@@ -67,9 +67,9 @@ from Central, and a release must not depend on Central being reachable at that m
 
 ### `frozen-coordinates.py`
 
-Prints `artifactId:version[:classifier,...]` for each frozen artifact. Derived, never
-hand-maintained, and that is load-bearing: the list was hand-written for exactly one
-commit and was already wrong twice. It named `sqlite-jdbc`, which is an ordinary reactor
+Prints `artifactId:version:packaging:[classifier,...]` for each frozen artifact and
+everything it drags in. Derived, never hand-maintained, and that is load-bearing: the
+list was hand-written for exactly one commit and was already wrong twice. It named `sqlite-jdbc`, which is an ordinary reactor
 module published on every tag, and it omitted `cn1-builder-resources-common` and
 `cn1-builder-resources-android` -- `runtime` dependencies of `codenameone-maven-plugin`
 pinned at `7.0` and published nowhere but Central. That second omission would have broken
@@ -88,6 +88,43 @@ own. Two ways that happens, both read from where the value actually lives:
    it exists only to give that editor Batik SVG support.
 
 Classifiers are scraped from the same `getArtifact` calls that name them.
+
+**The transitive closure is included, not just the pins.** `findArtifactFile` resolves
+with `setResolveTransitively(true)`, so resolving `codenameone-designer` at its pin also
+resolves `codenameone-core`, `codenameone-javase`, `codenameone-javase-svg`,
+`codenameone-css-compiler` and `sqlite-jdbc` at that same version — none published by any
+release. Seeding only the named pins left `cn1:design` still depending on Central for our
+own artifacts, which is the dependency the seeding exists to remove. Measured with
+`dependency:get`: transitive resolution of the designer pulls six jars, non-transitive
+pulls one.
+
+Parent poms are part of that closure — Maven reads them to build the effective model — and
+they are `pom` packaging with no jar, which is why the coordinate carries its packaging and
+the check does not demand a jar for one. The parent was found by diffing the derived set
+against what `dependency:get` actually pulled into an empty local repository, *not* by
+reading poms more carefully. Re-run that diff when this logic changes:
+
+```bash
+mvn org.apache.maven.plugins:maven-dependency-plugin:3.6.0:get -Dmaven.repo.local=/tmp/probe \
+  -Dartifact=com.codenameone:codenameone-designer:<pin>:jar:jar-with-dependencies -Dtransitive=true
+find /tmp/probe/com/codenameone -mindepth 2 -maxdepth 2 -type d   # compare against the derived set
+```
+
+Only `project/dependencies` is walked, never `<dependencyManagement>`: those are version
+constraints Maven resolves nothing from, and following them turned a 7-coordinate closure
+into 20 because the reactor parent manages every module.
+
+The walk reads poms from this repository first and Central second, so once a set is seeded
+it no longer needs Central. A transport failure is a hard error rather than a short
+closure — deriving a partial set from a bad minute would seed an incomplete closure that
+then passes its own check.
+
+**A longer-term alternative, deliberately not taken here.** The designer is consumed as a
+self-contained shaded jar: `getDesignerJar()` resolves the `jar-with-dependencies`
+attachment, unzips it and runs `designer_1.jar` from inside, so the transitive classpath is
+never used. Resolving it non-transitively would shrink the seed set to the pins alone. That
+is a change to resolution shared by several goals and cannot be verified without running
+the editor, so it does not belong in a cutover change.
 
 Seeded artifacts deliberately carry no release marker: they are resolved by exact pinned
 version rather than discovered, so `regen-maven-metadata.py` knows them as frozen and
@@ -121,13 +158,20 @@ built, so metadata generated from it would list exactly one version and clobber 
 accumulated history. Deriving from the listing is idempotent, repairs partial uploads on
 re-run, and gives the retention job the same code path when it *removes* versions.
 
-Its set of frozen artifacts — the ones exempt from the release-marker requirement, because
-they are seeded rather than released — comes from `frozen-coordinates.py` too. The
-hardcoded set this replaced was wrong in both directions: it listed `sqlite-jdbc`, an
-ordinary reactor module that therefore had its *incomplete* releases advertised, and it
-omitted `cn1-builder-resources-{common,android}`, which would have been seeded and then
-withheld, printing a "release not marked complete" line about their pinned version on
-every future run forever.
+Its set of frozen artifacts comes from `frozen-coordinates.py` too, as
+`(artifactId, version)` **pairs rather than artifactIds**. Once the set became the
+transitive closure it started including `codenameone-core`, `codenameone-javase`,
+`codenameone-css-compiler` and `sqlite-jdbc` at the frozen version — artifacts that also
+have ordinary releases. Exempting those by name would exempt *every* version of them from
+the release marker, which is exactly the bug that let an unfinished release advertise its
+`sqlite-jdbc`.
+
+A seeded coordinate is exempt from the marker but is **not advertised**. It is resolved by
+the exact path a pom names, never discovered, so it needs no metadata entry — and listing
+one would advertise a version whose release was never published here, the same promise the
+completion marker exists to avoid making. `codenameone-core` at the frozen version is a
+single jar copied in to satisfy the Resource Editor, not a release anyone should be
+offered.
 
 Run it after every `publish-staging-to-r2.sh`.
 

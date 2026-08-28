@@ -24,7 +24,7 @@
 
 """Derives the artifacts a release resolves but does not publish.
 
-Prints one `artifactId:version[:classifier,...]` per line, for
+Prints one `artifactId:version:packaging:[classifier,...]` per line, for
 seed-frozen-artifacts.sh (which copies them into R2) and check-frozen-artifacts.sh
 (which refuses to release while one of them is absent).
 
@@ -57,6 +57,29 @@ Classifiers matter here: the plugin asks for the designer as
 artifact actually consumed is missing. They are scraped from the same
 getArtifact call that names them.
 
+The TRANSITIVE CLOSURE of those pins is included, not just the pins themselves.
+`findArtifactFile` resolves with `setResolveTransitively(true)`, so resolving
+codenameone-designer:7.0.263 also resolves codenameone-core, codenameone-javase,
+codenameone-javase-svg, codenameone-css-compiler and sqlite-jdbc at that same
+version -- none of which any release publishes, and all of which predate the
+first version in this repository. Seeding only the two named pins therefore left
+the goal still depending on Maven Central, which is the exact dependency the
+seeding exists to remove. Verified with `dependency:get`: transitive resolution
+of the designer pulls six jars, non-transitive pulls one.
+
+Parent poms are part of that closure. Maven reads a pom's parent to build the
+effective model, so resolving codenameone-designer:7.0.263 also fetches
+com.codenameone:codenameone:7.0.263 -- a `pom` packaging artifact with no jar,
+which is why the emitted coordinate carries its packaging. This was found by
+diffing the derived set against what `dependency:get` actually pulled into an
+empty local repository, not by reading the poms harder; that diff is worth
+re-running when this logic changes.
+
+The closure is walked over the published poms, preferring this repository and
+falling back to Central, so once a set has been seeded the walk no longer needs
+Central at all. It is not cached in a checked-in list: that would be the same
+hand-maintained set this file exists to replace.
+
 Fails loudly rather than defaulting. Seeding the wrong set is worse than seeding
 nothing, because the immutability guard then refuses to repair it.
 """
@@ -65,6 +88,8 @@ import glob
 import os
 import re
 import sys
+import urllib.error
+import urllib.request
 import xml.etree.ElementTree as ET
 
 NS = "{http://maven.apache.org/POM/4.0.0}"
@@ -72,6 +97,20 @@ GROUP = "com.codenameone"
 
 # Versions that track the release itself. Anything else is a pin.
 RELEASE_VERSIONS = ("${project.version}", "${cn1.version}", "${cn1.plugin.version}")
+
+# Poms are fetched from here, in order. R2 first so that a seeded set needs no Central.
+POM_SOURCES = (
+    os.environ.get("R2_BASE_URL", "https://repo.codenameone.com/maven2") + "/com/codenameone/",
+    "https://repo1.maven.org/maven2/com/codenameone/",
+)
+
+# Cloudflare's Browser Integrity Check 403s "Python-urllib/*" on the repository's
+# custom domain. A Configuration Rule exempts /maven2/*, but this does not depend on
+# that rule staying in place.
+POM_HEADERS = {"User-Agent": "codenameone-frozen-coordinates"}
+
+# Scopes Maven does not resolve from a repository, or does not resolve for a consumer.
+NON_RESOLVED_SCOPES = ("test", "provided", "system")
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 MOJO = os.path.join(REPO_ROOT, "maven", "codenameone-maven-plugin", "src", "main",
@@ -140,23 +179,116 @@ def read_pinned_dependencies():
     return pinned
 
 
+def fetch_pom(artifact, version):
+    """The artifact's pom bytes, from the first source that has it, or None."""
+    last_error = None
+    for source in POM_SOURCES:
+        url = "%s%s/%s/%s-%s.pom" % (source, artifact, version, artifact, version)
+        request = urllib.request.Request(url, headers=POM_HEADERS)
+        try:
+            return urllib.request.urlopen(request, timeout=30).read()
+        except urllib.error.HTTPError as err:
+            if err.code == 404:
+                continue  # not here; try the next source
+            last_error = "%s -> HTTP %s" % (url, err.code)
+        except Exception as err:  # noqa: BLE001 - any transport problem is the same here
+            last_error = "%s -> %s" % (url, err)
+    if last_error:
+        # A transport failure is not the same as "absent everywhere". Failing is right:
+        # deriving a short closure from a bad minute would seed an incomplete set and
+        # then pass its own check.
+        fail("could not read the pom for %s:%s (%s)" % (artifact, version, last_error))
+    return None
+
+
+def properties_of(root):
+    values = {}
+    node = root.find(NS + "properties")
+    if node is not None:
+        for child in node:
+            values[child.tag.replace(NS, "")] = (child.text or "").strip()
+    return values
+
+
+def closure(roots):
+    """roots -> {(artifactId, version): packaging} for everything reachable."""
+    resolved = {}
+    pending = list(roots)
+    while pending:
+        artifact, version = pending.pop()
+        if (artifact, version) in resolved:
+            continue
+        resolved[(artifact, version)] = "jar"
+        body = fetch_pom(artifact, version)
+        if body is None:
+            # A root that exists in no repository is a broken pin, not an empty closure.
+            if (artifact, version) in roots:
+                fail("%s:%s is in no repository, so the pin cannot be satisfied"
+                     % (artifact, version))
+            continue
+        try:
+            root = ET.fromstring(body)
+        except ET.ParseError as err:
+            fail("could not parse the pom for %s:%s: %s" % (artifact, version, err))
+        resolved[(artifact, version)] = (root.findtext(NS + "packaging") or "jar").strip() or "jar"
+
+        # The parent is resolved too -- Maven needs it to build the effective model --
+        # and it is easy to miss because it is not a <dependency>.
+        parent = root.find(NS + "parent")
+        if parent is not None and (parent.findtext(NS + "groupId") or "").strip() == GROUP:
+            parent_artifact = (parent.findtext(NS + "artifactId") or "").strip()
+            parent_version = (parent.findtext(NS + "version") or "").strip()
+            if parent_artifact and parent_version and not parent_version.startswith("${"):
+                pending.append((parent_artifact, parent_version))
+
+        values = properties_of(root)
+        values["project.version"] = version
+        # project/dependencies only -- NOT root.iter(), which also returns
+        # <dependencyManagement> entries. Those are version constraints, not
+        # dependencies: Maven never resolves one unless something declares it. Walking
+        # them turned a 7-coordinate closure into 20, because the reactor's parent pom
+        # manages every module in the build.
+        declared = root.find(NS + "dependencies")
+        for dependency in (declared.findall(NS + "dependency") if declared is not None else []):
+            group = (dependency.findtext(NS + "groupId") or "").strip()
+            child = (dependency.findtext(NS + "artifactId") or "").strip()
+            child_version = (dependency.findtext(NS + "version") or "").strip()
+            scope = (dependency.findtext(NS + "scope") or "").strip()
+            optional = (dependency.findtext(NS + "optional") or "").strip()
+            if group != GROUP or not child:
+                continue
+            if scope in NON_RESOLVED_SCOPES or optional == "true":
+                continue
+            while child_version.startswith("${") and child_version.endswith("}"):
+                replacement = values.get(child_version[2:-1])
+                if replacement is None or replacement == child_version:
+                    break
+                child_version = replacement
+            if not child_version or child_version.startswith("${"):
+                # Inherited from the parent's dependencyManagement, which for these poms
+                # always tracks the release's own version.
+                child_version = version
+            pending.append((child, child_version))
+    return resolved
+
+
 def main():
     designer_version = read_designer_version()
     classifiers = read_classifiers()
 
-    coordinates = set()
-    coordinates.add(("codenameone-designer", designer_version))
-    coordinates.add(("codenameone-javase-svg", designer_version))
-    coordinates |= read_pinned_dependencies()
+    roots = set()
+    roots.add(("codenameone-designer", designer_version))
+    roots.add(("codenameone-javase-svg", designer_version))
+    roots |= read_pinned_dependencies()
 
-    if not coordinates:
+    if not roots:
         fail("no frozen coordinates were derived, which cannot be right")
 
-    for artifact, version in sorted(coordinates):
-        line = "%s:%s" % (artifact, version)
-        if artifact in classifiers:
-            line += ":" + ",".join(sorted(classifiers[artifact]))
-        print(line)
+    coordinates = closure(roots)
+
+    for (artifact, version), packaging in sorted(coordinates.items()):
+        print("%s:%s:%s:%s" % (artifact, version, packaging,
+                               ",".join(sorted(classifiers.get(artifact, [])))))
 
 
 if __name__ == "__main__":

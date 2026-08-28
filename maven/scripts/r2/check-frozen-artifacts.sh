@@ -36,6 +36,7 @@
 #
 # Usage: check-frozen-artifacts.sh [<artifactId>:<version> ...]
 #        defaults to the coordinates derived by frozen-coordinates.py
+#        (form: <artifactId>:<version>[:<packaging>[:<classifier>,...]])
 #
 # Reads only the public repository, so it needs no R2 credentials.
 #
@@ -80,20 +81,28 @@ probe() {
 
 status=0
 for coordinate in "${coordinates[@]}"; do
-    # `artifact:version[:classifier,...]`
+    # `artifact:version:packaging:classifier,...` -- packaging and classifiers may be
+    # absent when a coordinate is passed by hand on the command line.
     artifact=$(echo "$coordinate" | cut -d: -f1)
     version=$(echo "$coordinate" | cut -d: -f2)
-    classifiers=$(echo "$coordinate" | cut -d: -f3)
+    packaging=$(echo "$coordinate" | cut -d: -f3)
+    classifiers=$(echo "$coordinate" | cut -d: -f4)
     if [ -z "$artifact" ] || [ -z "$version" ]; then
         echo "ERROR: malformed coordinate '${coordinate}'." >&2
         exit 1
     fi
+    [ -n "$packaging" ] || packaging=jar
 
-    # The jar as well as the pom: a pom-only copy resolves during dependency
-    # collection and then fails at the point of actually using the artifact, which is
-    # the harder failure to read.
     probe "$artifact" "$version" "${artifact}-${version}.pom" pom
-    probe "$artifact" "$version" "${artifact}-${version}.jar" jar
+
+    # A `pom` packaging artifact has no jar, and demanding one would fail the release
+    # over a file that is not supposed to exist. Parent poms are in the closure for
+    # exactly this reason -- Maven fetches them to build the effective model.
+    if [ "$packaging" != "pom" ]; then
+        # A pom-only copy resolves during dependency collection and then fails at the
+        # point of actually using the artifact, which is the harder failure to read.
+        probe "$artifact" "$version" "${artifact}-${version}.jar" jar
+    fi
 
     # A classified attachment is what the plugin actually consumes for the designer,
     # so a check that stopped at the main jar would pass while the artifact the goal
