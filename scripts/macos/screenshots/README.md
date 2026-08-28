@@ -70,9 +70,21 @@ as a **review aid, never as a source**. Then:
 - **Rendering differences are expected and adopted.** AppKit text rasterization,
   the real title bar, AppKit scrollbars, and backing-scale-driven size changes
   are what a native port looks like.
-- **A `Window-*` capture with no window chrome is a blocker.** It means the
-  window manager is not producing a real `NSWindow`, which is the whole claim of
-  this port.
+- **A `Window-*` capture the same size as the requested window is a blocker.**
+  It means the window manager is not producing a real `NSWindow`, which is the
+  whole claim of this port.
+
+  Not "a capture with no chrome in it", which is how this read at first and is
+  wrong: `Window.capture()` returns the CONTENT view, so no run will ever show a
+  title bar inside the frame. The evidence for real chrome is arithmetic --
+  requesting 400x300 and getting 400x272 back means 28 points went somewhere, and
+  28 points is a standard macOS title bar. Content equal to the requested size is
+  what says there is no chrome at all.
+
+  `WindowHostTest` allows `CHROME_ALLOWANCE = 64` below the request, so an inset
+  anywhere in that range is within tolerance and is not by itself a finding. What
+  matters is that it is the SAME on every run, and step 3 below is what proves
+  that.
 
 ## Tolerance sidecars
 
