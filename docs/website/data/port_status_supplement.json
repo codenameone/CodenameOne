@@ -323,9 +323,9 @@
           "ports": [
             "macos"
           ],
-          "state": "unavailable",
-          "label": "No AppKit capture backend",
-          "detail": "The retained capture path is UIImagePickerController, which AppKit has no peer for, so hasCamera() answers false and the build does not request camera permission."
+          "state": "conditional",
+          "label": "AVFoundation capture",
+          "detail": "The modal Capture API is served by driving the portable camera session, so it needs a camera attached and the system prompt granted; hasCamera() answers AVFoundation rather than a constant. Permission and its usage description are emitted when the application calls capturePhoto or captureVideo."
         },
         {
           "ports": [
@@ -500,9 +500,9 @@
           "ports": [
             "macos"
           ],
-          "state": "unavailable",
-          "label": "No AppKit backend",
-          "detail": "getLocationManager() answers null: the Core Location delegate callbacks live in the UIKit sources the AppKit build excludes, so no entitlement makes foreground, background or geofence callbacks arrive."
+          "state": "conditional",
+          "label": "Core Location",
+          "detail": "Foreground fixes, significant-change monitoring and geofencing all run on the shared Core Location bridge, which the AppKit build compiles: the delegate callbacks are outside the UIKit-only sources. Needs the location usage prompt granted, and the build emits it when the application uses the API."
         },
         {
           "ports": [

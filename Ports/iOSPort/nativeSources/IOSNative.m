@@ -8861,23 +8861,18 @@ void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(CN1_THREAD_STA
 }
 
 void com_codename1_impl_ios_IOSNative_startUpdatingBackgroundLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-// Not implemented on the native macOS port: the body below is UIKit -- a
-// picker, an action sheet, a movie player, a pasteboard or a UIApplication
-// service -- and AppKit's equivalent is a different API rather than a
-// renamed one. The symbol still has to exist: ParparVM keeps a native method
-// alive BY its symbol appearing in the native sources, so removing it would
-// make the dead-code pass drop the Java side and ship green with the feature
-// silently gone. Returning an unsupported value instead lets the caller take
-// its unsupported path.
-#if TARGET_OS_OSX
-#else
+// Compiled on macOS too. The body is CoreLocation, not UIKit -- the blanket
+// comment that used to sit here listed pickers and action sheets, none of which
+// appear below -- and startMonitoringSignificantLocationChanges is the same call
+// on both platforms. Its stopUpdating counterpart was never guarded, so stopping
+// worked on macOS while starting quietly did nothing, and the application waited
+// for callbacks nobody had asked for.
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
     l.delegate = [CodenameOne_GLViewController instance];
 
     [l startMonitoringSignificantLocationChanges];
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
-#endif
 }
 
 void com_codename1_impl_ios_IOSNative_stopUpdatingBackgroundLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -8894,10 +8889,12 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGeofencingSupported___R_boolean(
 // never asked to monitor -- indistinguishable, from the app's side, from a fence
 // that simply never triggers.
 //
-// CoreLocation region monitoring does exist on macOS; this is a port that has
-// not been written, and the delegate that would receive didEnterRegion is the
-// UIKit view controller. watchOS and tvOS have no region monitoring at all.
-#if TARGET_OS_OSX || TARGET_OS_WATCH || TARGET_OS_TV
+// macOS is not among them any more. CoreLocation region monitoring is the same
+// API there, and the delegate that receives didEnterRegion is compiled on macOS
+// -- the claim that it lives in the UIKit half of the view controller was simply
+// wrong, which is what kept this answering no. watchOS and tvOS have no region
+// monitoring at all.
+#if TARGET_OS_WATCH || TARGET_OS_TV
     return JAVA_FALSE;
 #else
     return JAVA_TRUE;
@@ -8909,13 +8906,11 @@ void com_codename1_impl_ios_IOSNative_addGeofencing___long_double_double_double_
 // Not implemented on the native macOS port: the body below is UIKit -- a
 // picker, an action sheet, a movie player, a pasteboard or a UIApplication
 // service -- and AppKit's equivalent is a different API rather than a
-// renamed one. The symbol still has to exist: ParparVM keeps a native method
-// alive BY its symbol appearing in the native sources, so removing it would
-// make the dead-code pass drop the Java side and ship green with the feature
-// silently gone. Returning an unsupported value instead lets the caller take
-// its unsupported path.
-#if TARGET_OS_OSX
-#else
+// Compiled on macOS too, for the same reason as the background monitoring above:
+// CLCircularRegion and startMonitoringForRegion: are CoreLocation on both
+// platforms, and the didEnterRegion delegate that reports a crossing is compiled
+// here. removeGeofencing was never guarded, so a fence could be removed on macOS
+// but never added.
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
     l.delegate = [CodenameOne_GLViewController instance];
@@ -8928,7 +8923,6 @@ void com_codename1_impl_ios_IOSNative_addGeofencing___long_double_double_double_
     [region release];
 #endif
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
-#endif
 }
 
 
