@@ -110,6 +110,10 @@ dependency-reduced-pom.xml
 
 # Hugo website generated artifacts
 /docs/website/generated/
+# scripts/website/build.sh rm -rf's this directory and rebuilds it from
+# docs/developer-guide on every run, so a committed copy is both duplicated
+# source and guaranteed stale. 485 files of it were committed by accident once.
+/docs/website/static/developer-guide/
 /docs/website/.hugo_build.lock
 /docs/website/hugo_stats.json
 /docs/website/resources/
