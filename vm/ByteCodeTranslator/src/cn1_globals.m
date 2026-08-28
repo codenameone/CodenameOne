@@ -8119,15 +8119,29 @@ cn1GcMallocRetry:
                 // is ALREADY running is the thing that empties this table, and it can only
                 // do so while this thread is parked. Bounded, and on expiry control falls
                 // through to the growth below rather than proceeding with a full table.
+                //
+                // ONLY the migration is bounded. threadBlockedByGC is the GC handshake and
+                // is not this thread's to time out: the collector sets it, observes
+                // threadActive == FALSE, and then scans this thread's object stack and
+                // migrates its pending table on the strength of that. Republishing as
+                // active while it is still set -- which a bounded wait covering BOTH
+                // conditions does whenever the limit expires during a long root scan --
+                // lets this thread mutate its stack and append to the very table the
+                // collector is walking. Missed roots, use-after-free, or a corrupted table.
+                // The two parks in cn1PacingPark both wait on it unbounded for exactly this
+                // reason; folding it into the bounded loop here was the odd one out.
                 int pendingSpins = 0;
-                while((threadStateData->heapAllocationSize > 0
-                       || threadStateData->threadBlockedByGC)
+                while(threadStateData->heapAllocationSize > 0
                       && pendingSpins < CN1_PENDING_WAIT_MAX_SPINS) {
                     usleep((JAVA_INT)(1000));
                     pendingSpins++;
                 }
             }
 #endif
+            // Honour the stop-the-world before resuming, exactly like every other park.
+            while(threadStateData->threadBlockedByGC) {
+                usleep((JAVA_INT)(1000));
+            }
             invokedGC = NO;
             threadStateData->threadActive = JAVA_TRUE;
             CN1_STALL_ADD(__stallPending, CN1_STALL_PENDING_FULL, threadStateData);
