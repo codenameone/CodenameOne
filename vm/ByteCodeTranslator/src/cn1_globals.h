@@ -2022,6 +2022,14 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
 extern JAVA_VOID java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ex);
 
 
+/*
+ * When nonzero, an exception that no handler catches prints itself and ends the
+ * process instead of being silently discarded. Set by the clean (server-side)
+ * target's generated main(); left at 0 everywhere else so app targets keep the
+ * behaviour they ship with today.
+ */
+extern int cn1AbortOnUncaughtException;
+
 extern void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg);
 extern JAVA_INT  throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg);
 extern JAVA_BOOLEAN  throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg);

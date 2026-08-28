@@ -225,8 +225,23 @@ final class JavascriptNativeRegistry {
     }
 
     static String unsupportedReason(String symbol) {
-        if (symbol.startsWith("cn1_java_io_File_")) {
+        if (symbol.startsWith("cn1_java_io_File_")
+                || symbol.startsWith("cn1_java_io_FileInputStream_")
+                || symbol.startsWith("cn1_java_io_FileOutputStream_")) {
             return "java.io.File native filesystem access is not supported in javascript backend";
+        }
+        // The process-shaped parts of java.lang.System, added for the server-side
+        // (clean) target. A browser has no stdin to read and no environment to
+        // query, so these are unsupported here in the same sense java.io.File is
+        // -- not an oversight. System.in in particular is reached by EVERY
+        // translated program, because it is a static field of System, so leaving
+        // it uncategorized turned the core-slice completeness gate red for code
+        // that never touches it.
+        if (symbol.startsWith("cn1_java_io_StandardInputStream_")) {
+            return "process standard input is not available in the javascript backend";
+        }
+        if (symbol.startsWith("cn1_java_lang_System_getenv_")) {
+            return "environment variables are not available in the javascript backend";
         }
         return null;
     }

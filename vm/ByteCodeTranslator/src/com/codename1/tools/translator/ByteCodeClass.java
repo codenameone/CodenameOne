@@ -1209,6 +1209,15 @@ public class ByteCodeClass {
                     b.append("    setvbuf(stdout, NULL, _IONBF, 0);\n");
                     b.append("    setvbuf(stderr, NULL, _IONBF, 0);\n");
                     b.append("    initConstantPool();\n");
+                    // An exception no handler catches used to be discarded and
+                    // execution continued with the statement after the throw. An
+                    // app target nearly always has something upstream that
+                    // catches (the EDT's own try), so it stayed invisible there;
+                    // a server binary has no such catch, and the symptom is a
+                    // process that keeps serving with a half-built object where a
+                    // connection should be. Only this target opts in, so nothing
+                    // that ships today changes behaviour.
+                    b.append("    cn1AbortOnUncaughtException = 1;\n");
                     // With the nursery, the main thread allocates and must cooperate with
                     // the concurrent GC's stop-the-world pause (so the GC never scans its
                     // nursery while a minor collection runs). Lightweight threads are the

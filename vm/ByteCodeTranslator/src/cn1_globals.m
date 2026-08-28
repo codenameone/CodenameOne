@@ -4090,11 +4090,16 @@ static signed char cn1BibopSizeToClass[CN1_BIBOP_MAX_OBJECT + 1];
 
 // struct CN1BibopPage is defined in cn1_globals.h (shared with the inlined bump).
 
-static CN1BibopPage* _Atomic bibopAllPages = 0;   // registry head (atomic)
+/* No initializer: a static object is zero-initialized by the language, and
+ * clang 14 -- which is what Debian bookworm ships, and therefore what the
+ * glibc builder image uses -- rejects `= 0` on an _Atomic POINTER as "not a
+ * compile-time constant". The integer atomics above are accepted; only the
+ * pointer ones trip it. */
+static CN1BibopPage* _Atomic bibopAllPages;   // registry head (atomic)
 static _Atomic long long bibopAllPagesCount = 0;  // grow-only registration count
 static CN1BibopPage* bibopFreePool = 0;           // bibopMutex
 static CN1BibopPage* bibopPartialPool[CN1_BIBOP_NUM_CLASSES]; // bibopMutex
-static CN1BibopPage* _Atomic bibopSweepStack = 0; // Treiber-ish (push CAS / swap)
+static CN1BibopPage* _Atomic bibopSweepStack; // Treiber-ish (push CAS / swap); see above
 static pthread_mutex_t bibopMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_once_t  bibopOnce  = PTHREAD_ONCE_INIT;
 // Non-static: also read/written by the inlined bump fast path (cn1_globals.h).
@@ -11888,6 +11893,67 @@ JAVA_OBJECT __NEW_ARRAY_JAVA_DOUBLE(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     return o;
 }
 
+/*
+ * Set by the clean target's generated main(). See the uncaught path at the bottom
+ * of throwException.
+ */
+int cn1AbortOnUncaughtException = 0;
+
+/*
+ * The end of the road for an exception no handler wants.
+ *
+ * Reached only when cn1AbortOnUncaughtException is set, which is the clean
+ * (server-side) target and nothing else -- an app target keeps today's behaviour,
+ * because changing what a shipped app does when it swallows an exception is not
+ * this change's business.
+ */
+static void cn1ReportUncaughtException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    static int reporting = 0;
+    if(reporting) {
+        /* Rendering the trace threw as well. Say so and stop, rather than recurse
+         * until the C stack runs out -- that reports as a segfault and hides the
+         * original failure entirely. */
+        fprintf(stderr, "Uncaught exception while reporting an uncaught exception\n");
+        fflush(stderr);
+        exit(1);
+    }
+    reporting = 1;
+    /* The search above left tryBlockOffset at -1: it decrements once on entry and
+     * then once per frame it rejects. Rendering the trace runs Java, and a Java
+     * method that saves and restores a NEGATIVE try depth corrupts the stack it
+     * restores into -- which is a SIGBUS in the reporter rather than a report.
+     * Every handler has been unwound by now, so the honest depth is zero. */
+    threadStateData->tryBlockOffset = 0;
+    fprintf(stderr, "Uncaught exception");
+    if(exceptionArg != JAVA_NULL && exceptionArg->__codenameOneParentClsReference != NULL
+            && exceptionArg->__codenameOneParentClsReference->clsName != NULL) {
+        fprintf(stderr, " %s", exceptionArg->__codenameOneParentClsReference->clsName);
+    }
+    if(exceptionArg != JAVA_NULL) {
+        /* The message, which the pre-rendered stack string does not carry -- and
+         * on a server it is the actionable half of the report. */
+        JAVA_OBJECT message = java_lang_Throwable_getMessage___R_java_lang_String(
+                threadStateData, exceptionArg);
+        if(message != JAVA_NULL) {
+            const char* text = stringToUTF8(threadStateData, message);
+            if(text != NULL) {
+                fprintf(stderr, ": %s", text);
+            }
+        }
+    }
+    fprintf(stderr, "\n");
+    fflush(stderr);
+    if(exceptionArg != JAVA_NULL) {
+        /* The Java renderer, so the message and the frames come out in the form a
+         * developer sees everywhere else. It runs with an empty try-block stack,
+         * which is what the guard above is for. */
+        java_lang_Throwable_printStackTrace__(threadStateData, exceptionArg);
+    }
+    fflush(stdout);
+    fflush(stderr);
+    exit(1);
+}
+
 void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
     #if defined(__OBJC__)
     //NSLog(@"Throwing exception!"); 
@@ -11910,6 +11976,22 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
         } 
         threadStateData->tryBlockOffset--; 
     } 
+    /*
+     * No handler anywhere on this thread. Historically this simply returned, and
+     * the generated code carried on with the statement AFTER the throw -- a
+     * `throw` that does nothing, with the method's locals in whatever state the
+     * half-finished operation left them. On an app target something upstream (the
+     * EDT's own catch) nearly always exists, so it stayed invisible; a server
+     * binary has no such catch, and the failure mode is a process that keeps
+     * serving with a null where a database connection should be.
+     *
+     * The clean target therefore reports and exits. Every other target keeps the
+     * old behaviour, because making this fatal everywhere would change what apps
+     * that ship today do.
+     */
+    if(cn1AbortOnUncaughtException) {
+        cn1ReportUncaughtException(threadStateData, exceptionArg);
+    }
 }
 
 JAVA_INT throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
