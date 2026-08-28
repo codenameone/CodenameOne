@@ -2420,6 +2420,9 @@ public class Window extends Container implements TopLevelContainer {
             ((Window) ownerWindow).forgetOwned(this);
         }
         releaseModal();
+        // The accessibility tree cached for this window outlives it otherwise, keeping
+        // the whole disposed hierarchy reachable.
+        com.codename1.ui.accessibility.AccessibilityManager.getInstance().releaseRoot(this);
         Desktop.getInstance().deregisterWindow(this);
         Display.getInstance().windowDisposed(this);
         deinitializeImpl();
@@ -3961,6 +3964,40 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     public int getComponentIndex(Component cmp) {
         return contentPane.getComponentIndex(cmp);
+    }
+
+    /// Replaces this window's content, animating the change.
+    ///
+    /// The window analogue of showing another `Form` with a transition, and the reason
+    /// a `Form` transition into or out of a window is not a thing: a transition paints
+    /// the two screens into one `Graphics` covering one surface, and two operating
+    /// system windows are composited by the window server, on monitors that may not
+    /// even share a scale factor. There is no shared context to draw an in between
+    /// frame into. Moving between screens *inside* one window is an ordinary
+    /// transition, and this is it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the new content
+    ///
+    /// - `t`: the transition to animate with, or null to swap immediately
+    public void setContent(Component content, Transition t) {
+        Container cp = getContentPane();
+        if (t == null || cp.getComponentCount() != 1) {
+            cp.removeAll();
+            if (content != null) {
+                // A BorderLayout content pane -- which is what a window built with one
+                // has -- refuses an add with no constraint.
+                if (cp.getLayout() instanceof BorderLayout) {
+                    cp.addComponent(BorderLayout.CENTER, content);
+                } else {
+                    cp.addComponent(content);
+                }
+            }
+            cp.revalidateWithAnimationSafety();
+            return;
+        }
+        cp.replace(cp.getComponentAt(0), content, t);
     }
 
     /// {@inheritDoc}

@@ -57,9 +57,18 @@ final class JavaSEAccessibility {
     private final RootContext root = new RootContext();
     private final Map<Long, VirtualAccessible> cache = new HashMap<Long, VirtualAccessible>();
 
+    /// The surface this bridge describes. Zero is the main one; each desktop window
+    /// has its own canvas and its own id.
+    private final int windowId;
+
     JavaSEAccessibility(JPanel canvas, JavaSEPort implementation) {
+        this(canvas, implementation, 0);
+    }
+
+    JavaSEAccessibility(JPanel canvas, JavaSEPort implementation, int windowId) {
         this.canvas = canvas;
         this.implementation = implementation;
+        this.windowId = windowId;
     }
 
     AccessibleContext getContext() {
@@ -72,7 +81,9 @@ final class JavaSEAccessibility {
     }
 
     private AccessibilityTreeSnapshot tree() {
-        return implementation.getAccessibilityTreeSnapshot();
+        // This surface's tree, not the current form's. A window has its own hierarchy,
+        // so a bridge that asked for the main one described the wrong window entirely.
+        return implementation.getAccessibilityTreeSnapshot(windowId);
     }
 
     private VirtualAccessible accessible(long id) {

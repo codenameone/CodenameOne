@@ -3114,7 +3114,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         @Override
         public javax.accessibility.AccessibleContext getAccessibleContext() {
             if (cn1Accessibility == null) {
-                cn1Accessibility = new JavaSEAccessibility(this, JavaSEPort.this);
+                // Bound to this canvas's own surface. Every window has its own canvas,
+                // so a bridge that always described surface zero handed a screen reader
+                // on a secondary window the main window's tree.
+                cn1Accessibility = new JavaSEAccessibility(this, JavaSEPort.this, windowId);
                 AccessibilityManager.getInstance().invalidateAll();
             }
             return cn1Accessibility.getContext();
@@ -4627,6 +4630,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         EventQueue.invokeLater(new Runnable() {
             public void run() {
                 if (canvas != null) canvas.accessibilityChanged(changeType);
+                // Every desktop window has its own canvas and its own tree. Telling
+                // only the main one left a screen reader on a secondary window with a
+                // description that never updated.
+                for (C c : liveWindowCanvases()) {
+                    c.accessibilityChanged(changeType);
+                }
             }
         });
     }
@@ -4638,7 +4647,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public boolean isAccessibilityTreeUpdateRequired() {
-        return screenReaderEnabled || canvas != null && canvas.isAccessibilityContextRequested();
+        if (screenReaderEnabled || canvas != null && canvas.isAccessibilityContextRequested()) {
+            return true;
+        }
+        // A reader attached to a secondary window and not to the main one still needs
+        // the eager refreshes, so the answer is over every surface rather than one.
+        for (C c : liveWindowCanvases()) {
+            if (c.isAccessibilityContextRequested()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void paintDirty() {
@@ -21641,7 +21660,37 @@ public class JavaSEPort extends CodenameOneImplementation {
     C createWindowCanvas(int windowId) {
         C c = new C();
         c.windowId = windowId;
+        synchronized (windowCanvases) {
+            windowCanvases.add(new java.lang.ref.WeakReference<C>(c));
+        }
         return c;
+    }
+
+    /**
+     * The canvas of every desktop window, so accessibility changes reach them too.
+     * Weakly held: a window's canvas dies with the window, and keeping a hard
+     * reference here would pin every window ever opened for the life of the port.
+     */
+    private final java.util.List<java.lang.ref.WeakReference<C>> windowCanvases =
+            new java.util.ArrayList<java.lang.ref.WeakReference<C>>();
+
+    /**
+     * Every live window canvas, dropping any whose window has gone.
+     */
+    private java.util.List<C> liveWindowCanvases() {
+        java.util.List<C> out = new java.util.ArrayList<C>();
+        synchronized (windowCanvases) {
+            java.util.Iterator<java.lang.ref.WeakReference<C>> it = windowCanvases.iterator();
+            while (it.hasNext()) {
+                C c = it.next().get();
+                if (c == null) {
+                    it.remove();
+                } else {
+                    out.add(c);
+                }
+            }
+        }
+        return out;
     }
 
     /**

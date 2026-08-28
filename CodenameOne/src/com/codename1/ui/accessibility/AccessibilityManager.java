@@ -25,6 +25,7 @@ package com.codename1.ui.accessibility;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
+import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -35,6 +36,7 @@ import com.codename1.ui.Slider;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.table.Table;
 import java.util.ArrayList;
@@ -66,7 +68,19 @@ public final class AccessibilityManager {
     private boolean dirty = true;
     private boolean refreshScheduled;
     private int pendingChanges = CHANGE_ALL;
-    private Form snapshotForm;
+    /// The root the cached snapshot describes. A `Container` rather than a `Form`,
+    /// because a `com.codename1.ui.Window` is a root in its own right.
+    private Container snapshotRoot;
+
+    /// Snapshots for roots other than the most recent one, so a screen reader moving
+    /// between two windows does not rebuild both trees on every hop. Bounded, and
+    /// cleared whole by `#invalidate(Component, int)` -- the dirty flag stays global,
+    /// because per root dirtiness is a second thing to get wrong.
+    private final LinkedHashMap<Container, AccessibilityTreeSnapshot> snapshotsByRoot =
+            new LinkedHashMap<Container, AccessibilityTreeSnapshot>();
+
+    /// How many roots' snapshots to keep.
+    private static final int MAX_CACHED_ROOTS = 8;
     private AccessibilityTreeSnapshot snapshot = new AccessibilityTreeSnapshot(
             0, Collections.<Long>emptyList(), Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
 
@@ -80,6 +94,16 @@ public final class AccessibilityManager {
     public synchronized void invalidate(Component component, int changeType) {
         dirty = true;
         pendingChanges |= changeType;
+        snapshotsByRoot.clear();
+        // The root the changed component actually lives on, not whatever form happens
+        // to be current: a change inside a window used to schedule a rebuild of the
+        // main form's tree instead, so the window's own tree stayed stale.
+        TopLevelContainer changedTop = component != null
+                ? component.getTopLevelContainer() : null;
+        if (changedTop == null) {
+            changedTop = CN.getCurrentTopLevel();
+        }
+        final Container refreshRoot = changedTop == null ? null : changedTop.asContainer();
         try {
             // Most mutations only need to make the cached snapshot stale. Ports
             // that can pull the tree do so on demand, and ports such as Android
@@ -98,7 +122,7 @@ public final class AccessibilityManager {
                         synchronized (AccessibilityManager.this) {
                             changes = pendingChanges;
                         }
-                        getSnapshot(Display.getInstance().getCurrent());
+                        getSnapshotForRoot(refreshRoot);
                         synchronized (AccessibilityManager.this) {
                             refreshScheduled = false;
                         }
@@ -122,19 +146,61 @@ public final class AccessibilityManager {
                 return snapshot;
             }
         }
-        return getSnapshot(Display.getInstance().getCurrent());
+        return getSnapshot(CN.getCurrentTopLevel());
+    }
+
+    /// The accessibility tree for a top level, which may be a
+    /// `com.codename1.ui.Window` rather than a `Form`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to describe, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the snapshot, never null
+    public AccessibilityTreeSnapshot getSnapshot(TopLevelContainer top) {
+        return getSnapshotForRoot(top == null ? null : top.asContainer());
+    }
+
+    /// Drops any snapshot cached for a root that is going away.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root being disposed
+    public synchronized void releaseRoot(Container root) {
+        if (root == null) {
+            return;
+        }
+        snapshotsByRoot.remove(root);
+        if (snapshotRoot == root) { //NOPMD CompareObjectsWithEquals
+            snapshotRoot = null;
+        }
     }
 
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public synchronized AccessibilityTreeSnapshot getSnapshot(Form form) {
+        return getSnapshotForRoot(form);
+    }
+
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
+    private synchronized AccessibilityTreeSnapshot getSnapshotForRoot(Container form) {
         // Walking a live lightweight component hierarchy off the Codename One
         // EDT is unsafe. Native bridges on other threads receive the last
         // immutable snapshot; active bridges arrange eager refreshes on the EDT.
         if (!Display.getInstance().isEdt()) {
             return snapshot;
         }
-        if (!dirty && form == snapshotForm) {
-            return snapshot;
+        if (!dirty) {
+            if (form == snapshotRoot) {
+                return snapshot;
+            }
+            AccessibilityTreeSnapshot cached = snapshotsByRoot.get(form);
+            if (cached != null) {
+                snapshot = cached;
+                snapshotRoot = form;
+                return snapshot;
+            }
         }
         if (form == null) {
             generation++;
@@ -142,7 +208,8 @@ public final class AccessibilityManager {
                     generation, Collections.<Long>emptyList(),
                     Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
             snapshot = emptySnapshot;
-            snapshotForm = null;
+            snapshotRoot = null;
+            snapshotsByRoot.clear();
             dirty = false;
             pendingChanges = 0;
             return snapshot;
@@ -157,7 +224,11 @@ public final class AccessibilityManager {
         generation++;
         AccessibilityTreeSnapshot updatedSnapshot = new AccessibilityTreeSnapshot(generation, rootIds, nodes);
         snapshot = updatedSnapshot;
-        snapshotForm = form;
+        snapshotRoot = form;
+        snapshotsByRoot.put(form, updatedSnapshot);
+        while (snapshotsByRoot.size() > MAX_CACHED_ROOTS) {
+            snapshotsByRoot.remove(snapshotsByRoot.keySet().iterator().next());
+        }
         dirty = false;
         pendingChanges = 0;
         return snapshot;

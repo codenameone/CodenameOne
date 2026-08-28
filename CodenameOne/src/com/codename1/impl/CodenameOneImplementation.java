@@ -12491,6 +12491,27 @@ public abstract class CodenameOneImplementation {
         return AccessibilityManager.getInstance().getCurrentSnapshot();
     }
 
+    /// The semantic tree of one rendered surface.
+    ///
+    /// Zero is the application's main surface; any other value names a desktop window.
+    /// A port with more than one surface has to ask per surface, or a screen reader
+    /// attached to a secondary window is handed the main window's tree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the surface to describe, zero for the main one
+    ///
+    /// #### Returns
+    ///
+    /// the snapshot, never null
+    public AccessibilityTreeSnapshot getAccessibilityTreeSnapshot(int windowId) {
+        if (windowId == 0) {
+            return getAccessibilityTreeSnapshot();
+        }
+        com.codename1.ui.Window w = com.codename1.ui.Desktop.getInstance().windowById(windowId);
+        return AccessibilityManager.getInstance().getSnapshot(w);
+    }
+
     /// Dispatches an action from a native virtual accessibility node onto the EDT.
     public boolean performAccessibilityAction(long nodeId, String actionId, Object argument) {
         return AccessibilityManager.getInstance().performAction(nodeId, actionId, argument);

@@ -5348,4 +5348,112 @@ class WindowTest extends UITestBase {
         a.dispose();
         b.dispose();
     }
+
+    @FormTest
+    void setContentSwapsTheWindowsScreenWithATransition() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("screens", new BorderLayout());
+        w.setWindowSize(400, 300);
+        Label first = new Label("first");
+        w.add(BorderLayout.CENTER, first);
+        w.show();
+        DisplayTest.flushEdt();
+        assertEquals(1, w.getContentPane().getComponentCount());
+
+        Label second = new Label("second");
+        w.setContent(second, null);
+        DisplayTest.flushEdt();
+        assertEquals(1, w.getContentPane().getComponentCount());
+        assertSame(second, w.getContentPane().getComponentAt(0),
+                "moving between screens inside a window is an ordinary swap");
+        assertNull(first.getParent());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aWindowCarriesTheTintPropertyWithoutPaintingItTwice() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("tint", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+
+        // The property exists because ComboBox, FloatingActionButton and
+        // InfiniteProgress read and write it. Window deliberately does not paint it in
+        // paint(): its layered pane repaints the whole window as a backdrop, so a tint
+        // there would be composited twice and read darker than the same tint on a form.
+        w.setTintColor(0x80112233);
+        assertEquals(0x80112233, w.getTintColor());
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aWindowAnswersWhetherItIsShowing() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("showing", new BorderLayout());
+        assertFalse(w.isTopLevelShowing(), "not until it is shown");
+        w.show();
+        DisplayTest.flushEdt();
+        assertTrue(w.isTopLevelShowing());
+        w.dispose();
+        DisplayTest.flushEdt();
+        assertFalse(w.isTopLevelShowing(), "and not once it is gone");
+    }
+
+    @FormTest
+    void aWindowHasNoSoftButtonArea() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("soft", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+        assertEquals(0, w.softButtonAreaHeight(),
+                "a window has no soft button bar, so it costs nothing");
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void layeredPaneAccessorsDoNotCreateTheLayer() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("layers", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+
+        assertNull(w.getFormLayeredPaneIfExists(),
+                "asking must not build a layer, or overlays create one to find it empty");
+        assertNull(w.getLayeredPaneIfExists());
+        assertNotNull(w.getFormLayeredPane(WindowTest.class, true));
+        assertNotNull(w.getFormLayeredPaneIfExists(), "and reports it once it exists");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aNestedFormRegistersItsAnimationsWithTheWindow() {
+        // Independent of Dialog: an embedded form used to register through
+        // getParent().getComponentForm(), which is null inside a window, so it was
+        // never ticked and every animateLayout on it waited forever.
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("nested", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+
+        Form nested = new Form("nested form", new BorderLayout());
+        nested.add(BorderLayout.CENTER, new Label("body"));
+        w.getContentPane().addComponent(BorderLayout.CENTER, nested);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+
+        assertSame(w, nested.getTopLevelContainer(),
+                "an embedded form hands the walk up to the window");
+        assertNull(nested.getComponentForm(),
+                "and getComponentForm stays null inside a window by design");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

@@ -23,6 +23,7 @@
 package com.codename1.ui.accessibility;
 
 import com.codename1.ui.Form;
+import com.codename1.ui.TopLevelContainer;
 
 /// Read-only semantic-tree inspection entry point for tests and developer tools.
 public final class AccessibilityInspector {
@@ -31,6 +32,20 @@ public final class AccessibilityInspector {
 
     public static AccessibilityTreeSnapshot snapshot(Form form) {
         return AccessibilityManager.getInstance().getSnapshot(form);
+    }
+
+    /// The semantic tree of a top level, which may be a `com.codename1.ui.Window`
+    /// rather than a `Form`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to describe, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the snapshot, never null
+    public static AccessibilityTreeSnapshot snapshot(TopLevelContainer top) {
+        return AccessibilityManager.getInstance().getSnapshot(top);
     }
 
     public static AccessibilityTreeSnapshot currentSnapshot() {
