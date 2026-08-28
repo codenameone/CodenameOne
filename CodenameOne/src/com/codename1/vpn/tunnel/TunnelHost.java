@@ -51,6 +51,18 @@ public final class TunnelHost {
     /// @hidden not part of the public API.
     public void start(String server, String[] routes, String[] dns, int mtu,
             String data) {
+        synchronized (this) {
+            if (stopped) {
+                // A host stops ONCE and never restarts -- a port builds a
+                // new one per start -- so a start arriving after the stop is
+                // a race, not a restart. Unguarded it re-attached the closed
+                // transport and called onStart, so a tunnel torn down while
+                // its opener was still committing delivered onStop and then
+                // onStart to the application, for a link that was already
+                // dead.
+                return;
+            }
+        }
         tunnel.attach(transport);
         tunnel.begin(new TunnelConfiguration(server, routes, dns, mtu, data));
         if (transport.isBlocking()) {

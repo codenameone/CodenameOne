@@ -88,6 +88,22 @@ public class CN1VpnService extends VpnService {
 
     private static DescriptorTunnelTransport transport;
 
+    /// Serialises a start's COMMIT against a stop.
+    ///
+    /// The generation check makes the publication itself atomic, but not the
+    /// three acts that follow it -- the foreground promotion, the
+    /// acknowledgement and starting the read loop. A stop landing between
+    /// them found a published host, tore it down and answered, and this
+    /// thread then promoted the service and reported a successful start for
+    /// a tunnel that was already gone, leaving an ongoing notification
+    /// behind it.
+    ///
+    /// Its own lock rather than a wider critical section on the class
+    /// monitor: stopLocked runs the tunnel's onStop under that monitor, and
+    /// promote() and deliverAck are the app's and the platform's code. The
+    /// order is always this lock first, then the class monitor.
+    private static final Object startLock = new Object();
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
@@ -96,7 +112,11 @@ public class CN1VpnService extends VpnService {
             if (requestId >= 0) {
                 Tunnels.deliverAck(requestId, true, 0, null);
             }
-            stopSelf();
+            // stopSelfResult, for the reason stopIfIdle gives: a start
+            // command arriving behind this one owns the service, and a plain
+            // stopSelf would reach onDestroy and tear down the tunnel that
+            // start is about to publish.
+            stopSelfResult(startId);
             // NOT_STICKY: a tunnel the app asked to stop must not be brought
             // back by the system, which would leave a link up that nothing
             // in the app believes exists.
@@ -112,7 +132,7 @@ public class CN1VpnService extends VpnService {
             // something this process kept. Refusing is honest: re-reading a
             // stale setup would bring a link up that the app has no tunnel
             // registered for.
-            stopIfIdle();
+            stopIfIdle(startId);
             return START_NOT_STICKY;
         }
         // Claimed by REQUEST, not read from a global. Two starts racing
@@ -125,7 +145,7 @@ public class CN1VpnService extends VpnService {
                     "No tunnel is registered for this request; Tunnels"
                     + ".start() registers one before the service is asked to"
                     + " run, and a restart of this service does not carry it");
-            stopIfIdle();
+            stopIfIdle(startId);
             return START_NOT_STICKY;
         }
         // OFF the main thread from here. establish() resolves the gateway
@@ -140,7 +160,7 @@ public class CN1VpnService extends VpnService {
             generation = ++startGeneration;
         }
         Thread opener = new Thread(
-                new Opener(this, starting, fields, rid, generation),
+                new Opener(this, starting, fields, rid, generation, startId),
                 "CN1 VPN tunnel start");
         opener.setDaemon(true);
         opener.start();
@@ -157,39 +177,53 @@ public class CN1VpnService extends VpnService {
         private final String[] fields;
         private final int requestId;
         private final int generation;
+        private final int startId;
 
         Opener(CN1VpnService service, VpnTunnel tunnel, String[] fields,
-                int requestId, int generation) {
+                int requestId, int generation, int startId) {
             this.service = service;
             this.tunnel = tunnel;
             this.fields = fields;
             this.requestId = requestId;
             this.generation = generation;
+            this.startId = startId;
         }
 
         @Override
         public void run() {
-            service.open(tunnel, fields, requestId, generation);
+            service.open(tunnel, fields, requestId, generation, startId);
         }
     }
 
-    /// Stops the service ONLY when no tunnel is published.
+    /// Stops the service ONLY when no tunnel is published and no newer
+    /// start has arrived.
     ///
     /// stopSelf reaches onDestroy, which retires whatever is running -- so a
     /// start that failed or was superseded, calling it unconditionally, tore
     /// down the tunnel that had replaced it. The replacement's caller had
     /// already been told it was up.
     ///
+    /// The `host == null` test alone cannot close that, because it answers
+    /// about NOW and stopSelf acts later: a replacement opener can publish
+    /// between the two, and onDestroy then tears down a tunnel that was
+    /// found absent a moment before it existed. stopSelfResult is the
+    /// platform's own answer to exactly this -- it stops only while `startId`
+    /// is still the most recent command delivered -- and every publication
+    /// is preceded by the start command that carries a newer one.
+    ///
     /// The paths that DID stop something -- an explicit stop, a revoke -- do
     /// not come through here: they have just cleared the field this reads,
     /// and stopping is the point.
-    private void stopIfIdle() {
+    ///
+    /// @param startId the command this caller is acting for, from
+    /// onStartCommand
+    private void stopIfIdle(int startId) {
         boolean idle;
         synchronized (CN1VpnService.class) {
             idle = host == null;
         }
         if (idle) {
-            stopSelf();
+            stopSelfResult(startId);
         }
     }
 
@@ -202,7 +236,7 @@ public class CN1VpnService extends VpnService {
 
     /// The rest of the start, with DNS allowed.
     private void open(VpnTunnel tunnel, String[] fields, int requestId,
-            int generation) {
+            int generation, int startId) {
         if (!current(generation)) {
             // Superseded before this thread got going.
             fail(requestId, VpnError.UNKNOWN,
@@ -218,21 +252,21 @@ public class CN1VpnService extends VpnService {
             // something it cannot express -- a malformed CIDR, most often.
             fail(requestId, VpnError.INVALID_CONFIGURATION,
                     String.valueOf(refused.getMessage()));
-            stopIfIdle();
+            stopIfIdle(startId);
             return;
         }
         if (fd == null) {
             fail(requestId, VpnError.UNAUTHORIZED,
                     "The VPN consent this app was granted is no longer in"
                     + " force; call Tunnels.start() again to ask for it");
-            stopIfIdle();
+            stopIfIdle(startId);
             return;
         }
         // The generation is re-checked INSIDE the publication, not before
         // it; see start(). A check here and an install a few statements
         // later is a window, and it is the same window this whole mechanism
         // exists to close.
-        start(tunnel, fd, fields, requestId, generation);
+        start(tunnel, fd, fields, requestId, generation, startId);
     }
 
     /// The notification channel the ongoing-tunnel notification lives in.
@@ -318,12 +352,21 @@ public class CN1VpnService extends VpnService {
         // VpnService.protect on the socket -- which needs the socket, and a
         // Codename One app never has it -- and keeping the address out of
         // the routes, which is what the setup already describes.
-        String server = serverAddress(TunnelWire.server(fields));
+        String[] servers = serverAddresses(TunnelWire.server(fields));
         String[] routes = TunnelWire.routes(fields);
-        boolean excluded = false;
-        if (server != null && Build.VERSION.SDK_INT >= 33) {
-            // The direct way, where the platform has it.
-            excluded = excludeRoute(b, server);
+        boolean excluded = servers.length > 0;
+        if (excluded && Build.VERSION.SDK_INT >= 33) {
+            // The direct way, where the platform has it. EVERY address:
+            // excluding the first and leaving the rest inside is what let a
+            // failover capture its own connection. One refusal drops the
+            // whole set to the splitter below, which covers the addresses
+            // already excluded here as well -- saying "outside the tunnel"
+            // twice about one address is agreement, not conflict.
+            for (int i = 0; i < servers.length; i++) {
+                excluded &= excludeRoute(b, servers[i]);
+            }
+        } else {
+            excluded = false;
         }
         for (int i = 0; i < routes.length; i++) {
             int slash = routes[i].indexOf('/');
@@ -332,19 +375,19 @@ public class CN1VpnService extends VpnService {
                     ? (net.indexOf(':') >= 0 ? 128 : 32)
                     : parsePrefix(routes[i].substring(slash + 1),
                             net.indexOf(':') >= 0 ? 128 : 32);
-            if (!excluded && server != null
-                    && (net.indexOf(':') >= 0) == (server.indexOf(':') >= 0)) {
+            if (!excluded && servers.length > 0) {
                 // No excludeRoute on this platform, so the route is SPLIT
-                // around the server instead: the complement of one address
-                // inside a prefix is at most one block per remaining bit,
-                // each exact. The same traffic is carried, minus the one
-                // host the tunnel needs to reach to carry it.
+                // around the servers instead: the complement of a handful of
+                // addresses inside a prefix is a set of exact blocks. The
+                // same traffic is carried, minus the hosts the tunnel needs
+                // to reach to carry it.
                 //
-                // BOTH families. The first version of this did v4 only, so
+                // BOTH families, and the splitter picks the ones that belong
+                // to this route's. The first version of this did v4 only, so
                 // an IPv6 gateway under ::/0 kept the route it was supposed
                 // to be excluded from and captured its own connection --
                 // the exact loop the v4 case was written to prevent.
-                if (addSplitRoutes(b, net, prefix, server)) {
+                if (addSplitRoutes(b, net, prefix, servers)) {
                     continue;
                 }
             }
@@ -381,7 +424,7 @@ public class CN1VpnService extends VpnService {
         }
     }
 
-    /// The server as a bare address, RESOLVING a host name.
+    /// The server as bare addresses, RESOLVING a host name to ALL of them.
     ///
     /// Routes take addresses, so a setup naming its gateway
     /// `vpn.example.com` -- which is the ordinary way to write one -- has to
@@ -390,29 +433,38 @@ public class CN1VpnService extends VpnService {
     /// at all: the default route went in, the tunnel's own connection to its
     /// gateway went into the TUN, and nothing moved.
     ///
+    /// EVERY record, not the first. A gateway behind several A or AAAA
+    /// records is ordinary -- it is how one is made redundant -- and the
+    /// transport picks among them itself, moving to the next when one
+    /// refuses. Excluding only the first left every other address inside the
+    /// default route, so the failover that was supposed to keep the tunnel
+    /// up was the thing that captured its own connection: the same loop the
+    /// exclusion exists to prevent, reached by the path an app takes when
+    /// something has already gone wrong.
+    ///
     /// Resolution happens on the service's start thread, never the main one;
     /// see onStartCommand.
-    private static String serverAddress(String server) {
+    private static String[] serverAddresses(String server) {
         if (server == null || server.length() == 0) {
-            return null;
+            return new String[0];
         }
-        if (!isLiteral(server)) {
-            try {
-                // The FIRST address only. A gateway behind several is one
-                // this cannot fully exclude, and excluding the one the
-                // transport will most likely use is better than excluding
-                // none -- but an app in that position should give the
-                // literal it dials.
-                return java.net.InetAddress.getByName(server)
-                        .getHostAddress();
-            } catch (java.io.IOException unresolved) {
-                // No DNS yet, or a name that does not resolve. The tunnel
-                // comes up without the exclusion rather than not at all,
-                // which is what it did before this existed.
-                return null;
+        if (isLiteral(server)) {
+            return new String[] {server};
+        }
+        try {
+            java.net.InetAddress[] all =
+                    java.net.InetAddress.getAllByName(server);
+            String[] out = new String[all.length];
+            for (int i = 0; i < all.length; i++) {
+                out[i] = all[i].getHostAddress();
             }
+            return out;
+        } catch (java.io.IOException unresolved) {
+            // No DNS yet, or a name that does not resolve. The tunnel comes
+            // up without the exclusion rather than not at all, which is what
+            // it did before this existed.
+            return new String[0];
         }
-        return server;
     }
 
     /// Whether this is already an address rather than a name.
@@ -453,43 +505,120 @@ public class CN1VpnService extends VpnService {
         }
     }
 
-    /// Adds `net/prefix` as a set of routes that omits `server`.
+    /// Adds `net/prefix` as a set of routes that omits every server inside
+    /// it.
     ///
-    /// Walks the prefix bit by bit: at each step the sibling half that does
-    /// NOT contain the server is a complete route, and the half that does is
-    /// narrowed further. That yields at most 32 routes and covers exactly
-    /// the original block minus the one address.
+    /// Walks the block as a binary trie: a half containing no server is a
+    /// complete route and is added whole, a half containing one is narrowed
+    /// further, and a single host that IS a server is dropped. With one
+    /// server that reduces to one route per remaining bit, which is what
+    /// this did before; with several it is bounded by the same depth times
+    /// the number of them.
     ///
-    /// @return false when the server is not inside this route, in which case
-    /// the caller adds the route whole
+    /// Several is not exotic. A gateway name with two A records is the
+    /// ordinary way to make one redundant, and the transport chooses among
+    /// them itself -- so excluding a single address left the others inside
+    /// the tunnel and the first failover captured its own connection.
+    ///
+    /// NOT under a CI gate: this port has no test module, and the one
+    /// parameter that would need faking is a platform Builder. The walk was
+    /// checked instead against a set-difference oracle over 4, 5 and 6 bit
+    /// address spaces exhaustively -- every block, every prefix, every one,
+    /// two and three address combination, 9.2 million cases -- asserting
+    /// that the routes emitted cover the block minus the servers exactly and
+    /// never overlap, and randomly at 8 and 16 bits. Read it as reasoning
+    /// that was checked once, not as a regression that cannot return.
+    ///
+    /// @return false when no server of this route's family is inside it, in
+    /// which case the caller adds the route whole
     private static boolean addSplitRoutes(Builder b, String net, int prefix,
-            String server) {
+            String[] servers) {
         byte[] netBits = addressBytes(net);
-        byte[] serverBits = addressBytes(server);
-        if (netBits == null || serverBits == null
-                || netBits.length != serverBits.length) {
+        if (netBits == null) {
             return false;
         }
         int width = netBits.length * 8;
         if (prefix < 0 || prefix > width) {
             return false;
         }
+        // The block itself, with any host bits the caller wrote cleared: a
+        // route is named by its network address, and "10.0.0.5/8" is a way
+        // people write one.
+        byte[] block = new byte[netBits.length];
         for (int i = 0; i < prefix; i++) {
-            if (bitAt(netBits, i) != bitAt(serverBits, i)) {
-                // The server is somewhere else entirely; nothing to split.
-                return false;
+            setBit(block, i, bitAt(netBits, i));
+        }
+        // The servers of THIS family that fall inside it. A v6 address under
+        // a v4 route is not this route's business, and neither is an address
+        // outside the block.
+        byte[][] inside = new byte[servers.length][];
+        int found = 0;
+        for (int i = 0; i < servers.length; i++) {
+            byte[] bits = addressBytes(servers[i]);
+            if (bits == null || bits.length != netBits.length
+                    || !within(block, prefix, bits)) {
+                continue;
+            }
+            inside[found++] = bits;
+        }
+        if (found == 0) {
+            return false;
+        }
+        // An explicit stack rather than recursion: the depth is the address
+        // width, and a service is not the place to find out what the stack
+        // budget is.
+        byte[][] pending = new byte[(width + 1) * found * 2 + 2][];
+        int[] lengths = new int[pending.length];
+        int top = 0;
+        pending[top] = block;
+        lengths[top] = prefix;
+        top++;
+        while (top > 0) {
+            top--;
+            byte[] current = pending[top];
+            int length = lengths[top];
+            boolean holds = false;
+            for (int i = 0; i < found && !holds; i++) {
+                holds = within(current, length, inside[i]);
+            }
+            if (!holds) {
+                b.addRoute(addressText(current), length);
+                continue;
+            }
+            if (length == width) {
+                // The server itself. This is the address being excluded, so
+                // it is the one block that is not added.
+                continue;
+            }
+            if (top + 2 > pending.length) {
+                // Unreachable: the stack is sized for the whole walk. Adding
+                // the block whole rather than silently dropping it is the
+                // safe direction if that is ever wrong -- a route too many
+                // carries traffic, a route too few loses it.
+                b.addRoute(addressText(current), length);
+                continue;
+            }
+            for (int half = 0; half <= 1; half++) {
+                byte[] child = new byte[current.length];
+                System.arraycopy(current, 0, child, 0, current.length);
+                setBit(child, length, half);
+                pending[top] = child;
+                lengths[top] = length + 1;
+                top++;
             }
         }
-        for (int bit = prefix; bit < width; bit++) {
-            // The sibling of the half the server is in: the server's own
-            // bits down to this depth, with this bit flipped and everything
-            // below it cleared.
-            byte[] sibling = new byte[netBits.length];
-            for (int i = 0; i < bit; i++) {
-                setBit(sibling, i, bitAt(serverBits, i));
+        return true;
+    }
+
+    /// Whether `address` falls inside `block`'s first `length` bits.
+    private static boolean within(byte[] block, int length, byte[] address) {
+        if (block.length != address.length) {
+            return false;
+        }
+        for (int i = 0; i < length; i++) {
+            if (bitAt(block, i) != bitAt(address, i)) {
+                return false;
             }
-            setBit(sibling, bit, bitAt(serverBits, bit) == 0 ? 1 : 0);
-            b.addRoute(addressText(sibling), bit + 1);
         }
         return true;
     }
@@ -563,59 +692,69 @@ public class CN1VpnService extends VpnService {
     }
 
     private void start(VpnTunnel tunnel, ParcelFileDescriptor fd,
-            String[] fields, int requestId, int generation) {
+            String[] fields, int requestId, int generation, int startId) {
         DescriptorTunnelTransport t =
                 new DescriptorTunnelTransport(fd, TunnelWire.mtu(fields));
         TunnelHost h = new TunnelHost(tunnel, t);
         Thread runner = new Thread(new Loop(this, h,
                 TunnelWire.server(fields), TunnelWire.routes(fields),
                 TunnelWire.dnsServers(fields), TunnelWire.mtu(fields),
-                TunnelWire.data(fields)), "CN1 VPN tunnel");
+                TunnelWire.data(fields), startId), "CN1 VPN tunnel");
         // A daemon thread: the loop parks on a descriptor read, and a
         // non-daemon thread doing that keeps the process alive after
         // everything else has finished with it.
         runner.setDaemon(true);
         boolean published;
-        synchronized (CN1VpnService.class) {
-            // The CHECK and the install in ONE critical section. Separated,
-            // a stop landing between them bumped the generation, found no
-            // published host, answered successfully -- and then this
-            // installed the tunnel and acknowledged the start anyway. The
-            // check has to be part of the publication, not a prelude to it.
-            published = generation == startGeneration;
+        // The COMMIT, whole: publication, promotion, acknowledgement and the
+        // read loop. Under startLock so a stop cannot land in the middle of
+        // it -- which used to leave the caller told its start had succeeded,
+        // an ongoing notification posted, and the loop started, for a tunnel
+        // stopLocked had already retired. See startLock.
+        synchronized (startLock) {
+            synchronized (CN1VpnService.class) {
+                // The CHECK and the install in ONE critical section.
+                // Separated, a stop landing between them bumped the
+                // generation, found no published host, answered successfully
+                // -- and then this installed the tunnel and acknowledged the
+                // start anyway. The check has to be part of the publication,
+                // not a prelude to it.
+                published = generation == startGeneration;
+                if (published) {
+                    // A start arriving while one is already up replaces it,
+                    // so the previous link is torn down first rather than
+                    // left with a thread still reading it.
+                    stopLocked(TunnelStopReason.REQUESTED);
+                    host = h;
+                    transport = t;
+                    loop = runner;
+                }
+            }
             if (published) {
-                // A start arriving while one is already up replaces it, so
-                // the previous link is torn down first rather than left with
-                // a thread still reading it.
-                stopLocked(TunnelStopReason.REQUESTED);
-                host = h;
-                transport = t;
-                loop = runner;
+                // FOREGROUND once the tunnel is really this service's.
+                // Android 8 shuts down an ordinary started service that
+                // keeps running, so a tunnel brought up without this was
+                // acknowledged, established, and then killed a little later
+                // with nothing in the app to say why. After the publication
+                // rather than before it, so a superseded start does not
+                // leave a notification for a tunnel it never installed.
+                promote(TunnelWire.sessionName(fields));
+                // ANSWERED before the loop is started, and deliberately: the
+                // link is established by now -- establish() returned a
+                // descriptor -- so the app's start() has succeeded, and
+                // making it wait for the first packet would leave it pending
+                // on a tunnel that may legitimately be idle for minutes.
+                if (requestId >= 0) {
+                    Tunnels.deliverAck(requestId, true, 0, null);
+                }
+                runner.start();
             }
         }
         if (!published) {
             t.close();
             fail(requestId, VpnError.UNKNOWN,
                     "The tunnel start was superseded while it was opening");
-            stopIfIdle();
-            return;
+            stopIfIdle(startId);
         }
-        // FOREGROUND once the tunnel is really this service's. Android 8
-        // shuts down an ordinary started service that keeps running, so a
-        // tunnel brought up without this was acknowledged, established, and
-        // then killed a little later with nothing in the app to say why.
-        // After the publication rather than before it, so a superseded start
-        // does not leave a notification for a tunnel it never installed.
-        promote(TunnelWire.sessionName(fields));
-        // ANSWERED before the loop is started, and deliberately: the link is
-        // established by now -- establish() returned a descriptor -- so the
-        // app's start() has succeeded, and making it wait for the first
-        // packet would leave it pending on a tunnel that may legitimately be
-        // idle for minutes.
-        if (requestId >= 0) {
-            Tunnels.deliverAck(requestId, true, 0, null);
-        }
-        runner.start();
     }
 
     /// Runs the host's blocking loop off the main thread.
@@ -631,8 +770,12 @@ public class CN1VpnService extends VpnService {
         private final int mtu;
         private final String data;
 
+        /// The command this loop's tunnel was started for; see stopIfIdle.
+        private final int startId;
+
         Loop(CN1VpnService service, TunnelHost host, String server,
-                String[] routes, String[] dns, int mtu, String data) {
+                String[] routes, String[] dns, int mtu, String data,
+                int startId) {
             this.service = service;
             this.host = host;
             this.server = server;
@@ -640,6 +783,7 @@ public class CN1VpnService extends VpnService {
             this.dns = dns;
             this.mtu = mtu;
             this.data = data;
+            this.startId = startId;
         }
 
         @Override
@@ -678,7 +822,7 @@ public class CN1VpnService extends VpnService {
                 // Through the same guard: stopLocked has cleared the field,
                 // so this stops -- unless a start published in the interval,
                 // and then it must not.
-                service.stopIfIdle();
+                service.stopIfIdle(startId);
             }
         }
     }
@@ -690,6 +834,9 @@ public class CN1VpnService extends VpnService {
         // on an unexpected stop must not fight the user who just switched it
         // off.
         stopTunnel(TunnelStopReason.USER_DISABLED);
+        // Plain stopSelf, unlike the paths that carry a start id: this is
+        // the platform saying the consent is gone, so there is no start
+        // worth protecting -- establish() would answer null for it anyway.
         stopSelf();
         super.onRevoke();
     }
@@ -702,10 +849,16 @@ public class CN1VpnService extends VpnService {
 
     /// Tears down whatever is running, once.
     static void stopTunnel(TunnelStopReason reason) {
-        synchronized (CN1VpnService.class) {
-            // Invalidates any opener still in flight; see startGeneration.
-            startGeneration++;
-            stopLocked(reason);
+        // startLock FIRST, so a start that has published cannot still be
+        // promoting the service and acknowledging success while this runs.
+        // See its declaration; the order is never reversed.
+        synchronized (startLock) {
+            synchronized (CN1VpnService.class) {
+                // Invalidates any opener still in flight; see
+                // startGeneration.
+                startGeneration++;
+                stopLocked(reason);
+            }
         }
         Tunnels.clearRegistered();
     }

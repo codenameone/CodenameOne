@@ -166,4 +166,30 @@ public class VpnTunnelTest {
                 "and it carries the reason the first stop gave");
         assertTrue(transport.isClosed(), "the platform's link is released");
     }
+
+    @Test
+    public void aStoppedHostDoesNotStart() {
+        // A host stops once and never restarts -- a port builds a new one
+        // per start -- so a start arriving after the stop is a race, not a
+        // restart. It is a race the Android service could lose: the opener
+        // publishes the host, Tunnels.stop() runs stopLocked, and the opener
+        // then goes on to start the read loop. Unguarded, that re-attached
+        // the closed transport and called onStart, so the application saw
+        // onStop followed by onStart for a link that was already dead --
+        // and a tunnel that reconnects on an unexpected stop would have
+        // acted on the wrong one of the two.
+        Recording t = new Recording();
+        LoopbackTunnelTransport transport = new LoopbackTunnelTransport(4, 1500);
+        TunnelHost host = new TunnelHost(t, transport);
+
+        host.stop(TunnelStopReason.REQUESTED.ordinal());
+        host.start("s", null, null, 1500, null);
+
+        assertEquals(1, t.events.size(),
+                "the stop is the only thing the tunnel hears: " + t.events);
+        assertTrue(t.events.get(0).startsWith("stop:"),
+                "and it is the stop, not a start after it");
+        assertTrue(transport.isClosed(),
+                "the transport stays closed rather than being re-attached");
+    }
 }
