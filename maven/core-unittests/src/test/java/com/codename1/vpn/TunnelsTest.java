@@ -127,6 +127,21 @@ public class TunnelsTest {
     }
 
     @Test
+    public void aLinkThatDiesOnItsOwnStillTellsTheTunnel() {
+        // A descriptor that fails without a stop and without the platform
+        // revoking the VPN used to end the read loop and nothing else: the
+        // tunnel never heard onStop, and the port kept a published host and
+        // a foreground notification for a link nobody was serving.
+        Echo tunnel = new Echo();
+        VpnAwait.value(Tunnels.start(tunnel, new TunnelSetup()
+                .address("10.0.0.2/32")));
+        bridge.simulateTransportFailure();
+        assertTrue(tunnel.events.contains("stop:NETWORK_LOST"),
+                "the tunnel is told the link went, and why: "
+                        + tunnel.events);
+    }
+
+    @Test
     public void stoppingTellsTheTunnelWhy() {
         Echo tunnel = new Echo();
         VpnAwait.value(Tunnels.start(tunnel, new TunnelSetup()

@@ -117,8 +117,11 @@ public class LocalVpnBridge implements VpnBridge {
             return;
         }
         String[] fields = TunnelWire.split(setupWire);
+        // NON-BLOCKING: this bridge delivers packets by pumping, which is
+        // the iOS shape. Asking for the blocking one ran the host's loop to
+        // its end inside start().
         LoopbackTunnelTransport t =
-                new LoopbackTunnelTransport(4, TunnelWire.mtu(fields));
+                new LoopbackTunnelTransport(4, TunnelWire.mtu(fields), false);
         TunnelHost h = new TunnelHost(tunnel, t);
         synchronized (this) {
             stopTunnelLocked(TunnelStopReason.REQUESTED);
@@ -169,6 +172,32 @@ public class LocalVpnBridge implements VpnBridge {
             t = tunnelTransport;
         }
         return t == null ? new byte[0][] : t.forwarded();
+    }
+
+    /// Makes the transport fail the way a dead descriptor does.
+    ///
+    /// @hidden not part of the public API; test and simulator only.
+    public void simulateTransportFailure() {
+        LoopbackTunnelTransport t;
+        TunnelHost h;
+        synchronized (this) {
+            t = tunnelTransport;
+            h = tunnelHost;
+        }
+        if (t == null || h == null) {
+            return;
+        }
+        // What a dead descriptor does to the port: the read fails, the
+        // host's loop retires the tunnel. This transport is pumped rather
+        // than looped, so the retirement is driven directly -- the point of
+        // the test is the tunnel hearing onStop with a reason, not the
+        // mechanics of which thread noticed.
+        t.close();
+        h.stop(TunnelStopReason.NETWORK_LOST.ordinal());
+        synchronized (this) {
+            tunnelHost = null;
+            tunnelTransport = null;
+        }
     }
 
     private void stopTunnelLocked(TunnelStopReason reason) {

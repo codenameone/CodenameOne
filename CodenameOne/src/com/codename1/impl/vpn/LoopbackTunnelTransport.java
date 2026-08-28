@@ -44,7 +44,16 @@ public final class LoopbackTunnelTransport implements TunnelTransport {
     private final LinkedList<byte[]> inbound = new LinkedList<byte[]>();
     private final List<byte[]> forwarded = new ArrayList<byte[]>();
     private final PacketBuffer[] pool;
+
+    /// See isBlocking.
+    private boolean blocking = true;
     private boolean closed;
+
+    /// @hidden not part of the public API.
+    public LoopbackTunnelTransport(int batch, int mtu, boolean blocking) {
+        this(batch, mtu);
+        this.blocking = blocking;
+    }
 
     /// @hidden not part of the public API.
     public LoopbackTunnelTransport(int batch, int mtu) {
@@ -74,10 +83,19 @@ public final class LoopbackTunnelTransport implements TunnelTransport {
 
     @Override
     public boolean isBlocking() {
-        // Modelled on ANDROID, which is the platform whose loop owns a
-        // thread. A callback-driven simulation would exercise the iOS shape
-        // instead; the host reads this rather than assuming either.
-        return true;
+        // EITHER shape, because both are real and the host has to work with
+        // both. A blocking one models Android, whose loop owns a thread and
+        // learns the link is going down from a zero-length read. A
+        // non-blocking one models iOS, where packets arrive through a
+        // callback and the host arms rather than loops.
+        //
+        // The default is blocking, which is what the packet-loop test
+        // drives. The simulation bridge asks for the other: it delivers
+        // packets by PUMPING, and a transport that is pumped is not one that
+        // blocks -- claiming otherwise ran the loop to its end during
+        // start(), which with a host that retires the tunnel on a
+        // zero-length read now means retiring it the moment it starts.
+        return blocking;
     }
 
     @Override

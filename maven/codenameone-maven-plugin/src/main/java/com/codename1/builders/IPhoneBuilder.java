@@ -11291,6 +11291,19 @@ public class IPhoneBuilder extends Executor {
      * so the generated provider can construct the application's own
      * VpnTunnel rather than reimplementing it.</p>
      */
+    /// The translated stub's file-name stem, which is the mangled fully
+    /// qualified main class.
+    ///
+    /// Not the simple name: the translator emits com_pkg_MainStub.m, and a
+    /// rename keyed on the simple name lands on nothing -- silently, leaving
+    /// the duplicate entry point it was meant to remove.
+    private static String mangleForStub(BuildRequest request) {
+        String pkg = request.getPackageName();
+        String main = request.getMainClass();
+        String fqn = pkg == null || pkg.length() == 0 ? main : pkg + "." + main;
+        return fqn.replace('.', '_');
+    }
+
     private void appendVpnTunnelExtensionTarget(StringBuilder sb,
             BuildRequest request, File distDir)
             throws IOException, BuildException {
@@ -11375,6 +11388,27 @@ public class IPhoneBuilder extends Executor {
                 + "  tunnel_target.source_build_phase.add_file_reference("
                 + "f.file_ref) unless f.file_ref.nil?\n"
                 + "}\n"
+                // The app's C main() comes with those sources, and an app
+                // extension enters through NSExtensionPrincipalClass rather
+                // than through main. Left in, the target has an application
+                // entry point in it.
+                //
+                // RENAMED per file rather than excluded, which is what the
+                // watch target does with the same stub and for the same
+                // reason: the file carries the app's translated classes as
+                // well as the entry, so dropping it drops the classes. The
+                // translator names it from the mangled fully qualified
+                // class, not the simple one.
+                + "stub_name = '"
+                + escapeRubyStr(mangleForStub(request) + "Stub.m") + "'\n"
+                + "tunnel_target.source_build_phase.files.to_a.each do |bf|\n"
+                + "  ref = bf.file_ref\n"
+                + "  next unless ref && ref.path"
+                + " && File.basename(ref.path) == stub_name\n"
+                + "  bf.settings = { 'COMPILER_FLAGS' =>"
+                + " '-Dmain=cn1_vpn_tunnel_main_unused"
+                + " -Wno-error=return-type -Wno-return-type' }\n"
+                + "end\n"
                 + "main_app_target.add_dependency(tunnel_target)\n"
                 + "fileref = xcproj.groups.find{|e|"
                 + " e.display_name=='Products'}.new_file('"

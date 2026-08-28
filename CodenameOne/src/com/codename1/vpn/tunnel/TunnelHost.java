@@ -99,6 +99,16 @@ public final class TunnelHost {
                 // Zero is how a blocking transport says the link is going
                 // down; anything else and the loop would spin on a closed
                 // descriptor for as long as the process lived.
+                //
+                // NOT retired here, deliberately. Only the TRANSPORT knows
+                // what a zero-length read meant: on a descriptor it is a
+                // link that failed or closed, and in a pumped simulation it
+                // is a queue that happens to be empty. Retiring the tunnel
+                // from this side turned the second into the first and
+                // announced a stop the caller had not asked for. The port
+                // that owns the transport ends the tunnel when its loop
+                // returns -- see CN1VpnService.Loop -- because that is where
+                // the difference is known.
                 return;
             }
             for (int i = 0; i < n; i++) {

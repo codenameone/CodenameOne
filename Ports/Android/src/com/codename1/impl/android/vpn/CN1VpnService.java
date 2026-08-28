@@ -547,7 +547,7 @@ public class CN1VpnService extends VpnService {
         DescriptorTunnelTransport t =
                 new DescriptorTunnelTransport(fd, TunnelWire.mtu(fields));
         TunnelHost h = new TunnelHost(tunnel, t);
-        Thread runner = new Thread(new Loop(h,
+        Thread runner = new Thread(new Loop(this, h,
                 TunnelWire.server(fields), TunnelWire.routes(fields),
                 TunnelWire.dnsServers(fields), TunnelWire.mtu(fields),
                 TunnelWire.data(fields)), "CN1 VPN tunnel");
@@ -603,6 +603,7 @@ public class CN1VpnService extends VpnService {
     /// A named class rather than an anonymous one so it holds no synthetic
     /// reference to the service, which the loop outlives by design.
     private static final class Loop implements Runnable {
+        private final CN1VpnService service;
         private final TunnelHost host;
         private final String server;
         private final String[] routes;
@@ -610,8 +611,9 @@ public class CN1VpnService extends VpnService {
         private final int mtu;
         private final String data;
 
-        Loop(TunnelHost host, String server, String[] routes, String[] dns,
-                int mtu, String data) {
+        Loop(CN1VpnService service, TunnelHost host, String server,
+                String[] routes, String[] dns, int mtu, String data) {
+            this.service = service;
             this.host = host;
             this.server = server;
             this.routes = routes;
@@ -625,6 +627,27 @@ public class CN1VpnService extends VpnService {
             // Returns when the descriptor closes, which is how stop() ends
             // it; the host has already told the tunnel by then.
             host.start(server, routes, dns, mtu, data);
+            // And the service lets go too. A link that failed on its own --
+            // TunnelHost retires the tunnel for that now -- used to leave
+            // this service holding a published host, a foreground
+            // notification and a registered tunnel with nothing forwarding
+            // for it. Nothing here runs when a stop caused the loop to end:
+            // stopLocked has already cleared the fields, so this finds none
+            // of its own and does nothing.
+            boolean mine;
+            synchronized (CN1VpnService.class) {
+                // QUALIFIED, because this class has its own `host` field and
+                // the unqualified name resolved to it -- comparing the field
+                // with itself, which SpotBugs caught as
+                // SA_FIELD_SELF_COMPARISON. Always true, so the teardown
+                // below would have run after an ordinary stop as well as
+                // after a dead link.
+                mine = CN1VpnService.host == this.host;
+            }
+            if (mine) {
+                stopTunnel(TunnelStopReason.NETWORK_LOST);
+                service.stopSelf();
+            }
         }
     }
 
