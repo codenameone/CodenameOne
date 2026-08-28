@@ -52,6 +52,7 @@ We did not turn every screen into a window or replace `Form`. We separated the a
 ## TL;DR
 
 - [`Window`](#form-stays-central-window-adds-another-top-level) opens a real desktop window on Java SE, native Windows, native Linux, and Mac Catalyst. It supports ownership, modality, close policies, monitor placement, native peers, text editing, and independent capture.
+- {{< post-link path="/blog/compile-time-build-hints" text="Compiler-checked build hints" >}} move 87 common server settings onto the main class, where Java catches misspelled names, wrong types, and unsupported values before upload.
 - {{< post-link path="/blog/documents-in-system-file-browser" text="Document Provider" >}} publishes a selected read-only file tree into the iOS Files app and Android storage picker without exposing the rest of the application sandbox.
 - {{< post-link path="/blog/uwb-nearby-devices" text="Nearby Devices" >}} adds UWB distance and direction, companion association, presence, and local device-to-device transport with explicit capability and platform boundaries.
 - {{< post-link path="/blog/watch-complications-wear-companion" text="Wearable follow-through" >}} closes two gaps we named last week: generated watch complications and Tiles, plus a companion Wear APK beside the phone artifact. A separate fix repairs watchOS message callbacks and startup.
@@ -164,6 +165,34 @@ Mac Catalyst exposed a deeper problem. It can create a second scene, but several
 
 We are working on a native AppKit port in [PR #5601](https://github.com/codenameone/CodenameOne/pull/5601). It is still in development. The current release continues to use Catalyst, with multi-window support opt-in and the documented limits above.
 
+## Build hints can fail before upload
+
+Build hints began as an escape hatch between two release clocks. The build server changed almost every week, while updating every IDE plugin was slower. A plugin could send `codename1.arg.<name>=<value>`, and the server could start reading a new setting without waiting for new client UI.
+
+That design has lasted for more than a decade, but unchecked strings have a predictable failure mode. A misspelled name is accepted, uploaded, never read, and silently discarded. The build stays green while using a default the developer meant to override.
+
+[PR #5586](https://github.com/codenameone/CodenameOne/pull/5586) adds compiler-checked annotations for 87 common hints:
+
+```java
+@Android(
+        themeMode = ThemeMode.MODERN,
+        minSdkVersion = AndroidMinSdk.API_24)
+@Build(nativeTheme = ThemeMode.MODERN)
+@DesktopBuild(
+        titleBar = DesktopTitleBar.NATIVE,
+        width = 1280,
+        height = 800)
+@Ios(newStorageLocation = Toggle.ON)
+public class MyApplication extends Lifecycle {
+}
+```
+
+The Java type is the hint type. Closed value sets become enums. List hints become arrays with their separator and CN1Lib merge behavior attached to the declaration. An omitted attribute emits nothing, so the build server still controls its current default.
+
+The existing protocol and builders remain in place. `BuildHintAnnotationProcessor` turns the checked form back into the same name and string values. Properties remain supported for the long tail and dynamic families such as `android.permission.<NAME>`. Declaring the same hint in both forms is a build error.
+
+The {{< post-link path="/blog/compile-time-build-hints" text="compile-time build hints post" >}} explains the catalog, merge order, source compatibility policy, and `mvn cn1:migrate-build-hints` migration goal.
+
 ## Publish selected files into the system file browser
 
 The {{< post-link path="/blog/documents-in-system-file-browser" text="Document Provider post" >}} covers [PR #5607](https://github.com/codenameone/CodenameOne/pull/5607). It lets an application publish a specific read-only tree into the iOS Files app and Android storage picker.
@@ -224,11 +253,11 @@ Detection remains an on-device obstacle, not a trust anchor. A capable attacker 
 
 ## More surfaces, narrower exposure, stronger defaults
 
-This week's changes expand what one Codename One application can own without turning platform differences into pretend sameness. A desktop app gets multiple native windows, but a phone keeps one main form. A published document tree reaches the system browser, but the rest of the sandbox stays private. UWB, companion devices, and nearby transport have separate opt-ins and capability queries. Watch surfaces now reach actual watch faces and Tiles.
+This week's changes expand what one Codename One application can own without turning platform differences into pretend sameness. A desktop app gets multiple native windows, but a phone keeps one main form. Common build hints move into compiler-checked code, while dynamic and service-only hints keep their string escape hatch. A published document tree reaches the system browser, but the rest of the sandbox stays private. UWB, companion devices, and nearby transport have separate opt-ins and capability queries. Watch surfaces now reach actual watch faces and Tiles.
 
 The security work follows the same discipline. Document Provider exposes a named read-only tree. Nearby transport gives Android a connection authentication token and says when iOS cannot. Rootless detection checks current jailbreak layouts, then stops short of claiming that local code can establish trust. The Maven cutover keeps signed artifacts and refuses partial releases before metadata advertises them.
 
-Our security lead comes from those defaults. Ordinary cross-platform code starts with a narrow capability, an explicit failure mode, and no silent fallback that widens access. App Hardening raises the cost of modifying the binary. App Shield moves the final trust decision to the backend. The APIs in this release make the safer choice available before an application drops into native code.
+Our security lead comes from those defaults. Ordinary cross-platform code starts with a narrow capability, an explicit failure mode, and no silent fallback that widens access. Compiler-checked `@Hardening` and `@IosPrivacy` settings also remove a class of silent configuration failure before a build leaves the machine. App Hardening raises the cost of modifying the binary. App Shield moves the final trust decision to the backend. The APIs in this release make the safer choice available before an application drops into native code.
 
 Start by updating the two repository lists in your POM. Then open the [desktop windows guide](/developer-guide/#desktop-windows) and run the inspector example in a desktop build.
 
