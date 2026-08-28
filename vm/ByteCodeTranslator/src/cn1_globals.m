@@ -708,6 +708,7 @@ long long cn1GcPoolNs = 0;    // the constant-pool root scan
 // gap between them is what a bigger batch window or a dedup would buy.
 _Atomic long cn1GcSatbAlready = 0;   // enqueued while ALREADY at the current epoch
 _Atomic long cn1GcSatbFresh = 0;     // enqueued while mark == -1 (fresh; grace covers it)
+_Atomic long cn1GcSatbLocks = 0;     // gcSatbMutex acquisitions taken by the ENQUEUE side
 long cn1GcSatbDrainAlready = 0;      // already at the current epoch by the time it drained
 static long long cn1GcNowNs(void) {
     struct timespec t;
@@ -812,9 +813,6 @@ void cn1StallRecord(int cause, long long ns, struct ThreadLocalData* ts) {
         b++;
     }
     atomic_fetch_add_explicit(&cn1StallBuckets[cause][b], 1, memory_order_relaxed);
-    if(ts != 0) {
-        atomic_fetch_add_explicit(&ts->gcStallNs, ns, memory_order_relaxed);
-    }
 }
 #endif
 
@@ -1673,15 +1671,28 @@ static int gcBeltDiagCount = 0;
 // million-element array would block cn1SatbTake for the whole walk, trading a lot of short
 // stalls for one long one. 256 bounds the hold and still cuts acquisitions by that factor.
 //
-// Measured on a driver that arraycopies and clones a 200,000-element Object[] of OLD (so
-// unfiltered) references 400 times while a second thread keeps the collector busy, five
-// interleaved reps, -DCN1_SATB_NO_BULK restoring the per-element shape for the A/B:
-// the copy loop's median goes 576ms -> 494ms with much tighter spread (556-648 -> 492-500).
+// Measured with BulkCopyCost -- 400 arraycopy+clone rounds over a 200,000-element Object[]
+// of OLD (so unfiltered) references while a second thread keeps the collector busy --
+// against -DCN1_SATB_NO_BULK, which restores the per-element shape.
 //
-// Read the COLLECTOR side of that A/B carefully, because it looks like a regression and is
-// not: markMs 477 -> 648 and satbMs 243 -> 453. The bulk arm logs twice the references
-// (37.9M -> 74.5M) for the simple reason that a faster mutator gets through more copies
-// inside the same mark. Per logged entry the drain costs 6.4ns before and 6.1ns after.
+// State the COUNTER, not the clock. satbLocks/satbRefs is 32,687,021/28,307,948 = 1.155
+// enqueue-side mutex acquisitions per logged reference for the per-element arm, and
+// 758,576/138,841,746 = 0.0055 for this one: 210x fewer. It is not the flat 256x the chunk
+// size suggests because a range shorter than a chunk, and every range's trailing partial
+// chunk, still costs one acquisition.
+//
+// Both figures must be normalised per logged reference, because the two arms do not log
+// the same amount: 28.3M against 138.8M above, for the simple reason that a mutator that
+// is not serialising on a mutex gets through more copies inside the same mark. That is
+// also why the collector's own markMs and satbMs READ higher in the bulk arm while the
+// cost per drained entry is unchanged (6.4ns against 6.1ns), and why a raw before/after of
+// either number would invert the conclusion.
+//
+// No throughput claim. Interleaved medians over seven reps put the copy loop 3.7% apart,
+// and this host cannot resolve that -- the same seven reps threw 1323ms and 1016ms
+// outliers against a ~650ms median. An earlier, quieter session measured 14%; the honest
+// summary is that the acquisition count is down 210x and the wall clock is below this
+// machine's noise floor either way.
 //
 // Scope, so nobody reads more into this than it says: on the ordinary churn workload
 // (GcSteadyState, with or without CN1_WL_BIGARRAY) the log holds 0-6 entries a cycle --
@@ -1691,10 +1702,58 @@ static int gcBeltDiagCount = 0;
 // cloneArray barriers added here put through it.
 #define CN1_SATB_BULK_CHUNK 256
 
+// TERMINATION HANDSHAKE for the bulk path.
+//
+// The barrier's flag check and its append are two separate steps, so the collector can
+// clear gcSatbActive and run its final cn1SatbTake() in between -- leaving an entry in the
+// log that this cycle never drains. For a single store that is the window the clear's own
+// comment calls harmless, because what lands late is a reference that is already marked or
+// is fresh and covered by the grace rule. Chunking would widen it from one late append to
+// one per chunk, and cloneArray publishes the copied references into a brand new array
+// that the grace pass has ALREADY walked past, so a reference dropped here is one the
+// sweep can free under a live pointer. That is the failure the insertion half exists to
+// prevent, and it is not something to leave to a probability argument.
+//
+// So the bulk path registers itself. An enqueuer increments, then re-reads the flag; the
+// collector clears the flag, then waits for the count to fall to zero before its final
+// take. Both sides are seq_cst, which is what makes the store-then-load pair on each side
+// non-reorderable: if the enqueuer sees the flag set, the collector must see the count,
+// and if the collector sees zero, the enqueuer has either finished flushing or has yet to
+// increment and will read the cleared flag and do nothing.
+//
+// The wait is safe to spin on because nothing between the increment and the decrement can
+// block: no allocation, no Java call, no safepoint, so a registered thread cannot be
+// paused by this same collector while holding the count. It is bounded by one range walk.
+//
+// Cost, A/B'd against -DCN1_SATB_NO_BULK_HANDSHAKE interleaved in one session: 3.2% on the
+// bulk-copy driver, which is inside this host's noise floor (see the note above). The
+// enqueuer pays three atomics per RANGE, not per element, and the collector's wait happens
+// at most once a cycle and only when a copy is genuinely in flight.
+//
+// This does NOT close the same window on the per-store barrier, and is not meant to. There
+// the handshake would have to be an unconditional atomic on every reference store to be
+// correct -- the increment must precede the flag read -- which is precisely the cost that
+// barrier is designed around ("off-mark the barrier is a single relaxed flag load"). That
+// window is pre-existing, argued harmless where the flag is cleared, and unchanged here.
+static _Atomic int cn1SatbBulkInFlight = 0;
+static void cn1SatbEnqueueRangeBody(JAVA_ARRAY_OBJECT* refs, int count);
+
+// Called by the collector after clearing gcSatbActive and before the final drain.
+void cn1SatbBulkQuiesce(void) {
+#ifndef CN1_SATB_NO_BULK_HANDSHAKE
+    while(atomic_load_explicit(&cn1SatbBulkInFlight, memory_order_seq_cst) != 0) {
+        usleep(50);
+    }
+#endif
+}
+
 static void cn1SatbFlushChunk(JAVA_OBJECT* buf, int n) {
     if(n <= 0) {
         return;
     }
+#ifdef CN1_GC_CONFORM
+    atomic_fetch_add_explicit(&cn1GcSatbLocks, 1, memory_order_relaxed);
+#endif
     pthread_mutex_lock(&gcSatbMutex);
     if(gcSatbTop + n > gcSatbCap) {
         long ncap = gcSatbCap ? gcSatbCap : 8192;
@@ -1715,6 +1774,23 @@ static void cn1SatbFlushChunk(JAVA_OBJECT* buf, int n) {
 }
 
 void cn1SatbEnqueueRange(JAVA_ARRAY_OBJECT* refs, int count) {
+#ifdef CN1_SATB_NO_BULK_HANDSHAKE
+    cn1SatbEnqueueRangeBody(refs, count);
+#else
+    // Register BEFORE re-reading the flag; see cn1SatbBulkQuiesce above.
+    atomic_fetch_add_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
+    if(!__atomic_load_n(&gcSatbActive, __ATOMIC_SEQ_CST)) {
+        // The drain reached its fixpoint while we were on our way in, so everything the
+        // snapshot needed is already marked and there is nothing this range can add.
+        atomic_fetch_sub_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
+        return;
+    }
+    cn1SatbEnqueueRangeBody(refs, count);
+    atomic_fetch_sub_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
+#endif
+}
+
+static void cn1SatbEnqueueRangeBody(JAVA_ARRAY_OBJECT* refs, int count) {
 #ifdef CN1_SATB_NO_BULK
     // Ablation arm: the per-element shape this replaced, one mutex acquisition each.
     for(int i = 0 ; i < count ; i++) {
@@ -1830,6 +1906,9 @@ void cn1SatbEnqueue(JAVA_OBJECT old) {
             atomic_fetch_add_explicit(&cn1GcSatbFresh, 1, memory_order_relaxed);
         }
     }
+#endif
+#ifdef CN1_GC_CONFORM
+    atomic_fetch_add_explicit(&cn1GcSatbLocks, 1, memory_order_relaxed);
 #endif
     pthread_mutex_lock(&gcSatbMutex);
     if(gcSatbTop >= gcSatbCap) {
@@ -2595,7 +2674,11 @@ void codenameOneGCMark() {
     }
     // Snapshot closed; stop logging. A store racing this clear either logged already
     // (drained just below) or overwrites/adds an already-marked reference (harmless).
-    __atomic_store_n(&gcSatbActive, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&gcSatbActive, 0, __ATOMIC_SEQ_CST);
+    // Let any bulk copy that already passed the flag check finish appending before the
+    // final take, so it cannot leave entries behind for a log this cycle never drains
+    // again. See cn1SatbBulkQuiesce.
+    cn1SatbBulkQuiesce();
     {
         JAVA_OBJECT* batch;
         long n = cn1SatbTake(&batch);        // final catch of anything logged during the tail
@@ -10458,6 +10541,7 @@ static void cn1GcProbeResetPhases(void) {
     cn1GcSatbDrainAlready = 0;
     atomic_store_explicit(&cn1GcSatbAlready, 0, memory_order_relaxed);
     atomic_store_explicit(&cn1GcSatbFresh, 0, memory_order_relaxed);
+    atomic_store_explicit(&cn1GcSatbLocks, 0, memory_order_relaxed);
     cn1GcPoolNs = 0;
 }
 
@@ -10567,7 +10651,7 @@ void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
         " triggerKb=%ld bypassActs=%ld bypassAllocs=%ld occKb=%ld liveKb=%ld reclKb=%ld"
         " markMs=%.1f sweepMs=%.1f snapMs=%.1f graceMs=%.1f drainMs=%.1f"
         " waitMs=%.1f stackMs=%.1f tdrainMs=%.1f migrateMs=%.1f migrated=%ld"
-        " satbMs=%.1f satbRefs=%ld satbAlready=%ld satbFresh=%ld satbDrainAlready=%ld poolMs=%.1f"
+        " satbMs=%.1f satbRefs=%ld satbAlready=%ld satbFresh=%ld satbLocks=%ld satbDrainAlready=%ld poolMs=%.1f"
         " staleSkips=%ld ovfCycles=%ld graceDrains=%ld"
         " consWords=%lld consResolved=%lld consFirstMarks=%lld"
         " monitors=%ld immortal=%d fvLive=%ld sideKb=%lld residKb=%lld\n",
@@ -10594,6 +10678,7 @@ void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
         cn1GcSatbNs / 1e6, cn1GcSatbEntries,
         atomic_load_explicit(&cn1GcSatbAlready, memory_order_relaxed),
         atomic_load_explicit(&cn1GcSatbFresh, memory_order_relaxed),
+        atomic_load_explicit(&cn1GcSatbLocks, memory_order_relaxed),
         cn1GcSatbDrainAlready, cn1GcPoolNs / 1e6,
         atomic_load_explicit(&cn1GcStaleSkips, memory_order_relaxed),
         atomic_load_explicit(&cn1GcOverflowCycles, memory_order_relaxed),
@@ -10614,7 +10699,6 @@ void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
 // lock, so reading the slots without it is a use-after-free, not merely a stale number.
 // It is 1024 pointer reads once a second against a lock the mutators hold for microseconds.
 static long long cn1StallLastNs = 0;   // previous second's summed thread stall clock
-static long long cn1StallLastMs = 0;   // ...and the wall stamp it was read at
 // Peak concurrent mutator count, sampled by the 1Hz thread. The whole-run duty figure
 // has to divide by SOMETHING, and by exit the workers have exited and taken their stall
 // clocks with them -- summing live threads there reports one thread and 100% duty on a
@@ -10622,21 +10706,43 @@ static long long cn1StallLastMs = 0;   // ...and the wall stamp it was read at
 // process-wide), so the honest denominator is the peak thread count that produced them.
 static _Atomic int cn1StallPeakThreads = 0;
 
+// The aggregate mutator stall clock, and how many mutators are alive to have earned it.
+//
+// The TOTAL comes from the process-wide per-cause counters. It used to come from a
+// per-thread counter in ThreadLocalData, summed over the live threads; that counter is
+// gone, because summing the live threads loses a thread's entire history the moment
+// markDeadThread() drops its TLD out of allThreads: the next sample's delta goes
+// NEGATIVE, gets clamped to zero, and the 1Hz line then reports 100% duty for exactly the
+// short-lived-thread workloads where duty is most worth knowing -- and keeps doing it
+// until the surviving threads' counters climb back past the vanished total. Measured at
+// exit on both GcSteadyState and ThreadChurn, the live-thread walk returns 0 against a
+// process-wide 9.4-35.2 SECONDS, because by then every mutator has gone.
+//
+// The two sources are otherwise the same number: cn1StallRecord increments the per-cause
+// total and the per-thread field in one call. Substituting one for the other is exact
+// only if the collector never records a stall of its own -- it would be inside the
+// process-wide total and outside the mutator-only walk. All seven CN1_STALL_ADD sites are
+// mutator paths (pacing park, handshake, low memory, pending-table, signal stop), and
+// instrumenting cn1StallRecord to attribute by thread confirms it: gcThreadNs=0 and
+// nullTsRecords=0 on the churn, legacy-heavy and thread-churn shapes alike.
+//
+// The COUNT still comes from the live walk, and still excludes the collector: threadRunner
+// marks every Java thread lightweightThread = JAVA_TRUE, the GC thread included, so
+// counting them all put the collector in the denominator and overstated duty -- four
+// workers plus main plus the collector divided the stall by six thread-seconds instead of
+// five.
 static void cn1StallSumThreads(long long* outNs, int* outThreads) {
     long long total = 0;
     int threads = 0;
-    // The COLLECTOR is not a mutator. threadRunner marks every Java thread
-    // lightweightThread = JAVA_TRUE, the GC thread included, so counting them all put the
-    // collector in the denominator: four workers plus main plus the collector divided the
-    // aggregate stall by six thread-seconds instead of five and overstated the duty figure
-    // this instrument exists to report.
+    for(int c = 0 ; c < CN1_STALL_CAUSES ; c++) {
+        total += atomic_load_explicit(&cn1StallNs[c], memory_order_relaxed);
+    }
     JAVA_OBJECT gcThread = get_static_java_lang_System_gcThreadInstance();
     lockCriticalSection();
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         struct ThreadLocalData* t = allThreads[iter];
         if(t != 0 && t->lightweightThread
            && (gcThread == JAVA_NULL || t->currentThreadObject != gcThread)) {
-            total += atomic_load_explicit(&t->gcStallNs, memory_order_relaxed);
             threads++;
         }
     }
@@ -10731,8 +10837,49 @@ static void cn1ReportStalls(void) {
 // series that survives a collector which has stopped finishing cycles, which is the state
 // the reporter describes and the one in which the per-cycle emitter above goes silent.
 static void* cn1GcProbeThread(void* ignored) {
+    // Thread-time integral for the window about to be reported: the sum over the window of
+    // (live mutators * slice), in nanoseconds. It is the denominator the duty figure needs.
+    long long cn1StallThreadTimeNs = 0;
+    long long lastSliceMs = cn1GcProbeElapsedMs();
     for(;;) {
-        usleep(1000000);
+        // A plain usleep(1000000) is not a second here. The signal-based thread stop
+        // delivers to this thread too, usleep returns early on EINTR, and the "1Hz" series
+        // collapsed to whatever the signal rate happened to be -- 20ms windows in a
+        // thread-churn run. Windows that short are how the line came to print a NEGATIVE
+        // duty: the stall accrued by four threads easily exceeds 20ms of one thread's wall
+        // clock, and the old denominator was a single end-of-window thread count times the
+        // elapsed wall time.
+        //
+        // So sleep in slices until a second of monotonic time has genuinely passed, and
+        // integrate the live mutator count across those slices. That makes the denominator
+        // real thread-time, which is also what makes it correct when threads are created
+        // and destroyed inside the window -- the case that produced the bogus figures.
+        long long windowStartMs = lastSliceMs;
+        while(cn1GcProbeElapsedMs() - windowStartMs < 1000) {
+            usleep(100000);
+            {
+                long long nowSliceMs = cn1GcProbeElapsedMs();
+                long long sliceMs = nowSliceMs - lastSliceMs;
+                if(sliceMs > 0) {
+                    long long unusedNs = 0;
+                    int liveNow = 0;
+                    cn1StallSumThreads(&unusedNs, &liveNow);
+                    cn1StallThreadTimeNs += (long long)liveNow * sliceMs * 1000000LL;
+                    // Track the peak here rather than at emit time: the whole-run
+                    // [GCSTALL] line divides by it, and a run shorter than one emit
+                    // interval would otherwise report threads=0 and dutyPct=-1.
+                    {
+                        int peak = atomic_load_explicit(&cn1StallPeakThreads, memory_order_relaxed);
+                        while(liveNow > peak &&
+                              !atomic_compare_exchange_weak_explicit(&cn1StallPeakThreads, &peak,
+                                                                     liveNow, memory_order_relaxed,
+                                                                     memory_order_relaxed)) {
+                        }
+                    }
+                }
+                lastSliceMs = nowSliceMs;
+            }
+        }
         fprintf(stderr, "[GCPROBE-T] v=1 tMs=%lld fpKb=%lld cyc=%d pgTotal=%lld"
                         " matured=%ld maturedDied=%ld maturedPages=%ld triggerKb=%ld"
                         " bytesSinceGc=%lld staleSkips=%ld\n",
@@ -10774,25 +10921,16 @@ static void* cn1GcProbeThread(void* ignored) {
             long long nowNs = 0;
             int threads = 0;
             cn1StallSumThreads(&nowNs, &threads);
-            {
-                int peak = atomic_load_explicit(&cn1StallPeakThreads, memory_order_relaxed);
-                while(threads > peak &&
-                      !atomic_compare_exchange_weak_explicit(&cn1StallPeakThreads, &peak, threads,
-                                                             memory_order_relaxed,
-                                                             memory_order_relaxed)) {
-                }
-            }
             long long deltaNs = nowNs - cn1StallLastNs;
             long long nowMs = cn1GcProbeElapsedMs();
-            long long deltaMs = nowMs - cn1StallLastMs;
-            if(deltaNs < 0) {
-                deltaNs = 0;    // a thread died and took its clock with it
-            }
+            // No clamp on deltaNs. The source is monotonic now (see cn1StallSumThreads);
+            // the clamp that used to sit here existed only to hide a dying thread taking
+            // its clock with it, and would now hide a genuine accounting bug instead.
             fprintf(stderr, "[GCSTALL-T] v=1 tMs=%lld threads=%d stallMs=%lld dutyPct=%.1f"
                             " volume=%ld budget=%ld lowMem=%ld handshake=%ld pending=%ld\n",
                     nowMs, threads, deltaNs / 1000000LL,
-                    (deltaMs > 0 && threads > 0)
-                        ? 100.0 * (1.0 - ((double)deltaNs / 1000000.0) / ((double)deltaMs * threads))
+                    (cn1StallThreadTimeNs > 0)
+                        ? 100.0 * (1.0 - (double)deltaNs / (double)cn1StallThreadTimeNs)
                         : -1.0,
                     atomic_load_explicit(&cn1StallCount[CN1_STALL_PACING_VOLUME], memory_order_relaxed),
                     atomic_load_explicit(&cn1StallCount[CN1_STALL_PACING_BUDGET], memory_order_relaxed),
@@ -10800,7 +10938,7 @@ static void* cn1GcProbeThread(void* ignored) {
                     atomic_load_explicit(&cn1StallCount[CN1_STALL_HANDSHAKE], memory_order_relaxed),
                     atomic_load_explicit(&cn1StallCount[CN1_STALL_PENDING_FULL], memory_order_relaxed));
             cn1StallLastNs = nowNs;
-            cn1StallLastMs = nowMs;
+            cn1StallThreadTimeNs = 0;
         }
         fflush(stderr);
     }

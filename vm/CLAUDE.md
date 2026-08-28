@@ -98,6 +98,60 @@ the pull request description carry the pre-correction pair (51% -> 90%) and shou
 copied forward. That single number is what the whole issue was
 about, and no earlier instrument could produce it.
 
+**Three things about dutyPct that were wrong, because a duty figure is easy to compute and
+hard to compute correctly.** All three were found by review or by pointing the instrument at
+a workload whose threads come and go, and all three inflated it.
+
+- **The collector was in the denominator.** `threadRunner` sets `lightweightThread =
+  JAVA_TRUE` on every Java thread, the GC thread included, so a four-worker run divided the
+  aggregate stall by six thread-seconds instead of five. `cn1StallSumThreads` excludes
+  `System.gcThreadInstance`. The headline pair this branch reports is 38% -> 86%; anything
+  quoting 51% -> 90% predates the correction.
+- **The stall clock died with the thread that earned it.** It used to be summed from a
+  per-thread counter over the LIVE threads, and `markDeadThread()` drops a TLD out of
+  `allThreads` on exit -- so the next sample's delta went negative, got clamped to zero, and
+  the line reported **100% duty exactly at a thread-generation boundary**. Measured at exit
+  the live-thread walk returned 0 against a process-wide 9.4-35.2 seconds. The total now
+  comes from the process-wide per-cause counters (`cn1StallNs[]`), which nothing removes,
+  and the per-thread counter is gone. Substituting one for the other is exact only because
+  the collector never records a stall of its own -- all seven `CN1_STALL_ADD` sites are
+  mutator paths, and instrumenting `cn1StallRecord` to attribute by thread confirms it
+  (`gcThreadNs=0`, `nullTsRecords=0` on every shape).
+- **The "1Hz" line was not 1Hz, and a short window printed NEGATIVE duty.** `usleep` returns
+  early on `EINTR` and the signal-based thread stop delivers to the probe thread too, so the
+  series collapsed to ~20ms windows -- and four threads easily accrue more stall than 20ms
+  of one thread's wall clock. The loop now sleeps in slices until a second of monotonic time
+  has genuinely passed, and integrates the live mutator count across those slices, so the
+  denominator is real thread-time rather than one end-of-window count times elapsed wall
+  time. That integral is also what makes it correct when threads are created and destroyed
+  inside the window. `MutatorChurnDuty` is the driver that shows all of this.
+
+**Bulk reference copies take the SATB mutex once per chunk, and shut down with a
+handshake.** `cn1SatbEnqueue` locks per accepted reference, which is right for the per-store
+barrier and wrong for `cloneArray` / `arraycopy` on an object array -- the grace-pass audit
+put both through it, turning one `memcpy` into an acquisition per element. `cn1SatbEnqueueRange`
+filters unlocked and flushes 256 at a time: **1.155 -> 0.0055 acquisitions per logged
+reference, 210x fewer** (`satbLocks`/`satbRefs` under `CN1_GC_CONFORM`, driver
+`BulkCopyCost`, `-DCN1_SATB_NO_BULK` for the A/B). Normalise per logged reference or the
+comparison inverts: the arms do not log the same amount, because a mutator not serialising
+on a mutex gets further through its copies inside the same mark, which also makes the bulk
+arm's `markMs` and `satbMs` read HIGHER at an unchanged 6.4 -> 6.1ns per drained entry.
+Chunked rather than one hold for the whole range, because a single acquisition across a
+million-element array would block `cn1SatbTake` for the entire walk.
+
+The flag check and the append are two steps, so the collector can clear `gcSatbActive` and
+run its final `cn1SatbTake()` between chunks and strand entries in a log this cycle never
+drains again. For a single store that window is argued harmless where the flag is cleared;
+for `cloneArray` it is not, because the copy publishes into a brand new array the grace pass
+has ALREADY walked past, so a dropped reference is one the sweep can free under a live
+pointer. `cn1SatbBulkQuiesce` closes it: the enqueuer registers before re-reading the flag,
+the collector clears the flag then waits for the count to reach zero before the final take,
+both sides seq_cst. It is safe to spin on because nothing between register and deregister
+can block or reach a safepoint. It costs 3.2%, inside this host's noise.
+`-DCN1_SATB_NO_BULK_HANDSHAKE` compiles it out. This deliberately does NOT close the same
+window on the per-store barrier: there the handshake would have to be an unconditional
+atomic on every reference store, which is the exact cost that barrier is designed around.
+
 Read `cyclesOnDemand` / `cyclesAfterIdle` first. They say how the collector decided to
 start each cycle, and unlike any pause threshold they mean the same thing on a slow runner:
 a machine with fewer cores makes cycles longer, it does not make the collector idle through

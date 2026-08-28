@@ -1031,6 +1031,7 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 extern volatile int gcSatbActive;
 extern void cn1SatbEnqueue(JAVA_OBJECT old);
 extern void cn1SatbEnqueueRange(JAVA_ARRAY_OBJECT* refs, int count);
+extern void cn1SatbBulkQuiesce(void);
 #if defined(CN1_DISABLE_SATB)
 #define CN1_WRITE_BARRIER(target, value) do { } while(0)
 #else
@@ -1230,14 +1231,6 @@ struct ThreadLocalData {
     void* volatile gcSigStackBase;           // [sp,base) high bound (filled by GC/handler)
     char         gcSigRegs[4096];            // raw copy of the interrupted ucontext (GPRs)
     volatile sig_atomic_t gcSigRegsLen;      // valid bytes in gcSigRegs
-#endif
-#ifdef CN1_GC_CONFORM
-    // Cumulative nanoseconds this thread has spent stopped at any of the park sites
-    // enumerated by CN1_STALL_* in cn1_globals.m. Written by the owning thread, summed
-    // once a second by the probe thread, hence atomic rather than plain -- see the
-    // [GCSTALL-T] duty-cycle line. Present only in a CN1_GC_CONFORM build, so the
-    // struct a shipping build compiles is unchanged.
-    _Atomic long long gcStallNs;
 #endif
 };
 
