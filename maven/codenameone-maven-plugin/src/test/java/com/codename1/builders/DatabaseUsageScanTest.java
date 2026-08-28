@@ -394,8 +394,8 @@ class DatabaseUsageScanTest {
                 innerZip.write(chunk);
             }
             innerZip.closeEntry();
-            innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Secure.class"));
-            innerZip.write(classCalling("rawKey"));
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Plain.class"));
+            innerZip.write(classTouchingNothing());
             innerZip.closeEntry();
         } finally {
             innerZip.close();
@@ -410,13 +410,20 @@ class DatabaseUsageScanTest {
             aar.close();
         }
 
+        // Neither class in this archive touches the database, so a scan that
+        // read the whole thing answers no. It answers YES, which can only be
+        // the refusal talking -- and answering yes is the point: what the
+        // archive contains past the bomb is UNKNOWN, and reporting "no database
+        // use" for an unknown ships an application whose SQLite implementation
+        // was left out of the build and which fails on the device the first
+        // time it opens one.
         Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
-        assertFalse(usage.usesDatabase(),
-                "the scan must stop at the bomb rather than read past it");
-        assertFalse(usage.usesDatabaseCipher(), "and report nothing from beyond it");
+        assertTrue(usage.usesDatabase(),
+                "a budget refusal must be assumed to hide database use");
+        assertTrue(usage.usesDatabaseCipher(), "and to hide encryption with it");
 
-        // The same jar without the bomb still scans, so the assertion above is
-        // about the bound and not about the archive being unreadable.
+        // The same jar without the bomb answers no, so the assertion above is
+        // about the refusal and not about this scan saying yes to everything.
         assertTrue(new File(lib, "bomb.aar").delete());
         java.io.ByteArrayOutputStream plainInner = new java.io.ByteArrayOutputStream();
         java.util.zip.ZipOutputStream plainZip = new java.util.zip.ZipOutputStream(plainInner);
@@ -424,8 +431,8 @@ class DatabaseUsageScanTest {
             plainZip.putNextEntry(new java.util.zip.ZipEntry("assets/small.bin"));
             plainZip.write(new byte[16]);
             plainZip.closeEntry();
-            plainZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Secure.class"));
-            plainZip.write(classCalling("rawKey"));
+            plainZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Plain.class"));
+            plainZip.write(classTouchingNothing());
             plainZip.closeEntry();
         } finally {
             plainZip.close();
@@ -439,8 +446,23 @@ class DatabaseUsageScanTest {
         } finally {
             ok.close();
         }
-        assertTrue(executor.scanForDatabaseUsage(root).usesDatabaseCipher(),
-                "a nested class after an ordinary skipped entry is still read");
+        assertFalse(executor.scanForDatabaseUsage(root).usesDatabase(),
+                "a nested archive read to its end reports what it actually contains");
+    }
+
+    /// A class that references nothing this scan looks for.
+    private byte[] classTouchingNothing() {
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "com/vendor/Plain", null, "java/lang/Object", null);
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "run", "()V", null, null);
+        m.visitCode();
+        m.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        m.visitMaxs(1, 1);
+        m.visitEnd();
+        w.visitEnd();
+        return w.toByteArray();
     }
 
     @Test

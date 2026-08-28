@@ -908,6 +908,15 @@ public abstract class Executor {
                         } finally {
                             nested.close();
                         }
+                    } catch (ScanBudgetExceeded refused) {
+                        // Same exception, opposite handling, for the reason the
+                        // comment above gives: the consequence of dropping
+                        // classes here is silent and lands on the device. A .jar
+                        // that turns out not to be an archive genuinely says
+                        // nothing about the entries after it; a refusal says the
+                        // rest is unknown, and unknown has to be resolved
+                        // upwards rather than skipped past.
+                        throw refused;
                     } catch (IOException cannotReadEntry) {
                         log("WARNING: could not read " + name + " inside " + archive
                                 + " while looking for database use; the rest of the archive was "
@@ -929,12 +938,32 @@ public abstract class Executor {
                     } finally {
                         in.close();
                     }
+                } catch (ScanBudgetExceeded refused) {
+                    // Not swallowed like an unreadable entry. Skipping one entry
+                    // and reading on is right when that entry is corrupt; it is
+                    // wrong when the budget stopped us, because the aggregate
+                    // budget then refuses every entry after it as well and the
+                    // archive quietly contributes nothing while looking read.
+                    throw refused;
                 } catch (IOException cannotReadEntry) {
                     log("WARNING: could not read " + name + " inside " + archive
                             + " while looking for database use; the rest of the archive was still "
                             + "read");
                 }
             }
+        } catch (ScanBudgetExceeded refused) {
+            // Answer YES rather than continue with a partial read. This gate
+            // decides whether the SQLite and cipher implementations are linked
+            // in, so a false negative is a green build that fails on the device
+            // the first time the application opens a database -- and a refusal
+            // means the rest of the archive is UNKNOWN, not absent. Being wrong
+            // in this direction costs a fatter binary (and on Android a higher
+            // minimum SDK), which is the loud, recoverable half of the trade.
+            found[0] = true;
+            found[1] = true;
+            log("WARNING: " + archive + " was refused by the scan budget ("
+                    + refused.getMessage() + "); assuming it uses an encrypted database, "
+                    + "because what it contains past that point cannot be known");
         } catch (IOException cannotRead) {
             // An archive that cannot be opened says nothing either way, and refusing to build over
             // it would fail every application carrying a jar this cannot parse.
@@ -1332,6 +1361,23 @@ public abstract class Executor {
         }
     }
 
+    /**
+     * Thrown when a scan refuses to keep reading, as opposed to failing to read.
+     *
+     * <p>The difference matters to the database scan. An archive that cannot be
+     * parsed says nothing either way and is skipped, which is right. A budget
+     * refusal is not that: the bytes were readable and we chose to stop, so what
+     * comes after them is unknown rather than absent -- and answering "no
+     * database use" for an unknown ships an application whose SQLite or cipher
+     * implementation was left out of the build. A separate type is what lets the
+     * two be told apart at the catch.</p>
+     */
+    static final class ScanBudgetExceeded extends IOException {
+        ScanBudgetExceeded(String message) {
+            super(message);
+        }
+    }
+
     static final class PermScanBudget {
         private long total;
         private int extracted;
@@ -1356,7 +1402,7 @@ public abstract class Executor {
             }
             streamBytes += n;
             if (streamBytes > streamLimit) {
-                throw new IOException("nested archives fed more than " + streamLimit
+                throw new ScanBudgetExceeded("nested archives fed more than " + streamLimit
                         + " bytes to the permission scan; refusing to keep reading");
             }
         }
@@ -1373,7 +1419,7 @@ public abstract class Executor {
          */
         void entry(String name) throws IOException {
             if (++entries > PERM_SCAN_MAX_ENTRIES) {
-                throw new IOException("more than " + PERM_SCAN_MAX_ENTRIES
+                throw new ScanBudgetExceeded("more than " + PERM_SCAN_MAX_ENTRIES
                         + " archive entries; refusing to keep scanning (at " + name + ")");
             }
         }
@@ -1388,7 +1434,7 @@ public abstract class Executor {
          */
         File nextFile(File tmp) throws IOException {
             if (extracted >= PERM_SCAN_MAX_ENTRIES) {
-                throw new IOException("more than " + PERM_SCAN_MAX_ENTRIES
+                throw new ScanBudgetExceeded("more than " + PERM_SCAN_MAX_ENTRIES
                         + " class entries; refusing to keep extracting");
             }
             return new File(tmp, (extracted++) + ".class");
@@ -1418,7 +1464,7 @@ public abstract class Executor {
          */
         byte[] readEntry(InputStream in, String name, long declared) throws IOException {
             if (declared > PERM_SCAN_MAX_ENTRY_BYTES) {
-                throw new IOException("entry " + name + " declares " + declared
+                throw new ScanBudgetExceeded("entry " + name + " declares " + declared
                         + " bytes; refusing to read it");
             }
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(
@@ -1430,11 +1476,11 @@ public abstract class Executor {
                 entryBytes += n;
                 total += n;
                 if (entryBytes > PERM_SCAN_MAX_ENTRY_BYTES) {
-                    throw new IOException("class entry " + name + " expands past "
+                    throw new ScanBudgetExceeded("class entry " + name + " expands past "
                             + PERM_SCAN_MAX_ENTRY_BYTES + " bytes; refusing to keep reading");
                 }
                 if (total > PERM_SCAN_MAX_TOTAL_BYTES) {
-                    throw new IOException("class entries expand beyond the "
+                    throw new ScanBudgetExceeded("class entries expand beyond the "
                             + PERM_SCAN_MAX_TOTAL_BYTES
                             + " byte scan budget; refusing to keep reading");
                 }
@@ -1452,7 +1498,7 @@ public abstract class Executor {
          */
         void copy(InputStream in, File out, String name, long declared) throws IOException {
             if (declared > PERM_SCAN_MAX_ENTRY_BYTES) {
-                throw new IOException("entry " + name + " declares " + declared
+                throw new ScanBudgetExceeded("entry " + name + " declares " + declared
                         + " bytes; refusing to read it");
             }
             if (out == null) {
@@ -1466,11 +1512,11 @@ public abstract class Executor {
                     entryBytes += n;
                     total += n;
                     if (entryBytes > PERM_SCAN_MAX_ENTRY_BYTES) {
-                        throw new IOException("entry " + name + " expands past "
+                        throw new ScanBudgetExceeded("entry " + name + " expands past "
                                 + PERM_SCAN_MAX_ENTRY_BYTES + " bytes; refusing to keep reading");
                     }
                     if (total > PERM_SCAN_MAX_TOTAL_BYTES) {
-                        throw new IOException("archive entries expand beyond the "
+                        throw new ScanBudgetExceeded("archive entries expand beyond the "
                                 + PERM_SCAN_MAX_TOTAL_BYTES
                                 + " byte scan budget; refusing to keep reading");
                     }
@@ -1488,11 +1534,11 @@ public abstract class Executor {
                     // Checked as the bytes arrive, which is the only check a
                     // compression bomb cannot lie its way past.
                     if (entryBytes > PERM_SCAN_MAX_ENTRY_BYTES) {
-                        throw new IOException("class entry " + name + " expands past "
+                        throw new ScanBudgetExceeded("class entry " + name + " expands past "
                                 + PERM_SCAN_MAX_ENTRY_BYTES + " bytes; refusing to keep reading");
                     }
                     if (total > PERM_SCAN_MAX_TOTAL_BYTES) {
-                        throw new IOException("class entries expand beyond the "
+                        throw new ScanBudgetExceeded("class entries expand beyond the "
                                 + PERM_SCAN_MAX_TOTAL_BYTES
                                 + " byte scan budget; refusing to keep extracting");
                     }
@@ -1581,6 +1627,14 @@ public abstract class Executor {
                     } finally {
                         nested.close();
                     }
+                } catch (ScanBudgetExceeded refused) {
+                    // Let it out, so the caller's handler reports it. Swallowing
+                    // it here left the loudest case the quietest: the budget is
+                    // shared, so every entry after the refusal is refused too,
+                    // and the archive finished with no protected API found and
+                    // not one word about why. The permissions it would have
+                    // justified are then simply absent from the manifest.
+                    throw refused;
                 } catch (IOException cannotReadEntry) {
                     message.append("WARNING: could not read ")
                             .append(entry.getName()).append(" inside ")
