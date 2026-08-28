@@ -295,11 +295,16 @@ public class Dialog extends Form implements AbstractDialog {
         private final int tint;
         private final Image backdrop;
 
-        DialogScrim(Dialog dlg, boolean blocking, int tint, Image backdrop) {
+        DialogScrim(Dialog dlg, int tint, Image backdrop) {
             this.dlg = dlg;
             this.tint = tint;
             this.backdrop = backdrop;
-            setGrabsPointerEvents(blocking);
+            // Always, not only when modal. Grabbing is what puts this in front of the
+            // window's own content for hit testing, and that is as necessary for
+            // delivering an outside press to a modeless popup as it is for swallowing
+            // one aimed through a modal dialog. A scrim only exists when the dialog
+            // wants one of those two things.
+            setGrabsPointerEvents(true);
         }
 
         @Override
@@ -2345,7 +2350,7 @@ public class Dialog extends Form implements AbstractDialog {
         getStyle().setBgPainter(NO_OP_PAINTER);
 
         if (modal || disposeWhenPointerOutOfBounds) {
-            scrim = new DialogScrim(this, modal, getTintColor(), backdrop);
+            scrim = new DialogScrim(this, getTintColor(), backdrop);
             layer.addComponent(scrim);
         }
 

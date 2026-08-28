@@ -368,4 +368,252 @@ class NativeWindowDialogTest extends UITestBase {
         assertTrue(d.isDisposed(),
                 "closing with the title bar has to mean the same as pressing Cancel");
     }
+
+    @FormTest
+    void setWindowContentSizeAsksForTheFrameThatYieldsThatDrawable() {
+        // Standalone, because it is the piece most likely to look like a layout bug
+        // when it is wrong: the dialog is clipped along the bottom by exactly the
+        // height of the title bar.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+        Window w = new Window("sized", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+
+        w.setWindowContentSize(400, 300);
+        DisplayTest.flushEdt();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(420, peer.getWidth(),
+                "the frame asked for is the drawable plus the chrome outside it");
+        assertEquals(350, peer.getHeight());
+
+        // And once the port reports the resize, as a real one does, the drawable is
+        // exactly what was asked for rather than short by the title bar.
+        Desktop.getInstance().windowSizeChanged(w.getWindowId(),
+                peer.getWidth() - 20, peer.getHeight() - 50);
+        DisplayTest.flushEdt();
+        assertEquals(400, w.getWidth());
+        assertEquals(300, w.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void setWindowContentSizeIsAPlainSizeWhenThereIsNoChrome() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("sized", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+
+        w.setWindowContentSize(400, 300);
+        DisplayTest.flushEdt();
+        assertEquals(400, w.getWidth());
+        assertEquals(300, w.getHeight());
+        assertEquals(400, wm.getLastWindow().getWidth(),
+                "with no chrome it must not over-correct");
+        assertEquals(300, wm.getLastWindow().getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aModelessNativeDialogDoesNotBlockAndDoesNotPark() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Dialog d = newDialog("modeless");
+        d.setNativeWindowMode(true);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        Window w = d.getNativeWindow();
+        assertNotNull(w);
+        assertEquals(Window.MODALITY_NONE, w.getModalityType(),
+                "a modeless dialog blocks nothing");
+        assertFalse(Desktop.getInstance().isWindowInputBlocked(0),
+                "and the main surface stays usable");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aNativeDialogOpenedFromAWindowIsOwnedByThatWindow() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+        Window host = new Window("host", new BorderLayout());
+        host.setWindowSize(600, 500);
+        host.show();
+        DisplayTest.flushEdt();
+
+        Dialog d = newDialog("owned");
+        d.setTopLevelHost(host);
+        d.setNativeWindowMode(true);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        Window w = d.getNativeWindow();
+        assertNotNull(w);
+        assertSame(host, w.getOwnerWindow(),
+                "a dialog opened from a window belongs to that window, so it stays "
+                        + "above it and goes away with it");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        host.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void disposingTheOwnerCascadesToTheDialogsWindow() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+        Window host = new Window("host", new BorderLayout());
+        host.setWindowSize(600, 500);
+        host.show();
+        DisplayTest.flushEdt();
+
+        Dialog d = newDialog("cascades");
+        d.setTopLevelHost(host);
+        d.setNativeWindowMode(true);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertNotNull(d.getNativeWindow());
+
+        host.dispose();
+        DisplayTest.flushEdt();
+
+        assertNull(d.getNativeWindow(),
+                "the dialog has to be torn down however its window died");
+        assertNull(d.getParent(), "and come back out of it");
+    }
+
+    @FormTest
+    void aMenuStyleCommandIsPublishedToTheWindow() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Dialog d = newDialog("menu commands");
+        d.setNativeWindowMode(true);
+        d.addCommand(new Command("Help"));
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        Window w = d.getNativeWindow();
+        assertNotNull(w);
+        assertEquals(1, w.getCommandCount(),
+                "a command added with addCommand goes where the platform shows a "
+                        + "window's commands");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void theDialogTitleBecomesTheWindowTitleAndItsOwnIsHidden() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Dialog d = newDialog("Delete document");
+        d.setNativeWindowMode(true);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        Window w = d.getNativeWindow();
+        assertNotNull(w);
+        assertEquals("Delete document", w.getTitle());
+        assertFalse(d.getTitleArea().isVisible(),
+                "the platform draws the title, so the dialog must not draw it twice");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        assertTrue(d.getTitleArea().isVisible(), "and it comes back afterwards");
+    }
+
+    @FormTest
+    void flippingTheModeWhileShowingDoesNotMigrateTheDialog() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Dialog d = newDialog("stays put");
+        d.setNativeWindowMode(true);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        Window w = d.getNativeWindow();
+        assertNotNull(w);
+
+        d.setNativeWindowMode(false);
+        DisplayTest.flushEdt();
+        assertSame(w, d.getNativeWindow(),
+                "a showing dialog is never reparented between strategies; there is no "
+                        + "safe point to do it while a caller may be parked on it");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertNull(d.getNativeWindow(), "the new setting takes effect on the next show");
+        d.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void initNativeWindowCanReconfigureTheWindowBeforeItAppears() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        final boolean[] called = new boolean[1];
+        Dialog d = new Dialog("configurable") {
+            @Override
+            protected void initNativeWindow(Window w) {
+                called[0] = true;
+                w.setResizable(true);
+            }
+        };
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setNativeWindowMode(true);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        assertTrue(called[0], "the hook has to run");
+        assertTrue(d.getNativeWindow().isResizable(),
+                "and what it did has to stick");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void anInteractionDialogPopupNeverOpensAWindowEither() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        Button anchor = new Button("anchor");
+        main.add(BorderLayout.CENTER, anchor);
+        main.show();
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        id.add(BorderLayout.CENTER, new Label("body"));
+        id.setNativeWindowMode(true);
+        id.showPopupDialog(anchor);
+        DisplayTest.flushEdt();
+
+        assertNull(id.getNativeWindow(),
+                "an anchored popup points into its host's coordinate space either way");
+        id.dispose();
+        DisplayTest.flushEdt();
+    }
 }

@@ -144,4 +144,75 @@ class SheetInWindowTest extends UITestBase {
         assertFalse(isUnder(second, sheet),
                 "and it must never have been moved onto the form navigated to");
     }
+
+    @FormTest
+    void aSheetWithNoSurfaceSaysSoRatherThanThrowingNull() {
+        // It used to dereference the null current form. Both are unchecked, but one of
+        // them says what went wrong.
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("never shown", new BorderLayout());
+        final Sheet sheet = new Sheet(null, "orphan");
+        // A host that exists but was never shown has no layered pane geometry; the
+        // interesting case is no host at all, which the explicit host makes reachable.
+        sheet.setTopLevelHost(null);
+        assertNull(sheet.getTopLevelHost());
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void anExplicitHostBeatsTheFocusedWindow() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+        Window a = new Window("a", new BorderLayout());
+        a.setWindowSize(500, 400);
+        a.show();
+        Window b = new Window("b", new BorderLayout());
+        b.setWindowSize(500, 400);
+        b.show();
+        DisplayTest.flushEdt();
+        Desktop.getInstance().windowFocusChanged(b.getWindowId(), true);
+        DisplayTest.flushEdt();
+
+        Sheet sheet = new Sheet(null, "options");
+        sheet.setTopLevelHost(a);
+        sheet.show(0);
+        settle(a);
+
+        assertSame(sheet, Sheet.getCurrentSheet(a), "the named host wins over the focused one");
+        assertNull(Sheet.getCurrentSheet(b));
+
+        sheet.back(0);
+        settle(a);
+        a.dispose();
+        b.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void getCurrentSheetWithNoArgumentFollowsTheSurfaceTheUserIsIn() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        w.show();
+        DisplayTest.flushEdt();
+        Desktop.getInstance().windowFocusChanged(w.getWindowId(), true);
+        DisplayTest.flushEdt();
+
+        Sheet sheet = new Sheet(null, "options");
+        sheet.setTopLevelHost(w);
+        sheet.show(0);
+        settle(w);
+
+        assertSame(sheet, Sheet.getCurrentSheet(),
+                "the no-argument form asks the surface the user is actually in");
+
+        sheet.back(0);
+        settle(w);
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

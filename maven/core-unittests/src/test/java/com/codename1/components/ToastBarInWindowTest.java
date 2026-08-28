@@ -92,4 +92,39 @@ class ToastBarInWindowTest extends UITestBase {
     // ToastBar.Status.show() drives it through slideUpAndWait -- which parks the event
     // dispatch thread until the animation finishes. That belongs in the device
     // conformance suite, which runs a real surface, rather than here.
+
+    @FormTest
+    void aDisposedWindowTakesItsToastBarWithIt() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        ToastBar first = ToastBar.getInstance(w);
+        assertNotNull(first);
+
+        w.dispose();
+        DisplayTest.flushEdt();
+
+        // Cached on the window itself rather than in a registry, so there is nothing
+        // to clean up and nothing that outlives the window.
+        Window second = new Window("host again", new BorderLayout());
+        second.setWindowSize(400, 300);
+        second.show();
+        DisplayTest.flushEdt();
+        assertNotSame(first, ToastBar.getInstance(second),
+                "a new window gets a new one rather than inheriting the old window's");
+
+        second.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aNullTopLevelFallsBackToTheSingleton() {
+        assertSame(ToastBar.getInstance(), ToastBar.getInstance(null),
+                "callers with nothing to resolve still get the singleton");
+    }
 }

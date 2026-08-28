@@ -1460,22 +1460,27 @@ public class Window extends Container implements TopLevelContainer {
             });
             return;
         }
-        setWindowSize(width, height);
         if (nativePeer == null) {
-            // No peer to measure against yet. show() applies the pending size, and the
-            // caller can ask again once the window is up if it needs the exact fit.
+            // Nothing to measure against yet, so this is an ordinary size. show()
+            // applies it, and a caller that needs the exact fit can ask again after.
+            setWindowSize(width, height);
             return;
         }
+        // Measured before resizing, from the window as it stands: the frame the
+        // platform reports and the drawable it currently gives us describe the same
+        // moment. Reading the drawable back after a resize instead would measure the
+        // old one, because the new size does not reach the component until the port
+        // reports it.
+        Rectangle frame = getWindowBounds();
         int drawableW = getWidth();
         int drawableH = getHeight();
-        if (drawableW <= 0 || drawableH <= 0) {
-            return;
+        int chromeW = 0;
+        int chromeH = 0;
+        if (frame != null && drawableW > 0 && drawableH > 0) {
+            chromeW = Math.max(0, frame.getWidth() - drawableW);
+            chromeH = Math.max(0, frame.getHeight() - drawableH);
         }
-        int chromeW = width - drawableW;
-        int chromeH = height - drawableH;
-        if (chromeW != 0 || chromeH != 0) {
-            setWindowSize(width + chromeW, height + chromeH);
-        }
+        setWindowSize(width + chromeW, height + chromeH);
     }
 
     /// Moves and resizes this window.

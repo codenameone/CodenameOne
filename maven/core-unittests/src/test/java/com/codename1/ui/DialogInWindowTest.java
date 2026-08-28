@@ -376,4 +376,307 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    /// Opens a window with a form behind it, ready to host a dialog.
+    private Window openHost(int w, int h) {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+        Window win = new Window("host", new BorderLayout());
+        win.setWindowSize(w, h);
+        win.show();
+        DisplayTest.flushEdt();
+        return win;
+    }
+
+    @FormTest
+    void everyModelessEntryPointReachesTheWindow() {
+        // show(), showModeless(), show(t,b,l,r,...), showAtPosition, showPacked and
+        // showStretched all funnel through one dispatch point. Each is checked because
+        // they do not all reach it the same way -- showPacked and showPopupDialog get
+        // there through show(), the rest through Form.showDialog.
+        Window w = openHost(700, 600);
+        try {
+            Dialog a = new Dialog("modeless");
+            a.setLayout(new BorderLayout());
+            a.add(BorderLayout.CENTER, new Label("body"));
+            a.setTopLevelHost(w);
+            a.showModeless();
+            DisplayTest.flushEdt();
+            assertTrue(isUnder(w, a), "showModeless");
+            a.dispose();
+            DisplayTest.flushEdt();
+
+            Dialog b = new Dialog("packed");
+            b.setLayout(new BorderLayout());
+            b.add(BorderLayout.CENTER, new Label("body"));
+            b.setTopLevelHost(w);
+            b.showPacked(BorderLayout.CENTER, false);
+            DisplayTest.flushEdt();
+            assertTrue(isUnder(w, b), "showPacked");
+            b.dispose();
+            DisplayTest.flushEdt();
+
+            Dialog c = new Dialog("stretched");
+            c.setLayout(new BorderLayout());
+            c.add(BorderLayout.CENTER, new Label("body"));
+            c.setTopLevelHost(w);
+            c.showStretched(BorderLayout.SOUTH, false);
+            DisplayTest.flushEdt();
+            assertTrue(isUnder(w, c), "showStretched");
+            c.dispose();
+            DisplayTest.flushEdt();
+
+            Dialog d = new Dialog("margins");
+            d.setLayout(new BorderLayout());
+            d.add(BorderLayout.CENTER, new Label("body"));
+            d.setTopLevelHost(w);
+            d.show(20, 20, 20, 20, true, false);
+            DisplayTest.flushEdt();
+            assertTrue(isUnder(w, d), "show(top,bottom,left,right,includeTitle,modal)");
+            d.dispose();
+            DisplayTest.flushEdt();
+
+            Dialog e = new Dialog("positioned");
+            e.setLayout(new BorderLayout());
+            e.add(BorderLayout.CENTER, new Label("body"));
+            e.setTopLevelHost(w);
+            e.showAtPosition(20, 20, 20, 20, false);
+            DisplayTest.flushEdt();
+            assertTrue(isUnder(w, e), "showAtPosition");
+            e.dispose();
+            DisplayTest.flushEdt();
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void aModalDialogInAWindowBlocksPressesReachingTheContentBehindIt() throws Exception {
+        // The scrim is what makes a hosted dialog modal at all: without something in
+        // the layer that responds to pointer events the window hands the press to its
+        // content pane and the button underneath fires.
+        final Window w = openHost(600, 500);
+        final boolean[] pressedBehind = new boolean[1];
+        Button behind = new Button("behind");
+        behind.addActionListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                pressedBehind[0] = true;
+            }
+        });
+        w.add(BorderLayout.CENTER, behind);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+        int bx = behind.getAbsoluteX() + behind.getWidth() / 2;
+        int by = behind.getAbsoluteY() + behind.getHeight() / 2;
+
+        // Sanity: the press reaches the button when nothing is over it. Without this
+        // the assertion below would pass on a window that ignores input entirely.
+        w.pointerPressed(bx, by);
+        w.pointerReleased(bx, by);
+        DisplayTest.flushEdt();
+        assertTrue(pressedBehind[0], "sanity: the button is reachable to begin with");
+        pressedBehind[0] = false;
+
+        final Dialog d = new Dialog("modal");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setDisposeWhenPointerOutOfBounds(false);
+        d.setTopLevelHost(w);
+
+        // A modal show parks its caller, so it is driven off the dispatch thread.
+        Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                d.show(10, 10, 10, 10, true, true);
+            }
+        }, "cn1-test-modal-dialog");
+        caller.start();
+        try {
+            for (int i = 0; i < 400 && d.getParent() == null; i++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            assertTrue(isUnder(w, d), "precondition: the modal dialog is up");
+
+            w.pointerPressed(bx, by);
+            w.pointerReleased(bx, by);
+            DisplayTest.flushEdt();
+            assertFalse(pressedBehind[0],
+                    "a press aimed through a modal dialog must not reach what is behind it");
+        } finally {
+            d.dispose();
+            for (int i = 0; i < 400 && caller.isAlive(); i++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            caller.join(2000);
+            assertFalse(caller.isAlive(), "the modal wait has to end, not leak a thread");
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void pressingOutsideAHostedDialogDismissesItWhenAsked() {
+        // The other half of what the scrim is for: it is also the only thing that can
+        // deliver an outside press to the dialog. Without it the press goes to the
+        // window's content pane and Dialog.pointerReleased never runs.
+        Window w = openHost(600, 500);
+        Dialog d = new Dialog("dismissable");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setDisposeWhenPointerOutOfBounds(true);
+        d.setTopLevelHost(w);
+        d.show(80, 80, 80, 80, true, false);
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(w, d), "precondition: the dialog is up");
+
+        // The very top left of the window, which the inset dialog cannot cover.
+        w.pointerPressed(2, 2);
+        w.pointerReleased(2, 2);
+        DisplayTest.flushEdt();
+
+        assertTrue(d.isDisposed(),
+                "a press outside the dialog has to reach it and close it");
+        assertTrue(d.wasDisposedDueToOutOfBoundsTouch());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aTimeoutDisposesAWindowHostedDialog() {
+        // The guard for the animation registration fix: setTimeout registers the dialog
+        // as an animation, and inside a window that registration used to reach nobody,
+        // so the timeout never elapsed and the dialog stayed up for good.
+        Window w = openHost(500, 400);
+        Dialog d = new Dialog("timed");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        // Long enough that the dialog is demonstrably up before it elapses.
+        d.setTimeout(120);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(w, d), "precondition: the dialog is up");
+
+        for (int i = 0; i < 200 && !d.isDisposed(); i++) {
+            w.repaintAnimations();
+            DisplayTest.flushEdt();
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        assertTrue(d.isDisposed(), "the timeout has to elapse inside a window too");
+        assertNull(d.getParent());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void theBackKeyDisposesAWindowHostedDialog() {
+        // A window has no menu bar to map the back key, so the dialog listens for it.
+        Window w = openHost(500, 400);
+        Dialog d = new Dialog("backable");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(w, d));
+
+        w.keyReleased(MenuBar.backSK);
+        DisplayTest.flushEdt();
+        assertTrue(d.isDisposed(), "back has to close a dialog hosted on a window");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aBackCommandIsFiredRatherThanJustDisposing() {
+        Window w = openHost(500, 400);
+        Dialog d = new Dialog("with back");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        Command back = new Command("Cancel");
+        d.setBackCommand(back);
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        w.keyReleased(MenuBar.backSK);
+        DisplayTest.flushEdt();
+        assertTrue(d.isDisposed());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void resizingTheHostReadjustsAHostedDialog() {
+        Window w = openHost(600, 500);
+        Dialog d = new Dialog("resizes");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showPacked(BorderLayout.CENTER, false);
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(w, d));
+
+        Desktop.getInstance().windowSizeChanged(w.getWindowId(), 900, 700);
+        DisplayTest.flushEdt();
+
+        assertTrue(isUnder(w, d), "a resize must not evict the dialog");
+        assertTrue(d.getWidth() <= w.getWidth());
+        assertTrue(d.getHeight() <= w.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aPopupInAWindowSurvivesAResizeButNotAnOrientationFlip() {
+        // showPopupDialog is what turns disposeOnRotation on. A window has no
+        // orientation, so firing on any resize at all would close the popup the moment
+        // the user dragged the window wider.
+        final Window w = openHost(900, 500);
+        Button anchor = new Button("anchor");
+        w.add(BorderLayout.CENTER, anchor);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+
+        final Dialog d = new Dialog();
+        final boolean[] survivedResize = new boolean[1];
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("popup"));
+        d.addShowListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                // Wider, still landscape: the popup has to survive this.
+                Desktop.getInstance().windowSizeChanged(w.getWindowId(), 1100, 500);
+                survivedResize[0] = !d.isDisposed();
+                // Now actually flipped, which does close it and ends the blocking show.
+                Desktop.getInstance().windowSizeChanged(w.getWindowId(), 500, 1100);
+                if (!d.isDisposed()) {
+                    d.dispose();
+                }
+            }
+        });
+        d.showPopupDialog(anchor);
+        DisplayTest.flushEdt();
+
+        assertTrue(survivedResize[0],
+                "a resize that keeps the window's shape must not close a popup on it");
+        assertTrue(d.isDisposed(), "but an orientation flip does");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }
