@@ -1007,6 +1007,16 @@ static NETunnelProviderManager *cn1vpTunnelManager = nil;
 
 static CN1VpnTunnelWatcher *cn1vpTunnelWatcher = nil;
 
+/// Which start is current.
+///
+/// The watcher covers a start once it is armed. Everything before that --
+/// loading the manager, saving it, reloading it -- is asynchronous too, and a
+/// stop arriving in that window found no watcher and no manager, answered
+/// successfully, and then the continuation went on to start the session. The
+/// tunnel came up after the caller was told it was down. Bumped by every
+/// start and every stop, and checked before the session is started.
+static int cn1vpTunnelGeneration = 0;
+
 /// Stops watching and releases the watcher, ANSWERING it if it never was.
 ///
 /// A watcher carries the only completion path its start has. Releasing one
@@ -1108,7 +1118,14 @@ void com_codename1_impl_ios_IOSNative_vpnStartTunnel___int_java_lang_String(
                     stringToUTF8(threadStateData, setupWire)];
     [wire retain];
     int rid = (int)requestId;
+    int generation = ++cn1vpTunnelGeneration;
     cn1vpLoadTunnelManager(^(NETunnelProviderManager *m, NSError *loadError) {
+        if (generation != cn1vpTunnelGeneration) {
+            cn1vpTunnelAck(rid, NO, CN1_VPN_ERR_UNKNOWN,
+                    @"The tunnel start was superseded before it opened");
+            [wire release];
+            return;
+        }
         if (m == nil) {
             cn1vpFail(rid, CN1_VPN_ERR_UNKNOWN, loadError);
             [wire release];
@@ -1158,6 +1175,16 @@ void com_codename1_impl_ios_IOSNative_vpnStartTunnel___int_java_lang_String(
                 NSError *startError = nil;
                 NETunnelProviderSession *session =
                         (NETunnelProviderSession *)m.connection;
+                if (generation != cn1vpTunnelGeneration) {
+                    // A stop landed while this was saving and reloading.
+                    // Starting now would bring the tunnel up behind the
+                    // answer that caller already has.
+                    cn1vpTunnelAck(rid, NO, CN1_VPN_ERR_UNKNOWN,
+                            @"The tunnel start was superseded while it was"
+                            @" opening");
+                    [wire release];
+                    return;
+                }
                 BOOL ok = [session startVPNTunnelAndReturnError:&startError];
                 if (!ok) {
                     cn1vpFail(rid, CN1_VPN_ERR_UNKNOWN, startError);
@@ -1196,9 +1223,10 @@ void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId) {
     int rid = (int)requestId;
-    // A start still waiting for its extension is superseded by this stop;
-    // leaving the watcher armed would have it read the teardown as that
-    // start's answer.
+    // Invalidates any start in flight, armed or not; see
+    // cn1vpTunnelGeneration. The watcher covers the armed ones and this
+    // covers the window before that, where there is nothing to disarm.
+    cn1vpTunnelGeneration++;
     cn1vpStopWatchingTunnel();
     if (cn1vpTunnelManager != nil) {
         [(NETunnelProviderSession *)cn1vpTunnelManager.connection stopVPNTunnel];

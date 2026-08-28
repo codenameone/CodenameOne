@@ -75,6 +75,17 @@ public class CN1VpnService extends VpnService {
 
     private static Thread loop;
 
+    /// Which start is current. Bumped by every start and every stop, and
+    /// re-checked by an opener before it publishes anything.
+    ///
+    /// A stop that arrives while an opener is still resolving DNS or
+    /// establishing the interface finds no published host, answers
+    /// successfully and calls stopSelf -- and the opener then went on to
+    /// establish, promote and publish a tunnel the caller had been told was
+    /// stopped. Nothing it could check said otherwise, because the state it
+    /// would have checked is the state it had not written yet.
+    private static int startGeneration;
+
     private static DescriptorTunnelTransport transport;
 
     @Override
@@ -124,7 +135,12 @@ public class CN1VpnService extends VpnService {
         final String[] fields = TunnelWire.split(wire);
         final VpnTunnel starting = tunnel;
         final int rid = requestId;
-        Thread opener = new Thread(new Opener(this, starting, fields, rid),
+        int generation;
+        synchronized (CN1VpnService.class) {
+            generation = ++startGeneration;
+        }
+        Thread opener = new Thread(
+                new Opener(this, starting, fields, rid, generation),
                 "CN1 VPN tunnel start");
         opener.setDaemon(true);
         opener.start();
@@ -140,23 +156,39 @@ public class CN1VpnService extends VpnService {
         private final VpnTunnel tunnel;
         private final String[] fields;
         private final int requestId;
+        private final int generation;
 
         Opener(CN1VpnService service, VpnTunnel tunnel, String[] fields,
-                int requestId) {
+                int requestId, int generation) {
             this.service = service;
             this.tunnel = tunnel;
             this.fields = fields;
             this.requestId = requestId;
+            this.generation = generation;
         }
 
         @Override
         public void run() {
-            service.open(tunnel, fields, requestId);
+            service.open(tunnel, fields, requestId, generation);
+        }
+    }
+
+    /// Whether this opener is still the current start.
+    private static boolean current(int generation) {
+        synchronized (CN1VpnService.class) {
+            return generation == startGeneration;
         }
     }
 
     /// The rest of the start, with DNS allowed.
-    private void open(VpnTunnel tunnel, String[] fields, int requestId) {
+    private void open(VpnTunnel tunnel, String[] fields, int requestId,
+            int generation) {
+        if (!current(generation)) {
+            // Superseded before this thread got going.
+            fail(requestId, VpnError.UNKNOWN,
+                    "The tunnel start was superseded before it opened");
+            return;
+        }
         ParcelFileDescriptor fd;
         try {
             fd = establish(fields);
@@ -173,6 +205,21 @@ public class CN1VpnService extends VpnService {
             fail(requestId, VpnError.UNAUTHORIZED,
                     "The VPN consent this app was granted is no longer in"
                     + " force; call Tunnels.start() again to ask for it");
+            stopSelf();
+            return;
+        }
+        // RE-CHECKED with the descriptor in hand. Establishing can take a
+        // while -- a DNS lookup and a platform call -- and a stop that
+        // arrived meanwhile has already told the caller the tunnel is down.
+        // Publishing now would bring one up behind that answer.
+        if (!current(generation)) {
+            try {
+                fd.close();
+            } catch (java.io.IOException alreadyGone) {
+                // Nothing useful to do; the link is going either way.
+            }
+            fail(requestId, VpnError.UNKNOWN,
+                    "The tunnel start was superseded while it was opening");
             stopSelf();
             return;
         }
@@ -283,13 +330,18 @@ public class CN1VpnService extends VpnService {
                     ? (net.indexOf(':') >= 0 ? 128 : 32)
                     : parsePrefix(routes[i].substring(slash + 1),
                             net.indexOf(':') >= 0 ? 128 : 32);
-            if (!excluded && server != null && net.indexOf(':') < 0
-                    && server.indexOf(':') < 0) {
+            if (!excluded && server != null
+                    && (net.indexOf(':') >= 0) == (server.indexOf(':') >= 0)) {
                 // No excludeRoute on this platform, so the route is SPLIT
                 // around the server instead: the complement of one address
-                // inside a prefix is at most 32 blocks, each exact. The same
-                // traffic is carried, minus the one host the tunnel needs to
-                // reach to carry it.
+                // inside a prefix is at most one block per remaining bit,
+                // each exact. The same traffic is carried, minus the one
+                // host the tunnel needs to reach to carry it.
+                //
+                // BOTH families. The first version of this did v4 only, so
+                // an IPv6 gateway under ::/0 kept the route it was supposed
+                // to be excluded from and captured its own connection --
+                // the exact loop the v4 case was written to prevent.
                 if (addSplitRoutes(b, net, prefix, server)) {
                     continue;
                 }
@@ -410,56 +462,75 @@ public class CN1VpnService extends VpnService {
     /// the caller adds the route whole
     private static boolean addSplitRoutes(Builder b, String net, int prefix,
             String server) {
-        long netBits = ipv4(net);
-        long serverBits = ipv4(server);
-        if (netBits < 0 || serverBits < 0 || prefix < 0 || prefix > 32) {
+        byte[] netBits = addressBytes(net);
+        byte[] serverBits = addressBytes(server);
+        if (netBits == null || serverBits == null
+                || netBits.length != serverBits.length) {
             return false;
         }
-        long mask = prefix == 0 ? 0L : (0xFFFFFFFFL << (32 - prefix)) & 0xFFFFFFFFL;
-        if ((netBits & mask) != (serverBits & mask)) {
-            // The server is somewhere else entirely; nothing to split.
+        int width = netBits.length * 8;
+        if (prefix < 0 || prefix > width) {
             return false;
         }
-        for (int bit = prefix; bit < 32; bit++) {
-            long stepMask = (0xFFFFFFFFL << (31 - bit)) & 0xFFFFFFFFL;
-            // The sibling of the half the server is in.
-            long sibling = (serverBits & stepMask) ^ (1L << (31 - bit));
-            b.addRoute(ipv4Text(sibling & stepMask), bit + 1);
+        for (int i = 0; i < prefix; i++) {
+            if (bitAt(netBits, i) != bitAt(serverBits, i)) {
+                // The server is somewhere else entirely; nothing to split.
+                return false;
+            }
+        }
+        for (int bit = prefix; bit < width; bit++) {
+            // The sibling of the half the server is in: the server's own
+            // bits down to this depth, with this bit flipped and everything
+            // below it cleared.
+            byte[] sibling = new byte[netBits.length];
+            for (int i = 0; i < bit; i++) {
+                setBit(sibling, i, bitAt(serverBits, i));
+            }
+            setBit(sibling, bit, bitAt(serverBits, bit) == 0 ? 1 : 0);
+            b.addRoute(addressText(sibling), bit + 1);
         }
         return true;
     }
 
-    /// An IPv4 dotted address as an unsigned 32-bit value, or -1.
-    private static long ipv4(String text) {
-        long out = 0;
-        int part = 0;
-        int value = 0;
-        boolean digit = false;
-        for (int i = 0; i <= text.length(); i++) {
-            char c = i == text.length() ? '.' : text.charAt(i);
-            if (c == '.') {
-                if (!digit || value > 255 || part > 3) {
-                    return -1;
-                }
-                out = (out << 8) | value;
-                value = 0;
-                digit = false;
-                part++;
-            } else if (c >= '0' && c <= '9') {
-                value = value * 10 + (c - '0');
-                digit = true;
-            } else {
-                return -1;
-            }
+    /// An address literal as its raw bytes, or null when it is not one.
+    ///
+    /// Through InetAddress rather than parsed here: IPv6 has eight notations
+    /// and a hand-written parser would get one of them wrong. No lookup
+    /// happens -- the caller has already resolved anything that was a name.
+    private static byte[] addressBytes(String literal) {
+        try {
+            return java.net.InetAddress.getByName(literal).getAddress();
+        } catch (Exception notAnAddress) {
+            return null;
         }
-        return part == 4 ? out : -1;
     }
 
-    /// The dotted form of an unsigned 32-bit address.
-    private static String ipv4Text(long value) {
-        return ((value >> 24) & 0xFF) + "." + ((value >> 16) & 0xFF) + "."
-                + ((value >> 8) & 0xFF) + "." + (value & 0xFF);
+    private static int bitAt(byte[] address, int index) {
+        return (address[index / 8] >> (7 - (index % 8))) & 1;
     }
+
+    private static void setBit(byte[] address, int index, int value) {
+        int mask = 1 << (7 - (index % 8));
+        if (value == 0) {
+            address[index / 8] &= (byte) ~mask;
+        } else {
+            address[index / 8] |= (byte) mask;
+        }
+    }
+
+    /// The textual form of raw address bytes.
+    private static String addressText(byte[] address) {
+        try {
+            return java.net.InetAddress.getByAddress(address)
+                    .getHostAddress();
+        } catch (Exception impossible) {
+            // getByAddress only rejects a length that is not 4 or 16, and
+            // these came from getAddress.
+            return null;
+        }
+    }
+
+
 
     /// A CIDR prefix, or `fallback` when the text is not one.
     ///
@@ -572,6 +643,8 @@ public class CN1VpnService extends VpnService {
     /// Tears down whatever is running, once.
     static void stopTunnel(TunnelStopReason reason) {
         synchronized (CN1VpnService.class) {
+            // Invalidates any opener still in flight; see startGeneration.
+            startGeneration++;
             stopLocked(reason);
         }
         Tunnels.clearRegistered();

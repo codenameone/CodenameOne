@@ -15,6 +15,12 @@ on:
       - 'Ports/iOSPort/nativeSources/CN1Vpn.*'
       - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.h'
       - 'Ports/iOSPort/nativeSources/CodenameOne_GLAppDelegate.m'
+      # The header this job compiles against is DERIVED from these two, so a
+      # change to either can break the check while touching no native source.
+      # A pull request that renames an upcall, or breaks the generator, would
+      # otherwise skip the job that exists to catch exactly that.
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCallCallbacks.java'
+      - 'scripts/gen-ios-callback-stub.py'
       - '.github/workflows/call-vpn-native.yml'
   push:
     branches: [ master ]
@@ -23,6 +29,12 @@ on:
       - 'Ports/iOSPort/nativeSources/CN1Vpn.*'
       - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.h'
       - 'Ports/iOSPort/nativeSources/CodenameOne_GLAppDelegate.m'
+      # The header this job compiles against is DERIVED from these two, so a
+      # change to either can break the check while touching no native source.
+      # A pull request that renames an upcall, or breaks the generator, would
+      # otherwise skip the job that exists to catch exactly that.
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCallCallbacks.java'
+      - 'scripts/gen-ios-callback-stub.py'
       - '.github/workflows/call-vpn-native.yml'
 
 permissions:
