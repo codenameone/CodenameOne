@@ -14,9 +14,24 @@
   {{- $skipped := 0 -}}
   {{- $notRun := 0 -}}
   {{- $awaiting := 0 -}}
+  {{- /* The tests this port is actually on the hook for. A feature whose baselines
+         are scoped away from this port is answered by whatever is left -- reading
+         one of seven when six of them never applied made a fully covered port look
+         mostly uncovered. */ -}}
+  {{- $applicable := 0 -}}
   {{- $failedTests := slice -}}
   {{- $skippedTests := slice -}}
   {{- range $feature.tests -}}
+    {{- /* A test scoped to other ports does not apply here: this port has no
+         windowing system, was never asked for the capability, and will never
+         carry the test in its report. Counting it as awaiting would leave a
+         permanent "waiting for this port's next run" against something that
+         is never coming, which reads as a gap rather than as not applicable. */ -}}
+    {{- $scope := index $contract.test_scopes . -}}
+    {{- if and $scope (not (in $scope $port.id)) -}}
+      {{- continue -}}
+    {{- end -}}
+    {{- $applicable = add $applicable 1 -}}
     {{- $result := index $report.tests . -}}
     {{- /* Absent and "not-run" are different claims. "not-run" means this port
            ran the suite with the test in its contract and nothing reported
@@ -91,7 +106,7 @@
   {{- end -}}
   {{- $bootstrapComplete := and (eq $report.bootstrap_source "successful-master-workflow") (eq $report.workflow_conclusion "success") -}}
   {{- $complete := or $report.suite_finished $bootstrapComplete -}}
-  {{- $total := len $feature.tests -}}
+  {{- $total := $applicable -}}
   {{- $state = "partial" -}}
   {{- $mark = "−" -}}
   {{- $awaitingNote := cond (gt $awaiting 0) (printf ", %d awaiting this port's next run" $awaiting) "" -}}

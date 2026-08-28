@@ -32,6 +32,11 @@ on:
   pull_request:
     paths:
       - '.github/workflows/linux-build-run.yml'
+      # The package install goes through these, and they run from this workflow
+      # too -- a change to either must be exercised by the job that depends on
+      # it, the same way archetype-smoke, designer and pr.yml list them.
+      - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci/apt-get-update.sh'
       - 'vm/**'
       - 'Ports/LinuxPort/**'
       - 'maven/linux/**'
@@ -44,6 +49,8 @@ on:
     branches: [ master, main ]
     paths:
       - '.github/workflows/linux-build-run.yml'
+      - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci/apt-get-update.sh'
       - 'vm/**'
       - 'Ports/LinuxPort/**'
       - 'maven/linux/**'
@@ -68,12 +75,9 @@ jobs:
       - name: Install Xvfb
         run: |
           set -e
-          bash scripts/ci/apt-get-update.sh
           # The CN1 CSS compiler renders via CEF/AWT and throws HeadlessException
           # without a display, so the common build runs under a virtual X server.
-          sudo apt-get install -y --no-install-recommends \
-            -o Acquire::ForceIPv4=true -o Acquire::Retries=5 \
-            xvfb
+          bash scripts/ci/apt-get-install.sh xvfb
 
       - name: Set up JDK 8
         uses: actions/setup-java@v5
@@ -155,9 +159,10 @@ jobs:
       - name: Install the GTK build stack + toolchain
         run: |
           set -e
-          bash scripts/ci/apt-get-update.sh
-          sudo apt-get install -y --no-install-recommends \
-            -o Acquire::ForceIPv4=true -o Acquire::Retries=5 \
+          # Through the shared helper: it refreshes the index once when a .deb
+          # 404s, which is what a point release landing mid-job looks like --
+          # three openssl packages took this job out on 2026-08-25.
+          bash scripts/ci/apt-get-install.sh \
             cmake ninja-build pkg-config unzip xvfb fonts-dejavu-core \
             libgtk-3-dev libcairo2-dev libpango1.0-dev libgdk-pixbuf-2.0-dev libglib2.0-dev \
             libfontconfig1-dev libfreetype-dev \
@@ -266,9 +271,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           set -e
-          sudo apt-get install -y --no-install-recommends \
-            -o Acquire::ForceIPv4=true -o Acquire::Retries=5 \
-            gdb >/dev/null 2>&1 || true
+          bash scripts/ci/apt-get-install.sh gdb >/dev/null 2>&1 || true
           Xvfb :99 -screen 0 1200x1600x24 >/tmp/xvfb-run.log 2>&1 &
           export DISPLAY=:99
           sleep 2

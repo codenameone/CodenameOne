@@ -83,8 +83,13 @@ public class LevelPlayProvider implements AdProvider {
 
     @Override
     public boolean isFormatSupported(AdFormat format) {
-        // Banner plus the four full screen formats; native ads are not yet wired.
-        return format != AdFormat.NATIVE;
+        // What LevelPlay mediates, which is not the whole enum: it has no
+        // rewarded-interstitial and no app-open format, and native ads are not
+        // wired. Both bridges reject those from createFullScreen, so a
+        // predicate promising them would have callers ask for an ad that comes
+        // back null.
+        return format == AdFormat.BANNER || format == AdFormat.INTERSTITIAL
+                || format == AdFormat.REWARDED;
     }
 
     @Override

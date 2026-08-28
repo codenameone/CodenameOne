@@ -82,6 +82,21 @@ typedef struct {
     simd_float4x4 transform;
 } CN1MetalMatrices;
 
+// -------- GPU memory census (diagnostic; compiled out by default) --------
+
+// vmmap tells you the GPU holds N megabytes; it cannot tell you which allocation
+// made them. MTLTexture.allocatedSize is the authoritative per-texture figure and
+// MTLDevice.currentAllocatedSize the authoritative live total, so recording the
+// first at every creation site and printing the second attributes the whole
+// number. Enable with -DCN1_TEXTURE_CENSUS.
+#ifdef CN1_TEXTURE_CENSUS
+void cn1TextureCensusNote(const char *site, id<MTLTexture> t);
+void cn1TextureCensusDump(const char *label);
+#define CN1_TEX_NOTE(site, t) cn1TextureCensusNote((site), (t))
+#else
+#define CN1_TEX_NOTE(site, t) do {} while(0)
+#endif
+
 // -------- Encoder lifecycle (called by CodenameOne_GLViewController / METALView) --------
 
 // Called by METALView.setFramebuffer after acquiring a command encoder for

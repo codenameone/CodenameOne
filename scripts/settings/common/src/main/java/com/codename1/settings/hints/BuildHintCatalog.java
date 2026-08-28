@@ -1,4 +1,29 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.settings.hints;
+
+import com.codename1.build.shared.BuildHints;
+import com.codename1.build.shared.HintType;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -7,6 +32,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * The build hints the Settings tool offers for editing.
+ *
+ * <p>Built from {@link BuildHints}, which holds the hints declared in the catalog and
+ * the ones the {@code @Ios} / {@code @Android} annotations declare, and is the same one
+ * the builders' drift gate checks. It
+ * used to be scraped out of the developer guide's AsciiDoc table at runtime, with the
+ * type guessed by string-matching the description prose -- so a hint the guide did not
+ * mention was invisible here, and one whose wording changed silently changed type.</p>
+ */
 public final class BuildHintCatalog {
     private final Map<String, BuildHintMetadata> hints = new LinkedHashMap<String, BuildHintMetadata>();
 
@@ -25,6 +60,16 @@ public final class BuildHintCatalog {
     public List<BuildHintMetadata> search(String query) {
         ArrayList<BuildHintMetadata> out = new ArrayList<BuildHintMetadata>();
         for (BuildHintMetadata hint : hints.values()) {
+            // A deprecated alias is the same effective setting as its target --
+            // the builder reads android.captureRecord and then lets
+            // and.captureRecord override it. Offering both as things to add gave
+            // one setting two independent controls, and a project that filled in
+            // both got whichever the builder happens to prefer. The alias stays
+            // in the catalog so an existing declaration is still described; it
+            // is simply not something to browse to and add.
+            if (hint.aliasOf() != null) {
+                continue;
+            }
             if (hint.matches(query)) {
                 out.add(hint);
             }
@@ -38,181 +83,47 @@ public final class BuildHintCatalog {
         }
     }
 
-    public static BuildHintCatalog fromAsciiDoc(String asciidoc) {
+    /**
+     * Every hint the catalog describes, including the ones consumed only by the
+     * build service. Dynamic families such as {@code android.permission.<NAME>}
+     * are left out: their names are patterns rather than keys, so there is
+     * nothing for the editor to set.
+     */
+    public static BuildHintCatalog load() {
         BuildHintCatalog catalog = new BuildHintCatalog();
-        if (asciidoc == null) {
-            return fallback();
-        }
-        String[] lines = asciidoc.replace("\r\n", "\n").split("\n");
-        boolean inTable = false;
-        boolean buildHintTable = false;
-        String currentName = null;
-        StringBuilder currentDescription = new StringBuilder();
-        for (String raw : lines) {
-            String line = raw.trim();
-            if ("|===".equals(line)) {
-                if (inTable) {
-                    if (buildHintTable) {
-                        flush(catalog, currentName, currentDescription.toString());
-                        break;
-                    }
-                    inTable = false;
-                } else {
-                    inTable = true;
-                    buildHintTable = false;
-                    currentName = null;
-                    currentDescription.setLength(0);
-                }
+        for (BuildHints.Hint h : BuildHints.entries()) {
+            if (h.isDynamic()) {
                 continue;
             }
-            if (!inTable) {
-                continue;
-            }
-            if (line.startsWith("//")) {
-                continue;
-            }
-            if (!buildHintTable) {
-                String header = line.startsWith("|") ? line.substring(1).trim() : line;
-                if (header.startsWith("Name") && header.contains("|Description")) {
-                    buildHintTable = true;
-                }
-                continue;
-            }
-            if (line.startsWith("|")) {
-                String cell = line.substring(1).trim();
-                if (currentName == null) {
-                    currentName = cell;
-                    currentDescription.setLength(0);
-                } else if (currentDescription.length() == 0) {
-                    currentDescription.append(cell);
-                } else {
-                    flush(catalog, currentName, currentDescription.toString());
-                    currentName = cell;
-                    currentDescription.setLength(0);
-                }
-            } else if (currentName != null && line.length() > 0) {
-                if (currentDescription.length() > 0) {
-                    currentDescription.append(' ');
-                }
-                currentDescription.append(line);
-            }
-        }
-        if (catalog.hints.isEmpty()) {
-            return fallback();
+            catalog.add(new BuildHintMetadata(
+                    h.name(),
+                    h.doc(),
+                    toSettingsType(h.type()),
+                    h.platform(),
+                    h.values(),
+                    h.def(),
+                    annotationOf(h),
+                    h.aliasOf()));
         }
         return catalog;
     }
 
-    private static void flush(BuildHintCatalog catalog, String rawName, String description) {
-        if (rawName == null || rawName.trim().length() == 0) {
-            return;
+    private static String annotationOf(BuildHints.Hint h) {
+        if (!h.isAnnotated()) {
+            return null;
         }
-        for (String name : splitNames(rawName)) {
-            catalog.add(new BuildHintMetadata(name, description, inferType(name, description), inferPlatform(name)));
-        }
+        return "@" + h.group().annotationSimpleName() + "(" + h.attr() + ")";
     }
 
-    private static List<String> splitNames(String raw) {
-        ArrayList<String> names = new ArrayList<String>();
-        String normalized = raw.replace("`", "").replace("(a.k.a.", "/").replace(")", "");
-        String[] parts = normalized.split(",");
-        for (String part : parts) {
-            String[] slashParts = part.split("/");
-            for (String slashPart : slashParts) {
-                String name = slashPart.trim();
-                if (name.indexOf(' ') >= 0 || name.length() == 0 || name.startsWith("(")) {
-                    continue;
-                }
-                names.add(name);
-            }
+    /**
+     * Maps the catalog's type to this tool's vocabulary. Derived rather than
+     * duplicated so the two cannot drift apart again.
+     */
+    private static BuildHintType toSettingsType(HintType type) {
+        try {
+            return BuildHintType.valueOf(BuildHints.settingsType(type));
+        } catch (IllegalArgumentException ex) {
+            return BuildHintType.TEXT;
         }
-        return names.isEmpty() ? Collections.singletonList(raw.trim()) : names;
-    }
-
-    private static BuildHintType inferType(String name, String description) {
-        String n = name.toLowerCase();
-        String d = description == null ? "" : description.toLowerCase();
-        if ("java.version".equals(name)) {
-            return BuildHintType.INTEGER;
-        }
-        if ("android.targetSDKVersion".equals(name)) {
-            return BuildHintType.INTEGER;
-        }
-        if ("android.useAndroidX".equals(name)) {
-            return BuildHintType.BOOLEAN;
-        }
-        if ("build.cn1Version".equals(name) || "ios.bundleVersion".equals(name)) {
-            return BuildHintType.VERSION;
-        }
-        if (n.contains("password") || n.contains("secret") || n.contains("token")) {
-            return BuildHintType.SECRET;
-        }
-        if (n.contains("certificate") || n.contains("provision") || n.contains("sdkroot") || d.contains("path to")) {
-            return BuildHintType.PATH;
-        }
-        if (n.contains("url") || d.contains("https://") || d.contains("http://")) {
-            return BuildHintType.URL;
-        }
-        if (d.contains("true/false") || d.contains("boolean true/false") || d.contains("`true`") || d.contains("`false`")) {
-            return BuildHintType.BOOLEAN;
-        }
-        if (d.contains("comma") || d.contains("comma-delimited") || d.contains("comma delimited")) {
-            return BuildHintType.CSV;
-        }
-        if (d.contains("<") && d.contains(">") || n.contains("xml") || n.contains("plistinject") || n.contains("xpermissions")) {
-            return BuildHintType.XML;
-        }
-        if (n.contains("version") || d.contains("version")) {
-            return BuildHintType.VERSION;
-        }
-        if (d.contains("can be ") || d.contains("supported values") || d.contains("accepts ")) {
-            return BuildHintType.ENUM;
-        }
-        if (d.contains("integer") || d.contains("size in bytes") || n.endsWith("port")) {
-            return BuildHintType.INTEGER;
-        }
-        return BuildHintType.TEXT;
-    }
-
-    private static String inferPlatform(String name) {
-        if (name.startsWith("android.") || name.startsWith("and.")) {
-            return "android";
-        }
-        if (name.startsWith("ios.")) {
-            return "ios";
-        }
-        if (name.startsWith("macNative.") || name.startsWith("codename1.mac.") || name.startsWith("desktop.mac.")) {
-            return "mac";
-        }
-        if (name.startsWith("windows.") || name.startsWith("win.")) {
-            return "windows";
-        }
-        if (name.startsWith("linux.")) {
-            return "linux";
-        }
-        if (name.startsWith("javascript.")) {
-            return "javascript";
-        }
-        if (name.startsWith("desktop.")) {
-            return "desktop";
-        }
-        return "general";
-    }
-
-    public static BuildHintCatalog fallback() {
-        BuildHintCatalog catalog = new BuildHintCatalog();
-        catalog.add(new BuildHintMetadata("build.cn1Version", "Pins the cloud build to a released Codename One version such as 7.0.250, or master.", BuildHintType.VERSION, "general"));
-        catalog.add(new BuildHintMetadata("java.version", "Build server Java version.", BuildHintType.INTEGER, "general"));
-        catalog.add(new BuildHintMetadata("android.debug", "Whether to include an Android debug build.", BuildHintType.BOOLEAN, "android"));
-        catalog.add(new BuildHintMetadata("android.release", "Whether to include an Android release build.", BuildHintType.BOOLEAN, "android"));
-        catalog.add(new BuildHintMetadata("android.xpermissions", "Additional Android manifest permissions XML.", BuildHintType.XML, "android"));
-        catalog.add(new BuildHintMetadata("ios.bundleVersion", "Version number of the generated iOS bundle.", BuildHintType.VERSION, "ios"));
-        catalog.add(new BuildHintMetadata("ios.deployment_target", "Minimum iOS version.", BuildHintType.VERSION, "ios"));
-        catalog.add(new BuildHintMetadata("ios.plistInject", "Raw XML injected into the iOS Info.plist.", BuildHintType.XML, "ios"));
-        catalog.add(new BuildHintMetadata("macNative.distribution", "Mac native distribution: appStore, developerID, or both.", BuildHintType.ENUM, "mac"));
-        catalog.add(new BuildHintMetadata("windows.signing.timestampUrl", "RFC 3161 timestamp server URL for Windows signing.", BuildHintType.URL, "windows"));
-        catalog.add(new BuildHintMetadata("desktop.width", "Desktop window width.", BuildHintType.INTEGER, "desktop"));
-        catalog.add(new BuildHintMetadata("desktop.height", "Desktop window height.", BuildHintType.INTEGER, "desktop"));
-        return catalog;
     }
 }

@@ -55,7 +55,11 @@ class LinuxBrowserComponent extends PeerComponent {
     LinuxBrowserComponent(BrowserComponent browser) {
         super(null);
         this.browser = browser;
-        this.peer = LinuxNative.browserCreate(800, 600);
+        // A starting slot only. A BrowserComponent is routinely constructed while
+        // detached, and then this resolves to the main window; initComponent() re-hosts
+        // it once the component is in its real hierarchy.
+        this.peer = LinuxNative.browserCreate(800, 600,
+                LinuxWindowManager.slotForComponent(browser));
     }
 
     long peer() {
@@ -89,10 +93,20 @@ class LinuxBrowserComponent extends PeerComponent {
     @Override
     protected void initComponent() {
         super.initComponent();
+        // Resolved here rather than in the constructor: the constructor runs while the
+        // component is usually still detached, so the slot it picked was the main
+        // window's and the WebKit view stayed there permanently -- visible, and taking
+        // input, over the main window instead of the one the browser is in.
+        LinuxNative.browserSetHost(peer, LinuxWindowManager.slotForComponent(browser));
         LinuxNative.browserSetBounds(peer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
         LinuxNative.browserSetVisible(peer, true);
-        if (poller == null && getComponentForm() != null) {
-            poller = UITimer.timer(60, true, getComponentForm(), new Runnable() {
+        // The top level rather than the form: getComponentForm() is null by design
+        // inside a Window, so the poller never started there and poll() never drained
+        // the native LOAD, NAV and MSG events -- onLoad, navigation callbacks and
+        // JavaScript return callbacks simply never fired in a window.
+        com.codename1.ui.TopLevelContainer browserTop = getTopLevelContainer();
+        if (poller == null && browserTop != null) {
+            poller = UITimer.timer(60, true, browserTop, new Runnable() {
                 public void run() {
                     poll();
                 }

@@ -47,6 +47,27 @@ public class WindowEvent extends ActionEvent {
         this.bounds = bounds;
     }
 
+    /// Creates a new window event for a source other than the display, such as an
+    /// individual `com.codename1.ui.Window`.
+    ///
+    /// The `Display` form is kept separate so that code registered through
+    /// `Display#addWindowListener(com.codename1.ui.events.ActionListener)` -- which
+    /// only ever hears about the application's main window -- can keep casting
+    /// `getSource()` to `Display` safely.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the object that generated the event
+    ///
+    /// - `type`: the type of the window event
+    ///
+    /// - `bounds`: the bounds of the window, if known
+    public WindowEvent(Object source, Type type, Rectangle bounds) {
+        super(source, ActionEvent.Type.Other);
+        this.type = type;
+        this.bounds = bounds;
+    }
+
     /// The type of window event.
     ///
     /// #### Returns
@@ -78,6 +99,9 @@ public class WindowEvent extends ActionEvent {
         /// The window was resized.
         Resized,
         /// The window was moved.
-        Moved
+        Moved,
+        /// The window was destroyed and its native window released. Unlike a close
+        /// request, this cannot be vetoed -- it reports what already happened.
+        Disposed
     }
 }

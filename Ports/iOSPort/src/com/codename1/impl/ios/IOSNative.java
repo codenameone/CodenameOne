@@ -209,6 +209,89 @@ public final class IOSNative {
     // Toolbar acts as the window title bar, and make the window movable by its background so the
     // toolbar drags it. Passing false restores the standard titled window. A no-op on iOS/iPadOS.
     native void setMacWindowUndecorated(boolean undecorated);
+
+    // ---- Mac Catalyst desktop windows (CN1MacWindows.m) ---------------------
+    //
+    // A window is addressed by the slot returned from macWindowCreate. The
+    // windowId passed in is the framework's own id, stored natively and echoed
+    // back on every callback so events route without a lookup. Every one of these
+    // is a no-op on iOS proper, where the implementation is compiled out.
+
+    native int macWindowCreate(int windowId, String title, int x, int y, int width, int height,
+            boolean decorated, boolean resizable, boolean positionSet);
+
+    native void macWindowDestroy(int slot);
+
+    native void macWindowShow(int slot, boolean visible);
+
+    /** The token of the scene request currently outstanding for this window, or 0. */
+    native int macWindowRequestSeq(int slot);
+
+    native void macWindowSetTitle(int slot, String title);
+
+    native void macWindowSetBounds(int slot, int x, int y, int width, int height);
+
+    native void macWindowGetBounds(int slot, int[] out);
+
+    native boolean macMainWindowGetBounds(int[] out);
+
+    native int macWindowGetWidth(int slot);
+
+    native int macWindowGetHeight(int slot);
+
+    native void macWindowSetState(int slot, int state);
+
+    /** Requests a scene again after one was destroyed without the app getting a say. */
+    /// Applies a resizability change to a window that may already have a scene.
+    /// Records which window is being edited, so the native editor lands in its view.
+    native void macWindowSetEditingSlot(int slot);
+
+    native void macWindowSetResizable(int slot, boolean resizable);
+
+    /// Applies a decoration change to a window that may already have a scene.
+    native void macWindowSetDecorated(int slot, boolean decorated);
+
+    /// Records a minimum size and applies it to an existing scene.
+    native void macWindowSetMinimumSize(int slot, int width, int height);
+
+    native boolean macWindowReopen(int slot);
+
+    /** Enables or disables touch input, used while a modal window blocks this one. */
+    native void macWindowSetInputEnabled(int slot, boolean enabled);
+
+    native void macMainWindowSetInputEnabled(boolean enabled);
+
+    /** Starts reporting display attach/remove/mode changes; idempotent. */
+    native void macWindowWatchScreens();
+
+    /**
+     * Presents one rendered frame. The pixels are the window's own raster; the
+     * native side wraps them in a CGImage and assigns it to the view's layer.
+     */
+    native void macWindowPresent(int slot, int[] argb, int width, int height);
+
+    /**
+     * True when the app's Info.plist actually enables multiple scenes. Without it
+     * the system refuses to activate a second scene, so this is what decides
+     * whether the windowing API reports itself supported.
+     */
+    native boolean macMultiWindowSupported();
+
+    native int macMonitorCount();
+
+    native int macPrimaryMonitor();
+
+    native void macMonitorBounds(int monitor, boolean workArea, int[] out);
+
+    native int macMonitorDpi(int monitor);
+
+    native int macMonitorScaleTimes100(int monitor);
+
+    native int macMonitorForWindow(int slot);
+
+    /// The monitor the application's own Catalyst scene is on. The main window has
+    /// no slot, so `#macMonitorForWindow(int)` cannot answer for it.
+    native int macMonitorForMainWindow();
     
     native void setImageName(long nativeImage, String name);
     
@@ -305,6 +388,10 @@ public final class IOSNative {
     native void updatePeerPositionSize(long peer, int x, int y, int w, int h);
     
     native void peerInitialized(long peer, int x, int y, int w, int h);
+
+    /// Attaches a peer to the Catalyst window that owns it. Returns false when the
+    /// window has no content view yet, so the caller keeps the peer where it is.
+    native boolean macWindowAttachPeer(long peer, int slot, int x, int y, int w, int h);
 
     native void peerDeinitialized(long peer);
     native void peerSetVisible(long peer, boolean v);
@@ -1073,6 +1160,18 @@ public final class IOSNative {
     /** True when LAContext.canEvaluatePolicy(deviceOwnerAuthenticationWithBiometrics) succeeds. */
     native boolean isBiometricsSupported();
 
+    /// True when the Metal view renders straight into the CAMetalLayer drawable
+    /// instead of into a retained screen texture. The renderer decides this, not
+    /// Java, but the paint model has to follow it: a direct-mode frame presents a
+    /// different buffer every time, so anything left unpainted shows a frame from
+    /// two or three presents ago. See IOSImplementation.paintDirty.
+    native boolean isDirectToDrawable();
+
+    /// True while VoiceOver, Switch Control or Voice Control is actually running.
+    /// UIKit pulls the semantic tree on demand, so nothing needs projecting eagerly
+    /// unless one of these is listening.
+    native boolean isAssistiveTechnologyActive();
+
     /** Same as {@link #isBiometricsSupported()} but also requires at least one biometric to be enrolled. */
     native boolean canAuthenticateBiometric();
 
@@ -1229,6 +1328,66 @@ public final class IOSNative {
 
     /** True when ActivityKit live activities are available and enabled (iOS 16.1+). */
     native boolean surfacesActivitiesSupported();
+
+    // --- Document provider (FileProvider) -----------------------------------
+    // All gated natively by CN1_USE_DOCUMENTS (the build flips it on when the app references
+    // com.codename1.documents). When the define is off these compile to harmless stubs so the
+    // symbols always resolve. The reader is the generated CN1Documents app extension, a
+    // separate process that cannot call Java, so nothing here hands it data: the Java side
+    // (IOSDocumentProviderBridge) writes the index and the endpoint settings into the App Group
+    // container, and these natives only tell the system that a provider exists and that what it
+    // published has changed.
+
+    /**
+     * Returns the filesystem path of the App Group container shared with the CN1Documents
+     * extension (group id from the CN1DocumentsAppGroup Info.plist key), or an empty string
+     * when no usable app group exists.
+     */
+    native String getDocumentsContainerPath();
+
+    /**
+     * Registers this app's provider domain with the system, so the location appears in the file
+     * browser. Idempotent: registering a domain that already exists is not an error and is how
+     * this is called on every publish rather than once.
+     */
+    native void documentsRegisterDomain();
+
+    /** Removes the provider domain, so the location disappears from the file browser. */
+    native void documentsRemoveDomain();
+
+    /**
+     * Tells the system that the published tree changed and its enumerators are stale. The
+     * browser re-enumerates on its own schedule; this is a hint, not a synchronous refresh.
+     */
+    native void documentsSignalChange();
+
+    /** True when this build linked the document provider natives and the app group resolves. */
+    native boolean documentProviderSupported();
+
+    /**
+     * Atomically replaces {@code target} with {@code source}, both absolute paths.
+     *
+     * <p>The published index is read by the extension, which is a different process: a delete
+     * followed by a rename leaves a window in which there is no index at all, and an enumeration
+     * landing there reports an empty tree. No lock in this process can close that window. POSIX
+     * rename replaces in one step -- the old file stays visible until the new one takes its
+     * name -- and a failure leaves the previous publication intact rather than destroyed.</p>
+     *
+     * @return true when the replacement happened
+     */
+    native boolean documentsReplaceFile(String source, String target);
+
+    /**
+     * Removes {@code path} and everything under it, without following symbolic links.
+     *
+     * <p>Walking the tree from Java and deleting file by file follows links: a link inside the
+     * published tree pointing at the app's own storage would have logout's {@code clear()} delete
+     * that storage's contents. {@code -[NSFileManager removeItemAtPath:error:]} removes a link
+     * rather than what it names, so the recursion cannot leave the tree.</p>
+     *
+     * @return true when nothing is left at that path
+     */
+    native boolean documentsRemoveTree(String path);
 
     // --- App intents (Core Spotlight + App Intents) -------------------------
     // Backs com.codename1.intents. Two frameworks with different floors sit behind these:

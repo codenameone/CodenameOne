@@ -511,7 +511,13 @@ public class EncodedImage extends Image {
                                     hardCache = i;
                                 }
                                 cache = Display.getInstance().createSoftWeakRef(i);
-                                Display.getInstance().getCurrent().repaint();
+                                // Every top level, not just the current form: an image
+                                // decoded asynchronously has no idea where it is being
+                                // displayed, and this is the only notification that its
+                                // pixels arrived. Repainting the current form alone left
+                                // it blank in every window -- and threw when no form was
+                                // showing at all.
+                                Display.getInstance().repaintTopLevels();
                                 width = i.getWidth();
                                 height = i.getHeight();
                             }

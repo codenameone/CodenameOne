@@ -2086,6 +2086,70 @@ void cn1CapturePointerMetadata(UITouch* touch) {
 }
 #endif // !TARGET_OS_WATCH
 
+#if TARGET_OS_MACCATALYST
+/*
+ * Mac Catalyst desktop windows. These marshal a window's own events into the
+ * framework, mirroring the pointerPressed / screenSizeChanged bridges below so
+ * all the ParparVM thread-state handling stays in one file.
+ */
+void CN1MacWindowDeliverClose(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowCloseCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
+void CN1MacWindowDeliverClosed(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowClosedNativelyCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
+
+void CN1MacWindowDeliverMonitorsChanged(void) {
+    com_codename1_impl_ios_IOSImplementation_monitorsChangedCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1MacWindowDeliverFocus(int windowId, BOOL gained) {
+    com_codename1_impl_ios_IOSImplementation_windowFocusCallback___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, gained ? JAVA_TRUE : JAVA_FALSE);
+}
+
+void CN1MacWindowDeliverContentReady(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowContentReadyCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
+void CN1MacWindowDeliverActivationFailed(int windowId, int requestSeq) {
+    com_codename1_impl_ios_IOSImplementation_windowActivationFailedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, requestSeq);
+}
+
+void CN1MacWindowDeliverVisibility(int windowId, BOOL shown) {
+    com_codename1_impl_ios_IOSImplementation_windowVisibilityCallback___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, shown ? JAVA_TRUE : JAVA_FALSE);
+}
+
+void CN1MacWindowDeliverResize(int windowId, int width, int height) {
+    com_codename1_impl_ios_IOSImplementation_windowSizeCallback___int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, width, height);
+}
+
+void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_windowPointerCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, type, x, y);
+}
+
+void CN1MacWindowDeliverHover(int windowId, int type, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_windowHoverCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, type, x, y);
+}
+
+void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY) {
+    com_codename1_impl_ios_IOSImplementation_windowWheelCallback___int_int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, x, y, scrollX, scrollY);
+}
+
+void CN1MacWindowDeliverPinch(int windowId, float scale, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_windowPinchCallback___int_float_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, scale, x, y);
+}
+
+void CN1MacWindowDeliverRotation(int windowId, float radians, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_windowRotationCallback___int_float_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, radians, x, y);
+}
+
+void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed) {
+    com_codename1_impl_ios_IOSImplementation_windowKeyCallback___int_int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, keyCode, pressed ? JAVA_TRUE : JAVA_FALSE);
+}
+#endif
+
 void pointerPressed(int* x, int* y, int length) {
     if(length == 1) {
         com_codename1_impl_ios_IOSImplementation_pointerPressedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x[0], y[0]);
@@ -2343,6 +2407,239 @@ void com_codename1_impl_ios_IOSNative_setNativeMenuCommands___java_lang_String(C
 void com_codename1_impl_ios_IOSNative_setMacWindowUndecorated___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN undecorated) {
 #if TARGET_OS_MACCATALYST
     CN1SetMacWindowUndecorated(undecorated ? YES : NO);
+#endif
+}
+
+/* ---- Mac Catalyst desktop windows (CN1MacWindows.m) --------------------- */
+#if TARGET_OS_MACCATALYST
+#import "CN1MacWindows.h"
+#endif
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_boolean_R_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT windowId, JAVA_OBJECT title,
+        JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
+        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_BOOLEAN positionSet) {
+#if TARGET_OS_MACCATALYST
+    POOL_BEGIN();
+    NSString* t = toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    int slot = CN1MacWindowCreate(windowId, t == nil ? @"" : t, x, y, width, height,
+            decorated ? YES : NO, resizable ? YES : NO, positionSet ? YES : NO);
+    POOL_END();
+    return slot;
+#else
+    return -1;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowDestroy___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowDestroy(slot);
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macWindowRequestSeq___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacWindowRequestSeq(slot);
+#else
+    return 0;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowShow___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN visible) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowShow(slot, visible ? YES : NO);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetDecorated___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN decorated) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetDecorated(slot, decorated == JAVA_TRUE ? YES : NO);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetMinimumSize___int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT width, JAVA_INT height) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetMinimumSize(slot, width, height);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetEditingSlot___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetEditingSlot(slot);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetResizable___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN resizable) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetResizable(slot, resizable == JAVA_TRUE ? YES : NO);
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowReopen___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacWindowReopen(slot) ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetInputEnabled___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN enabled) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetInputEnabled(slot, enabled == JAVA_TRUE);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macMainWindowSetInputEnabled___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN enabled) {
+#if TARGET_OS_MACCATALYST
+    CN1MacMainWindowSetInputEnabled(enabled == JAVA_TRUE);
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowAttachPeer___long_int_int_int_int_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+#if TARGET_OS_MACCATALYST
+    UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+    return CN1MacWindowAttachPeer(slot, v, x, y, w, h) ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowWatchScreens__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowWatchScreens();
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetTitle___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT title) {
+#if TARGET_OS_MACCATALYST
+    POOL_BEGIN();
+    NSString* t = toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    CN1MacWindowSetTitle(slot, t == nil ? @"" : t);
+    POOL_END();
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetBounds___int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetBounds(slot, x, y, width, height);
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMainWindowGetBounds___int_1ARRAY_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+#if TARGET_OS_MACCATALYST
+    if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
+        return JAVA_FALSE;
+    }
+    return CN1MacMainWindowGetBounds((int*) ((JAVA_ARRAY) out)->data) ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowGetBounds___int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT out) {
+#if TARGET_OS_MACCATALYST
+    if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
+        return;
+    }
+    CN1MacWindowGetBounds(slot, (int*) ((JAVA_ARRAY) out)->data);
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetWidth___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacWindowGetWidth(slot);
+#else
+    return 0;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetHeight___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacWindowGetHeight(slot);
+#else
+    return 0;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetState___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT state) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetState(slot, state);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowPresent___int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT argb, JAVA_INT width, JAVA_INT height) {
+#if TARGET_OS_MACCATALYST
+    if (argb == JAVA_NULL) {
+        return;
+    }
+    CN1MacWindowPresent(slot, ((JAVA_ARRAY) argb)->data, width, height);
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMultiWindowSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMultiWindowSupported() ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMonitorCount();
+#else
+    return 1;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macPrimaryMonitor___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacPrimaryMonitor();
+#else
+    return 0;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macMonitorBounds___int_boolean_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor, JAVA_BOOLEAN workArea, JAVA_OBJECT out) {
+#if TARGET_OS_MACCATALYST
+    if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
+        return;
+    }
+    CN1MacMonitorBounds(monitor, workArea ? YES : NO, (int*) ((JAVA_ARRAY) out)->data);
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorDpi___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMonitorDpi(monitor);
+#else
+    return 96;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorScaleTimes100___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
+#if TARGET_OS_MACCATALYST
+    /* Scaled by a hundred because the bridge carries ints; the Java side divides
+     * it back out. */
+    return (JAVA_INT) (CN1MacMonitorScale(monitor) * 100.0 + 0.5);
+#else
+    return 100;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForWindow___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMonitorForWindow(slot);
+#else
+    return 0;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForMainWindow___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMonitorForMainWindow();
+#else
+    return 0;
 #endif
 }
 
@@ -7603,6 +7900,18 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
     }
     id<MTLTexture> src = mv.screenTexture;
     if (src == nil) {
+        // Direct-to-drawable mode (CN1_DIRECT_DRAWABLE, opt-in) keeps no
+        // retained screen texture, so there is nothing here to read back and
+        // the caller falls through to drawViewHierarchyInRect:. That is correct
+        // on device but samples the CALayer's presented drawable, so it can lag
+        // a frame -- exactly the staleness this readback exists to avoid, and
+        // on headless Catalyst (no display link) it can be stale indefinitely.
+        //
+        // Reading the live drawable instead is not the fix: retaining it past
+        // present starves nextDrawable, and after present the buffer is
+        // recycled for the following frame. A deterministic capture needs a
+        // one-shot render into a scratch target, which is worth doing when the
+        // mode stops being opt-in. Until then the default path is unaffected.
         return NULL;
     }
     NSUInteger w = src.width;
@@ -14894,6 +15203,115 @@ static void cn1_resetContext(void) {
 }
 #endif // !TARGET_OS_TV
 
+#if !TARGET_OS_WATCH
+BOOL cn1AccessibilityEagerLatched(void);
+void cn1RegisterAccessibilityStatusObservers(void);
+
+// A technology STARTING is not a component mutation, so nothing in the portable
+// layer would schedule the projection it needs and the native tree would stay
+// empty until some unrelated UI change happened to invalidate something. These
+// notifications are the trigger for that transition.
+//
+// Once any of them fires we latch eager projection on for the rest of the
+// process rather than flipping it back and forth. The technologies UIKit will
+// not report at all are handled by cn1AccessibilityNoteClientQuery below, which
+// does not depend on flags or notifications.
+static BOOL cn1A11yLatched = NO;
+
+BOOL cn1AccessibilityEagerLatched(void) {
+    return cn1A11yLatched;
+}
+
+static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *observer,
+                                          CFStringRef name, const void *object,
+                                          CFDictionaryRef userInfo) {
+    cn1A11yLatched = YES;
+    com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+// Called from the METALView / EAGLView accessibilityElements getters: a real
+// client asked for
+// the tree. This, not the running flags, is what makes the gate correct for the
+// technologies UIKit will not report -- see the comment on that getter.
+void cn1AccessibilityNoteClientQuery(void) {
+    if(cn1A11yLatched) {
+        return;   // one transition only; this is on a UIKit query path
+    }
+    cn1A11yLatched = YES;
+    com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void cn1RegisterAccessibilityStatusObservers(void) {
+    static BOOL done = NO;
+    if(done) {
+        return;
+    }
+    done = YES;
+    // Built up rather than written as a literal: the AssistiveTouch notification
+    // is iOS 10, and ios.deployment_target lets IPhoneBuilder emit older
+    // targets, where the weakly-linked constant is nil -- and a nil inside an
+    // @[] literal raises. Same reason the running check below is guarded.
+    NSMutableArray *names = [NSMutableArray arrayWithCapacity:3];
+    if(UIAccessibilityVoiceOverStatusDidChangeNotification != nil) {
+        [names addObject:UIAccessibilityVoiceOverStatusDidChangeNotification];
+    }
+    if(UIAccessibilitySwitchControlStatusDidChangeNotification != nil) {
+        [names addObject:UIAccessibilitySwitchControlStatusDidChangeNotification];
+    }
+    if(UIAccessibilityAssistiveTouchStatusDidChangeNotification != nil) {
+        [names addObject:UIAccessibilityAssistiveTouchStatusDidChangeNotification];
+    }
+    for(NSString *n in names) {
+        CFNotificationCenterAddObserver(CFNotificationCenterGetLocalCenter(), NULL,
+                                        cn1AccessibilityStatusChanged,
+                                        (__bridge CFStringRef)n, NULL,
+                                        CFNotificationSuspensionBehaviorDeliverImmediately);
+    }
+}
+#endif
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    // CN1_EAGER_A11Y=1 restores the old always-project behaviour for an A/B.
+    if(getenv("CN1_EAGER_A11Y") != NULL) {
+        return JAVA_TRUE;
+    }
+#if !TARGET_OS_WATCH
+    // These three are the ENTIRE public surface for "is an assistive technology
+    // running": UIKit exposes IsVoiceOverRunning, IsSwitchControlRunning and
+    // IsAssistiveTouchRunning and nothing else. In particular there is no
+    // public running flag for Voice Control or Full Keyboard Access, so this
+    // cannot detect them -- see cn1AccessibilityStatusChanged for how that gap
+    // is covered rather than ignored.
+    cn1RegisterAccessibilityStatusObservers();
+    if(cn1AccessibilityEagerLatched()) {
+        return JAVA_TRUE;
+    }
+    if(UIAccessibilityIsVoiceOverRunning() || UIAccessibilityIsSwitchControlRunning()) {
+        return JAVA_TRUE;
+    }
+    // iOS 10. Weakly linked, so on an older deployment target the symbol is
+    // null and calling it jumps through nothing -- test the pointer first.
+    if(UIAccessibilityIsAssistiveTouchRunning != NULL &&
+       UIAccessibilityIsAssistiveTouchRunning()) {
+        return JAVA_TRUE;
+    }
+    return JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDirectToDrawable___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef CN1_USE_METAL
+    extern int cn1DirectToDrawableEnabled(void);
+    return cn1DirectToDrawableEnabled() ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (NSClassFromString(@"LAContext") == NULL) {
@@ -15961,6 +16379,392 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported___R_bo
     return com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
+// --- Document provider (FileProvider) ----------------------------------------
+// Gated by CN1_USE_DOCUMENTS, which the builder defines when the app references
+// com.codename1.documents. It also generates the CN1Documents extension target and injects
+// the CN1DocumentsAppGroup Info.plist key. Builds without the define compile the stub branch
+// and link no framework.
+//
+// Nothing here hands the extension any data. The extension is a separate process that runs
+// while this one is dead, so the Java side writes the index and the endpoint settings into the
+// App Group container and these natives only tell the system that the provider exists and that
+// what it published has changed.
+//
+// TARGET_OS_* rather than a restructure: this file is shared verbatim with the AppKit macOS
+// port, and the iOS slice has to stay byte-for-byte what it was.
+//
+// Mac Catalyst is excluded, and not as a policy choice: FileProvider is marked
+// API_UNAVAILABLE(macCatalyst), so importing it under macabi does not compile. Catalyst reports
+// TARGET_OS_IOS, which is why the test is not simply for iOS. A Catalyst build therefore takes
+// the stub branch below, documentProviderSupported() answers false, and the API is an honest
+// no-op there. The AppKit macOS port is unaffected -- it builds against the macOS SDK, where
+// FileProvider is available.
+#if defined(CN1_USE_DOCUMENTS) && (TARGET_OS_OSX || (TARGET_OS_IOS && !TARGET_OS_MACCATALYST))
+#import <FileProvider/FileProvider.h>
+
+// The domain identifier is fixed rather than derived from the bundle id: it is scoped to this
+// app already, and the extension resolves its container from the app group, not from this.
+#define CN1_DOCUMENTS_DOMAIN_ID @"CN1Documents"
+
+static NSString *cn1DocumentsGroupId(void) {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1DocumentsAppGroup"];
+    return ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) ? (NSString *)v : nil;
+}
+
+static NSString *cn1DocumentsContainerPath(void) {
+    NSString *group = cn1DocumentsGroupId();
+    if (group == nil) {
+        return nil;
+    }
+    NSURL *container = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:group];
+    return container == nil ? nil : container.path;
+}
+
+// The display name shown for this location in the file browser. The builder writes it next to
+// the group id; falling back to the app's own name keeps an unnamed location from appearing as
+// a bare identifier.
+static NSString *cn1DocumentsDisplayName(void) {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1DocumentsDisplayName"];
+    if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) {
+        return (NSString *)v;
+    }
+    id name = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"];
+    if ([name isKindOfClass:[NSString class]] && [(NSString *)name length] > 0) {
+        return (NSString *)name;
+    }
+    return @"Documents";
+}
+
+// ARC is off in this port, so the domain is autoreleased at the point of creation rather than
+// left to leak on every publish.
+API_AVAILABLE(ios(16.0), macos(13.0))
+static NSFileProviderDomain *cn1DocumentsDomain(void) {
+    return [[[NSFileProviderDomain alloc] initWithIdentifier:CN1_DOCUMENTS_DOMAIN_ID
+                                                displayName:cn1DocumentsDisplayName()] autorelease];
+}
+
+// Which provider the BUILD generated, not what this OS could run. Below the replicated API's
+// floor the builder emits the classic NSFileProviderExtension instead, and that one is not
+// domain-based: it is reached through the default manager and registers no domain at all.
+// Deciding this from @available alone would strand the classic extension -- every publish would
+// register nothing and signal nothing, so the browser would keep serving the tree it first read.
+static BOOL cn1DocumentsReplicated(void) {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1DocumentsReplicated"];
+    if ([v isKindOfClass:[NSString class]]) {
+        return [(NSString *)v boolValue];
+    }
+    if ([v isKindOfClass:[NSNumber class]]) {
+        return [(NSNumber *)v boolValue];
+    }
+    // Absent means a build that predates the key, which only ever generated the replicated
+    // provider.
+    return YES;
+}
+
+/// The queue every domain operation runs on, one at a time.
+///
+/// +addDomain: and +removeDomain: return as soon as the operation has STARTED, so ordering the
+/// calls -- which is all a lock on the Java side can do -- orders nothing at all. An account
+/// switch is clear() followed by publish(): the removal and the registration then run
+/// concurrently, and a removal that completes last takes away the location the publish had just
+/// registered. The tree is on disk, the app believes it published, and nothing appears in Files
+/// until something publishes again.
+static dispatch_queue_t cn1DocumentsDomainQueue(void) {
+    static dispatch_queue_t queue;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        queue = dispatch_queue_create("com.codename1.documents.domain", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
+
+/// Runs one domain operation, holding the queue until its completion handler has fired.
+///
+/// Suspending from inside a block running on the queue takes effect once that block returns, so
+/// the operation is started and nothing else begins until the completion resumes the queue. That
+/// is what turns "the calls were ordered" into "the operations were ordered". No semaphore, so no
+/// thread is blocked and nothing has to outlive the callback.
+///
+/// The resume is guarded because resuming a queue that is not suspended traps. `op` is expected
+/// to call `done` exactly once, which is what NSFileProviderManager does whether or not it
+/// errors; the guard means a framework that called back twice would cost an ordering rather than
+/// crash the app.
+/// How long clear() waits for the system to take the domain away before giving up on it.
+///
+/// Long enough that a removal queued behind a registration still lands inside it, short enough
+/// that a provider daemon in trouble cannot hold up a logout.
+#define CN1_DOCUMENTS_DOMAIN_TIMEOUT 5.0
+
+static void cn1DocumentsQueueDomainOp(void (^op)(void (^done)(void))) {
+    dispatch_queue_t queue = cn1DocumentsDomainQueue();
+    dispatch_async(queue, ^{
+        dispatch_suspend(queue);
+        __block BOOL resumed = NO;
+        op(^{
+            @synchronized (queue) {
+                if (resumed) {
+                    return;
+                }
+                resumed = YES;
+            }
+            dispatch_resume(queue);
+        });
+    });
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    NSString *path = cn1DocumentsContainerPath();
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG (path == nil ? @"" : path));
+    POOL_END();
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_documentsRegisterDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    // The classic provider has no domain to register: the system finds it through the extension
+    // point alone, so this is correctly a no-op there rather than a missing step.
+    if (!cn1DocumentsReplicated()) {
+        return;
+    }
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        POOL_BEGIN();
+        if (cn1DocumentsGroupId() != nil) {
+            // Adding a domain that already exists succeeds, which is what lets this be called on
+            // every publish instead of tracked. The error is logged rather than propagated: a
+            // failure here means the location does not appear, and taking down the publish that
+            // already wrote the index would help nobody.
+            NSFileProviderDomain *domain = [cn1DocumentsDomain() retain];
+            cn1DocumentsQueueDomainOp(^(void (^done)(void)) {
+                [NSFileProviderManager addDomain:domain completionHandler:^(NSError *error) {
+                    if (error != nil) {
+                        NSLog(@"Codename One: could not register the document provider domain: %@",
+                              error);
+                    }
+                    [domain release];
+                    done();
+                }];
+            });
+        }
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (!cn1DocumentsReplicated()) {
+        return;
+    }
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        POOL_BEGIN();
+        // Queued behind any registration still running, and holding the queue until this one
+        // finishes, so a publish that follows a clear cannot have its domain removed by this.
+        NSFileProviderDomain *domain = [cn1DocumentsDomain() retain];
+        // And WAITED for, unlike every other domain call here. This one is the last step of
+        // clear(), which an app calls to log a user out: queueing it and returning would let the
+        // app finish logging out while the domain -- and the copies the system materialized
+        // under it, which live in its own store rather than in the container the tree was just
+        // deleted from -- are still there to be browsed. The wait can also be a real one, since
+        // the operation may be sitting behind a registration that has not finished.
+        //
+        // Bounded, and deliberately so, rather than waiting until the system says it is done.
+        // This runs on whatever thread the app calls clear() from, in the middle of a logout: an
+        // open-ended wait hands a provider daemon in trouble the power to hang the app there,
+        // which is a worse failure than a system cache that outlives the call. Past the deadline
+        // nothing is abandoned -- the removal is still queued and the system still performs it --
+        // and there is no API that makes it happen sooner.
+        //
+        // What can be seen in that window is narrower than it looks. The published tree and the
+        // copies in the group container are already gone, synchronously, above; an enumeration
+        // therefore answers empty. What the system may still show is its OWN store of items it
+        // had materialized, which only removeDomain clears.
+        NSCondition *finished = [[NSCondition alloc] init];
+        __block BOOL removed = NO;
+        cn1DocumentsQueueDomainOp(^(void (^done)(void)) {
+            [NSFileProviderManager removeDomain:domain completionHandler:^(NSError *error) {
+                if (error != nil) {
+                    NSLog(@"Codename One: could not remove the document provider domain: %@",
+                          error);
+                }
+                [domain release];
+                [finished lock];
+                removed = YES;
+                [finished signal];
+                [finished unlock];
+                done();
+            }];
+        });
+        // The block owns its own reference to the condition -- dispatch_async copies it to the
+        // heap, which retains what it captured -- so releasing this one after the wait is safe
+        // whether the completion has run or not.
+        NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:CN1_DOCUMENTS_DOMAIN_TIMEOUT];
+        [finished lock];
+        while (!removed && [finished waitUntilDate:deadline]) {
+            // waitUntilDate returns on a signal OR a spurious wake; the flag is the condition.
+        }
+        BOOL timedOut = !removed;
+        [finished unlock];
+        [finished release];
+        if (timedOut) {
+            NSLog(@"Codename One: removing the document provider domain did not finish within "
+                  @"%g seconds; the published location may remain visible until it does",
+                  (double) CN1_DOCUMENTS_DOMAIN_TIMEOUT);
+        }
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_documentsSignalChange__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (!cn1DocumentsReplicated()) {
+        // The classic provider is reached through the default manager rather than a domain.
+        // Without this a pre-iOS-16 build would publish a new tree and never tell the browser,
+        // leaving an open or cached folder showing the previous publish indefinitely.
+        //
+        // TARGET_OS_OSX rather than @available: +defaultManager is API_UNAVAILABLE(macos), so on
+        // the AppKit slice this does not compile at all rather than merely failing at runtime.
+        // Nothing is lost there -- the generator refuses to emit the classic provider for macOS,
+        // whose floor is already past the replicated API, so this branch is unreachable on it.
+#if !TARGET_OS_OSX
+        POOL_BEGIN();
+        NSFileProviderManager *mgr = [NSFileProviderManager defaultManager];
+        // The root AND the working set. This provider hands out a separate enumerator per folder
+        // identifier, so signalling the root alone leaves a nested folder the user already has
+        // open showing the previous publication until something makes Files re-enumerate it. The
+        // working set is the container that stands for the whole published tree -- CN1's
+        // enumerator answers it by walking every node -- so the pair covers what the root cannot.
+        NSString *containers[] = {
+            NSFileProviderRootContainerItemIdentifier,
+            NSFileProviderWorkingSetContainerItemIdentifier
+        };
+        for (int i = 0; i < 2; i++) {
+            [mgr signalEnumeratorForContainerItemIdentifier:containers[i]
+                                          completionHandler:^(NSError *error) {
+                if (error != nil) {
+                    NSLog(@"Codename One: could not signal the document provider: %@", error);
+                }
+            }];
+        }
+        POOL_END();
+#endif
+        return;
+    }
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        POOL_BEGIN();
+        NSFileProviderManager *mgr = [NSFileProviderManager managerForDomain:cn1DocumentsDomain()];
+        // The working set is signalled rather than the root: it is the container the browser
+        // watches while the location is not open, so signalling only the root would leave a
+        // closed-and-reopened browser showing the previous publish.
+        [mgr signalEnumeratorForContainerItemIdentifier:NSFileProviderWorkingSetContainerItemIdentifier
+                                      completionHandler:^(NSError *error) {
+            if (error != nil) {
+                NSLog(@"Codename One: could not signal the document provider: %@", error);
+            }
+        }];
+        POOL_END();
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    // The container is load-bearing either way: without the group there is nowhere for the two
+    // processes to meet and the extension would enumerate an empty tree forever.
+    BOOL ok = cn1DocumentsContainerPath() != nil;
+    POOL_END();
+    if (!ok) {
+        return JAVA_FALSE;
+    }
+    if (!cn1DocumentsReplicated()) {
+        // A classic build is supported on exactly the systems it was generated for. Gating this
+        // on the replicated API would answer false on every device below iOS 16 -- which is the
+        // whole population ios.documentProvider.deploymentTarget < 16 exists to serve -- and an
+        // app following the documented isSupported() guard would hide the feature there.
+        return JAVA_TRUE;
+    }
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        return JAVA_TRUE;
+    }
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT source, JAVA_OBJECT target) {
+    if (source == JAVA_NULL || target == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    POOL_BEGIN();
+    NSString *from = toNSString(CN1_THREAD_STATE_PASS_ARG source);
+    NSString *to = toNSString(CN1_THREAD_STATE_PASS_ARG target);
+    // rename(2) rather than NSFileManager: -moveItemAtPath: refuses an existing destination, and
+    // removing it first is exactly the window this exists to close. rename replaces atomically
+    // within a filesystem, which the two paths always share -- both are inside the App Group
+    // container.
+    BOOL ok = rename([from fileSystemRepresentation], [to fileSystemRepresentation]) == 0;
+    if (!ok) {
+        NSLog(@"Codename One: could not replace %@ with %@ (errno %d)", to, from, errno);
+    }
+    POOL_END();
+    return ok ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+    if (path == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    POOL_BEGIN();
+    NSString *target = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSError *err = nil;
+    // -removeItemAtPath: rather than a walk in Java. It removes a symbolic link itself instead of
+    // what the link names, so clear() cannot be steered out of the published tree and into the
+    // app's own storage. It also removes a whole directory in one call, which a Java walk cannot:
+    // FileSystemStorage.delete refuses a non-empty directory.
+    BOOL ok = [fm removeItemAtPath:target error:&err];
+    if (!ok && [fm fileExistsAtPath:target]) {
+        NSLog(@"Codename One: could not remove %@ (%@)", target, err);
+    } else {
+        // "Nothing is left there" is the contract, and a path that was never there satisfies it.
+        ok = ![fm fileExistsAtPath:target];
+    }
+    POOL_END();
+    return ok ? JAVA_TRUE : JAVA_FALSE;
+}
+
+#else
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_NULL;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT source, JAVA_OBJECT target) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+    return JAVA_FALSE;
+}
+void com_codename1_impl_ios_IOSNative_documentsRegisterDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+void com_codename1_impl_ios_IOSNative_documentsSignalChange__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+#endif // CN1_USE_DOCUMENTS
+
+// New-VM (return-type-encoded) manglings for the value-returning document provider natives.
+// Defined after the implementations/stubs above so each call is to an already-declared
+// function. The void documents* methods need no _R_ wrapper.
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT source, JAVA_OBJECT target) {
+    return com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, source, target);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+    return com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, path);
+}
+
 // --- App intents (Core Spotlight + App Intents) ------------------------------
 // Gated by CN1_USE_INTENTS, which the builder defines when the app references
 // com.codename1.intents. Two frameworks with very different availability sit behind this:
@@ -16527,6 +17331,26 @@ void cn1_watch_activate_connectivity(void) {
     [CN1WatchConnectivity shared];
 }
 #endif
+
+// Declared rather than left implicit. These six are the translated form of the static
+// Java methods on IOSWearableCallbacks, and ParparVM emits their definitions -- but it
+// emits no header this file includes, so every call below was an implicit declaration.
+// C99 dropped those, and a clang that enforces it turns all six into build errors:
+// "call to undeclared function ... ISO C99 and later do not support implicit function
+// declarations". That is a toolchain change away from breaking every iOS target at
+// once, which is exactly what happened, so the declarations are written out here.
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeMessageReceived___java_lang_String_byte_1ARRAY_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT payload, JAVA_INT replyToken);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeReplyReceived___int_byte_1ARRAY_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT replyToken, JAVA_OBJECT payload, JAVA_OBJECT error);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeDataChanged___java_lang_String_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT payload);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeDataChangedTracked___java_lang_String_byte_1ARRAY_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT payload, JAVA_OBJECT token);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeDataRemoved___java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeStateChanged__(
+        CODENAME_ONE_THREAD_STATE);
 
 // Callbacks the delegate calls when the peer sends something. Each hops into the Java callback
 // surface, which owns EDT dispatch and the cold-start queue.

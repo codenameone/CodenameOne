@@ -2,17 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Overview
-
-Codename One is a cross-platform mobile development framework that compiles Java/Kotlin bytecode to native OS executables for iOS, Android, and other platforms. The repository includes:
-
-- **Core framework** (`CodenameOne/src/`) - The main UI framework and APIs
-- **ParparVM** (`vm/`) - iOS VM that translates Java bytecode to C code for native iOS compilation
-- **Platform ports** (`Ports/`, `maven/android/`, `maven/ios/`) - Platform-specific implementations
-- **Build tools** (`maven/codenameone-maven-plugin/`) - Maven plugin for building apps
-- **Designer** (`CodenameOneDesigner/`) - Visual design tool
-- **Tests** (`tests/`) - Test suites and samples
-
 ## Build System
 
 The project is transitioning from Ant to Maven. **Maven is the preferred build system.**
@@ -72,38 +61,7 @@ mvn test -Plocal-dev-javase
 ant samples
 ```
 
-### Legacy Ant Build
-
-While Maven is preferred, Ant builds are still supported:
-
-```bash
-ant                    # Build core
-ant core              # Build Codename One core
-ant ios               # Build iOS port
-ant android           # Build Android port
-ant javase            # Build JavaSE port
-ant test-javase       # Run tests
-ant samples           # Launch sample runner
-```
-
 ## Project Architecture
-
-### Core Framework Structure
-
-The framework is organized into these main packages under `CodenameOne/src/com/codename1/`:
-
-- **`ui/`** - UI components, layouts, and rendering
-- **`io/`** - Networking, storage, and I/O operations
-- **`components/`** - High-level UI components (e.g., SpanLabel, InfiniteProgress)
-- **`charts/`** - Charting library
-- **`maps/`** - Mapping support
-- **`util/`** - Utilities (e.g., StringUtil, MathUtil)
-- **`l10n/`** - Localization support
-- **`impl/`** - Platform implementation interfaces
-- **`db/`** - Database APIs
-- **`push/`** - Push notification support
-- **`media/`** - Media playback
-- **`properties/`** - Property binding framework
 
 ### ParparVM (iOS Translation)
 
@@ -120,28 +78,6 @@ Located in `vm/`, ParparVM is Codename One's iOS VM that translates Java bytecod
 - Targets Java 5 with Java 8 syntax via retrolambda
 
 **Build output:** Valid Xcode project that can be opened, debugged, and profiled with native tools.
-
-### Maven Module Structure
-
-- **`core/`** - Framework core (compiled with `-source 1.5 -target 1.5`)
-- **`factory/`** - Factory interfaces for platform implementations
-- **`javase/`** - JavaSE simulator port
-- **`javase-svg/`** - SVG support for JavaSE
-- **`android/`** - Android port
-- **`ios/`** - iOS port resources
-- **`parparvm/`** - ParparVM resources
-- **`designer/`** - Visual designer tool
-- **`codenameone-maven-plugin/`** - Maven build plugin
-- **`sqlite-jdbc/`** - SQLite support
-- **`java-runtime/`** - Java runtime utilities
-
-### Platform Implementations
-
-Each platform provides implementation of interfaces in `com.codename1.impl`:
-
-- **JavaSE** (`Ports/JavaSE/`) - Desktop simulator
-- **Android** (`maven/android/`) - Android native implementation
-- **iOS** (`maven/ios/`, `Ports/iOSPort/`) - iOS native implementation via ParparVM
 
 ## Development Workflow
 
@@ -266,6 +202,37 @@ programs pushed from a desktop, interpreted rather than compiled. See
   interfaces a class implements, and which constructors exist. Note `javap`
   resolves `java.*` from the platform even with `-cp`, so inspect the extracted
   `.class` file directly or you will be reading the JDK's copy.
+### Build hints
+
+A build hint is a `codename1.arg.<name>=<value>` line the builders read as
+`request.getArg(name, default)`. An undeclared name is accepted, never read, and
+silently does nothing, so every hint must be declared in exactly one place:
+
+- **`CodenameOne/src/com/codename1/annotations/buildhints`** if it has an
+  annotation. Hand-written, and the source of truth -- see its
+  `package-info.java`.
+- **`maven/build-hint-catalog`** otherwise: dynamic families, build-service-only
+  hints, the long tail.
+
+Nothing is generated into the tree. `BuildHintCodeGenerator` renders the
+annotated hints into `cn1-build-hints.json` for the editors that cannot read
+bytecode, and into the developer guide's table -- both during a build, neither
+committed. Every module that needs the data file renders it into its own
+`target/classes`: `maven/javase`, `maven/codenameone-maven-plugin` and
+`scripts/settings/common`. The catalog cannot render its own, because the
+generator lives in `build-hint-tools`, which depends on it.
+
+Adding a hint to a builder means declaring it in the same change:
+
+```bash
+source tools/env.sh
+scripts/gen-build-hint-annotations.sh --check  # the render still works (CI)
+scripts/check-build-hint-catalog.sh            # every hint the code reads is declared
+```
+
+`scripts/build-hint-catalog-baseline.txt` is an **empty** ratchet: a new entry
+means a hint went in undeclared. Do not re-run `tools/build-hint-bootstrap/`; it
+seeded the catalog once and would overwrite hand edits.
 
 ### Never rely on ClassCastException
 
@@ -378,17 +345,6 @@ cd maven/integration-tests
 ./android-native-interface-test.sh  # Test Android native interfaces
 ```
 
-## Important Files and Locations
-
-- **`maven/pom.xml`** - Root Maven POM, defines all modules and dependencies
-- **`maven/CodeNameOneBuildClient.jar`** - Build client (copied to `~/.codenameone/`)
-- **`scripts/setup-workspace.sh`** - Initial workspace setup script
-- **`scripts/build-android-port.sh`** - Android port build script
-- **`scripts/build-ios-port.sh`** - iOS port build script
-- **`tools/env.sh`** - Environment variables (created by setup-workspace.sh)
-- **`BUILDING.md`** - Detailed build instructions
-- **`README.md`** - Project overview and getting started
-
 ## Common Patterns
 
 ### Resource Files
@@ -414,13 +370,39 @@ bash update-version.sh 8.0.1
 
 ## Deployment and Release
 
-### Maven Central Deployment
+### Release Deployment
 
-See `maven/README.adoc` for full process. Summary:
+Releases go to the Codename One Maven repository at
+<https://repo.codenameone.com/maven2> (Cloudflare R2), **not** to Maven Central.
+Central keeps every version published before the cutover and nothing is removed
+from it, but it receives no new ones. Do not add a Central publication step back;
+the reasons and the rules the publishing scripts enforce are in
+`maven/scripts/r2/README.md`.
+
+`central-publishing-maven-plugin` is still what builds a release. That is not a
+leftover: it stages a complete Maven layout with all four checksums and `.asc`
+signatures, which is exactly the tree R2 needs. Every build passes
+`-DskipPublishing=true`, so it stages and never uploads. It still needs a `central`
+server entry in `settings.xml` or it NPEs before staging, which is why the release
+workflow keeps `server-id: central` with no credentials attached.
+
+See `maven/README.adoc` for the full process. Summary:
 1. Update to release version: `bash update-version.sh X.Y.Z`
-2. Push tags (triggers GitHub Actions workflow)
+2. Push tags, **one at a time** (triggers `.github/workflows/release.yml`) --
+   a third tag pushed during a running release replaces the pending second one
+   and it is never published
 3. Update to next SNAPSHOT: `bash update-version.sh X.Y.Z+1-SNAPSHOT`
-4. Close and release staging repository on Sonatype
+
+Some artifacts are resolved by a release at a version that is not the release's
+own -- `codenameone-designer` and `codenameone-javase-svg` at
+`cn1.designer.version`, and `cn1-builder-resources-{common,android}` at their
+pinned version. They are published nowhere but Maven Central, so they have to be
+copied into the repository once. `maven/scripts/r2/frozen-coordinates.py`
+**derives** that set from the tree; do not replace it with a hand-written list,
+which was wrong twice in its single commit of existence. After bumping any such
+pin, run the *Seed frozen artifacts to R2* workflow before the next release tag.
+The release refuses to build while a pinned version is absent from the
+repository, so the ordering is enforced rather than remembered.
 
 ### Build Server
 
@@ -450,19 +432,3 @@ The JavaSE port serves as the simulator with:
 - **Missing cn1-binaries**: Run `setup-workspace.sh` or manually clone to `../cn1-binaries`
 - **Build client missing**: Copy `maven/CodeNameOneBuildClient.jar` to `~/.codenameone/`
 - **macOS ARM JDK8**: Setup script downloads x64 version (works via Rosetta)
-
-## Contributing
-
-- Discuss changes in [discussion forum](https://www.codenameone.com/discussion-forum.html) or [Stack Overflow](http://stackoverflow.com/tags/codenameone)
-- File clear, concise issues with test cases
-- JavaDoc editable directly in source
-- Developer guide wiki: https://github.com/codenameone/CodenameOne/wiki/
-- By contributing, you grant Codename One shared ownership of your work
-
-## Additional Resources
-
-- Main site: https://www.codenameone.com
-- JavaDoc: https://www.codenameone.com/javadoc/
-- Developer Guide: https://www.codenameone.com/manual/
-- Maven Manual: https://shannah.github.io/codenameone-maven-manual/
-- Build from source blog: https://www.codenameone.com/blog/building-codename-one-from-source-maven-edition.html

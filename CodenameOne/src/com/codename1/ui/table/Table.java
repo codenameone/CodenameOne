@@ -31,7 +31,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
@@ -43,6 +42,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.validation.Constraint;
 import com.codename1.ui.validation.Validator;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.util.CaseInsensitiveOrder;
 
 import java.util.Comparator;
@@ -189,7 +189,7 @@ public class Table extends Container {
     ///
     /// the offset of the selected row in the table if a selection exists
     public int getSelectedRow() {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             Component c = f.getFocused();
             if (c != null) {
@@ -215,7 +215,7 @@ public class Table extends Container {
     ///
     /// the offset of the selected column in the table if a selection exists
     public int getSelectedColumn() {
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             Component c = f.getFocused();
             if (c != null) {
@@ -228,7 +228,7 @@ public class Table extends Container {
     private void updateModel() {
         int selectionRow = -1;
         int selectionColumn = -1;
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             Component c = f.getFocused();
             if (c != null) {

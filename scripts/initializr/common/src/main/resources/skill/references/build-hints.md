@@ -15,8 +15,6 @@ When in doubt, search the developer guide for the exact key name — there are h
 | Hint | Effect |
 | --- | --- |
 | `codename1.arg.java.version=17` | **Required.** Picks the JDK 17 build server toolchain. |
-| `codename1.arg.build.compile=true` | Run the ahead-of-time / bytecode-to-native compile (recommended for iOS, smaller binaries). |
-| `codename1.arg.build.timeout=180` | Build server timeout in minutes. Bump for very large apps. |
 | `codename1.arg.var.<name>=...` | Define a custom variable referenced as `${var.name}` elsewhere in hints. |
 
 ## iOS
@@ -41,17 +39,16 @@ When in doubt, search the developer guide for the exact key name — there are h
 | `codename1.arg.ios.beforeFinishLaunching=...` | Native code inserted before iOS's `application:didFinishLaunchingWithOptions:` returns. |
 | `codename1.arg.ios.newStorageLocation=true` | Use modern iOS storage paths (recommended for new apps). |
 | `codename1.arg.ios.wallet.extension=true` | Generate an Apple Wallet issuer-provisioning extension (iOS 14+). See *Apple Wallet issuer provisioning* below. |
+| `codename1.arg.ios.documentProvider.enabled=true` | Publish the app's content as a location in the system file browser (Files on iOS, the storage picker on Android). See *Document provider* below. |
 
 ## Android
 
 | Hint | Effect |
 | --- | --- |
-| `codename1.arg.android.googlePlayVersion=true` | Build the Google Play–compatible APK/AAB variant. |
-| `codename1.arg.android.sdkVersion=34` | Compile-time Android SDK. |
 | `codename1.arg.android.targetSDKVersion=34` | Target SDK in the manifest (drives Play Store acceptance). |
-| `codename1.arg.android.minSdkVersion=24` | Minimum Android API level. |
-| `codename1.arg.android.buildToolsVersion=34.0.0` | Android build-tools version. |
-| `codename1.arg.android.xPermissions=<uses-permission android:name="..."/>` | Inject extra `<uses-permission>` lines into the manifest. |
+| `codename1.arg.android.min_sdk_version=24` | Minimum Android API level. |
+| `codename1.arg.android.buildToolsVersion=34.0.0` | Android build-tools version. Also selects the compile SDK — there is no separate compile-SDK hint. |
+| `codename1.arg.android.xpermissions=<uses-permission android:name="..."/>` | Inject extra `<uses-permission>` lines into the manifest. |
 | `codename1.arg.android.xapplication=<receiver .../>` | Inject XML inside the manifest's `<application>` element. |
 | `codename1.arg.android.activity.launchMode=singleTask` | Launch mode for the main activity. |
 | `codename1.arg.android.statusbar_hidden=true` | Hide the Android status bar. |
@@ -103,6 +100,26 @@ Card issuers can surface their cards inside the iOS Wallet app via a *non-UI iss
 
 This is an advanced, issuer-only feature — most apps never need it. The compiled native code is gated behind a build define, so leaving the hints unset is a no-op.
 
+## Document provider
+
+Publishes app content as a browsable location in the system file browser: the Files app on iOS, the storage picker on Android. Referencing `com.codename1.documents` is what makes the build generate the native plumbing -- an app-extension target plus App Group on iOS, a `DocumentsProvider` in the manifest on Android.
+
+Publish a tree of `DocumentNode`s through `com.codename1.documents.DocumentProvider`. Content comes either from bytes written under `DocumentProvider.getSharedDirectory()` (a node's `path`) or on demand from an HTTPS endpoint you host (a node's `remoteId` plus `setRemoteEndpoint`).
+
+| Hint (`codename1.arg.` prefix) | Effect |
+| --- | --- |
+| `ios.documentProvider.enabled=true` | Declares the feature. Redundant for the build, which detects the API reference itself, but it is how the Certificate Wizard and the signing preflight know the extension will be generated. |
+| `ios.documentProvider.appGroup=group.com.example.app` | Shared App Group (must start with `group.`), defaulting to `group.` plus the package name. It is the entire transport between the app and the extension. |
+| `ios.documentProvider.displayName=...` | Name the location carries in the browser; defaults to the app's display name. |
+| `ios.documentProvider.deploymentTarget=16.0` | Minimum OS version. At or above 16.0 the extension uses `NSFileProviderReplicatedExtension`; below it, the deprecated `NSFileProviderExtension`. |
+| `ios.documentProvider.extension=false` | Skip the iOS lowering entirely, leaving the API an inert no-op. |
+
+Two things to get right. Node ids must be stable for the life of the item -- the platform remembers them for favourites and recents, so ids derived from list position point the browser at the wrong file later. And the reader is a *separate process* that runs while the app is dead and cannot call Java, so publish whenever your data changes rather than in response to being browsed.
+
+If all you want is the app's own documents folder visible in Files, you need none of this -- set `ios.plistInject` with `UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace` instead.
+
+The extension needs its own App ID and provisioning profile; `mvn cn1:certificatewizard` creates both, along with the App Group.
+
 ## JavaScript / web
 
 | Hint | Effect |
@@ -112,8 +129,6 @@ This is an advanced, issuer-only feature — most apps never need it. The compil
 | `codename1.arg.javascript.proxy.allowedTargets=...` | Restrict the generated proxy to comma-separated origins, hosts, or wildcard subdomains. |
 | `codename1.arg.javascript.proxy.url=...` | Use an externally hosted proxy URL. This suppresses generated packaging unless `javascript.proxy.target` is also explicit. |
 | `codename1.arg.javascript.inject_proxy=false` | Disable proxy generation and proxy URL injection. |
-| `codename1.arg.javascript.html5=true` | Emit modern ES output. |
-| `codename1.arg.javascript.bundleResources=true` | Inline `theme.res` into the bundle (faster cold start). |
 
 ## Variable substitution
 

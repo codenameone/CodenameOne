@@ -38,6 +38,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.WeakHashMap;
+import com.codename1.ui.TopLevelContainer;
 
 /// Shows a "Washing Machine" infinite progress indication animation, to customize the image you can either
 /// use the infiniteImage theme constant or the `setAnimation` method. The image is rotated
@@ -194,6 +195,26 @@ public class InfiniteProgress extends Component {
         return d;
     }
 
+    /// True when this spinner's own top level is the one on screen.
+    ///
+    /// A `Window` is on screen in its own right, so comparing it against
+    /// `Display#getCurrent()` -- which only ever names a `Form` -- reported false for
+    /// every spinner in a window and stopped it animating and painting.
+    ///
+    /// #### Returns
+    ///
+    /// true when the surface holding this component is displayed
+    private boolean isOnDisplayedTopLevel() {
+        TopLevelContainer top = getTopLevelContainer();
+        if (top == null) {
+            return false;
+        }
+        if (top instanceof com.codename1.ui.Window) {
+            return ((com.codename1.ui.Window) top).isWindowShowing();
+        }
+        return Display.getInstance().getCurrent() == top; //NOPMD CompareObjectsWithEquals
+    }
+
     /// {@inheritDoc}
     @Override
     protected void initComponent() {
@@ -201,20 +222,25 @@ public class InfiniteProgress extends Component {
         if (animation == null) {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
         }
-        Form f = getComponentForm();
-        if (f != null) {
-            f.registerAnimated(this);
-        }
+        registerForAnimation();
     }
 
     /// {@inheritDoc}
     @Override
     protected void deinitialize() {
-        Form f = getComponentForm();
-        if (f == null) {
-            f = Display.getInstance().getCurrent();
+        // The fallback to the current form existed because deinitialize can run after
+        // the component has left its hierarchy. It threw outright in a window-only
+        // application, where there is no current form either -- and that threw during
+        // Window.dispose(), before the native peer and paint surface were released.
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null) {
+            top.deregisterAnimated(this);
+        } else {
+            Form current = Display.getInstance().getCurrent();
+            if (current != null) {
+                current.deregisterAnimated(this);
+            }
         }
-        f.deregisterAnimated(this);
         super.deinitialize();
     }
 
@@ -242,7 +268,7 @@ public class InfiniteProgress extends Component {
     /// True if it animated and should be repainted.
     ///
     public boolean animate(boolean force) {
-        if (!force && (!isVisible() || Display.getInstance().getCurrent() != this.getComponentForm())) { // PMD Fix: CollapsibleIfStatements merged visibility checks //NOPMD CompareObjectsWithEquals
+        if (!force && (!isVisible() || !isOnDisplayedTopLevel())) { // PMD Fix: CollapsibleIfStatements merged visibility checks
             return false;
         }
         // reduce repaint thrushing of the UI from the infinite progress
@@ -303,7 +329,7 @@ public class InfiniteProgress extends Component {
     /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
-        if (this.getComponentForm() != null && Display.getInstance().getCurrent() != this.getComponentForm()) { //NOPMD CompareObjectsWithEquals
+        if (getTopLevelContainer() != null && !isOnDisplayedTopLevel()) {
             return;
         }
         super.paint(g);

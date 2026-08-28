@@ -30,6 +30,19 @@ import java.util.List;
 
 public class ThreadSafeDatabaseTest extends UITestBase {
 
+    /**
+     * How long a test waits for a worker thread to stop.
+     *
+     * <p>Deliberately below the 5000ms {@code @FormTest} timeout in
+     * {@link com.codename1.junit.EDTTestInterceptor}. These waits used to use
+     * 5000ms as well, so a slow runner spent the whole harness budget inside the
+     * poll loop and the interceptor fired first: the report was
+     * "FormTest timed out after 5000ms" with nothing about which condition never
+     * became true. With headroom the test fails on its own assertion instead,
+     * which names the thing that went wrong.</p>
+     */
+    private static final long WORKER_STOP_TIMEOUT_MILLIS = 2000;
+
     @FormTest
     public void testDelegation() throws Exception {
         Database db = TestCodenameOneImplementation.getInstance().openOrCreateDB("test_threadsafe.db");
@@ -91,7 +104,7 @@ public class ThreadSafeDatabaseTest extends UITestBase {
                 }
             }
         });
-        long deadline = System.currentTimeMillis() + 5000;
+        long deadline = System.currentTimeMillis() + WORKER_STOP_TIMEOUT_MILLIS;
         while (!tsDb.getThread().isFinished() && System.currentTimeMillis() < deadline) {
             Thread.sleep(10);
         }
@@ -118,7 +131,7 @@ public class ThreadSafeDatabaseTest extends UITestBase {
         com.codename1.util.EasyThread et = com.codename1.util.EasyThread.start("test-kill-flag");
         Assertions.assertFalse(et.isFinished(), "a running thread is not finished");
         et.kill();
-        long deadline = System.currentTimeMillis() + 5000;
+        long deadline = System.currentTimeMillis() + WORKER_STOP_TIMEOUT_MILLIS;
         while (!et.isFinished() && System.currentTimeMillis() < deadline) {
             Thread.sleep(10);
         }
@@ -150,7 +163,7 @@ public class ThreadSafeDatabaseTest extends UITestBase {
                 .openOrCreateDB("test_threadsafe_close_after_worker.db");
         ThreadSafeDatabase tsDb = new ThreadSafeDatabase(db);
         tsDb.getThread().killWhenIdle();
-        long deadline = System.currentTimeMillis() + 5000;
+        long deadline = System.currentTimeMillis() + WORKER_STOP_TIMEOUT_MILLIS;
         while (!tsDb.getThread().isFinished() && System.currentTimeMillis() < deadline) {
             Thread.sleep(10);
         }
@@ -202,7 +215,7 @@ public class ThreadSafeDatabaseTest extends UITestBase {
         });
         synchronized (started) {
             while (!started[0]) {
-                started.wait(5000);
+                started.wait(WORKER_STOP_TIMEOUT_MILLIS);
             }
         }
 

@@ -30,15 +30,31 @@ function control() {
   };
 }
 
-function load(consent, search = "") {
+function load(
+  consent,
+  search = "",
+  pathname = "/playground/",
+  experimentArm = null,
+  experimentTelemetryEnabled = true,
+  hostname = "www.codenameone.com",
+  legacyConsent = null,
+  sessionStore = storage(),
+  fetchHandler = null
+) {
   const timers = [];
+  const timerDelays = [];
+  const fetches = [];
+  let uuid = 0;
   const documentListeners = {};
   const banner = control();
   const accept = control();
   const decline = control();
   const cookies = new Map();
   if (consent) {
-    cookies.set("cn1_crisp_consent", consent);
+    cookies.set("cn1_crisp_consent_v2", consent);
+  }
+  if (legacyConsent) {
+    cookies.set("cn1_crisp_consent", legacyConsent);
   }
 
   const document = {
@@ -68,16 +84,53 @@ function load(consent, search = "") {
     },
   });
 
+  const localStore = storage();
+  if (experimentArm) {
+    localStore.setItem("cn1-exp-004-arm-v1", experimentArm);
+  }
+
   const window = {
+    crypto: {
+      randomUUID() {
+        uuid += 1;
+        return `00000000-0000-4000-8000-${String(uuid).padStart(12, "0")}`;
+      },
+    },
+    fetch(url, options) {
+      fetches.push({ url, options });
+      if (fetchHandler) {
+        return Promise.resolve(fetchHandler(url, options, fetches));
+      }
+      if (url === "/api/exp004/session") {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            submission_token: "00000000-0000-4000-8000-999999999999",
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, status: 202 });
+    },
     location: {
-      pathname: "/playground/",
+      hostname,
+      pathname,
       search,
     },
-    setTimeout(callback) {
+    setTimeout(callback, delay = 0) {
       timers.push(callback);
+      timerDelays.push(delay);
       return timers.length;
     },
   };
+  if (experimentArm) {
+    window.cn1Exp004 = {
+      id: "EXP-004",
+      arm: experimentArm,
+      telemetryEnabled: experimentTelemetryEnabled,
+      persist() { return true; },
+    };
+  }
   window.window = window;
 
   const context = vm.createContext({
@@ -85,14 +138,38 @@ function load(consent, search = "") {
     decodeURIComponent,
     document,
     encodeURIComponent,
-    localStorage: storage(),
-    sessionStorage: storage(),
+    localStorage: localStore,
+    sessionStorage: sessionStore,
     URL,
     URLSearchParams,
     window,
   });
   vm.runInContext(source, context, { filename: scriptPath });
-  return { accept, decline, documentListeners, timers, window, sessionStorage: context.sessionStorage };
+  return {
+    accept,
+    decline,
+    documentListeners,
+    fetches,
+    timerDelays,
+    timers,
+    window,
+    sessionStorage: context.sessionStorage,
+  };
+}
+
+async function settle(state, runTimers = false) {
+  for (let round = 0; round < 8; round += 1) {
+    await Promise.resolve();
+  }
+  if (runTimers) {
+    while (state.timers.length) {
+      const callbacks = state.timers.splice(0);
+      callbacks.forEach((callback) => callback());
+      for (let round = 0; round < 8; round += 1) {
+        await Promise.resolve();
+      }
+    }
+  }
 }
 
 function eventCommands(state) {
@@ -101,6 +178,15 @@ function eventCommands(state) {
 
 function events(state) {
   return eventCommands(state).map((command) => command[2][0][0]);
+}
+
+function normalizedCounterBody(options) {
+  const body = JSON.parse(options.body);
+  if (Object.hasOwn(body, "occurred_at")) {
+    assert.ok(Number.isInteger(body.occurred_at));
+    body.occurred_at = "<occurred_at>";
+  }
+  return body;
 }
 
 {
@@ -141,6 +227,221 @@ function events(state) {
   state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
   assert.equal(eventCommands(state).length, 0,
     "a project download must not be recorded without analytics consent");
+}
+
+{
+  const state = load(null, "", "/", "ownership", true, "www.codenameone.com", "accepted");
+  assert.equal(eventCommands(state).length, 0,
+    "old chat-only consent must not authorize experiment telemetry");
+  assert.equal(state.window.CRISP_WEBSITE_ID, undefined,
+    "old chat-only consent must not load Crisp before the new opt-in");
+}
+
+{
+  const state = load("accepted", "", "/", "ownership");
+  state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+  state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+  await settle(state);
+
+  const recorded = events(state);
+  assert.equal(recorded.length, 3,
+    "one homepage exposure may produce at most one arm-specific download");
+  assert.equal(recorded[0][0], "Exp004OwnershipExposure");
+  assert.equal(recorded[0][1].experiment_id, "EXP-004");
+  assert.equal(recorded[0][1].experiment_arm, "ownership");
+  assert.equal(
+    state.sessionStorage.getItem(
+      "cn1-crisp-ev-Exp004OwnershipExposure-exp-004-ownership"
+    ),
+    "1"
+  );
+  assert.equal(recorded[1][0], "InitializrProjectDownloaded");
+  assert.equal(recorded[1][1].experiment_arm, "ownership");
+  assert.equal(recorded[2][0], "Exp004OwnershipDownload");
+  assert.equal(state.fetches.length, 3,
+    "one rate-limited session plus two events must reach the counter");
+  assert.deepEqual(
+    state.fetches.map(({ url, options }) => ({
+      url,
+      method: options.method,
+      keepalive: options.keepalive,
+      body: normalizedCounterBody(options),
+    })),
+    [
+      {
+        url: "/api/exp004/session",
+        method: "POST",
+        keepalive: true,
+        body: {
+          session_key: "00000000-0000-4000-8000-000000000001",
+          arm: "ownership",
+        },
+      },
+      {
+        url: "/api/exp004/collect",
+        method: "POST",
+        keepalive: true,
+        body: {
+          event: "Exp004OwnershipExposure",
+          event_id: "00000000-0000-4000-8000-000000000002",
+          occurred_at: "<occurred_at>",
+          session_key: "00000000-0000-4000-8000-000000000001",
+          submission_token: "00000000-0000-4000-8000-999999999999",
+        },
+      },
+      {
+        url: "/api/exp004/collect",
+        method: "POST",
+        keepalive: true,
+        body: {
+          event: "Exp004OwnershipDownload",
+          event_id: "00000000-0000-4000-8000-000000000003",
+          occurred_at: "<occurred_at>",
+          session_key: "00000000-0000-4000-8000-000000000001",
+          submission_token: "00000000-0000-4000-8000-999999999999",
+        },
+      },
+    ],
+  );
+}
+
+{
+  const state = load("accepted", "", "/playground/", "reach");
+  state.window.cn1CrispEvents.conversionClick({ action: "playground-download" });
+
+  const recorded = events(state);
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0][0], "ConversionClick");
+  assert.equal(recorded[0][1].experiment_arm, undefined,
+    "a conversion without a current homepage exposure must not inherit a stored arm");
+}
+
+{
+  const state = load(null, "", "/", "reach");
+  assert.equal(eventCommands(state).length, 0, "experiment exposure must wait for consent");
+  state.accept.click();
+  await settle(state);
+  const recorded = events(state);
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0][0], "Exp004ReachExposure");
+  assert.equal(state.fetches.length, 2,
+    "accepting consent must authorize a session and record the exposure denominator");
+}
+
+{
+  const state = load("declined", "", "/", "ownership");
+  assert.equal(eventCommands(state).length, 0,
+    "a declined homepage view must not be recorded");
+  state.accept.click();
+  const recorded = events(state);
+  assert.equal(recorded.length, 1,
+    "opting in after a prior decline must record the exposure denominator");
+  assert.equal(recorded[0][0], "Exp004OwnershipExposure");
+}
+
+{
+  const state = load("accepted", "", "/", "reach", false);
+  assert.equal(eventCommands(state).length, 0,
+    "a preview assignment must never emit production experiment telemetry");
+  assert.equal(state.fetches.length, 0,
+    "a preview assignment must never hit the first-party counter");
+}
+
+{
+  const state = load(
+    "accepted",
+    "",
+    "/",
+    "reach",
+    true,
+    "exp-004-homepage-positioning.codenameone.pages.dev"
+  );
+  assert.equal(eventCommands(state).length, 0,
+    "a Cloudflare preview host must never emit production experiment telemetry");
+  assert.equal(state.fetches.length, 0,
+    "a Cloudflare preview must never hit the first-party counter");
+}
+
+{
+  const state = load("accepted", "", "/initializr/", "reach");
+  state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+
+  const recorded = events(state);
+  assert.equal(recorded.length, 1,
+    "a direct project download must not be attributed without a current homepage exposure");
+  assert.equal(recorded[0][0], "InitializrProjectDownloaded");
+  assert.deepEqual(JSON.parse(JSON.stringify(recorded[0][1])), { page: "/initializr/" });
+  assert.equal(state.fetches.length, 0,
+    "an unexposed download must not hit the experiment counter");
+}
+
+{
+  const sharedSession = storage();
+  const first = load(
+    "accepted", "", "/", "ownership", true, "www.codenameone.com", null,
+    sharedSession,
+    (url) => url === "/api/exp004/session"
+      ? {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            submission_token: "00000000-0000-4000-8000-999999999999",
+          }),
+        }
+      : { ok: false, status: 503 }
+  );
+  await settle(first);
+  const failedBody = JSON.parse(
+    first.fetches.find(({ url }) => url === "/api/exp004/collect").options.body
+  );
+
+  const recovered = load(
+    "accepted", "", "/", "ownership", true, "www.codenameone.com", null,
+    sharedSession
+  );
+  await settle(recovered);
+  const recoveredBody = JSON.parse(
+    recovered.fetches.find(({ url }) => url === "/api/exp004/collect").options.body
+  );
+  assert.equal(recoveredBody.event_id, failedBody.event_id,
+    "a reload must retry a failed counter post with its persisted event ID");
+  assert.equal(recoveredBody.occurred_at, failedBody.occurred_at,
+    "a reload must retain the original event occurrence time");
+  assert.equal(
+    sharedSession.getItem("cn1-exp-004-counter-ack-v1-Exp004OwnershipExposure"),
+    "1",
+    "only a successful response may acknowledge the persisted event"
+  );
+}
+
+{
+  const unavailableStorage = {
+    getItem() { throw new Error("storage unavailable"); },
+    setItem() { throw new Error("storage unavailable"); },
+    removeItem() { throw new Error("storage unavailable"); },
+  };
+  const state = load(
+    "accepted", "", "/", "reach", true, "www.codenameone.com", null,
+    unavailableStorage
+  );
+  await settle(state);
+  assert.equal(state.fetches.filter(({ url }) => url === "/api/exp004/collect").length, 1,
+    "storage-disabled visitors must still get best-effort in-memory telemetry");
+}
+
+{
+  const state = load(
+    "accepted", "", "/", "ownership", true, "www.codenameone.com", null,
+    storage(),
+    (url) => url === "/api/exp004/session"
+      ? { ok: false, status: 429, json: async () => ({}) }
+      : { ok: true, status: 202 }
+  );
+  await settle(state, true);
+  assert.ok(
+    state.timerDelays.reduce((total, delay) => total + delay, 0) > 60000,
+    "session enrollment retries must continue beyond the 60-second rate-limit window"
+  );
 }
 
 {

@@ -23,6 +23,9 @@
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
+#if TARGET_OS_MACCATALYST
+#import "CN1MacWindows.h"
+#endif
 #import "EAGLView.h"
 #ifdef CN1_USE_METAL
 #import "METALView.h"
@@ -282,6 +285,30 @@ JAVA_INT getSafeTop() {
 
 #if !TARGET_OS_WATCH
 UIView *editingComponent;
+
+#if TARGET_OS_MACCATALYST
+/*
+ * Moves an editor that had to start before its window's scene existed.
+ *
+ * Editing can begin in the same event dispatch turn as Window.show(), and the scene
+ * is granted asynchronously -- so CN1MacWindowEditingHostView() can be nil while a
+ * secondary window is genuinely the requested host. The editor went to the main
+ * controller's view and stayed there, visible and typeable in the wrong window,
+ * because adoption never revisited it. Called from CN1MacWindowSceneConnected.
+ */
+void CN1MacWindowReattachEditor(UIView* host) {
+    if (host == nil || editingComponent == nil) {
+        return;
+    }
+    if (editingComponent.superview == host) {
+        return;
+    }
+    [editingComponent removeFromSuperview];
+    [host addSubview:editingComponent];
+    [editingComponent becomeFirstResponder];
+    [editingComponent setNeedsDisplay];
+}
+#endif
 
 // Currently used only for datepicker but could be used for
 // other things.  A persistent reference to the action sheet
@@ -584,7 +611,9 @@ static int cn1MapUIPressTypeToKeyCode(UIPressType type) {
 // expects: a negative sentinel for non-printable keys, a unicode codepoint for
 // printable characters, or 0 if we don't recognize the key.
 #if !TARGET_OS_WATCH
-static int cn1MapUIKeyToKeyCode(UIKey *key) API_AVAILABLE(ios(13.4)) {
+/* Not static: the Mac Catalyst window controller needs the same mapping, and
+ * duplicating a hundred-case switch would let the two drift apart. */
+int cn1MapUIKeyToKeyCode(UIKey *key) API_AVAILABLE(ios(13.4)) {
     switch (key.keyCode) {
         case UIKeyboardHIDUsageKeyboardReturnOrEnter:
         case UIKeyboardHIDUsageKeypadEnter:
@@ -839,6 +868,22 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             }
         }
         float scale = scaleValue;
+#if TARGET_OS_MACCATALYST
+        {
+            /* The owning window's backing scale when this edit belongs to a Codename
+             * One window, since scaleValue is the *main* scene's. Two Catalyst scenes
+             * can sit on displays of different scale, and converting with the wrong
+             * one left the native field oversized or undersized and displaced from
+             * the lightweight field it replaces -- the same defect peers had before
+             * they were given the owning window's scale. Zero means the main surface,
+             * which keeps scaleValue. */
+            extern double CN1MacWindowEditingScale(void);
+            double windowScale = CN1MacWindowEditingScale();
+            if (windowScale > 0) {
+                scale = (float) windowScale;
+            }
+        }
+#endif
         editCompoentX = (x + padLeft) / scale;
         editCompoentY = (y + padTop) / scale;
         editComponentPadTop = padTop;
@@ -1222,9 +1267,27 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
         }
         editingComponent.opaque = NO;
-        [[CodenameOne_GLViewController instance].view addSubview:editingComponent];
+        UIView* editHost = [CodenameOne_GLViewController instance].view;
+#if TARGET_OS_MACCATALYST
+        {
+            /* A field inside a Codename One window belongs in that window's view.
+             * Added to the main controller's view unconditionally, the editor stayed
+             * on the main surface while the user typed into a secondary window. iOS
+             * keeps the original path exactly. */
+            UIView* windowHost = CN1MacWindowEditingHostView();
+            if (windowHost != nil) {
+                editHost = windowHost;
+            }
+            /* windowHost can be nil for a window whose scene has not been granted
+             * yet, since editing can start in the same turn as show(). The editor
+             * goes to the main view for now and CN1MacWindowSceneConnected moves it
+             * across through CN1MacWindowReattachEditor once the content view
+             * exists -- without that it stayed on the main surface for good. */
+        }
+#endif
+        [editHost addSubview:editingComponent];
         [editingComponent becomeFirstResponder];
-        [[CodenameOne_GLViewController instance].view resignFirstResponder];
+        [editHost resignFirstResponder];
         [editingComponent setNeedsDisplay];
         
     });
@@ -4447,12 +4510,26 @@ BOOL prefersStatusBarHidden = NO;
             JAVA_OBJECT comp = impl->com_codename1_impl_ios_IOSImplementation_currentEditing;
 #endif
             if(comp != NULL) {
+                /* The same scale the editor was created with. Creation was corrected
+                 * to use the owning window's, and leaving this on the main scene's
+                 * meant the editor jumped back to the wrong offset the first time
+                 * scrolling or layout moved the field. */
+                float editScale = scaleValue;
+#if TARGET_OS_MACCATALYST
+                {
+                    extern double CN1MacWindowEditingScale(void);
+                    double windowScale = CN1MacWindowEditingScale();
+                    if (windowScale > 0) {
+                        editScale = (float) windowScale;
+                    }
+                }
+#endif
 #ifndef NEW_CODENAME_ONE_VM
-                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX__(comp) + com_codename1_ui_Component_getScrollX__(comp) + editComponentPadLeft) / scaleValue;
-                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY__(comp) + com_codename1_ui_Component_getScrollY__(comp) + editComponentPadTop) / scaleValue;
+                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX__(comp) + com_codename1_ui_Component_getScrollX__(comp) + editComponentPadLeft) / editScale;
+                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY__(comp) + com_codename1_ui_Component_getScrollY__(comp) + editComponentPadTop) / editScale;
 #else
-                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + com_codename1_ui_Component_getScrollX___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadLeft) / scaleValue;
-                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + com_codename1_ui_Component_getScrollY___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadTop) / scaleValue;
+                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + com_codename1_ui_Component_getScrollX___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadLeft) / editScale;
+                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + com_codename1_ui_Component_getScrollY___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadTop) / editScale;
 #endif
                 if(newEditCompoentX != editCompoentX || newEditCompoentY != editCompoentY) {
                     for (UIWindow *window in [[UIApplication sharedApplication] windows])

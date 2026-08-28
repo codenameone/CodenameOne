@@ -32,10 +32,10 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.EncodedImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.geom.Point;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.TopLevelContainer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -190,9 +190,9 @@ public class NativeMap extends Container implements MapSurface {
     }
 
     private void revalidateForm() {
-        Form form = getComponentForm();
+        TopLevelContainer form = getTopLevelContainer();
         if (form != null) {
-            form.revalidate();
+            form.asContainer().revalidate();
         }
     }
 

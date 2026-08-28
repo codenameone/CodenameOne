@@ -29,7 +29,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.InputComponent;
@@ -551,9 +550,16 @@ public class Validator {
                 cmp.addFocusListener(new FocusListener() {
                     @Override
                     public void focusGained(Component cmp) {
-                        // special case. Before the form is showing don't show error dialogs
-                        Form p = cmp.getComponentForm();
-                        if (p != Display.getInstance().getCurrent()) { //NOPMD CompareObjectsWithEquals
+                        // special case. Before the top level is showing don't show
+                        // error dialogs. Resolved through the top level rather than the
+                        // form: getComponentForm() is null inside a Window, so this
+                        // returned every time and the configured popup never appeared
+                        // there at all.
+                        com.codename1.ui.TopLevelContainer p = cmp.getTopLevelContainer();
+                        boolean showing = p instanceof com.codename1.ui.Window
+                                ? ((com.codename1.ui.Window) p).isWindowShowing()
+                                : p == Display.getInstance().getCurrent(); //NOPMD CompareObjectsWithEquals
+                        if (!showing) {
                             return;
                         }
                         if (message != null) {
@@ -563,6 +569,9 @@ public class Validator {
                             String err = getErrorMessage(cmp);
                             if (err != null && err.length() > 0) {
                                 message = new InteractionDialog(err);
+                                // The emblem path below shows by rectangle, which has
+                                // no anchor component to resolve a host from.
+                                message.setTopLevelHost(p);
                                 message.getTitleComponent().setUIID(errorMessageUIID);
                                 message.setAnimateShow(false);
                                 if (validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
@@ -724,11 +733,13 @@ public class Validator {
             }
         }
 
-        if (cmp.getComponentForm() != null) {
-            if (validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
-                if (!(cmp.getComponentForm().getGlassPane() instanceof ComponentListener)) {
-                    cmp.getComponentForm().setGlassPane(new ComponentListener(null));
-                }
+        if (validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
+            // The outer guard used to resolve the form, which is null by design inside a
+            // Window -- so the emblem glass pane was never installed there and EMBLEM
+            // validation showed nothing at all.
+            com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+            if (top != null && !(top.getGlassPane() instanceof ComponentListener)) {
+                top.setGlassPane(new ComponentListener(null));
             }
         }
         if (v) {
@@ -809,20 +820,29 @@ public class Validator {
                     xpos += Math.round(width * validationEmblemPositionX);
                     ypos += Math.round(height * validationEmblemPositionY);
 
-                    Form componentForm = c.getComponentForm();
-                    if (isPointCoveredByFormLayer(xpos, ypos, componentForm)) {
+                    // The top level, not the form: in a window getComponentForm() is
+                    // null, both helpers below then took their null guard, and the
+                    // emblem was painted straight over any overlay covering it.
+                    com.codename1.ui.TopLevelContainer emblemTop = c.getTopLevelContainer();
+                    if (isPointCoveredByFormLayer(xpos, ypos, emblemTop)) {
                         continue;
                     }
                     int emblemWidth = validationFailedEmblem.getWidth();
                     int emblemHeight = validationFailedEmblem.getHeight();
                     int drawX;
-                    if (xpos + emblemWidth > Display.getInstance().getDisplayWidth()) {
+                    // The owning surface's width, not the main display's. Component
+                    // coordinates are local to the window they live in, so a narrower
+                    // window clipped the emblem and a wider one flipped it needlessly.
+                    int surfaceWidth = emblemTop == null
+                            ? Display.getInstance().getDisplayWidth()
+                            : emblemTop.asContainer().getWidth();
+                    if (xpos + emblemWidth > surfaceWidth) {
                         drawX = xpos - emblemWidth;
                     } else {
                         drawX = xpos - emblemWidth / 2;
                     }
                     int drawY = ypos - emblemHeight / 2;
-                    if (isEmblemRectCoveredByInteractionDialog(new Rectangle(drawX, drawY, emblemWidth, emblemHeight), componentForm)) {
+                    if (isEmblemRectCoveredByInteractionDialog(new Rectangle(drawX, drawY, emblemWidth, emblemHeight), emblemTop)) {
                         continue;
                     }
 
@@ -842,7 +862,7 @@ public class Validator {
             }
         }
 
-        boolean isPointCoveredByFormLayer(int x, int y, Form form) {
+        boolean isPointCoveredByFormLayer(int x, int y, com.codename1.ui.TopLevelContainer form) {
             if (form == null) {
                 return false;
             }
@@ -869,7 +889,8 @@ public class Validator {
             return false;
         }
 
-        boolean isEmblemRectCoveredByInteractionDialog(Rectangle emblemRect, Form form) {
+        boolean isEmblemRectCoveredByInteractionDialog(Rectangle emblemRect,
+                com.codename1.ui.TopLevelContainer form) {
             if (form == null || emblemRect == null) {
                 return false;
             }

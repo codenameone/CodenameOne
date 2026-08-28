@@ -45,6 +45,7 @@
 
 typedef struct CN1Edit {
     HWND hwnd;             /* the EDIT control, created on the pump thread       */
+    int slot;              /* owning desktop window, or -1 for the main window   */
     int x, y, w, h;
     JAVA_BOOLEAN singleLine;
     int maxSize;
@@ -139,8 +140,15 @@ void cn1WinEditHandleMessage(WPARAM op, LPARAM lp) {
         /* No WS_EX_CLIENTEDGE: the Codename One field already draws its border and
          * background around the control's (padding-inset) text area, so the EDIT is
          * borderless and colour-matched to blend in. */
+        /* Parented to the window the field actually lives in. With the main HWND
+         * hard-coded here the editor appeared over the main window while the user
+         * was typing into a secondary one. */
+        HWND host = e->slot >= 0 ? cn1WinDesktopHwnd(e->slot) : cn1Win.hwnd;
+        if (host == NULL) {
+            host = cn1Win.hwnd;
+        }
         e->hwnd = CreateWindowExW(0, L"EDIT", L"", style,
-                e->x, e->y, e->w, e->h, cn1Win.hwnd, NULL, GetModuleHandleW(NULL), NULL);
+                e->x, e->y, e->w, e->h, host, NULL, GetModuleHandleW(NULL), NULL);
         if (e->hwnd != NULL) {
             g_currentEdit = e;
             SetWindowLongPtrW(e->hwnd, GWLP_USERDATA, (LONG_PTR) e);
@@ -196,10 +204,10 @@ void cn1WinEditHandleMessage(WPARAM op, LPARAM lp) {
     }
 }
 
-JAVA_LONG com_codename1_impl_windows_WindowsNative_editStringAt___int_int_int_int_java_lang_String_boolean_int_long_int_int_int_R_long(
+JAVA_LONG com_codename1_impl_windows_WindowsNative_editStringAt___int_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_R_long(
         CODENAME_ONE_THREAD_STATE, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h,
         JAVA_OBJECT text, JAVA_BOOLEAN singleLine, JAVA_INT maxSize, JAVA_LONG fontPeer,
-        JAVA_INT fgColor, JAVA_INT bgColor, JAVA_INT align) {
+        JAVA_INT fgColor, JAVA_INT bgColor, JAVA_INT align, JAVA_INT slot) {
     /* No host window (headless screenshot mode) -> no native editing surface. */
     if (cn1Win.hwnd == NULL) {
         return 0;
@@ -215,6 +223,7 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_editStringAt___int_int_int_in
     e->singleLine = singleLine;
     e->maxSize = maxSize;
     e->align = align;
+    e->slot = slot;
     e->font = (void*) (intptr_t) fontPeer;
     if (fgColor >= 0 && bgColor >= 0) {
         e->fg = cn1EditColorRef(fgColor);

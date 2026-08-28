@@ -252,6 +252,14 @@ def chunk_text(text, max_bytes=CHUNK_BYTES):
 # accept-list mechanism handles the cases where the language is otherwise
 # fine and we just need LanguageTool to stop flagging an identifier.
 DISABLED_RULES = (
+    # "This punctuation mark requires whitespace" on a trailing ellipsis. Every
+    # hit in the guide is a UI label that genuinely ends in one -- "File >
+    # Import...", "Edit Configurations...", "Add property..." -- so the ellipsis
+    # is part of the name being quoted and cannot take a leading space. Most of
+    # them are not even authored as an ellipsis: Asciidoctor rewrites "..." to
+    # U+2026 followed by a zero-width space, and the rule fires on its own
+    # substitution. Nothing here is a spacing defect.
+    "EN_ELLIPSIS",
     # "Use a comma before 'and'/'but' connecting two independent clauses".
     # Stylistic — common in developer prose to omit, and the suggested
     # rewrites read worse than the originals in many cases.
@@ -390,6 +398,12 @@ DISABLED_RULES = (
     # quoted text (e.g. a TeaVM error message) or apply stylistic
     # suggestions whose surrounding context the rendered HTML cannot
     # easily recover.
+    # Asciidoctor renders `...` as an ellipsis CHARACTER followed by a
+    # zero-width space, and EN_ELLIPSIS wants whitespace before it. There is
+    # nothing an author can write differently: the source says "..." and the
+    # renderer decides the rest, so every one of these is a property of the
+    # toolchain rather than of the prose.
+    "EN_ELLIPSIS",
     "COMMA_PARENTHESIS_WHITESPACE",  # most matches are AsciiDoc-syntax
     "EXTREME_ADJECTIVES",            # "Extra Small/Extra Large" labels
     "RB_RB_COMMA",                   # same as above

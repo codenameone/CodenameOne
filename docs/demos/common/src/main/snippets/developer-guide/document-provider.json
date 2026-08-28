@@ -1,0 +1,20 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::document-provider-json-001[]
+{
+  "id": "root",
+  "name": "Example Drive",
+  "folder": true,
+  "children": [
+    {
+      "id": "inv-2031-01",
+      "name": "January.pdf",
+      "folder": false,
+      "contentType": "application/pdf",
+      "remoteId": "invoices/2031/01",
+      "size": 48213,
+      "lastModified": 1735689600000
+    }
+  ]
+}
+// end::document-provider-json-001[]

@@ -1528,6 +1528,16 @@ public final class GeneratedAccess_com_codename1_util {
                 typedTarget.addErrorListener((com.codename1.util.EasyThread.ErrorListener) adaptedArgs[0]); return null;
             }
         }
+        if ("awaitFinished".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.awaitFinished(); return null;
+            }
+        }
+        if ("isFinished".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isFinished();
+            }
+        }
         if ("isThisIt".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isThisIt();
@@ -1536,6 +1546,11 @@ public final class GeneratedAccess_com_codename1_util {
         if ("kill".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.kill(); return null;
+            }
+        }
+        if ("killWhenIdle".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.killWhenIdle(); return null;
             }
         }
         if ("removeErrorListener".equals(name)) {

@@ -24,6 +24,7 @@ package com.codename1.builders;
 
 import com.codename1.build.shared.PlatformFeatureCatalog;
 import com.codename1.util.IOSAppIntentsBuilder;
+import com.codename1.util.IOSDocumentProviderExtensionBuilder;
 import com.codename1.util.IOSWalletExtensionBuilder;
 import com.codename1.util.MatterExtensionBuilder;
 import com.codename1.util.IOSWidgetExtensionBuilder;
@@ -842,6 +843,22 @@ public class IPhoneBuilder extends Executor {
     // ios.surfaces.extension=false the whole iOS lowering is skipped (no define flip, no
     // extension, no Swift glue): the surfaces API compiles but answers unsupported at runtime.
     private boolean surfacesExtensionEnabled;
+
+    // Set when the app references com.codename1.documents. Gates the CN1_USE_DOCUMENTS native
+    // define, the CN1Documents file provider extension and the app group that lets the two
+    // processes meet.
+    private boolean usesDocuments;
+
+    // usesDocuments && ios.documentProvider.extension != false. When the developer opts out the
+    // whole iOS lowering is skipped and the API stays an inert no-op.
+    private boolean documentProviderEnabled;
+
+    private String documentsAppGroup;
+    private String documentsDisplayName;
+
+    // Whether the generated extension is the replicated (iOS 16 / macOS 13) provider.
+    // Read by injectToPlist so the app-side natives know which one they are talking to.
+    private boolean documentsUsesReplicatedApi = true;
     /// True when a watch target exists and at least one kind declares a complication family, so
     /// the watch app gets a CN1WatchWidgets extension of its own.
     ///
@@ -1017,8 +1034,64 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    /**
+     * <p>An App Group identifier: {@code group.} followed by dot-separated segments of letters,
+     * digits and hyphens.</p>
+     *
+     * <p>A positive pattern rather than a list of characters to reject, for the reason the Ruby
+     * escaping beside it gives: the failure being prevented is "someone thought of a character I
+     * did not". This value reaches an Info.plist, an entitlements file and the generated Ruby, so
+     * the cost of a character nobody anticipated is a malformed file rather than a clear error.</p>
+     */
+    private static boolean isAppGroupIdentifier(String value) {
+        if (value == null || !value.startsWith("group.") || value.length() <= "group.".length()) {
+            return false;
+        }
+        boolean segmentHasContent = false;
+        for (int i = "group.".length(); i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '.') {
+                if (!segmentHasContent) {
+                    return false;
+                }
+                segmentHasContent = false;
+            } else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '-') {
+                segmentHasContent = true;
+            } else {
+                return false;
+            }
+        }
+        return segmentHasContent;
+    }
+
+    /** Escapes the five characters that cannot appear literally in plist text. */
+    private static String xmlEscape(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&apos;");
+    }
+
     private static String escapeRuby(String input) {
         return input.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    /**
+     * <p>Escapes a value for a DOUBLE-quoted Ruby literal, which is what the generated
+     * xcodeproj script writes build settings into.</p>
+     *
+     * <p>Build-setting values are developer input -- they arrive from
+     * {@code <target>.buildSettings.*} hints and from a buildSettings.properties inside a
+     * submitted app_extensions archive -- and a perfectly ordinary one carries a quote:
+     * {@code OTHER_SWIFT_FLAGS=$(inherited) -DNAME="foo"}. Emitted verbatim it closes the
+     * literal, and the script then fails to parse before it has configured anything, with a
+     * Ruby error naming a line nobody wrote.</p>
+     *
+     * <p>Backslash first, or escaping the quote would be undone by escaping what precedes
+     * it. {@code #} is escaped too: Ruby interpolates {@code #{...}} inside double quotes,
+     * so a value containing one would otherwise be evaluated rather than written.</p>
+     */
+    private static String escapeRubyDoubleQuoted(String input) {
+        return input.replace("\\", "\\\\").replace("\"", "\\\"").replace("#", "\\#");
     }
 
     /** Package-private accessor so {@link MacNativeBuilder} (separate file in
@@ -2047,6 +2120,13 @@ public class IPhoneBuilder extends Executor {
                     if (!usesSurfaces && cls.indexOf("com/codename1/surfaces/") == 0) {
                         usesSurfaces = true;
                     }
+                    // Document provider (com.codename1.documents.*): the app's content shown in
+                    // the system file browser. Gated on actual usage so the CN1Documents
+                    // extension / app group / CN1_USE_DOCUMENTS natives are only added for apps
+                    // that publish documents.
+                    if (!usesDocuments && cls.indexOf("com/codename1/documents/") == 0) {
+                        usesDocuments = true;
+                    }
                     // Phone-to-watch link (com.codename1.wearable.*). Gated on actual usage
                     // so WatchConnectivity.framework and the CN1_USE_WATCHCONNECTIVITY
                     // natives are only added for apps that talk to their watch app.
@@ -2393,6 +2473,7 @@ public class IPhoneBuilder extends Executor {
         // resources, delivered alongside .ios.appext archives in resDir) and resolve the app
         // group. Widget kinds must be known at build time -- the Swift WidgetBundle is static.
         parseSurfacesManifest(resDir, request);
+        parseDocumentProviderHints(request);
 
         // App intents: read the build-time manifest the annotation processor emitted into the
         // project jar. Deliberately softer than surfaces, where a missing manifest fails the
@@ -3617,6 +3698,14 @@ public class IPhoneBuilder extends Executor {
             // compiled out, so the watch slice fails to link rather than merely doing nothing.
             if (surfacesExtensionEnabled || surfacesWatchEnabled) {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WIDGETS", "#define CN1_USE_WIDGETS");
+            }
+
+            // com.codename1.documents usage compiles the FileProvider glue (gated by
+            // CN1_USE_DOCUMENTS so other builds carry no such symbols). The define lives in the
+            // shared CodenameOne_GLViewController.h so it reaches every document translation
+            // unit, mirroring CN1_USE_WIDGETS.
+            if (documentProviderEnabled) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_DOCUMENTS", "#define CN1_USE_DOCUMENTS");
             }
 
             // com.codename1.wearable usage compiles the WatchConnectivity glue (gated by
@@ -4968,6 +5057,18 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // The document provider's whole transport is the shared container. Without the
+            // entitlement the group does not resolve, documentProviderSupported() answers false
+            // and DocumentProvider.publish() returns before the bridge is reached -- a feature
+            // that builds, signs and ships doing nothing.
+            if (documentProviderEnabled) {
+                String appGroups = request.getArg("ios.app_groups", "");
+                if (!declaresAppGroup(appGroups, documentsAppGroup)) {
+                    request.putArgument("ios.app_groups", appGroups.length() == 0
+                            ? documentsAppGroup : appGroups + "," + documentsAppGroup);
+                }
+            }
+
             // Sign in with Apple requires the
             // com.apple.developer.applesignin entitlement; Apple rejects
             // builds whose binary references ASAuthorizationAppleIDProvider
@@ -5461,6 +5562,12 @@ public class IPhoneBuilder extends Executor {
                     replaceAllInFile(infoPlist, "<key>UIPrerenderedIcon</key>[^<]*<false/>", "<key>UIPrerenderedIcon</key><true/>");
                 }
 
+                // After every edit to the shared plist, never before: the Mac slice's copy
+                // is derived from the finished file. See writeCatalystInfoPlist.
+                if (macNativeBuilder.isMultiWindow()) {
+                    writeCatalystInfoPlist(tmpFile, request.getMainClass());
+                }
+
 
                 if(runPods || !request.getArg("ios.buildType", "debug").equals("debug") || request.getArg("ios.force64", "false").equals("true")) {
                     File pbx = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
@@ -5541,6 +5648,7 @@ public class IPhoneBuilder extends Executor {
             // the ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
             boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled
                     || surfacesExtensionEnabled || matterExtensionEnabled
+                    || documentProviderEnabled
                     || hasAppExtensionArchives(appExtensionArchiveDir);
             if (needsXcodeProjectMutation) {
                 try {
@@ -5945,7 +6053,8 @@ public class IPhoneBuilder extends Executor {
                                     + "embed_phase.add_file_reference(fileref)\n"
                                     + "service_target.build_configurations.each{|e| \n");
                             for (String buildSettingKey : buildSettingsMap.keySet()) {
-                                sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+                                sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
                             }
                             sb.append("}\n");
                             sb.append("end\n");
@@ -5976,6 +6085,14 @@ public class IPhoneBuilder extends Executor {
                         // extension's IPHONEOS_DEPLOYMENT_TARGET=16.1 survives it -- see the
                         // ordering note in appendWidgetExtensionRuby.
                         appendWidgetExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
+                    }
+
+                    if (documentProviderEnabled) {
+                        // Same ordering note: appended after the global deployment-target pass,
+                        // so the extension keeps its own floor while the app keeps whatever it
+                        // targets.
+                        appendDocumentProviderExtensionTargets(appExtensionsBuilder, request,
+                                new File(tmpFile, "dist"));
                     }
 
                     // App Intents needs no Xcode target of its own: the declarations compile
@@ -6092,7 +6209,8 @@ public class IPhoneBuilder extends Executor {
                             + "      file_name && file_name.downcase.end_with?('.swift') && !file_name.start_with?('"
                             + SURFACES_EXTENSION_NAME + "/') && !file_name.start_with?('"
                             + SURFACES_WATCH_EXTENSION_NAME + "/') && !file_name.start_with?('"
-                            + MatterExtensionBuilder.EXTENSION_NAME + "/') && !file_name.include?('/"
+                            + MatterExtensionBuilder.EXTENSION_NAME + "/') && !file_name.start_with?('"
+                            + DOCUMENTS_EXTENSION_NAME + "/') && !file_name.include?('/"
                             + WatchNativeBuilder.WATCH_SRC_DIR + "/')\n"
                             + "    end\n"
                             + "    swift_refs.each do |ref|\n"
@@ -6431,6 +6549,11 @@ public class IPhoneBuilder extends Executor {
 
                 if (macNativeBuilder.isEnabled()) {
                     File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
+                    // Deliberately no App Group in the Mac entitlements for the document
+                    // provider: FileProvider is unavailable on Mac Catalyst, so that slice hosts
+                    // no extension and nothing there would use the group. An entitlement the Mac
+                    // provisioning profile does not carry fails signing, so an unused capability
+                    // is not free.
                     macNativeBuilder.writeEntitlements(request, appSrcDir);
                     macNativeBuilder.writeStubHeaders(appSrcDir);
                     macNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
@@ -7757,7 +7880,8 @@ public class IPhoneBuilder extends Executor {
             afterKey++;
             // The key's CONTENT resolved, so a name spelled with CDATA or wrapped in a comment
             // still matches -- an XML parser reads all of those as the same key.
-            String name = WatchNativeBuilder.plistStringContent(plist.substring(openEnd + 1, close));
+            String name = WatchNativeBuilder.plistStringContentExact(
+                    plist.substring(openEnd + 1, close));
             if (key.equals(name)) {
                 return afterKey;
             }
@@ -10519,8 +10643,8 @@ public class IPhoneBuilder extends Executor {
                 + "embed_phase.add_file_reference(fileref)\n"
                 + "service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
-            sb.append("  e.build_settings['" + buildSettingKey + "'] = \""
-                    + buildSettingsMap.get(buildSettingKey) + "\"\n");
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
         }
         sb.append("}\n");
         sb.append("end\n");
@@ -10590,7 +10714,8 @@ public class IPhoneBuilder extends Executor {
                 + "embed_phase.add_file_reference(fileref)\n"
                 + "service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
-            sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
         }
         sb.append("}\n");
         sb.append("end\n");
@@ -10601,6 +10726,9 @@ public class IPhoneBuilder extends Executor {
 
     /** Xcode target / folder name of the generated WidgetKit extension. */
     static final String SURFACES_EXTENSION_NAME = "CN1Widgets";
+
+    /** The generated file provider extension target, and so the last component of its bundle id. */
+    static final String DOCUMENTS_EXTENSION_NAME = "CN1Documents";
 
     /// The iOS release App Intents first shipped in.
     ///
@@ -10661,9 +10789,13 @@ public class IPhoneBuilder extends Executor {
     }
 
     static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents) {
-        int key = inject.indexOf("NSUserActivityTypes");
-        int open = key < 0 ? -1 : inject.indexOf("<array>", key);
-        int close = open < 0 ? -1 : inject.indexOf("</array>", open);
+        // The same structural reading the rest of the plist parsing uses: this walks a
+        // fragment the application supplied, so "<array >" and "</array >" are shapes it
+        // has to accept. Found by enumerating every literal closing tag left in this
+        // file rather than waiting for the next one to be reported.
+        int key = plistKeyIndex(inject, "NSUserActivityTypes");
+        int open = key < 0 ? -1 : plistElementIndex(inject, "array", key);
+        int close = open < 0 ? -1 : plistCloseElementIndex(inject, "array", open);
         if (close < 0) {
             return inject;
         }
@@ -11172,6 +11304,175 @@ public class IPhoneBuilder extends Executor {
     }
 
     /**
+     * Resolves the document provider hints. Unlike surfaces this needs no build-time manifest:
+     * the tree is published at runtime and nothing about it is compiled into the native app, so
+     * the only build-time decisions are the App Group, the name the location carries in the file
+     * browser and the extension's deployment target.
+     */
+    private void parseDocumentProviderHints(BuildRequest request) throws BuildException {
+        // Two ways in, because two things need to agree. The classpath scan is the automatic
+        // one and matches how surfaces decides. The explicit hint exists because the tools that
+        // cannot read bytecode -- the Certificate Wizard, which creates the extension's App ID
+        // and profile, and the signing preflight, which refuses a build that lacks them -- have
+        // no other way to know this project wants the extension. Honouring it here is what keeps
+        // those two from acting on an extension this builder would never have generated.
+        documentProviderEnabled = (usesDocuments
+                        || "true".equals(request.getArg("ios.documentProvider.enabled", "false")))
+                && !"false".equals(request.getArg("ios.documentProvider.extension", "true"));
+        if (!documentProviderEnabled) {
+            // Either the app never touches com.codename1.documents and never asked for the
+            // extension, or the developer opted out with ios.documentProvider.extension=false.
+            // In both cases the iOS lowering is skipped entirely and the API stays an inert
+            // no-op at runtime.
+            return;
+        }
+        String hintAppGroup = request.getArg("ios.documentProvider.appGroup", null);
+        documentsAppGroup = hintAppGroup != null && hintAppGroup.length() > 0
+                ? hintAppGroup : "group." + request.getPackageName();
+        if (!isAppGroupIdentifier(documentsAppGroup)) {
+            // Apple rejects the entitlement rather than the build, so this would otherwise
+            // surface as a signing failure naming neither the hint nor the value. The whole
+            // syntax is checked, not just the prefix: this value is written into the app plist,
+            // the extension's plist and its entitlements, so a character that is significant in
+            // XML produces a malformed file long before anything gets as far as signing.
+            throw new BuildException("ios.documentProvider.appGroup must be an App Group "
+                    + "identifier -- 'group.' followed by dot-separated alphanumeric segments, "
+                    + "hyphens allowed (an Apple requirement); found '" + documentsAppGroup + "'");
+        }
+        // Decided here rather than when the target is generated, so the plist key below cannot
+        // depend on which of the two runs first. It is the same comparison
+        // IOSDocumentProviderExtensionBuilder makes when it picks which provider to emit.
+        documentsUsesReplicatedApi = IOSDocumentProviderExtensionBuilder.compareVersions(
+                request.getArg("ios.documentProvider.deploymentTarget",
+                        IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS),
+                IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS) >= 0;
+        documentsDisplayName = request.getArg("ios.documentProvider.displayName",
+                request.getDisplayName());
+        if (documentsDisplayName == null || documentsDisplayName.length() == 0) {
+            documentsDisplayName = request.getMainClass();
+        }
+    }
+
+    /**
+     * Generates the CN1Documents file provider extension folder under dist/ and appends the ruby
+     * that wires the extension target into the generated Xcode project. Modeled on
+     * {@link #appendWidgetExtensionTargets}.
+     *
+     * <p>Unlike surfaces this writes no app-target glue. FileProvider is an Objective-C framework,
+     * so the natives in IOSNative.m call it directly rather than trampolining through Swift.</p>
+     */
+    private void appendDocumentProviderExtensionTargets(StringBuilder sb, BuildRequest request,
+            File distDir) throws IOException {
+        IOSDocumentProviderExtensionBuilder docBuilder = new IOSDocumentProviderExtensionBuilder()
+                .setVersions(embeddedExtensionShortVersion(request),
+                        embeddedExtensionBundleVersion(request))
+                .setExtensionName(DOCUMENTS_EXTENSION_NAME)
+                .setHostBundleId(request.getPackageName())
+                .setAppGroupId(documentsAppGroup)
+                .setDisplayName(documentsDisplayName)
+                .setDeploymentTarget(request.getArg("ios.documentProvider.deploymentTarget",
+                        IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS));
+        String extensionName = docBuilder.getExtensionName();
+        File extensionDir = new File(distDir, extensionName);
+        IOSWalletExtensionBuilder.writeFileMap(docBuilder.buildFileMap(), extensionDir);
+        appendDocumentProviderExtensionRuby(sb, request, docBuilder, extensionDir, distDir);
+        log("Adding file provider extension target " + extensionName + " (app group "
+                + documentsAppGroup + ", "
+                + (docBuilder.usesReplicatedApi()
+                        ? "NSFileProviderReplicatedExtension"
+                        : "NSFileProviderExtension (pre-iOS-16)")
+                + ")");
+        sb.append("xcproj.save(project_file)\n");
+    }
+
+    private void appendDocumentProviderExtensionRuby(StringBuilder sb, BuildRequest request,
+            IOSDocumentProviderExtensionBuilder docBuilder, File extensionDir, File distDir)
+            throws IOException {
+        String extensionName = docBuilder.getExtensionName();
+        Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
+        buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY",
+                embeddedExtensionDeviceFamily(request.getArg("ios.project_type", "ios")));
+        buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
+        buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
+        // The builder's buildSettings.properties supplies the deployment target, Swift version,
+        // bundle id, entitlements and Info.plist paths; deleted after loading so it is not added
+        // to the Xcode group as a resource.
+        File buildSettingsProps = new File(extensionDir, "buildSettings.properties");
+        if (buildSettingsProps.exists()) {
+            Properties props = new Properties();
+            // Deliberately not caught: falling back on the defaults above would silently
+            // produce a target with the wrong bundle id, which then signs against the wrong
+            // profile and fails much later with a message naming neither.
+            try (FileInputStream fis = new FileInputStream(buildSettingsProps)) {
+                props.load(fis);
+            }
+            for (Object key : props.keySet()) {
+                if (key instanceof String) {
+                    buildSettingsMap.put((String) key, props.getProperty((String) key));
+                }
+            }
+            buildSettingsProps.delete();
+        }
+        for (String key : request.getArgs()) {
+            if (key.startsWith("ios.documentProvider.buildSettings.")) {
+                buildSettingsMap.put(
+                        key.substring("ios.documentProvider.buildSettings.".length()),
+                        request.getArg(key, ""));
+            }
+        }
+        // No export-options bookkeeping here, unlike the daemon's copy of this method: this
+        // builder produces the Xcode project for a local build and the developer archives it in
+        // Xcode, so there is no generated exportOptions.plist to name each embedded bundle by
+        // identifier. An overridden PRODUCT_BUNDLE_IDENTIFIER therefore needs nothing recorded --
+        // it is already in the build settings the target is generated with.
+        // CRITICAL ordering note: this fragment rides in appExtensionsBuilder, which the schemes
+        // script appends AFTER the global deployment-target pass (deploymentTargetStr stomps
+        // IPHONEOS_DEPLOYMENT_TARGET on every existing target). Because this target is created
+        // after that pass ran, its own deployment target below survives. Do not move this
+        // fragment before deploymentTargetStr.
+        // The whole fragment is guarded so re-running the script (the build re-executes
+        // fix_xcode_schemes.rb after dependency integration) doesn't duplicate the target.
+        // No explicit framework linkage: Swift autolinks FileProvider.
+        sb.append("\nif xcproj.targets.find{|e| e.name=='" + extensionName + "'}.nil?\n"
+                + "service_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '"
+                + docBuilder.getDeploymentTarget() + "')\n"
+                + "service_group = xcproj.new_group('" + extensionName + "')\n");
+        appendFilesToXcodeProjGroup(sb, extensionDir, "service_group", "service_target", distDir);
+        sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
+                + "main_app_target.add_dependency(service_target)\n"
+                + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('" + extensionName + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                + "embed_phase = main_app_target.copy_files_build_phases.find{|p| p.name=='Embed App Extensions'} || main_app_target.new_copy_files_build_phase('Embed App Extensions')\n"
+                + "embed_phase.build_action_mask = \"2147483647\"\n"
+                + "embed_phase.dst_subfolder_spec = \"13\"\n"
+                + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
+                + "embed_file = embed_phase.add_file_reference(fileref)\n");
+        if (macNativeBuilder.isEnabled()) {
+            // Kept off the Catalyst slice, exactly as the widget extension is, and for a harder
+            // reason than the widget one: FileProvider is API_UNAVAILABLE(macCatalyst), so the
+            // generated Swift does not compile under macabi at all -- "'NSFileProviderDomain' is
+            // unavailable in Mac Catalyst", and the same for every other type it names. A
+            // Catalyst app cannot host this extension however it is entitled.
+            //
+            // The iOS app keeps its provider; the Catalyst slice ships without one, and the
+            // app-side natives take their stub branch there so the API is an honest no-op.
+            // macOS support belongs to the AppKit port, which builds against the macOS SDK where
+            // FileProvider exists.
+            sb.append("dep = main_app_target.dependencies.find{|d| d.target && d.target.uuid == service_target.uuid}\n"
+                    + "dep.platform_filter = 'ios' if dep\n"
+                    + "embed_file.platform_filter = 'ios'\n");
+            buildSettingsMap.put("SUPPORTS_MACCATALYST", "NO");
+        }
+        sb.append("service_target.build_configurations.each{|e| \n");
+        for (String buildSettingKey : buildSettingsMap.keySet()) {
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
+        }
+        sb.append("}\n");
+        sb.append("end\n");
+    }
+
+    /**
      * Generates the CN1Widgets WidgetKit extension folder under dist/, drops the app-side
      * Swift glue into &lt;MainClass&gt;-src (the schemes ruby sweeps *.swift there into the
      * APP target) and appends the ruby that wires the extension target into the generated
@@ -11308,7 +11609,8 @@ public class IPhoneBuilder extends Executor {
         }
         sb.append("service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
-            sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
         }
         sb.append("}\n");
         sb.append("end\n");
@@ -11395,7 +11697,1190 @@ public class IPhoneBuilder extends Executor {
         return out.toArray(new File[out.size()]);
     }
 
-    private void injectToPlist(File tmpFile, File resDir, BuildRequest request) throws IOException {
+    /// The text of the `UIApplicationSceneManifest` value element, or the empty string
+    /// when the fragment does not declare one.
+    ///
+    /// Scoping the manifest checks to this rather than to the whole injection is what
+    /// stops an unrelated dictionary answering for the manifest.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// #### Returns
+    ///
+    /// the manifest's value element, or ""
+    static String plistManifestScope(String plist) {
+        if (plist == null) {
+            return "";
+        }
+        // The fragment's own level. A manifest parked inside some other dictionary is
+        // not a member of the plist UIKit reads, so it configures nothing -- and
+        // answering from it accepts a build whose windows are unsupported on the
+        // device, which is the whole failure this validation exists to catch.
+        int[] range = plistMemberRange(plist, 0, plist.length(), "UIApplicationSceneManifest");
+        return range == null ? "" : plist.substring(range[0], range[1]);
+    }
+
+    /// The text of a top-level string or boolean member, or null when the fragment has none.
+    ///
+    /// Enough for the two internal keys that are compared against what the build resolved: both
+    /// are a plain value, and a fragment that put something else there -- a dict, an array -- is
+    /// not a value this can disagree with, so it answers null and the caller leaves it alone.
+    static String topLevelPlistString(String plist, String key) {
+        if (plist == null) {
+            return null;
+        }
+        int[] range = plistMemberRange(plist, 0, plist.length(), key);
+        if (range == null) {
+            return null;
+        }
+        String value = plist.substring(range[0], range[1]).trim();
+        if (value.startsWith("<true")) {
+            return "true";
+        }
+        if (value.startsWith("<false")) {
+            return "false";
+        }
+        if (!value.startsWith("<string>") || !value.endsWith("</string>")) {
+            return null;
+        }
+        return value.substring("<string>".length(), value.length() - "</string>".length()).trim();
+    }
+
+    /// Whether the fragment declares the key as a member of ITS OWN level.
+    ///
+    /// plistDeclaresKey answers for a key anywhere in the fragment, nested dictionaries included.
+    /// A key the app-side code reads off the main bundle has to be a top-level member to be read
+    /// at all, so a nested namesake is not the same declaration and must not stand in for one.
+    static boolean declaresTopLevelPlistKey(String plist, String key) {
+        return plist != null && plistMemberRange(plist, 0, plist.length(), key) != null;
+    }
+
+    /// Whether the fragment actually declares the given key.
+    ///
+    /// The rest of this method tests the injected plist with plain `contains`, which is
+    /// fine where the answer only decides whether to add a key of our own -- matching
+    /// too eagerly there just skips an injection. These two checks are different: they
+    /// fail the build, so a key named inside a comment or quoted in some unrelated
+    /// string value would stop a build that was going to work. Hence a declared
+    /// `<key>` element, and not one that only exists inside a comment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `key`: the key to look for
+    ///
+    /// #### Returns
+    ///
+    /// true if the fragment declares the key outside any comment
+    static boolean plistDeclaresKey(String plist, String key) {
+        return plistKeyIndex(plist, key) >= 0;
+    }
+
+    /// Index of the declared key element, skipping any occurrence inside a comment, or
+    /// -1 when the fragment does not declare it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `key`: the key to look for
+    ///
+    /// #### Returns
+    ///
+    /// the index of the `<key>` element, or -1
+    static int plistKeyIndex(String plist, String key) {
+        return plistKeyIndex(plist, key, 0);
+    }
+
+    /// As above, starting the search at `from`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `key`: the key name to look for
+    ///
+    /// - `from`: index to start looking from
+    ///
+    /// #### Returns
+    ///
+    /// the index of the key element, or -1
+    static int plistKeyIndex(String plist, String key, int from) {
+        int at = plistElementIndex(plist, "key", from);
+        while (at >= 0) {
+            int contentStart = plistOpenTagEnd(plist, at);
+            // Structural, like the container tags: "</key >" closes a key just as
+            // "</key>" does, and matching the literal reported such a key absent --
+            // which makes the injection append a second one beside the application's
+            // own and the validation reject a correctly configured build.
+            int close = plistKeyContentEnd(plist, at, contentStart);
+            if (close < 0 || contentStart < 0) {
+                return -1;
+            }
+            // The element's text, trimmed. "<key>\n  UIApplicationSceneManifest\n</key>"
+            // is the same key as the contiguous spelling, and requiring the tags and the
+            // name to be adjacent reported it absent -- which made the build append a
+            // second manifest beside the application's own, leaving duplicate keys.
+            // The key's CONTENT resolved, not its serialization: `<key><![CDATA[Foo]]></key>`,
+            // a comment inside the element and a character reference all name the same key
+            // to a plist parser. Comparing the raw text missed every one of those, so an
+            // injected key spelled that way was reported absent -- and the caller then left
+            // it in place, or appended a second one beside it. plistKeyEnd already resolved
+            // through the same helper, so this was two answers to one question.
+            if (key.equals(WatchNativeBuilder.plistStringContentExact(
+                    plist.substring(contentStart, close)))) {
+                return at;
+            }
+            at = plistElementIndex(plist, "key", close);
+        }
+        return -1;
+    }
+
+    /// Index just past the `</key>` closing the key element that starts at `keyIndex`,
+    /// or -1. Callers need this rather than adding a fixed tag length, since the
+    /// element may carry whitespace around its name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `keyIndex`: index of the key element's `<key>`
+    ///
+    /// #### Returns
+    ///
+    /// the index just past `</key>`, or -1
+    static int plistKeyEnd(String plist, int keyIndex) {
+        int contentStart = plistOpenTagEnd(plist, keyIndex);
+        if (contentStart < 0) {
+            return -1;
+        }
+        int close = plistKeyContentEnd(plist, keyIndex, contentStart);
+        if (close < 0) {
+            return -1;
+        }
+        // A self-closing <key/> has no closing tag to step past: its content ends where
+        // the element does, so that position is already the answer.
+        return close == contentStart ? contentStart : plistOpenTagEnd(plist, close);
+    }
+
+    /// Index of the next live element with this name at or after `from`, or -1.
+    ///
+    /// Matches the element rather than a literal tag, so `<key>`, `<key >` and
+    /// `<key attr="x">` are all that element and `<keyboard>` is not. The rest of this
+    /// guard used literal tags, which is true of every Info.plist in practice but is an
+    /// assumption about formatting rather than about the document.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `name`: the element name
+    ///
+    /// - `from`: index to start looking from
+    ///
+    /// #### Returns
+    ///
+    /// the index of the element's `<`, or -1
+    static int plistElementIndex(String plist, String name, int from) {
+        int at = plistIndexOfLive(plist, "<" + name, from);
+        while (at >= 0) {
+            int after = at + 1 + name.length();
+            if (after < plist.length()) {
+                char c = plist.charAt(after);
+                if (c == '>' || c == '/' || c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                    return at;
+                }
+            }
+            at = plistIndexOfLive(plist, "<" + name, at + 1);
+        }
+        return -1;
+    }
+
+    /// Index just past the `>` closing the opening tag that starts at `elementIndex`,
+    /// or -1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `elementIndex`: index of the element's `<`
+    ///
+    /// #### Returns
+    ///
+    /// the index just past the opening tag, or -1
+    static int plistOpenTagEnd(String plist, int elementIndex) {
+        int gt = plist.indexOf('>', elementIndex);
+        return gt < 0 ? -1 : gt + 1;
+    }
+
+    /// Index of the first occurrence of `needle` at or after `from` that is really
+    /// markup -- not inside a comment and not inside a CDATA section -- or -1.
+    ///
+    /// Every one of these checks needs the same thing -- text that is really there,
+    /// rather than text that only looks like markup -- so they share this rather than
+    /// each deciding for itself. Three separate `indexOf` calls is how the role ended
+    /// up comment-aware while the delegate name beneath it was not.
+    ///
+    /// CDATA counts as much as a comment. `<![CDATA[<key>UIApplicationSceneManifest</key>]]>`
+    /// inside some unrelated injected string is character data, not a declaration, and
+    /// reading it as one made `#sceneManifestRejection(String)` believe a manifest had
+    /// been declared, fail to find it at the fragment root, and refuse a Catalyst build
+    /// that was perfectly valid. Delegating to the shared scanner also drops the old
+    /// backwards `lastIndexOf("<!--")` heuristic, which read a `<!--` written INSIDE a
+    /// CDATA section as if it opened a real comment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `needle`: the text to find
+    ///
+    /// - `from`: index to start looking from
+    ///
+    /// #### Returns
+    ///
+    /// the index of the first live occurrence, or -1
+    static int plistIndexOfLive(String plist, String needle, int from) {
+        int i = from;
+        while (i <= plist.length()) {
+            int at = plist.indexOf(needle, i);
+            if (at < 0) {
+                return -1;
+            }
+            int skipped = WatchNativeBuilder.skipMarkupBefore(plist, at, i);
+            if (skipped < 0) {
+                // Unterminated comment or CDATA: nothing after it can be located
+                // reliably, so the needle is treated as absent rather than guessed at.
+                return -1;
+            }
+            if (skipped != at) {
+                i = skipped;
+                continue;
+            }
+            return at;
+        }
+        return -1;
+    }
+
+    /// The name of the next element opening at or after `from`, or null if there is
+    /// none.
+    ///
+    /// Comments, declarations and closing tags are stepped over so the answer is the
+    /// next element that actually opens. Enough structure to read a plist value without
+    /// pretending to parse a document we did not write.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the fragment to read
+    ///
+    /// - `from`: index to start looking from
+    ///
+    /// #### Returns
+    ///
+    /// the element name, or null when no element opens after `from`
+    static String nextElementName(String plist, int from) {
+        // nextMarkupAt steps over comments, CDATA, processing instructions and
+        // declarations whole. Doing it here instead meant three different sets of rules
+        // in one parser: this one skipped a comment properly but advanced a single
+        // character past "<?", landing inside the instruction's data and returning the
+        // element name written there -- so a key's real value was reported as whatever
+        // an ignored instruction happened to mention.
+        int lt = nextMarkupAt(plist, from);
+        while (lt >= 0 && lt + 1 < plist.length()) {
+            if (plist.charAt(lt + 1) == '/') {
+                // Markup, but a closing tag is not the next element's name.
+                lt = nextMarkupAt(plist, lt + 1);
+                continue;
+            }
+            int end = lt + 1;
+            while (end < plist.length()) {
+                char c = plist.charAt(end);
+                if (c == '>' || c == '/' || c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                    break;
+                }
+                end++;
+            }
+            return plist.substring(lt + 1, end);
+        }
+        return null;
+    }
+
+    /// Whether a plist fragment wires the application window scene role to Codename
+    /// One's scene delegate.
+    ///
+    /// A manifest can declare the role and hand it to somebody else's delegate, in
+    /// which case the secondary scenes a window needs are never adopted. The delegate
+    /// has to appear inside this role's own configuration, which is why the search
+    /// stops at the next scene role -- a CarPlay role naming its own delegate must not
+    /// be mistaken for this one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// #### Returns
+    ///
+    /// true if the window scene role names `CodenameOne_GLSceneDelegate`
+    /// Why this build cannot give the Mac slice a usable scene manifest, or null when
+    /// it can.
+    ///
+    /// Only reached when the application supplied its own `UIApplicationSceneManifest`
+    /// through `ios.plistInject`, in which case this build must not write a second
+    /// one. What it must not do either is demand that manifest already support
+    /// multiple scenes: that fragment goes into the plist the iPhone/iPad slice reads,
+    /// and true there is the iPad multi-window opt-in the Mac-specific copy exists to
+    /// avoid. A single-scene iOS manifest is the right thing to inject, and
+    /// `#plistForMacSlice(String)` adds the support key and the window role to the Mac
+    /// copy.
+    ///
+    /// So what is rejected is only what cannot be repaired without discarding
+    /// something the application wrote:
+    ///
+    /// - a manifest, or a `UISceneConfigurations`, that is not a dictionary. There is
+    ///   nothing to add a member to, and left alone the Mac copy is a silent no-op --
+    ///   a build that succeeds and a window that is unsupported on the device.
+    /// - a window role already wired to somebody else's delegate. Adding ours beside
+    ///   it would not help, since UIKit reads the role rather than a list of
+    ///   candidates.
+    ///
+    /// Separate from the throw so it can be tested: this decides what a build with
+    /// windows will accept, and every part of it has been wrong at least once.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inject`: the injected plist fragment
+    ///
+    /// #### Returns
+    ///
+    /// the reason to refuse, or null to proceed
+    static String sceneManifestRejection(String inject) {
+        // The fragment's OWN level, which is the level plistManifestScope answers from
+        // and the level UIKit reads. A UIApplicationSceneManifest key sitting inside some
+        // unrelated nested dictionary declares nothing; searching the whole fragment made
+        // this guard say otherwise, plistManifestScope then correctly came back empty, and
+        // the check below refused the build for a non-dictionary manifest it never had --
+        // one plistForMacSlice would simply have added the root member to.
+        if (plistMemberRange(inject, 0, inject.length(), "UIApplicationSceneManifest") == null) {
+            return null;
+        }
+        // Two of the same reserved key at one level. A property list resolves
+        // duplicates to the LAST value, while every lookup here answers with the
+        // first -- so validating and rewriting the first would leave the second in
+        // force on the device: a build that succeeds and a Window that is
+        // unsupported. Fragments composed by more than one injector are how this
+        // arises, and there is no safe pick between them, so it is reported.
+        if (plistMemberDuplicated(inject, 0, inject.length(), "UIApplicationSceneManifest")) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but "
+                    + "ios.plistInject declares UIApplicationSceneManifest twice. A property "
+                    + "list takes the last of a duplicated key, so the two disagree about "
+                    + "what the bundle ends up with. Compose them into one manifest.";
+        }
+        String manifest = plistManifestScope(inject);
+        if (!"dict".equals(nextElementName(manifest, 0))) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UIApplicationSceneManifest in ios.plistInject is not a <dict>. UIKit "
+                    + "reads it as a dictionary of scene settings, so it has to be one.";
+        }
+        if (plistDictDuplicated(manifest, "UIApplicationSupportsMultipleScenes")) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UIApplicationSceneManifest in ios.plistInject declares "
+                    + "UIApplicationSupportsMultipleScenes twice. A property list takes the "
+                    + "last of a duplicated key, so setting the first to true would leave a "
+                    + "later false in force. Compose them into one entry.";
+        }
+        if (plistDictDuplicated(manifest, "UISceneConfigurations")) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UIApplicationSceneManifest in ios.plistInject declares "
+                    + "UISceneConfigurations twice. A property list takes the last of a "
+                    + "duplicated key, so the two disagree about which scenes the bundle "
+                    + "configures. Compose them into one dictionary.";
+        }
+        String configurations = plistDictMember(manifest, "UISceneConfigurations");
+        if (configurations != null && !"dict".equals(nextElementName(configurations, 0))) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UISceneConfigurations in the UIApplicationSceneManifest from "
+                    + "ios.plistInject is not a <dict>. UIKit reads it as a dictionary keyed "
+                    + "by scene role, so it has to be one.";
+        }
+        if (plistDictDuplicated(configurations, "UIWindowSceneSessionRoleApplication")) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UISceneConfigurations in ios.plistInject declares "
+                    + "UIWindowSceneSessionRoleApplication twice. A property list takes the "
+                    + "last of a duplicated key, so the two disagree about which delegate "
+                    + "adopts a window. Compose them into one role.";
+        }
+        String role = plistDictMember(configurations, "UIWindowSceneSessionRoleApplication");
+        for (String configuration : plistArrayMembers(role)) {
+            if (plistDictDuplicated(configuration, "UISceneDelegateClassName")) {
+                return "macNative.enabled=true asks for com.codename1.ui.Window support, but a "
+                        + "UIWindowSceneSessionRoleApplication configuration in "
+                        + "ios.plistInject declares UISceneDelegateClassName twice. A property "
+                        + "list takes the last of a duplicated key, so naming "
+                        + "CodenameOne_GLSceneDelegate first would leave a later delegate in "
+                        + "force and no scene adopting a window. Compose them into one entry.";
+            }
+        }
+        if (role != null && !plistManifestWiresWindowScene(inject)) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UIApplicationSceneManifest in ios.plistInject already declares a "
+                    + "UIWindowSceneSessionRoleApplication that does not name "
+                    + "CodenameOne_GLSceneDelegate. A window is a scene of that role, so it is "
+                    + "the delegate that has to be Codename One's. Point that configuration at "
+                    + "CodenameOne_GLSceneDelegate, or drop the window role from your manifest "
+                    + "and let the build add one for the Mac slice.";
+        }
+        return null;
+    }
+
+    /// The Mac slice's version of a finished plist: one that supports multiple scenes
+    /// and declares the window role to create them with.
+    ///
+    /// The shared plist is left exactly as the iOS slice needs it, which for a default
+    /// Catalyst build means it carries no scene manifest at all -- declaring one
+    /// activates the UIScene lifecycle, and the iPhone/iPad artifact still carries its
+    /// main NIB, which is a window with no scene and a launch FrontBoard terminates.
+    /// So this adds whatever is missing, and only the Mac slice ever reads the result:
+    ///
+    /// - no manifest at all: a whole one is added to the root dictionary;
+    /// - a manifest without multiple-scene support: the key is set, or added;
+    /// - a manifest whose scene configurations have no window role -- which is what a
+    ///   CarPlay build with ios.uiscene off produces -- the role is added to them.
+    ///
+    /// That last case is why this cannot simply flip a boolean: a manifest can exist
+    /// and still describe no window UIKit could create.
+    ///
+    /// Returns the input unchanged when there is nothing to do.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the finished plist text
+    ///
+    /// #### Returns
+    ///
+    /// the plist text for the Mac slice
+    static String plistForMacSlice(String plist) {
+        if (plist == null) {
+            return null;
+        }
+        plist = plistWithExpandedDict(plist, 0);
+        // The Mac slice always ends up with a scene manifest, and a scene lifecycle
+        // beside a legacy main NIB is the orphan window FrontBoard terminates -- the
+        // very pairing that keeps the manifest out of the shared plist. The shared
+        // plist only drops NSMainNibFile under ios.uiscene, so for the default Catalyst
+        // build it is still there and has to go here.
+        //
+        // The Mac build settings exclude MainWindow.xib from compilation anyway, so the
+        // key names a NIB that is not in this bundle even before the lifecycle argument.
+        plist = plistWithoutRootMembers(plist, "NSMainNibFile");
+        int[] root = plistRootDictBody(plist);
+        if (root == null) {
+            return plist;
+        }
+        int[] manifest = plistMemberRange(plist, root[0], root[1], "UIApplicationSceneManifest");
+        if (manifest == null) {
+            return plist.substring(0, root[1]) + MAC_SCENE_MANIFEST + plist.substring(root[1]);
+        }
+        String updated = plist.substring(manifest[0], manifest[1]);
+        updated = plistWithMultipleScenes(updated);
+        updated = plistWithWindowRole(updated);
+        return plist.substring(0, manifest[0]) + updated + plist.substring(manifest[1]);
+    }
+
+    /// The same text with the dictionary element at or after `from` expanded from the
+    /// self-closing spelling to an empty pair, so members can be added to it.
+    ///
+    /// `<dict/>` is a valid empty dictionary and an application is free to write one.
+    /// Everything that reads a plist here copes with it, but nothing can add a member
+    /// to it: there is no closing tag to insert before. Expanding it first is what
+    /// lets the Mac slice give an empty manifest, or empty scene configurations, the
+    /// content it needs -- without it the copy was returned unchanged and windows
+    /// stayed unsupported on the device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to normalize
+    ///
+    /// - `from`: where to look for the dictionary
+    ///
+    /// #### Returns
+    ///
+    /// the text, with that dictionary expanded if it needed it
+    private static String plistWithExpandedDict(String text, int from) {
+        int open = plistElementIndex(text, "dict", from);
+        if (open < 0) {
+            return text;
+        }
+        int gt = text.indexOf('>', open);
+        if (gt <= open || text.charAt(gt - 1) != '/') {
+            return text;
+        }
+        return text.substring(0, gt - 1) + "></dict>" + text.substring(gt + 1);
+    }
+
+    /// The `{start, end}` offsets of the root dictionary's body -- just inside its
+    /// `<dict>` and just before the matching close.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: a whole plist document
+    ///
+    /// #### Returns
+    ///
+    /// the body's offsets, or null when there is no root dictionary
+    private static int[] plistRootDictBody(String plist) {
+        int open = plistElementIndex(plist, "dict", 0);
+        if (open < 0) {
+            return null;
+        }
+        int bodyStart = plistOpenTagEnd(plist, open);
+        int afterClose = plistValueElementEnd(plist, open);
+        if (bodyStart < 0 || afterClose < 0) {
+            return null;
+        }
+        // Back up over the closing tag itself. afterClose is immediately past the
+        // root's own close, so the last "</dict" at or before it is that tag.
+        int close = plist.lastIndexOf("</dict", afterClose);
+        if (close < bodyStart) {
+            return null;
+        }
+        return new int[] {bodyStart, close};
+    }
+
+    /// The same manifest with `UIApplicationSupportsMultipleScenes` true, adding the
+    /// member when it is absent.
+    private static String plistWithMultipleScenes(String manifestElement) {
+        String manifest = plistWithExpandedDict(manifestElement, 0);
+        int[] body = plistRootDictBody(manifest);
+        if (body == null) {
+            return manifest;
+        }
+        int[] member = plistMemberRange(manifest, body[0], body[1],
+                "UIApplicationSupportsMultipleScenes");
+        if (member != null) {
+            return manifest.substring(0, member[0]) + "<true/>" + manifest.substring(member[1]);
+        }
+        return manifest.substring(0, body[1])
+                + "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                + manifest.substring(body[1]);
+    }
+
+    /// The same manifest with a window scene role wired to Codename One's delegate,
+    /// adding the scene configurations dictionary when there is none.
+    ///
+    /// Left alone when a window role is already there, whatever it names: rewriting a
+    /// role the application wrote would silently replace its choice, and the caller
+    /// refuses that case rather than overruling it.
+    private static String plistWithWindowRole(String manifestElement) {
+        String manifest = plistWithExpandedDict(manifestElement, 0);
+        int[] body = plistRootDictBody(manifest);
+        if (body == null) {
+            return manifest;
+        }
+        int[] configurations = plistMemberRange(manifest, body[0], body[1],
+                "UISceneConfigurations");
+        if (configurations == null) {
+            return manifest.substring(0, body[1])
+                    + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                    + WINDOW_SCENE_ROLE
+                    + "    </dict>\n"
+                    + manifest.substring(body[1]);
+        }
+        String dict = plistWithExpandedDict(
+                manifest.substring(configurations[0], configurations[1]), 0);
+        int[] dictBody = plistRootDictBody(dict);
+        if (dictBody == null) {
+            return manifest;
+        }
+        if (plistMemberRange(dict, dictBody[0], dictBody[1],
+                "UIWindowSceneSessionRoleApplication") != null) {
+            return manifest;
+        }
+        String widened = dict.substring(0, dictBody[1]) + WINDOW_SCENE_ROLE
+                + dict.substring(dictBody[1]);
+        return manifest.substring(0, configurations[0]) + widened
+                + manifest.substring(configurations[1]);
+    }
+
+    /// The value element of `key` when it is an immediate member of `dict`, which is
+    /// itself a whole `<dict>...</dict>` element, or null when this dictionary has no
+    /// such member.
+    ///
+    /// Membership is what UIKit reads. A reserved key sitting inside some unrelated
+    /// metadata dictionary nested in this one is not a member of it and is ignored on
+    /// the device, so answering from anywhere inside would accept a manifest that
+    /// enables and configures nothing -- the green build with an unsupported `Window`
+    /// that this validation exists to prevent.
+    ///
+    /// Each member's value element is skipped whole, which is what keeps the walk at
+    /// the dictionary's own level without counting nesting separately.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dict`: a `<dict>` element, as returned by `#plistManifestScope(String)`
+    ///
+    /// - `key`: the member name to look for
+    ///
+    /// #### Returns
+    ///
+    /// the member's value element, or null
+    static String plistDictMember(String dict, String key) {
+        int[] range = plistDictMemberRange(dict, key);
+        return range == null ? null : dict.substring(range[0], range[1]);
+    }
+
+    /// The `{start, end}` offsets of a member's value element within `dict`, or null
+    /// when this dictionary has no such member. `#plistDictMember(String, String)`
+    /// documents what membership means and why it is the only question worth asking;
+    /// this form exists so a caller can rewrite the value in the original text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dict`: a `<dict>` element
+    ///
+    /// - `key`: the member name to look for
+    ///
+    /// #### Returns
+    ///
+    /// the value element's offsets, or null
+    static int[] plistDictMemberRange(String dict, String key) {
+        if (dict == null || !"dict".equals(nextElementName(dict, 0))) {
+            return null;
+        }
+        int open = plistElementIndex(dict, "dict", 0);
+        if (open < 0) {
+            return null;
+        }
+        int at = plistOpenTagEnd(dict, open);
+        int end = plistValueElementEnd(dict, 0);
+        if (at < 0) {
+            return null;
+        }
+        if (end < 0) {
+            end = dict.length();
+        }
+        return plistMemberRange(dict, at, end, key);
+    }
+
+    /// The `{key start, value end}` offsets of a member at the level between `from`
+    /// and `to`, so the whole entry can be removed rather than just its value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the text to search
+    ///
+    /// - `from`: where this level starts
+    ///
+    /// - `to`: where this level ends
+    ///
+    /// - `key`: the member name to look for
+    ///
+    /// #### Returns
+    ///
+    /// the entry's offsets, or null
+    static int[] plistMemberEntryRange(String plist, int from, int to, String key) {
+        int at = from;
+        while (at < to) {
+            int keyIndex = plistElementIndex(plist, "key", at);
+            if (keyIndex < 0 || keyIndex >= to) {
+                return null;
+            }
+            int contentStart = plistOpenTagEnd(plist, keyIndex);
+            int close = plistKeyContentEnd(plist, keyIndex, contentStart);
+            int valueStart = plistKeyEnd(plist, keyIndex);
+            if (contentStart < 0 || close < 0 || valueStart < 0) {
+                return null;
+            }
+            int valueEnd = plistValueElementEnd(plist, valueStart);
+            if (valueEnd < 0) {
+                return null;
+            }
+            // The key's CONTENT resolved, not its serialization: `<key><![CDATA[Foo]]></key>`,
+            // a comment inside the element and a character reference all name the same key
+            // to a plist parser. Comparing the raw text missed every one of those, so an
+            // injected key spelled that way was reported absent -- and the caller then left
+            // it in place, or appended a second one beside it. plistKeyEnd already resolved
+            // through the same helper, so this was two answers to one question.
+            if (key.equals(WatchNativeBuilder.plistStringContentExact(
+                    plist.substring(contentStart, close)))) {
+                return new int[] {keyIndex, valueEnd};
+            }
+            at = valueEnd;
+        }
+        return null;
+    }
+
+    /// The same plist without any root-dictionary member named `key`.
+    ///
+    /// Every occurrence goes, not only the first. A plist may legitimately carry the
+    /// same root key twice: `ios.plistInject` appends its members after the template's,
+    /// so a project that injects its own `NSMainNibFile` ends up with the template's
+    /// entry followed by its own. CFPropertyList resolves a duplicate key to the LAST
+    /// one, while every lookup here finds the first -- so removing a single match would
+    /// delete the entry that was already being ignored and leave the effective one
+    /// behind. On the Mac slice that means the scene manifest added afterwards pairs
+    /// with a live main NIB, which is the orphan window FrontBoard terminates at
+    /// launch: exactly what this transform exists to prevent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: a whole plist document
+    ///
+    /// - `key`: the member to drop
+    ///
+    /// #### Returns
+    ///
+    /// the plist without any such member, or unchanged when it has none
+    static String plistWithoutRootMembers(String plist, String key) {
+        String previous;
+        do {
+            previous = plist;
+            plist = plistWithoutRootMember(plist, key);
+        } while (!plist.equals(previous));
+        return plist;
+    }
+
+    /// The same plist without the FIRST `key` member of its root dictionary.
+    ///
+    /// Callers that must be sure the key is gone want `plistWithoutRootMembers`: a
+    /// duplicate root key resolves to the last one, so dropping one match can leave
+    /// the effective entry in place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: a whole plist document
+    ///
+    /// - `key`: the member to drop
+    ///
+    /// #### Returns
+    ///
+    /// the plist without that member, or unchanged when it has none
+    static String plistWithoutRootMember(String plist, String key) {
+        int[] root = plistRootDictBody(plist);
+        if (root == null) {
+            return plist;
+        }
+        int[] entry = plistMemberEntryRange(plist, root[0], root[1], key);
+        if (entry == null) {
+            return plist;
+        }
+        return plist.substring(0, entry[0]) + plist.substring(entry[1]);
+    }
+
+    /// Whether `key` appears more than once as a member at the level between `from`
+    /// and `to`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the text to search
+    ///
+    /// - `from`: where this level starts
+    ///
+    /// - `to`: where this level ends
+    ///
+    /// - `key`: the member name to count
+    ///
+    /// #### Returns
+    ///
+    /// true when there are two or more
+    static boolean plistMemberDuplicated(String plist, int from, int to, String key) {
+        int[] first = plistMemberRange(plist, from, to, key);
+        return first != null && plistMemberRange(plist, first[1], to, key) != null;
+    }
+
+    /// Whether `key` appears more than once as a member of the dictionary `dict`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dict`: a `<dict>` element, or null
+    ///
+    /// - `key`: the member name to count
+    ///
+    /// #### Returns
+    ///
+    /// true when there are two or more
+    static boolean plistDictDuplicated(String dict, String key) {
+        if (dict == null) {
+            return false;
+        }
+        int[] body = plistRootDictBody(dict);
+        return body != null && plistMemberDuplicated(dict, body[0], body[1], key);
+    }
+
+    /// The `{start, end}` offsets of `key`'s value element between `from` and `to`,
+    /// searching only that level: each member's value element is skipped whole, so a
+    /// key of the same name nested inside one of them is never mistaken for a member
+    /// here.
+    ///
+    /// Serves both shapes the plist code deals in -- a `<dict>` element's body, and an
+    /// injected fragment, which is a run of key and value elements with no wrapper.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the text to search
+    ///
+    /// - `from`: where this level starts
+    ///
+    /// - `to`: where this level ends
+    ///
+    /// - `key`: the member name to look for
+    ///
+    /// #### Returns
+    ///
+    /// the value element's offsets, or null
+    static int[] plistMemberRange(String plist, int from, int to, String key) {
+        int at = from;
+        while (at < to) {
+            int keyIndex = plistElementIndex(plist, "key", at);
+            if (keyIndex < 0 || keyIndex >= to) {
+                return null;
+            }
+            int contentStart = plistOpenTagEnd(plist, keyIndex);
+            int close = plistKeyContentEnd(plist, keyIndex, contentStart);
+            int valueStart = plistKeyEnd(plist, keyIndex);
+            if (contentStart < 0 || close < 0 || valueStart < 0) {
+                return null;
+            }
+            int valueEnd = plistValueElementEnd(plist, valueStart);
+            if (valueEnd < 0) {
+                return null;
+            }
+            // The key's CONTENT resolved, not its serialization: `<key><![CDATA[Foo]]></key>`,
+            // a comment inside the element and a character reference all name the same key
+            // to a plist parser. Comparing the raw text missed every one of those, so an
+            // injected key spelled that way was reported absent -- and the caller then left
+            // it in place, or appended a second one beside it. plistKeyEnd already resolved
+            // through the same helper, so this was two answers to one question.
+            if (key.equals(WatchNativeBuilder.plistStringContentExact(
+                    plist.substring(contentStart, close)))) {
+                return new int[] {valueStart, valueEnd};
+            }
+            at = valueEnd;
+        }
+        return null;
+    }
+
+    /// Whether an application supplied manifest declares multiple-scene support at the
+    /// level UIKit reads it -- as a member of the manifest dictionary itself, not
+    /// somewhere nested inside it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the whole injected fragment
+    ///
+    /// #### Returns
+    ///
+    /// true when the manifest itself sets the key true
+    static boolean plistManifestSupportsMultipleScenes(String plist) {
+        String value = plistDictMember(
+                plistManifestScope(plist), "UIApplicationSupportsMultipleScenes");
+        // The value of a key is the element that follows it, so read that element's
+        // name rather than matching a spelling: "<true/>", "<true />" and
+        // "<true></true>" are the same element.
+        return value != null && "true".equals(nextElementName(value, 0));
+    }
+
+    /// Whether an application supplied manifest wires the window scene role to
+    /// Codename One's delegate, at the levels UIKit reads them: the role has to be a
+    /// member of the manifest's `UISceneConfigurations` dictionary, which in turn has
+    /// to be a member of the manifest.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the whole injected fragment
+    ///
+    /// #### Returns
+    ///
+    /// true when the window role names `CodenameOne_GLSceneDelegate`
+    static boolean plistManifestWiresWindowScene(String plist) {
+        String manifest = plistManifestScope(plist);
+        String configurations = plistDictMember(manifest, "UISceneConfigurations");
+        String role = plistDictMember(configurations, "UIWindowSceneSessionRoleApplication");
+        // The shape UIKit requires, not merely the names it uses. The role's value is
+        // an array of configuration dictionaries; a role written as a dictionary, or
+        // one whose delegate key is buried in a nested dictionary rather than owned by
+        // a configuration, describes no window UIKit can create -- and accepting it
+        // passes the build and leaves Window unsupported on the device, which is what
+        // this check exists to prevent.
+        for (String configuration : plistArrayMembers(role)) {
+            if (!"dict".equals(nextElementName(configuration, 0))) {
+                continue;
+            }
+            String delegate = plistDictMember(configuration, "UISceneDelegateClassName");
+            if (delegate != null && "string".equals(nextElementName(delegate, 0))
+                    && "CodenameOne_GLSceneDelegate".equals(
+                            plistStringValueAfter(delegate, 0))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The immediate members of an `<array>` element, in order, or an empty list when
+    /// this is not an array.
+    ///
+    /// Each member's own element is skipped whole, so a nested array or dictionary
+    /// contributes one member rather than its contents.
+    ///
+    /// #### Parameters
+    ///
+    /// - `array`: an `<array>` element
+    ///
+    /// #### Returns
+    ///
+    /// the member elements
+    static java.util.List<String> plistArrayMembers(String array) {
+        java.util.List<String> members = new java.util.ArrayList<String>();
+        if (array == null || !"array".equals(nextElementName(array, 0))) {
+            return members;
+        }
+        int open = plistElementIndex(array, "array", 0);
+        if (open < 0) {
+            return members;
+        }
+        int at = plistOpenTagEnd(array, open);
+        if (at < 0) {
+            return members;
+        }
+        int end = plistValueElementEnd(array, 0);
+        if (end < 0) {
+            end = array.length();
+        }
+        while (at < end) {
+            String name = nextElementName(array, at);
+            if (name == null) {
+                break;
+            }
+            int start = plistElementIndex(array, name, at);
+            // Past the array's own close, so nextElementName found something after it.
+            if (start < 0 || start >= end) {
+                break;
+            }
+            int memberEnd = plistValueElementEnd(array, start);
+            if (memberEnd < 0 || memberEnd > end) {
+                break;
+            }
+            members.add(array.substring(start, memberEnd));
+            at = memberEnd;
+        }
+        return members;
+    }
+
+    /// Index just past the element that is the value at `from`, honouring nesting, or
+    /// -1 when there is no element there.
+    ///
+    /// This is what bounds a scene role: the role's value is its own array, so the
+    /// configurations belonging to it are exactly the ones inside that element. Bounding
+    /// by the next key whose *name* looks like a role instead was wrong twice over -- a
+    /// string mentioning the words ended the role early, and so did an unrelated key
+    /// like "MySceneSessionRoleMetadata" declared inside it, which made the build reject
+    /// a manifest that was correctly wired.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `from`: index just past the key whose value is wanted
+    ///
+    /// #### Returns
+    ///
+    /// the index just past the value element, or -1
+    static int plistValueElementEnd(String plist, int from) {
+        String name = nextElementName(plist, from);
+        if (name == null) {
+            return -1;
+        }
+        int open = plistElementIndex(plist, name, from);
+        if (open < 0) {
+            return -1;
+        }
+        int gt = plist.indexOf('>', open);
+        if (gt < 0) {
+            return -1;
+        }
+        if (plist.charAt(gt - 1) == '/') {
+            return gt + 1;
+        }
+        int depth = 0;
+        int scan = gt;
+        while (true) {
+            // Structural, not spelled-out tags. "<array >" and "<dict custom=\"x\">" are
+            // the same elements as "<array>" and "<dict>", and the rest of this parser
+            // already accepts them -- matching literals here missed a nested opening and
+            // let the first inner "</array>" close the outer one, truncating the role
+            // before its delegate. A closing tag written "</array >" was missed the
+            // other way and left no close at all.
+            //
+            // Live tags only. A comment containing "</dict>" would otherwise close the
+            // element early and truncate the range, so validation would read a prefix of
+            // the manifest and reject a build that is correctly configured -- the same
+            // rule the key and element searches already follow.
+            int nextOpen = plistNestedElementIndex(plist, name, scan + 1);
+            int nextClose = plistCloseElementIndex(plist, name, scan + 1);
+            if (nextClose < 0) {
+                return -1;
+            }
+            if (nextOpen >= 0 && nextOpen < nextClose) {
+                depth++;
+                scan = nextOpen;
+            } else if (depth == 0) {
+                return plistOpenTagEnd(plist, nextClose);
+            } else {
+                depth--;
+                scan = nextClose;
+            }
+        }
+    }
+
+    /// The next opening element of the given name that actually opens a nesting level.
+    ///
+    /// A self-closing "<array/>" is an element but not a level: counting it as one would
+    /// leave the depth permanently ahead and swallow the real closing tag, so the value
+    /// would run to the end of the fragment. The literal matching this replaced happened
+    /// to get that right by not matching self-closing tags at all; matching structurally
+    /// means excluding them on purpose.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the fragment
+    ///
+    /// - `name`: the element name
+    ///
+    /// - `from`: where to start
+    ///
+    /// #### Returns
+    ///
+    /// the index of the opening tag, or -1
+    private static int plistNestedElementIndex(String plist, String name, int from) {
+        int at = plistElementIndex(plist, name, from);
+        while (at >= 0) {
+            int end = plistOpenTagEnd(plist, at);
+            if (end < 0) {
+                return -1;
+            }
+            if (end < 2 || plist.charAt(end - 2) != '/') {
+                return at;
+            }
+            at = plistElementIndex(plist, name, end);
+        }
+        return -1;
+    }
+
+    /// Where a `<key>` element's content ends: the `<` of its closing tag, or -- for the
+    /// self-closing `<key/>` -- the position just past the tag, where its empty content
+    /// both starts and ends.
+    ///
+    /// `<key/>` is a valid empty key and Foundation reads the members after it normally:
+    /// plutil turns `<key/><string>metadata</string><key>NSMainNibFile</key>...` into
+    /// `{"":"metadata","NSMainNibFile":"MainWindow"}`. Every walker here looked for a
+    /// `</key>` that does not exist, gave up, and stopped dead at that entry -- so a
+    /// later root NSMainNibFile was invisible and survived into the Catalyst plist.
+    ///
+    /// Returning `contentStart` rather than a special case at each call site is what
+    /// makes the four walkers agree: the empty substring matches no real key, and they
+    /// carry on from just past the tag exactly as they would from a closing one.
+    /// `#plistValueElementEnd(String, int)` already did this for self-closing values.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the plist text
+    ///
+    /// - `keyIndex`: the `<` of the key element
+    ///
+    /// - `contentStart`: the position just past its opening tag
+    ///
+    /// #### Returns
+    ///
+    /// the end of the key's content, or -1 when the element never closes
+    static int plistKeyContentEnd(String plist, int keyIndex, int contentStart) {
+        if (contentStart >= 2 && plist.charAt(contentStart - 2) == '/') {
+            return contentStart;
+        }
+        return plistCloseElementIndex(plist, "key", keyIndex);
+    }
+
+    /// The next live closing element of the given name.
+    ///
+    /// The counterpart of `plistElementIndex` for "</name>", tolerating the whitespace
+    /// XML allows before the ">" so that "</array >" closes an array.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the fragment
+    ///
+    /// - `name`: the element name
+    ///
+    /// - `from`: where to start
+    ///
+    /// #### Returns
+    ///
+    /// the index of the closing tag, or -1
+    static int plistCloseElementIndex(String plist, String name, int from) {
+        int at = plistIndexOfLive(plist, "</" + name, from);
+        while (at >= 0) {
+            int after = at + 2 + name.length();
+            int scan = after;
+            while (scan < plist.length()) {
+                char c = plist.charAt(scan);
+                if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                    scan++;
+                    continue;
+                }
+                break;
+            }
+            // Only whitespace may sit between the name and the ">". Anything else means
+            // this was a different element whose name merely starts the same way.
+            if (scan < plist.length() && plist.charAt(scan) == '>' && scan >= after) {
+                return at;
+            }
+            at = plistIndexOfLive(plist, "</" + name, at + 1);
+        }
+        return -1;
+    }
+
+    /// The text of the `<string>` element that follows `from`, or null when the next
+    /// element is not a string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the injected plist fragment
+    ///
+    /// - `from`: index to read the value from, normally just past a key
+    ///
+    /// #### Returns
+    ///
+    /// the string's text with its XML character data resolved, trimmed, or null
+    static String plistStringValueAfter(String plist, int from) {
+        if (!"string".equals(nextElementName(plist, from))) {
+            return null;
+        }
+        int open = plistElementIndex(plist, "string", from);
+        int contentStart = open < 0 ? -1 : plistOpenTagEnd(plist, open);
+        if (contentStart < 0) {
+            return null;
+        }
+        // Structural, like every other closing tag this parser reads. "</string >" ends
+        // a string just as "</string>" does, and matching the literal made the window
+        // role check report the delegate missing and abort a build that was correctly
+        // configured.
+        int close = plistCloseElementIndex(plist, "string", open);
+        if (close < 0) {
+            return null;
+        }
+        // The value a plist parser reads, not its serialization:
+        // <string><![CDATA[CodenameOne_GLSceneDelegate]]></string> and
+        // CodenameOne_GLSceneDelegat&#x65; both name that delegate. Comparing the raw
+        // text made plistManifestWiresWindowScene report another delegate and reject a
+        // correctly configured manifest. Same helper the key comparisons use, so the
+        // two sides of a member agree about what its text is. It trims on both of its
+        // paths, so the explicit trim is not lost.
+        return WatchNativeBuilder.plistStringContentExact(plist.substring(contentStart, close));
+    }
+
+    private void injectToPlist(File tmpFile, File resDir, BuildRequest request)
+            throws IOException, BuildException {
         File buildinRes = new File(tmpFile, "btres");
         File mat = new File(buildinRes, "material-design-font.ttf");
         if(mat.exists()) {
@@ -11574,12 +13059,36 @@ public class IPhoneBuilder extends Executor {
             }
         }
         boolean useUISceneManifest = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
+        // com.codename1.ui.Window needs multiple scenes, and a Window only exists on
+        // the Mac Catalyst slice, so the key follows macNative.enabled exactly.
+        boolean multiWindow = macNativeBuilder.isMultiWindow();
         // CarPlay requires the UIScene lifecycle and a dedicated
         // CPTemplateApplicationSceneSessionRoleApplication scene wired to
         // CodenameOne_CarPlaySceneDelegate. Emit the manifest when either UIScene is on or the app
         // uses CarPlay; include the phone window role only under UIScene, and the CarPlay role only
         // when the app references com.codename1.car.
-        if ((useUISceneManifest || usesCar) && !inject.contains("UIApplicationSceneManifest")) {
+        // multiWindow is in the condition as well as the value below. A Catalyst build
+        // with ios.uiscene=false and no CarPlay skipped the whole block, so the bundle
+        // got neither UIApplicationSupportsMultipleScenes nor a scene configuration --
+        // and getWindowManager() reads that key back out of the bundle, so windows were
+        // reported unsupported and constructing one threw, in the very build that had
+        // just asked for them.
+        if (multiWindow) {
+            String rejection = sceneManifestRejection(inject);
+            if (rejection != null) {
+                throw new BuildException(rejection);
+            }
+        }
+        // multiWindow is deliberately NOT in this condition. Declaring
+        // UIApplicationSceneManifest activates the UIScene lifecycle, and the
+        // NSMainNibFile removal above runs only under ios.uiscene -- so putting a
+        // manifest in the shared plist for a Catalyst build would hand the iPhone/iPad
+        // artifact a scene lifecycle while it still carries its main NIB, which is a
+        // window with no scene and a launch FrontBoard terminates on iOS 26. The Mac
+        // slice's copy is where a manifest appears for windows; see
+        // plistForMacSlice.
+        if ((useUISceneManifest || usesCar)
+                && !plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
             String carPlayScene = usesCar
                     ? "        <key>CPTemplateApplicationSceneSessionRoleApplication</key>\n"
                     + "        <array>\n"
@@ -11591,24 +13100,26 @@ public class IPhoneBuilder extends Executor {
                     + "            </dict>\n"
                     + "        </array>\n"
                     : "";
-            String windowScene = useUISceneManifest
-                    ? "        <key>UIWindowSceneSessionRoleApplication</key>\n"
-                    + "        <array>\n"
-                    + "            <dict>\n"
-                    + "                <key>UISceneConfigurationName</key>\n"
-                    + "                <string>Default Configuration</string>\n"
-                    + "                <key>UISceneDelegateClassName</key>\n"
-                    + "                <string>CodenameOne_GLSceneDelegate</string>\n"
-                    + "            </dict>\n"
-                    + "        </array>\n"
-                    : "";
+            String windowScene = useUISceneManifest ? WINDOW_SCENE_ROLE : "";
             inject += "\n<key>UIApplicationSceneManifest</key>\n"
                     + "<dict>\n"
                     + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
-                    // Keep single-scene (false): the CarPlay scene is a distinct scene ROLE
-                    // (CPTemplateApplicationSceneSessionRoleApplication), not a second window of the
-                    // app role, so it does not need multiple-scene support. Setting this true changed
-                    // Mac Catalyst windowing and crashed the screenshot suite (26 GB / signal loop).
+                    // False here, in every build, including the one that asked for
+                    // windows. This is ONE Info.plist: macNative.enabled sets
+                    // SUPPORTS_MACCATALYST=YES on the app target rather than making a
+                    // second target, and the same build still ships the iPhone/iPad
+                    // slice, so both destinations read this file. Writing true here
+                    // would opt every iPad build into the multi-window behaviour it
+                    // never asked for.
+                    //
+                    // The Mac slice gets its own copy of the finished plist, differing
+                    // in exactly this key, selected by INFOPLIST_FILE[sdk=macosx*] --
+                    // see MacNativeBuilder.writeCatalystInfoPlist. A copy generated
+                    // from this file cannot drift from it.
+                    //
+                    // The CarPlay scene is a distinct scene ROLE
+                    // (CPTemplateApplicationSceneSessionRoleApplication), not a second
+                    // window of the app role, so it never needed the key either.
                     + "    <false/>\n"
                     + "    <key>UISceneConfigurations</key>\n"
                     + "    <dict>\n"
@@ -11808,6 +13319,70 @@ public class IPhoneBuilder extends Executor {
         // External surfaces: the Java bridge (IOSSurfaceBridge via IOSNative.m) resolves the
         // shared App Group container through this key; the CN1Widgets extension carries its own
         // copy in its generated Info.plist. See surfaces.json / the ios.surfaces.* build hints.
+        // Document provider: the Java bridge (IOSDocumentProviderBridge via IOSNative.m) resolves
+        // the shared App Group container through this key, and names the location in the file
+        // browser through the next one; the CN1Documents extension carries its own copy of the
+        // group in its generated Info.plist. See the ios.documentProvider.* build hints.
+        if (documentProviderEnabled) {
+            // Structurally, not by substring. Everywhere else in this method a loose match only
+            // decides whether to add a key of our own, and matching too eagerly just skips an
+            // injection the developer clearly made themselves. Here it is not benign: the name
+            // appearing in a comment, inside a string value, in a nested dictionary or as part
+            // of a longer key would suppress the top-level entry, and the app-side native reads
+            // ONLY the main bundle's top-level key -- so it finds nothing, isSupported() answers
+            // false, and publishing becomes a silent no-op in a build that generated the
+            // extension and signed it.
+            // A value that disagrees is refused rather than left alone. This key is not a hint
+            // -- ios.documentProvider.appGroup is -- and the entitlements on both targets carry
+            // the group the hint resolved to, so an injected key naming a different one has the
+            // app publishing into a container the extension is not entitled to read: nothing
+            // appears, and nothing says why. A stale manual injection is exactly how a project
+            // gets there.
+            String injectedGroup = topLevelPlistString(inject, "CN1DocumentsAppGroup");
+            if (injectedGroup != null && !injectedGroup.equals(documentsAppGroup)) {
+                throw new BuildException("ios.plistInject sets CN1DocumentsAppGroup to '"
+                        + injectedGroup + "' while this build shares '" + documentsAppGroup
+                        + "' with the generated extension. The app would publish into a container "
+                        + "the extension cannot read. Remove the injected key and set "
+                        + "ios.documentProvider.appGroup instead, which entitles both sides.");
+            }
+            if (!declaresTopLevelPlistKey(inject, "CN1DocumentsAppGroup")) {
+                inject += "\n<key>CN1DocumentsAppGroup</key><string>"
+                        + xmlEscape(documentsAppGroup) + "</string>";
+            }
+            if (!declaresTopLevelPlistKey(inject, "CN1DocumentsDisplayName")) {
+                inject += "\n<key>CN1DocumentsDisplayName</key><string>"
+                        + plistEscape(documentsDisplayName) + "</string>";
+            }
+            // Which provider was generated, which the app-side natives cannot infer. Below the
+            // replicated API's floor the extension is the classic NSFileProviderExtension, which
+            // registers no domain and is signalled through the default manager instead. Deciding
+            // that from @available at runtime would strand a classic build on the very systems it
+            // was generated for.
+            // Structurally, for the reason the two keys above give -- and this one decides
+            // MORE than whether a key is written: a missing top-level value reads as YES, so a
+            // classic build whose fragment merely mentions the name anywhere would register a
+            // domain and signal through a manager that the generated NSFileProviderExtension
+            // never registers with, leaving the location inert on exactly the systems the
+            // classic provider exists for.
+            // Same reasoning, and the same cost: this says which of the two FileProvider APIs
+            // was generated, so a value that disagrees has the app registering a domain the
+            // extension never serves, or signalling through a manager it never registers with.
+            String injectedReplicated = topLevelPlistString(inject, "CN1DocumentsReplicated");
+            if (injectedReplicated != null
+                    && !injectedReplicated.equals(String.valueOf(documentsUsesReplicatedApi))) {
+                throw new BuildException("ios.plistInject sets CN1DocumentsReplicated to '"
+                        + injectedReplicated + "' while this build generated the "
+                        + (documentsUsesReplicatedApi ? "replicated" : "classic")
+                        + " provider. Remove the injected key; ios.documentProvider."
+                        + "deploymentTarget is what chooses between them.");
+            }
+            if (!declaresTopLevelPlistKey(inject, "CN1DocumentsReplicated")) {
+                inject += "\n<key>CN1DocumentsReplicated</key><string>"
+                        + (documentsUsesReplicatedApi ? "true" : "false") + "</string>";
+            }
+        }
+
         if (surfacesExtensionEnabled || surfacesWatchEnabled) {
             if (!inject.contains("CN1SurfacesAppGroup")) {
                 inject += "\n<key>CN1SurfacesAppGroup</key><string>" + surfacesAppGroup + "</string>";
@@ -12003,6 +13578,104 @@ public class IPhoneBuilder extends Executor {
         
         try(FileOutputStream fo = new FileOutputStream(infoPlist)) {
             fo.write(b.toString().getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    /// The window scene role, wired to Codename One's scene delegate. A
+    /// `com.codename1.ui.Window` is a second scene of the app role, so this is the
+    /// configuration UIKit creates one from; without it a manifest can say multiple
+    /// scenes are supported and still describe nothing to create them with.
+    static final String WINDOW_SCENE_ROLE =
+            "        <key>UIWindowSceneSessionRoleApplication</key>\n"
+            + "        <array>\n"
+            + "            <dict>\n"
+            + "                <key>UISceneConfigurationName</key>\n"
+            + "                <string>Default Configuration</string>\n"
+            + "                <key>UISceneDelegateClassName</key>\n"
+            + "                <string>CodenameOne_GLSceneDelegate</string>\n"
+            + "            </dict>\n"
+            + "        </array>\n";
+
+    /// The whole scene manifest a Mac slice needs: multiple scenes supported, and the
+    /// window role to create them with.
+    static final String MAC_SCENE_MANIFEST =
+            "<key>UIApplicationSceneManifest</key>\n"
+            + "<dict>\n"
+            + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
+            + "    <true/>\n"
+            + "    <key>UISceneConfigurations</key>\n"
+            + "    <dict>\n"
+            + WINDOW_SCENE_ROLE
+            + "    </dict>\n"
+            + "</dict>\n";
+
+    /// The Mac slice's Info.plist, relative to the Xcode project directory, which is
+    /// the form `INFOPLIST_FILE` is resolved against and the one the generated project
+    /// already uses.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mainClass`: the application's main class, which names the file
+    ///
+    /// #### Returns
+    ///
+    /// the project-relative path
+    static String catalystInfoPlistRelativePath(String mainClass) {
+        return mainClass + "-src/" + mainClass + "-MacCatalyst-Info.plist";
+    }
+
+    /// Writes the Mac slice its own Info.plist: the finished one with
+    /// `UIApplicationSupportsMultipleScenes` set true, which
+    /// `com.codename1.ui.Window` needs and the iOS slice must not have.
+    ///
+    /// This exists because a Mac build is one target with `SUPPORTS_MACCATALYST=YES`
+    /// and still ships the iPhone/iPad slice, so both destinations read one plist.
+    /// `INFOPLIST_FILE[sdk=macosx*]` is the only place they can be told apart.
+    ///
+    /// Written for every Mac build, not only the ones that need the key changed.
+    /// `MacNativeBuilder` selects this file before the plist exists in one of the two
+    /// builders that share this code, so it cannot decide by looking; a build whose
+    /// application already asked for multiple scenes simply gets an identical copy.
+    ///
+    /// Generated from the finished text rather than maintained beside it, so it
+    /// carries everything the build put there and cannot drift.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tmpFile`: the build's working directory
+    ///
+    /// - `mainClass`: the application's main class, which names the file
+    ///
+    /// - `plist`: the finished plist text
+    /// Writes the Mac slice's Info.plist, derived from the FINISHED shared one.
+    ///
+    /// Read off disk rather than handed the buffer injectToPlist wrote, and called from
+    /// the end of the build rather than from inside it, because the shared plist is
+    /// still edited afterwards: ios.interface_orientation strips the orientations the
+    /// application did not ask for, and ios.prerendered_icon rewrites its key. A copy
+    /// taken earlier kept orientations the real plist no longer had -- and supported
+    /// orientations decide how large a Catalyst window opens, so every screenshot in the
+    /// suite came out a point shorter than the golden and 147 of them failed. Anything
+    /// that edits the shared plist has to run BEFORE this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tmpFile`: the build's temporary directory
+    ///
+    /// - `mainClass`: the application's main class name
+    private void writeCatalystInfoPlist(File tmpFile, String mainClass) throws IOException {
+        File distSrc = new File(new File(tmpFile, "dist"), mainClass + "-src");
+        if (!distSrc.isDirectory()) {
+            return;
+        }
+        File source = new File(distSrc, mainClass + "-Info.plist");
+        if (!source.isFile()) {
+            return;
+        }
+        String plist = new String(java.nio.file.Files.readAllBytes(source.toPath()), "UTF-8");
+        File target = new File(distSrc, mainClass + "-MacCatalyst-Info.plist");
+        try (FileOutputStream fo = new FileOutputStream(target)) {
+            fo.write(plistForMacSlice(plist).getBytes(StandardCharsets.UTF_8));
         }
     }
 

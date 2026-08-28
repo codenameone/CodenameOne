@@ -42,6 +42,7 @@ import org.objectweb.asm.Opcodes;
 public final class AnnotatedClass {
 
     private final String internalName;
+    private String sourceFile;
     private final String superInternalName;
     private final List<String> interfaceInternalNames;
     private final int access;
@@ -106,6 +107,17 @@ public final class AnnotatedClass {
     }
 
     /// JVM internal name (`com/example/ProfileForm`).
+    /// The source file name the compiler recorded, or null when the class was
+    /// compiled without debug information.
+    ///
+    /// The name only, never a path. It is the one reliable link back from a
+    /// class to its source: Kotlin lets a file's name and directory differ from
+    /// the class it declares, so deriving the file from the class name is a
+    /// guess and this is not.
+    public String getSourceFile() { return sourceFile; }
+
+    void setSourceFile(String sourceFile) { this.sourceFile = sourceFile; }
+
     public String getInternalName() { return internalName; }
 
     /// Dotted binary name (`com.example.ProfileForm`).

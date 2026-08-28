@@ -160,6 +160,7 @@ public class Simulator {
                 files.add(commonClasses.getAbsoluteFile());
             }
             loadSimulatorProperties(cn1Props.getParentFile());
+            publishAnnotationBuildHints(cn1Props.getParentFile(), classPathStr);
         }
         if (isDebug && usingHotswapAgent) { 
             HotswapProperties hotswapProperties = new HotswapProperties();
@@ -451,4 +452,885 @@ public class Simulator {
         }
     }
     
+
+    /**
+     * Publishes build hints declared as annotations so the simulator sees them.
+     *
+     * <p>The simulator never runs {@code cn1:build}, so it never sees the build
+     * request the annotations feed. Without this, moving a hint like
+     * {@code desktop.titleBar} or {@code nativeTheme} out of
+     * {@code codenameone_settings.properties} and onto the main class would
+     * silently stop it working under {@code cn1:run} -- the build would still be
+     * right and only the simulator would be wrong, which is the hardest kind of
+     * discrepancy to track down.</p>
+     *
+     * <p>Published as system properties rather than added as another source to
+     * {@code JavaSEPort.buildHint} because several readers bypass that method
+     * and call {@code System.getProperty("codename1.arg....")} directly. Setting
+     * the property fixes those, and every future one, with no change to them.</p>
+     *
+     * <p>An existing value always wins, which is what preserves {@code -D}: the
+     * JVM has already applied the command line by the time this runs.</p>
+     *
+     * <p>Read straight off disk, not through {@code getResourceAsStream}: at this
+     * point in {@code main} the application classes are not on any classloader
+     * yet -- the loader is built from {@code files} further down.</p>
+     */
+    private static void publishAnnotationBuildHints(File projectDir, String classPathStr) {
+        // A reload re-enters main() in the SAME JVM, so anything published last
+        // time is still set. Withdraw it before deciding anything: otherwise the
+        // "existing value wins" rule that protects -D also protects the previous
+        // build's annotation value, and an edited @DesktopBuild(titleBar = ...) -- or
+        // a deleted annotation, which takes an early return below -- keeps
+        // showing the old setting until the process is restarted.
+        //
+        // Only what THIS method installed is withdrawn. A -D was never installed
+        // here, because a key already set is skipped, so it is never a candidate.
+        withdrawPublishedHints();
+        if (projectDir == null) {
+            return;
+        }
+        String expectedMain = configuredMainClass(projectDir);
+        FoundManifest found = findAnnotationManifest(projectDir, classPathStr, expectedMain);
+        if (found == null) {
+            // Annotations on the main class but no manifest means process-annotations
+            // did not run -- an upgraded or hand-written POM that never bound the
+            // goal. CN1BuildMojo refuses a device build for exactly this, so
+            // returning quietly here made the simulator the one place where the
+            // annotated hints vanish with nothing said, and local and device
+            // behaviour diverge for the same project.
+            //
+            // A warning rather than a refusal: the simulator's job is to start, and
+            // the hints it is missing are build settings, not something it cannot
+            // run without.
+            warnIfAnnotatedButUnprocessed(classPathStr, expectedMain);
+            return;
+        }
+        java.util.Properties p = found.hints;
+        File f = found.file;
+        String stampedFor = p.getProperty("cn1.buildHints.mainClass");
+        if (expectedMain != null && !expectedMain.equals(stampedFor)) {
+            // Somebody else's configuration. codename1.mainName changing without a
+            // clean build leaves the old class and its manifest together in the
+            // output directory, and the timestamp check finds that pair perfectly
+            // consistent -- so without the stamp the simulator runs the previous
+            // application's hints. The native merge already refuses this.
+            //
+            // No stamp is refused on the same terms rather than trusted: the
+            // resource is written by process-annotations, which always records
+            // one, so a file without it was written by something else. And
+            // staleManifestReason cannot judge it either -- with no main class
+            // named there is nothing to compare the manifest against, so it
+            // reports "not stale" and the hints would be published unchecked.
+            System.err.println("Warning: " + found.where + (stampedFor == null
+                            ? " does not say which application it was generated for"
+                            : " was generated for " + stampedFor + ", not " + expectedMain)
+                    + ", so its build hints were NOT applied.");
+            return;
+        }
+        // Sharing an archive does not mean sharing a build. Nothing deletes an
+        // old manifest from target/classes, so a recompiled main class and last
+        // week's resource are packaged into the same jar.
+        String staleAgainst = staleManifestReason(p, found);
+        if (staleAgainst != null) {
+            // Nothing removes target/classes between builds, so a project that ran
+            // process-annotations once and then stopped -- goal unbound, skipped,
+            // or bound to a phase that no longer runs -- keeps a manifest that
+            // looks entirely valid while the annotations beside it have moved on.
+            // The device build refuses this outright; the simulator would
+            // otherwise run on the previous values of hints it can actually see,
+            // such as desktop.titleBar and nativeTheme, and show the wrong thing
+            // with no indication why.
+            //
+            // Judged on timestamps rather than the manifest's own fingerprint:
+            // recomputing that means parsing the class file's annotation table,
+            // and the simulator has no bytecode reader. The comparison is sound in
+            // the direction that matters -- process-classes always follows compile
+            // within a build, so a main class newer than the manifest cannot have
+            // produced it.
+            System.err.println("Warning: " + found.where + " " + staleAgainst
+                    + ", so it was produced by an earlier build "
+                    + "and its build hints were NOT applied.");
+            System.err.println("         Rebuild the project so the cn1 process-annotations "
+                    + "goal regenerates it.");
+            return;
+        }
+        // A hint declared BOTH ways is a build error, and the native merge says
+        // so. Publishing it here instead would bury it: buildHint() reads the
+        // system property before the settings file, so the line the developer
+        // just added to codenameone_settings.properties would be silently
+        // ignored by the simulator while the device build refused to run at all.
+        // Reachable because editing the properties file does not touch the class,
+        // so the timestamp check above still finds the manifest current.
+        java.util.Properties declared = loadProjectSettings(projectDir);
+        int applied = 0;
+        for (String key : p.stringPropertyNames()) {
+            if (!key.startsWith("codename1.arg.")) {
+                continue;
+            }
+            String conflict = declaredInPropertiesToo(p, declared, key);
+            if (conflict != null) {
+                System.err.println("Warning: " + conflict + " is declared both as an annotation "
+                        + "and in codenameone_settings.properties, so the annotation value was "
+                        + "NOT applied. Delete one of them -- a build will refuse this.");
+                continue;
+            }
+            String claimed = claimedBySystemProperty(p, key);
+            if (claimed == null) {
+                System.setProperty(key, p.getProperty(key));
+                PUBLISHED_HINTS.add(key);
+                applied++;
+            } else if (!claimed.equals(key)) {
+                // Set under the OTHER spelling of the same setting, so leaving
+                // this one out is what makes -D win. Publishing it would not
+                // even lose quietly: buildHint() reads and.themeMode before
+                // cn1.androidTheme, so the annotation would beat the command
+                // line here while the device build honoured it.
+                System.out.println("Applying " + claimed + " from the command line rather than "
+                        + key + " from the annotation -- they are one setting");
+            }
+        }
+        if (applied > 0) {
+            System.out.println("Applied " + applied + " build hint(s) from annotations");
+        }
+    }
+
+    /**
+     * Keys this class installed into the system properties, so a reload can take
+     * them back out.
+     *
+     * <p>Static because a reload re-enters {@code main} in the same JVM rather
+     * than starting a process.</p>
+     */
+    private static final java.util.Set<String> PUBLISHED_HINTS =
+            new java.util.HashSet<String>();
+
+    /** Removes what a previous launch published, leaving anything else alone. */
+    private static void withdrawPublishedHints() {
+        if (PUBLISHED_HINTS.isEmpty()) {
+            return;
+        }
+        for (String key : PUBLISHED_HINTS) {
+            System.clearProperty(key);
+        }
+        PUBLISHED_HINTS.clear();
+    }
+
+    /**
+     * The system property that already sets {@code key}, under any spelling, or
+     * null when nothing does.
+     *
+     * <p>An alias and its target are ONE effective setting, so a command line
+     * that named either of them has set this hint. Comparing the key literally
+     * missed that: with `-Dcodename1.arg.cn1.androidTheme` against an annotated
+     * `and.themeMode`, the canonical key was unclaimed, the annotation value was
+     * published, and `buildHint()` reads the canonical first -- so the
+     * annotation beat the command line in the simulator while the device build
+     * honoured it.</p>
+     *
+     * <p>The alias list comes out of the manifest, which the processor writes it
+     * into, because the catalog that knows about aliases is a build-time
+     * artifact this port cannot reach.</p>
+     */
+    static String claimedBySystemProperty(java.util.Properties manifest, String key) {
+        if (System.getProperty(key) != null) {
+            return key;
+        }
+        String name = key.substring("codename1.arg.".length());
+        String aliases = manifest.getProperty("cn1.buildHints.alias." + name);
+        if (aliases == null) {
+            return null;
+        }
+        for (String alias : aliases.split(",")) {
+            String other = "codename1.arg." + alias.trim();
+            if (alias.trim().length() > 0 && System.getProperty(other) != null) {
+                return other;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The properties key that declares the same setting as {@code key} in the
+     * settings file, or null when the file declares none of its spellings.
+     *
+     * <p>An alias and its target name one setting -- the builder reads
+     * {@code android.captureRecord} and then lets {@code and.captureRecord}
+     * override it -- so either spelling in the file collides. The spellings come
+     * out of the manifest, which the annotation processor writes them into,
+     * because the catalog that knows about aliases is a build-time artifact and
+     * this port cannot reach it.</p>
+     */
+    private static String declaredInPropertiesToo(java.util.Properties manifest,
+                                                  java.util.Properties declared, String key) {
+        if (declared == null) {
+            return null;
+        }
+        if (declared.getProperty(key) != null) {
+            return key;
+        }
+        String name = key.substring("codename1.arg.".length());
+        String aliases = manifest.getProperty("cn1.buildHints.alias." + name);
+        if (aliases == null) {
+            return null;
+        }
+        for (String alias : aliases.split(",")) {
+            String other = "codename1.arg." + alias.trim();
+            if (alias.trim().length() > 0 && declared.getProperty(other) != null) {
+                return other;
+            }
+        }
+        return null;
+    }
+
+    /** The project's settings file, or null when it cannot be read. */
+    private static java.util.Properties loadProjectSettings(File projectDir) {
+        File settings = new File(projectDir, "codenameone_settings.properties");
+        if (!settings.isFile()) {
+            return null;
+        }
+        java.util.Properties p = new java.util.Properties();
+        FileInputStream in = null;
+        try {
+            in = new FileInputStream(settings);
+            p.load(in);
+            return p;
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // read-only stream; nothing useful to do
+                }
+            }
+        }
+    }
+
+    /**
+     * The main class this project is configured to launch, or null.
+     *
+     * <p>The launcher's answer first. {@code process-annotations} stamps the
+     * manifest with the EFFECTIVE identity -- the settings file with any
+     * {@code -Dcodename1.mainName} applied -- and {@code SimulatorMojo} forwards
+     * that same pair. Reading only the file disagreed with the stamp on an
+     * overridden build, so the simulator refused the manifest and silently ran
+     * without the hints the device build applies.</p>
+     *
+     * <p>The pair is taken from one source or the other, never mixed: a
+     * forwarded main class with no package is a project that has none, not one
+     * whose package should be read out of the file.</p>
+     */
+    static String configuredMainClass(File projectDir) {
+        String main = System.getProperty("codename1.mainName");
+        String pkg = System.getProperty("codename1.packageName");
+        if (main == null || main.trim().length() == 0) {
+            java.util.Properties p = loadProjectSettings(projectDir);
+            if (p == null) {
+                return null;
+            }
+            main = p.getProperty("codename1.mainName");
+            pkg = p.getProperty("codename1.packageName");
+        }
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        return (pkg == null || pkg.trim().length() == 0)
+                ? main.trim() : pkg.trim() + "." + main.trim();
+    }
+
+    /** The manifest's path inside a jar, which is its resource path with / separators. */
+    private static final String ANNOTATION_HINTS_ENTRY =
+            "META-INF/codenameone/build-hints.properties";
+
+    /**
+     * A manifest that was found, and where.
+     *
+     * <p>Not a File, because it can live inside a jar: the javase-only nested
+     * build the simulator runs resolves the application's own common module as a
+     * dependency artifact, so its manifest has no path of its own.</p>
+     */
+    static final class FoundManifest {
+        final java.util.Properties hints;
+        /** The file on disk, or null when it came out of a jar. */
+        final File file;
+        /** The jar it came out of, or null when it is a file on disk. */
+        final File jar;
+        final String where;
+
+        FoundManifest(java.util.Properties hints, File file, File jar, String where) {
+            this.hints = hints;
+            this.file = file;
+            this.jar = jar;
+            this.where = where;
+        }
+    }
+
+    /**
+     * The emitted build hint manifest, or null when there is none.
+     *
+     * <p>{@code target/classes} is only the default: a module may configure
+     * {@code build/outputDirectory}, and the annotation processor writes where
+     * that says. Hard-coding the conventional path meant the device build applied
+     * the annotated hints and {@code cn1:run} silently ignored them, which is the
+     * asymmetry this whole publishing step exists to remove.</p>
+     *
+     * <p>The configured directory is on the simulator's own classpath, so the
+     * classpath is searched rather than the layout guessed at. The conventional
+     * path is tried last, so a project that moved its output without running
+     * clean cannot have the leftover tree answer for it.</p>
+     */
+    static FoundManifest findAnnotationManifest(File projectDir, String classPathStr,
+                                               String expectedMain) {
+        String resource = "META-INF" + File.separator + "codenameone"
+                + File.separator + "build-hints.properties";
+        String entryName = ANNOTATION_HINTS_ENTRY;
+        // The classpath first, because it is the output the build is ACTUALLY
+        // using. Trying the conventional path first looked harmless and is not:
+        // a project that moves to a configured output directory without running
+        // clean leaves the old target/classes in place, complete with its old
+        // manifest and the old class beside it, so the staleness check compares
+        // two obsolete files against each other, finds them consistent, and
+        // publishes last week's hints while the real ones sit on the classpath.
+        FoundManifest stale = null;
+        // Current, but with no compiled main class beside it: usable, not preferred.
+        FoundManifest apart = null;
+        if (classPathStr != null) {
+            for (String entry
+                    : classPathStr.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+                if (entry.length() == 0) {
+                    continue;
+                }
+                File dir = new File(entry);
+                if (dir.isDirectory()) {
+                    File candidate = new File(dir, resource);
+                    if (candidate.isFile()) {
+                        java.util.Properties loaded = readProperties(candidate);
+                        if (loaded != null) {
+                            // The stamp decides here too. A reactor dependency or
+                            // a stale JavaSE output directory earlier on the
+                            // classpath can carry ANOTHER application's manifest,
+                            // and taking it ended the search: the caller then saw
+                            // a main class that was not this one and published
+                            // nothing at all, so cn1:run silently dropped
+                            // desktop.titleBar and nativeTheme while this
+                            // application's own manifest sat in a later entry.
+                            String stamp = loaded.getProperty("cn1.buildHints.mainClass");
+                            FoundManifest found =
+                                    new FoundManifest(loaded, candidate, null,
+                                            candidate.toString());
+                            if (expectedMain == null || expectedMain.equals(stamp)) {
+                                // Right application, but possibly the wrong
+                                // build: a leftover output directory earlier on
+                                // the classpath carries a manifest stamped for
+                                // this same main class, and taking it ended the
+                                // search -- the caller then reported it stale and
+                                // published nothing, while the current manifest
+                                // sat in a later entry. The first stale one is
+                                // kept so that finding NO current manifest still
+                                // says why.
+                                if (staleManifestReason(loaded, found, classPathStr) == null) {
+                                    if (manifestIsColocated(loaded, found)) {
+                                        return found;
+                                    }
+                                    if (apart == null) {
+                                        apart = found;
+                                    }
+                                } else if (stale == null) {
+                                    stale = found;
+                                }
+                            }
+                            // A manifest with no stamp at all is passed over
+                            // when there IS a main class to compare against. It
+                            // was kept as a last resort "in case it predates the
+                            // stamp", but nothing predates it: the whole
+                            // resource is written by process-annotations, which
+                            // has always stamped it. What that leniency really
+                            // did was let an unstamped file in a dependency's
+                            // output directory -- or one a project keeps in
+                            // src/main/resources -- outrank this application's
+                            // own manifest, because it was returned before the
+                            // conventional target/classes lookup below and the
+                            // caller accepted a null stamp.
+                        }
+                    }
+                    continue;
+                }
+                // A jar too. The javase-only nested build the simulator runs
+                // resolves the application's OWN common module as a dependency
+                // artifact, so its manifest has no directory anywhere -- skipping
+                // jars meant desktop.titleBar and nativeTheme were simply absent
+                // under cn1:run while the device build applied them.
+                //
+                // The stamp is what tells that jar from a library's: a jar is
+                // accepted only when it was generated for THIS application's main
+                // class, so a dependency carrying its own manifest is passed over
+                // rather than picked and then rejected.
+                if (dir.isFile() && entry.endsWith(".jar") && expectedMain != null) {
+                    java.util.Properties loaded = readJarEntry(dir, entryName);
+                    if (loaded != null
+                            && expectedMain.equals(loaded.getProperty("cn1.buildHints.mainClass"))) {
+                        FoundManifest found = new FoundManifest(loaded, null, dir,
+                                entryName + " in " + dir.getName());
+                        if (staleManifestReason(loaded, found, classPathStr) == null) {
+                            if (manifestIsColocated(loaded, found)) {
+                                return found;
+                            }
+                            if (apart == null) {
+                                apart = found;
+                            }
+                        } else if (stale == null) {
+                            stale = found;
+                        }
+                    }
+                }
+            }
+        }
+        // Only when the classpath carries none: a launch that did not pass the
+        // module's output directory at all still finds a conventional build.
+        File conventional = new File(projectDir, "target" + File.separator + "classes"
+                + File.separator + resource);
+        java.util.Properties loaded = conventional.isFile() ? readProperties(conventional) : null;
+        if (loaded != null) {
+            FoundManifest found =
+                    new FoundManifest(loaded, conventional, null, conventional.toString());
+            if (staleManifestReason(loaded, found, classPathStr) == null) {
+                if (manifestIsColocated(loaded, found)) {
+                    return found;
+                }
+                if (apart == null) {
+                    apart = found;
+                }
+            } else if (stale == null) {
+                stale = found;
+            }
+        }
+        // Nothing colocated anywhere. A current manifest that simply is not
+        // beside its class comes next -- it is applied, because refusing it would
+        // lose the hints of a layout that packages resources apart from classes.
+        // Only then the stale one, which the caller refuses but can name.
+        if (apart != null) {
+            return apart;
+        }
+        return stale;
+    }
+
+    /** Loads a properties file, or null when it cannot be read. */
+    private static java.util.Properties readProperties(File f) {
+        java.util.Properties p = new java.util.Properties();
+        FileInputStream in = null;
+        try {
+            in = new FileInputStream(f);
+            p.load(in);
+            return p;
+        } catch (IOException ex) {
+            System.err.println("Warning: could not read " + f + ": " + ex.getMessage());
+            return null;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // read-only stream; nothing useful to do
+                }
+            }
+        }
+    }
+
+    /** Loads one entry of a jar as properties, or null when it is not there. */
+    private static java.util.Properties readJarEntry(File jar, String entryName) {
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(jar);
+            java.util.zip.ZipEntry entry = zip.getEntry(entryName);
+            if (entry == null) {
+                return null;
+            }
+            java.util.Properties p = new java.util.Properties();
+            java.io.InputStream in = zip.getInputStream(entry);
+            try {
+                p.load(in);
+            } finally {
+                in.close();
+            }
+            return p;
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (IOException ignored) {
+                    // read-only archive
+                }
+            }
+        }
+    }
+
+    /**
+     * Why the manifest was left behind by an earlier build, or null when it is
+     * current.
+     *
+     * <p>By the class file's own contents when the manifest records them, and
+     * only otherwise by timestamps. Timestamps are not always available to
+     * compare: a jar records entry times to two-second granularity, and a build
+     * configured for reproducible output stamps every entry identically, which
+     * makes the comparison inert rather than merely coarse. A manifest with no
+     * recorded digest is one an older plugin wrote, so it falls back rather than
+     * being refused.</p>
+     */
+    static String staleManifestReason(java.util.Properties manifest,
+                                      FoundManifest found) {
+        return staleManifestReason(manifest, found, null);
+    }
+
+    /**
+     * The same, also comparing against a main class packaged apart from the
+     * manifest.
+     *
+     * <p>Looking only beside the manifest answers "no evidence" for the layout
+     * that packages resources separately from classes, and a manifest with no
+     * evidence against it is accepted -- so a stale manifest in a resource-only
+     * element published last build's hints while the class it claims to describe
+     * sat, recompiled, in another element. The class is the same class wherever
+     * it is on the classpath, so compare against the first one found.</p>
+     */
+    static String staleManifestReason(java.util.Properties manifest,
+                                      FoundManifest found, String classPathStr) {
+        String main = manifest.getProperty("cn1.buildHints.mainClass");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        String entry = main.trim().replace('.', '/') + ".class";
+        String recorded = manifest.getProperty("cn1.buildHints.classDigest");
+        if (recorded != null && recorded.length() > 0) {
+            String actual = found.jar != null
+                    ? digestOfJarEntry(found.jar, entry)
+                    : digestOfFile(classFileBeside(found.file, main));
+            if (actual == null) {
+                actual = digestOfClassOnClassPath(classPathStr, main);
+            }
+            if (actual != null) {
+                return recorded.equals(actual) ? null
+                        : "does not describe the compiled " + entry;
+            }
+        }
+        String older = found.jar != null
+                ? classNewerThanManifestInJar(manifest, found.jar)
+                : (found.file == null ? null : classNewerThanManifest(manifest, found.file));
+        return older == null ? null : "is older than " + older;
+    }
+
+    /// Whether the class the manifest was generated FROM sits in the same place.
+    ///
+    /// The processor writes the resource into the very directory it scanned, so a
+    /// manifest and the class it describes are written together. An entry
+    /// carrying the stamp without the class is therefore a leftover -- moving the
+    /// application class between modules without cleaning leaves exactly that --
+    /// and it must not end the search while this application's real manifest sits
+    /// in a later entry.
+    ///
+    /// Not a staleness verdict: a stale manifest has its hints REFUSED, and an
+    /// entry that merely assembles resources from another module would then lose
+    /// its hints entirely. It only loses the tie -- see the `apart` fallback.
+    static boolean manifestIsColocated(java.util.Properties manifest, FoundManifest found) {
+        String main = manifest.getProperty("cn1.buildHints.mainClass");
+        if (main == null || main.trim().length() == 0) {
+            return true;
+        }
+        if (found.jar != null) {
+            return digestOfJarEntry(found.jar,
+                    main.trim().replace('.', '/') + ".class") != null;
+        }
+        return found.file == null || classFileBeside(found.file, main) != null;
+    }
+
+    /** Descriptors of the build hint annotations, as they appear in a class file. */
+    private static final String HINT_ANNOTATION_MARKER = "com/codename1/annotations/buildhints/";
+
+    /**
+     * Says so when the main class carries build hint annotations that nothing
+     * turned into a manifest.
+     *
+     * <p>By scanning the class file's bytes for the annotations package rather
+     * than reading the bytecode: an annotation's type appears in the constant
+     * pool as a descriptor, and the simulator has no class reader. That is wider
+     * than reading the annotation table -- a main class that merely mentions the
+     * package would match too -- which is acceptable for a warning and is why
+     * this does not refuse anything.</p>
+     */
+    static void warnIfAnnotatedButUnprocessed(String classPathStr, String main) {
+        byte[] bytes = mainClassBytes(classPathStr, main);
+        if (bytes == null) {
+            return;
+        }
+        String text;
+        try {
+            text = new String(bytes, "ISO-8859-1");
+        } catch (java.io.UnsupportedEncodingException never) {
+            return;
+        }
+        if (text.indexOf(HINT_ANNOTATION_MARKER) < 0) {
+            return;
+        }
+        System.err.println("Warning: " + main + " carries build hint annotations, but no "
+                + ANNOTATION_HINTS_ENTRY + " was found, so none of them are in effect here. "
+                + "The cn1 process-annotations goal has to run on the module that compiles the "
+                + "main class; a device build refuses this outright.");
+    }
+
+    /** Every byte of {@code f}, or null when it is absent or unreadable. */
+    private static byte[] readAllBytes(File f) {
+        if (f == null) {
+            return null;
+        }
+        try {
+            java.io.InputStream in = new FileInputStream(f);
+            try {
+                return drain(in);
+            } finally {
+                in.close();
+            }
+        } catch (IOException ex) {
+            return null;
+        }
+    }
+
+    /** Every byte of one jar entry, or null when it is not there. */
+    private static byte[] jarEntryBytes(File jar, String entryName) {
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(jar);
+            java.util.zip.ZipEntry entry = zip.getEntry(entryName);
+            if (entry == null) {
+                return null;
+            }
+            java.io.InputStream in = zip.getInputStream(entry);
+            try {
+                return drain(in);
+            } finally {
+                in.close();
+            }
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (IOException ignored) {
+                    // read-only archive
+                }
+            }
+        }
+    }
+
+    private static byte[] drain(java.io.InputStream in) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int r;
+        while ((r = in.read(buf)) > 0) {
+            out.write(buf, 0, r);
+        }
+        return out.toByteArray();
+    }
+
+    /** {@code main}'s class file bytes from the first classpath element holding it. */
+    private static byte[] mainClassBytes(String classPathStr, String main) {
+        if (classPathStr == null || main == null || main.trim().length() == 0) {
+            return null;
+        }
+        String entry = main.trim().replace('.', '/') + ".class";
+        for (String element
+                : classPathStr.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+            if (element.length() == 0) {
+                continue;
+            }
+            File f = new File(element);
+            byte[] bytes = f.isDirectory()
+                    ? readAllBytes(fileIfPresent(new File(f, entry.replace('/', File.separatorChar))))
+                    : (f.isFile() ? jarEntryBytes(f, entry) : null);
+            if (bytes != null) {
+                return bytes;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The digest of {@code main}'s class file, from the first classpath element
+     * that holds it, or null when the classpath does not hold it at all.
+     */
+    private static String digestOfClassOnClassPath(String classPathStr, String main) {
+        if (classPathStr == null || main == null || main.trim().length() == 0) {
+            return null;
+        }
+        String entry = main.trim().replace('.', '/') + ".class";
+        for (String element
+                : classPathStr.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+            if (element.length() == 0) {
+                continue;
+            }
+            File f = new File(element);
+            String digest = f.isDirectory()
+                    ? digestOfFile(fileIfPresent(new File(f, entry.replace('/', File.separatorChar))))
+                    : (f.isFile() ? digestOfJarEntry(f, entry) : null);
+            if (digest != null) {
+                return digest;
+            }
+        }
+        return null;
+    }
+
+    /** {@code f} when it is a file, so a missing one digests as null. */
+    private static File fileIfPresent(File f) {
+        return f != null && f.isFile() ? f : null;
+    }
+
+    private static File classFileBeside(File manifestFile, String main) {
+        if (manifestFile == null) {
+            return null;
+        }
+        File classes = manifestFile.getParentFile();                  // .../codenameone
+        classes = classes == null ? null : classes.getParentFile();   // .../META-INF
+        classes = classes == null ? null : classes.getParentFile();   // the output dir
+        if (classes == null) {
+            return null;
+        }
+        File f = new File(classes, main.trim().replace('.', File.separatorChar) + ".class");
+        return f.isFile() ? f : null;
+    }
+
+    /** SHA-256 of a file, hex, or null when it cannot be read. */
+    private static String digestOfFile(File f) {
+        if (f == null) {
+            return null;
+        }
+        try {
+            java.io.InputStream in = new FileInputStream(f);
+            try {
+                return digestOf(in);
+            } finally {
+                in.close();
+            }
+        } catch (IOException ex) {
+            return null;
+        }
+    }
+
+    /** SHA-256 of one jar entry, hex, or null when it is absent or unreadable. */
+    static String digestOfJarEntry(File jar, String entryName) {
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(jar);
+            java.util.zip.ZipEntry entry = zip.getEntry(entryName);
+            if (entry == null) {
+                return null;
+            }
+            java.io.InputStream in = zip.getInputStream(entry);
+            try {
+                return digestOf(in);
+            } finally {
+                in.close();
+            }
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (IOException ignored) {
+                    // read-only archive
+                }
+            }
+        }
+    }
+
+    private static String digestOf(java.io.InputStream in) throws IOException {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[8192];
+            for (int n = in.read(buf); n > 0; n = in.read(buf)) {
+                md.update(buf, 0, n);
+            }
+            StringBuilder hex = new StringBuilder();
+            for (byte b : md.digest()) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+                hex.append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException ex) {
+            return null;
+        }
+    }
+
+    /**
+     * As above, for a manifest read out of a jar: the two entries' own
+     * timestamps, since being in one archive proves nothing about which build
+     * wrote them.
+     *
+     * <p>Zip stores times to two-second granularity, so the comparison is
+     * deliberately strict -- a class newer by less than that reads as
+     * consistent. It only has to catch a manifest from an EARLIER build, which
+     * is not a near thing.</p>
+     */
+    static String classNewerThanManifestInJar(java.util.Properties manifest, File jar) {
+        String main = manifest.getProperty("cn1.buildHints.mainClass");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        String classEntry = main.trim().replace('.', '/') + ".class";
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(jar);
+            java.util.zip.ZipEntry cls = zip.getEntry(classEntry);
+            java.util.zip.ZipEntry res = zip.getEntry(ANNOTATION_HINTS_ENTRY);
+            if (cls == null || res == null) {
+                return null;
+            }
+            long classTime = cls.getTime();
+            long manifestTime = res.getTime();
+            if (classTime < 0L || manifestTime < 0L) {
+                return null;
+            }
+            return classTime > manifestTime ? classEntry : null;
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (IOException ignored) {
+                    // read-only archive
+                }
+            }
+        }
+    }
+
+    private static String classNewerThanManifest(java.util.Properties manifest,
+                                                 File manifestFile) {
+        String main = manifest.getProperty("cn1.buildHints.mainClass");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        // Beside the manifest, whatever directory that turned out to be -- the
+        // two are written by the same build into the same output directory.
+        File classes = manifestFile.getParentFile();          // .../codenameone
+        classes = classes == null ? null : classes.getParentFile();   // .../META-INF
+        classes = classes == null ? null : classes.getParentFile();   // the output dir
+        if (classes == null) {
+            return null;
+        }
+        File classFile = new File(classes,
+                main.trim().replace('.', File.separatorChar) + ".class");
+        if (!classFile.isFile()) {
+            return null;
+        }
+        long classTime = classFile.lastModified();
+        long manifestTime = manifestFile.lastModified();
+        if (classTime == 0L || manifestTime == 0L) {
+            return null;
+        }
+        return classTime > manifestTime ? classFile.getName() : null;
+    }
 }

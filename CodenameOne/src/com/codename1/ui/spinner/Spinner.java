@@ -37,6 +37,7 @@ import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.TopLevelContainer;
 
 import java.util.Calendar;
 import java.util.Date;
@@ -301,7 +302,13 @@ class Spinner extends List {
     /// {@inheritDoc}
     @Override
     protected void initComponent() {
-        getComponentForm().registerAnimated(this);
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+        TopLevelContainer topLevel = getTopLevelContainer();
+        if (topLevel != null) {
+            topLevel.registerAnimated(this);
+        }
         boolean n = UIManager.getInstance().isThemeConstant("spinnerFocusBool", false);
         setIgnoreFocusComponentWhenUnfocused(!n);
     }
@@ -309,7 +316,13 @@ class Spinner extends List {
     /// {@inheritDoc}
     @Override
     protected void deinitialize() {
-        getComponentForm().deregisterAnimated(this);
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+        TopLevelContainer topLevel = getTopLevelContainer();
+        if (topLevel != null) {
+            topLevel.deregisterAnimated(this);
+        }
     }
 
     /// {@inheritDoc}

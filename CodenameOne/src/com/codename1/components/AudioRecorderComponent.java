@@ -42,6 +42,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.TopLevelContainer;
 
 import java.io.IOException;
 
@@ -532,12 +533,24 @@ public class AudioRecorderComponent extends Container implements ActionSource {
     @Override
     protected void initComponent() {
         super.initComponent();
-        getComponentForm().registerAnimated(this);
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+        TopLevelContainer topLevel = getTopLevelContainer();
+        if (topLevel != null) {
+            topLevel.registerAnimated(this);
+        }
     }
 
     @Override
     protected void deinitialize() {
-        getComponentForm().deregisterAnimated(this);
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+        TopLevelContainer topLevel = getTopLevelContainer();
+        if (topLevel != null) {
+            topLevel.deregisterAnimated(this);
+        }
         super.deinitialize();
     }
 

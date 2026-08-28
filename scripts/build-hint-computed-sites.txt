@@ -1,0 +1,42 @@
+# Call sites that BUILD a hint name rather than writing it as a literal, so no
+# literal anywhere in the tree names the hint. The miner cannot resolve these --
+# the platform, or the entitlement, is only known at run time -- and before this
+# file existed it did not report them either, so the gate could print "all
+# described" while android.maps.provider and ios.nativeVerify had no catalog row
+# at all.
+#
+# Every site the miner finds must be listed here with what it expands to, and
+# every expansion must be catalogued or match a dynamic pattern. A new computed
+# site therefore forces a catalog decision instead of disappearing.
+#
+# Format: <file>|<expression>|<expansion>[,<expansion>...][#<call-count>]
+#
+# The call count defaults to 1 and only matters when one file makes the same
+# call twice: two `getArg(hintAndMarker[0], ...)` over different tables produce
+# an identical key, so without it the second would be validated against the
+# first one's expansions and its own hints never checked at all.
+#
+# Keyed by the expression, not just the file: a builder that already appears here
+# would otherwise absorb a SECOND computed hint for free -- adding
+# `platform + ".maps.apiKey"` beside the provider one kept the gate green while
+# the new hint had no catalog row. The line number is deliberately not part of
+# the key, so moving code does not churn this file.
+#
+# Reported when the expression BUILDS a name (contains a string literal) or reads
+# one out of a table (contains a subscript). A helper that merely forwards a
+# variable -- getArg(key, ...) inside a wrapper -- gets its literal from its
+# caller, which the ordinary literal pass already mines, and is not reported.
+#
+# The table case is why the subscript counts: IPhoneBuilder's
+# WALLET_INJECTION_HINTS holds ten real hints in a String[][] and reaches getArg
+# as hintAndMarker[0], so no literal anywhere sits at a getArg call and every
+# literal search -- including this gate -- reported success while all ten had no
+# catalog row.
+
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/MapsProviderInjector.java|platform + ".maps.provider"|android.maps.provider,ios.maps.provider
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/NativeVerifyOption.java|platformPrefix + "." + HINT|ios.nativeVerify,linux.nativeVerify,windows.nativeVerify
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/MacNativeBuilder.java|"macNative.provisioningProfile." + (isAppStore ? "appStore" : "developerID")|macNative.provisioningProfile.appStore,macNative.provisioningProfile.developerID
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java|"ios.entitlements.com.apple.developer.healthkit." + suffix|ios.entitlements.com.apple.developer.healthkit.access
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/WatchNativeBuilder.java|"ios.entitlements.com.apple.developer.healthkit." + canonicalKey|ios.entitlements.com.apple.developer.healthkit.access
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java|hintAndMarker[0]|ios.wallet.nonuiImportsInject,ios.wallet.statusInject,ios.wallet.passEntriesInject,ios.wallet.remotePassEntriesInject,ios.wallet.generateRequestInject,ios.wallet.generateResponseInject,ios.wallet.uiImportsInject,ios.wallet.uiViewDidLoadInject,ios.wallet.uiAuthRequestInject,ios.wallet.uiAuthResponseInject
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java|"ios." + privacyKey|ios.NSBluetoothAlwaysUsageDescription,ios.NSBluetoothPeripheralUsageDescription,ios.NSCameraUsageDescription,ios.NSMicrophoneUsageDescription,ios.NSSpeechRecognitionUsageDescription

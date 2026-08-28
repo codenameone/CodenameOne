@@ -235,10 +235,67 @@ final class BuildHintSchemaDefaults {
                 + "category, android.software.leanback uses-feature, touchscreen "
                 + "required=false) and a generated tv_banner drawable. With the "
                 + "hint off the manifest is unchanged.");
+
+        // Everything else that has a build hint annotation, generated from the
+        // catalog. Registered last on purpose: set() never overwrites, so the
+        // hand-written labels and descriptions above win and this only fills in
+        // the hints nobody has written prose for.
+        BuildHintCatalogDefaults.register();
+    }
+
+    /**
+     * The hints this class describes by hand.
+     *
+     * <p>{@link BuildHintCatalogDefaults} consults it so the two never describe
+     * the same hint. The group name is part of the property key, so a hint
+     * registered under both {@code hardening} and {@code Hardening} is not
+     * overwritten -- it is a second group, and the editor renders both, giving
+     * the user duplicate controls for one setting.</p>
+     */
+    private static final java.util.Set<String> DECLARED = new java.util.HashSet<String>();
+
+    /** The group keys this class registered, recorded as they are registered. */
+    private static final java.util.Set<String> DECLARED_GROUPS = new java.util.HashSet<String>();
+
+    /** Hint names {@link #register} describes, for the generated companion to skip. */
+    static java.util.Set<String> declaredHints() {
+        return java.util.Collections.unmodifiableSet(DECLARED);
+    }
+
+    /**
+     * The group key this class already uses for {@code annotation}, or null.
+     *
+     * <p>The group name is part of the property key, so a catalog hint whose group
+     * differs from a hand-written one only in case lands in a second group beside
+     * it -- which is how harden.rename came to sit alone under "App Hardening"
+     * next to the five hints under "App Hardening (Enterprise)". Matching on case
+     * is a convention rather than a table, so there is nothing here to drift.</p>
+     */
+    static String declaredGroupFor(String annotation) {
+        for (String g : DECLARED_GROUPS) {
+            if (g.equalsIgnoreCase(annotation)) {
+                return g;
+            }
+        }
+        return null;
     }
 
     /** Idempotent setter: does not overwrite user / project-level hint metadata. */
     private static void set(String suffix, String value) {
+        int hash = suffix.indexOf('#');
+        if (suffix.startsWith("{{@")) {
+            int close = suffix.indexOf("}}", 3);
+            if (close > 3) {
+                DECLARED_GROUPS.add(suffix.substring(3, close));
+            }
+        }
+        if (suffix.startsWith("{{#") && hash >= 0) {
+            int second = suffix.indexOf('#', hash + 1);
+            int close = suffix.indexOf("}}", second + 1);
+            if (second > 0 && close > second) {
+                DECLARED.add(suffix.substring(second + 1, close));
+            }
+        }
         String key = "codename1.arg." + suffix;
         if (System.getProperty(key) == null) {
             System.setProperty(key, value);

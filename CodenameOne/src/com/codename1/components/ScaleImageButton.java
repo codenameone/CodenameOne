@@ -25,7 +25,6 @@ package com.codename1.components;
 
 import com.codename1.ui.Button;
 import com.codename1.ui.Display;
-import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
@@ -153,12 +152,7 @@ public class ScaleImageButton extends Button {
 
     void checkAnimation(Image icon) {
         if (icon != null && icon.isAnimation()) {
-            Form parent = getComponentForm();
-            if (parent != null) {
-                // animations are always running so the internal animation isn't
-                // good enough. We never want to stop this sort of animation
-                parent.registerAnimated(this);
-            }
+            registerForAnimation();
         }
     }
 

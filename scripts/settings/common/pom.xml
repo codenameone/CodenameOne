@@ -8,9 +8,26 @@
     </parent>
     <artifactId>cn1-settings-common</artifactId>
     <packaging>jar</packaging>
+
+    <properties>
+        <cn1.settings.skipTests>true</cn1.settings.skipTests>
+    </properties>
     <name>cn1-settings-common</name>
 
     <dependencies>
+        <!-- Build-time only: it runs the generator below and must never reach a
+             built app, because it pulls in ASM and ParparVM parses every class
+             in an app jar. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-build-hint-tools</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-build-hint-catalog</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
@@ -74,15 +91,46 @@
             <resource>
                 <directory>${project.basedir}/src/main/resources</directory>
             </resource>
-            <resource>
-                <directory>${project.basedir}/../../../docs/developer-guide</directory>
-                <includes>
-                    <include>Advanced-Topics-Under-The-Hood.asciidoc</include>
-                </includes>
-                <targetPath>com/codename1/settings/hints</targetPath>
-            </resource>
         </resources>
         <plugins>
+            <!-- The build hint data file, rendered from the annotations in
+                 CodenameOne/src into this module's own classes. Generated rather
+                 than checked in, because a committed generated file conflicts on
+                 every merge and there is nothing for a hand edit to survive in.
+                 classpathScope=compile so that build-hint-tools resolves from the
+                 reactor: a plugin level dependency would have to come from the
+                 repository, which is a chicken and egg on a clean checkout. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>cn1-generate-build-hint-data</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.codename1.build.shared.BuildHintCodeGenerator</mainClass>
+                            <classpathScope>compile</classpathScope>
+                            <!-- combine.self=override so a plugin level
+                                 configuration cannot merge into this one. The
+                                 Settings module's javase profile declares this
+                                 same plugin with its own <arguments> holding a
+                                 <classpath/> element, and Maven merged that
+                                 Object into this String array: "can not cast one
+                                 of the elements of java.lang.Object[]". Only
+                                 with -Dcodename1.platform=javase, which is why a
+                                 plain local build never saw it. -->
+                            <arguments combine.self="override">
+                                <argument>${project.basedir}/../../../CodenameOne/src</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -131,7 +179,10 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <skipTests>true</skipTests>
+                    <!-- Skipped by default: this module's tests need a JDK 17 toolchain
+                         and the CN1 simulator classes, which the packaging build does not
+                         set up. Opt in with -Dcn1.settings.skipTests=false. -->
+                    <skipTests>${cn1.settings.skipTests}</skipTests>
                 </configuration>
             </plugin>
         </plugins>

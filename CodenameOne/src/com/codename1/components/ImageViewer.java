@@ -27,7 +27,6 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.ImageFactory;
@@ -40,6 +39,7 @@ import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.TopLevelContainer;
 
 /// ImageViewer allows zooming/panning an image and potentially flicking between multiple images
 /// within a list of images.
@@ -367,7 +367,7 @@ public class ImageViewer extends Component {
             image.lock();
         }
         if (image.isAnimation()) {
-            getComponentForm().registerAnimated(this);
+            registerForAnimation();
         }
         eagerLock();
     }
@@ -448,7 +448,12 @@ public class ImageViewer extends Component {
         pointerPressedThumbnailIndex = getThumbnailIndexAt(x, y);
         currentZoom = zoom;
         delegatingDragToParent = false;
-        getComponentForm().addComponentAwaitingRelease(this);
+        // Resolved through the top level so this works inside a Window, where
+        // getComponentForm() is null and this line threw.
+        TopLevelContainer viewerTop = getTopLevelContainer();
+        if (viewerTop != null) {
+            viewerTop.addComponentAwaitingRelease(this);
+        }
     }
 
     private Container findScrollableYAncestor() {
@@ -807,6 +812,16 @@ public class ImageViewer extends Component {
         if (image != null) {
             return new Dimension(image.getWidth(), image.getHeight());
         }
+        // The surface this viewer lives on, not the main display: inside a Window,
+        // getDisplayWidth() is the main window's and an empty viewer asked for the
+        // whole screen.
+        TopLevelContainer top = getTopLevelContainer();
+        if (top != null) {
+            Container c = top.asContainer();
+            if (c.getWidth() > 0 && c.getHeight() > 0) {
+                return new Dimension(c.getWidth(), c.getHeight());
+            }
+        }
         return new Dimension(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
     }
 
@@ -830,7 +845,7 @@ public class ImageViewer extends Component {
             if (motion.isFinished()) {
                 zooming = false;
                 if (!result) {
-                    getComponentForm().deregisterAnimated(this);
+                    deregisterFromAnimation();
                 }
             }
             repaint();
@@ -1104,9 +1119,12 @@ public class ImageViewer extends Component {
             updatePositions();
             repaint();
             if (image.isAnimation()) {
-                Form f = getComponentForm();
-                if (f != null) {
-                    f.registerAnimated(this);
+                // The top level, matching every other registration here: inside a
+                // Window getComponentForm() is null, so swapping in an animated image
+                // silently stopped animating it.
+                TopLevelContainer swapTop = getTopLevelContainer();
+                if (swapTop != null) {
+                    swapTop.registerAnimated(this);
                 }
             }
         }
@@ -1269,7 +1287,7 @@ public class ImageViewer extends Component {
             float initZoom = this.zoom;
             motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int) (zoom * 10000), 200);
             motion.start();
-            getComponentForm().registerAnimated(this);
+            registerForAnimation();
         } else {
             this.zoom = zoom;
             updatePositions();
@@ -1306,7 +1324,7 @@ public class ImageViewer extends Component {
             float initZoom = this.zoom;
             motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int) (zoom * 10000), 200);
             motion.start();
-            getComponentForm().registerAnimated(this);
+            registerForAnimation();
         } else {
             this.zoom = zoom;
             updatePositions();
@@ -1495,7 +1513,11 @@ public class ImageViewer extends Component {
 
     }
 
+
     class AnimatePanX implements Animation {
+        /// The top level this animation was registered on, so it is removed from that
+        /// one rather than from wherever the viewer has since moved.
+        private TopLevelContainer host;
         private final Motion motion;
         private final Image replaceImage;
         private final int updatePos;
@@ -1505,7 +1527,15 @@ public class ImageViewer extends Component {
             motion.start();
             this.replaceImage = replaceImage;
             this.updatePos = updatePos;
-            Display.getInstance().getCurrent().registerAnimated(this);
+            // This viewer's own top level, not whatever form happens to be current.
+            // Display.getCurrent() only ever names a Form: in a window-only application
+            // it is null and this threw, and with a main form present it registered the
+            // animation against the wrong surface and later deregistered from it.
+            TopLevelContainer panTop = getTopLevelContainer();
+            if (panTop != null) {
+                host = panTop;
+                panTop.registerAnimated(this);
+            }
         }
 
         @Override
@@ -1547,7 +1577,10 @@ public class ImageViewer extends Component {
                         getImageRight().unlock();
                     }
                 }
-                Display.getInstance().getCurrent().deregisterAnimated(this);
+                if (host != null) {
+                    host.deregisterAnimated(this);
+                    host = null;
+                }
             }
             repaint();
             return false;

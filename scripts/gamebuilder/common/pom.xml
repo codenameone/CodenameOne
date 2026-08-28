@@ -115,6 +115,7 @@
                         <goals>
                             <goal>bytecode-compliance</goal>
                             <goal>css</goal>
+                            <goal>process-annotations</goal>
                         </goals>
                     </execution>
                     <execution>

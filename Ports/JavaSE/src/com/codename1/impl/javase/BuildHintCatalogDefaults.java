@@ -1,0 +1,159 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.javase;
+
+import com.codename1.io.JSONParser;
+
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Build Hint editor schema for every hint that has a build hint annotation.
+ *
+ * <p>Read from the one data file the annotations are rendered into, rather than
+ * generated as Java: the simulator has no bytecode reader, so it cannot read the
+ * annotations themselves.</p>
+ *
+ * <p>Registered after {@link BuildHintSchemaDefaults}, skipping every hint that
+ * class already describes and joining its group where it declared one. Neither
+ * can be left to the setter, because both the hint name and the group name are
+ * part of the property key: a second registration overwrites nothing, it adds a
+ * second control, or a second group beside the first.</p>
+ */
+final class BuildHintCatalogDefaults {
+
+    /** Where the generator writes it, on this module's own classpath. */
+    private static final String RESOURCE = "/cn1-build-hints.json";
+
+    private BuildHintCatalogDefaults() {
+    }
+
+    static void register() {
+        List<Map<String, Object>> hints = load();
+        if (hints.isEmpty()) {
+            return;
+        }
+        Set<String> handWritten = BuildHintSchemaDefaults.declaredHints();
+        for (Map<String, Object> h : hints) {
+            String name = str(h, "name");
+            // The annotation's own simple name, recorded by the generator: it is
+            // not derivable from the group here, since DESKTOP is @DesktopBuild
+            // and GENERAL is @Build.
+            String annotation = str(h, "annotation");
+            if (name == null || annotation == null || handWritten.contains(name)) {
+                continue;
+            }
+            // Join the hand-written group when there is one, and leave its label
+            // alone: it carries a description this file has no equivalent for.
+            String existing = BuildHintSchemaDefaults.declaredGroupFor(annotation);
+            if (existing != null) {
+                annotation = existing;
+            } else {
+                set("{{@" + annotation + "}}.label", str(h, "groupLabel"));
+            }
+            String key = "{{#" + annotation + "#" + name + "}}";
+            set(key + ".label", str(h, "label"));
+            set(key + ".type", str(h, "editor"));
+            List<Object> values = list(h, "values");
+            if (!values.isEmpty()) {
+                StringBuilder joined = new StringBuilder();
+                for (int i = 0; i < values.size(); i++) {
+                    joined.append(i == 0 ? "" : ",").append(String.valueOf(values.get(i)));
+                }
+                set(key + ".values", joined.toString());
+            }
+            set(key + ".description", str(h, "doc"));
+        }
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> load() {
+        InputStream in = BuildHintCatalogDefaults.class.getResourceAsStream(RESOURCE);
+        if (in == null) {
+            // Say so rather than coming up with an empty editor. The Maven build gets
+            // this file from the catalog artifact and the Ant build copies it in
+            // (Ports/JavaSE/build.xml), so absence means a build front end that does
+            // neither -- which used to leave the editor silently empty.
+            System.err.println("Warning: " + RESOURCE + " is not on the classpath, so the "
+                    + "build hint editor has no catalog. The JavaSE port needs "
+                    + "codenameone-build-hint-catalog on its classpath.");
+            return java.util.Collections.emptyList();
+        }
+        try {
+            // The parser wants an object at the root, so the array is wrapped.
+            Map<String, Object> root = new JSONParser().parseJSON(
+                    new InputStreamReader(wrap(in), "UTF-8"));
+            Object hints = root.get("hints");
+            return hints instanceof List ? (List<Map<String, Object>>) hints
+                    : java.util.Collections.<Map<String, Object>>emptyList();
+        } catch (Exception ex) {
+            System.err.println("Warning: could not read " + RESOURCE + ": " + ex);
+            return java.util.Collections.emptyList();
+        } finally {
+            try {
+                in.close();
+            } catch (java.io.IOException ignored) {
+                // read-only stream
+            }
+        }
+    }
+
+    /** The array wrapped in an object, which is what JSONParser accepts. */
+    private static InputStream wrap(InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        out.write("{\"hints\":".getBytes("UTF-8"));
+        byte[] buffer = new byte[8192];
+        int read;
+        while ((read = in.read(buffer)) > 0) {
+            out.write(buffer, 0, read);
+        }
+        out.write("}".getBytes("UTF-8"));
+        return new java.io.ByteArrayInputStream(out.toByteArray());
+    }
+
+    private static String str(Map<String, Object> h, String key) {
+        Object v = h.get(key);
+        return v instanceof String ? (String) v : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> list(Map<String, Object> h, String key) {
+        Object v = h.get(key);
+        return v instanceof List ? (List<Object>) v : java.util.Collections.emptyList();
+    }
+
+    /** Idempotent setter: does not overwrite user or project-level metadata. */
+    private static void set(String suffix, String value) {
+        if (value == null || value.length() == 0) {
+            return;
+        }
+        String key = "codename1.arg." + suffix;
+        if (System.getProperty(key) == null) {
+            System.setProperty(key, value);
+        }
+    }
+}

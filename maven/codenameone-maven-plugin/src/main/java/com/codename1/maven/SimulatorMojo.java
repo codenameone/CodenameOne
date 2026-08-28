@@ -98,8 +98,10 @@ private static final String GROUP_ID="com.codenameone";
         //request.setPomFile( new File( "/path/to/pom.xml" ) );
         request.setGoals( Collections.singletonList( "verify" ) );
         request.setBaseDirectory(javaseProject);
-        Properties props = new Properties();
-        props.setProperty("codename1.platform", "javase");
+        // The command line reaches the nested build, which is where
+        // prepare-simulator-classpath publishes it onward to the simulator JVM.
+        Properties props = nestedBuildProperties(
+                getSession() == null ? null : getSession().getUserProperties());
         
         request.setProperties(props);
         request.setProfiles(Collections.singletonList("simulator"));

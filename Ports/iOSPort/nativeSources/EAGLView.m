@@ -47,6 +47,25 @@ extern void repaintUI();
 
 @implementation EAGLView
 
+// Mirrors METALView's override -- see the long comment there. UIKit asks a
+// container for its accessibility elements only when something is consuming the
+// semantic tree, so the query is the signal that a client exists, and unlike the
+// UIAccessibilityIs*Running flags it covers the technologies UIKit publishes no
+// flag for (Voice Control, Full Keyboard Access). This backend needs its own
+// copy: CodenameOne_GLViewController installs EAGLView rather than METALView
+// whenever CN1_USE_METAL is absent, and without it every portable-tree
+// invalidation is discarded on the GL path.
+- (NSArray *)accessibilityElements {
+#if !TARGET_OS_WATCH
+    // The note function is itself gated on !TARGET_OS_WATCH (UIAccessibility's
+    // status notifications do not exist there), so the call has to be too or the
+    // watch build fails to link.
+    extern void cn1AccessibilityNoteClientQuery(void);
+    cn1AccessibilityNoteClientQuery();
+#endif
+    return [super accessibilityElements];
+}
+
 @synthesize context;
 @synthesize peerComponentsLayer;
 

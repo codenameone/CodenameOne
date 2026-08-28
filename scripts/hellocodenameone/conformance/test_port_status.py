@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import copy
 import json
 import tempfile
 import unittest
@@ -382,6 +383,77 @@ class PortStatusTest(unittest.TestCase):
             "status": "not-run",
         }
         self.assertEqual([], port_status.coverage_problems(self.manifest, reports))
+
+    def test_a_scoped_test_is_expected_only_where_it_applies(self):
+        # The windowed baselines are the reason scoping exists. A port with no
+        # windowing system will never carry them, so without a scope they would be
+        # absent from its report forever -- and the first desktop run to publish one
+        # would make every other port look like it had dropped a test.
+        desktop = port_status.tests_for_port(self.manifest, "linux-x64")
+        phone = port_status.tests_for_port(self.manifest, "android")
+        self.assertIn("WindowLayoutTest", desktop)
+        self.assertNotIn("WindowLayoutTest", phone)
+        # MultiWindowApiTest is not scoped: it asserts the contract everywhere,
+        # including that the API throws where windows are unsupported.
+        self.assertIn("MultiWindowApiTest", desktop)
+        self.assertIn("MultiWindowApiTest", phone)
+
+    def scoped_out_ports(self, test_name):
+        return {
+            port["id"]
+            for port in self.manifest["ports"]
+            if test_name not in port_status.tests_for_port(self.manifest, port["id"])
+        }
+
+    def coverage_with_one_port_carrying(self, port_id, test_name, feature):
+        reports = self.stored_reports()
+        reports[port_id]["tests"][test_name] = {"feature": feature, "status": "pass"}
+        return port_status.coverage_problems(self.manifest, reports)
+
+    def test_coverage_does_not_call_a_scoped_test_dropped_where_it_cannot_run(self):
+        # The failure this prevents: one desktop port publishes WindowLayoutTest,
+        # which teaches known_since that the test exists, and every later run on a
+        # port that can never run it is then read as having dropped it.
+        problems = self.coverage_with_one_port_carrying(
+            "linux-x64", "WindowLayoutTest", "multi-window")
+        out = self.scoped_out_ports("WindowLayoutTest")
+        self.assertTrue(out)
+        blamed = [
+            p for p in problems
+            if "WindowLayoutTest" in p and any(port in p for port in out)
+        ]
+        self.assertEqual([], blamed, problems)
+
+    def test_coverage_still_catches_a_scoped_test_dropped_where_it_applies(self):
+        # Scoping must not become a way for a port that *does* have windows to stop
+        # reporting them: another desktop port that ran later without it is still a
+        # port that dropped it.
+        problems = self.coverage_with_one_port_carrying(
+            "linux-x64", "WindowLayoutTest", "multi-window")
+        in_scope = port_status.test_scopes(self.manifest)["WindowLayoutTest"] - {"linux-x64"}
+        self.assertTrue(
+            any("WindowLayoutTest" in p and any(port in p for port in in_scope)
+                for p in problems),
+            problems,
+        )
+
+    def test_a_test_scoped_to_an_unknown_port_is_rejected(self):
+        manifest = copy.deepcopy(self.manifest)
+        self.rescope(manifest, "WindowLayoutTest", ["linux-x64", "no-such-port"])
+        with self.assertRaises(port_status.ContractError) as caught:
+            port_status.validate(manifest)
+        self.assertIn("no-such-port", str(caught.exception))
+
+    def test_a_scoped_test_must_name_at_least_one_port(self):
+        manifest = copy.deepcopy(self.manifest)
+        self.rescope(manifest, "WindowLayoutTest", [])
+        with self.assertRaises(port_status.ContractError) as caught:
+            port_status.validate(manifest)
+        self.assertIn("WindowLayoutTest", str(caught.exception))
+
+    @staticmethod
+    def rescope(manifest, test_name, ports):
+        manifest.setdefault("test_scopes", {})[test_name] = ports
 
     def test_coverage_accepts_a_documented_skip(self):
         # The distinction the rule turns on: a port that genuinely cannot do something reports
@@ -889,9 +961,12 @@ class PortStatusTest(unittest.TestCase):
 
     def publishable_report(self, port_id, **overrides):
         mapped = port_status.test_to_feature(self.manifest)
+        # Only the tests this port is expected to report on. A test scoped to other
+        # ports is not something this report is missing, and carrying it here would
+        # make the fixture assert the opposite of the contract.
         tests = {
-            test: {"status": "pass", "feature": feature}
-            for test, feature in mapped.items()
+            test: {"status": "pass", "feature": mapped[test]}
+            for test in port_status.tests_for_port(self.manifest, port_id)
         }
         report = {
             "schema_version": self.manifest["schema_version"],

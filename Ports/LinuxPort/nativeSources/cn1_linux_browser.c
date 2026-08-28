@@ -113,6 +113,9 @@ typedef struct {
     GtkWidget* view;
     char* queue[CN1_BROWSER_QUEUE];
     int head, tail;
+    /* The window whose overlay hosts this view, so move and teardown target the
+     * same place it was added to. */
+    int slot;
     pthread_mutex_t lock;
 } CN1Browser;
 
@@ -150,11 +153,15 @@ static void cn1BrowserScriptMessage(WebKitUserContentManager* mgr, WebKitJavascr
     (void) mgr;
 }
 
-typedef struct { int w, h; CN1Browser* result; } CN1BrowserCreateReq;
+typedef struct { int w, h; int slot; CN1Browser* result; } CN1BrowserCreateReq;
 
 static void cn1BrowserCreateOnMain(void* p) {
     CN1BrowserCreateReq* req = (CN1BrowserCreateReq*) p;
     CN1Browser* b = (CN1Browser*) calloc(1, sizeof(CN1Browser));
+    /* Set before anything reads it: calloc leaves it 0, which is a *valid* desktop
+     * window slot, so adding the view to "slot 0" targeted a window that does not
+     * exist and the browser was never placed in any overlay at all. */
+    b->slot = req->slot;
     WebKitUserContentManager* mgr = p_webkit_user_content_manager_new();
     pthread_mutex_init(&b->lock, 0);
     p_webkit_user_content_manager_register_script_message_handler(mgr, "cn1");
@@ -181,8 +188,13 @@ static void cn1BrowserCreateOnMain(void* p) {
         }
     }
     b->view = p_webkit_web_view_new_with_user_content_manager(mgr);
+    /* A reference of our own, held for the life of the CN1Browser. Without it the
+     * overlay holds the only one, so the widget goes away with whichever window
+     * happens to be hosting it -- while Java still has the peer and can re-host it,
+     * navigate it or destroy it. */
+    g_object_ref_sink(b->view);
     g_signal_connect(b->view, "load-changed", G_CALLBACK(cn1BrowserLoadChanged), b);
-    cn1LinuxOverlayAdd(b->view, 0, 0, req->w > 0 ? req->w : 1, req->h > 0 ? req->h : 1);
+    cn1LinuxOverlayAdd(b->slot, b->view, 0, 0, req->w > 0 ? req->w : 1, req->h > 0 ? req->h : 1);
     req->result = b;
 }
 
@@ -190,16 +202,56 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_browserSupported___R_boolean(C
     return (cn1LinuxWindowWidget() != 0 && cn1LoadWebkit()) ? JAVA_TRUE : JAVA_FALSE;
 }
 
-JAVA_LONG com_codename1_impl_linux_LinuxNative_browserCreate___int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT w, JAVA_INT h) {
+JAVA_LONG com_codename1_impl_linux_LinuxNative_browserCreate___int_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT w, JAVA_INT h, JAVA_INT slot) {
     CN1BrowserCreateReq req;
     if (cn1LinuxWindowWidget() == 0 || !cn1LoadWebkit()) {
         return 0;
     }
     req.w = w;
     req.h = h;
+    req.slot = slot;
     req.result = 0;
     cn1LinuxRunOnMainAndWait(cn1BrowserCreateOnMain, &req);
     return (JAVA_LONG) (intptr_t) req.result;
+}
+
+typedef struct { CN1Browser* b; int slot; } CN1BrowserHostReq;
+
+static void cn1BrowserSetHostOnMain(void* p) {
+    CN1BrowserHostReq* req = (CN1BrowserHostReq*) p;
+    CN1Browser* b = req->b;
+    /* The slot alone is not enough to conclude the view is already where it belongs.
+     * Disposing a window detaches whatever its overlay was hosting, and window
+     * creation reuses the lowest free slot -- so the next window commonly gets the
+     * same number, and skipping on the number alone left the browser unparented and
+     * invisible while the framework believed it was hosted. Attachment is the thing
+     * being decided, so attachment is what gets tested. */
+    if (b->slot == req->slot && gtk_widget_get_parent(b->view) != 0) {
+        return;
+    }
+    /* Moved between overlays rather than recreated: the view keeps its page, its load
+     * state and its script message handler, so a browser added to a window after it
+     * was constructed does not lose whatever it had already loaded.
+     *
+     * Safe to unparent because the CN1Browser holds a reference of its own from
+     * creation; the overlay's is not the only one. */
+    cn1LinuxOverlayRemove(b->slot, b->view);
+    b->slot = req->slot;
+    cn1LinuxOverlayAdd(b->slot, b->view, 0, 0, 1, 1);
+}
+
+/* Re-hosts the view in the given window's overlay. The real bounds arrive right
+ * after from browserSetBounds, so the 1x1 above is never displayed. */
+JAVA_VOID com_codename1_impl_linux_LinuxNative_browserSetHost___long_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT slot) {
+    CN1Browser* b = (CN1Browser*) (intptr_t) peer;
+    CN1BrowserHostReq req;
+    if (!b) {
+        return;
+    }
+    req.b = b;
+    req.slot = slot;
+    cn1LinuxRunOnMainAndWait(cn1BrowserSetHostOnMain, &req);
 }
 
 typedef struct { CN1Browser* b; char* a; char* c; int x, y, w, h; } CN1BrowserOp;
@@ -221,7 +273,7 @@ static void cn1BrowserExecuteOnMain(void* p) {
 
 static void cn1BrowserBoundsOnMain(void* p) {
     CN1BrowserOp* op = (CN1BrowserOp*) p;
-    cn1LinuxOverlayMove(op->b->view, op->x, op->y, op->w, op->h);
+    cn1LinuxOverlayMove(op->b->slot, op->b->view, op->x, op->y, op->w, op->h);
 }
 
 static void cn1BrowserSetVisibleOnMain(void* p) {
@@ -311,8 +363,11 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_browserCapturePng___long_R_byte
 static void cn1BrowserDestroyOnMain(void* p) {
     CN1Browser* b = (CN1Browser*) p;
     if (b->view) {
-        cn1LinuxOverlayRemove(b->view);
+        cn1LinuxOverlayRemove(b->slot, b->view);
         gtk_widget_destroy(b->view);
+        /* The reference taken at creation. Dropping it last is what finally finalizes
+         * the view, and only when the application asked for the browser to go. */
+        g_object_unref(b->view);
         b->view = 0;
     }
 }

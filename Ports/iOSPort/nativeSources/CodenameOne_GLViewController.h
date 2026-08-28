@@ -209,6 +209,11 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 // mirroring CN1_USE_WIDGETS.
 //#define CN1_USE_INTENTS
 
+// Uncommented by the builder when the app references com.codename1.documents. Gates the
+// FileProvider glue in IOSNative.m, so a build that never publishes documents carries no
+// FileProvider symbols at all.
+//#define CN1_USE_DOCUMENTS
+
 // CN1_APP_INTENTS_DECLARED is the narrower question: did the build actually generate App Intent
 // declarations? CN1_USE_INTENTS only says the app references the package, and an app can use
 // indexing and donation while switching declarations off with ios.intents.appIntents=false.

@@ -19,7 +19,7 @@ You can run the `generate-cn1lib-project` goal as follows:
 include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-cn1lib-project.sh[tag=appendix-goal-generate-cn1lib-project-bash-001,indent=0]
 ----
 
-NOTE: Make sure you substitute the https://search.maven.org/search?q=a:codenameone-maven-plugin[latest codenameone-maven-plugin version] for the `$CN1VERSION` in this command.
+NOTE: Make sure you substitute the latest `codenameone-maven-plugin` version, listed as `<release>` in the https://repo.codenameone.com/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml[repository metadata], for the `$CN1VERSION` in this command. Because this goal runs outside any project, Maven can only find that version if you have configured the Codename One repository in your Maven settings; see the _Configuring the Codename One repository_ section of <<creating-app-project,Creating a new project>>.
 
 Some notes about this command as shown above:
 

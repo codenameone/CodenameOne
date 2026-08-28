@@ -422,7 +422,7 @@ public class MapComponent extends Container {
                 }
 
             });
-            timer.schedule(doubleTapThreshold, false, this.getComponentForm());
+            timer.schedule(doubleTapThreshold, false, this.getTopLevelContainer());
         } else {
             tapCount = 0;
         }
@@ -481,7 +481,12 @@ public class MapComponent extends Container {
                 super.repaint();
             } else {
                 // workaround for rounding error in scale/clipping
-                getComponentForm().repaint();
+                // The top level rather than the form: getComponentForm() is null by
+                // design inside a Window, so panning the map threw.
+                com.codename1.ui.TopLevelContainer top = getTopLevelContainer();
+                if (top != null) {
+                    top.asContainer().repaint();
+                }
             }
             fireMapListenerEvent();
             return;

@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
     zip \
     git \
     python3 \
+    gcc \
+    gcc-mingw-w64-x86-64 \
     xvfb \
     ant \
     maven \

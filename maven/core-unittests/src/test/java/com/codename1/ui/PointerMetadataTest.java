@@ -102,4 +102,161 @@ class PointerMetadataTest extends UITestBase {
     void getCurrentPointerEventNeverNull() {
         assertNotNull(display.getCurrentPointerEvent());
     }
+
+    @Test
+    void eachQueuedPointerEventKeepsTheMetadataThatArrivedWithIt() {
+        // A port reports pointer metadata into a single mutable record immediately
+        // before queueing the event, but the PointerEvent is not built until the event
+        // is dispatched. A port that drains a burst -- the Win32 pump translates queued
+        // messages before returning, and the GTK drain does the same -- therefore
+        // overwrote that record several times before any of the burst was dispatched,
+        // and every event came out carrying the *last* one's button and device type.
+        // A secondary window's right click or pen event read as a left mouse click,
+        // which loses a context menu or a stylus callback.
+        Form f = new Form("burst");
+        final java.util.List<Integer> buttons = new java.util.ArrayList<Integer>();
+        final java.util.List<Integer> types = new java.util.ArrayList<Integer>();
+        f.addPointerPressedListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                buttons.add(Integer.valueOf(display.getPointerButton()));
+                types.add(Integer.valueOf(display.getPointerType()));
+            }
+        });
+        f.show();
+        flushSerialCalls();
+
+        // Two presses queued back to back, exactly as a drained burst arrives, with no
+        // dispatch in between.
+        implementation.setPointerEventMetadata(PointerEvent.BUTTON_SECONDARY,
+                PointerEvent.MASK_SECONDARY, PointerEvent.TYPE_STYLUS, 0.5f, 0, 0, 0, 0, false);
+        display.pointerPressed(new int[]{10}, new int[]{10});
+        implementation.setPointerEventMetadata(PointerEvent.BUTTON_PRIMARY,
+                PointerEvent.MASK_PRIMARY, PointerEvent.TYPE_MOUSE, 1f, 0, 0, 0, 0, false);
+        display.pointerPressed(new int[]{20}, new int[]{20});
+
+        flushSerialCalls();
+
+        assertEquals(2, buttons.size(), "both queued presses should have dispatched");
+        assertEquals(PointerEvent.BUTTON_SECONDARY, buttons.get(0).intValue(),
+                "the first press must keep its own button; taking the record as it "
+                        + "stands at dispatch time gives it the second press's");
+        assertEquals(PointerEvent.TYPE_STYLUS, types.get(0).intValue(),
+                "and its own device type");
+        assertEquals(PointerEvent.BUTTON_PRIMARY, buttons.get(1).intValue());
+        assertEquals(PointerEvent.TYPE_MOUSE, types.get(1).intValue());
+
+        implementation.resetPointerEventMetadata();
+    }
+
+    @Test
+    void coalescedDragsDoNotConsumeSnapshotSlotsFromOtherQueuedEvents() {
+        // Coalescing keeps ONE queued drag packet however many updates arrive. Taking a
+        // fresh snapshot slot per update therefore runs the ring forward without bound
+        // while the number of live packets stays tiny -- and with the event dispatch
+        // thread blocked the ring wraps onto slots belonging to packets that are still
+        // queued. The press below is the victim: it dispatches with the drag's button.
+        Form f = new Form("coalesce");
+        final java.util.List<Integer> pressButtons = new java.util.ArrayList<Integer>();
+        f.addPointerPressedListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                pressButtons.add(Integer.valueOf(display.getPointerButton()));
+            }
+        });
+        f.show();
+        flushSerialCalls();
+
+        // Queued from the event dispatch thread itself, so nothing can be dispatched
+        // part way through. Queueing from the test thread let the event dispatch
+        // thread drain the press before the drags arrived, and the test then passed
+        // against the un-fixed code because the ring never had a chance to wrap onto a
+        // slot that was still live.
+        display.callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                implementation.setPointerEventMetadata(PointerEvent.BUTTON_SECONDARY,
+                        PointerEvent.MASK_SECONDARY, PointerEvent.TYPE_STYLUS,
+                        0.5f, 0, 0, 0, 0, false);
+                display.pointerPressed(new int[]{10}, new int[]{10});
+
+                // More updates than the ring has slots, all collapsing into one packet.
+                implementation.setPointerEventMetadata(PointerEvent.BUTTON_PRIMARY,
+                        PointerEvent.MASK_PRIMARY, PointerEvent.TYPE_MOUSE,
+                        1f, 0, 0, 0, 0, false);
+                for (int iter = 0; iter < 600; iter++) {
+                    display.pointerDragged(new int[]{11 + iter}, new int[]{11});
+                }
+            }
+        });
+
+        flushSerialCalls();
+
+        assertEquals(1, pressButtons.size(), "the press should have dispatched once");
+        assertEquals(PointerEvent.BUTTON_SECONDARY, pressButtons.get(0).intValue(),
+                "a coalesced drag must reuse its own snapshot slot; taking a new one "
+                        + "per update wraps the ring onto the still-queued press");
+
+        implementation.resetPointerEventMetadata();
+    }
+
+    @Test
+    void theSnapshotRingCoversBothLiveEventStacks() throws Exception {
+        // Display double buffers the input event stack: the event dispatch thread swaps
+        // a full batch out and dispatches it while the native input thread fills the
+        // other, so both are live at once. The ring has to cover both, or it wraps onto
+        // packets that have not been dispatched yet.
+        //
+        // Asserted against the arithmetic rather than against the number, so that
+        // growing the event stack without growing the ring fails here instead of
+        // producing a rare wrong-button dispatch under load.
+        java.lang.reflect.Field stack =
+                Display.class.getDeclaredField("inputEventStack");
+        stack.setAccessible(true);
+        int stackInts = ((int[]) stack.get(display)).length;
+
+        java.lang.reflect.Field slots = com.codename1.impl.CodenameOneImplementation.class
+                .getDeclaredField("POINTER_METADATA_SLOTS");
+        slots.setAccessible(true);
+        int ring = slots.getInt(null);
+
+        // Smallest pointer packet is three ints: the type word, x and y.
+        int maxLivePackets = (stackInts / 3) * 2;
+        assertTrue(ring >= maxLivePackets,
+                "the metadata ring (" + ring + " slots) must cover both live event "
+                        + "stacks (" + maxLivePackets + " packets); a smaller ring wraps "
+                        + "onto packets that are still queued");
+    }
+
+    @Test
+    void dispatchingAnEventDoesNotDisturbWhatThePortHasStaged() {
+        // The restore that gives a dispatched packet its own metadata used to write
+        // back into the same fields a port fills in before queueing. Those are written
+        // on the port's thread and read when the packet is queued, so the restore could
+        // land between a port's setPointerEventMetadata and the capture that follows
+        // it, handing the *next* packet the previous event's button. It showed up as
+        // the reverse of the bug the snapshot was added to fix, and only under CI
+        // timing.
+        implementation.setPointerEventMetadata(PointerEvent.BUTTON_SECONDARY,
+                PointerEvent.MASK_SECONDARY, PointerEvent.TYPE_STYLUS, 0.5f, 0, 0, 0, 0, false);
+        int first = implementation.capturePointerEventMetadata();
+
+        // A port stages the next event's metadata...
+        implementation.setPointerEventMetadata(PointerEvent.BUTTON_PRIMARY,
+                PointerEvent.MASK_PRIMARY, PointerEvent.TYPE_MOUSE, 1f, 0, 0, 0, 0, false);
+
+        // ...and the event dispatch thread restores the earlier packet's snapshot in
+        // between, which is the interleaving that used to corrupt the staging.
+        implementation.selectPointerEventMetadata(first);
+
+        // The staged metadata must be untouched, so the packet queued next still
+        // carries what the port asked for.
+        int second = implementation.capturePointerEventMetadata();
+        implementation.selectPointerEventMetadata(second);
+        assertEquals(PointerEvent.BUTTON_PRIMARY, display.getPointerButton(),
+                "a dispatch must not overwrite the metadata a port has staged");
+        assertEquals(PointerEvent.TYPE_MOUSE, display.getPointerType());
+
+        implementation.resetPointerEventMetadata();
+    }
 }

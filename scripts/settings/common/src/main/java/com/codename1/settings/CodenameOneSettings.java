@@ -80,7 +80,12 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.codename1.annotations.buildhints.*;
 
+@Android(themeMode = ThemeMode.MODERN)
+@Build(nativeTheme = ThemeMode.MODERN)
+@DesktopBuild(height = 820, interactiveScrollbars = Toggle.ON, titleBar = DesktopTitleBar.NATIVE, width = 1260)
+@Ios(themeMode = ThemeMode.MODERN)
 public class CodenameOneSettings extends Lifecycle {
     public enum Section { BASIC, BUILD_HINTS, EXTENSIONS, ADVANCED }
 
@@ -90,7 +95,10 @@ public class CodenameOneSettings extends Lifecycle {
 
     private ProjectBinding binding;
     private SettingsProperties settings;
-    private BuildHintCatalog buildHints = BuildHintCatalog.fallback();
+    private BuildHintCatalog buildHints = BuildHintCatalog.load();
+    /// hint name -> the annotation attribute that declares it, e.g. "@Ios(pods)".
+    /// Empty when the project has not been built, or declares none.
+    private java.util.Map<String, String> annotationOwnedHints = new java.util.HashMap<>();
     private Section section = Section.BASIC;
     private Form form;
     private Container page;
@@ -221,38 +229,8 @@ public class CodenameOneSettings extends Lifecycle {
             } catch (Exception ex) {
                 Log.e(ex);
             }
-            buildHints = loadBuildHints(binding.buildHintsDoc());
-        }
-    }
-
-    private BuildHintCatalog loadBuildHints(String docPath) {
-        InputStream in = null;
-        if (docPath != null && docPath.length() > 0) {
-            try {
-                String url = ProjectIO.fsUrl(docPath);
-                FileSystemStorage fs = FileSystemStorage.getInstance();
-                if (fs.exists(url)) {
-                    in = fs.openInputStream(url);
-                    return BuildHintCatalog.fromAsciiDoc(Util.readToString(in, "UTF-8"));
-                }
-            } catch (Exception ex) {
-                Log.e(ex);
-            } finally {
-                Util.cleanup(in);
-                in = null;
-            }
-        }
-        try {
-            in = getClass().getResourceAsStream("/com/codename1/settings/hints/Advanced-Topics-Under-The-Hood.asciidoc");
-            if (in == null) {
-                return BuildHintCatalog.fallback();
-            }
-            return BuildHintCatalog.fromAsciiDoc(Util.readToString(in, "UTF-8"));
-        } catch (Exception ex) {
-            Log.e(ex);
-            return BuildHintCatalog.fallback();
-        } finally {
-            Util.cleanup(in);
+            buildHints = BuildHintCatalog.load();
+            annotationOwnedHints = loadAnnotationOwnedHints();
         }
     }
 
@@ -638,6 +616,20 @@ public class CodenameOneSettings extends Lifecycle {
                 ToastBar.showErrorMessage("Enter a build hint name.");
                 return;
             }
+            // The same ownership rule as the catalog rows. Withholding the row's
+            // controls and leaving this form open is no protection at all: typing
+            // ios.teamId here -- or any alias of it -- writes exactly the second
+            // declaration the row was hiding, and the next build refuses the
+            // project. Canonical, so an alias of an annotation-owned hint is
+            // caught too.
+            String ownedBy = annotationOwnedHints.get(
+                    com.codename1.build.shared.BuildHints.canonicalName(k));
+            if (ownedBy != null) {
+                ToastBar.showErrorMessage(k + " is set by " + ownedBy
+                        + " on the main class. Change it there -- declaring it here as well "
+                        + "fails the build.");
+                return;
+            }
             settings.setBuildHint(k, value.getText() == null ? "" : value.getText());
             key.setText("");
             value.setText("");
@@ -681,6 +673,13 @@ public class CodenameOneSettings extends Lifecycle {
     private Component hintRow(BuildHintMetadata meta) {
         Container row = new Container(BoxLayout.y());
         row.setUIID(uiid("SettingsRow"));
+        // Look the hint up by its canonical name: a deprecated alias configures the
+        // same effective setting, so cn1.androidTheme is owned whenever an
+        // annotation owns and.themeMode. Matching on the exact name left the alias
+        // row offering Add, which would create the second declaration the next
+        // build refuses through the alias conflict check.
+        String ownedBy = annotationOwnedHints.get(
+                com.codename1.build.shared.BuildHints.canonicalName(meta.name()));
         boolean active = hasBuildHint(meta.name());
         String value = active ? settings.getBuildHint(meta.name()) : "";
         BuildHintType effectiveType = effectiveHintType(meta, value);
@@ -693,26 +692,119 @@ public class CodenameOneSettings extends Lifecycle {
         if (active) {
             metaLine.add(new Label("Active", uiid("SettingsActiveBadge")));
         }
+        if (ownedBy != null) {
+            metaLine.add(new Label(ownedBy, uiid("SettingsRowMeta")));
+        }
+        if (meta.aliasOf() != null) {
+            metaLine.add(new Label("alias of " + meta.aliasOf(), uiid("SettingsRowMeta")));
+        }
         text.add(name).add(metaLine);
-        if (active) {
+        // Both spellings declared. They are ONE setting -- the builder reads the
+        // canonical name and then lets the alias override it -- so the file is
+        // saying two things and which one wins is a builder detail nobody should
+        // have to know. The alias no longer appears in the browse list, so this
+        // is reachable only for a project that already had it.
+        if (meta.aliasOf() != null && active && hasBuildHint(meta.aliasOf())) {
+            TextArea both = new TextArea(meta.name() + " and " + meta.aliasOf()
+                    + " are two spellings of one setting, and both are declared. "
+                    + meta.name() + " is the one that takes effect. Remove it to fall back to "
+                    + meta.aliasOf() + ".");
+            both.setUIID(uiid("SettingsRowText"));
+            both.setEditable(false);
+            both.setFocusable(false);
+            text.add(both);
+        }
+        if (ownedBy != null) {
+            // Set by an annotation on the main class. Editing it here would write a
+            // second declaration and the next build would refuse the project, so the
+            // value is shown and the editor is withheld.
+            boolean duplicate = active;
+            TextArea owned = new TextArea(duplicate
+                    ? "Declared BOTH here and by " + ownedBy + " on the main class. The next "
+                      + "build refuses that. Remove the properties declaration with the button "
+                      + "on the right, or delete the annotation attribute."
+                    : "Set by " + ownedBy + " on the main class. "
+                      + "Change it there -- declaring it here as well fails the build.");
+            owned.setUIID(uiid("SettingsRowText"));
+            owned.setEditable(false);
+            owned.setFocusable(false);
+            text.add(owned);
+            if (duplicate) {
+                // The properties declaration exists AND an annotation owns the
+                // hint, so this row is the build failure. Withholding every
+                // control left the tool able to report the problem and unable to
+                // fix it; the value stays uneditable -- editing it would only
+                // move the conflict -- but removing it is exactly the resolution,
+                // so that button stays.
+                Container header = new Container(new BorderLayout());
+                header.add(BorderLayout.CENTER, text);
+                header.add(BorderLayout.EAST, removeHintButton(meta));
+                row.add(header);
+            } else {
+                row.add(text);
+            }
+        } else if (active) {
             text.add(activeHintEditor(meta, value, effectiveType));
         } else {
             Container controls = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
             controls.setUIID(uiid("SettingsHintEditor"));
             Button add = new Button("Add", uiid("SettingsOutline"));
             add.setMaterialIcon(FontImage.MATERIAL_ADD, 1.2f);
-            add.addActionListener(e -> {
-                settings.setBuildHint(meta.name(), defaultHintValue(meta));
-                renderBuildHintsList();
-                animatePage();
-            });
-            controls.add(add);
+            String seed = defaultHintValue(meta);
+            if (seed != null) {
+                add.addActionListener(e -> {
+                    settings.setBuildHint(meta.name(), seed);
+                    renderBuildHintsList();
+                    animatePage();
+                });
+                controls.add(add);
+            } else {
+                // Nothing safe to seed. The build decides this hint's value
+                // itself when the line is ABSENT -- android.targetSDKVersion is
+                // computed from the installed platforms -- so writing a
+                // placeholder does not create an unset hint, it overrides the
+                // computation with a value nobody chose. `0` there selects the
+                // legacy android-14 target and emits targetSdkVersion="0"; an
+                // empty string is no better for a hint whose presence is the
+                // switch, which is how facebook.appId=\"\" would enable Facebook
+                // with no ID.
+                //
+                // So the row asks for a value and writes nothing until it has
+                // one. Add is what reveals the field, not what saves.
+                TextField pending = new TextField("", "value");
+                pending.setUIID(uiid("SettingsField"));
+                configureHintField(pending, meta);
+                Button save = new Button("Save", uiid("SettingsOutline"));
+                save.addActionListener(e -> {
+                    String typed = pending.getText() == null ? "" : pending.getText().trim();
+                    if (typed.length() == 0) {
+                        ToastBar.showErrorMessage(meta.name()
+                                + " has no default -- enter the value you want.");
+                        return;
+                    }
+                    if (!isValidHintValue(meta, typed)) {
+                        ToastBar.showErrorMessage(typed + " is not a valid value for "
+                                + meta.name() + ".");
+                        return;
+                    }
+                    settings.setBuildHint(meta.name(), canonicalHintValue(meta, typed));
+                    renderBuildHintsList();
+                    animatePage();
+                });
+                add.addActionListener(e -> {
+                    controls.removeAll();
+                    controls.add(pending).add(save);
+                    controls.getComponentForm().revalidate();
+                    pending.startEditingAsync();
+                });
+                controls.add(add);
+            }
             Container header = new Container(new BorderLayout());
             header.add(BorderLayout.CENTER, text);
             header.add(BorderLayout.EAST, controls);
             row.add(header);
         }
-        if (active) {
+        if (active && ownedBy == null) {
             row.add(text);
         }
         TextArea details = new TextArea(meta.description());
@@ -743,7 +835,13 @@ public class CodenameOneSettings extends Lifecycle {
             valueField.addDataChangedListener((type, index) -> {
                 String next = valueField.getText() == null ? "" : valueField.getText().trim();
                 if (isValidHintValue(meta, next)) {
-                    settings.setBuildHint(meta.name(), next);
+                    // Stored in the domain's own spelling. Accepting `INTERNALONLY`
+                    // and writing it back verbatim marked the value valid and then
+                    // failed the Android build, because the builder copies it into
+                    // the case-sensitive android:installLocation attribute. What
+                    // the developer meant is unambiguous, and only one spelling of
+                    // it works everywhere.
+                    settings.setBuildHint(meta.name(), canonicalHintValue(meta, next));
                     valueField.setUIID(uiid("SettingsField"));
                 } else {
                     valueField.setUIID(uiid("SettingsFieldError"));
@@ -752,14 +850,7 @@ public class CodenameOneSettings extends Lifecycle {
             });
             controls.add(BorderLayout.CENTER, valueField);
         }
-        Button remove = new Button("", uiid("SettingsSmallIconButton"));
-        remove.setMaterialIcon(FontImage.MATERIAL_DELETE, 2.2f);
-        remove.addActionListener(e -> {
-            settings.removeBuildHint(meta.name());
-            renderBuildHintsList();
-            animatePage();
-        });
-        controls.add(BorderLayout.EAST, remove);
+        controls.add(BorderLayout.EAST, removeHintButton(meta));
         editor.add(editorLayout.createConstraint(0, 0).widthPercentage(72), new Container());
         editor.add(editorLayout.createConstraint(0, 1).widthPercentage(28), controls);
         return editor;
@@ -778,14 +869,37 @@ public class CodenameOneSettings extends Lifecycle {
         return settings.keys().contains(SettingsProperties.fullBuildHintKey(key));
     }
 
+    /// Deletes this hint's properties declaration.
+    ///
+    /// One implementation, used by the ordinary editor and by the conflict row:
+    /// removing the declaration is the resolution in both, and the second copy
+    /// this replaced was the reason the conflict row had no way out at all.
+    private Button removeHintButton(BuildHintMetadata meta) {
+        Button remove = new Button("", uiid("SettingsSmallIconButton"));
+        remove.setMaterialIcon(FontImage.MATERIAL_DELETE, 2.2f);
+        remove.addActionListener(e -> {
+            settings.removeBuildHint(meta.name());
+            renderBuildHintsList();
+            animatePage();
+        });
+        return remove;
+    }
+
+    /// The value Add should write, or null when there is nothing to write.
+    ///
+    /// NOT the build server's recorded default. Writing that pins a value the
+    /// server owns into the developer's project: the server may change it, and
+    /// the line now says the old answer forever, with nothing to show that it
+    /// was never a decision anybody made. That is the same stale second copy
+    /// the annotations refuse to carry, except materialised into user projects
+    /// where it outlives any release.
+    ///
+    /// A boolean is the one thing worth seeding, because its two values are the
+    /// whole domain and `true` is a real choice -- which is what adding the hint
+    /// means. Everything else the developer types, and until they do, the
+    /// absence of the line IS the configuration.
     private String defaultHintValue(BuildHintMetadata meta) {
-        if (meta.type() == BuildHintType.BOOLEAN) {
-            return "true";
-        }
-        if (meta.type() == BuildHintType.INTEGER) {
-            return "0";
-        }
-        return "";
+        return meta.type() == BuildHintType.BOOLEAN ? "true" : null;
     }
 
     private int descriptionRows(String text) {
@@ -812,11 +926,54 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
+    /// `value` in the spelling the catalog declares, or `value` when the domain
+    /// is open or does not recognise it.
+    ///
+    /// Only the spelling changes, never the choice: an accepted alias resolves to
+    /// the canonical value it names, which is the one every reader accepts.
+    private String canonicalHintValue(BuildHintMetadata meta, String value) {
+        if (value == null || value.length() == 0 || meta.values().isEmpty()) {
+            return value;
+        }
+        com.codename1.build.shared.BuildHints.Hint hint =
+                com.codename1.build.shared.BuildHints.byName(meta.name());
+        if (hint == null || hint.values().isEmpty()) {
+            return value;
+        }
+        String canonical = hint.canonicalValue(value);
+        return canonical == null ? value : canonical;
+    }
+
     private boolean isValidHintValue(BuildHintMetadata meta, String value) {
         if (value == null || value.trim().length() == 0) {
             return true;
         }
         String v = value.trim();
+        // A closed value domain is the one case where a wrong value is certain to
+        // be wrong: the builder compares against these strings and silently uses
+        // its default when it recognises none of them.
+        //
+        // Through the catalog's own canonicalisation rather than the picklist,
+        // because a domain can accept spellings that are not offered as choices:
+        // ios.themeMode=flat and and.themeMode=material are what the runtime
+        // compares against, and rejecting them told a developer that a working
+        // configuration was invalid and then refused to save the edit.
+        if (!meta.values().isEmpty()) {
+            com.codename1.build.shared.BuildHints.Hint hint =
+                    com.codename1.build.shared.BuildHints.byName(meta.name());
+            if (hint != null && !hint.values().isEmpty()) {
+                return hint.canonicalValue(v) != null;
+            }
+            for (String allowed : meta.values()) {
+                if (allowed.equalsIgnoreCase(v)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (meta.type() == BuildHintType.BOOLEAN) {
+            return "true".equalsIgnoreCase(v) || "false".equalsIgnoreCase(v);
+        }
         if (meta.type() == BuildHintType.INTEGER) {
             return isDigits(v);
         }
@@ -1544,9 +1701,6 @@ public class CodenameOneSettings extends Lifecycle {
         Container c = card("Files");
         actionRow(c, "Settings file", binding.settings(), () -> Display.getInstance().execute(ProjectIO.fsUrl(binding.settings())));
         actionRow(c, "Common POM", binding.pom(), () -> Display.getInstance().execute(ProjectIO.fsUrl(binding.pom())));
-        if (binding.buildHintsDoc() != null && binding.buildHintsDoc().length() > 0) {
-            actionRow(c, "Build-hints source", binding.buildHintsDoc(), () -> Display.getInstance().execute(ProjectIO.fsUrl(binding.buildHintsDoc())));
-        }
         page.add(c);
     }
 
@@ -2063,5 +2217,3917 @@ public class CodenameOneSettings extends Lifecycle {
         public boolean isScrollableY() {
             return false;
         }
+    }
+
+    /// Reads the hints the main class's annotations declare.
+    ///
+    /// The annotation processor writes this file into `target/classes` on every
+    /// build and deletes it when the last annotation goes away, so it is the
+    /// authoritative statement of what the annotations currently declare -- and
+    /// it carries `cn1.buildHints.origin.<name>`, which names the attribute.
+    ///
+    /// This matters because a hint declared by an annotation must not also be
+    /// written into `codenameone_settings.properties`: the next build fails with
+    /// the duplicate-declaration error. Without this the Add button would create
+    /// exactly that, silently, for any hint the generated project ships as an
+    /// annotation.
+    ///
+    /// An unbuilt project has no file and no annotation-owned hints, which is the
+    /// same conservative answer this tool gave before.
+    private java.util.Map<String, String> loadAnnotationOwnedHints() {
+        java.util.Map<String, String> out = new java.util.HashMap<>();
+        if (binding == null || binding.projectDir() == null) {
+            return out;
+        }
+        String path = outputDirectory(binding.projectDir())
+                + "/META-INF/codenameone/build-hints.properties";
+        InputStream in = null;
+        try {
+            // Always start from the source, because it is the only current
+            // statement of what the annotations declare. The manifest is a build
+            // artifact and goes stale in both directions: absent right after
+            // cn1:migrate-build-hints, and out of date the moment an attribute is
+            // added to a project that was built earlier. Trusting it alone left
+            // the newly annotated hint looking unowned, and Add then wrote the
+            // duplicate declaration the next build refuses.
+            //
+            // The manifest supplies origins, but it cannot ADD ownership the
+            // source does not show. An attribute deleted from the main class and
+            // not yet rebuilt is exactly that case: the source is right, the
+            // manifest is a build old, and taking the union kept Add and the
+            // editor hidden for a hint nothing owns any more -- until the user
+            // happened to rebuild, with nothing to suggest that was the fix.
+            java.util.Map<String, String> fromSource = annotationOwnedHintsFromSource();
+            if (fromSource != null) {
+                out.putAll(fromSource);
+            }
+
+            String url = ProjectIO.fsUrl(path);
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            if (!fs.exists(url)) {
+                return out;
+            }
+            in = fs.openInputStream(url);
+            String text = Util.readToString(in, "ISO-8859-1");
+            String originPrefix = "cn1.buildHints.origin.";
+            for (String line : com.codename1.util.StringUtil.tokenize(text, "\n")) {
+                String t = line.trim();
+                if (!t.startsWith(originPrefix)) {
+                    continue;
+                }
+                int eq = t.indexOf('=');
+                if (eq > originPrefix.length()) {
+                    String hint = t.substring(originPrefix.length(), eq).trim();
+                    String canonical =
+                            com.codename1.build.shared.BuildHints.canonicalName(hint);
+                    // Only for a hint the source still declares -- unless there
+                    // was no source to read, where the manifest is all there is
+                    // and is better than nothing.
+                    if (fromSource == null || fromSource.containsKey(canonical)) {
+                        out.put(canonical, t.substring(eq + 1).trim());
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            Log.e(ex);
+        } finally {
+            Util.cleanup(in);
+        }
+        return out;
+    }
+
+    /// Reads the build hint annotations straight off the main class.
+    ///
+    /// Only the attribute *names* are needed -- what each hint is set to does not
+    /// matter, only that an annotation owns it -- so this scans the annotation
+    /// list above the class declaration for `name =` at the top level of each
+    /// annotation's parentheses and maps those to hint names through the catalog.
+    /// Values are skipped wholesale, so a comma or bracket inside a string cannot
+    /// confuse it.
+    /// The hints the main class's SOURCE declares, or null when no source file
+    /// for it could be read at all.
+    private java.util.Map<String, String> annotationOwnedHintsFromSource() {
+        java.util.Map<String, String> out = new java.util.HashMap<>();
+        // What the launcher resolved, when it did: `codename1.mainName` can be
+        // overridden with -D, and that overlay is the entry point
+        // process-annotations stamps the manifest with. Reading the file here
+        // scanned a different class than the build compiles, so an annotation on
+        // the selected one was reported as absent -- and Add then writes the
+        // duplicate declaration the next build refuses.
+        //
+        // The pair travels together or not at all: a resolved main class with no
+        // package means a project that has none.
+        String main = binding == null ? null : binding.mainName();
+        String pkg = binding == null ? null : binding.packageName();
+        if (main == null || main.isEmpty()) {
+            main = settings == null ? null : settings.get("codename1.mainName");
+            pkg = settings == null ? null : settings.get("codename1.packageName");
+        }
+        if (binding == null || binding.projectDir() == null || main == null || main.isEmpty()) {
+            return out;
+        }
+        String rel = (pkg == null || pkg.isEmpty() ? "" : pkg.replace('.', '/') + "/") + main;
+        // Where the class would be if it is named after its file, looked for in
+        // the roots the build actually compiles rather than at three
+        // conventional paths. A project that moves its sources can leave an
+        // older copy of the main class at the conventional path, and reading
+        // that one reported the annotations it does not carry as absent.
+        for (String ext : new String[]{".java", ".kt"}) {
+            for (String root : mainSourceRoots(binding.projectDir())) {
+                String path = root + "/" + rel + ext;
+                String text = readIfPresent(path);
+                if (text != null && ext.equals(".java")) {
+                    text = decodeUnicodeEscapes(text);
+                }
+                // The path has to DECLARE the class, not merely exist. Moving a
+                // Kotlin main class into a differently named file can leave the
+                // old Main.kt behind holding something else, and returning on
+                // its mere existence skipped the search below -- reporting the
+                // annotated hints as unowned, which is the state that lets Add
+                // write the duplicate.
+                if (text == null || !declaresClass(text, main, pkg, ext.equals(".kt"))) {
+                    continue;
+                }
+                collectOwnedHints(text, out, ext.equals(".kt"),
+                        otherProjectSources(binding.projectDir(), path));
+                return out;
+            }
+        }
+        // A file named after its class is a convention, not the truth: Kotlin
+        // does not require it. Falling straight through to null here let the
+        // caller trust a stale manifest -- which is the bug the source scan was
+        // added to fix, reappearing for anyone whose layout is merely unusual.
+        // So look properly before giving up.
+        String found = findMainClassSource(binding.projectDir(), main, pkg);
+        if (found != null) {
+            collectOwnedHints(found, out, lastSourceWasKotlin,
+                    otherProjectSources(binding.projectDir(), lastSourcePath));
+            return out;
+        }
+        // Genuinely no source. Distinct from "found and declares nothing", and
+        // the caller has to tell them apart before letting the source overrule
+        // the manifest.
+        return null;
+    }
+
+    /// Set by findMainClassSource, since it decides the language by what it finds.
+    private boolean lastSourceWasKotlin;
+
+    /// The path findMainClassSource read, so it can be left out of the sweep for
+    /// declarations made elsewhere.
+    private String lastSourcePath;
+
+    /// The directories a module's MAIN sources are compiled from, by
+    /// convention, as candidates to be filtered by what exists.
+    ///
+    /// WHY THE ROOT LIST HAS TO BE RIGHT, stated once here because every rule
+    /// below shares this consequence: the first file found for the main class
+    /// answers for it. Include a directory the build does not compile and a
+    /// dormant copy there answers instead of the compiled source, so its missing
+    /// or obsolete annotations make an annotation-owned hint look editable --
+    /// and Add then writes the properties line that the next build refuses as a
+    /// duplicate declaration.
+    ///
+    /// An allow-list rather than a walk of the whole project with exclusions.
+    /// The exclusions were never going to be complete -- `src/test` was
+    /// followed by `src/testFixtures`, then `src/main/resources`, then
+    /// `src/main/templates` and `src/main/proto` -- because "not a source root"
+    /// is not a property of a directory's name. Naming the roots instead makes
+    /// every one of those wrong by construction.
+    ///
+    /// `target/generated-sources` is a root: Maven plugins add it, so a
+    /// declaration there is one the compiler sees. Nothing else under an output
+    /// directory is reachable, which also retires the `build` special case --
+    /// starting inside a source root means com.codename1.build.shared is walked
+    /// as the package it is, with no rule needed to tell it from an output
+    /// directory.
+    ///
+    /// The flat `src` is a candidate only where there is no `src/main`, since
+    /// that is the layout it belongs to; in a Maven layout it would drag the
+    /// test sets back in.
+    ///
+    /// KNOWN LIMIT, and the reason it is acceptable: a module that configures a
+    /// custom root in its POM is not covered, because this tool has no resolved
+    /// project to ask and its POM handling is deliberately string surgery rather
+    /// than an XML model. Missing a peer means a shadowing type goes unseen, so
+    /// a hint reads as annotation-owned and its editor stays hidden -- annoying,
+    /// but it cannot write the duplicate declaration that fails the next build,
+    /// which is what including a non-source directory could.
+    static java.util.List<String> candidateSourceRoots(String projectDir, boolean hasSrcMain) {
+        return candidateSourceRoots(projectDir, hasSrcMain, true);
+    }
+
+    /// The same, with `kotlinCompiled` saying whether the build compiles the
+    /// conventional Kotlin root.
+    ///
+    /// It was always offered, and searched BEFORE anything the POM declares. A
+    /// module with no Kotlin plugin, or one that replaces the root with its own
+    /// `<sourceDirs>`, can still have a copy of the main class sitting there.
+    static java.util.List<String> candidateSourceRoots(String projectDir, boolean hasSrcMain,
+                                                       boolean kotlinCompiled) {
+        return candidateSourceRoots(projectDir, hasSrcMain, kotlinCompiled, true);
+    }
+
+    /// The same, with `javaCompiled` saying whether the build compiles the
+    /// conventional Java root.
+    ///
+    /// A `.java` candidate is searched before any `.kt`, so a dormant Java copy
+    /// of the main class in a module that compiles its application from Kotlin
+    /// was selected ahead of the compiled source -- and its missing or obsolete
+    /// annotations then made annotation-owned hints look editable.
+    static java.util.List<String> candidateSourceRoots(String projectDir, boolean hasSrcMain,
+                                                       boolean kotlinCompiled,
+                                                       boolean javaCompiled) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (projectDir == null) {
+            return out;
+        }
+        if (javaCompiled) {
+            out.add(projectDir + "/src/main/java");
+        }
+        if (kotlinCompiled) {
+            out.add(projectDir + "/src/main/kotlin");
+        }
+        if (!hasSrcMain) {
+            out.add(projectDir + "/src");
+        }
+        if (javaCompiled) {
+            // Java trees, so the same gate as src/main/java: nothing under them
+            // is compiled when javac is not running, and a `.java` candidate is
+            // searched before every `.kt` one -- which is how a disabled
+            // generator's leftover copy of the main class was selected ahead of
+            // the Kotlin source the build actually compiles.
+            //
+            // A guess of last resort either way: a generator registers a CHILD
+            // of these (target/generated-sources/annotations), not the container,
+            // and a root Maven really compiles has already come from the POM
+            // above. They stay only because an older project layout may have
+            // nothing else to offer.
+            out.add(projectDir + "/target/generated-sources");
+            out.add(projectDir + "/build/generated-sources");
+        }
+        return out;
+    }
+
+    /// The roots a POM declares: `<sourceDirectory>`, and the source lists the
+    /// Kotlin and build-helper plugins take.
+    ///
+    /// A string read, like the rest of this tool's POM handling. It is looking
+    /// for plain elements, and what it cannot resolve -- a `${property}` path --
+    /// it leaves alone rather than guessing.
+    ///
+    /// A declared root under a test tree is dropped: those are configured
+    /// through the same elements, and one of them shadowing a production type is
+    /// the failure this list exists to avoid.
+    static java.util.List<String> declaredSourceRoots(String pomText) {
+        return declaredSourceRoots(pomText, null);
+    }
+
+    /// The same list, resolving a `${property}` root against `properties` --
+    /// what the POM chain declares. A root written that way is one Maven
+    /// compiles, and dropping it is a main class this tool cannot find.
+    static java.util.List<String> declaredSourceRoots(String pomText,
+                                                      java.util.Map<String, String> properties) {
+        return declaredSourceRoots(pomText, properties, null);
+    }
+
+    /// The same list, with `managedFromChain` -- every `<pluginManagement>`
+    /// section in this POM's parent chain -- available as the configuration an
+    /// activated plugin inherits.
+    ///
+    /// A parent that puts the `add-source` execution in `<pluginManagement>`
+    /// while the module turns it on with a bare `<plugin>` is the ordinary
+    /// multi-module shape, and neither POM answers on its own: the child has the
+    /// activation and no configuration, the parent has the configuration and no
+    /// activation. Reading them independently lost the root, and a main class
+    /// living there then looked absent -- which is what puts an annotation-owned
+    /// hint back in the editor for Add to declare a second time.
+    static java.util.List<String> declaredSourceRoots(String pomText,
+                                                      java.util.Map<String, String> properties,
+                                                      String managedFromChain) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (String active : activeConfiguration(pomText)) {
+            collectDeclaredRoots(active, properties, managedFromChain, out);
+        }
+        return out;
+    }
+
+    /// The parts of a POM whose configuration is in effect without being asked
+    /// for: the document with its `<profiles>` removed, and any profile that
+    /// says it is active by default.
+    ///
+    /// A profile this reader cannot evaluate is left out rather than merged in.
+    /// An inactive `<sourceDirectory>src/preview</sourceDirectory>` was being
+    /// read as a production root, so a type kept there shadowed the real
+    /// annotation -- and activation depends on properties, files, the JDK and
+    /// the OS, none of which this tool has a model for.
+    ///
+    /// An `activeByDefault` profile is INCLUDED even though Maven switches all
+    /// of them off as soon as any other profile in the same POM activates. That
+    /// is a deliberate choice, not an oversight, and it is worth writing down
+    /// because the rule reads like it should go the other way.
+    ///
+    /// Whether the other profile activates depends on a property, a file, the
+    /// JDK or the OS, so this reader cannot tell. Both guesses end in a failed
+    /// build, but not with the same likelihood:
+    ///
+    /// - Include it and the profile was off: a root is scanned that the build
+    ///   does not compile. That only misleads if a dormant copy of the main
+    ///   class happens to sit there.
+    /// - Exclude it and the profile was on: the real root is missed, no main
+    ///   class is found at all, and then EVERY annotation-owned hint looks
+    ///   unowned -- so Add writes a duplicate for any of them.
+    ///
+    /// The second is both likelier and broader, so the default profile stays in.
+    /// None of this applies when `mvn cn1:settings` launched the tool: Maven has
+    /// already resolved the profiles and the roots arrive in the binding, which
+    /// `mainSourceRoots` returns before it ever reads a POM. This path is the
+    /// standalone fallback.
+    static java.util.List<String> activeConfiguration(String pomText) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (pomText == null) {
+            return out;
+        }
+        pomText = withoutComments(pomText);
+        out.add(withoutElement(pomText, "profiles"));
+        int at = pomText.indexOf("<profile>");
+        while (at >= 0) {
+            int close = pomText.indexOf("</profile>", at);
+            if (close < 0) {
+                break;
+            }
+            String profile = pomText.substring(at, close);
+            // Trimmed, through the same helper the goal, id, phase and
+            // extension reads already use. Maven trims the boolean, so a
+            // pretty-printed <activeByDefault>\n  true\n</activeByDefault>
+            // activates the profile while an exact substring test excluded it --
+            // and a compile root that profile declares then went missing.
+            if (declaresValue(profile, "activeByDefault", "true")) {
+                out.add(profile);
+            }
+            at = pomText.indexOf("<profile>", close);
+        }
+        return out;
+    }
+
+    /// `pomText` with the sections that configure something OTHER than the
+    /// compilation removed.
+    ///
+    /// Plugin configuration is reached through activePluginBlock, which knows
+    /// which plugin and which goal it is reading; anything left here is being
+    /// searched by element name alone, and an element name is not evidence.
+    /// <reporting> and the resource lists go for the same reason -- none of them
+    /// tells the compiler where the sources are.
+    static String compileRootsOnly(String pomText) {
+        if (pomText == null) {
+            return null;
+        }
+        return withoutNonCompileSections(pomText);
+    }
+
+    private static void collectDeclaredRoots(String pomText,
+                                             java.util.Map<String, String> properties,
+                                             String managedFromChain,
+                                             java.util.List<String> out) {
+        // Scoped to the elements that actually declare a compile root.
+        // `<source>` and `<sourceDir>` are ordinary words: another plugin
+        // naming src/main/templates in one of them is not saying it is
+        // compiled, and treating it as a root put the templates back in the
+        // sweep that the root list had just taken them out of.
+        // The SAME scoping the two below already had, which this line did not:
+        // <sourceDirectory> is Maven's compile root only as a direct child of
+        // <build>. Checkstyle's <sourceDirectories><sourceDirectory> names a
+        // directory to ANALYSE, PMD's does the same, and reading the whole POM
+        // for the element made an analysis-only path a compile root.
+        collectRoots(elementValues(compileRootsOnly(pomText), "sourceDirectory"), properties, out);
+        String kotlin = activePluginBlock(pomText, "kotlin-maven-plugin", "sourceDir",
+                "compile", managedFromChain);
+        collectContainerRoots(compileGoalConfiguration(kotlin, "compile", "sourceDirs",
+                kotlinRunsWithoutExecution(kotlin)), "sourceDirs", properties, out);
+        String helper = activePluginBlock(pomText, "build-helper-maven-plugin", "source",
+                "add-source", managedFromChain);
+        if (helper != null) {
+            // add-test-source uses the same element, so an execution that adds
+            // TEST sources is passed over -- the same distinction the Kotlin
+            // plugin's compile and test-compile executions need.
+            // add-source runs only where an execution says so.
+            collectContainerRoots(compileGoalConfiguration(helper, "add-source", "sources",
+                    false), "sources", properties, out);
+        }
+    }
+
+    /// The parts of a plugin element whose configuration applies to the MAIN
+    /// compilation, most specific first.
+    ///
+    /// The test goals use the same elements -- `test-compile` for Kotlin,
+    /// `add-test-source` for build-helper -- and a test directory whose name
+    /// does not look like one, `fixtures` say, is otherwise read as production
+    /// code and shadows a real annotation.
+    ///
+    /// Maven's merge rules, which this used to ignore by returning both levels
+    /// unconditionally: an execution's own value REPLACES the plugin-level one,
+    /// unless the POM asks for both with `combine.children="append"`;
+    /// `combine.self="override"` discards the inherited configuration wholesale;
+    /// and plugin-level configuration applies on its own when no execution is
+    /// bound to the goal. Returning the replaced list as well made this scan
+    /// read a directory the build does not compile, where a dormant copy of the
+    /// main class can be picked before the real one -- and then its
+    /// annotation-owned hints look editable and Add writes the duplicate the
+    /// next build refuses.
+    ///
+    /// `element` is what the caller is about to read out of these blocks, since
+    /// the rules are per element rather than per configuration.
+    private static java.util.List<String> compileGoalConfiguration(String pluginBlock,
+                                                                   String goal,
+                                                                   String element) {
+        return compileGoalConfiguration(pluginBlock, goal, element, true);
+    }
+
+    /// The same, with `runsWithoutExecution` saying whether the goal is bound
+    /// when the POM writes no execution for it.
+    ///
+    /// True for maven-compiler-plugin, which the default lifecycle binds, and
+    /// for a Kotlin plugin with `<extensions>true</extensions>`. NOT for
+    /// build-helper, whose `add-source` runs only where an execution says so:
+    /// plugin-level `<sources>` with no execution is dormant configuration, and
+    /// reading it as a compiled root put a directory the build never touches
+    /// ahead of the real one.
+    private static java.util.List<String> compileGoalConfiguration(String pluginBlock,
+                                                                   String goal,
+                                                                   String element,
+                                                                   boolean runsWithoutExecution) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (pluginBlock == null) {
+            return out;
+        }
+        int executions = pluginBlock.indexOf("<executions>");
+        int endOfExecutions = pluginBlock.indexOf("</executions>");
+        String pluginLevel = executions >= 0 && endOfExecutions > executions
+                ? pluginBlock.substring(0, executions) + pluginBlock.substring(endOfExecutions)
+                : pluginBlock;
+        boolean bound = false;
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                break;
+            }
+            String execution = pluginBlock.substring(at, close);
+            // The goal as an ELEMENT: `test-compile` contains `compile`, so a
+            // substring test takes exactly the executions it must not. An
+            // execution that names no goal but carries Maven's own id for one is
+            // bound to it -- that is how a POM overrides a lifecycle-injected
+            // execution.
+            // <phase>none</phase> is the conventional way to switch off an
+            // execution inherited from a parent while leaving its goal in place,
+            // so the goal alone does not mean the build runs it.
+            // The id alone binds the goal only where the LIFECYCLE provides an
+            // execution for it, which is the same question runsWithoutExecution
+            // answers: build-helper never gets one, so `default-add-source` with
+            // no <goal> runs nothing.
+            if (!declaresValue(execution, "phase", "none")
+                    && (declaresValue(execution, "goal", goal)
+                        || (runsWithoutExecution
+                            && declaresValue(execution, "id", "default-" + goal)))) {
+                bound = true;
+                // Attribute-tolerant: `<sourceDirs combine.children="append">`
+                // is the element, and matching `<sourceDirs>` literally missed
+                // exactly the execution that asks for both lists.
+                if (containerValues(execution, element).isEmpty()) {
+                    if (execution.indexOf("combine.self=\"override\"") < 0) {
+                        out.add(pluginLevel);
+                    }
+                } else {
+                    out.add(execution);
+                    if (execution.indexOf("combine.children=\"append\"") >= 0) {
+                        out.add(pluginLevel);
+                    }
+                }
+            }
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        if (!bound && runsWithoutExecution) {
+            // Plugin-level configuration applies to every execution, so it
+            // counts when the goal runs without one -- dropping it lost a
+            // `<sourceDirs>` written once outside them, and a main class
+            // compiled from there became invisible.
+            out.add(pluginLevel);
+        }
+        return out;
+    }
+
+    private static void collectRoots(java.util.List<String> blocks, String element,
+                                     java.util.Map<String, String> properties,
+                                     java.util.List<String> out) {
+        for (String block : blocks) {
+            collectRoots(elementValues(block, element), properties, out);
+        }
+    }
+
+    /// The values of every direct child of `container`, whatever they are named.
+    ///
+    /// Maven maps a collection parameter by POSITION, not by child tag: the
+    /// Kotlin plugin reads `<sourceDirs><source>gen/kt</source></sourceDirs>`
+    /// exactly as it reads `<sourceDir>`, and AbstractCN1Mojo iterates the
+    /// children for that reason. Requiring one spelling here dropped a root
+    /// Maven really compiles -- and it is the SAME question the Maven side
+    /// already answered the other way.
+    private static void collectContainerRoots(java.util.List<String> blocks, String container,
+                                              java.util.Map<String, String> properties,
+                                              java.util.List<String> out) {
+        for (String block : blocks) {
+            // The container may carry attributes -- `<sourceDirs
+            // combine.children="append">` is how a POM asks for both lists --
+            // so it cannot be found by matching `<sourceDirs>` literally.
+            for (String dirs : containerValues(block, container)) {
+                collectRoots(childValues(dirs), properties, out);
+            }
+        }
+    }
+
+    /// The contents of every `<name>` or `<name ...>` element in `xml`.
+    private static java.util.List<String> containerValues(String xml, String name) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (xml == null) {
+            return out;
+        }
+        String open = "<" + name;
+        String shut = "</" + name + ">";
+        int at = xml.indexOf(open);
+        while (at >= 0) {
+            int nameEnd = at + open.length();
+            char after = nameEnd < xml.length() ? xml.charAt(nameEnd) : ' ';
+            if (after != '>' && after != ' ' && after != '\t' && after != '\n'
+                    && after != '\r' && after != '/') {
+                // <sourceDirsSomethingElse>, not this element.
+                at = xml.indexOf(open, nameEnd);
+                continue;
+            }
+            int tagEnd = xml.indexOf('>', nameEnd);
+            if (tagEnd < 0) {
+                return out;
+            }
+            if (xml.charAt(tagEnd - 1) == '/') {
+                at = xml.indexOf(open, tagEnd);
+                continue;
+            }
+            int close = xml.indexOf(shut, tagEnd);
+            if (close < 0) {
+                return out;
+            }
+            out.add(xml.substring(tagEnd + 1, close));
+            at = xml.indexOf(open, close + shut.length());
+        }
+        return out;
+    }
+
+    /// The text of every direct child element of `xml`.
+    private static java.util.List<String> childValues(String xml) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (xml == null) {
+            return out;
+        }
+        int at = 0;
+        while (true) {
+            int open = xml.indexOf('<', at);
+            if (open < 0 || open + 1 >= xml.length()) {
+                return out;
+            }
+            if (xml.charAt(open + 1) == '/') {
+                at = open + 2;
+                continue;
+            }
+            int nameEnd = xml.indexOf('>', open);
+            if (nameEnd < 0) {
+                return out;
+            }
+            String name = xml.substring(open + 1, nameEnd).trim();
+            if (name.endsWith("/")) {
+                at = nameEnd + 1;
+                continue;
+            }
+            int space = name.indexOf(' ');
+            if (space > 0) {
+                name = name.substring(0, space);
+            }
+            String shut = "</" + name + ">";
+            int close = xml.indexOf(shut, nameEnd);
+            if (close < 0) {
+                return out;
+            }
+            out.add(xml.substring(nameEnd + 1, close));
+            at = close + shut.length();
+        }
+    }
+
+    private static void collectRoots(java.util.List<String> values,
+                                     java.util.Map<String, String> properties,
+                                     java.util.List<String> out) {
+        for (String value : values) {
+            String path = value.trim().replace('\\', '/');
+            // A `${project.basedir}` prefix is deterministic and common; only
+            // an expression this reader cannot resolve makes the path unusable.
+            // No name test. Every root that reaches here was declared through a
+            // MAIN-code element -- <sourceDirectory>, build-helper add-source,
+            // the Kotlin compile goal -- and the test spellings of each
+            // (<testSourceDirectory>, add-test-source, test-compile) are filtered
+            // by element and goal before this. Maven compiles
+            // src/integrationTest/java as main code when a POM says so, and
+            // guessing from the path dropped exactly that root -- taking the
+            // annotated main class in it, which is the failure this list exists
+            // to prevent.
+            if (path.isEmpty() || expandProjectPaths(path, "/probe", null, properties) == null) {
+                continue;
+            }
+            if (!out.contains(path)) {
+                out.add(path);
+            }
+        }
+    }
+
+
+    /// `path` with the project-directory expressions Maven resolves the same way
+    /// every time applied, or null when an expression is left that this reader
+    /// cannot resolve.
+    static String expandProjectPaths(String path, String projectDir) {
+        return expandProjectPaths(path, projectDir, null);
+    }
+
+    /// As above; `buildDirectory` is what the POM configures, when it configures
+    /// one.
+    ///
+    /// `${project.build.directory}` is `target` by default and whatever
+    /// `<build><directory>` says otherwise -- hard-coding `target` sent the
+    /// search to a directory a project that overrides it does not compile from.
+    static String expandProjectPaths(String path, String projectDir, String buildDirectory) {
+        return expandProjectPaths(path, projectDir, buildDirectory, null);
+    }
+
+    /// As above, also resolving an ordinary `${property}` against what the POM
+    /// chain declares.
+    ///
+    /// Only the project expressions used to be resolved and everything else was
+    /// discarded, which is not "unknown, leave it alone": a dropped root is a
+    /// main class this tool cannot find, and then Add offers that class's
+    /// annotation-owned hints as properties to set a second time -- the
+    /// duplicate declaration the next build refuses.
+    static String expandProjectPaths(String path, String projectDir, String buildDirectory,
+                                     java.util.Map<String, String> properties) {
+        String build = buildDirectory == null || buildDirectory.trim().isEmpty()
+                ? projectDir + "/target" : buildDirectory.trim().replace('\\', '/');
+        if (!build.startsWith("/") && build.indexOf(':') != 1) {
+            build = projectDir + "/" + build;
+        }
+        String out = path;
+        out = replaceLiteral(out, "${project.basedir}", projectDir);
+        out = replaceLiteral(out, "${project.baseDir}", projectDir);
+        out = replaceLiteral(out, "${basedir}", projectDir);
+        out = replaceLiteral(out, "${pom.basedir}", projectDir);
+        out = replaceLiteral(out, "${project.build.directory}", build);
+        out = resolveDeclaredProperties(out, properties);
+        // A `$` that opens nothing is an ordinary character in a path; only an
+        // unresolved `${...}` makes the value unusable.
+        return out.indexOf("${") >= 0 ? null : out;
+    }
+
+    /// `value` with every `${name}` the POM chain defines applied, repeating for
+    /// a property written in terms of another and stopping on a cycle.
+    ///
+    /// Names it does not know are left in place, so the caller can still tell an
+    /// unresolved expression from a resolved one.
+    static String resolveDeclaredProperties(String value,
+                                            java.util.Map<String, String> properties) {
+        if (value == null || properties == null || properties.isEmpty()) {
+            return value;
+        }
+        String out = value;
+        // Long enough for a property defined in terms of another; a cycle stops
+        // here rather than looping.
+        for (int pass = 0; pass < 8 && out.indexOf("${") >= 0; pass++) {
+            StringBuilder expanded = new StringBuilder();
+            boolean changed = false;
+            int at = 0;
+            while (true) {
+                int open = out.indexOf("${", at);
+                if (open < 0) {
+                    expanded.append(out.substring(at));
+                    break;
+                }
+                int close = out.indexOf('}', open + 2);
+                if (close < 0) {
+                    // Not an expression, just a stray `${`.
+                    expanded.append(out.substring(at));
+                    break;
+                }
+                expanded.append(out, at, open);
+                String resolved = properties.get(out.substring(open + 2, close));
+                if (resolved == null) {
+                    expanded.append(out, open, close + 1);
+                } else {
+                    expanded.append(resolved);
+                    changed = true;
+                }
+                at = close + 1;
+            }
+            out = expanded.toString();
+            if (!changed) {
+                // Everything left is a name nothing declares; another pass would
+                // produce the same string.
+                break;
+            }
+        }
+        return out;
+    }
+
+    /// The sections of a POM that configure something OTHER than which files
+    /// get compiled.
+    ///
+    /// Shared by the two readers that search by element name, because they were
+    /// written from the same rule and then drifted: `<directory>` was already
+    /// taken as a direct child with these stripped, while `<sourceDirectory>`
+    /// was read across the whole POM and picked up Checkstyle's analysis-only
+    /// one. One list, so the next element added to either cannot be scoped by
+    /// only one of them.
+    private static final String[] NON_COMPILE_SECTIONS = {
+        "resources", "testResources", "plugins", "pluginManagement", "filters", "extensions",
+        "reporting"
+    };
+
+    /// `xml` with every [#NON_COMPILE_SECTIONS] section removed.
+    private static String withoutNonCompileSections(String xml) {
+        if (xml == null) {
+            return null;
+        }
+        String out = xml;
+        for (String section : NON_COMPILE_SECTIONS) {
+            out = withoutElement(out, section);
+        }
+        return out;
+    }
+
+    /// The `<directory>` the POM's `<build>` element configures, or null.
+    ///
+    /// A DIRECT child: `<resources>` and the plugin sections carry
+    /// `<directory>` elements of their own, and taking the first one in the
+    /// build element would read a resource directory as the output directory.
+    static String configuredBuildDirectory(String pomText) {
+        if (pomText == null) {
+            return null;
+        }
+        int at = pomText.indexOf("<build>");
+        if (at < 0) {
+            return null;
+        }
+        int close = pomText.indexOf("</build>", at);
+        String build = close < 0 ? pomText.substring(at) : pomText.substring(at, close);
+        return elementValue(withoutNonCompileSections(build), "directory");
+    }
+
+    private static String withoutElement(String xml, String name) {
+        String open = "<" + name + ">";
+        String shut = "</" + name + ">";
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int hit = xml.indexOf(open, at);
+            if (hit < 0) {
+                out.append(xml.substring(at));
+                return out.toString();
+            }
+            out.append(xml, at, hit);
+            int close = xml.indexOf(shut, hit);
+            if (close < 0) {
+                return out.toString();
+            }
+            at = close + shut.length();
+        }
+    }
+
+    private static String replaceLiteral(String text, String find, String with) {
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int hit = text.indexOf(find, at);
+            if (hit < 0) {
+                out.append(text.substring(at));
+                return out.toString();
+            }
+            out.append(text, at, hit).append(with);
+            at = hit + find.length();
+        }
+    }
+
+    private static java.util.List<String> elementValues(String xml, String name) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (xml == null) {
+            return out;
+        }
+        String open = "<" + name + ">";
+        String shut = "</" + name + ">";
+        int at = xml.indexOf(open);
+        while (at >= 0) {
+            int close = xml.indexOf(shut, at + open.length());
+            if (close < 0) {
+                break;
+            }
+            out.add(xml.substring(at + open.length(), close));
+            at = xml.indexOf(open, close + shut.length());
+        }
+        return out;
+    }
+
+    /// Those of them that are there, plus whatever the POM declares.
+    private java.util.List<String> mainSourceRoots(String projectDir) {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        // What the launcher resolved, when it did. Reading the POM is guesswork
+        // by comparison -- it cannot evaluate a profile activation, follow an
+        // inherited <sourceDirectory> or expand an arbitrary property.
+        //
+        // Added to what this tool works out for itself rather than replacing
+        // it: `mvn cn1:settings` runs no lifecycle, so a goal that adds source
+        // roots at generate-sources has not run and the resolved list can be
+        // missing them. Treating an incomplete list as the whole answer hid
+        // roots the POM reading would have found.
+        java.util.List<String> out = new java.util.ArrayList<>();
+        java.util.List<String> resolvedRoots =
+                binding == null ? new java.util.ArrayList<>() : binding.sourceRoots();
+        for (String root : resolvedRoots) {
+            if (fs.isDirectory(ProjectIO.fsUrl(root)) && !out.contains(root)) {
+                out.add(root);
+            }
+        }
+        boolean hasSrcMain = projectDir != null
+                && fs.isDirectory(ProjectIO.fsUrl(projectDir + "/src/main"));
+        if (!out.isEmpty()) {
+            // Maven answered, so that IS the set. A project that replaces
+            // src/main/java with a custom root can still have dormant files in
+            // the conventional tree, and adding it back scanned code the build
+            // does not compile -- where a same-package type shadows a real
+            // annotation. The conventions are a guess for when nobody resolved
+            // the roots, not a supplement to an answer.
+            return out;
+        }
+        // What the POM DECLARES first, then the conventions. A module may put
+        // its sources somewhere else entirely, and the main class is the one
+        // file this list cannot afford to miss: without it nothing knows which
+        // hints an annotation owns, and Add writes the duplicate the next build
+        // refuses. Searching the conventions first let a dormant copy left at
+        // src/main/java be picked over the root the build really compiles.
+        //
+        // Reached only when the launcher said nothing, since the resolved list
+        // returns above. Maven applies profile activation, and activating one
+        // explicitly DEACTIVATES an activeByDefault profile, so a root read from
+        // such a profile is one the build is not compiling.
+        java.util.List<String> candidates = new java.util.ArrayList<>();
+        for (String pom : pomChain()) {
+            for (String declared : declaredSourceRoots(pom, pomProperties(),
+                    chainPluginManagement())) {
+                String expanded = expandProjectPaths(declared, projectDir,
+                        buildDirectory(projectDir), pomProperties());
+                if (expanded == null) {
+                    continue;
+                }
+                String path = expanded.startsWith("/") || expanded.indexOf(':') == 1
+                        ? normalizePath(expanded) : normalizePath(projectDir + "/" + expanded);
+                if (!candidates.contains(path)) {
+                    candidates.add(path);
+                }
+            }
+        }
+        for (String conventional
+                : candidateSourceRoots(projectDir, hasSrcMain, compilesKotlinConventionally(),
+                        compilesJava())) {
+            if (!candidates.contains(conventional)) {
+                candidates.add(conventional);
+            }
+        }
+        for (String candidate : candidates) {
+            if (fs.isDirectory(ProjectIO.fsUrl(candidate)) && !out.contains(candidate)) {
+                out.add(candidate);
+            }
+        }
+        return out;
+    }
+
+    /// Every `<properties>` name the POM chain declares, nearest POM winning.
+    ///
+    /// Read once per session: the chain does not change while the project is
+    /// bound, and this walks the filesystem to find the parents.
+    ///
+    /// A profile this reader cannot evaluate contributes nothing, the same rule
+    /// `activeConfiguration` applies to everything else. `-D` is invisible here
+    /// -- the launcher resolves that and publishes the answer in the binding;
+    /// this is the fallback for when it did not.
+    private java.util.Map<String, String> pomProperties() {
+        if (!pomPropertiesRead) {
+            pomPropertiesRead = true;
+            pomProperties = new java.util.HashMap<>();
+            for (String pom : pomChain()) {
+                // Through declaredProperties, which is where the precedence rule
+                // lives. Inlining the walk here read FIRST-wins across
+                // activeConfiguration, and that list starts with the
+                // profile-stripped document -- so a base <properties> value beat
+                // an active profile's redefinition of it, which is backwards.
+                // Nearest POM still wins, because declaredProperties only adds a
+                // name that is not taken yet.
+                //
+                // The rule was written down and tested against a method nothing
+                // in production called.
+                declaredProperties(pom, pomProperties);
+            }
+        }
+        return pomProperties;
+    }
+
+    private boolean pomPropertiesRead;
+    private java.util.Map<String, String> pomProperties;
+
+    /// The `<properties>` `pomText` declares, added to `out` unless the name is
+    /// already there -- a nearer POM's value wins.
+    ///
+    /// Only the configuration that is in effect, the same rule
+    /// `activeConfiguration` applies to everything else.
+    static void declaredProperties(String pomText, java.util.Map<String, String> out) {
+        // Within ONE POM the later declaration wins: `activeConfiguration`
+        // returns the document before its profiles, and an active profile
+        // REDEFINING a base property is the whole point of writing it there.
+        // Keeping the first value read the base one Maven has overridden, and
+        // resolved a root or an encoding to something the build is not using.
+        java.util.Map<String, String> nearest = new java.util.HashMap<>();
+        for (String active : activeConfiguration(pomText)) {
+            // The plugin sections carry `<properties>` elements of their own --
+            // surefire's system properties, for one -- and reading those as
+            // project properties would resolve a root against a name the model
+            // does not define.
+            String declarations = withoutElement(active, "plugins");
+            declarations = withoutElement(declarations, "pluginManagement");
+            for (String block : elementValues(declarations, "properties")) {
+                java.util.Map<String, String> declared = new java.util.HashMap<>();
+                collectProperties(block, declared);
+                nearest.putAll(declared);
+            }
+        }
+        // Across POMs the first one read wins, which is the nearest: a module's
+        // own property overrides its parent's.
+        for (String name : nearest.keySet()) {
+            if (!out.containsKey(name)) {
+                out.put(name, nearest.get(name));
+            }
+        }
+    }
+
+    /// The name/value pairs a `<properties>` block declares.
+    ///
+    /// A string read like the rest of this tool's POM handling: every direct
+    /// child element is a property, and its name is the tag.
+    static void collectProperties(String block, java.util.Map<String, String> out) {
+        if (block == null) {
+            return;
+        }
+        int at = 0;
+        while (true) {
+            int open = block.indexOf('<', at);
+            if (open < 0) {
+                return;
+            }
+            if (open + 4 <= block.length() && "<!--".equals(block.substring(open, open + 4))) {
+                int end = block.indexOf("-->", open);
+                if (end < 0) {
+                    return;
+                }
+                at = end + 3;
+                continue;
+            }
+            int nameEnd = block.indexOf('>', open);
+            if (nameEnd < 0) {
+                return;
+            }
+            String name = block.substring(open + 1, nameEnd).trim();
+            if (name.isEmpty() || name.charAt(0) == '/' || name.charAt(0) == '?'
+                    || name.endsWith("/")) {
+                at = nameEnd + 1;
+                continue;
+            }
+            // An attribute is not part of the name, and a property element does
+            // not carry one that matters here.
+            int space = name.indexOf(' ');
+            if (space >= 0) {
+                name = name.substring(0, space);
+            }
+            int close = block.indexOf("</" + name + ">", nameEnd);
+            if (close < 0) {
+                at = nameEnd + 1;
+                continue;
+            }
+            if (!out.containsKey(name)) {
+                out.put(name, block.substring(nameEnd + 1, close).trim());
+            }
+            at = close + name.length() + 3;
+        }
+    }
+
+    /// Whether the POM chain says anything compiles the Java sources.
+    ///
+    /// `default-compile` switched off with `<phase>none</phase>` and nothing
+    /// bound in its place means javac never runs, however many `.java` files are
+    /// there. Only a JAVA compiler execution counts: kotlinc does joint
+    /// compilation, reading Java sources to resolve against them and emitting no
+    /// class files for them, which is why Kotlin's documented Maven setup adds a
+    /// `java-compile` execution back.
+    private boolean compilesJava() {
+        for (String pom : pomChain()) {
+            for (String active : activeConfiguration(pom)) {
+                String compiler = activePluginBlock(active, "maven-compiler-plugin", "encoding",
+                        "compile", chainPluginManagement());
+                if (compiler == null) {
+                    compiler = pluginBlock(managementOnly(active), "maven-compiler-plugin");
+                }
+                if (compiler == null || !disablesDefaultCompile(compiler)) {
+                    continue;
+                }
+                return bindsGoal(compiler, "compile");
+            }
+        }
+        return true;
+    }
+
+    /// Whether this compiler plugin block switches `default-compile` off.
+    static boolean disablesDefaultCompile(String pluginBlock) {
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                return false;
+            }
+            String execution = pluginBlock.substring(at, close);
+            if (declaresValue(execution, "id", "default-compile")
+                    && declaresValue(execution, "phase", "none")) {
+                return true;
+            }
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        return false;
+    }
+
+    /// Whether the POM chain says the build compiles `src/main/kotlin`.
+    ///
+    /// The same two conditions the resolved-root side applies: the Kotlin plugin
+    /// has to be bound -- an execution on `compile`, or
+    /// `<extensions>true</extensions>` -- and it must not say where its sources
+    /// are, because a configured `<sourceDirs>` REPLACES the default.
+    private boolean compilesKotlinConventionally() {
+        boolean bound = false;
+        for (String pom : pomChain()) {
+            for (String active : activeConfiguration(pom)) {
+                String plugin = activePluginBlock(active, "kotlin-maven-plugin", "sourceDir",
+                        chainPluginManagement());
+                if (plugin == null) {
+                    continue;
+                }
+                // A configured <sourceDirs> REPLACES the default, so the
+                // convention is not a root at all.
+                if (plugin.indexOf("<sourceDir>") >= 0) {
+                    return false;
+                }
+                bound |= bindsKotlinCompile(plugin);
+            }
+        }
+        return bound;
+    }
+
+    /// Every `<pluginManagement>` section in the POM chain, read once.
+    ///
+    /// A plugin is ACTIVATED by a `<plugin>` entry and CONFIGURED by a managed
+    /// block, and in a multi-module project those routinely live in different
+    /// files: the module turns the plugin on, the parent says what it does.
+    /// Reading each POM independently found neither -- the child has no managed
+    /// block and the parent has no activation -- so an inherited source root was
+    /// lost and a main class living there looked absent.
+    private String chainPluginManagement() {
+        if (!chainManagementRead) {
+            chainManagementRead = true;
+            StringBuilder sb = new StringBuilder();
+            for (String pom : pomChain()) {
+                String managed = managementOnly(pom);
+                if (managed != null) {
+                    sb.append(managed);
+                }
+            }
+            chainManagement = sb.length() == 0 ? null : sb.toString();
+        }
+        return chainManagement;
+    }
+
+    private boolean chainManagementRead;
+    private String chainManagement;
+
+    /// The bound POM and its ancestors, nearest first.
+    ///
+    /// Bounded: a parent chain is short, and this walks the filesystem.
+    private java.util.List<String> pomChain() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        String path = binding == null ? null : binding.pom();
+        String text = pomText();
+        // Every POM nearer than the one being read. Inheritance is applied one
+        // level at a time, so an intermediate parent that disables the
+        // grandparent's execution disables it for this module too -- and this
+        // module never mentions it.
+        java.util.List<String> nearer = new java.util.ArrayList<>();
+        for (int depth = 0; depth < 8 && path != null && text != null; depth++) {
+            // Stripped HERE rather than in the seven walks over this list, so a
+            // walk added later cannot be the one that forgets. A plugin or
+            // execution marked <inherited>false</inherited> applies to the POM
+            // that wrote it and not to its children, so an ANCESTOR's copy is
+            // not part of this module's build, and a root it configures is one
+            // the module never compiles. depth 0 is this module's own POM, which
+            // applies its declarations whatever it says about children.
+            // Two things an ANCESTOR's declarations are subject to and its own
+            // are not, both applied here rather than in the seven walks over
+            // this list. Maven merges the active <plugins> of a parent and a
+            // child by plugin and then by execution id, and this reader parses
+            // each POM independently -- so a child that switches an inherited
+            // execution off with <phase>none</phase> still got the parent's
+            // enabled copy, and a root the build does not compile went into the
+            // scan.
+            out.add(depth == 0 ? text
+                    : withoutExecutionsDisabledBy(withoutNonInheritedPlugins(text), nearer));
+            nearer.add(text);
+            String parent = parentPomPath(path, text);
+            if (parent == null || parent.equals(path)) {
+                break;
+            }
+            path = parent;
+            text = readIfPresentRaw(path);
+        }
+        return out;
+    }
+
+    /// Where `pomText`'s parent POM is, given that it lives at `pomPath`.
+    ///
+    /// `<relativePath>` when it says, `../pom.xml` when it does not, which is
+    /// Maven's own default. Null when the POM declares no parent at all.
+    static String parentPomPath(String pomPath, String pomText) {
+        if (pomPath == null || pomText == null || pomText.indexOf("<parent>") < 0) {
+            return null;
+        }
+        String parent = pomText.substring(pomText.indexOf("<parent>"));
+        String relative = elementValue(parent, "relativePath");
+        if (relative == null) {
+            // `<relativePath/>` is Maven's way of saying "there is no local
+            // parent, resolve it from the repository". elementValue cannot see a
+            // self-closing element, so it read as ABSENT and this fell through to
+            // Maven's default of ../pom.xml -- inheriting properties, a build
+            // directory and managed roots from a POM the project does not
+            // inherit from at all.
+            relative = declaresEmptyElement(parent, "relativePath") ? "" : "../pom.xml";
+        }
+        relative = relative.trim().replace('\\', '/');
+        if (relative.isEmpty()) {
+            // An empty relativePath means "resolve from the repository", which
+            // this reader cannot do.
+            return null;
+        }
+        if (!relative.endsWith(".xml")) {
+            relative = relative + "/pom.xml";
+        }
+        int slash = pomPath.replace('\\', '/').lastIndexOf('/');
+        String dir = slash < 0 ? "" : pomPath.replace('\\', '/').substring(0, slash);
+        return normalizePath(dir + "/" + relative);
+    }
+
+    /// A path with its `.` and `..` segments applied.
+    static String normalizePath(String path) {
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        boolean absolute = path.startsWith("/");
+        for (String segment : com.codename1.util.StringUtil.tokenize(path, "/")) {
+            if (segment.isEmpty() || ".".equals(segment)) {
+                continue;
+            }
+            if ("..".equals(segment)) {
+                if (!parts.isEmpty() && !"..".equals(parts.get(parts.size() - 1))) {
+                    parts.remove(parts.size() - 1);
+                    continue;
+                }
+                if (absolute) {
+                    continue;
+                }
+            }
+            parts.add(segment);
+        }
+        StringBuilder out = new StringBuilder(absolute ? "/" : "");
+        for (int i = 0; i < parts.size(); i++) {
+            if (i > 0) {
+                out.append('/');
+            }
+            out.append(parts.get(i));
+        }
+        return out.toString();
+    }
+
+
+    /// Where the compiled classes land, which is where process-annotations
+    /// writes the build hint manifest.
+    ///
+    /// `target/classes` was hardcoded. A project that configures
+    /// `<build><outputDirectory>` compiles somewhere else and the manifest goes
+    /// with it, so the lookup found nothing and every annotation-owned hint
+    /// looked editable -- and Add then wrote the duplicate declaration the next
+    /// build refuses. That is the whole failure this manifest exists to prevent,
+    /// reached by looking in the wrong directory.
+    ///
+    /// Maven's own layering: the configured `<outputDirectory>` if there is one,
+    /// else `<directory>/classes`, else `target/classes`. Read from the POM
+    /// rather than the binding because the binding does not carry it; a launcher
+    /// that resolved it could pass it and this would become the fallback.
+    private String outputDirectory(String projectDir) {
+        for (String pom : pomChain()) {
+            for (String active : activeConfiguration(pom)) {
+                String configured = configuredOutputDirectory(active);
+                if (configured == null || configured.trim().isEmpty()) {
+                    continue;
+                }
+                // The build directory IS resolvable here, unlike inside
+                // <directory> itself, so the general expander applies.
+                String expanded = expandProjectPaths(configured.trim(), projectDir,
+                        buildDirectory(projectDir), pomProperties());
+                if (expanded != null && !expanded.isEmpty()) {
+                    return expanded.startsWith("/") || expanded.indexOf(':') == 1
+                            ? normalizePath(expanded)
+                            : normalizePath(projectDir + "/" + expanded);
+                }
+            }
+        }
+        String build = buildDirectory(projectDir);
+        return normalizePath((build == null || build.isEmpty()
+                ? projectDir + "/target" : build) + "/classes");
+    }
+
+    /// The `<outputDirectory>` the POM's `<build>` element configures, or null.
+    ///
+    /// A DIRECT child, through the same section filter as `<directory>`: the
+    /// plugin sections carry `<outputDirectory>` elements of their own -- the
+    /// compiler plugin's, the resources plugin's -- and taking the first one in
+    /// the build element would read somebody else's.
+    static String configuredOutputDirectory(String pomText) {
+        if (pomText == null) {
+            return null;
+        }
+        int at = pomText.indexOf("<build>");
+        if (at < 0) {
+            return null;
+        }
+        int close = pomText.indexOf("</build>", at);
+        String build = close < 0 ? pomText.substring(at) : pomText.substring(at, close);
+        return elementValue(withoutNonCompileSections(build), "outputDirectory");
+    }
+
+    /// The build directory the POM chain configures, nearest first, or null for
+    /// Maven's own default.
+    private String buildDirectory(String projectDir) {
+        for (String pom : pomChain()) {
+            for (String active : activeConfiguration(pom)) {
+                String configured = configuredBuildDirectory(active);
+                if (configured == null || configured.trim().isEmpty()) {
+                    continue;
+                }
+                // `<directory>${project.basedir}/out</directory>` is legal and
+                // resolvable -- discarding it sent the search to `target` for a
+                // project that compiles somewhere else. Only the basedir family
+                // is applied here: the value being read IS the build directory,
+                // so expanding a reference to it would be circular.
+                String expanded = expandBasedir(configured.trim(), projectDir, pomProperties());
+                if (expanded != null) {
+                    return expanded;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// The basedir family only, which is what a build directory may name.
+    ///
+    /// Not `${project.build.directory}`: the value being read IS the build
+    /// directory, so expanding a reference to it would be circular -- and the
+    /// general expander resolves that one to `target`, which would quietly make
+    /// a self-reference mean the default.
+    static String expandBasedir(String value, String projectDir) {
+        return expandBasedir(value, projectDir, null);
+    }
+
+    /// As above, also resolving an ordinary `${property}`.
+    static String expandBasedir(String value, String projectDir,
+                                java.util.Map<String, String> properties) {
+        String out = value;
+        out = replaceLiteral(out, "${project.basedir}", projectDir);
+        out = replaceLiteral(out, "${project.baseDir}", projectDir);
+        out = replaceLiteral(out, "${basedir}", projectDir);
+        out = replaceLiteral(out, "${pom.basedir}", projectDir);
+        out = resolveDeclaredProperties(out, properties);
+        return out.indexOf("${") >= 0 ? null : out;
+    }
+
+    /// The bound POM's text, read once per session.
+    private String pomText() {
+        if (!pomTextRead) {
+            pomTextRead = true;
+            if (binding != null && binding.pom() != null && !binding.pom().isEmpty()) {
+                pomText = readIfPresentRaw(binding.pom());
+            }
+        }
+        return pomText;
+    }
+
+    private boolean pomTextRead;
+    private String pomText;
+
+    /// The text of every OTHER source in the project, bounded.
+    ///
+    /// For the declarations that are not file-scoped and so can decide what a
+    /// name in the main source means: a `typealias` naming one of our
+    /// annotations, and a type whose name shadows an on-demand import of one.
+    /// Java as well as Kotlin, because the second of those is a Java rule too --
+    /// a `p/Ios.java` beside the main class is what `@Ios` means there,
+    /// whatever the wildcard import says.
+    ///
+    /// Bounded in files read and in directories walked, because this runs when
+    /// the tool opens a project and a source tree is not a search index; a
+    /// project past the bound simply keeps the earlier behaviour for whatever
+    /// was declared in a file nobody reached.
+    private java.util.List<PeerSource> otherProjectSources(String projectDir, String exclude) {
+        java.util.List<PeerSource> out = new java.util.ArrayList<>();
+        if (projectDir == null) {
+            return out;
+        }
+        java.util.List<String> queue = new java.util.ArrayList<>(mainSourceRoots(projectDir));
+        for (int i = 0; i < queue.size() && i < 4000 && out.size() < 200; i++) {
+            String dir = queue.get(i);
+            String[] children;
+            try {
+                children = FileSystemStorage.getInstance().listFiles(ProjectIO.fsUrl(dir));
+            } catch (Exception ex) {
+                continue;
+            }
+            if (children == null) {
+                continue;
+            }
+            for (String child : children) {
+                String name = child.endsWith("/") ? child.substring(0, child.length() - 1) : child;
+                String path = dir + "/" + name;
+                if (FileSystemStorage.getInstance().isDirectory(ProjectIO.fsUrl(path))) {
+                    if (!name.startsWith(".")) {
+                        queue.add(path);
+                    }
+                    continue;
+                }
+                if (!name.endsWith(".kt") && !name.endsWith(".java")) {
+                    continue;
+                }
+                if (path.equals(exclude) || out.size() >= 200) {
+                    continue;
+                }
+                String text = readIfPresent(path);
+                if (text != null) {
+                    boolean kotlinPeer = name.endsWith(".kt");
+                    // Java's escapes are translated before anything is
+                    // tokenized, so a peer declaring an escaped package name is
+                    // in the package it decodes to -- and reading it literally
+                    // put it in another one, where it shadows nothing.
+                    out.add(new PeerSource(
+                            kotlinPeer ? text : decodeUnicodeEscapes(text), kotlinPeer));
+                }
+            }
+        }
+        return out;
+    }
+
+    /// The text of the file declaring `main` in `pkg`, found by searching, or null.
+    ///
+    /// Walks the project for a `.java` or `.kt` file that declares the class, so
+    /// a configured source root or a Kotlin file whose name differs from its
+    /// class is found anyway. Bounded in depth and in how many files it will
+    /// open, because this runs when Settings opens a project and a source tree is
+    /// not a search index.
+    private String findMainClassSource(String projectDir, String main, String pkg) {
+        if (projectDir == null || main == null || main.isEmpty()) {
+            return null;
+        }
+        // Collected first, then examined in two passes. Deciding as we walk made
+        // the answer depend on directory order: the budget could be spent on
+        // unrelated files before reaching the one Kotlin source whose name
+        // differs from its class -- which is the only layout this fallback exists
+        // for, so exactly the case it would drop.
+        java.util.List<String> named = new java.util.ArrayList<>();
+        java.util.List<String> others = new java.util.ArrayList<>();
+        java.util.List<String> queue = new java.util.ArrayList<>(mainSourceRoots(projectDir));
+        for (int i = 0; i < queue.size() && i < 4000; i++) {
+            String dir = queue.get(i);
+            String[] children;
+            try {
+                children = FileSystemStorage.getInstance().listFiles(ProjectIO.fsUrl(dir));
+            } catch (Exception ex) {
+                continue;
+            }
+            if (children == null) {
+                continue;
+            }
+            for (String child : children) {
+                String name = child.endsWith("/") ? child.substring(0, child.length() - 1) : child;
+                String path = dir + "/" + name;
+                if (FileSystemStorage.getInstance().isDirectory(ProjectIO.fsUrl(path))) {
+                    // The same roots as the peer sweep, so the two cannot
+                    // disagree about where this module's sources are.
+                    if (!name.startsWith(".")) {
+                        queue.add(path);
+                    }
+                    continue;
+                }
+                if (name.equals(main + ".java") || name.equals(main + ".kt")) {
+                    named.add(path);
+                } else if (name.endsWith(".kt")) {
+                    // Only Kotlin: Java requires a public type to be named after
+                    // its file, so a differently named .java cannot declare the
+                    // main class of an application.
+                    others.add(path);
+                }
+            }
+        }
+        String hit = firstDeclaring(named, main, pkg, named.size());
+        return hit != null ? hit : firstDeclaring(others, main, pkg, 400);
+    }
+
+
+    /// The text of the first of `paths` that declares `main` in `pkg`, opening at
+    /// most `budget` of them.
+    private String firstDeclaring(java.util.List<String> paths, String main, String pkg,
+                                  int budget) {
+        int opened = 0;
+        for (String path : paths) {
+            if (opened++ >= budget) {
+                return null;
+            }
+            String text = readIfPresent(path);
+            if (text != null && !path.endsWith(".kt")) {
+                text = decodeUnicodeEscapes(text);
+            }
+            if (text == null || !declaresClass(text, main, pkg, path.endsWith(".kt"))) {
+                continue;
+            }
+            lastSourceWasKotlin = path.endsWith(".kt");
+            lastSourcePath = path;
+            return text;
+        }
+        return null;
+    }
+
+    /// Whether `text` declares `main` in `pkg`, judged by the package statement
+    /// and a `class`/`object` declaration rather than by where the file sits.
+    static boolean declaresClass(String text, String main, String pkg) {
+        return declaresClass(text, main, pkg, true);
+    }
+
+    /// Whether `text` declares `main` in `pkg`, judged by the package statement
+    /// and a `class`/`object` declaration rather than by where the file sits.
+    ///
+    /// Found in CODE: a `// class Main` left over from an edit, or those words
+    /// inside a string, would otherwise make an unrelated file answer for the
+    /// main class -- ownership then reads as empty and Settings offers Add for a
+    /// hint the real main class already annotates.
+    /// The package `source` declares, or "" for the default package.
+    static String declaredPackageIn(String text, boolean kotlin) {
+        int pkgAt = nextMarker(text, "package", 0, kotlin);
+        while (pkgAt >= 0) {
+            int after = pkgAt + "package".length();
+            if (after < text.length() && !continuesAName(text.charAt(after))
+                    && (pkgAt == 0 || !continuesAName(text.charAt(pkgAt - 1)))) {
+                return qualifiedNameAt(text, after, kotlin);
+            }
+            pkgAt = nextMarker(text, "package", after, kotlin);
+        }
+        return "";
+    }
+
+    static boolean declaresClass(String text, String main, String pkg, boolean kotlin) {
+        String declaredPkg = "";
+        int pkgAt = nextMarker(text, "package", 0, kotlin);
+        while (pkgAt >= 0) {
+            int after = pkgAt + "package".length();
+            if (after < text.length() && !continuesAName(text.charAt(after))
+                    && (pkgAt == 0 || !continuesAName(text.charAt(pkgAt - 1)))) {
+                // Live tokens, as the processor-side helper reads it.
+                // `package /* generated */ com.example;` is legal, and taking the
+                // remainder of the text and trimming it started the name at the
+                // comment -- so the real main source was rejected by both the
+                // conventional lookup and the fallback search.
+                // Component by component, exactly as the import reader does.
+                // `package com /* generated */ . example;` is legal, and reading
+                // the name as one contiguous run recorded `com` and rejected the
+                // real main source.
+                declaredPkg = qualifiedNameAt(text, after, kotlin);
+                break;
+            }
+            pkgAt = nextMarker(text, "package", after, kotlin);
+        }
+        if (!(pkg == null || pkg.isEmpty() ? "" : pkg).equals(declaredPkg)) {
+            return false;
+        }
+        // At the TOP level. An application's main class is not nested, and
+        // accepting a nested one let an unrelated `class Outer { class Main }`
+        // in the same package end the search on the wrong file -- so the
+        // annotations on the real main class were never read, and Settings
+        // offered Add for a hint that is already annotated.
+        int depth = 0;
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c == '"' || c == '\'' || c == '/' || c == '`') {
+                int skipped = skipNonCode(text, i, kotlin);
+                if (skipped > i) {
+                    i = skipped;
+                    continue;
+                }
+            }
+            if (c == '{') {
+                depth++;
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                depth--;
+                i++;
+                continue;
+            }
+            if (depth != 0 || !continuesAName(c)
+                    || (i > 0 && continuesAName(text.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int wordEnd = i;
+            while (wordEnd < text.length() && continuesAName(text.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            String word = text.substring(i, wordEnd);
+            if ("class".equals(word) || "object".equals(word)) {
+                // Every legal separator, not just a space: `class\nMain` and
+                // `class /* why */ Main` are both valid Java and Kotlin, and
+                // stopping at a newline read the declaration as unnamed.
+                int n = nextLiveChar(text, wordEnd, kotlin);
+                if (n >= 0) {
+                    // Kotlin lets the name be ESCAPED in backticks, and the
+                    // binary name -- which is what codename1.mainName holds --
+                    // is the text between them. Reading it with the identifier
+                    // rule recorded an empty name, so the real main source was
+                    // rejected, nothing knew which hints an annotation already
+                    // owns, and Settings offered Add for one of them.
+                    int end = n;
+                    String declared;
+                    if (kotlin && text.charAt(n) == '`') {
+                        int close = text.indexOf('`', n + 1);
+                        declared = close < 0 ? null : text.substring(n + 1, close);
+                    } else {
+                        while (end < text.length() && continuesAName(text.charAt(end))) {
+                            end++;
+                        }
+                        declared = text.substring(n, end);
+                    }
+                    if (main.equals(declared)) {
+                        return true;
+                    }
+                }
+            }
+            i = wordEnd;
+        }
+        return false;
+    }
+
+    /// The POM as bytes-to-ISO-8859-1, used only to find the encoding
+    /// declaration -- which is ASCII wherever it appears.
+    private String readIfPresentRaw(String path) {
+        InputStream in = null;
+        try {
+            String url = ProjectIO.fsUrl(path);
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            if (!fs.exists(url)) {
+                return null;
+            }
+            in = fs.openInputStream(url);
+            return new String(Util.readInputStream(in), "ISO-8859-1");
+        } catch (Exception ex) {
+            return null;
+        } finally {
+            Util.cleanup(in);
+        }
+    }
+
+    private String readIfPresent(String path) {
+        InputStream in = null;
+        try {
+            String url = ProjectIO.fsUrl(path);
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            if (!fs.exists(url)) {
+                return null;
+            }
+            in = fs.openInputStream(url);
+            byte[] bytes = Util.readInputStream(in);
+            // What the project SAYS it is written in, when it says. The guess
+            // below can only tell UTF-8 from a single-byte encoding, so a
+            // multibyte one such as Shift_JIS came back as mojibake and its
+            // non-ASCII names never matched.
+            String declared = declaredSourceEncoding();
+            if (declared != null) {
+                try {
+                    return new String(bytes, declared);
+                } catch (Exception unsupported) {
+                    // Named an encoding this runtime does not have. Guessing is
+                    // better than failing to read the file at all.
+                }
+            }
+            // UTF-8 where the file is UTF-8, which is the overwhelming case;
+            // ISO-8859-1 where it is not, since that never fails to decode. The
+            // compiler's source encoding is a project setting this tool does not
+            // have, and decoding a single-byte source as UTF-8 produced
+            // replacement characters -- so a non-ASCII package or class name
+            // never matched codename1.packageName, the real main source was
+            // rejected, and a hint an annotation owns read as editable.
+            return new String(bytes, isValidUtf8(bytes) ? "UTF-8" : "ISO-8859-1");
+        } catch (Exception ex) {
+            Log.e(ex);
+            return null;
+        } finally {
+            Util.cleanup(in);
+        }
+    }
+
+    /// The index just past the dotted name starting at or after `from`, or
+    /// `from` when there is none. The same walk as `qualifiedNameAt`, so the two
+    /// cannot disagree about where a name ends.
+    static int qualifiedNameEnd(String source, int from, boolean kotlin) {
+        int i = nextLiveChar(source, from, kotlin);
+        int end = from;
+        while (i >= 0 && i < source.length()) {
+            int stop = componentEnd(source, i, kotlin);
+            if (stop == i) {
+                return end;
+            }
+            end = stop;
+            int dot = nextLiveChar(source, stop, kotlin);
+            if (dot < 0 || source.charAt(dot) != '.') {
+                return end;
+            }
+            i = nextLiveChar(source, dot + 1, kotlin);
+        }
+        return end;
+    }
+
+    /// The dotted name starting at or after `from`, stepping over whitespace and
+    /// comments around each dot.
+    /// The end of the name component at `i`, or `i` when there is none.
+    ///
+    /// A Kotlin component may be ESCAPED in backticks -- `package com.`when``
+    /// is legal and the class belongs to com.when. Reading only identifier
+    /// characters stopped at the backtick and recorded `com.`, so the real main
+    /// source was rejected: nothing then knew which hints an annotation already
+    /// owns, and Settings could write the duplicate properties declaration that
+    /// the next build rejects.
+    private static int componentEnd(String source, int i, boolean kotlin) {
+        if (kotlin && i < source.length() && source.charAt(i) == '`') {
+            int close = source.indexOf('`', i + 1);
+            return close < 0 ? i : close + 1;
+        }
+        int end = i;
+        while (end < source.length() && continuesAName(source.charAt(end))) {
+            end++;
+        }
+        return end;
+    }
+
+    /// That component's text, which is what the backticks quote rather than
+    /// include.
+    private static String componentText(String source, int i, int end, boolean kotlin) {
+        if (kotlin && i < end && source.charAt(i) == '`') {
+            return source.substring(i + 1, end - 1);
+        }
+        return source.substring(i, end);
+    }
+
+    static String qualifiedNameAt(String source, int from, boolean kotlin) {
+        int i = nextLiveChar(source, from, kotlin);
+        StringBuilder name = new StringBuilder();
+        while (i >= 0 && i < source.length()) {
+            int end = componentEnd(source, i, kotlin);
+            if (end == i) {
+                break;
+            }
+            name.append(componentText(source, i, end, kotlin));
+            int dot = nextLiveChar(source, end, kotlin);
+            if (dot < 0 || source.charAt(dot) != '.') {
+                break;
+            }
+            name.append('.');
+            i = nextLiveChar(source, dot + 1, kotlin);
+        }
+        return name.toString();
+    }
+
+    /// One import directive: the dotted name it introduces and its alias, if any.
+    static final class Imported {
+        final String name;
+        final String alias;
+
+        Imported(String name, String alias) {
+            this.name = name;
+            this.alias = alias;
+        }
+    }
+
+    /// Every live `import` in `source`, read FORWARDS.
+    ///
+    /// Forwards rather than by backing up from a name, because backing up has to
+    /// step over comments in reverse -- and
+    /// `import /* build hints */ com.codename1.annotations.buildhints.Ios;` is
+    /// legal, so a backward walk that skipped only spaces missed the import and
+    /// the live @Ios was read as somebody else's.
+    static java.util.List<Imported> importsIn(String source, boolean kotlin) {
+        java.util.List<Imported> out = new java.util.ArrayList<>();
+        int at = nextMarker(source, "import", 0, kotlin);
+        while (at >= 0) {
+            int after = at + "import".length();
+            boolean whole = (at == 0 || !continuesAName(source.charAt(at - 1)))
+                    && after < source.length() && !continuesAName(source.charAt(after));
+            if (!whole) {
+                at = nextMarker(source, "import", after, kotlin);
+                continue;
+            }
+            int i = nextLiveChar(source, after, kotlin);
+            if (i < 0) {
+                return out;
+            }
+            // Java's optional `static`, which is a modifier and not the imported
+            // name. Reading it as the name recorded an import called `static`,
+            // so `import static com.example.Types.Ios;` never registered as
+            // giving `Ios` away -- a wildcard import of ours was trusted instead
+            // and the editor was hidden for a hint the processor never emits.
+            if (!kotlin && source.startsWith("static", i)
+                    && i + 6 < source.length() && !continuesAName(source.charAt(i + 6))) {
+                int afterStatic = nextLiveChar(source, i + 6, kotlin);
+                if (afterStatic >= 0) {
+                    i = afterStatic;
+                }
+            }
+            // Component by component, stepping over whitespace and comments
+            // around each dot. `import com.codename1.annotations. /* x */
+            // buildhints.Ios;` is legal, and reading the name as one contiguous
+            // run stopped at the separator and recorded only the prefix -- so the
+            // import was not recognised and the live @Ios read as somebody
+            // else's.
+            StringBuilder name = new StringBuilder();
+            while (i >= 0 && i < source.length()) {
+                if (source.charAt(i) == '*') {
+                    name.append('*');
+                    i++;
+                    break;
+                }
+                // A COMPONENT may be escaped -- `import
+                // com.codename1.annotations.`buildhints`.Ios` is legal Kotlin.
+                // Reading only identifier characters recorded `annotations.`, so
+                // the import went unrecognised and a live @Ios was read as
+                // somebody else's: Settings then offered the hint as unowned and
+                // could write the duplicate the next build refuses.
+                int end = componentEnd(source, i, kotlin);
+                if (end == i) {
+                    break;
+                }
+                name.append(componentText(source, i, end, kotlin));
+                int dot = nextLiveChar(source, end, kotlin);
+                if (dot < 0 || source.charAt(dot) != '.') {
+                    i = end;
+                    break;
+                }
+                name.append('.');
+                i = nextLiveChar(source, dot + 1, kotlin);
+            }
+            if (i < 0) {
+                i = source.length();
+            }
+            String alias = null;
+            int a = nextLiveChar(source, i, kotlin);
+            if (a >= 0 && source.regionMatches(a, "as", 0, 2)
+                    && a + 2 < source.length() && !continuesAName(source.charAt(a + 2))) {
+                int n = nextLiveChar(source, a + 2, kotlin);
+                if (n >= 0) {
+                    // The alias may be escaped too: `import a.B as `when``.
+                    int nameEnd = componentEnd(source, n, kotlin);
+                    if (nameEnd > n) {
+                        alias = componentText(source, n, nameEnd, kotlin);
+                    }
+                }
+            }
+            if (name.length() > 0) {
+                out.add(new Imported(name.toString(), alias));
+            }
+            at = nextMarker(source, "import", i, kotlin);
+        }
+        return out;
+    }
+
+    /// Whether a live import brings `simple` in from the build hints package.
+    ///
+    /// Either the type by name or the package on demand, and neither if some
+    /// other library's type of that name is imported explicitly: a single-type
+    /// import shadows an on-demand one, so their `Ios` beats our wildcard. That
+    /// is the language's rule, not a preference.
+    static boolean importsAnnotation(String source, String simple, boolean kotlin) {
+        return importsAnnotation(source, simple, kotlin, false);
+    }
+
+    /// As above; `shadowed` says the same package declares a type of that name.
+    ///
+    /// A same-package type beats an ON-DEMAND import in both languages, so a
+    /// project with its own `Ios` and a wildcard import of ours writes its own
+    /// -- and reading that as ours hid the editor for a hint the processor never
+    /// emits. A NAMED import still wins, since it is the more specific statement
+    /// and a file may not both import a name and declare it.
+    static boolean importsAnnotation(String source, String simple, boolean kotlin,
+                                     boolean shadowed) {
+        String pkg = "com.codename1.annotations.buildhints.";
+        boolean ours = false;
+        for (Imported imported : importsIn(source, kotlin)) {
+            if (imported.alias != null) {
+                // Introduces its ALIAS rather than its own name -- so it neither
+                // grants nor shadows the simple spelling, unless the alias IS
+                // that spelling. `import com.example.Other as Ios` makes `@Ios`
+                // mean Other, and ignoring it let a wildcard import of ours be
+                // trusted instead, hiding the editor for a hint the processor
+                // never emits.
+                if (imported.alias.equals(simple)) {
+                    return imported.name.startsWith(pkg);
+                }
+                continue;
+            }
+            if (imported.name.equals(pkg + simple)) {
+                return true;
+            }
+            if (imported.name.equals(pkg + "*")) {
+                ours = !shadowed;
+            } else if (imported.name.endsWith("." + simple)) {
+                return false;
+            }
+        }
+        return ours;
+    }
+
+    /// Whether a top-level type named `simple` is declared in `text`.
+    ///
+    /// Wider than the main-class lookup on purpose: an annotation is declared
+    /// with `annotation class` in Kotlin and `@interface` in Java, and any of
+    /// those shadows an on-demand import of the same name.
+    static boolean declaresTypeNamed(String text, String simple, boolean kotlin) {
+        return declaresTypeNamed(text, simple, kotlin, true);
+    }
+
+    /// As above; `includePrivate` is false for a peer, where a file-private
+    /// declaration is not a name the main source can see.
+    ///
+    /// On a top-level Kotlin declaration `private` means this FILE only, so
+    /// another file's `private annotation class Ios` shadows nothing -- counting
+    /// it made a real `@Ios` read as somebody else's, so the hint looked unowned
+    /// and Add wrote the duplicate the next build refuses. In the main file
+    /// itself a private type does shadow, because that is the file it belongs
+    /// to.
+    static boolean declaresTypeNamed(String text, String simple, boolean kotlin,
+                                     boolean includePrivate) {
+        String modifiers = !includePrivate && kotlin ? blanked(text, kotlin) : null;
+        int depth = 0;
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c == '"' || c == '\'' || c == '/' || c == '`') {
+                int skipped = skipNonCode(text, i, kotlin);
+                if (skipped > i) {
+                    i = skipped;
+                    continue;
+                }
+            }
+            if (c == '{') {
+                depth++;
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                depth--;
+                i++;
+                continue;
+            }
+            if (depth != 0 || !continuesAName(c)
+                    || (i > 0 && continuesAName(text.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int wordEnd = i;
+            while (wordEnd < text.length() && continuesAName(text.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            String word = text.substring(i, wordEnd);
+            if ("class".equals(word) || "object".equals(word) || "interface".equals(word)
+                    || "enum".equals(word) || "record".equals(word)) {
+                int n = nextLiveChar(text, wordEnd, kotlin);
+                if (n >= 0) {
+                    int end = componentEnd(text, n, kotlin);
+                    if (end > n && componentText(text, n, end, kotlin).equals(simple)
+                            && (modifiers == null || !declaredPrivate(modifiers, i))) {
+                        return true;
+                    }
+                }
+            }
+            i = wordEnd;
+        }
+        return false;
+    }
+
+
+    /// EVERY such name, for the same reason the import form collects them all:
+    /// a file may declare `typealias First = Ios` and `typealias AppIos = Ios`
+    /// and use only the second.
+    static java.util.List<String> kotlinTypeAliases(String source, String simple,
+                                                    boolean kotlin) {
+        return kotlinTypeAliases(visibleTypeAliases(source, null), simple, kotlin);
+    }
+
+    /// Every name that resolves to `simple`, across all of `sources`, following
+    /// a CHAIN of aliases.
+    ///
+    /// `typealias AppIos = Ios` then `typealias CustomIos = AppIos` is legal,
+    /// and `@CustomIos(...)` still compiles to our annotation. Accepting only a
+    /// right-hand side that names the annotation directly left the hint reading
+    /// as unowned, so Add wrote the duplicate declaration the next build
+    /// refuses. Resolved by closure rather than by recursion so that a cycle --
+    /// which the compiler rejects, but this reader must not hang on -- simply
+    /// stops adding names.
+    /// A `typealias`, with where it was written and the name the main file sees
+    /// it under.
+    ///
+    /// The two names differ because an import may rename it: `import
+    /// com.other.AppIos as Custom` makes `com.other`'s `AppIos` usable only as
+    /// `Custom`, so the file that declares it and the file that writes the
+    /// annotation disagree about what it is called.
+    static final class AliasDeclaration {
+        /// The name in the file that declares it, which its own chain uses.
+        final String local;
+        /// The name the main file writes, or null when it cannot see this one.
+        final String visible;
+        final String target;
+        /// The package it is declared in, which is the scope its chain resolves
+        /// in -- a chain may span files, but only within one package.
+        final String scope;
+        /// The text that declares it, whose imports decide what its target names.
+        final String owner;
+
+        AliasDeclaration(String local, String visible, String target, String scope, String owner) {
+            this.local = local;
+            this.visible = visible;
+            this.target = target;
+            this.scope = scope;
+            this.owner = owner;
+        }
+    }
+
+    /// Whether `word` is a modifier that may sit between `private` and the
+    /// keyword it belongs to.
+    ///
+    /// A class carries more of them than a typealias does -- `private
+    /// annotation class Ios` is the shape that matters here -- and stopping at
+    /// the first one not on this list is what keeps a `private` belonging to an
+    /// earlier declaration from being read as this one's.
+    private static boolean isDeclarationModifier(String word) {
+        return "public".equals(word) || "internal".equals(word) || "protected".equals(word)
+                || "actual".equals(word) || "expect".equals(word)
+                || "annotation".equals(word) || "data".equals(word) || "enum".equals(word)
+                || "sealed".equals(word) || "open".equals(word) || "abstract".equals(word)
+                || "final".equals(word) || "inner".equals(word) || "value".equals(word)
+                || "inline".equals(word) || "external".equals(word);
+    }
+
+    /// The source encoding the POM declares, or null when it declares none.
+    ///
+    /// Read once per session: this is asked for every source file the sweeps
+    /// open, and the answer cannot change while the project is bound.
+    private String declaredSourceEncoding() {
+        if (!sourceEncodingRead) {
+            sourceEncodingRead = true;
+            // What the launcher resolved, when it did: Maven has already applied
+            // the profiles, the inheritance and the properties that this reader
+            // can only approximate.
+            if (binding != null && binding.sourceEncoding() != null
+                    && !binding.sourceEncoding().isEmpty()) {
+                sourceEncoding = binding.sourceEncoding();
+                return sourceEncoding;
+            }
+            // The chain, not the module alone: `project.build.sourceEncoding`
+            // is normally declared once in the parent, which is where a
+            // multi-module Codename One project puts it -- so looking only at
+            // the bound POM found nothing in the standard layout.
+            for (String pom : pomChain()) {
+                for (String active : activeConfiguration(pom)) {
+                    sourceEncoding = declaredSourceEncoding(active, pomProperties(),
+                            chainPluginManagement());
+                    if (sourceEncoding != null) {
+                        break;
+                    }
+                }
+                if (sourceEncoding != null) {
+                    break;
+                }
+            }
+        }
+        return sourceEncoding;
+    }
+
+    private boolean sourceEncodingRead;
+    private String sourceEncoding;
+
+    /// The encoding `pomText` declares: the conventional property first, then
+    /// the compiler plugin's own setting.
+    ///
+    /// A string read rather than an XML model, which is how this tool handles
+    /// POMs everywhere else. It is looking for one value that is written as a
+    /// plain element in both places.
+    static String declaredSourceEncoding(String pomText) {
+        return declaredSourceEncoding(pomText, null);
+    }
+
+    /// The same answer, resolving a `${property}` encoding against what the POM
+    /// chain declares.
+    ///
+    /// `<encoding>${source.charset}</encoding>` is the charset Maven really
+    /// compiles with. Discarding it fell through to an inherited
+    /// `project.build.sourceEncoding` that is not the one in force, and a
+    /// non-ASCII package or main-class name was then decoded with the wrong
+    /// charset -- missing the annotated source altogether.
+    static String declaredSourceEncoding(String pomText,
+                                         java.util.Map<String, String> properties) {
+        return declaredSourceEncoding(pomText, properties, null);
+    }
+
+    /// The same, also consulting the parent chain's `<pluginManagement>`.
+    static String declaredSourceEncoding(String pomText,
+                                         java.util.Map<String, String> properties,
+                                         String managedFromChain) {
+        if (pomText == null) {
+            return null;
+        }
+        // The compiler plugin's own <encoding> FIRST. The parameter defaults to
+        // ${project.build.sourceEncoding}, so an explicit one overrides the
+        // property -- reading the property first meant a module that sets the
+        // plugin parameter was decoded with the value it overrides.
+        //
+        // Inside the COMPILER plugin, and scoped to the compile goal.
+        // maven-resources-plugin declares an <encoding> of its own, and taking
+        // the first one in the file adopted the resource charset for every
+        // source -- so a UTF-8 source with a differently encoded resources block
+        // was read as neither.
+        String value = null;
+        for (String block : compileGoalConfiguration(
+                compilerPluginBlock(pomText, managedFromChain), "compile", "encoding")) {
+            value = elementValue(block, "encoding");
+            if (value != null && value.trim().length() > 0) {
+                break;
+            }
+            value = null;
+        }
+        if (value == null) {
+            value = elementValue(pomText, "project.build.sourceEncoding");
+        }
+        if (value == null) {
+            value = elementValue(pomText, "maven.compiler.encoding");
+        }
+        value = resolveDeclaredProperties(value, properties);
+        if (value == null || value.trim().isEmpty() || value.indexOf("${") >= 0) {
+            // An expression nothing declares is not an encoding; the caller
+            // falls back rather than compiling a property name as a charset.
+            return null;
+        }
+        return value.trim();
+    }
+
+    /// Whether `xml` declares `<element>value</element>`, comparing the element's
+    /// VALUE rather than its serialization.
+    ///
+    /// `<goal>\n  compile\n</goal>` is ordinary pretty-printed XML and Maven
+    /// trims it before running the goal. Matching the serialized string left
+    /// such an execution looking unbound, so the root it configures was dropped
+    /// and a main class living there could not be found.
+    static boolean declaresValue(String xml, String element, String value) {
+        if (xml == null) {
+            return false;
+        }
+        for (String declared : elementValues(xml, element)) {
+            if (value.equals(declared.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether `pluginBlock` has an enabled execution bound to `goal`.
+    ///
+    /// A null goal means the caller does not care, and any execution counts.
+    static boolean bindsGoal(String pluginBlock, String goal) {
+        if (pluginBlock == null) {
+            return false;
+        }
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                return false;
+            }
+            String execution = pluginBlock.substring(at, close);
+            if (!declaresValue(execution, "phase", "none")
+                    && (goal == null || declaresValue(execution, "goal", goal))) {
+                return true;
+            }
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        return false;
+    }
+
+    /// Whether this Kotlin plugin block compiles with no execution written.
+    ///
+    /// `<extensions>true</extensions>` is what binds compile without one, and a
+    /// POM switches that off the way it switches off any inherited execution --
+    /// `<id>default-compile</id>` with `<phase>none</phase>`.
+    ///
+    /// Only that id cancels it: the execution the extension contributes is
+    /// `default-compile`, so disabling a differently named one that happens to
+    /// bind `compile` switches off only that execution. Reading any disabled
+    /// compile execution as cancellation dropped the Kotlin roots of a module
+    /// that still compiles Kotlin.
+    static boolean kotlinRunsWithoutExecution(String pluginBlock) {
+        if (pluginBlock == null
+                || !declaresValue(pluginBlock, "extensions", "true")) {
+            return false;
+        }
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                break;
+            }
+            String execution = pluginBlock.substring(at, close);
+            if (declaresValue(execution, "phase", "none")
+                    && declaresValue(execution, "id", "default-compile")) {
+                return false;
+            }
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        return true;
+    }
+
+    /// Whether this Kotlin plugin block compiles at all -- an enabled execution
+    /// on `compile`, or the lifecycle extension.
+    static boolean bindsKotlinCompile(String pluginBlock) {
+        if (pluginBlock == null) {
+            return false;
+        }
+        // The id alone binds compile only where the extension lifecycle provides
+        // that execution. Without <extensions>true</extensions> the Kotlin
+        // plugin gets none injected, so `default-compile` with no <goal> is a
+        // name and nothing more -- and treating it as a binding puts
+        // src/main/kotlin in the roots for a module that compiles no Kotlin,
+        // where a dormant peer shadows the real annotation.
+        boolean lifecycleProvided = declaresValue(pluginBlock, "extensions", "true");
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                break;
+            }
+            String execution = pluginBlock.substring(at, close);
+            if (!declaresValue(execution, "phase", "none")
+                    && (declaresValue(execution, "goal", "compile")
+                        || (lifecycleProvided
+                            && declaresValue(execution, "id", "default-compile")))) {
+                return true;
+            }
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        return kotlinRunsWithoutExecution(pluginBlock);
+    }
+
+    /// The `<plugin>` element that supplies `element` for the plugins the module
+    /// actually RUNS, or null when the module does not run this plugin.
+    ///
+    /// `<pluginManagement>` is a place to pin a version and pre-configure a
+    /// plugin, not to run one: Maven executes a managed plugin only where the
+    /// module also lists it under `<plugins>`. Reading the managed block on its
+    /// own added `add-source` directories the build does not compile -- and a
+    /// dormant source in one of those can declare a same-package `Ios` or
+    /// `Android` type, which shadows the real annotation and puts an
+    /// annotation-owned hint back in the editor for Add to declare a second
+    /// time.
+    ///
+    /// But Maven MERGES the managed declaration into the active one, and the
+    /// ordinary idiom is a managed block carrying the executions with a bare
+    /// `<plugin>` under `<plugins>` to turn it on. Returning only the active
+    /// block there lost the configuration the module really compiles with, which
+    /// is the same missed-root ending by another route. So: the active block
+    /// where it declares `element` itself, and the managed one where it does
+    /// not.
+    ///
+    /// The narrowing this does not model, which is rare enough to name rather
+    /// than guess at: a managed execution and an active execution with DIFFERENT
+    /// ids both contributing the element. Maven keeps both; this takes the
+    /// active one, on the same principle as everywhere else here -- a root the
+    /// build does not compile is worse than one it does.
+    ///
+    /// Not for the compiler plugin, which is bound by the default lifecycle --
+    /// see `compilerPluginBlock`.
+    static String activePluginBlock(String pomText, String artifactId, String element) {
+        return activePluginBlock(pomText, artifactId, element, null);
+    }
+
+    /// The same, also looking in `managedFromChain` -- the `<pluginManagement>`
+    /// sections of this POM's ANCESTORS -- for the configuration an activated
+    /// plugin inherits. This POM's own managed block is nearer, so it wins.
+    static String activePluginBlock(String pomText, String artifactId, String element,
+                                    String managedFromChain) {
+        return activePluginBlock(pomText, artifactId, element, null, managedFromChain);
+    }
+
+    /// As above, with `goal` naming what a child execution has to bind before it
+    /// counts as replacing the managed one.
+    static String activePluginBlock(String pomText, String artifactId, String element,
+                                    String goal, String managedFromChain) {
+        if (pomText == null) {
+            return null;
+        }
+        String active = pluginBlock(withoutElement(pomText, "pluginManagement"), artifactId);
+        if (active == null) {
+            return null;
+        }
+        // The module's own <pluginManagement> is the first link of the chain, so
+        // it needs no separate argument -- passing it separately is what let the
+        // nearest block win outright.
+        String chain = managedFromChain == null ? managementOnly(pomText) : managedFromChain;
+        String chosen = active;
+        if (element != null && active.indexOf("<" + element + ">") < 0) {
+            // The child activates the plugin but configures nothing, so the
+            // configuration is inherited. Nearest first, then up the chain.
+            String managed = pluginBlock(managementOnly(pomText), artifactId);
+            if (managed != null && managed.indexOf("<" + element + ">") >= 0) {
+                chosen = managed;
+            } else {
+                String inherited = managedBlockDeclaring(chain, artifactId, element);
+                chosen = inherited != null && inherited.indexOf("<" + element + ">") >= 0
+                        ? inherited : (managed == null ? active : managed);
+            }
+        }
+        // ONE place, for every block this can return. Whichever declaration
+        // supplied the configuration, the thing that BINDS the goal may sit
+        // somewhere else entirely: a module with a bare <plugin>, a nearer
+        // <pluginManagement> holding <sourceDirs>, and the compile execution up
+        // in an ancestor is an ordinary shape, and each of those three pieces
+        // has at some point been read without the others.
+        //
+        // This merge used to hang off the branch where the ACTIVE block carried
+        // the configuration, so the inherited-configuration branch returned a
+        // block with no bound goal and the caller dropped a real source root.
+        // Written as a single exit because that is the third time a rule landed
+        // on one branch of this method and not its sibling.
+        //
+        // bindsGoal first: a block that already binds the goal needs nothing,
+        // and appending would only repeat what it says.
+        // The active block's OWN executions travel with it. Taking the managed
+        // block for its configuration used to drop them: a module that declares
+        // the add-source execution and inherits <sources> from management ended
+        // up with configuration and no binding, so compileGoalConfiguration read
+        // the goal as unbound and omitted a root Maven really compiles.
+        // The chosen block may be an ancestor's, carrying the very execution the
+        // child switched off; bindsGoal would find that enabled copy.
+        String merged = chosen == active ? chosen
+                : withoutDisabledExecutions(chosen, active) + executionsOnly(active);
+        return bindsGoal(merged, goal) ? merged
+                : merged + mergedManagedExecutions(chain, artifactId,
+                        active);
+    }
+
+    /// `xml` with every `<!-- ... -->` removed.
+    ///
+    /// Everything here reads POM text by searching it, so a commented-out
+    /// element is indistinguishable from a live one unless the comments are
+    /// taken out first. An unterminated comment swallows the rest of the file,
+    /// which is what an XML parser does with it too.
+    static String withoutComments(String xml) {
+        if (xml == null || xml.indexOf("<!--") < 0) {
+            return xml;
+        }
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = xml.indexOf("<!--", at);
+            if (open < 0) {
+                out.append(xml.substring(at));
+                return out.toString();
+            }
+            out.append(xml, at, open);
+            int close = xml.indexOf("-->", open + 4);
+            if (close < 0) {
+                return out.toString();
+            }
+            at = close + 3;
+        }
+    }
+
+    /// The managed `<executions>` for `artifactId`, merged across the whole
+    /// chain, or "".
+    ///
+    /// Every managed declaration in the chain, not the nearest one that happens
+    /// to have an execution. Maven MERGES `pluginManagement` down the chain, so a
+    /// parent that binds `compile` and a child that manages only the version --
+    /// or only an unrelated execution -- still leaves the parent's binding in
+    /// force. Stopping at the nearest block dropped it, the goal read as unbound,
+    /// and the source root it configures disappeared from the scan; a dormant
+    /// copy of the main class could then answer for the compiled one and its
+    /// annotation-owned hints looked editable, which is how Add writes the
+    /// duplicate the next build refuses.
+    ///
+    /// Merged BY ID, because that is how Maven merges them and because a union
+    /// would be wrong in the direction that matters: a child re-declaring the
+    /// parent's execution id with `<phase>none</phase>` switches it off, and a
+    /// union would still see the parent's binding and call it bound. Within an id
+    /// the nearest declaration that says something wins, and one that says
+    /// nothing about a field leaves the ancestor's showing -- so a child that
+    /// overrides only the phase keeps the goals it inherits.
+    ///
+    /// Only the executions: the managed block's own configuration does NOT come
+    /// along, because the active declaration already supplied the element and an
+    /// active value REPLACES the managed one.
+    private static String mergedManagedExecutions(String managedFromChain, String artifactId) {
+        return mergedManagedExecutions(managedFromChain, artifactId, null);
+    }
+
+    /// The same, without the executions `disabledBy` switches off by id.
+    ///
+    /// Maven merges executions by id, so a child that redeclares the parent's id
+    /// with `<phase>none</phase>` turns it off. Appending the managed set
+    /// unfiltered left the disabled child copy and the enabled ancestor copy
+    /// both present, and `bindsGoal` answered from whichever it reached first --
+    /// reporting a root the build does not compile.
+    private static String mergedManagedExecutions(String managedFromChain, String artifactId,
+                                                  String disabledBy) {
+        java.util.Set<String> off = disabledExecutionIds(disabledBy);
+        java.util.List<String> blocks = pluginBlocks(managedFromChain, artifactId);
+        if (blocks.isEmpty()) {
+            return "";
+        }
+        // Insertion-ordered so the emitted text is stable, and so an execution
+        // only an ancestor declares still comes out.
+        java.util.Map<String, String[]> byId = new java.util.LinkedHashMap<>();
+        for (String block : blocks) {
+            for (String execution : executionBlocks(block)) {
+                java.util.List<String> ids = elementValues(execution, "id");
+                // Maven's own name for an execution that does not give one.
+                String id = ids.isEmpty() ? "default" : ids.get(0).trim();
+                if (off.contains(id)) {
+                    // The active declaration switched this id off; the ancestor's
+                    // enabled copy of it is not a binding this module has.
+                    continue;
+                }
+                java.util.List<String> phases = elementValues(execution, "phase");
+                String phase = phases.isEmpty() ? null : phases.get(0).trim();
+                String goals = between(execution, "<goals>", "</goals>");
+                // The execution's own configuration travels with it. build-helper
+                // and Kotlin put <sources>/<sourceDirs> HERE rather than at
+                // plugin level, so a merge that kept only the binding left the
+                // goal on one execution and the root it configures on another --
+                // and compileGoalConfiguration, which looks for the source ON the
+                // bound execution, found none.
+                String configuration = between(execution, "<configuration>", "</configuration>");
+                String[] merged = byId.get(id);
+                if (merged == null) {
+                    byId.put(id, new String[]{phase, goals, configuration});
+                    continue;
+                }
+                if (merged[0] == null) {
+                    merged[0] = phase;
+                }
+                if (merged[1] == null) {
+                    merged[1] = goals;
+                }
+                if (merged[2] == null) {
+                    merged[2] = configuration;
+                }
+            }
+        }
+        if (byId.isEmpty()) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder("<executions>");
+        for (java.util.Map.Entry<String, String[]> e : byId.entrySet()) {
+            out.append("<execution><id>").append(e.getKey()).append("</id>");
+            if (e.getValue()[0] != null) {
+                out.append("<phase>").append(e.getValue()[0]).append("</phase>");
+            }
+            if (e.getValue()[1] != null) {
+                out.append(e.getValue()[1]);
+            }
+            if (e.getValue()[2] != null) {
+                out.append(e.getValue()[2]);
+            }
+            out.append("</execution>");
+        }
+        return out.append("</executions>").toString();
+    }
+
+    /// `block` without the executions `disabledBy` switches off by id.
+    ///
+    /// The block that supplied the CONFIGURATION carries its own executions, and
+    /// when that block came from an ancestor those are the ones the child was
+    /// overriding. Filtering only what gets appended left the ancestor's enabled
+    /// copy sitting inside the chosen block, where bindsGoal found it.
+    private static String withoutDisabledExecutions(String block, String disabledBy) {
+        return withoutExecutionIds(block, disabledExecutionIds(disabledBy));
+    }
+
+    /// `block` without the executions named by `off`.
+    private static String withoutExecutionIds(String block, java.util.Set<String> off) {
+        if (block == null || off == null || off.isEmpty()
+                || block.indexOf("<execution>") < 0) {
+            return block;
+        }
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = block.indexOf("<execution>", at);
+            if (open < 0) {
+                out.append(block.substring(at));
+                return out.toString();
+            }
+            int close = block.indexOf("</execution>", open);
+            if (close < 0) {
+                out.append(block.substring(at));
+                return out.toString();
+            }
+            close += "</execution>".length();
+            out.append(block, at, open);
+            String execution = block.substring(open, close);
+            java.util.List<String> ids = elementValues(execution, "id");
+            if (!off.contains(ids.isEmpty() ? "default" : ids.get(0).trim())) {
+                out.append(execution);
+            }
+            at = close;
+        }
+    }
+
+    /// The execution ids that are switched off for `artifactId`, resolved
+    /// NEAREST first.
+    ///
+    /// Not the union of every level that says `<phase>none</phase>`. Maven takes
+    /// the nearest declaration that names a phase, so a leaf that redeclares an
+    /// id its parent disabled turns it back ON -- keeping the parent's `none` as
+    /// well dropped a root the build really compiles. A level that says nothing
+    /// about the phase decides nothing and the question passes further up.
+    private static java.util.Set<String> disabledNearestFirst(java.util.List<String> nearer,
+                                                              String artifactId) {
+        java.util.Set<String> off = new java.util.HashSet<>();
+        java.util.Set<String> decided = new java.util.HashSet<>();
+        for (String child : nearer) {
+            for (String block : pluginBlocks(withoutElement(child, "pluginManagement"),
+                    artifactId)) {
+                for (String execution : executionBlocks(block)) {
+                    java.util.List<String> phases = elementValues(execution, "phase");
+                    if (phases.isEmpty()) {
+                        continue;
+                    }
+                    java.util.List<String> ids = elementValues(execution, "id");
+                    String id = ids.isEmpty() ? "default" : ids.get(0).trim();
+                    if (!decided.add(id)) {
+                        continue;
+                    }
+                    if ("none".equals(phases.get(0).trim())) {
+                        off.add(id);
+                    }
+                }
+            }
+        }
+        return off;
+    }
+
+    /// The execution ids `pluginBlock` switches off with `<phase>none</phase>`.
+    private static java.util.Set<String> disabledExecutionIds(String pluginBlock) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        if (pluginBlock == null) {
+            return out;
+        }
+        for (String execution : executionBlocks(pluginBlock)) {
+            if (!declaresValue(execution, "phase", "none")) {
+                continue;
+            }
+            java.util.List<String> ids = elementValues(execution, "id");
+            // An execution with no id cannot be the override of a named one, and
+            // "default" is the name Maven gives it.
+            out.add(ids.isEmpty() ? "default" : ids.get(0).trim());
+        }
+        return out;
+    }
+
+    /// Every `<plugin>` block for `artifactId` in `pomText`, in document order.
+    ///
+    /// `pluginBlock` returns the first and nothing else, which is the right
+    /// answer for one POM and the wrong one for the concatenated management
+    /// chain, where each POM in it contributes its own block.
+    static java.util.List<String> pluginBlocks(String pomText, String artifactId) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (pomText == null) {
+            return out;
+        }
+        String text = withoutComments(pomText);
+        int at = indexOfArtifactId(text, artifactId, 0);
+        while (at >= 0) {
+            int open = text.lastIndexOf("<plugin>", at);
+            int close = text.indexOf("</plugin>", at);
+            if (open >= 0 && close > open) {
+                out.add(text.substring(open, close));
+                at = indexOfArtifactId(text, artifactId, close);
+            } else {
+                at = indexOfArtifactId(text, artifactId, at + 1);
+            }
+        }
+        return out;
+    }
+
+    /// The `<executions>` element of `pluginBlock`, or "" when it has none.
+    private static String executionsOnly(String pluginBlock) {
+        String out = between(pluginBlock, "<executions>", "</executions>");
+        return out == null ? "" : out;
+    }
+
+    /// `pomText` with the executions `childPom` switches off by id removed.
+    ///
+    /// Per plugin, because an execution id is only meaningful within one: two
+    /// plugins may both declare `default` and disabling one says nothing about
+    /// the other.
+    static String withoutExecutionsDisabledBy(String pomText, String childPom) {
+        return withoutExecutionsDisabledBy(pomText,
+                childPom == null ? java.util.Collections.<String>emptyList()
+                        : java.util.Collections.singletonList(childPom));
+    }
+
+    /// The same, against EVERY nearer POM rather than only the leaf.
+    ///
+    /// Inheritance is applied one level at a time, so an intermediate parent
+    /// that disables the grandparent's execution disables it for the leaf too --
+    /// and the leaf never mentions it. Comparing every ancestor with the leaf
+    /// alone let the grandparent's enabled copy through, and its root went into
+    /// the scan.
+    static String withoutExecutionsDisabledBy(String pomText, java.util.List<String> nearer) {
+        if (pomText == null || nearer == null || nearer.isEmpty()) {
+            return pomText;
+        }
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = pomText.indexOf("<plugin>", at);
+            if (open < 0) {
+                out.append(pomText.substring(at));
+                return out.toString();
+            }
+            int close = pomText.indexOf("</plugin>", open);
+            if (close < 0) {
+                out.append(pomText.substring(at));
+                return out.toString();
+            }
+            close += "</plugin>".length();
+            out.append(pomText, at, open);
+            String plugin = pomText.substring(open, close);
+            String artifactId = elementValue(plugin, "artifactId");
+            java.util.Set<String> off = artifactId == null
+                    ? new java.util.HashSet<String>()
+                    : disabledNearestFirst(nearer, artifactId.trim());
+            out.append(off.isEmpty() ? plugin : withoutExecutionIds(plugin, off));
+            at = close;
+        }
+    }
+
+    /// `pomText` with the plugin and execution blocks a child does NOT inherit
+    /// removed.
+    ///
+    /// `<inherited>false</inherited>` means the declaration applies to the POM
+    /// that wrote it and not to its children. Walking the parent chain and
+    /// taking every plugin regardless made a root the child never compiles part
+    /// of the search -- and a dormant copy of the child's main class sitting
+    /// there shadows the live annotated source.
+    ///
+    /// Only meaningful for an ANCESTOR: a POM always applies its own
+    /// declarations, whatever the flag says about its children.
+    static String withoutNonInheritedPlugins(String pomText) {
+        if (pomText == null || pomText.indexOf("<inherited>") < 0) {
+            return pomText;
+        }
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = pomText.indexOf("<plugin>", at);
+            if (open < 0) {
+                out.append(pomText.substring(at));
+                return out.toString();
+            }
+            int close = pomText.indexOf("</plugin>", open);
+            if (close < 0) {
+                out.append(pomText.substring(at));
+                return out.toString();
+            }
+            close += "</plugin>".length();
+            out.append(pomText, at, open);
+            String plugin = pomText.substring(open, close);
+            // The plugin's own flag, not one belonging to an execution inside it.
+            if (!declaresValue(withoutElement(plugin, "executions"), "inherited", "false")) {
+                out.append(withoutNonInheritedExecutions(plugin));
+            }
+            at = close;
+        }
+    }
+
+    /// One plugin block with the executions a child does not inherit removed.
+    private static String withoutNonInheritedExecutions(String pluginBlock) {
+        if (pluginBlock.indexOf("<inherited>") < 0) {
+            return pluginBlock;
+        }
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = pluginBlock.indexOf("<execution>", at);
+            if (open < 0) {
+                out.append(pluginBlock.substring(at));
+                return out.toString();
+            }
+            int close = pluginBlock.indexOf("</execution>", open);
+            if (close < 0) {
+                out.append(pluginBlock.substring(at));
+                return out.toString();
+            }
+            close += "</execution>".length();
+            out.append(pluginBlock, at, open);
+            String execution = pluginBlock.substring(open, close);
+            if (!declaresValue(execution, "inherited", "false")) {
+                out.append(execution);
+            }
+            at = close;
+        }
+    }
+
+    /// The `<execution>` blocks of one plugin block, in order.
+    private static java.util.List<String> executionBlocks(String pluginBlock) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (pluginBlock == null) {
+            return out;
+        }
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                return out;
+            }
+            out.add(pluginBlock.substring(at, close));
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        return out;
+    }
+
+    /// The text from `open` through the following `close`, or null.
+    private static String between(String xml, String open, String close) {
+        if (xml == null) {
+            return null;
+        }
+        int from = xml.indexOf(open);
+        if (from < 0) {
+            return null;
+        }
+        int to = xml.indexOf(close, from);
+        return to < 0 ? null : xml.substring(from, to + close.length());
+    }
+
+    /// The `<pluginManagement>` sections of `pomText`, and nothing else.
+    private static String managementOnly(String pomText) {
+        if (pomText == null) {
+            return null;
+        }
+        pomText = withoutComments(pomText);
+        String open = "<pluginManagement>";
+        String shut = "</pluginManagement>";
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int hit = pomText.indexOf(open, at);
+            if (hit < 0) {
+                return out.length() == 0 ? null : out.toString();
+            }
+            int close = pomText.indexOf(shut, hit);
+            if (close < 0) {
+                return out.length() == 0 ? null : out.toString();
+            }
+            out.append(pomText, hit + open.length(), close);
+            at = close + shut.length();
+        }
+    }
+
+    /// The compiler plugin's element, preferring the one the module declares.
+    ///
+    /// maven-compiler-plugin runs from the default lifecycle whether or not the
+    /// POM mentions it, so `<pluginManagement>` configuration for it applies --
+    /// but an explicit `<plugins>` entry overrides that, and the managed block
+    /// usually comes first in the file, so taking the first match in the text
+    /// picked exactly the wrong one.
+    static String compilerPluginBlock(String pomText) {
+        return compilerPluginBlock(pomText, null);
+    }
+
+    /// The same, also consulting the parent chain's managed sections.
+    static String compilerPluginBlock(String pomText, String managedFromChain) {
+        String active = activePluginBlock(pomText, "maven-compiler-plugin", "encoding",
+                "compile", managedFromChain);
+        if (active != null) {
+            return active;
+        }
+        String managed = pluginBlock(managementOnly(pomText), "maven-compiler-plugin");
+        if (managed != null) {
+            return managed;
+        }
+        // Bound by the default lifecycle, so an ancestor's managed configuration
+        // applies with no <plugins> entry anywhere.
+        return managedBlockDeclaring(managedFromChain, "maven-compiler-plugin", "encoding");
+    }
+
+    /// The managed block for `artifactId` that declares `element`, else the
+    /// first managed block for it, else null.
+    ///
+    /// The chain is every POM's `<pluginManagement>` concatenated, and Maven
+    /// MERGES them, so the configuration may sit further up than the nearest
+    /// declaration does. `pluginBlock` returns the first match and stops: a
+    /// parent managing only the version hid an ancestor's `<sourceDirs>` or
+    /// `<encoding>`, the element read as absent, and the source root it
+    /// configures never reached the scan -- which is how a dormant copy of the
+    /// main class answers for the compiled one and its annotation-owned hints
+    /// look editable.
+    ///
+    /// Falling back to the first block matters as much as the search: a caller
+    /// asking for a block that declares nothing in particular still wants the
+    /// declaration, and returning null there would drop the plugin entirely.
+    static String managedBlockDeclaring(String managedFromChain, String artifactId,
+                                        String element) {
+        String first = null;
+        for (String block : pluginBlocks(managedFromChain, artifactId)) {
+            if (first == null) {
+                first = block;
+            }
+            if (element == null || block.indexOf("<" + element + ">") >= 0) {
+                return block;
+            }
+        }
+        return first;
+    }
+
+    /// Where an `<artifactId>` whose TRIMMED value is `artifactId` opens, at or
+    /// after `from`, or -1.
+    ///
+    /// Matched by value rather than as the serialized string
+    /// `<artifactId>x</artifactId>`. A POM may pretty-print it across lines and
+    /// Maven trims the text, so the plugin is active while the substring search
+    /// found nothing, and the Kotlin or build-helper roots it configures went
+    /// missing from the scan.
+    private static int indexOfArtifactId(String xml, String artifactId, int from) {
+        String open = "<artifactId>";
+        String shut = "</artifactId>";
+        int at = xml.indexOf(open, from);
+        while (at >= 0) {
+            int close = xml.indexOf(shut, at + open.length());
+            if (close < 0) {
+                return -1;
+            }
+            if (artifactId.equals(xml.substring(at + open.length(), close).trim())) {
+                return at;
+            }
+            at = xml.indexOf(open, close + shut.length());
+        }
+        return -1;
+    }
+
+    /// Whether `xml` declares `name` with nothing in it -- `<name/>` or
+    /// `<name></name>`.
+    ///
+    /// Present-and-empty is a statement in Maven, and a different one from
+    /// absent: `<relativePath/>` disables local parent lookup.
+    static boolean declaresEmptyElement(String xml, String name) {
+        if (xml == null) {
+            return false;
+        }
+        String selfClosing = "<" + name + "/>";
+        if (xml.indexOf(selfClosing) >= 0 || xml.indexOf("<" + name + " />") >= 0) {
+            return true;
+        }
+        String value = elementValue(xml, name);
+        return value != null && value.trim().isEmpty();
+    }
+
+    /// The `<plugin>` element declaring `artifactId`, or null.
+    static String pluginBlock(String pomText, String artifactId) {
+        if (pomText == null) {
+            return null;
+        }
+        // A commented-out <plugin> is not a plugin. This reader is a string
+        // search, so a block someone parked inside <!-- --> matched exactly like
+        // a live one and contributed source roots the build does not compile.
+        pomText = withoutComments(pomText);
+        int at = indexOfArtifactId(pomText, artifactId, 0);
+        if (at < 0) {
+            return null;
+        }
+        int open = pomText.lastIndexOf("<plugin>", at);
+        int close = pomText.indexOf("</plugin>", at);
+        if (open < 0 || close < 0) {
+            return null;
+        }
+        return pomText.substring(open, close);
+    }
+
+    private static String elementValue(String xml, String name) {
+        if (xml == null) {
+            return null;
+        }
+        String open = "<" + name + ">";
+        int at = xml.indexOf(open);
+        if (at < 0) {
+            return null;
+        }
+        int close = xml.indexOf("</" + name + ">", at + open.length());
+        return close < 0 ? null : xml.substring(at + open.length(), close);
+    }
+
+    /// Whether `bytes` decode as UTF-8.
+    ///
+    /// Hand-rolled because CharsetDecoder is outside the Codename One API
+    /// subset this class compiles against, the same reason the name predicate
+    /// and the hex reader are.
+    static boolean isValidUtf8(byte[] bytes) {
+        int i = 0;
+        while (i < bytes.length) {
+            int b = bytes[i] & 0xFF;
+            int following;
+            int lowest;
+            int payload;
+            if (b < 0x80) {
+                i++;
+                continue;
+            } else if (b >= 0xC2 && b <= 0xDF) {
+                following = 1;
+                lowest = 0x80;
+                payload = 0x1F;
+            } else if (b >= 0xE0 && b <= 0xEF) {
+                following = 2;
+                lowest = 0x800;
+                payload = 0x0F;
+            } else if (b >= 0xF0 && b <= 0xF4) {
+                following = 3;
+                lowest = 0x10000;
+                payload = 0x07;
+            } else {
+                return false;
+            }
+            if (i + following >= bytes.length) {
+                return false;
+            }
+            int value = b & payload;
+            for (int n = 1; n <= following; n++) {
+                int next = bytes[i + n] & 0xFF;
+                if (next < 0x80 || next > 0xBF) {
+                    return false;
+                }
+                value = (value << 6) | (next & 0x3F);
+            }
+            // Overlong, and the surrogate range, which UTF-8 does not encode.
+            if (value < lowest || value > 0x10FFFF || (value >= 0xD800 && value <= 0xDFFF)) {
+                return false;
+            }
+            i += following + 1;
+        }
+        return true;
+    }
+
+    /// `source` with its comments and literals replaced by spaces, offsets and
+    /// line breaks preserved.
+    ///
+    /// For reading BACKWARDS, which the forward scanner cannot help with:
+    /// `private /* note */ typealias AppIos = Ios` is legal, and a backward walk
+    /// that skips only whitespace stops at the comment and reports the
+    /// declaration as public.
+    private static String blanked(String source, boolean kotlin) {
+        char[] out = source.toCharArray();
+        int i = 0;
+        while (i < out.length) {
+            char c = out[i];
+            if (c != '"' && c != '\'' && c != '/' && c != '`') {
+                i++;
+                continue;
+            }
+            int end = skipNonCode(source, i, kotlin);
+            if (end <= i) {
+                i++;
+                continue;
+            }
+            while (i < end) {
+                if (out[i] != '\n' && out[i] != '\r') {
+                    out[i] = ' ';
+                }
+                i++;
+            }
+        }
+        return new String(out);
+    }
+
+    /// Whether the declaration at `at` carries the `private` modifier.
+    ///
+    /// Read backwards over the modifiers that may precede the keyword, stopping
+    /// at anything that is not one -- so a `private` belonging to whatever came
+    /// before this declaration is not read as this one's.
+    private static boolean declaredPrivate(String source, int at) {
+        int i = at;
+        for (int word = 0; word < 8; word++) {
+            int end = i;
+            while (end > 0 && (source.charAt(end - 1) == ' ' || source.charAt(end - 1) == '\t'
+                    || source.charAt(end - 1) == '\n' || source.charAt(end - 1) == '\r')) {
+                end--;
+            }
+            int start = end;
+            while (start > 0 && continuesAName(source.charAt(start - 1))) {
+                start--;
+            }
+            if (start == end) {
+                return false;
+            }
+            String modifier = source.substring(start, end);
+            if ("private".equals(modifier)) {
+                return true;
+            }
+            if (!isDeclarationModifier(modifier)) {
+                return false;
+            }
+            i = start;
+        }
+        return false;
+    }
+
+    /// Another source file, with the language it is written in.
+    ///
+    /// The language travels with the text because it changes what the text
+    /// MEANS: raw strings close differently, block comments nest in one and not
+    /// the other, and Java translates unicode escapes before it tokenizes -- so
+    /// a Java peer declaring `package \u0070;` is in package p, which a
+    /// Kotlin-mode read cannot see.
+    static final class PeerSource {
+        final String text;
+        final boolean kotlin;
+
+        PeerSource(String text, boolean kotlin) {
+            this.text = text;
+            this.kotlin = kotlin;
+        }
+    }
+
+    /// Peers written in one language, which is what a caller that has plain
+    /// texts means by them.
+    static java.util.List<PeerSource> peers(java.util.List<String> texts, boolean kotlin) {
+        java.util.List<PeerSource> out = new java.util.ArrayList<>();
+        if (texts != null) {
+            for (String text : texts) {
+                if (text != null) {
+                    out.add(new PeerSource(text, kotlin));
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Every `typealias` `mainSource` can see, with the name it sees it under.
+    ///
+    /// Visibility is per SYMBOL, not per package: `import com.other.Unrelated`
+    /// exposes nothing else from `com.other`, and `import com.other.AppIos as
+    /// Custom` exposes that one under `Custom`. Reducing this to "does the main
+    /// file import anything from that package" was wrong in both directions --
+    /// it let an unrelated import expose an alias that hides the editor for a
+    /// hint nothing owns, and it lost the local name of a renamed one so a real
+    /// annotation went unrecognised and Add wrote the duplicate.
+    static java.util.List<AliasDeclaration> visibleTypeAliases(String mainSource,
+                                                               java.util.List<String> others) {
+        return visibleTypeAliases(mainSource, peers(others, true), true);
+    }
+
+    static java.util.List<AliasDeclaration> visibleTypeAliases(String mainSource,
+                                                               java.util.List<PeerSource> others,
+                                                               boolean kotlin) {
+        java.util.List<AliasDeclaration> out = new java.util.ArrayList<>();
+        if (mainSource == null) {
+            return out;
+        }
+        String mainPkg = declaredPackageIn(mainSource, kotlin);
+        for (String[] declared : typeAliasDeclarations(mainSource, kotlin)) {
+            out.add(new AliasDeclaration(declared[0], declared[0], declared[1], mainPkg,
+                    mainSource));
+        }
+        if (others == null) {
+            return out;
+        }
+        java.util.List<Imported> imports = importsIn(mainSource, kotlin);
+        for (PeerSource peer : others) {
+            String other = peer == null ? null : peer.text;
+            if (other == null) {
+                continue;
+            }
+            String pkg = declaredPackageIn(other, peer.kotlin);
+            boolean samePackage = pkg.equals(mainPkg);
+            for (String[] declared : typeAliasDeclarations(other, peer.kotlin)) {
+                if ("private".equals(declared[2])) {
+                    // On a top-level Kotlin declaration `private` means this FILE
+                    // only, not this package -- so another file's is not a name
+                    // the main source can write, and treating it as one let it
+                    // vouch for an unrelated annotation of the same name and hide
+                    // the editor for a hint nothing owns.
+                    continue;
+                }
+                String visible = samePackage ? declared[0]
+                        : importedNameOf(imports, pkg, declared[0]);
+                // Kept even when invisible: it may still be a LINK in a chain
+                // whose visible end is imported, and that chain resolves in the
+                // package it is written in.
+                out.add(new AliasDeclaration(declared[0], visible, declared[1], pkg, other));
+            }
+        }
+        return out;
+    }
+
+    /// The name `imports` gives `pkg`.`simple`, or null when none of them does.
+    ///
+    /// A named import wins over an on-demand one, since it is the more specific
+    /// statement about that symbol and may rename it.
+    private static String importedNameOf(java.util.List<Imported> imports, String pkg,
+                                         String simple) {
+        String qualified = pkg == null || pkg.isEmpty() ? simple : pkg + "." + simple;
+        String onDemand = null;
+        for (Imported imported : imports) {
+            if (imported.name.equals(qualified)) {
+                return imported.alias != null ? imported.alias : simple;
+            }
+            if (imported.name.equals(pkg + ".*")) {
+                onDemand = simple;
+            }
+        }
+        return onDemand;
+    }
+
+    /// Every name that resolves to `simple`, following a CHAIN of aliases.
+    ///
+    /// `typealias AppIos = Ios` then `typealias CustomIos = AppIos` is legal,
+    /// and `@CustomIos(...)` still compiles to our annotation. Accepting only a
+    /// right-hand side that names the annotation directly left the hint reading
+    /// as unowned, so Add wrote the duplicate declaration the next build
+    /// refuses. Resolved by closure rather than by recursion so that a cycle --
+    /// which the compiler rejects, but this reader must not hang on -- simply
+    /// stops adding names.
+    ///
+    /// The chain is followed by the LOCAL name within one package, which is the
+    /// scope a top-level declaration resolves in, and only names the main file
+    /// can actually see are returned.
+    static java.util.List<String> kotlinTypeAliases(java.util.List<AliasDeclaration> declarations,
+                                                    String simple, boolean kotlin) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        if (!kotlin || declarations == null) {
+            return out;
+        }
+        String qualified = "com.codename1.annotations.buildhints." + simple;
+        java.util.List<String> resolved = new java.util.ArrayList<String>();
+        java.util.List<AliasDeclaration> pending = new java.util.ArrayList<>();
+        // The key each pending declaration's target might name, worked out once
+        // rather than on every pass.
+        java.util.List<java.util.List<String>> pendingTargets = new java.util.ArrayList<>();
+        for (AliasDeclaration declared : declarations) {
+            // The bare name counts only where an import makes it ours, and that
+            // import is file-scoped -- so it is decided per owner, here, rather
+            // than once for the whole sweep. `import ...Ios as Base` then
+            // `typealias AppIos = Base` is the same point one step along.
+            boolean imported = importsAnnotation(declared.owner, simple, kotlin);
+            java.util.List<String> importedAs = kotlinImportAliases(declared.owner, simple, kotlin);
+            if (declared.target.equals(qualified)
+                    || (imported && declared.target.equals(simple))
+                    || importedAs.contains(declared.target)) {
+                add(resolved, declared.scope + "\u0000" + declared.local);
+                add(out, declared.visible);
+            } else {
+                pending.add(declared);
+                pendingTargets.add(targetKeys(declared));
+            }
+        }
+        // Each pass can only resolve one more link, so the number of passes is
+        // bounded by the number of declarations left over.
+        for (int pass = 0; pass < pending.size(); pass++) {
+            boolean grew = false;
+            for (int i = 0; i < pending.size(); i++) {
+                AliasDeclaration declared = pending.get(i);
+                String key = declared.scope + "\u0000" + declared.local;
+                if (resolved.contains(key)) {
+                    continue;
+                }
+                for (String candidate : pendingTargets.get(i)) {
+                    if (resolved.contains(candidate)) {
+                        resolved.add(key);
+                        add(out, declared.visible);
+                        grew = true;
+                        break;
+                    }
+                }
+            }
+            if (!grew) {
+                break;
+            }
+        }
+        return out;
+    }
+
+    /// The chain links `declared`'s target might name, most specific first.
+    ///
+    /// A link may cross a package boundary: package `a` declares
+    /// `typealias Base = Ios`, package `b` imports `a.Base` and declares
+    /// `typealias AppIos = Base`. Looking only in the declaring file's own
+    /// package missed that, so the chain stopped there, the hint read as unowned
+    /// and Add wrote the duplicate declaration the next build refuses.
+    ///
+    /// A qualified target names its package outright. Otherwise a named import
+    /// -- under its own name or an `as` name -- says where it comes from, and
+    /// failing that it is the declaring package's own, or any package imported
+    /// on demand.
+    private static java.util.List<String> targetKeys(AliasDeclaration declared) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        String target = declared.target;
+        int dot = target.lastIndexOf('.');
+        if (dot > 0) {
+            out.add(target.substring(0, dot) + "\u0000" + target.substring(dot + 1));
+            return out;
+        }
+        java.util.List<String> onDemand = new java.util.ArrayList<String>();
+        for (Imported imported : importsIn(declared.owner, true)) {
+            int at = imported.name.lastIndexOf('.');
+            if (at <= 0) {
+                continue;
+            }
+            String pkg = imported.name.substring(0, at);
+            String simpleName = imported.name.substring(at + 1);
+            if ("*".equals(simpleName)) {
+                onDemand.add(pkg + "\u0000" + target);
+                continue;
+            }
+            String visibleAs = imported.alias != null ? imported.alias : simpleName;
+            if (visibleAs.equals(target)) {
+                out.add(pkg + "\u0000" + simpleName);
+                return out;
+            }
+        }
+        out.add(declared.scope + "\u0000" + target);
+        out.addAll(onDemand);
+        return out;
+    }
+
+    private static void add(java.util.List<String> out, String value) {
+        if (value != null && !out.contains(value)) {
+            out.add(value);
+        }
+    }
+
+    /// Every `typealias Name = Target` in `source`, as {name, target, private}.
+    ///
+    /// The third element is "private" when the declaration carries that
+    /// modifier, which on a top-level Kotlin declaration means visible in this
+    /// FILE only -- not in the package.
+    static java.util.List<String[]> typeAliasDeclarations(String source, boolean kotlin) {
+        java.util.List<String[]> out = new java.util.ArrayList<String[]>();
+        if (!kotlin || source == null) {
+            return out;
+        }
+        int at = nextMarker(source, "typealias", 0, kotlin);
+        while (at >= 0) {
+            int after = at + "typealias".length();
+            boolean whole = (at == 0 || !continuesAName(source.charAt(at - 1)))
+                    && after < source.length() && !continuesAName(source.charAt(after));
+            if (whole) {
+                int n = nextLiveChar(source, after, kotlin);
+                if (n >= 0) {
+                    int end = componentEnd(source, n, kotlin);
+                    if (end > n) {
+                        String name = componentText(source, n, end, kotlin);
+                        int eq = nextLiveChar(source, end, kotlin);
+                        if (eq >= 0 && source.charAt(eq) == '=') {
+                            out.add(new String[] {name, qualifiedNameAt(source, eq + 1, kotlin),
+                                    declaredPrivate(blanked(source, kotlin), at)
+                                            ? "private" : ""});
+                        }
+                    }
+                }
+            }
+            at = nextMarker(source, "typealias", after, kotlin);
+        }
+        return out;
+    }
+
+    /// The name a Kotlin `import ... as Alias` gives an annotation, or null.
+    ///
+    /// Kotlin lets a file rename what it imports, and then the annotation never
+    /// appears under its own name anywhere in the source. Missing that reads the
+    /// hint as unowned, so Settings offers it for Add, writes the properties
+    /// line, and the next `process-annotations` fails on the duplicate the tool
+    /// itself created.
+    static String kotlinImportAlias(String source, String simple, boolean kotlin) {
+        java.util.List<String> all = kotlinImportAliases(source, simple, kotlin);
+        return all.isEmpty() ? null : all.get(0);
+    }
+
+    /// EVERY such name. A file may import the same annotation twice under
+    /// different aliases, and answering with the first left the other
+    /// unrecognised -- so the hint read as unowned, Settings offered Add, and
+    /// the next build failed on the duplicate the tool had just written.
+    static java.util.List<String> kotlinImportAliases(String source, String simple,
+                                                      boolean kotlin) {
+        String needle = "com.codename1.annotations.buildhints." + simple;
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        for (Imported imported : importsIn(source, kotlin)) {
+            if (imported.alias != null && needle.equals(imported.name)) {
+                out.add(imported.alias);
+            }
+        }
+        return out;
+    }
+
+    /// Maps every `@Group(attr = ...)` on the main class to the hints it sets.
+    /// Java rules for the source text; see the three-argument form.
+    static void collectAnnotationOwnedHints(String source, java.util.Map<String, String> out) {
+        collectAnnotationOwnedHints(source, out, false);
+    }
+
+    static void collectAnnotationOwnedHints(String source, java.util.Map<String, String> out,
+                                            boolean kotlin) {
+        collectAnnotationOwnedHints(source, out, kotlin, null);
+    }
+
+    /// As above, also resolving `typealias` declarations made in OTHER files.
+    ///
+    /// A typealias is a top-level declaration, not a file-scoped one: a project
+    /// may declare `typealias AppIos = Ios` in one file and write `@AppIos(...)`
+    /// on the main class in another. Looking only at the main source read the
+    /// hint as unowned, so Add wrote the duplicate declaration the next build
+    /// refuses. An import alias is NOT collected this way -- that one applies
+    /// only to the file that writes it.
+    static void collectAnnotationOwnedHints(String source, java.util.Map<String, String> out,
+                                            boolean kotlin,
+                                            java.util.List<String> otherSources) {
+        collectOwnedHints(source, out, kotlin, peers(otherSources, kotlin));
+    }
+
+    static void collectOwnedHints(String source, java.util.Map<String, String> out,
+                                  boolean kotlin, java.util.List<PeerSource> otherSources) {
+        // Once, not once per hint: which aliases exist and what the main file
+        // calls them does not depend on which hint is being asked about.
+        java.util.List<AliasDeclaration> declaredAliases =
+                kotlin ? visibleTypeAliases(source, otherSources, kotlin)
+                       : new java.util.ArrayList<AliasDeclaration>();
+        // The sources whose top-level types could shadow an on-demand import:
+        // this file, and the rest of its package. Each is read in the language
+        // it is written in, since that decides what its text means -- a Java
+        // peer's unicode escapes among other things.
+        java.util.List<PeerSource> samePackage = new java.util.ArrayList<>();
+        samePackage.add(new PeerSource(source, kotlin));
+        if (otherSources != null) {
+            String mainPkg = declaredPackageIn(source, kotlin);
+            for (PeerSource peer : otherSources) {
+                if (peer != null && peer.text != null
+                        && declaredPackageIn(peer.text, peer.kotlin).equals(mainPkg)) {
+                    samePackage.add(peer);
+                }
+            }
+        }
+        for (com.codename1.build.shared.BuildHints.Hint h : com.codename1.build.shared.BuildHints.entries()) {
+            if (!h.isAnnotated()) {
+                continue;
+            }
+            String simple = h.group().annotationSimpleName();
+            // Three spellings are valid: the imported simple name, the fully
+            // qualified one, which needs no import, and a Kotlin alias, under
+            // which the annotation's own name appears nowhere. Missing any of
+            // them leaves the hint editable and Add writes the duplicate.
+            java.util.List<String> aliases = kotlinImportAliases(source, simple, kotlin);
+            // A fourth: Kotlin can rename a type in the FILE, with no import
+            // involved -- `typealias AppIos = Ios` and then `@AppIos(...)`. The
+            // compiled annotation is still ours, so missing it left the hint
+            // editable and Add wrote the duplicate the next build refuses.
+            // One closure over every source, not one per file: a chain may cross
+            // files, with the link that names our annotation in one and the link
+            // that the main class writes in another.
+            aliases.addAll(kotlinTypeAliases(declaredAliases, simple, kotlin));
+            // The simple name only counts when an import makes it OUR annotation.
+            // @Build and @Android are ordinary enough names that another library's
+            // annotation with a matching attribute would otherwise be read as
+            // ownership -- and Settings would hide the editor for a hint the
+            // processor never emits, which is indistinguishable from the tool
+            // being broken.
+            boolean shadowed = false;
+            boolean first = true;
+            for (PeerSource peer : samePackage) {
+                // The first entry is the main source itself, where a private
+                // type is in the file it belongs to and does shadow.
+                boolean own = first;
+                first = false;
+                if (declaresTypeNamed(peer.text, simple, peer.kotlin, own)) {
+                    shadowed = true;
+                    break;
+                }
+            }
+            boolean imported = importsAnnotation(source, simple, kotlin, shadowed);
+            String qualified = "com.codename1.annotations.buildhints." + simple;
+
+            // Every `@` that is real code, with the name after it read component
+            // by component. Matching literal strings could not see
+            // `@com.codename1.annotations. /* generated */ buildhints.Ios`, which
+            // is legal -- ownership then read as empty and Add wrote the
+            // duplicate.
+            int at = nextMarker(source, "@", 0, kotlin);
+            boolean found = false;
+            while (at >= 0 && !found) {
+                String name = qualifiedNameAt(source, at + 1, kotlin);
+                int after = qualifiedNameEnd(source, at + 1, kotlin);
+                boolean ours = (imported && name.equals(simple))
+                        || name.equals(qualified)
+                        || aliases.contains(name);
+                if (ours) {
+                    int open = nextLiveChar(source, after, kotlin);
+                    if (open >= 0 && source.charAt(open) == '(') {
+                        String args = balancedArgs(source, open, kotlin);
+                        if (args != null && declaresAttribute(args, h.attr(), kotlin)) {
+                            // Written down, but saying nothing: the processor
+                            // emits no hint for the unset constant, so the
+                            // properties file may legally declare it and this
+                            // must not claim ownership.
+                            if (isUnsetValue(h, attributeValue(args, h.attr(), kotlin), kotlin)) {
+                                break;
+                            }
+                            out.put(com.codename1.build.shared.BuildHints.canonicalName(h.name()),
+                                    "@" + simple + "(" + h.attr() + ")");
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                at = nextMarker(source, "@", at + 1, kotlin);
+            }
+        }
+    }
+
+    /// The text inside the parentheses starting at `open`, or null when unbalanced.
+    ///
+    /// Skips strings, character literals and comments. A comment inside an
+    /// annotation can carry an unmatched delimiter --
+    /// `@Ios(/* required for issue ( */ teamId = "x")` -- and counting it as
+    /// syntax loses the annotation's boundary, leaving an owned hint editable.
+    private static String balancedArgs(String source, int open, boolean kotlin) {
+        int depth = 0;
+        for (int i = open; i < source.length(); i++) {
+            int skipped = skipNonCode(source, i, kotlin);
+            if (skipped > i) {
+                i = skipped - 1;
+                continue;
+            }
+            char c = source.charAt(i);
+            if (c == '(' || c == '{' || c == '[') {
+                depth++;
+            } else if (c == ')' || c == '}' || c == ']') {
+                depth--;
+                if (depth == 0) {
+                    return source.substring(open + 1, i);
+                }
+            }
+        }
+        return null;
+    }
+
+    /// Whether `args` assigns `attr` at the top level, ignoring anything inside a
+    /// nested value, a string, a character literal or a comment.
+    /// The text `attr` is assigned inside `args`, or null when it is not there.
+    ///
+    /// Walks the arguments the same way `declaresAttribute` does, because the
+    /// two answers have to agree: one decides that an attribute is present and
+    /// the other decides whether what it says means anything.
+    static String attributeValue(String args, String attr, boolean kotlin) {
+        int depth = 0;
+        StringBuilder word = new StringBuilder();
+        for (int i = 0; i < args.length(); i++) {
+            int skipped = skipNonCode(args, i, kotlin);
+            if (skipped > i) {
+                i = skipped - 1;
+                continue;
+            }
+            char c = args.charAt(i);
+            if (c == '(' || c == '{' || c == '[') {
+                depth++;
+            } else if (c == ')' || c == '}' || c == ']') {
+                depth--;
+            } else if (depth == 0 && c == '='
+                    && (i + 1 >= args.length() || args.charAt(i + 1) != '=')) {
+                if (word.toString().trim().equals(attr)) {
+                    return valueAfter(args, i + 1, kotlin);
+                }
+                word.setLength(0);
+            } else if (depth == 0 && c == ',') {
+                word.setLength(0);
+            } else if (depth == 0) {
+                word.append(c);
+            }
+        }
+        return null;
+    }
+
+    /// The argument value beginning at `from`, up to the next top-level comma.
+    private static String valueAfter(String args, int from, boolean kotlin) {
+        int depth = 0;
+        StringBuilder out = new StringBuilder();
+        for (int i = from; i < args.length(); i++) {
+            int skipped = skipNonCode(args, i, kotlin);
+            if (skipped > i) {
+                out.append(args, i, skipped);
+                i = skipped - 1;
+                continue;
+            }
+            char c = args.charAt(i);
+            if (c == '(' || c == '{' || c == '[') {
+                depth++;
+            } else if (c == ')' || c == '}' || c == ']') {
+                depth--;
+            } else if (depth == 0 && c == ',') {
+                break;
+            }
+            out.append(c);
+        }
+        return out.toString().trim();
+    }
+
+    /// Whether `value` is the constant that sends nothing for `hint`.
+    ///
+    /// `@Android(appBundle = Toggle.DEFAULT)` is written down but emits no hint,
+    /// exactly as leaving the attribute out does -- so a properties line for it
+    /// is legal, and calling the hint annotation-owned hid the editor, refused
+    /// Add, and reported a value the build accepts as a duplicate.
+    ///
+    /// Compared against the constant the CATALOG records, not against the name
+    /// `DEFAULT`: every unset constant is spelled that way today and none of
+    /// this should depend on it staying that way.
+    static boolean isUnsetValue(com.codename1.build.shared.BuildHints.Hint hint, String value) {
+        return isUnsetValue(hint, value, false);
+    }
+
+    /// The same, reading `value` as source in the language it was written in.
+    ///
+    /// The last identifier TOKEN, not the text after the last dot.
+    /// `Toggle./* default */DEFAULT` is a perfectly ordinary way to write the
+    /// constant, and the processor sees Toggle.DEFAULT and emits nothing -- while
+    /// a raw suffix comparison saw `/* default */DEFAULT`, called the hint owned,
+    /// and hid a properties value the build accepts.
+    static boolean isUnsetValue(com.codename1.build.shared.BuildHints.Hint hint, String value,
+                                boolean kotlin) {
+        String unset = hint == null ? null : hint.unsetConstant();
+        if (unset == null || value == null) {
+            return false;
+        }
+        return unset.equals(lastIdentifier(value, kotlin));
+    }
+
+    /// The last identifier in `value`, ignoring comments and whitespace, or null.
+    static String lastIdentifier(String value, boolean kotlin) {
+        StringBuilder code = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            int skipped = skipNonCode(value, i, kotlin);
+            if (skipped > i) {
+                // A comment contributes nothing; a string literal is not an
+                // identifier either, and keeping it would let its CONTENTS be
+                // read as one.
+                i = skipped - 1;
+                code.append(' ');
+                continue;
+            }
+            code.append(value.charAt(i));
+        }
+        String text = code.toString();
+        int end = text.length();
+        while (end > 0 && Character.isWhitespace(text.charAt(end - 1))) {
+            end--;
+        }
+        int start = end;
+        while (start > 0 && isIdentifierChar(text.charAt(start - 1))) {
+            start--;
+        }
+        return start == end ? null : text.substring(start, end);
+    }
+
+    /// Whether `c` can appear in a Java or Kotlin identifier.
+    ///
+    /// Spelled out rather than through Character.isLetterOrDigit, which is not
+    /// in the Codename One runtime API this tool compiles against. Sources in
+    /// this repository are ASCII, so the constants being matched are too.
+    private static boolean isIdentifierChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9') || c == '_' || c == '$';
+    }
+
+    private static boolean declaresAttribute(String args, String attr, boolean kotlin) {
+        int depth = 0;
+        StringBuilder word = new StringBuilder();
+        for (int i = 0; i < args.length(); i++) {
+            int skipped = skipNonCode(args, i, kotlin);
+            if (skipped > i) {
+                i = skipped - 1;
+                continue;
+            }
+            char c = args.charAt(i);
+            if (c == '(' || c == '{' || c == '[') {
+                depth++;
+            } else if (c == ')' || c == '}' || c == ']') {
+                depth--;
+            } else if (depth == 0 && c == '='
+                    && (i + 1 >= args.length() || args.charAt(i + 1) != '=')) {
+                if (word.toString().trim().equals(attr)) {
+                    return true;
+                }
+                word.setLength(0);
+            } else if (depth == 0 && c == ',') {
+                word.setLength(0);
+            } else if (depth == 0) {
+                word.append(c);
+            }
+        }
+        return false;
+    }
+
+    /// Whether `c` could continue a Java identifier.
+    ///
+    /// Hand-rolled because Character.isJavaIdentifierPart is outside the
+    /// Codename One API subset, and this class is compiled as app code.
+    /// Java's unicode escapes, applied.
+    ///
+    /// javac processes `\\uXXXX` in the LEXICAL TRANSLATION step, before it
+    /// tokenizes anything, so `package com.ex\\u0061mple;` really declares
+    /// com.example and an escape works inside an identifier. Reading the text
+    /// literally recorded `com.ex`, so the real main source was rejected,
+    /// nothing knew which hints an annotation already owns, and Add could write
+    /// the duplicate declaration the next build refuses.
+    ///
+    /// A backslash only opens an escape when an EVEN number of backslashes
+    /// precedes it, which is what keeps a string literal spelling one. Kotlin
+    /// has no such step, so this is applied to Java only.
+    ///
+    /// Safe here because this tool never writes a source file back -- it edits
+    /// codenameone_settings.properties and the POM -- so nothing depends on an
+    /// offset into the text as it is on disk.
+    static String decodeUnicodeEscapes(String text) {
+        if (text == null || text.indexOf('\\') < 0) {
+            return text;
+        }
+        StringBuilder out = new StringBuilder(text.length());
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c != '\\') {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int j = i;
+            while (j < text.length() && text.charAt(j) == '\\') {
+                j++;
+            }
+            int run = j - i;
+            for (int pair = 0; pair < run / 2; pair++) {
+                out.append('\\').append('\\');
+            }
+            if (run % 2 == 0) {
+                i = j;
+                continue;
+            }
+            int u = j;
+            while (u < text.length() && text.charAt(u) == 'u') {
+                u++;
+            }
+            int value = u > j ? hexQuad(text, u) : -1;
+            if (value < 0) {
+                out.append('\\');
+                i = j;
+                continue;
+            }
+            out.append((char) value);
+            i = u + 4;
+        }
+        return out.toString();
+    }
+
+    /// The four hex digits at `from`, or -1. Hand-rolled for the same reason
+    /// [#continuesAName] is: this class compiles against the Codename One API
+    /// subset.
+    private static int hexQuad(String text, int from) {
+        if (from + 4 > text.length()) {
+            return -1;
+        }
+        int value = 0;
+        for (int i = from; i < from + 4; i++) {
+            char c = text.charAt(i);
+            int digit;
+            if (c >= '0' && c <= '9') {
+                digit = c - '0';
+            } else if (c >= 'a' && c <= 'f') {
+                digit = c - 'a' + 10;
+            } else if (c >= 'A' && c <= 'F') {
+                digit = c - 'A' + 10;
+            } else {
+                return -1;
+            }
+            value = value * 16 + digit;
+        }
+        return value;
+    }
+
+    private static boolean continuesAName(char c) {
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9') || c == '_' || c == '$') {
+            return true;
+        }
+        // Both languages allow a non-ASCII identifier -- a package name whose
+        // letters are outside ASCII is valid Java and Kotlin -- and stopping at
+        // the first such character read a short name, so the real main source
+        // was rejected and Settings could offer a hint an annotation already owns.
+        //
+        // Everything outside ASCII that is not whitespace counts, since
+        // Character.isJavaIdentifierPart is outside the Codename One API subset
+        // this class is compiled against. That is wider than the language rule,
+        // but only by characters that cannot legally sit next to an identifier
+        // in source the compiler has already accepted -- and the alternative,
+        // rejecting all of them, is wrong for every name that has one.
+        return c >= 0x80 && !Character.isWhitespace(c);
+    }
+
+    /// The index of the next character that is neither whitespace nor part of a
+    /// comment, starting at `from`; -1 when the source ends first.
+    static int nextLiveChar(String source, int from, boolean kotlin) {
+        int i = from;
+        while (i < source.length()) {
+            char c = source.charAt(i);
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f') {
+                i++;
+                continue;
+            }
+            if (c == '/') {
+                int skipped = skipNonCode(source, i, kotlin);
+                if (skipped > i) {
+                    i = skipped;
+                    continue;
+                }
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    /// The next occurrence of `marker` that is real code, or -1.
+    ///
+    /// Comments and string literals are stepped over with the same scanner the
+    /// argument reader uses, so what counts as code is one answer rather than
+    /// two that can disagree.
+    static int nextMarker(String source, String marker, int from, boolean kotlin) {
+        int i = from;
+        while (i < source.length()) {
+            char c = source.charAt(i);
+            if (c == '"' || c == '\'' || c == '/' || c == '`') {
+                int skipped = skipNonCode(source, i, kotlin);
+                if (skipped > i) {
+                    i = skipped;
+                    continue;
+                }
+            }
+            if (source.startsWith(marker, i)) {
+                return i;
+            }
+            i++;
+        }
+        return -1;
+    }
+
+    /// If a string, character literal or comment starts at `i`, the index just
+    /// past it; otherwise `i`.
+    /// Index just past a Java text block opening at `i`. Escapes apply, so a
+    /// backslash consumes the character after it and cannot start a delimiter.
+    private static int endOfJavaTextBlock(String s, int i) {
+        int j = i + 3;
+        while (j < s.length()) {
+            char c = s.charAt(j);
+            if (c == '\\') {
+                j += 2;
+                continue;
+            }
+            if (c == '"' && s.startsWith("\"\"\"", j)) {
+                return j + 3;
+            }
+            j++;
+        }
+        return s.length();
+    }
+
+    /// Index just past a Kotlin raw string opening at `i`. No escapes, and a run
+    /// of quotes closes at its last three, so the extra ones belong to the value.
+    /// The offset just past a `${ ... }` template expression at `i`, or -1 when
+    /// one does not start there.
+    ///
+    /// Braces are matched, and a nested literal inside the expression is stepped
+    /// over so that a `}` inside it does not close the expression early.
+    private static int endOfKotlinTemplate(String s, int i) {
+        if (i + 1 >= s.length() || s.charAt(i) != '$' || s.charAt(i + 1) != '{') {
+            return -1;
+        }
+        int depth = 0;
+        int j = i + 1;
+        while (j < s.length()) {
+            char ch = s.charAt(j);
+            if (ch == '"') {
+                j = s.startsWith("\"\"\"", j) ? endOfKotlinRawString(s, j) : endOfKotlinString(s, j);
+                continue;
+            }
+            // The expression is ordinary code, so it holds ordinary comments and
+            // char literals -- and a quote inside one of those is not a nested
+            // string. Reading `${ /* " */ 1 }` as if it were swallowed the rest
+            // of the file, hiding every annotation after it.
+            // An escaped identifier belongs here too: everything inside it is
+            // part of the name, so a quote there does not open a string and a
+            // brace does not close the expression.
+            if (ch == '\'' || ch == '/' || ch == '`') {
+                int skipped = skipNonCode(s, j, true);
+                if (skipped > j) {
+                    j = skipped;
+                    continue;
+                }
+            }
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+                if (depth == 0) {
+                    return j + 1;
+                }
+            }
+            j++;
+        }
+        return -1;
+    }
+
+    /// The offset just past an ordinary Kotlin string starting at `i`.
+    private static int endOfKotlinString(String s, int i) {
+        int j = i + 1;
+        while (j < s.length()) {
+            if (s.charAt(j) == '\\') {
+                j += 2;
+                continue;
+            }
+            int template = endOfKotlinTemplate(s, j);
+            if (template > j) {
+                j = template;
+                continue;
+            }
+            if (s.charAt(j) == '"') {
+                return j + 1;
+            }
+            j++;
+        }
+        return s.length();
+    }
+
+    private static int endOfKotlinRawString(String s, int i) {
+        int j = i + 3;
+        while (j < s.length()) {
+            // A template expression here too: a `"""` inside one is a nested
+            // literal, not this string's terminator.
+            int template = endOfKotlinTemplate(s, j);
+            if (template > j) {
+                j = template;
+                continue;
+            }
+            if (s.charAt(j) != '"') {
+                j++;
+                continue;
+            }
+            int run = j;
+            while (run < s.length() && s.charAt(run) == '"') {
+                run++;
+            }
+            if (run - j >= 3) {
+                return run;
+            }
+            j = run;
+        }
+        return s.length();
+    }
+
+    private static int skipNonCode(String s, int i, boolean kotlin) {
+        char c = s.charAt(i);
+        // A Kotlin raw string or a Java text block, which the ordinary rule reads
+        // as an empty string followed by a new one -- and then an embedded quote
+        // inside it opens a literal that swallows the annotation after it.
+        //
+        // The two languages close it differently, and taking the shorter reading
+        // in either direction over-consumes past a live annotation:
+        //
+        //   Java   escape sequences DO apply, so \" is one quote and the run
+        //          \""" is an escaped quote followed by two, not a delimiter.
+        //   Kotlin escapes do NOT apply, and a run of four or more quotes ends
+        //          the literal at its LAST three -- """a"""" holds a" .
+        if (c == '"' && s.startsWith("\"\"\"", i)) {
+            return kotlin ? endOfKotlinRawString(s, i) : endOfJavaTextBlock(s, i);
+        }
+        if (c == '"') {
+            for (int j = i + 1; j < s.length(); j++) {
+                if (s.charAt(j) == '\\') {
+                    j++;
+                    continue;
+                }
+                // A Kotlin template expression opens a fresh nesting level, and
+                // the first quote inside it starts a NEW literal rather than
+                // closing this one -- so `"${"@Ios(teamId = x)"}"` ended the
+                // string early and exposed its contents as live code, which read
+                // as an annotation nobody wrote and hid the editor for a hint
+                // nothing owns.
+                int template = kotlin ? endOfKotlinTemplate(s, j) : -1;
+                if (template > j) {
+                    j = template - 1;
+                    continue;
+                }
+                if (s.charAt(j) == '"') {
+                    return j + 1;
+                }
+            }
+            return s.length();
+        }
+        if (c == '\'') {
+            for (int j = i + 1; j < s.length(); j++) {
+                if (s.charAt(j) == '\\') {
+                    j++;
+                } else if (s.charAt(j) == '\'') {
+                    return j + 1;
+                }
+            }
+            return s.length();
+        }
+        // A Kotlin escaped identifier -- `class `when``. It is code, not a
+        // literal, but it is stepped over whole because a quote inside it
+        // (`say"hi` is a legal name) would otherwise open a literal that
+        // swallows every annotation after it, leaving an owned hint editable in
+        // Settings and letting the user add the duplicate that fails the build.
+        if (kotlin && c == '`') {
+            int close = s.indexOf('`', i + 1);
+            int nl = s.indexOf('\n', i + 1);
+            if (close >= 0 && (nl < 0 || close < nl)) {
+                return close + 1;
+            }
+        }
+        if (c == '/' && i + 1 < s.length()) {
+            char n = s.charAt(i + 1);
+            if (n == '/') {
+                int nl = s.indexOf('\n', i);
+                return nl < 0 ? s.length() : nl;
+            }
+            if (n == '*') {
+                // Kotlin block comments NEST; Java's do not. Stopping at the
+                // first */ in Kotlin ends the comment early and the rest of it is
+                // then read as live code.
+                if (!kotlin) {
+                    int close = s.indexOf("*/", i + 2);
+                    return close < 0 ? s.length() : close + 2;
+                }
+                int depth = 0;
+                int j = i;
+                while (j < s.length()) {
+                    if (s.charAt(j) == '/' && j + 1 < s.length() && s.charAt(j + 1) == '*') {
+                        depth++;
+                        j += 2;
+                        continue;
+                    }
+                    if (s.charAt(j) == '*' && j + 1 < s.length() && s.charAt(j + 1) == '/') {
+                        depth--;
+                        j += 2;
+                        if (depth == 0) {
+                            return j;
+                        }
+                        continue;
+                    }
+                    j++;
+                }
+                return s.length();
+            }
+        }
+        return i;
     }
 }

@@ -132,6 +132,66 @@ static void ensurePipelineCache(void) {
 
 // --------------- Encoder lifecycle ---------------
 
+#ifdef CN1_TEXTURE_CENSUS
+#define CN1_TEXCENSUS_SITES 32
+static const char *cn1TexSiteNames[CN1_TEXCENSUS_SITES];
+static long long cn1TexSiteBytes[CN1_TEXCENSUS_SITES];
+static long cn1TexSiteCount[CN1_TEXCENSUS_SITES];
+static int cn1TexSiteUsed = 0;
+static pthread_mutex_t cn1TexCensusMutex = PTHREAD_MUTEX_INITIALIZER;
+
+void cn1TextureCensusNote(const char *site, id<MTLTexture> t) {
+    if(t == nil || site == 0) {
+        return;
+    }
+    long long sz = (long long)[t allocatedSize];
+    // Log the big ones individually with their true shape. allocatedSize alone
+    // cannot be reasoned about -- a 2048x1536 BGRA8 render target reporting 21MB
+    // against a raw 12.6MB is either a bigger texture than you assumed or GPU-side
+    // compression metadata, and only the dimensions tell you which.
+    if(sz >= 1048576) {
+        fprintf(stderr, "[TEX] %-24s %5lux%-5lu fmt=%lu storage=%lu %.2fMB (raw %.2fMB)\n",
+                site, (unsigned long)[t width], (unsigned long)[t height],
+                (unsigned long)[t pixelFormat], (unsigned long)[t storageMode],
+                sz / (1024.0 * 1024.0),
+                ([t width] * [t height] * 4.0) / (1024.0 * 1024.0));
+        fflush(stderr);
+    }
+    pthread_mutex_lock(&cn1TexCensusMutex);
+    int i = 0;
+    for( ; i < cn1TexSiteUsed ; i++) {
+        if(cn1TexSiteNames[i] == site) {   // string literals: pointer identity is enough
+            break;
+        }
+    }
+    if(i == cn1TexSiteUsed && cn1TexSiteUsed < CN1_TEXCENSUS_SITES) {
+        cn1TexSiteNames[cn1TexSiteUsed++] = site;
+    }
+    if(i < CN1_TEXCENSUS_SITES) {
+        cn1TexSiteBytes[i] += sz;
+        cn1TexSiteCount[i]++;
+    }
+    pthread_mutex_unlock(&cn1TexCensusMutex);
+}
+
+void cn1TextureCensusDump(const char *label) {
+    id<MTLDevice> d = CN1MetalDevice();
+    pthread_mutex_lock(&cn1TexCensusMutex);
+    // currentAllocatedSize is LIVE; the per-site figures are CUMULATIVE. A site
+    // whose cumulative total dwarfs the live total is churn, not residency --
+    // which is itself the answer for the scratch/mutable-image paths.
+    fprintf(stderr, "[TEX:%s] device live currentAllocatedSize=%.2fMB\n", label,
+            d != nil ? [d currentAllocatedSize] / (1024.0 * 1024.0) : 0.0);
+    for(int i = 0 ; i < cn1TexSiteUsed ; i++) {
+        fprintf(stderr, "[TEX:%s]   %9.2fMB cumulative  %6ld allocs  %s\n", label,
+                cn1TexSiteBytes[i] / (1024.0 * 1024.0), cn1TexSiteCount[i],
+                cn1TexSiteNames[i]);
+    }
+    pthread_mutex_unlock(&cn1TexCensusMutex);
+    fflush(stderr);
+}
+#endif
+
 void CN1MetalBeginFrame(id<MTLRenderCommandEncoder> encoder,
                         simd_float4x4 projection,
                         int framebufferWidth,
@@ -1275,6 +1335,7 @@ id<MTLTexture> CN1MetalCreateAlphaMaskTexture(const uint8_t *bytes, int width, i
         width:width height:height mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
     id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("alphaMaskGlyph", tex);
     if (tex == nil) {
         return nil;
     }
@@ -1397,6 +1458,7 @@ id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {
         width:w height:h mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
     id<MTLTexture> texture = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("textureFromUIImage", texture);
     [texture replaceRegion:MTLRegionMake2D(0, 0, w, h)
                mipmapLevel:0
                  withBytes:rawData
@@ -1450,6 +1512,7 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
     desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModePrivate;
     id<MTLTexture> tex = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("mutableImage", tex);
     if (tex == nil) return;
     // Clear new texture to the fill colour stashed by createNativeMutableImage.
     // Default Image.createImage(w, h) → 0xffffffff opaque white; createImage(w, h, argb)
@@ -1527,6 +1590,7 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
                 seedStencilDesc.usage = MTLTextureUsageRenderTarget;
                 seedStencilDesc.storageMode = MTLStorageModePrivate;
                 seedStencilTex = [device newTextureWithDescriptor:seedStencilDesc];
+                CN1_TEX_NOTE("mutableSeedStencil", seedStencilTex);
                 if (seedStencilTex != nil) {
                     seedPass.stencilAttachment.texture = seedStencilTex;
                     seedPass.stencilAttachment.loadAction = MTLLoadActionClear;
@@ -1622,6 +1686,7 @@ BOOL CN1MetalBeginMutableImageDraw(GLUIImage *image) {
         stencilDesc.usage = MTLTextureUsageRenderTarget;
         stencilDesc.storageMode = MTLStorageModePrivate;
         stencilTex = [device newTextureWithDescriptor:stencilDesc];
+        CN1_TEX_NOTE("mutableDrawStencil", stencilTex);
         if (stencilTex != nil) {
             desc.stencilAttachment.texture = stencilTex;
             desc.stencilAttachment.loadAction = MTLLoadActionClear;
@@ -1770,6 +1835,7 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
     desc.usage = MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModeShared;
     id<MTLTexture> shared = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("mutableFlushShared", shared);
     if (shared == nil) return NO;
 
     id<MTLCommandBuffer> blitCb = [queue commandBuffer];
@@ -1853,6 +1919,7 @@ UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
     desc.usage = MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModeShared;
     id<MTLTexture> shared = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("mutableReadShared", shared);
     if (shared == nil) return nil;
 
     id<MTLCommandBuffer> blitCb = [queue commandBuffer];

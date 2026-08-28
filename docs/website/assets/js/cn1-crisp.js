@@ -1,10 +1,23 @@
 (() => {
-  const CONSENT_KEY = "cn1-crisp-consent-v1";
-  const CONSENT_COOKIE = "cn1_crisp_consent";
+  const CONSENT_KEY = "cn1-crisp-consent-v2";
+  const CONSENT_COOKIE = "cn1_crisp_consent_v2";
   const WEBSITE_ID = "e0201fca-1e59-4f30-9d00-8c37aa18293e";
   const CONSENT_TTL_DAYS = 365;
   const CONVERSION_ARRIVAL_KEY = "cn1-conversion-arrival-v1";
   const OSS_ATTRIBUTION_KEY = "cn1-oss-attribution-v1";
+  const EXP004_STORAGE_KEY = "cn1-exp-004-arm-v1";
+  const EXP004_COUNTER_SESSION_KEY = "cn1-exp-004-counter-session-v1";
+  const EXP004_COUNTER_TOKEN_KEY = "cn1-exp-004-counter-token-v1";
+  const EXP004_COUNTER_EVENT_PREFIX = "cn1-exp-004-counter-event-v1-";
+  const EXP004_COUNTER_OCCURRED_PREFIX = "cn1-exp-004-counter-occurred-v1-";
+  const EXP004_COUNTER_ACK_PREFIX = "cn1-exp-004-counter-ack-v1-";
+  const EXP004_COUNTER_SESSION_ENDPOINT = "/api/exp004/session";
+  const EXP004_COUNTER_ENDPOINT = "/api/exp004/collect";
+  const EXP004_COUNTER_RETRY_DELAYS = [1000, 5000, 15000, 45000];
+  const EXP004_ID = "EXP-004";
+  const EXP004_HOSTNAME = (window.location && window.location.hostname) || "";
+  const EXP004_PREVIEW_HOST = EXP004_HOSTNAME === "localhost" ||
+    EXP004_HOSTNAME === "127.0.0.1" || /\.pages\.dev$/i.test(EXP004_HOSTNAME);
   const OSS_VALUE_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
   const readCookie = (name) => {
@@ -104,6 +117,38 @@
     return enriched;
   };
 
+  const readExp004Assignment = () => {
+    if (EXP004_PREVIEW_HOST) {
+      return null;
+    }
+    const experiment = window.cn1Exp004;
+    if (experiment && experiment.telemetryEnabled === false) {
+      return null;
+    }
+    let arm = experiment && experiment.arm;
+    if (arm !== "ownership" && arm !== "reach") {
+      try {
+        arm = localStorage.getItem(EXP004_STORAGE_KEY);
+      } catch (e) {
+        return null;
+      }
+    }
+    if (arm !== "ownership" && arm !== "reach") {
+      return null;
+    }
+    return { id: EXP004_ID, arm };
+  };
+
+  const withExp004Assignment = (data, assignment) => {
+    if (!assignment) {
+      return data;
+    }
+    return Object.assign({}, data || {}, {
+      experiment_id: assignment.id,
+      experiment_arm: assignment.arm
+    });
+  };
+
   // --- Crisp trigger events -------------------------------------------------
   // Pages and product surfaces explicitly call the matching function below. This
   // shared script handles consent, timing, and deduplication; it never guesses user
@@ -111,15 +156,207 @@
   const firedThisView = {};
   const pendingEvents = {};
 
+  const crispEventDedupeName = (name, data) =>
+    data && data.action ? `${name}-${data.action}` : name;
+  const crispEventSessionKey = (name, data) =>
+    `cn1-crisp-ev-${crispEventDedupeName(name, data)}`;
+
+  const newExp004CounterId = () => {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+    if (!window.crypto || typeof window.crypto.getRandomValues !== "function") {
+      return null;
+    }
+    const bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-` +
+      `${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-` +
+      hex.slice(10).join("");
+  };
+
+  const exp004CounterMemory = {
+    sessionKey: null,
+    submissionToken: null,
+    eventIds: {},
+    occurredAt: {},
+    acknowledged: {}
+  };
+  let exp004CounterSessionPromise = null;
+
+  const readExp004CounterValue = (key, fallback) => {
+    try {
+      return sessionStorage.getItem(key) || fallback || null;
+    } catch (e) {
+      return fallback || null;
+    }
+  };
+
+  const writeExp004CounterValue = (key, value) => {
+    try {
+      sessionStorage.setItem(key, value);
+    } catch (e) {
+      // The in-memory copy keeps this page's best-effort reporting alive.
+    }
+  };
+
+  const clearExp004CounterToken = () => {
+    exp004CounterMemory.submissionToken = null;
+    exp004CounterSessionPromise = null;
+    try {
+      sessionStorage.removeItem(EXP004_COUNTER_TOKEN_KEY);
+    } catch (e) {
+      // The token is also cleared from memory.
+    }
+  };
+
+  const ensureExp004CounterSession = (sessionKey, arm) => {
+    const storedToken = readExp004CounterValue(
+      EXP004_COUNTER_TOKEN_KEY,
+      exp004CounterMemory.submissionToken
+    );
+    if (storedToken) {
+      exp004CounterMemory.submissionToken = storedToken;
+      return Promise.resolve(storedToken);
+    }
+    if (exp004CounterSessionPromise) {
+      return exp004CounterSessionPromise;
+    }
+    exp004CounterSessionPromise = window.fetch(EXP004_COUNTER_SESSION_ENDPOINT, {
+      method: "POST",
+      credentials: "same-origin",
+      keepalive: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_key: sessionKey, arm })
+    }).then((response) => {
+      if (!response.ok) throw new Error("counter_session_rejected");
+      return response.json();
+    }).then((payload) => {
+      const token = payload && payload.submission_token;
+      if (!/^[0-9a-f-]{36}$/i.test(token || "")) {
+        throw new Error("counter_session_invalid");
+      }
+      exp004CounterMemory.submissionToken = token;
+      writeExp004CounterValue(EXP004_COUNTER_TOKEN_KEY, token);
+      return token;
+    }).catch((error) => {
+      exp004CounterSessionPromise = null;
+      throw error;
+    });
+    return exp004CounterSessionPromise;
+  };
+
+  const reportFirstPartyExp004Event = (name) => {
+    if (!/^Exp004(?:Ownership|Reach)(?:Exposure|Download)$/.test(name) ||
+        typeof window.fetch !== "function") {
+      return false;
+    }
+    const armMatch = name.match(/^Exp004(Ownership|Reach)/);
+    const arm = armMatch && armMatch[1].toLowerCase();
+    let sessionKey = readExp004CounterValue(
+      EXP004_COUNTER_SESSION_KEY,
+      exp004CounterMemory.sessionKey
+    );
+    if (!sessionKey) {
+      sessionKey = newExp004CounterId();
+      if (!sessionKey) return false;
+      writeExp004CounterValue(EXP004_COUNTER_SESSION_KEY, sessionKey);
+    }
+    exp004CounterMemory.sessionKey = sessionKey;
+
+    const eventKey = `${EXP004_COUNTER_EVENT_PREFIX}${name}`;
+    let eventId = readExp004CounterValue(eventKey, exp004CounterMemory.eventIds[name]);
+    if (!eventId) {
+      eventId = newExp004CounterId();
+      if (!eventId) return false;
+      writeExp004CounterValue(eventKey, eventId);
+    }
+    exp004CounterMemory.eventIds[name] = eventId;
+
+    const occurredKey = `${EXP004_COUNTER_OCCURRED_PREFIX}${name}`;
+    let occurredAt = Number(readExp004CounterValue(
+      occurredKey,
+      exp004CounterMemory.occurredAt[name]
+    ));
+    if (!Number.isFinite(occurredAt) || occurredAt <= 0) {
+      occurredAt = Date.now();
+      writeExp004CounterValue(occurredKey, occurredAt);
+    }
+    exp004CounterMemory.occurredAt[name] = occurredAt;
+
+    const ackKey = `${EXP004_COUNTER_ACK_PREFIX}${name}`;
+    if (readExp004CounterValue(ackKey, exp004CounterMemory.acknowledged[name])) {
+      return true;
+    }
+
+    const send = (attempt) => {
+      if (getConsent() !== "accepted") return;
+      void ensureExp004CounterSession(sessionKey, arm).then((submissionToken) =>
+        window.fetch(EXP004_COUNTER_ENDPOINT, {
+          method: "POST",
+          credentials: "same-origin",
+          keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event: name,
+            event_id: eventId,
+            occurred_at: occurredAt,
+            session_key: sessionKey,
+            submission_token: submissionToken
+          })
+        })
+      ).then((response) => {
+        if (!response.ok) {
+          if (response.status === 401) clearExp004CounterToken();
+          throw new Error("counter_event_rejected");
+        }
+        exp004CounterMemory.acknowledged[name] = "1";
+        writeExp004CounterValue(ackKey, "1");
+      }).catch(() => {
+        if (attempt < EXP004_COUNTER_RETRY_DELAYS.length &&
+            getConsent() === "accepted") {
+          window.setTimeout(
+            () => send(attempt + 1),
+            EXP004_COUNTER_RETRY_DELAYS[attempt]
+          );
+        }
+      });
+    };
+    send(0);
+    return true;
+  };
+
+  const retryStoredExp004CounterEvents = () => {
+    if (EXP004_PREVIEW_HOST || getConsent() !== "accepted") return;
+    [
+      "Exp004OwnershipExposure",
+      "Exp004ReachExposure",
+      "Exp004OwnershipDownload",
+      "Exp004ReachDownload"
+    ].forEach((name) => {
+      const eventKey = `${EXP004_COUNTER_EVENT_PREFIX}${name}`;
+      const ackKey = `${EXP004_COUNTER_ACK_PREFIX}${name}`;
+      if (readExp004CounterValue(eventKey, null) &&
+          !readExp004CounterValue(ackKey, null)) {
+        reportFirstPartyExp004Event(name);
+      }
+    });
+  };
+
+  retryStoredExp004CounterEvents();
+
   const fireCrispEvent = (name, data) => {
     // Consent can change after a page schedules a dwell event. Check it at the
     // moment the event fires, before touching either deduplication guard.
-    const dedupeName = data && data.action ? `${name}-${data.action}` : name;
+    const dedupeName = crispEventDedupeName(name, data);
     if (getConsent() !== "accepted" || !window.$crisp || firedThisView[dedupeName]) {
       return false;
     }
     try {
-      const sessionKey = `cn1-crisp-ev-${dedupeName}`;
+      const sessionKey = crispEventSessionKey(name, data);
       if (sessionStorage.getItem(sessionKey)) {
         return false; // already fired earlier this session
       }
@@ -131,10 +368,11 @@
       window.$crisp.push(["set", "session:event", [[event]]]);
       firedThisView[dedupeName] = true;
       try {
-        sessionStorage.setItem(`cn1-crisp-ev-${dedupeName}`, "1");
+        sessionStorage.setItem(crispEventSessionKey(name, data), "1");
       } catch (e) {
         // sessionStorage unavailable — the per-view guard still applies
       }
+      reportFirstPartyExp004Event(name);
       return true;
     } catch (e) {
       return false;
@@ -168,6 +406,34 @@
     window.setTimeout(() => requestCrispEvent(name, data), delay);
   };
 
+  const exp004ExposureEvent = (assignment) => ({
+    name: assignment.arm === "ownership"
+      ? "Exp004OwnershipExposure" : "Exp004ReachExposure",
+    data: {
+      action: `${assignment.id.toLowerCase()}-${assignment.arm}`,
+      experiment_id: assignment.id,
+      experiment_arm: assignment.arm,
+      page: "/"
+    }
+  });
+
+  const readCurrentExp004Assignment = () => {
+    const assignment = readExp004Assignment();
+    if (!assignment) {
+      return null;
+    }
+    const exposure = exp004ExposureEvent(assignment);
+    try {
+      return sessionStorage.getItem(crispEventSessionKey(exposure.name, exposure.data))
+        ? assignment : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const withCurrentExp004Assignment = (data) =>
+    withExp004Assignment(data, readCurrentExp004Assignment());
+
   // Explicit hooks for the pages and product surfaces that own each event.
   const crispEvents = window.cn1CrispEvents || {};
   crispEvents.consoleDwell60 = (data) => scheduleCrispEvent(
@@ -182,14 +448,23 @@
   );
   crispEvents.buildError = (data) => requestCrispEvent("BuildError", data);
   crispEvents.conversionClick = (data) => requestCrispEvent(
-    "ConversionClick", withOssAttribution(data)
+    "ConversionClick", withCurrentExp004Assignment(withOssAttribution(data))
   );
   crispEvents.gettingStartedDwell = (data) => scheduleCrispEvent(
     "GettingStartedDwell", 20000, data
   );
-  crispEvents.initializrProjectDownloaded = (data) => requestCrispEvent(
-    "InitializrProjectDownloaded", data || { page: "/initializr/" }
-  );
+  crispEvents.initializrProjectDownloaded = (data) => {
+    const assignment = readCurrentExp004Assignment();
+    const payload = withExp004Assignment(
+      data || { page: "/initializr/" }, assignment
+    );
+    requestCrispEvent("InitializrProjectDownloaded", payload);
+    if (assignment) {
+      const eventName = assignment.arm === "ownership"
+        ? "Exp004OwnershipDownload" : "Exp004ReachDownload";
+      requestCrispEvent(eventName, payload);
+    }
+  };
   crispEvents.pricingEvaluator = (data) => {
     const firePricing = () => requestCrispEvent("PricingEvaluator", data);
     window.setTimeout(firePricing, 30000);
@@ -215,6 +490,18 @@
       data.content = attribution.content;
     }
     requestCrispEvent("OssArrival", data);
+  };
+
+  const reportExp004Exposure = () => {
+    if ((window.location.pathname || "/") !== "/") {
+      return;
+    }
+    const assignment = readExp004Assignment();
+    if (!assignment) {
+      return;
+    }
+    const exposure = exp004ExposureEvent(assignment);
+    requestCrispEvent(exposure.name, exposure.data);
   };
 
   const consumeConversionArrival = () => {
@@ -294,10 +581,14 @@
 
   const acceptConsent = () => {
     setConsent("accepted");
+    if (window.cn1Exp004 && window.cn1Exp004.persist) {
+      window.cn1Exp004.persist();
+    }
     closeBanner();
     loadCrisp();
     reportOssArrival();
     flushPendingEvents();
+    reportExp004Exposure();
   };
 
   const declineConsent = () => {
@@ -319,6 +610,7 @@
     openBanner();
   }
   consumeConversionArrival();
+  reportExp004Exposure();
 
   if (acceptBtn) {
     acceptBtn.addEventListener("click", acceptConsent);
@@ -331,7 +623,7 @@
   document.querySelectorAll("[data-cn1-enable-chat]").forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
-      acceptConsent();
+      openBanner();
     });
   });
 

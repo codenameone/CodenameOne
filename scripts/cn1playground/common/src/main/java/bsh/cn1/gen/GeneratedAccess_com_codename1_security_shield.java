@@ -756,6 +756,7 @@ public final class GeneratedAccess_com_codename1_security_shield {
         if ("JAILBREAK".equals(name)) return com.codename1.security.shield.ShieldSignal.JAILBREAK;
         if ("REPACKAGED".equals(name)) return com.codename1.security.shield.ShieldSignal.REPACKAGED;
         if ("ROOT".equals(name)) return com.codename1.security.shield.ShieldSignal.ROOT;
+        if ("TAPJACK".equals(name)) return com.codename1.security.shield.ShieldSignal.TAPJACK;
         throw unsupportedStaticField(com.codename1.security.shield.ShieldSignal.class, name);
     }
 

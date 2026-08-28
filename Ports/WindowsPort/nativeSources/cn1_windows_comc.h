@@ -89,6 +89,9 @@
 #ifndef ID2D1HwndRenderTarget_Resize
 #define ID2D1HwndRenderTarget_Resize(This, ...) ((This)->Resize(__VA_ARGS__))
 #endif
+#ifndef ID2D1HwndRenderTarget_Release
+#define ID2D1HwndRenderTarget_Release(This, ...) ((This)->Release(__VA_ARGS__))
+#endif
 #ifndef ID2D1PathGeometry_Open
 #define ID2D1PathGeometry_Open(This, ...) ((This)->Open(__VA_ARGS__))
 #endif
@@ -169,6 +172,9 @@
 #endif
 #ifndef ID2D1SolidColorBrush_SetColor
 #define ID2D1SolidColorBrush_SetColor(This, ...) ((This)->SetColor(__VA_ARGS__))
+#endif
+#ifndef ID2D1SolidColorBrush_Release
+#define ID2D1SolidColorBrush_Release(This, ...) ((This)->Release(__VA_ARGS__))
 #endif
 #ifndef IWICBitmapDecoder_GetFrame
 #define IWICBitmapDecoder_GetFrame(This, ...) ((This)->GetFrame(__VA_ARGS__))

@@ -137,7 +137,23 @@ public abstract class UITestBase {
         // short-circuits when Display.hasDragOccured() is true).
         resetDisplayBooleanField("dragOccured", false);
         resetDisplayBooleanField("pointerPressedAndNotReleasedOrDragged", false);
+        // The per-window half of the same state. Leaving it set would carry a held
+        // press from a window one test opened into the next test's assertions, which
+        // the singleton reset above cannot reach.
+        resetDisplayBooleanArrayField("selectionPressed");
         resetDisplayIntField("dragPathLength", 0);
+    }
+
+    private void resetDisplayBooleanArrayField(String name) {
+        try {
+            Field f = Display.class.getDeclaredField(name);
+            f.setAccessible(true);
+            boolean[] values = (boolean[]) f.get(display);
+            if (values != null) {
+                java.util.Arrays.fill(values, false);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private void resetDisplayBooleanField(String name, boolean value) {

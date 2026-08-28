@@ -1372,7 +1372,12 @@ public class Calendar extends Container implements ActionSource {
                             selected = components[iter];
                         }
                         fireActionEvent();
-                        if (!getComponentForm().isSingleFocusMode()) {
+                        // The top level rather than the form, and null tolerated:
+                        // getComponentForm() is null by design inside a Window, so
+                        // every ordinary day selection updated the date, fired its
+                        // listeners and then threw.
+                        TopLevelContainer top = getTopLevelContainer();
+                        if (top == null || !top.isSingleFocusMode()) {
                             setHandlesInput(false);
                         }
                         revalidate();

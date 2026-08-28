@@ -33,6 +33,8 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.TopLevelContainer;
+import com.codename1.ui.Window;
 
 /// A floating hint is similar to a text field with a hint. However, when the text field has text in it the hint appears
 /// above the text field instead including an animation when focus hits the text field see
@@ -107,17 +109,27 @@ public class FloatingHint extends Container {
         tf.addFocusListener(fl);
     }
 
+    /// Revalidates the surface a component lives in, whether that is a form or a
+    /// window.
+    private static void revalidateTopLevel(Component c) {
+        TopLevelContainer top = c.getTopLevelContainer();
+        if (top != null) {
+            top.asContainer().revalidate();
+        }
+    }
+
     private void focusGainedImpl() {
         if (isInitializedImpl()) {
             hintButton.setFocus(true);
             if (!hintButton.isVisible()) {
                 hintButton.setVisible(true);
-                if (getComponentForm().grabAnimationLock()) {
+                TopLevelContainer top = getTopLevelContainer();
+                if (top != null && top.grabAnimationLock()) {
                     morphAndWait(hintLabel, hintButton, 150);
-                    getComponentForm().releaseAnimationLock();
+                    top.releaseAnimationLock();
                 }
                 hintLabel.setVisible(false);
-                tf.getComponentForm().revalidate();
+                revalidateTopLevel(tf);
                 tf.setEditable(true);
                 tf.startEditingAsync();
             } else {
@@ -132,8 +144,23 @@ public class FloatingHint extends Container {
         }
     }
 
+    /// True when this hint is attached to the surface currently on screen.
+    ///
+    /// Comparing `Display#getCurrent()` -- which only ever names a `Form` -- against
+    /// `getComponentForm()`, null inside a `Window`, was false for every floating hint
+    /// in a window, so the animated hint silently degraded to the plain branch there.
     private boolean isInitializedImpl() {
-        return isInitialized() && getComponentForm() == Display.getInstance().getCurrent(); //NOPMD CompareObjectsWithEquals
+        if (!isInitialized()) {
+            return false;
+        }
+        TopLevelContainer top = getTopLevelContainer();
+        if (top == null) {
+            return false;
+        }
+        if (top instanceof Window) {
+            return ((Window) top).isWindowShowing();
+        }
+        return Display.getInstance().getCurrent() == top; //NOPMD CompareObjectsWithEquals
     }
 
     private void focusLostImpl() {
@@ -141,12 +168,13 @@ public class FloatingHint extends Container {
             hintButton.setFocus(false);
             if (tf.getText().length() == 0) {
                 hintLabel.setVisible(true);
-                if (getComponentForm().grabAnimationLock()) {
+                TopLevelContainer top = getTopLevelContainer();
+                if (top != null && top.grabAnimationLock()) {
                     morphAndWait(hintButton, hintLabel, 150);
-                    getComponentForm().releaseAnimationLock();
+                    top.releaseAnimationLock();
                 }
                 hintButton.setVisible(false);
-                tf.getComponentForm().revalidate();
+                revalidateTopLevel(tf);
                 revalidate();
                 tf.setEditable(false);
             }

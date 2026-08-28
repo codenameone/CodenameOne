@@ -2014,6 +2014,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -4058,6 +4063,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -6100,6 +6110,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -8158,6 +8173,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -10298,6 +10318,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -12372,6 +12397,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -14385,6 +14415,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -16413,6 +16448,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -18417,6 +18457,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -20450,6 +20495,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -22447,6 +22497,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -25030,6 +25085,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getTreeState".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTreeState();
@@ -27007,6 +27067,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -29161,6 +29226,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -30929,6 +30999,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -32645,6 +32720,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -34623,6 +34703,16 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
+        if ("getTopLevelHost".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelHost();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -35784,6 +35874,12 @@ public final class GeneratedAccess_com_codename1_components {
                 typedTarget.setTooltip((java.lang.String) adaptedArgs[0]); return null;
             }
         }
+        if ("setTopLevelHost".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TopLevelContainer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TopLevelContainer.class}, false);
+                typedTarget.setTopLevelHost((com.codename1.ui.TopLevelContainer) adaptedArgs[0]); return null;
+            }
+        }
         if ("setTransitions".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.Transition.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.Transition.class}, false);
@@ -36780,6 +36876,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -39053,6 +39154,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -41388,6 +41494,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -43448,6 +43559,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -44903,6 +45019,11 @@ public final class GeneratedAccess_com_codename1_components {
                 typedTarget.applyRTL(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
+        if ("asContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.asContainer();
+            }
+        }
         if ("bindProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.cloud.BindTarget.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.cloud.BindTarget.class}, false);
@@ -45764,6 +45885,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getTransitionInAnimator".equals(name)) {
@@ -48149,6 +48275,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -50400,6 +50531,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -52411,6 +52547,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -54394,6 +54535,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -56576,6 +56722,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -58486,6 +58637,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -60738,6 +60894,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -62926,6 +63087,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -65160,6 +65326,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -67520,6 +67691,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTop();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getTopOrLeftComponent".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTopOrLeftComponent();
@@ -69718,6 +69894,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getTransitionDurationMillis".equals(name)) {
@@ -72054,6 +72235,11 @@ public final class GeneratedAccess_com_codename1_components {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -74009,6 +74195,11 @@ public final class GeneratedAccess_com_codename1_components {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {

@@ -102,7 +102,16 @@ typedef enum {
      * fireRotationGesture, the same hooks the macOS trackpad drives. */
     CN1_EVENT_PINCH = 10,
     CN1_EVENT_ROTATE = 11,
-    CN1_EVENT_ACCESSIBILITY_ACTION = 12
+    CN1_EVENT_ACCESSIBILITY_ACTION = 12,
+    /* Additional desktop windows. These carry a non-zero windowId; every event
+     * above carries windowId 0, meaning the application's main window. */
+    CN1_EVENT_WINDOW_CLOSE = 13,
+    CN1_EVENT_WINDOW_FOCUS = 14,      /* keyCode 1 == gained, 0 == lost      */
+    CN1_EVENT_WINDOW_MONITOR = 15,    /* window moved to a different monitor */
+    CN1_EVENT_WINDOW_SHOWN = 16,
+    CN1_EVENT_WINDOW_HIDDEN = 17,
+    CN1_EVENT_WINDOW_MOVED = 18,
+    CN1_EVENT_MONITORS_CHANGED = 19
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */
@@ -113,6 +122,12 @@ typedef struct {
     JAVA_INT x;
     JAVA_INT y;
     JAVA_INT keyCode;
+    /* Which window the event came from. Zero is the application's main window,
+     * which is every event the port produced before desktop windows existed, so
+     * the Java side's main path is unchanged. A port must echo back the id it was
+     * handed at creation rather than looking the window up, because these are
+     * pushed from the pump thread. */
+    JAVA_INT windowId;
 } CN1Event;
 
 /* For pointer (pressed/released/dragged) events the otherwise-unused keyCode
@@ -254,9 +269,36 @@ void cn1WindowsLog(const char* message);
 void cn1WinApplyPendingResize(void);
 int  cn1WinCreateWindow(const char* utf8Title, int width, int height);
 void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode);
+/* Same, but tagged with the desktop window the event came from. */
+void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int keyCode);
+
+/* CN1_PE_TOUCH_FLAG / CN1_PE_PEN_FLAG for the message being handled, or 0 for a
+ * real mouse. Windows promotes touch and pen contacts to mouse messages and only
+ * distinguishes them through GetMessageExtraInfo. */
+int cn1WinTouchFlag(void);
+
+#ifdef WM_GESTURE
+/* Handles a WM_GESTURE for the given window, pushing pinch / rotate events tagged
+ * with windowId (0 is the main window). Returns non-zero when the gesture was
+ * consumed, in which case the handle has already been closed. Shared so a
+ * secondary desktop window reports trackpad gestures the same way the main one
+ * does. */
+int cn1WinHandleGesture(HWND hwnd, int windowId, LPARAM lParam);
+#endif
 int  cn1WinPollEvent(CN1Event* out);
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT cn1WinAccessibilityObject(HWND hwnd, WPARAM wParam, LPARAM lParam);
+
+/* Additional desktop windows (cn1_windows_desktopwindow.cpp). The main window in
+ * cn1Win is deliberately left alone: secondary windows live in their own table
+ * with their own HWND, render target and graphics, so nothing about the existing
+ * single-window path changes. */
+#define CN1_MAX_DESKTOP_WINDOWS 32
+/* Marshals window creation onto the pump thread, which must own the HWND. */
+#define WM_CN1_DESKTOPWINDOW (WM_APP + 25)
+void cn1WinDesktopHandleMessage(WPARAM wParam, LPARAM lParam);
+HWND cn1WinDesktopHwnd(int slot);
+int  cn1WinDesktopSlotForHwnd(HWND hwnd);
 
 /* BrowserComponent / WebView2 peer (cn1_windows_browser.cpp). The EDT-facing
  * native methods marshal each WebView2 operation to the main (pump) thread by

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>codenameone-build-hint-catalog</artifactId>
+    <name>Codename One Build Hint Catalog</name>
+    <description>Shared registry describing every Codename One build hint: type, value domain and merge semantics</description>
+
+    <!--
+        DEVICE-SAFE. The Settings tool depends on this and is a Codename One
+        application, so every class here is translated for the device. Nothing
+        in this artifact may touch ASM, javax.tools or anything else that only
+        exists on a build host; those readers live in
+        codenameone-build-hint-tools.
+    -->
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.7.3.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>false</failOnError>
+                    <xmlOutput>true</xmlOutput>
+                    <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>spotbugs</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

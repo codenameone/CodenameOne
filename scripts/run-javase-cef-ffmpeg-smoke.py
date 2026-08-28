@@ -61,6 +61,11 @@ def tail_text(path: Path, max_lines: int = 60) -> str:
 # and a non-resolvable import POM included.
 _TRANSFER_FAILURE = re.compile(
     r"Could not transfer artifact"
+    # Maven's wording when it reaches the repository but cannot read the POM it
+    # needs to resolve a dependency. Also a fetch failure, and it is what a
+    # Central hiccup during copy-dependencies actually prints -- a shape that
+    # made a green build red without a retry because nothing here named it.
+    r"|Failed to read artifact descriptor"
     r"|transfer failed for"
     r"|status code: (?:40[38]|409|425|429|5\d\d)"
     r"|Too Many Requests"

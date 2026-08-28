@@ -220,15 +220,19 @@ jobs:
           if grep -q '^codename1\.arg\.ios\.metal=' "$SETTINGS"; then
             sed -i '' 's|^codename1.arg.ios.metal=.*|codename1.arg.ios.metal=false|' "$SETTINGS"
           else
-            awk '
-              /^codename1\.arg\.ios\.applicationQueriesSchemes=/ {
-                print
-                print "codename1.arg.ios.metal=false"
-                next
-              }
-              { print }
-            ' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+            # Appended, not inserted beside a neighbouring key. Anchoring on
+            # another hint made this a silent no-op the day that hint moved to
+            # an annotation: the job then built with the DEFAULT backend, so it
+            # tested Metal while comparing against the GL screenshots and every
+            # frame differed.
+            printf 'codename1.arg.ios.metal=false\n' >> "$SETTINGS"
           fi
+          # A backend this job did not choose is not a test of anything, so
+          # prove the hint is there rather than trusting the edit.
+          grep -qx 'codename1.arg.ios.metal=false' "$SETTINGS" || {
+            echo "::error::ios.metal=false was not applied; this job would test the wrong backend"
+            exit 1
+          }
           echo "--- codenameone_settings.properties (ios.* keys after patch) ---"
           grep -n 'codename1\.arg\.ios' "$SETTINGS" || true
 
@@ -439,16 +443,16 @@ jobs:
           if grep -q '^codename1\.arg\.ios\.metal=' "$SETTINGS"; then
             sed -i '' 's|^codename1.arg.ios.metal=.*|codename1.arg.ios.metal=true|' "$SETTINGS"
           else
-            # Insert next to the other ios.* keys (after applicationQueriesSchemes).
-            awk '
-              /^codename1\.arg\.ios\.applicationQueriesSchemes=/ {
-                print
-                print "codename1.arg.ios.metal=true"
-                next
-              }
-              { print }
-            ' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+            # Appended, not inserted beside a neighbouring key -- see the GL
+            # job. This one passed while doing nothing, because the backend it
+            # failed to enable is also the default, which is exactly why the
+            # check below exists.
+            printf 'codename1.arg.ios.metal=true\n' >> "$SETTINGS"
           fi
+          grep -qx 'codename1.arg.ios.metal=true' "$SETTINGS" || {
+            echo "::error::ios.metal=true was not applied; this job would test the wrong backend"
+            exit 1
+          }
           echo "--- codenameone_settings.properties (ios.* keys after patch) ---"
           grep -n 'codename1\.arg\.ios' "$SETTINGS" || true
 

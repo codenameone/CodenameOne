@@ -37,8 +37,10 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
+import com.codename1.annotations.buildhints.*;
 
 /** Codename One application lifecycle and CLI dispatcher. */
+@DesktopBuild(height = 720, titleBar = DesktopTitleBar.NATIVE, width = 1280)
 public final class VideoBuilder {
     private Form current;
 

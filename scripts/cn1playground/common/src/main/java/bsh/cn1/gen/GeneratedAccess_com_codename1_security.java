@@ -121,6 +121,9 @@ public final class GeneratedAccess_com_codename1_security {
         if ("Signature".equals(simpleName)) {
             return com.codename1.security.Signature.class;
         }
+        if ("TapjackingPolicy".equals(simpleName)) {
+            return com.codename1.security.TapjackingPolicy.class;
+        }
         return null;
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
@@ -244,6 +247,12 @@ public final class GeneratedAccess_com_codename1_security {
     }
 
     private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
+        if ("addTapjackingListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                com.codename1.security.DeviceIntegrity.addTapjackingListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
         if ("confirmAttestation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -258,6 +267,11 @@ public final class GeneratedAccess_com_codename1_security {
         if ("getEnabledAccessibilityServices".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.security.DeviceIntegrity.getEnabledAccessibilityServices();
+            }
+        }
+        if ("getTapjackingPolicy".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.security.DeviceIntegrity.getTapjackingPolicy();
             }
         }
         if ("hasUntrustedAccessibilityService".equals(name)) {
@@ -280,6 +294,22 @@ public final class GeneratedAccess_com_codename1_security {
                 return com.codename1.security.DeviceIntegrity.isDeviceCompromised();
             }
         }
+        if ("isHideOverlayWindowsSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.security.DeviceIntegrity.isHideOverlayWindowsSupported();
+            }
+        }
+        if ("isScreenObscured".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.security.DeviceIntegrity.isScreenObscured();
+            }
+        }
+        if ("removeTapjackingListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                com.codename1.security.DeviceIntegrity.removeTapjackingListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
         if ("requestIntegrityToken".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -291,10 +321,22 @@ public final class GeneratedAccess_com_codename1_security {
                 com.codename1.security.DeviceIntegrity.resetAttestation(); return null;
             }
         }
+        if ("setHideOverlayWindows".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                com.codename1.security.DeviceIntegrity.setHideOverlayWindows(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
         if ("setSecureScreen".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 com.codename1.security.DeviceIntegrity.setSecureScreen(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setTapjackingProtection".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.security.TapjackingPolicy.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.security.TapjackingPolicy.class}, false);
+                com.codename1.security.DeviceIntegrity.setTapjackingProtection((com.codename1.security.TapjackingPolicy) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedStatic(com.codename1.security.DeviceIntegrity.class, name, safeArgs);
@@ -722,6 +764,13 @@ public final class GeneratedAccess_com_codename1_security {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.security.TapjackingPolicy) {
+            try {
+                return invoke12((com.codename1.security.TapjackingPolicy) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (unsupported != null) {
             throw unsupported;
         }
@@ -1100,6 +1149,12 @@ public final class GeneratedAccess_com_codename1_security {
     }
 
     private static Object invoke11(com.codename1.security.SecureStorage typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("entryState".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.entryState((java.lang.String) adaptedArgs[0]);
+            }
+        }
         if ("get".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -1130,10 +1185,31 @@ public final class GeneratedAccess_com_codename1_security {
                 return typedTarget.set((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]);
             }
         }
+        if ("setIfAbsent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.setIfAbsent((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
         if ("setKeychainAccessGroup".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.setKeychainAccessGroup((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke12(com.codename1.security.TapjackingPolicy typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("blocks".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Boolean.class}, false);
+                return typedTarget.blocks(((Boolean) adaptedArgs[0]).booleanValue(), ((Boolean) adaptedArgs[1]).booleanValue());
+            }
+        }
+        if ("isDetecting".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDetecting();
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1146,7 +1222,9 @@ public final class GeneratedAccess_com_codename1_security {
         if (type == com.codename1.security.Hash.class) return getStaticField3(name);
         if (type == com.codename1.security.Jwt.class) return getStaticField4(name);
         if (type == com.codename1.security.PublicKey.class) return getStaticField5(name);
-        if (type == com.codename1.security.Signature.class) return getStaticField6(name);
+        if (type == com.codename1.security.SecureStorage.class) return getStaticField6(name);
+        if (type == com.codename1.security.Signature.class) return getStaticField7(name);
+        if (type == com.codename1.security.TapjackingPolicy.class) return getStaticField8(name);
         throw unsupportedStaticField(type, name);
     }
 
@@ -1214,6 +1292,13 @@ public final class GeneratedAccess_com_codename1_security {
     }
 
     private static Object getStaticField6(String name) throws Exception {
+        if ("ENTRY_ABSENT".equals(name)) return com.codename1.security.SecureStorage.ENTRY_ABSENT;
+        if ("ENTRY_PRESENT".equals(name)) return com.codename1.security.SecureStorage.ENTRY_PRESENT;
+        if ("ENTRY_UNKNOWN".equals(name)) return com.codename1.security.SecureStorage.ENTRY_UNKNOWN;
+        throw unsupportedStaticField(com.codename1.security.SecureStorage.class, name);
+    }
+
+    private static Object getStaticField7(String name) throws Exception {
         if ("SHA256_WITH_ECDSA".equals(name)) return com.codename1.security.Signature.SHA256_WITH_ECDSA;
         if ("SHA256_WITH_RSA".equals(name)) return com.codename1.security.Signature.SHA256_WITH_RSA;
         if ("SHA384_WITH_ECDSA".equals(name)) return com.codename1.security.Signature.SHA384_WITH_ECDSA;
@@ -1221,6 +1306,14 @@ public final class GeneratedAccess_com_codename1_security {
         if ("SHA512_WITH_ECDSA".equals(name)) return com.codename1.security.Signature.SHA512_WITH_ECDSA;
         if ("SHA512_WITH_RSA".equals(name)) return com.codename1.security.Signature.SHA512_WITH_RSA;
         throw unsupportedStaticField(com.codename1.security.Signature.class, name);
+    }
+
+    private static Object getStaticField8(String name) throws Exception {
+        if ("BLOCK".equals(name)) return com.codename1.security.TapjackingPolicy.BLOCK;
+        if ("OFF".equals(name)) return com.codename1.security.TapjackingPolicy.OFF;
+        if ("REPORT".equals(name)) return com.codename1.security.TapjackingPolicy.REPORT;
+        if ("STRICT".equals(name)) return com.codename1.security.TapjackingPolicy.STRICT;
+        throw unsupportedStaticField(com.codename1.security.TapjackingPolicy.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

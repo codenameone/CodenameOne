@@ -44,6 +44,7 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.TopLevelContainer;
 
 
 /// A component to allow a user to enter their signature.  This is just a button that, when pressed,
@@ -242,13 +243,25 @@ public class SignatureComponent extends Container implements ActionSource<Action
     @Override
     protected void initComponent() {
         super.initComponent();
-        getComponentForm().registerAnimated(iconAnimation);
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+        TopLevelContainer topLevel = getTopLevelContainer();
+        if (topLevel != null) {
+            topLevel.registerAnimated(iconAnimation);
+        }
     }
 
     /// Overridden to deregister the icon animation when the field is removed from the form.
     @Override
     protected void deinitialize() {
-        getComponentForm().deregisterAnimated(iconAnimation);
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+        TopLevelContainer topLevel = getTopLevelContainer();
+        if (topLevel != null) {
+            topLevel.deregisterAnimated(iconAnimation);
+        }
         super.deinitialize();
     }
 

@@ -362,6 +362,10 @@ public final class GeneratedAccess_com_codename1_ui_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, com.codename1.ui.Form.class, java.lang.Runnable.class}, false);
                 return com.codename1.ui.util.UITimer.timer(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue(), (com.codename1.ui.Form) adaptedArgs[2], (java.lang.Runnable) adaptedArgs[3]);
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, com.codename1.ui.TopLevelContainer.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, com.codename1.ui.TopLevelContainer.class, java.lang.Runnable.class}, false);
+                return com.codename1.ui.util.UITimer.timer(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue(), (com.codename1.ui.TopLevelContainer) adaptedArgs[2], (java.lang.Runnable) adaptedArgs[3]);
+            }
         }
         throw unsupportedStatic(com.codename1.ui.util.UITimer.class, name, safeArgs);
     }
@@ -1681,6 +1685,11 @@ public final class GeneratedAccess_com_codename1_ui_util {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {

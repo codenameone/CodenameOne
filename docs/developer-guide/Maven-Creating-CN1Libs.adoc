@@ -72,7 +72,7 @@ image::img/intellij-new-project-menu.png[]
 . Select "Maven" in the left menu.
 +
 image::img/intellij-new-project-dialog-maven.png[]
-. Check the "Create from Archetype" checkbox. image:img/intellij-create-from-archetype-checkbox.png[]. This should allow you to choose from of archetypes that are already known to IntelliJ.
+. Check the "Create from Archetype" checkbox image:img/intellij-create-from-archetype-checkbox.png[]. This should allow you to choose from the archetypes that are already known to IntelliJ.
 . If you don't see an option for `com.codenameone:cn1lib-archetype`, then IntelliJ doesn't know about it yet. If, but you *do* see this option, you can skip to the next step. Press the "Add Archetype..." button. This will display a dialog for you to enter the details of the archetype.
 +
 image::img/intellij-add-archetype.png[]
@@ -283,7 +283,7 @@ Right-click on the "root" module in the project explorer and select _Run as_ > _
 
 image::img/eclipse-build-cn1lib.png[]
 
-TIP: If the build fails for any reason, check to make sure that your project is using the latest version of the Codename One plugin. You can do this by opening the _pom.xml_ file, and changing the `cn1.version` and `cn1.plugin.version` properties to reference the latest version. Check for the latest version https://search.maven.org/artifact/com.codenameone/codenameone[here].
+TIP: If the build fails for any reason, check to make sure that your project is using the latest version of the Codename One plugin. You can do this by opening the _pom.xml_ file, and changing the `cn1.version` and `cn1.plugin.version` properties to reference the latest version. Check for the latest version, listed as `<release>` in the https://repo.codenameone.com/maven2/com/codenameone/codenameone-core/maven-metadata.xml[repository metadata].
 
 
 ===== Building the Legacy.cnlib file

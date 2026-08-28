@@ -36,12 +36,12 @@ import java.util.ArrayList;
 ///
 /// @author Shai Almog
 public final class AnimationManager {
-    private final Form parentForm;
+    private final TopLevelContainer parentForm;
     private final ArrayList<ComponentAnimation> anims = new ArrayList<ComponentAnimation>();
     private final ArrayList<Runnable> postAnimations = new ArrayList<Runnable>();
     private final ArrayList<UIMutation> uiMutations = new ArrayList<UIMutation>();
 
-    AnimationManager(Form parentForm) {
+    AnimationManager(TopLevelContainer parentForm) {
         this.parentForm = parentForm;
     }
 
@@ -220,7 +220,7 @@ public final class AnimationManager {
                         }
                     }
                     if (changed) {
-                        parentForm.revalidate();
+                        parentForm.asContainer().revalidate();
                     }
                 }
                 recursion = false;

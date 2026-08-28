@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -157,6 +158,332 @@ public class OpenSettingsMojoTest {
         assertTrue(binding.contains("multimoduleRoot=" + root.getAbsolutePath()));
     }
 
+    /// What Maven RESOLVED, so the Settings tool does not have to infer it from
+    /// POM text. It has no model: it cannot evaluate a profile activation,
+    /// follow an inherited `<sourceDirectory>` or expand a property, and each of
+    /// those has been a way for it to miss the main class and then offer an
+    /// annotation-owned hint for editing.
+    @Test
+    public void bindingCarriesTheResolvedSourceRootsAndEncoding() throws Exception {
+        File root = tmp.newFolder("resolved");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(new File(common, "appsrc").mkdirs());
+        File input = tmp.newFile("resolved.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        mojo.project.addCompileSourceRoot(new File(common, "appsrc").getAbsolutePath());
+        mojo.project.getProperties().setProperty("project.build.sourceEncoding", "Shift_JIS");
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        // One line per root, so a path containing a separator survives.
+        assertTrue(binding, binding.contains(
+                "sourceRoot=" + new File(common, "src/main/java").getAbsolutePath() + "\n"));
+        assertTrue(binding, binding.contains(
+                "sourceRoot=" + new File(common, "appsrc").getAbsolutePath() + "\n"));
+        assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
+    }
+
+    /// The EFFECTIVE entry point travels in the binding.
+    ///
+    /// `codename1.mainName` can be overridden with `-D`, and that overlay is
+    /// what `process-annotations` stamps the manifest with. Settings reading the
+    /// file instead scanned a different class than the build compiles, so an
+    /// annotation on the selected one was reported as absent -- and Add then
+    /// writes the duplicate declaration the next build refuses.
+    @Test
+    public void bindingCarriesTheEffectiveMainClass() throws Exception {
+        File root = tmp.newFolder("identity");
+        File common = new File(root, "common");
+        assertTrue(common.mkdirs());
+        File input = tmp.newFile("identity.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        // What execute() leaves behind once the command line has been overlaid.
+        mojo.properties = new java.util.Properties();
+        mojo.properties.setProperty("codename1.mainName", "OverriddenApp");
+        mojo.properties.setProperty("codename1.packageName", "com.example");
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains("mainName=OverriddenApp\n"));
+        assertTrue(binding, binding.contains("packageName=com.example\n"));
+    }
+
+    /// ...and a launcher that has loaded no settings says nothing rather than
+    /// failing, which is how the other tests here drive writeBinding.
+    @Test
+    public void bindingOmitsTheMainClassWhenNothingResolvedIt() throws Exception {
+        File root = tmp.newFolder("noidentity");
+        File common = new File(root, "common");
+        assertTrue(common.mkdirs());
+        File input = tmp.newFile("noidentity.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertFalse(binding, binding.contains("mainName="));
+    }
+
+    /// Maven does not copy a plugin parameter into the project's properties, so
+    /// a POM that sets `<encoding>` inside maven-compiler-plugin -- in a profile,
+    /// say -- published nothing and left the tool guessing.
+    @Test
+    public void theCompilerPluginsEncodingIsPublishedToo() throws Exception {
+        File root = tmp.newFolder("plugin-encoding");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        File input = tmp.newFile("plugin-encoding.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        org.apache.maven.model.Plugin compiler = new org.apache.maven.model.Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        compiler.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><encoding>Shift_JIS</encoding></configuration>")));
+        mojo.project.getBuild().addPlugin(compiler);
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
+    }
+
+    /// The compiler plugin's `<encoding>` parameter DEFAULTS to
+    /// `${project.build.sourceEncoding}`, so an explicit one overrides the
+    /// property. Reading the property first gave a module that sets the plugin
+    /// parameter its parent's value instead of its own.
+    @Test
+    public void anExplicitPluginEncodingBeatsTheProperty() throws Exception {
+        File root = tmp.newFolder("precedence");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        File input = tmp.newFile("precedence.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        mojo.project.getProperties().setProperty("project.build.sourceEncoding", "UTF-8");
+        org.apache.maven.model.Plugin compiler = new org.apache.maven.model.Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        compiler.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><encoding>Shift_JIS</encoding></configuration>")));
+        mojo.project.getBuild().addPlugin(compiler);
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
+        assertFalse(binding, binding.contains("sourceEncoding=UTF-8"));
+    }
+
+    /// `add-source` runs at generate-sources and adds its directories to the
+    /// project, so a mojo bound after it sees them. A goal invoked DIRECTLY --
+    /// `mvn cn1:settings` -- runs no lifecycle at all, so they are missing and a
+    /// main class living only in an added root looked absent.
+    @Test
+    public void buildHelperSourcesAreResolvedWithoutTheLifecycle() throws Exception {
+        File root = tmp.newFolder("helper-roots");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(new File(common, "gen/main").mkdirs());
+        assertTrue(new File(common, "gen/fixtures").mkdirs());
+        File input = tmp.newFile("helper-roots.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        org.apache.maven.model.Plugin helper = new org.apache.maven.model.Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.addExecution(sourceExecution("add-source", "gen/main"));
+        helper.addExecution(sourceExecution("add-test-source", "gen/fixtures"));
+        mojo.project.getBuild().addPlugin(helper);
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains(
+                "sourceRoot=" + new File(common, "gen/main").getAbsolutePath() + "\n"));
+        // The test goal's directories are not main sources.
+        assertFalse(binding, binding.contains(new File(common, "gen/fixtures").getAbsolutePath()));
+    }
+
+    private static org.apache.maven.model.PluginExecution sourceExecution(String goal, String dir)
+            throws Exception {
+        org.apache.maven.model.PluginExecution execution =
+                new org.apache.maven.model.PluginExecution();
+        execution.setGoals(Arrays.asList(goal));
+        execution.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader("<configuration><sources><source>" + dir
+                        + "</source></sources></configuration>")));
+        return execution;
+    }
+
+    /// Maven merges plugin-level configuration into every execution, so a
+    /// `<sources>` written once outside them applies to the `add-source`
+    /// execution too -- and an execution's own value overrides a plugin-level
+    /// `<encoding>`. Reading only one of the two got both halves wrong in turn.
+    @Test
+    public void configurationAtEitherLevelIsApplied() throws Exception {
+        File root = tmp.newFolder("levels");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(new File(common, "gen/shared").mkdirs());
+        File input = tmp.newFile("levels.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+
+        // build-helper: the root is named at PLUGIN level, the goal in the
+        // execution.
+        org.apache.maven.model.Plugin helper = new org.apache.maven.model.Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><sources><source>gen/shared</source></sources>"
+                                + "</configuration>")));
+        org.apache.maven.model.PluginExecution add =
+                new org.apache.maven.model.PluginExecution();
+        add.setGoals(Arrays.asList("add-source"));
+        helper.addExecution(add);
+        mojo.project.getBuild().addPlugin(helper);
+
+        // compiler: the EXECUTION overrides the plugin-level encoding, and it
+        // names the goal only through Maven's own execution id.
+        org.apache.maven.model.Plugin compiler = new org.apache.maven.model.Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        compiler.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><encoding>UTF-8</encoding></configuration>")));
+        org.apache.maven.model.PluginExecution defaultCompile =
+                new org.apache.maven.model.PluginExecution();
+        defaultCompile.setId("default-compile");
+        defaultCompile.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><encoding>Shift_JIS</encoding></configuration>")));
+        compiler.addExecution(defaultCompile);
+        mojo.project.getBuild().addPlugin(compiler);
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains(
+                "sourceRoot=" + new File(common, "gen/shared").getAbsolutePath() + "\n"));
+        assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
+        assertFalse(binding, binding.contains("sourceEncoding=UTF-8"));
+    }
+
+    /// Within one execution the levels do NOT accumulate: Maven merges by
+    /// element, and a repeated list is replaced rather than appended unless the
+    /// POM says otherwise. Taking both added a directory the build does not
+    /// compile -- a phantom root for everything downstream to scan.
+    @Test
+    public void anExecutionsSourcesReplaceThePluginLevelOnes() throws Exception {
+        File root = tmp.newFolder("override");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(new File(common, "gen/plugin-level").mkdirs());
+        assertTrue(new File(common, "gen/execution").mkdirs());
+        File input = tmp.newFile("override.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        org.apache.maven.model.Plugin helper = new org.apache.maven.model.Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><sources><source>gen/plugin-level</source></sources>"
+                                + "</configuration>")));
+        helper.addExecution(sourceExecution("add-source", "gen/execution"));
+        mojo.project.getBuild().addPlugin(helper);
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains(
+                "sourceRoot=" + new File(common, "gen/execution").getAbsolutePath() + "\n"));
+        assertFalse(binding,
+                binding.contains(new File(common, "gen/plugin-level").getAbsolutePath()));
+    }
+
+    /// `cn1:settings` run from a platform module resolves the sibling common
+    /// directory, which the reactor need not contain. Publishing the platform
+    /// module's roots as common's sent Settings an authoritative-looking answer
+    /// about the wrong module, so it never read the real POM and missed the
+    /// annotated main source.
+    @Test
+    public void aModuleWeDoNotHaveIsNotDescribed() throws Exception {
+        File root = tmp.newFolder("platform");
+        File common = new File(root, "common");
+        File javase = new File(root, "javase");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(new File(javase, "src/main/java").mkdirs());
+        File input = tmp.newFile("platform.input");
+
+        // The project being built is javase; the directory being edited is
+        // common, and no reactor module describes it.
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(javase);
+        mojo.project.getProperties().setProperty("project.build.sourceEncoding", "Shift_JIS");
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains("projectDir=" + common.getAbsolutePath()));
+        assertFalse(binding, binding.contains("sourceRoot="));
+        assertFalse(binding, binding.contains("sourceEncoding="));
+        assertFalse(binding, binding.contains(javase.getAbsolutePath() + "/src"));
+    }
+
+    /// `getCN1ProjectDir()` hands back paths shaped like `javase/../common`,
+    /// which an absolute-path comparison never matches against a reactor
+    /// module's own basedir -- so the module WAS in the session and the binding
+    /// still said nothing about it.
+    @Test
+    public void aModuleIsMatchedThroughAnUnnormalizedPath() throws Exception {
+        File root = tmp.newFolder("unnormalized");
+        File common = new File(root, "common");
+        File javase = new File(root, "javase");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(javase.mkdirs());
+        File input = tmp.newFile("unnormalized.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        mojo.project.getProperties().setProperty("project.build.sourceEncoding", "Shift_JIS");
+
+        // The shape getCN1ProjectDir returns when it walks from a sibling.
+        File viaSibling = new File(javase, ".." + File.separator + "common");
+        mojo.writeBinding(input, viaSibling);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
+        assertTrue(binding, binding.contains("sourceRoot="));
+    }
+
+    /// A project that resolves neither says neither, and the tool falls back to
+    /// reading the POM itself rather than being handed an empty answer.
+    @Test
+    public void bindingOmitsWhatItCannotResolve() throws Exception {
+        File root = tmp.newFolder("unresolved");
+        File common = new File(root, "common");
+        assertTrue(common.mkdirs());
+        File input = tmp.newFile("unresolved.input");
+
+        new OpenSettingsMojo().writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertFalse(binding, binding.contains("sourceRoot="));
+        assertFalse(binding, binding.contains("sourceEncoding="));
+    }
+
     @Test
     public void pluginVersionUsesCodenameOneVersionInsteadOfApplicationVersion() {
         OpenSettingsMojo mojo = new OpenSettingsMojo();
@@ -202,6 +529,7 @@ public class OpenSettingsMojoTest {
 
     private MavenProject projectAt(File basedir) {
         MavenProject project = new MavenProject();
+        project.setBuild(new org.apache.maven.model.Build());
         project.setFile(new File(basedir, "pom.xml"));
         project.addCompileSourceRoot(new File(basedir, "src/main/java").getAbsolutePath());
         return project;

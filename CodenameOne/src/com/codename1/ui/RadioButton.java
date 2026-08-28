@@ -343,13 +343,20 @@ public class RadioButton extends Button {
         if (isInitialized()) {
             String s = getGroup();
             if (s != null) {
-                Form f = getComponentForm();
-                ButtonGroup b = (ButtonGroup) f.getClientProperty("$radio" + s);
-                if (b == null) {
-                    b = new ButtonGroup();
-                    f.putClientProperty("$radio" + s, b);
+                // The named group is stored on whichever surface owns this button.
+                // getComponentForm() is null by design inside a Window, so showing a
+                // window containing a grouped radio button threw before the native
+                // window was even mapped.
+                TopLevelContainer top = getTopLevelContainer();
+                if (top != null) {
+                    Container host = top.asContainer();
+                    ButtonGroup b = (ButtonGroup) host.getClientProperty("$radio" + s);
+                    if (b == null) {
+                        b = new ButtonGroup();
+                        host.putClientProperty("$radio" + s, b);
+                    }
+                    b.add(this);
                 }
-                b.add(this);
             }
         }
     }

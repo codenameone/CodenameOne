@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ProjectIOTest {
     @Test
@@ -64,5 +65,57 @@ public class ProjectIOTest {
                 + "settings=C:\\Users\\John Smith\\My App\\codenameone_settings.properties\n");
         assertEquals("C:\\Users\\John Smith\\My App", b.projectDir());
         assertEquals("C:\\Users\\John Smith\\My App\\codenameone_settings.properties", b.settings());
+    }
+
+    /// What Maven RESOLVED, so the tool does not have to infer it from POM
+    /// text: it has no model for profile activation, inheritance or property
+    /// expansion, and each of those has been a way for it to miss the main
+    /// class and then offer an annotation-owned hint for editing.
+    @Test
+    public void theBindingCarriesTheResolvedSourceRootsAndEncoding() {
+        // One line per root. Every delimiter is legal in a path -- a colon in a
+        // Unix directory name, a semicolon in either -- so a joined list would
+        // have split such a path into two roots that exist nowhere.
+        ProjectBinding b = ProjectBinding.parse(
+                "projectDir=/p/common\n"
+                        + "settings=/p/common/codenameone_settings.properties\n"
+                        + "sourceRoot=/p/common/src/main/java\n"
+                        + "sourceRoot=/p/common/od:d name\n"
+                        + "sourceEncoding=Shift_JIS\n");
+        assertEquals(java.util.Arrays.asList("/p/common/src/main/java", "/p/common/od:d name"),
+                b.sourceRoots());
+        assertEquals("Shift_JIS", b.sourceEncoding());
+
+        // A binding written by an older plugin says neither, and the tool falls
+        // back to reading the POM itself.
+        ProjectBinding older = ProjectBinding.parse(
+                "projectDir=/p/common\nsettings=/p/common/codenameone_settings.properties\n");
+        assertTrue(older.sourceRoots().isEmpty());
+        assertNull(older.sourceEncoding());
+    }
+
+    /// The launcher's entry point reaches the tool.
+    ///
+    /// `codename1.mainName` can be overridden with `-D`, and that overlay is the
+    /// class `process-annotations` stamps the manifest with. Without it the tool
+    /// scanned the file's entry point instead and reported the annotations on
+    /// the one the build selected as absent.
+    @Test
+    public void theBindingCarriesTheResolvedMainClass() {
+        ProjectBinding b = ProjectBinding.parse(
+                "projectDir=/p/common\n"
+                        + "settings=/p/common/codenameone_settings.properties\n"
+                        + "mainName=OverriddenApp\n"
+                        + "packageName=com.example\n");
+        assertEquals("OverriddenApp", b.mainName());
+        assertEquals("com.example", b.packageName());
+    }
+
+    /// A launcher that did not say leaves the tool to read the file.
+    @Test
+    public void theBindingSaysNothingWhenTheLauncherDidNot() {
+        ProjectBinding b = ProjectBinding.parse("projectDir=/p/common\n");
+        assertNull(b.mainName());
+        assertNull(b.packageName());
     }
 }

@@ -479,6 +479,10 @@ public final class GeneratedAccess_java_io {
             if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.toString((java.lang.String) adaptedArgs[0]);
+            }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {

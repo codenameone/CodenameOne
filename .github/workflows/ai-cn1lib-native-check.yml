@@ -20,9 +20,25 @@ on:
       - 'maven/cn1-ai-stablediffusion/**'
       - 'scripts/gen-ai-cn1libs.py'
 
+concurrency:
+  # These jobs run on macOS, where the runner pool is small and a queued run
+  # holds its slots until it finishes. Without this, a branch that is pushed
+  # several times queues every superseded run behind the current one -- five
+  # obsolete runs of this workflow, 4 macOS jobs each, sat queued on this
+  # branch before it was added.
+  #
+  # Keyed on the pull request number rather than head_ref, which is the source
+  # branch name with no fork identity in it: two pull requests opened from
+  # different forks that both use a common branch name -- master, patch-1 --
+  # would share a group and cancel each other's check. On push to master there
+  # is no pull request, so the group falls back to the unique run_id and every
+  # master commit is still checked in full.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   xcodebuild-cn1libs:
-    name: xcodebuild ${{ matrix.lib }}
+    name: xcodebuild ${{ matrix.lib }} (ARC ${{ matrix.arc }})
     # macos-14 ships Xcode 15.4 by default but also has Xcode 16.x
     # under /Applications/Xcode_16.X.app. xcodegen 2.45.4 emits
     # objectVersion=77 (Xcode 16-format) projects, so we explicitly
@@ -31,9 +47,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Each library is compiled under both memory models. The generated app
+        # target is manual-retain-release (CLANG_ENABLE_OBJC_ARC = NO in
+        # vm/ByteCodeTranslator/src/template/template.xcodeproj) and that is
+        # what compiles a cn1lib's sources today, while IPhoneBuilder can add
+        # -fobjc-arc to an individual file, so ARC is reachable too. An
+        # ARC-only check accepts code that does not build for customers.
         include:
-          - { lib: cn1-ai-whisper,            pod: ''                               }   # links static libwhisper.a
-          - { lib: cn1-ai-stablediffusion,    pod: ''                               }   # links Swift runner
+          - { lib: cn1-ai-whisper,            pod: '', arc: NO  }   # links static libwhisper.a
+          - { lib: cn1-ai-whisper,            pod: '', arc: YES }
+          - { lib: cn1-ai-stablediffusion,    pod: '', arc: NO  }   # links Swift runner
+          - { lib: cn1-ai-stablediffusion,    pod: '', arc: YES }
     steps:
       - uses: actions/checkout@v6
 
@@ -61,10 +85,22 @@ jobs:
       - name: Synthesise Xcode project via xcodegen
         run: |
           set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
           mkdir -p "$PROBE/CN1AIProbe"
+          # Objective-C and Objective-C++ alike. check-cn1lib-native-coverage.py
+          # counts a .mm file as an iOS native source, so staging only .m would
+          # let a broken Objective-C++ bridge be reported as covered while
+          # nothing ever compiled it.
           cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.h "$PROBE/CN1AIProbe/" 2>/dev/null || true
-          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.m "$PROBE/CN1AIProbe/"
+          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.m "$PROBE/CN1AIProbe/" 2>/dev/null || true
+          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.mm "$PROBE/CN1AIProbe/" 2>/dev/null || true
+          # An empty probe would build green and check nothing. find is used
+          # rather than ls because ls reports failure when either glob is
+          # unmatched, which is the normal case for a library with no .mm.
+          staged=$(find "$PROBE/CN1AIProbe" -maxdepth 1 \( -name '*.m' -o -name '*.mm' \) | wc -l)
+          if [ "$staged" -eq 0 ]; then
+              echo "::error::No Objective-C sources staged for ${{ matrix.lib }}"; exit 1
+          fi
           ls -la "$PROBE/CN1AIProbe/"
 
           cat > "$PROBE/project.yml" <<'YAML'
@@ -87,7 +123,7 @@ jobs:
               settings:
                 base:
                   CLANG_ENABLE_MODULES: YES
-                  CLANG_ENABLE_OBJC_ARC: YES
+                  CLANG_ENABLE_OBJC_ARC: ${{ matrix.arc }}
                   CODE_SIGNING_ALLOWED: NO
           YAML
           cd "$PROBE"
@@ -101,7 +137,7 @@ jobs:
         # xcodebuild can build directly.
         run: |
           set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
           cd "$PROBE"
           cat > Podfile <<EOF
           platform :ios, '14.0'
@@ -115,7 +151,7 @@ jobs:
       - name: xcodebuild
         run: |
           set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
           cd "$PROBE"
           if [ -d "CN1AIProbe.xcworkspace" ]; then
               xcodebuild -workspace CN1AIProbe.xcworkspace \

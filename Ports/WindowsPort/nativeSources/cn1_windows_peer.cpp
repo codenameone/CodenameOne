@@ -60,12 +60,21 @@ static HWND cn1PeerHwnd(JAVA_LONG peer) {
     return (HWND) (intptr_t) peer;
 }
 
-/* Reparent the app's HWND onto the host window and place + show it. */
-JAVA_VOID com_codename1_impl_windows_WindowsNative_peerInitialized___long_int_int_int_int(
-        CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+/* Reparent the app's HWND onto its owning window and place + show it. The slot is
+ * the window the component is in, -1 for the main one; a slot whose window has gone
+ * answers NULL, and SetParent(NULL) would make the peer a top level window of its
+ * own, so both fall back to the main window. */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_peerInitialized___long_int_int_int_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT slot, JAVA_INT x, JAVA_INT y,
+        JAVA_INT w, JAVA_INT h) {
     HWND hwnd = cn1PeerHwnd(peer);
+    HWND host;
     if (!hwnd || !IsWindow(hwnd)) return;
-    SetParent(hwnd, cn1Win.hwnd);
+    host = slot >= 0 ? cn1WinDesktopHwnd(slot) : NULL;
+    if (!host) {
+        host = cn1Win.hwnd;
+    }
+    SetParent(hwnd, host);
     LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
     style = (style | WS_CHILD) & ~(WS_POPUP | WS_OVERLAPPED);
     SetWindowLongPtrW(hwnd, GWL_STYLE, style);

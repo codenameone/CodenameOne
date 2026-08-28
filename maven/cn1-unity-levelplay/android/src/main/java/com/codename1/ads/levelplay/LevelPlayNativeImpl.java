@@ -25,41 +25,54 @@ package com.codename1.ads.levelplay;
 import android.app.Activity;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.view.View;
 
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
-import com.codename1.ui.PeerComponent;
 
-import com.ironsource.mediationsdk.IronSource;
-import com.ironsource.mediationsdk.IronSourceBannerLayout;
-import com.ironsource.mediationsdk.ISBannerSize;
-import com.ironsource.mediationsdk.adunit.adapter.utility.AdInfo;
-import com.ironsource.mediationsdk.logger.IronSourceError;
-import com.ironsource.mediationsdk.model.Placement;
-import com.ironsource.mediationsdk.sdk.LevelPlayBannerListener;
-import com.ironsource.mediationsdk.sdk.LevelPlayInterstitialListener;
-import com.ironsource.mediationsdk.sdk.LevelPlayRewardedVideoListener;
+import com.unity3d.mediation.LevelPlay;
+import com.unity3d.mediation.LevelPlayAdError;
+import com.unity3d.mediation.LevelPlayAdInfo;
+import com.unity3d.mediation.LevelPlayAdSize;
+import com.unity3d.mediation.LevelPlayConfiguration;
+import com.unity3d.mediation.LevelPlayInitError;
+import com.unity3d.mediation.LevelPlayInitListener;
+import com.unity3d.mediation.LevelPlayInitRequest;
+import com.unity3d.mediation.LevelPlayPrivacySettings;
+import com.unity3d.mediation.banner.LevelPlayBannerAdView;
+import com.unity3d.mediation.banner.LevelPlayBannerAdViewListener;
+import com.unity3d.mediation.interstitial.LevelPlayInterstitialAd;
+import com.unity3d.mediation.interstitial.LevelPlayInterstitialAdListener;
+import com.unity3d.mediation.rewarded.LevelPlayReward;
+import com.unity3d.mediation.rewarded.LevelPlayRewardedAd;
+import com.unity3d.mediation.rewarded.LevelPlayRewardedAdListener;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /// Android implementation of the Unity LevelPlay (ironSource) native bridge.
-/// Shipped as source and compiled by the Codename One Android build; validated
-/// on device.
+/// Shipped as source and compiled by the Codename One Android build, and by
+/// scripts/check-cn1lib-android-api.py against the SDK pinned in
+/// codenameone_library_required.properties.
 ///
-/// LevelPlay's interstitial and rewarded placements are singletons (not per ad
-/// unit), so the bridge routes the active full screen handle to the singleton
-/// callbacks; banners are per instance.
+/// Written against the unified LevelPlay API (LevelPlayInterstitialAd,
+/// LevelPlayRewardedAd, LevelPlayBannerAdView), where every ad is an object
+/// bound to one ad unit. The older IronSource entry points this bridge used
+/// were singletons per format, which forced it to route callbacks through a
+/// "currently active handle" field and lose events whenever two ads of the same
+/// format were in flight; one ad object per handle removes that.
 public class LevelPlayNativeImpl {
     private static final int FORMAT_INTERSTITIAL = 1;
     private static final int FORMAT_REWARDED = 2;
-    private static final int FORMAT_APP_OPEN = 4;
 
-    private final Map<Integer, Integer> formats = new HashMap<Integer, Integer>();
-    private final Map<Integer, IronSourceBannerLayout> banners = new HashMap<Integer, IronSourceBannerLayout>();
-    private int activeInterstitial = -1;
-    private int activeRewarded = -1;
-    private boolean listenersBound;
+    private final Map<Integer, FullScreenHolder> ads = new HashMap<Integer, FullScreenHolder>();
+    private final Map<Integer, LevelPlayBannerAdView> banners = new HashMap<Integer, LevelPlayBannerAdView>();
+
+    private static final class FullScreenHolder {
+        int format;
+        LevelPlayInterstitialAd interstitial;
+        LevelPlayRewardedAd rewarded;
+    }
 
     public void initialize(final String testDeviceIds, final boolean testMode,
                            final int tagForChildDirected, final int tagForUnderAge,
@@ -70,8 +83,26 @@ public class LevelPlayNativeImpl {
         }
         activity.runOnUiThread(new Runnable() {
             public void run() {
-                bindListeners();
-                IronSource.init(activity, readAppKey(activity));
+                // LevelPlay has no test device list: test ads are switched on
+                // per ad unit in the dashboard, and the test suite is opened
+                // from the app rather than by a flag here. So testMode and
+                // testDeviceIds have no counterpart on this platform.
+                if (tagForChildDirected == 1) {
+                    LevelPlayPrivacySettings.setCOPPA(true);
+                } else if (tagForChildDirected == 2) {
+                    LevelPlayPrivacySettings.setCOPPA(false);
+                }
+                LevelPlayInitRequest request =
+                        new LevelPlayInitRequest.Builder(readAppKey(activity)).build();
+                LevelPlay.init(activity, request, new LevelPlayInitListener() {
+                    public void onInitSuccess(LevelPlayConfiguration configuration) {
+                    }
+
+                    public void onInitFailed(LevelPlayInitError error) {
+                        LevelPlayCallback.fire(0, LevelPlayCallback.FAILED,
+                                error.getErrorCode(), error.getErrorMessage(), null, 0);
+                    }
+                });
             }
         });
     }
@@ -89,100 +120,144 @@ public class LevelPlayNativeImpl {
         return "";
     }
 
-    private void bindListeners() {
-        if (listenersBound) {
-            return;
+    public boolean createFullScreen(final int handle, final int format, final String adUnitId) {
+        if (format != FORMAT_INTERSTITIAL && format != FORMAT_REWARDED) {
+            // LevelPlay has no dedicated app-open or rewarded-interstitial
+            // format, and the provider expects false rather than an ad object
+            // that never loads.
+            return false;
         }
-        listenersBound = true;
-        IronSource.setLevelPlayInterstitialListener(new LevelPlayInterstitialListener() {
-            public void onAdReady(AdInfo adInfo) { fire(activeInterstitial, LevelPlayCallback.LOADED, 0, null, null, 0); }
-            public void onAdLoadFailed(IronSourceError e) { fire(activeInterstitial, LevelPlayCallback.FAILED, e.getErrorCode(), e.getErrorMessage(), null, 0); }
-            public void onAdOpened(AdInfo adInfo) { fire(activeInterstitial, LevelPlayCallback.SHOWN, 0, null, null, 0); fire(activeInterstitial, LevelPlayCallback.IMPRESSION, 0, null, null, 0); }
-            public void onAdShowFailed(IronSourceError e, AdInfo adInfo) { fire(activeInterstitial, LevelPlayCallback.SHOW_FAILED, e.getErrorCode(), e.getErrorMessage(), null, 0); }
-            public void onAdClicked(AdInfo adInfo) { fire(activeInterstitial, LevelPlayCallback.CLICKED, 0, null, null, 0); }
-            public void onAdClosed(AdInfo adInfo) { fire(activeInterstitial, LevelPlayCallback.DISMISSED, 0, null, null, 0); }
-        });
-        IronSource.setLevelPlayRewardedVideoListener(new LevelPlayRewardedVideoListener() {
-            public void onAdAvailable(AdInfo adInfo) { fire(activeRewarded, LevelPlayCallback.LOADED, 0, null, null, 0); }
-            public void onAdUnavailable() { fire(activeRewarded, LevelPlayCallback.FAILED, LevelPlayErrorCodes.NOT_READY, "No fill", null, 0); }
-            public void onAdOpened(AdInfo adInfo) { fire(activeRewarded, LevelPlayCallback.SHOWN, 0, null, null, 0); fire(activeRewarded, LevelPlayCallback.IMPRESSION, 0, null, null, 0); }
-            public void onAdShowFailed(IronSourceError e, AdInfo adInfo) { fire(activeRewarded, LevelPlayCallback.SHOW_FAILED, e.getErrorCode(), e.getErrorMessage(), null, 0); }
-            public void onAdClicked(Placement placement, AdInfo adInfo) { fire(activeRewarded, LevelPlayCallback.CLICKED, 0, null, null, 0); }
-            public void onAdRewarded(Placement placement, AdInfo adInfo) { fire(activeRewarded, LevelPlayCallback.REWARD, 0, null, placement.getRewardName(), placement.getRewardAmount()); }
-            public void onAdClosed(AdInfo adInfo) { fire(activeRewarded, LevelPlayCallback.DISMISSED, 0, null, null, 0); }
-        });
-    }
+        final Activity activity = AndroidNativeUtil.getActivity();
+        if (activity == null) {
+            return false;
+        }
+        final FullScreenHolder holder = new FullScreenHolder();
+        holder.format = format;
+        AndroidImplementation.runOnUiThreadAndBlock(new Runnable() {
+            public void run() {
+                if (format == FORMAT_REWARDED) {
+                    LevelPlayRewardedAd ad = new LevelPlayRewardedAd(adUnitId);
+                    ad.setListener(new LevelPlayRewardedAdListener() {
+                        public void onAdLoaded(LevelPlayAdInfo adInfo) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.LOADED, 0, null, null, 0);
+                        }
 
-    private static void fire(int handle, int event, int code, String message, String rewardType, int rewardAmount) {
-        if (handle >= 0) {
-            LevelPlayCallback.fire(handle, event, code, message, rewardType, rewardAmount);
-        }
-    }
+                        public void onAdLoadFailed(LevelPlayAdError error) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.FAILED,
+                                    error.getErrorCode(), error.getErrorMessage(), null, 0);
+                        }
 
-    public boolean createFullScreen(int handle, int format, String adUnitId) {
-        if (format == FORMAT_APP_OPEN) {
-            return false; // LevelPlay has no dedicated app-open format
-        }
-        formats.put(handle, format);
+                        public void onAdDisplayed(LevelPlayAdInfo adInfo) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.SHOWN, 0, null, null, 0);
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.IMPRESSION, 0, null, null, 0);
+                        }
+
+                        public void onAdDisplayFailed(LevelPlayAdError error, LevelPlayAdInfo adInfo) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.SHOW_FAILED,
+                                    error.getErrorCode(), error.getErrorMessage(), null, 0);
+                        }
+
+                        public void onAdRewarded(LevelPlayReward reward, LevelPlayAdInfo adInfo) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.REWARD, 0, null,
+                                    reward.getName(), reward.getAmount());
+                        }
+
+                        public void onAdClicked(LevelPlayAdInfo adInfo) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.CLICKED, 0, null, null, 0);
+                        }
+
+                        public void onAdClosed(LevelPlayAdInfo adInfo) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.DISMISSED, 0, null, null, 0);
+                        }
+                    });
+                    holder.rewarded = ad;
+                } else {
+                    LevelPlayInterstitialAd ad = new LevelPlayInterstitialAd(adUnitId);
+                    ad.setListener(new LevelPlayInterstitialAdListener() {
+                        public void onAdLoaded(LevelPlayAdInfo adInfo) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.LOADED, 0, null, null, 0);
+                        }
+
+                        public void onAdLoadFailed(LevelPlayAdError error) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.FAILED,
+                                    error.getErrorCode(), error.getErrorMessage(), null, 0);
+                        }
+
+                        public void onAdDisplayed(LevelPlayAdInfo adInfo) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.SHOWN, 0, null, null, 0);
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.IMPRESSION, 0, null, null, 0);
+                        }
+
+                        public void onAdDisplayFailed(LevelPlayAdError error, LevelPlayAdInfo adInfo) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.SHOW_FAILED,
+                                    error.getErrorCode(), error.getErrorMessage(), null, 0);
+                        }
+
+                        public void onAdClicked(LevelPlayAdInfo adInfo) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.CLICKED, 0, null, null, 0);
+                        }
+
+                        public void onAdClosed(LevelPlayAdInfo adInfo) {
+                            LevelPlayCallback.fire(handle, LevelPlayCallback.DISMISSED, 0, null, null, 0);
+                        }
+                    });
+                    holder.interstitial = ad;
+                }
+            }
+        });
+        ads.put(handle, holder);
         return true;
     }
 
     public void setServerSideVerification(int handle, String userId, String customData) {
         if (userId != null) {
-            IronSource.setUserId(userId);
+            LevelPlay.setDynamicUserId(userId);
         }
     }
 
-    public void loadFullScreen(final int handle, String keywords, String contentUrl, boolean nonPersonalized) {
-        final Integer format = formats.get(handle);
+    public void loadFullScreen(final int handle, String keywords, String contentUrl,
+                               boolean nonPersonalized) {
+        final FullScreenHolder holder = ads.get(handle);
         final Activity activity = AndroidNativeUtil.getActivity();
-        if (format == null || activity == null) {
+        if (holder == null || activity == null) {
             return;
         }
         activity.runOnUiThread(new Runnable() {
             public void run() {
-                if (format == FORMAT_INTERSTITIAL) {
-                    activeInterstitial = handle;
-                    IronSource.loadInterstitial();
-                } else if (format == FORMAT_REWARDED) {
-                    activeRewarded = handle;
-                    if (IronSource.isRewardedVideoAvailable()) {
-                        LevelPlayCallback.fire(handle, LevelPlayCallback.LOADED, 0, null, null, 0);
-                    }
+                if (holder.rewarded != null) {
+                    holder.rewarded.loadAd();
+                } else if (holder.interstitial != null) {
+                    holder.interstitial.loadAd();
                 }
             }
         });
     }
 
     public boolean isFullScreenLoaded(int handle) {
-        Integer format = formats.get(handle);
-        if (format == null) {
+        FullScreenHolder holder = ads.get(handle);
+        if (holder == null) {
             return false;
         }
-        if (format == FORMAT_INTERSTITIAL) {
-            return IronSource.isInterstitialReady();
+        if (holder.rewarded != null) {
+            return holder.rewarded.isAdReady();
         }
-        if (format == FORMAT_REWARDED) {
-            return IronSource.isRewardedVideoAvailable();
-        }
-        return false;
+        return holder.interstitial != null && holder.interstitial.isAdReady();
     }
 
     public void showFullScreen(final int handle) {
-        final Integer format = formats.get(handle);
+        final FullScreenHolder holder = ads.get(handle);
         final Activity activity = AndroidNativeUtil.getActivity();
-        if (format == null || activity == null) {
-            LevelPlayCallback.fire(handle, LevelPlayCallback.SHOW_FAILED, LevelPlayErrorCodes.NOT_READY, "No ad loaded", null, 0);
+        if (holder == null || activity == null) {
+            LevelPlayCallback.fire(handle, LevelPlayCallback.SHOW_FAILED,
+                    LevelPlayErrorCodes.NOT_READY, "No ad loaded", null, 0);
             return;
         }
         activity.runOnUiThread(new Runnable() {
             public void run() {
-                if (format == FORMAT_INTERSTITIAL) {
-                    activeInterstitial = handle;
-                    IronSource.showInterstitial();
-                } else if (format == FORMAT_REWARDED) {
-                    activeRewarded = handle;
-                    IronSource.showRewardedVideo();
+                if (holder.rewarded != null) {
+                    holder.rewarded.showAd(activity);
+                } else if (holder.interstitial != null) {
+                    holder.interstitial.showAd(activity);
                 }
             }
         });
@@ -192,50 +267,85 @@ public class LevelPlayNativeImpl {
     }
 
     public void disposeFullScreen(int handle) {
-        formats.remove(handle);
+        ads.remove(handle);
     }
 
-    public PeerComponent createBanner(final int handle, final String adUnitId, final int sizeType, final int widthDp) {
+    /// Returns the raw Android view rather than a peer component. The
+    /// generated LevelPlayNativeStub wraps whatever this method returns in
+    /// PeerComponent.create(), so returning a peer here makes
+    /// AndroidImplementation.createNativePeer reject its own AndroidPeer with
+    /// an IllegalArgumentException the first time a banner is shown.
+    public View createBanner(final int handle, final String adUnitId, final int sizeType,
+                             final int widthDp) {
         final Activity activity = AndroidNativeUtil.getActivity();
         if (activity == null) {
             return null;
         }
-        final IronSourceBannerLayout[] out = new IronSourceBannerLayout[1];
+        final LevelPlayBannerAdView[] out = new LevelPlayBannerAdView[1];
         AndroidImplementation.runOnUiThreadAndBlock(new Runnable() {
             public void run() {
-                IronSourceBannerLayout banner = IronSource.createBanner(activity, ISBannerSize.BANNER);
-                banner.setLevelPlayBannerListener(new LevelPlayBannerListener() {
-                    public void onAdLoaded(AdInfo adInfo) { LevelPlayCallback.fire(handle, LevelPlayCallback.LOADED, 0, null, null, 0); LevelPlayCallback.fire(handle, LevelPlayCallback.IMPRESSION, 0, null, null, 0); }
-                    public void onAdLoadFailed(IronSourceError e) { LevelPlayCallback.fire(handle, LevelPlayCallback.FAILED, e.getErrorCode(), e.getErrorMessage(), null, 0); }
-                    public void onAdClicked(AdInfo adInfo) { LevelPlayCallback.fire(handle, LevelPlayCallback.CLICKED, 0, null, null, 0); }
-                    public void onAdScreenPresented(AdInfo adInfo) { }
-                    public void onAdScreenDismissed(AdInfo adInfo) { }
-                    public void onAdLeftApplication(AdInfo adInfo) { }
+                LevelPlayBannerAdView.Config config = new LevelPlayBannerAdView.Config.Builder()
+                        .setAdSize(mapSize(activity, sizeType, widthDp))
+                        .build();
+                LevelPlayBannerAdView banner =
+                        new LevelPlayBannerAdView(activity, adUnitId, config);
+                banner.setBannerListener(new LevelPlayBannerAdViewListener() {
+                    public void onAdLoaded(LevelPlayAdInfo adInfo) {
+                        LevelPlayCallback.fire(handle, LevelPlayCallback.LOADED, 0, null, null, 0);
+                        LevelPlayCallback.fire(handle, LevelPlayCallback.IMPRESSION, 0, null, null, 0);
+                    }
+
+                    public void onAdLoadFailed(LevelPlayAdError error) {
+                        LevelPlayCallback.fire(handle, LevelPlayCallback.FAILED,
+                                error.getErrorCode(), error.getErrorMessage(), null, 0);
+                    }
+
+                    public void onAdClicked(LevelPlayAdInfo adInfo) {
+                        LevelPlayCallback.fire(handle, LevelPlayCallback.CLICKED, 0, null, null, 0);
+                    }
                 });
                 banners.put(handle, banner);
                 out[0] = banner;
             }
         });
-        return out[0] == null ? null : PeerComponent.create(out[0]);
+        return out[0];
     }
 
-    public void loadBanner(final int handle, String keywords, String contentUrl, boolean nonPersonalized) {
+    private static LevelPlayAdSize mapSize(Activity activity, int sizeType, int widthDp) {
+        switch (sizeType) {
+            case 1: return LevelPlayAdSize.BANNER;
+            case 2: return LevelPlayAdSize.LARGE;
+            case 3: return LevelPlayAdSize.MEDIUM_RECTANGLE;
+            case 4: return LevelPlayAdSize.LEADERBOARD;
+            default: {
+                LevelPlayAdSize adaptive = widthDp > 0
+                        ? LevelPlayAdSize.createAdaptiveAdSize(activity, Integer.valueOf(widthDp))
+                        : LevelPlayAdSize.createAdaptiveAdSize(activity);
+                // createAdaptiveAdSize is documented to return null when the
+                // container is too small to hold any adaptive size.
+                return adaptive == null ? LevelPlayAdSize.BANNER : adaptive;
+            }
+        }
+    }
+
+    public void loadBanner(final int handle, String keywords, String contentUrl,
+                           boolean nonPersonalized) {
         final Activity activity = AndroidNativeUtil.getActivity();
         if (activity == null) {
             return;
         }
         activity.runOnUiThread(new Runnable() {
             public void run() {
-                IronSourceBannerLayout banner = banners.get(handle);
+                LevelPlayBannerAdView banner = banners.get(handle);
                 if (banner != null) {
-                    IronSource.loadBanner(banner);
+                    banner.loadAd();
                 }
             }
         });
     }
 
     public void disposeBanner(final int handle) {
-        final IronSourceBannerLayout banner = banners.remove(handle);
+        final LevelPlayBannerAdView banner = banners.remove(handle);
         if (banner == null) {
             return;
         }
@@ -243,15 +353,16 @@ public class LevelPlayNativeImpl {
         if (activity != null) {
             activity.runOnUiThread(new Runnable() {
                 public void run() {
-                    IronSource.destroyBanner(banner);
+                    banner.destroy();
                 }
             });
         }
     }
 
     public void requestConsent(boolean underAgeOfConsent) {
-        // LevelPlay consent is set via IronSource.setConsent(...) from your CMP;
-        // report "not required" so the cross-platform flow can proceed.
+        // LevelPlay takes consent from your CMP through
+        // LevelPlayPrivacySettings rather than presenting a form of its own, so
+        // report "not required" and let the cross-platform flow proceed.
         LevelPlayCallback.fire(0, LevelPlayCallback.CONSENT_COMPLETE, 2, null, null, 0);
     }
 

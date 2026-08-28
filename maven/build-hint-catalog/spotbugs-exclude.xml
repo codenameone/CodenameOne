@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!--
+      BuildHints.entries() returns the field ENTRIES, which is assigned
+      Collections.unmodifiableList(...) in the static initialiser and never
+      reassigned. SpotBugs sees a List-typed field handed straight back and
+      cannot see that the wrapper makes it read-only, so the exposure it warns
+      about does not exist. Scoped to the one method rather than the pattern:
+      a future getter that really does hand out a mutable collection should
+      still be reported.
+    -->
+    <Match>
+        <Class name="com.codename1.build.shared.BuildHints"/>
+        <Method name="entries"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+</FindBugsFilter>

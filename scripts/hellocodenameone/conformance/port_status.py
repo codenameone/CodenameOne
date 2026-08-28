@@ -100,6 +100,38 @@ def test_to_feature(manifest: dict) -> dict[str, str]:
     return mapping
 
 
+def test_scopes(manifest: dict) -> dict[str, set[str] | None]:
+    """Map every test to the ports it applies to, or None when that is all of them.
+
+    Scopes live in a top-level ``test_scopes`` map rather than inside the feature's
+    test list, so that list stays a plain list of names: the website templates render,
+    count and search it, and giving some entries a different shape broke the site
+    build rather than the contract.
+
+    A scope exists for a capability a port does not have -- a windowing system, say.
+    Without it such a test is absent from that port's report forever, which the
+    coverage gate reads as a test the port dropped, and the only way to quiet that is a
+    row of skips on the public table inviting the reader to count a capability the port
+    was never asked for as something it failed to do.
+    """
+    scopes: dict[str, set[str] | None] = {}
+    scoped = manifest.get("test_scopes", {})
+    for feature in manifest.get("features", []):
+        for test in feature.get("tests", []):
+            ports = scoped.get(test)
+            scopes[test] = None if ports is None else set(ports)
+    return scopes
+
+
+def tests_for_port(manifest: dict, port_id: str) -> set[str]:
+    """The tests a given port is expected to report on."""
+    return {
+        test
+        for test, ports in test_scopes(manifest).items()
+        if ports is None or port_id in ports
+    }
+
+
 def screenshot_test(manifest: dict, output_name: str) -> str | None:
     matches = [
         item.get("test")
@@ -132,6 +164,24 @@ def validate(manifest: dict) -> dict:
     except ContractError as exc:
         problems.append(str(exc))
         mapped = {}
+
+    scoped = manifest.get("test_scopes", {})
+    if not isinstance(scoped, dict):
+        problems.append("test_scopes must be a map of test name to port list")
+        scoped = {}
+    for test, scoped_ports in sorted(scoped.items()):
+        if not isinstance(scoped_ports, list) or not scoped_ports:
+            problems.append(f"Scoped test {test} must list the ports it applies to")
+            continue
+        unknown_ports = sorted(set(scoped_ports) - set(port_ids))
+        if unknown_ports:
+            problems.append(
+                f"Test {test} is scoped to unknown ports: " + ", ".join(unknown_ports)
+            )
+        if test not in mapped:
+            # A scope on a name no feature registers is a scope that does nothing, and
+            # the test it was meant for is left unscoped.
+            problems.append(f"test_scopes names {test}, which no feature registers")
 
     registered = registered_tests()
     duplicate_registrations = sorted(
@@ -554,7 +604,11 @@ def coverage_problems(
             problems.append(f"{port}: report has no usable generated_at")
             continue
         own_contract = (contracts or {}).get(port)
-        absent = set(mapped) - set(tests)
+        # Scoped to this port. A test that does not apply here -- a windowed
+        # baseline on a port with no windowing system -- is absent from every
+        # report this port will ever publish, so without this the first desktop
+        # run to carry it would make every other port look like it dropped it.
+        absent = tests_for_port(manifest, port) - set(tests)
         dropped = sorted(
             name
             for name in absent
@@ -963,7 +1017,7 @@ def normalize(
             "compared": False,
             "comparison_passed": False,
         }
-        for test in mapped
+        for test in tests_for_port(manifest, port_id)
     }
     suite_finished = parse_logs(manifest, logs, states)
     performance = parse_performance(
@@ -1099,14 +1153,16 @@ def publishable_report_problems(
                     f"generated_at {generated_at!r} is in the future"
                 )
 
-    mapped = test_to_feature(manifest)
+    # Scoped to this port: a test that does not apply here is not something the
+    # report predates, it is something the report is right never to carry.
+    expected = tests_for_port(manifest, port_id)
     tests = report.get("tests")
     if not isinstance(tests, dict):
         malformed.append("report has no test result map")
         tests = {}
     else:
-        missing = sorted(set(mapped) - set(tests))
-        unknown = sorted(set(tests) - set(mapped))
+        missing = sorted(expected - set(tests))
+        unknown = sorted(set(tests) - expected)
         if missing:
             drift.append("report predates tests: " + ", ".join(missing))
         if unknown:

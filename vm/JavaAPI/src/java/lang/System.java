@@ -80,6 +80,21 @@ public final class System {
                         }
                     }
                     gcShouldLoop = true;
+                    // Thirty seconds. Collecting more often during start-up, to
+                    // shed the launch garbage sooner, has been tried once and is NOT
+                    // settled: widening the idle interval from one second instead
+                    // (cycles at t=2,3,5,9,17,33s rather than t=2,32s) measured a
+                    // settled footprint of 216.6MB against 169.8MB for the flat
+                    // interval -- but the same flat-interval build re-measured 252.8MB
+                    // an hour later, by which point the host had 13.4GB of its 14.3GB
+                    // swap in use. Physical footprint moves with the host's memory
+                    // pressure, so those three numbers were never comparable and the
+                    // experiment proved nothing either way.
+                    //
+                    // If you revisit it: build BOTH binaries, keep both .app bundles,
+                    // and interleave them in one session (A,B,A,B) on a host that is
+                    // not swapping. A soak of one build followed by a soak of the
+                    // other an hour later measures the machine.
                     while(gcShouldLoop) {
                         try {
                             System.gcMarkSweep();

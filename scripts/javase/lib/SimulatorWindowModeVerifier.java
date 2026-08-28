@@ -146,19 +146,27 @@ public class SimulatorWindowModeVerifier {
             BufferedImage image = captureDesktop();
             Instant renderDeadline = Instant.now().plusSeconds(30);
             while ((isBlankOrFlat(image) || isSingleWindowDeviceMissing(parsed, image)
+                        || isSingleWindowDeviceUnpainted(parsed, image)
                         || isComponentInspectorDetailsUnsettled(parsed, image)
                         || isComponentInspectorPropertiesUnpopulated(parsed, image))
                     && Instant.now().isBefore(renderDeadline)) {
                 Thread.sleep(500);
                 image = captureDesktop();
             }
-            validateScreenshotContent(parsed, image);
+            // Keep the capture whichever way validation goes. A failure used to
+            // throw before the write, so the one artifact that could explain it
+            // -- what was actually on screen -- was discarded, and the run left
+            // only a pixel count to reason from. Written under a .rejected.png
+            // name so it cannot be mistaken for a baseline.
+            try {
+                validateScreenshotContent(parsed, image);
+            } catch (Throwable failure) {
+                writeCapture(image, Path.of(parsed.screenshotPath + ".rejected.png"));
+                throw failure;
+            }
 
             Path screenshotPath = Path.of(parsed.screenshotPath);
-            Files.createDirectories(screenshotPath.getParent());
-            if (!ImageIO.write(image, "png", screenshotPath.toFile())) {
-                throw new AssertionError("No PNG writer available; screenshot was not written");
-            }
+            writeCapture(image, screenshotPath);
             System.out.println("[javase-verifier] screenshot=" + screenshotPath
                     + " mode=" + parsed.mode + " scenario=" + parsed.scenario
                     + (parsed.nativeTheme != null ? " nativeTheme=" + parsed.nativeTheme : ""));
@@ -195,6 +203,16 @@ public class SimulatorWindowModeVerifier {
         }
     }
 
+    /** Writes a capture, creating its directory. */
+    private static void writeCapture(BufferedImage image, Path to) throws Exception {
+        if (to.getParent() != null) {
+            Files.createDirectories(to.getParent());
+        }
+        if (!ImageIO.write(image, "png", to.toFile())) {
+            throw new AssertionError("No PNG writer available; screenshot was not written");
+        }
+    }
+
     private static BufferedImage captureDesktop() throws Exception {
         Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
         Rectangle bounds = new Rectangle(0, 0, Math.max(1, size.width), Math.max(1, size.height));
@@ -227,6 +245,105 @@ public class SimulatorWindowModeVerifier {
 
     private static boolean isBlankOrFlat(BufferedImage image) {
         return sampleColorCount(image) < 3;
+    }
+
+    /**
+     * Whether the device's screen -- the area inside the skin's bezel -- is still
+     * entirely dark, which is a capture taken before the first paint rather than a
+     * rendering difference. The javase-single-native-theme-ios-modern scenario is the
+     * one that shows it: it is the first capture after the CSS native themes are
+     * built, so it is the one that races the first paint, and it has come back with a
+     * solid black screen more than once while the scenarios after it passed.
+     *
+     * This is a WAIT condition and deliberately not an assertion. An earlier attempt
+     * asserted on a dark-pixel ratio measured over a region that included the skin's
+     * bezel, and the Nexus5X skin used by the Windows tooling run is mostly bezel:
+     * the threshold was never valid there and it turned a passing job red on its
+     * first run. Used only to wait, the worst a bad measurement can do is spend the
+     * 30 second deadline and then capture anyway, which costs time rather than a
+     * build.
+     *
+     * The bezel is measured rather than assumed, for the same reason: the dark body
+     * is found first and its interior is what gets tested, so nothing here depends on
+     * which skin is loaded or where the window sits.
+     */
+    private static boolean isSingleWindowDeviceUnpainted(Args args, BufferedImage image) {
+        if (!"single".equals(args.mode)) {
+            return false;
+        }
+        Rectangle body = darkBodyBounds(image);
+        if (body == null) {
+            // No device body found, which isSingleWindowDeviceMissing already covers.
+            return false;
+        }
+        // Inset well inside the bezel. The screen is a large fraction of the body on
+        // every skin here, so a fifth in from each edge is inside the screen on all of
+        // them without needing to know which one this is.
+        int insetX = Math.max(1, body.width / 5);
+        int insetY = Math.max(1, body.height / 5);
+        int x0 = body.x + insetX;
+        int y0 = body.y + insetY;
+        int x1 = body.x + body.width - insetX;
+        int y1 = body.y + body.height - insetY;
+        if (x1 - x0 < 20 || y1 - y0 < 20) {
+            return false;
+        }
+        int dark = 0;
+        int total = 0;
+        for (int y = y0; y < y1; y++) {
+            for (int x = x0; x < x1; x++) {
+                int rgb = image.getRGB(x, y);
+                if (((rgb >> 16) & 0xff) < 45 && ((rgb >> 8) & 0xff) < 45 && (rgb & 0xff) < 45) {
+                    dark++;
+                }
+                total++;
+            }
+        }
+        // Nearly all of it. A painted screen in any of these themes leaves plenty of
+        // light pixels; an unpainted one measured 99% here against 0% for the stored
+        // reference of the same scenario.
+        return total > 0 && dark * 100L / total >= 95;
+    }
+
+    /**
+     * The bounding box of the near-black device body within the region the
+     * single-window scenarios place it, or null when there is not enough of one to
+     * be a device.
+     */
+    private static Rectangle darkBodyBounds(BufferedImage image) {
+        int xMax = Math.min(image.getWidth(), 560);
+        int yMin = Math.min(image.getHeight(), 70);
+        int yMax = Math.min(image.getHeight(), 560);
+        if (xMax <= 0 || yMax <= yMin) {
+            return null;
+        }
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int maxX = -1;
+        int maxY = -1;
+        for (int y = yMin; y < yMax; y++) {
+            for (int x = 0; x < xMax; x++) {
+                int rgb = image.getRGB(x, y);
+                if (((rgb >> 16) & 0xff) < 45 && ((rgb >> 8) & 0xff) < 45 && (rgb & 0xff) < 45) {
+                    if (x < minX) {
+                        minX = x;
+                    }
+                    if (y < minY) {
+                        minY = y;
+                    }
+                    if (x > maxX) {
+                        maxX = x;
+                    }
+                    if (y > maxY) {
+                        maxY = y;
+                    }
+                }
+            }
+        }
+        if (maxX < 0 || maxX - minX < 60 || maxY - minY < 60) {
+            return null;
+        }
+        return new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
 
     private static boolean isSingleWindowDeviceMissing(Args args, BufferedImage image) {

@@ -1,0 +1,5351 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.Desktop;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestWindowManager;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.WindowEvent;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.DefaultLookAndFeel;
+import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class WindowTest extends UITestBase {
+
+    @FormTest
+    void unsupportedPlatformThrowsOnConstruction() {
+        // the default: no window manager, which is what every mobile port reports
+        assertFalse(Desktop.isSupported(),
+                "Desktop windowing should be off unless a test turns it on");
+        assertThrows(UnsupportedOperationException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() {
+                new Window("nope");
+            }
+        }, "Constructing a Window without a windowing system must throw, not degrade");
+    }
+
+    @FormTest
+    void unsupportedPlatformStillAnswersDesktopQueriesSafely() {
+        assertEquals(0, Desktop.getInstance().getWindows().length,
+                "getWindows() must be empty rather than null where there are no windows");
+        assertNull(Desktop.getInstance().getFocusedWindow());
+        assertEquals(1, Desktop.getInstance().getMonitors().length,
+                "A platform with no windowing system still reports its single display");
+        assertNotNull(Desktop.getInstance().getPrimaryMonitor());
+    }
+
+    @FormTest
+    void showCreatesExactlyOneNativeWindowAndDisposeReleasesIt() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("Inspector", new BorderLayout());
+        w.setWindowSize(640, 480);
+        w.show();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer, "show() should have created a native window");
+        assertEquals(1, wm.getWindows().size(), "show() must not create a second window");
+        assertTrue(peer.isVisible());
+        assertEquals("Inspector", peer.getTitle());
+        assertEquals(1, Desktop.getInstance().getWindows().length);
+
+        w.dispose();
+        assertTrue(peer.isDisposed());
+        assertFalse(peer.isVisible());
+        assertEquals(0, Desktop.getInstance().getWindows().length,
+                "A disposed window must leave the desktop registry");
+
+        // disposing twice is harmless
+        w.dispose();
+        assertEquals(1, wm.getWindows().size());
+    }
+
+    @FormTest
+    void titleAndBoundsReachTheNativeWindow() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("first");
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+
+        w.setTitle("second");
+        assertEquals("second", peer.getTitle());
+
+        w.setWindowBounds(new com.codename1.ui.geom.Rectangle(10, 20, 300, 200));
+        assertEquals(10, peer.getX());
+        assertEquals(20, peer.getY());
+        assertEquals(300, peer.getWidth());
+        assertEquals(200, peer.getHeight());
+        w.dispose();
+    }
+
+    @FormTest
+    void componentsInAWindowResolveTheWindowNotAForm() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("host", new BorderLayout());
+        Label content = new Label("hello");
+        w.add(BorderLayout.CENTER, content);
+        w.show();
+
+        assertSame(w, content.getTopLevelContainer(),
+                "A component in a Window must resolve that Window as its top level");
+        assertNull(content.getComponentForm(),
+                "getComponentForm() keeps its meaning and is null inside a Window");
+        assertSame(w.getContentPane(), content.getParent(),
+                "add() on a Window should reach the content pane, as it does on a Form");
+        w.dispose();
+    }
+
+    @FormTest
+    void formStillResolvesItselfAsTopLevel() {
+        Form f = new Form("main", new BorderLayout());
+        Label content = new Label("hello");
+        f.add(BorderLayout.CENTER, content);
+        f.show();
+        flushSerialCalls();
+
+        assertSame(f, content.getTopLevelContainer());
+        assertSame(f, content.getComponentForm(),
+                "The Form path must be completely unaffected");
+    }
+
+    @FormTest
+    void closeRequestHonoursTheCloseOperation() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("closable");
+        w.setCloseOperation(Window.HIDE_ON_CLOSE);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+
+        w.closeRequested();
+        assertFalse(peer.isDisposed(), "HIDE_ON_CLOSE must not destroy the window");
+        assertFalse(peer.isVisible());
+
+        w.setCloseOperation(Window.DISPOSE_ON_CLOSE);
+        w.closeRequested();
+        assertTrue(peer.isDisposed());
+    }
+
+    @FormTest
+    void aCloseListenerCanVetoTheClose() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("vetoed");
+        w.show();
+        final AtomicInteger calls = new AtomicInteger();
+        w.addCloseListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                calls.incrementAndGet();
+                evt.consume();
+            }
+        });
+
+        w.closeRequested();
+        assertEquals(1, calls.get());
+        assertFalse(wm.getLastWindow().isDisposed(),
+                "Consuming the close event must veto the close");
+        w.dispose();
+    }
+
+    @FormTest
+    void windowChromeReachesTheNativeWindow() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("chrome");
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+
+        assertTrue(peer.isDecorated(), "windows are decorated by default");
+        w.setDecorated(false);
+        assertFalse(peer.isDecorated());
+
+        w.setResizable(false);
+        assertFalse(peer.isResizable());
+
+        w.setAlwaysOnTop(true);
+        assertTrue(peer.isAlwaysOnTop());
+
+        w.requestWindowFocus();
+        assertTrue(peer.isFocusRequested());
+        w.dispose();
+    }
+
+    @FormTest
+    void modalityMarksTheNativeWindow() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("modal");
+        w.show();
+        assertEquals(Window.MODALITY_NONE, w.getModalityType());
+
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        assertEquals(Window.MODALITY_APPLICATION, w.getModalityType());
+        assertTrue(wm.getLastWindow().isModal());
+        w.dispose();
+    }
+
+    @FormTest
+    void windowsGetIndependentIds() {
+        implementation.setMultiWindowSupported(true);
+        Window a = new Window("a");
+        Window b = new Window("b");
+        a.show();
+        b.show();
+
+        assertEquals(2, Desktop.getInstance().getWindows().length);
+        assertSame(a, Desktop.getInstance().windowById(a.getWindowId()));
+        assertSame(b, Desktop.getInstance().windowById(b.getWindowId()));
+        assertTrue(a.getWindowId() != b.getWindowId(),
+                "Each window needs its own id, since events are routed by it");
+        a.dispose();
+        b.dispose();
+    }
+
+    @FormTest
+    void showInitializesTheHierarchy() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("Preferences", new BorderLayout());
+        Label added = new Label("before show");
+        w.add(BorderLayout.CENTER, added);
+        assertFalse(added.isInitialized(),
+                "nothing should be initialized before the window is shown");
+
+        w.show();
+
+        // Without this a Window is the one top level whose children never receive
+        // initComponent(), so look and feel binding and peer attachment never happen.
+        assertTrue(added.isInitialized(),
+                "show() must initialize the hierarchy the way setCurrent() does for a Form");
+        assertTrue(w.isInitialized());
+        w.dispose();
+        assertFalse(added.isInitialized(), "dispose() must deinitialize it again");
+    }
+
+    @FormTest
+    void aFailedNativeWindowIsReportedRatherThanShown() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setCreateFails(true);
+        final Window w = new Window("too many");
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() {
+                w.show();
+            }
+        }, "A window the platform could not create must not become a phantom window");
+        assertEquals(0, Desktop.getInstance().getWindows().length,
+                "a window that failed to open must not be registered");
+    }
+
+    @FormTest
+    void modalityIsAcquiredByShowAndReleasedByDispose() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("modal");
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.show();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertTrue(peer.isModal(),
+                "a window shown with a modality type blocks, whether or not showModal was used");
+        assertEquals(1, peer.getModalCalls());
+
+        w.dispose();
+        assertFalse(peer.isModal(),
+                "the native modal flag must be dropped: on Windows it disables the main "
+                        + "window, and leaving it set makes the application unusable");
+        assertEquals(2, peer.getModalCalls(),
+                "the flag has to be set and cleared exactly once each");
+    }
+
+    @FormTest
+    void aFailedActivationReleasesTheWindowsModality() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("never appears");
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertTrue(peer.isModal(), "it starts this blocking");
+
+        Desktop.getInstance().windowActivationFailed(w.getWindowId());
+        DisplayTest.flushEdt();
+
+        // Not the minimize path: that keeps the modal registration on purpose, because
+        // a minimized window is still open. A window that never appeared would then
+        // block input everywhere while showModal() waited for a window nobody can see.
+        assertFalse(peer.isModal(),
+                "a window the platform could not create must stop blocking the others");
+        assertFalse(w.isWindowShowing(),
+                "and must not be reported as showing");
+        assertFalse(w.isWindowDisposed(),
+                "but it stays registered, so a later show() can ask the platform again");
+
+        // Disposed here rather than left behind: a window that outlives its test stays
+        // in the desktop registry, and the next test to paint reaches it without a
+        // window manager configured.
+        w.dispose();
+    }
+
+    @FormTest
+    void theMainSurfacesNotchDoesNotPadAWindowsContent() {
+        implementation.setMultiWindowSupported(true);
+        // A device whose main surface has a notch: 40px inset at the top.
+        implementation.setDisplaySafeArea(new Rectangle(0, 40,
+                Display.getInstance().getDisplayWidth(),
+                Display.getInstance().getDisplayHeight() - 40));
+        try {
+            Window w = new Window("safe", new BorderLayout());
+            w.setWindowSize(300, 200);
+            Container inner = new Container(new BorderLayout());
+            inner.getAllStyles().setPadding(0, 0, 0, 0);
+            inner.setSafeArea(true);
+            Label child = new Label("child");
+            child.getAllStyles().setPadding(0, 0, 0, 0);
+            child.getAllStyles().setMargin(0, 0, 0, 0);
+            inner.add(BorderLayout.CENTER, child);
+            w.add(BorderLayout.CENTER, inner);
+            w.show();
+            w.revalidate();
+
+            // Asserted on the laid-out child rather than on the padding: the snap puts
+            // its insets on the style only for the duration of the layout and restores
+            // them straight after, so the padding reads the same either way and only
+            // where the child landed shows what happened.
+            //
+            // A desktop window has no notch and says so through getSafeArea(), but the
+            // snap read the display's insets directly, so the main surface's notch was
+            // applied to content in every window.
+            assertEquals(0, child.getY() - inner.getY(),
+                    "nothing in a window may be pushed down by the main surface's notch");
+
+            w.dispose();
+        } finally {
+            implementation.setDisplaySafeArea(null);
+        }
+    }
+
+    @FormTest
+    void theAnimateAndReplaceFamilyTargetsTheContentPane() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("delegating", new com.codename1.ui.layouts.FlowLayout());
+        Label a = new Label("a");
+        Label b = new Label("b");
+        w.add(a);
+
+        // getComponentIndex looks in the content pane, where the application's
+        // components actually are -- the window root holds only the title area and the
+        // content pane, so asking it would answer -1 for every child.
+        assertEquals(0, w.getComponentIndex(a),
+                "getComponentIndex has to look where the children are");
+
+        w.replace(a, b, null);
+
+        assertSame(b, w.getContentPane().getComponentAt(0),
+                "replace has to work on the content pane, as it does on a Form");
+        assertEquals(-1, w.getContentPane().getComponentIndex(a));
+    }
+
+    @FormTest
+    void indexedAddsReachTheWindowsContentPane() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("indexed", new com.codename1.ui.layouts.FlowLayout());
+        Label first = new Label("first");
+        Label second = new Label("second");
+
+        w.addComponent(first);
+        // The indexed overloads are separate methods, not paths through the plain one,
+        // so they needed delegating in their own right. Without it the component landed
+        // in the window root beside the title area and the content pane could not see
+        // it.
+        w.addComponent(0, second);
+
+        assertEquals(2, w.getContentPane().getComponentCount(),
+                "an indexed add belongs in the content pane, as it does on a Form");
+        assertSame(second, w.getContentPane().getComponentAt(0),
+                "and at the index it asked for");
+        assertSame(first, w.getContentPane().getComponentAt(1));
+    }
+
+    @FormTest
+    void aFabBindsToAWindowsContentPane() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("fab", new BorderLayout());
+        w.setWindowSize(300, 200);
+        com.codename1.components.FloatingActionButton fab =
+                com.codename1.components.FloatingActionButton.createFAB(
+                        com.codename1.ui.FontImage.MATERIAL_ADD);
+
+        Container wrapper = fab.bindFabToContainer(w.getContentPane());
+
+        // Binding to a top level's content pane installs the button on that top level's
+        // layered pane and answers null. Resolving through getComponentForm() -- null in
+        // a window by design -- fell through to the wrapper branch instead and returned
+        // an unattached container, so the button never appeared.
+        assertNull(wrapper,
+                "binding to a window's content pane installs the button, as it does on a Form");
+        assertSame(w, fab.getTopLevelContainer(),
+                "and the button ends up inside that window");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void monitorsDifferingOnlyInScaleAreNotEqual() {
+        Rectangle bounds = new Rectangle(0, 0, 1920, 1080);
+        Rectangle work = new Rectangle(0, 0, 1920, 1040);
+        Monitor at1x = new Monitor(0, bounds, work, 160, 1.0, 96, "primary", true);
+        Monitor at2x = new Monitor(0, bounds, work, 320, 2.0, 192, "primary", true);
+
+        // Neither the index nor the bounds move when a display is rescaled, which is
+        // exactly what Desktop reports as a reconfiguration. Comparing only those two
+        // made the new snapshot equal to the old one, so anything caching
+        // getMonitors() and diffing by equality kept the stale scale.
+        assertNotEquals(at1x, at2x, "a rescaled monitor is not the same snapshot");
+        assertNotEquals(at1x.hashCode(), at2x.hashCode(),
+                "and its hash has to move with it");
+
+        // A taskbar switching to auto-hide changes only the work area.
+        Monitor fullWork = new Monitor(0, bounds, bounds, 160, 1.0, 96, "primary", true);
+        assertNotEquals(at1x, fullWork, "a changed work area is a changed snapshot");
+
+        // Same values means same snapshot, so equality stays useful.
+        assertEquals(at1x, new Monitor(0, bounds, work, 160, 1.0, 96, "primary", true));
+    }
+
+    @FormTest
+    void aPickerInAWindowUsesItsLightweightPopup() {
+        implementation.setMultiWindowSupported(true);
+        // A platform that does have a native picker: without the window check the
+        // native path would be taken, and every native picker attaches to the main
+        // surface rather than to the window the component is in.
+        implementation.setNativePickerTypeSupported(Boolean.TRUE, Boolean.TRUE, Boolean.TRUE);
+        Window w = new Window("picks", new BorderLayout());
+        com.codename1.ui.spinner.Picker p = new com.codename1.ui.spinner.Picker();
+        p.setType(Display.PICKER_TYPE_STRINGS);
+        p.setStrings("A", "B", "C");
+        w.add(BorderLayout.CENTER, p);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.revalidate();
+
+        p.pressed();
+        p.released();
+        DisplayTest.flushEdt();
+
+        // The lightweight popup is an InteractionDialog, which resolves its host from
+        // the component, so it lands in this window's own hierarchy. The native path
+        // would have put nothing here.
+        assertTrue(containsInteractionDialog(w.asContainer()),
+                "a picker in a window has to open its popup in that window");
+
+        w.dispose();
+    }
+
+    private static boolean containsInteractionDialog(Container c) {
+        int count = c.getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof com.codename1.components.InteractionDialog) {
+                return true;
+            }
+            if (cmp instanceof Container && containsInteractionDialog((Container) cmp)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @FormTest
+    void aWindowsContentPaneScrollsVerticallyByDefault() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("default");
+
+        // scrollableYFlag() rather than isScrollableY(): the latter is a computed
+        // predicate -- it also requires content taller than the container, or always
+        // tensile -- so on an empty pane it reads false whether or not the constructor
+        // set the default, and the assertion would have proved nothing either way.
+        boolean scrolls = w.getContentPane().scrollableYFlag();
+
+        // The same default a Form's content pane gets. Without it, content taller than
+        // the window is clipped and unreachable, and identical content moved from a
+        // Form silently stopped scrolling.
+        assertTrue(scrolls,
+                "a window's content pane scrolls vertically by default, as a Form's does");
+    }
+
+    @FormTest
+    void settingRTLOnAWindowReachesItsContentPane() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("rtl", new com.codename1.ui.layouts.FlowLayout());
+
+        w.setRTL(true);
+
+        // The application's layout runs in the content pane, so setting it on the root
+        // alone left directional layouts reversed while isRTL() reported true.
+        assertTrue(w.getContentPane().isRTL(),
+                "setRTL has to reach the content pane, as it does on a Form");
+        assertTrue(w.isRTL());
+    }
+
+    @FormTest
+    void scrollSettingsReachTheWindowsContentPane() {
+        implementation.setMultiWindowSupported(true);
+        // Deliberately not a BorderLayout content pane: setScrollableY forces false
+        // for one, on a Form just the same, so a BorderLayout would make this pass or
+        // fail for a reason that has nothing to do with the delegation.
+        Window w = new Window("scrolls", new com.codename1.ui.layouts.FlowLayout());
+
+        w.setScrollableY(true);
+        w.setScrollableX(false);
+        w.setAlwaysTensile(true);
+        w.setScrollAnimationSpeed(123);
+
+        // The content pane scrolls, not the window root, which is a fixed BorderLayout
+        // holding the title area and the content. Set on the root these reach nothing,
+        // while the same calls on a Form reach its content pane -- so code moved from a
+        // Form to a Window would silently stop scrolling.
+        assertTrue(w.getContentPane().isScrollableY(),
+                "setScrollableY has to reach the content pane, as it does on a Form");
+        assertFalse(w.getContentPane().isScrollableX());
+        assertTrue(w.getContentPane().isAlwaysTensile());
+        assertEquals(123, w.getContentPane().getScrollAnimationSpeed());
+        // And the getters read back from the same place.
+        assertTrue(w.isScrollableY());
+        assertFalse(w.isScrollableX());
+    }
+
+    @FormTest
+    void aWindowPaintsItsBackgroundOncePerPaint() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("bg", new BorderLayout());
+        w.setWindowSize(120, 90);
+        w.show();
+        final int[] painted = new int[1];
+        w.getAllStyles().setBgPainter(new Painter() {
+            @Override
+            public void paint(Graphics g, Rectangle rect) {
+                painted[0]++;
+            }
+        });
+
+        w.internalPaintImpl(Image.createImage(120, 90).getGraphics(), true);
+
+        // internalPaintImpl paints the background before it invokes paint(), so
+        // without the guard a custom painter runs twice per frame and a translucent
+        // one is composited on top of itself.
+        assertEquals(1, painted[0],
+                "the window's background painter must run once per paint");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void closeListenersFireOnceForOneClose() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("closes");
+        final AtomicInteger closes = new AtomicInteger();
+        w.addCloseListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                closes.incrementAndGet();
+            }
+        });
+        w.show();
+        w.closeRequested();
+
+        // dispose() used to fire them a second time, so one user close ran a
+        // listener's save or cleanup work twice.
+        assertEquals(1, closes.get(), "one close must notify a close listener once");
+        assertTrue(w.isWindowDisposed());
+    }
+
+    @FormTest
+    void anOwnedWindowIsDisposedWithItsOwner() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.show();
+        assertEquals(2, Desktop.getInstance().getWindows().length);
+
+        owner.dispose();
+
+        assertTrue(child.isWindowDisposed(),
+                "an owned window cannot outlive its owner: the platform would leave it "
+                        + "open with nothing behind it");
+        assertEquals(0, Desktop.getInstance().getWindows().length);
+    }
+
+    @FormTest
+    void showingAWindowRestoresAnOwnerTheApplicationHid() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.show();
+        owner.hide();
+        child.hide();
+        assertFalse(owner.isWindowShowing(), "the owner starts this hidden");
+
+        child.show();
+
+        assertTrue(owner.isWindowShowing(),
+                "an owned window cannot be on screen without its owner, so showing it "
+                        + "has to bring the owner back");
+        assertTrue(child.isWindowShowing());
+
+        owner.dispose();
+    }
+
+    @FormTest
+    void restoringAHiddenOwnerGoesThroughItsOwnLifecycle() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.show();
+        owner.hide();
+        child.hide();
+
+        child.show();
+
+        // Mapping the owner's native window is not enough: hide() made the component
+        // hierarchy invisible, and only the framework show() path puts it back. A
+        // window restored by the port alone would repaint nothing and take no input.
+        assertTrue(owner.asContainer().isVisible(),
+                "the owner's component hierarchy has to be visible again, not merely "
+                        + "its native window mapped");
+
+        owner.dispose();
+    }
+
+    @FormTest
+    void aWholeHiddenOwnerChainComesBack() {
+        implementation.setMultiWindowSupported(true);
+        Window grandparent = new Window("grandparent");
+        grandparent.show();
+        Window parent = new Window("parent");
+        parent.setOwnerWindow(grandparent);
+        parent.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(parent);
+        child.show();
+        grandparent.hide();
+        parent.hide();
+        child.hide();
+
+        child.show();
+
+        assertTrue(grandparent.isWindowShowing(),
+                "the restore has to walk the whole owner chain, not just one level: a "
+                        + "child cannot be on screen through a visible parent whose own "
+                        + "owner is hidden");
+        assertTrue(parent.isWindowShowing());
+        assertTrue(child.isWindowShowing());
+
+        grandparent.dispose();
+    }
+
+    @FormTest
+    void restoringAWindowBringsItsHiddenOwnerBackToo() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.show();
+        child.hideNotify();
+        owner.hide();
+        assertFalse(owner.isWindowShowing(), "the owner starts this hidden");
+
+        child.restore();
+
+        // restore() owes the same invariant show() does: un-minimizing a window while
+        // its owner is away puts it on screen without the owner, or lets the window
+        // system suppress it while the framework counts it back.
+        assertTrue(owner.isWindowShowing(),
+                "restoring an owned window has to bring its owner back as well");
+
+        owner.dispose();
+    }
+
+    @FormTest
+    void showingAMinimizedWindowAsksThePortToRestoreIt() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("minimized");
+        w.show();
+        w.hideNotify();
+        int before = wm.getLastWindow().getRestoreCount();
+
+        w.show();
+
+        // Mapping is not enough: setVisible(true) on AWT and SW_SHOW on Win32 leave a
+        // window iconic, so only the restore path actually brings it back.
+        assertEquals(before + 1, wm.getLastWindow().getRestoreCount(),
+                "showing a minimized window has to go through the port's restore path, "
+                        + "not just map it again");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void showingAWindowRestoresAnIconifiedOwner() {
+        TestWindowManager ownerWm = implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.show();
+        child.hide();
+        // Native minimization arrives through hideNotify, not hide().
+        owner.hideNotify();
+        assertFalse(owner.isWindowShowing(), "the owner starts this minimized");
+
+        child.show();
+
+        assertTrue(owner.isWindowShowing(),
+                "a minimized owner has to be restored too: only one port did it "
+                        + "itself, so everywhere else the child was mapped against an "
+                        + "owner still minimized");
+        assertTrue(child.isWindowShowing());
+        assertNotNull(ownerWm, "the fake manager is what records the restore");
+
+        owner.dispose();
+    }
+
+    @FormTest
+    void aRestoredWindowIsNoLongerMarkedMinimized() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("restored");
+        w.show();
+        w.hideNotify();
+
+        w.show();
+
+        // Only hide() and showNotify() cleared this before, so a window restored
+        // through show() stayed marked minimized while it was on screen. There is no
+        // public predicate for it, so the field is read directly, as the timer test
+        // above reads animatableComponents.
+        assertTrue(w.isWindowShowing());
+        boolean stillIconified;
+        try {
+            java.lang.reflect.Field f = Window.class.getDeclaredField("iconified");
+            f.setAccessible(true);
+            stillIconified = f.getBoolean(w);
+        } catch (Exception err) {
+            throw new RuntimeException(err);
+        }
+        assertFalse(stillIconified,
+                "a window that is on screen cannot still be marked minimized");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void theMinimumSizeReachesThePortAndClampsAResize() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("clamped", new BorderLayout());
+        w.setWindowSize(800, 600);
+        w.setMinimumWindowSize(new com.codename1.ui.geom.Dimension(320, 240));
+        w.show();
+
+        assertEquals(320, wm.getLastWindow().getMinimumWidth(),
+                "the constraint has to reach the port, which is where it can be enforced");
+        assertEquals(240, wm.getLastWindow().getMinimumHeight());
+
+        // The framework deliberately does not re-clamp what the port reports. The
+        // minimum is native geometry and includes the platform's chrome, while a
+        // resize reports content dimensions, so clamping one against the other mixes
+        // two coordinate spaces -- on a decorated window it laid the hierarchy out
+        // larger than the canvas it is drawn into, clipping controls and putting hit
+        // testing out of step with what is on screen. The window lays out to what it
+        // was actually given; enforcing the minimum belongs to the platform that owns
+        // the frame, which is why the assertions above matter.
+        w.sizeChangedInternal(100, 80);
+        assertEquals(100, w.getWidth());
+        assertEquals(80, w.getHeight());
+        w.dispose();
+    }
+
+    @FormTest
+    void keysReachTheWindowsFocusedComponent() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("keys", new BorderLayout());
+        final AtomicInteger pressed = new AtomicInteger();
+        Button b = new Button("target") {
+            @Override
+            public void keyPressed(int keyCode) {
+                super.keyPressed(keyCode);
+                pressed.incrementAndGet();
+            }
+        };
+        w.add(BorderLayout.CENTER, b);
+        w.show();
+        w.setFocused(b);
+
+        // Container's inherited handler only forwards to a lead component, so without
+        // Window dispatching keys itself the focused component never sees one.
+        w.keyPressed('a');
+        assertEquals(1, pressed.get(), "the focused component must receive the key");
+
+        final AtomicInteger listened = new AtomicInteger();
+        w.addKeyListener('b', new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                listened.incrementAndGet();
+            }
+        });
+        w.keyReleased('b');
+        assertEquals(1, listened.get(), "addKeyListener must fire in a window too");
+        w.dispose();
+    }
+
+    @FormTest
+    void hidingAModalWindowStopsItBlocking() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("modal");
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.setCloseOperation(Window.HIDE_ON_CLOSE);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertTrue(peer.isModal());
+
+        w.closeRequested();
+
+        // The user can no longer reach it, so it must not go on blocking what is
+        // behind it -- natively or in the framework.
+        assertFalse(w.isWindowShowing());
+        assertFalse(peer.isModal(),
+                "a hidden modal window must release the block it holds");
+        w.dispose();
+    }
+
+    @FormTest
+    void modalityTellsThePortWhatItBlocks() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        TestWindowManager.FakeWindow ownerPeer = wm.getLastWindow();
+
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.setModalityType(Window.MODALITY_WINDOW);
+        child.show();
+        TestWindowManager.FakeWindow childPeer = wm.getLastWindow();
+
+        // A port applies modality by disabling the blocked window, so window scoped
+        // modality naming the main window would make an unrelated part of the
+        // application unusable.
+        assertFalse(childPeer.isModalApplicationWide());
+        assertSame(ownerPeer, childPeer.getModalOwner());
+        assertSame(ownerPeer, childPeer.getOwner(),
+                "the owner has to reach createWindow, or no platform knows the window "
+                        + "should stay above it");
+        owner.dispose();
+    }
+
+    @FormTest
+    void aNarrowerModalDoesNotLiftABroaderOne() {
+        implementation.setMultiWindowSupported(true);
+        Window appModal = new Window("application modal");
+        appModal.setModalityType(Window.MODALITY_APPLICATION);
+        appModal.show();
+
+        Window child = new Window("window modal");
+        child.setOwnerWindow(appModal);
+        child.setModalityType(Window.MODALITY_WINDOW);
+        child.show();
+
+        // The window modal on top blocks only its owner. Consulting just the newest
+        // blocker would answer "not blocked" for the main form and for every unrelated
+        // window, silently letting input back in while an application modal is still up.
+        // The wheel entry point is the one that reports the answer synchronously.
+        Desktop d = Desktop.getInstance();
+        assertTrue(d.windowMouseWheelEvent(0, 5, 5, 0, 120, false, 0),
+                "the main form stays blocked while an application modal is registered");
+
+        child.dispose();
+        assertTrue(d.windowMouseWheelEvent(0, 5, 5, 0, 120, false, 0),
+                "and stays blocked once the narrower one is gone");
+
+        appModal.dispose();
+        assertFalse(d.windowMouseWheelEvent(0, 5, 5, 0, 120, false, 0),
+                "input returns once no modal window is registered");
+    }
+
+    @FormTest
+    void theOwnerCannotBeChangedOnceTheWindowExists() {
+        implementation.setMultiWindowSupported(true);
+        Window a = new Window("a");
+        a.show();
+        final Window b = new Window("b");
+        b.show();
+        final Window child = new Window("child");
+        child.setOwnerWindow(a);
+        child.show();
+
+        // Native ownership is fixed when the window is created, and the port was told
+        // to block a specific owner. Repointing the field would strand the modal
+        // blocker on the previous owner and leave the platform relation on it too.
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() {
+                child.setOwnerWindow(b);
+            }
+        });
+        a.dispose();
+        b.dispose();
+    }
+
+    @FormTest
+    void minimizingAModalWindowDoesNotEndItsModality() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("modal");
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+
+        // The platform minimizing the window also clears nativeVisible. Reading that
+        // as "the modal is over" would end the wait and drop the block, so restoring
+        // the window would put a modal back on screen with input flowing behind it.
+        w.hideNotify();
+        assertTrue(peer.isModal(), "a minimized modal window is still modal");
+
+        w.showNotify();
+        assertTrue(w.isWindowShowing());
+        assertTrue(peer.isModal());
+        w.dispose();
+        assertFalse(peer.isModal());
+    }
+
+    @FormTest
+    void aMoveIsReportedToWindowListeners() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("moves");
+        w.show();
+        final AtomicInteger moves = new AtomicInteger();
+        w.addWindowListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                if (((com.codename1.ui.events.WindowEvent) evt).getType()
+                        == com.codename1.ui.events.WindowEvent.Type.Moved) {
+                    moves.incrementAndGet();
+                }
+            }
+        });
+
+        // Only a monitor change was reported before, so an ordinary move within one
+        // display never reached a listener and nothing could persist a position.
+        Desktop.getInstance().windowMoved(w.getWindowId());
+        flushSerialCalls();
+        assertEquals(1, moves.get());
+        w.dispose();
+    }
+
+    @FormTest
+    void thePortIsToldWhetherAPositionWasChosen() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window placed = new Window("placed");
+        // Negative is an ordinary coordinate: a monitor left of or above the primary
+        // display has a negative origin, so it cannot double as "no position given".
+        placed.setWindowBounds(new com.codename1.ui.geom.Rectangle(-1400, -200, 300, 200));
+        placed.show();
+        assertTrue(wm.getLastWindow().isPositionSet());
+        assertEquals(-1400, wm.getLastWindow().getX());
+        placed.dispose();
+
+        Window unplaced = new Window("unplaced");
+        unplaced.show();
+        assertFalse(wm.getLastWindow().isPositionSet(),
+                "a window that named no position must be placed by the platform");
+        unplaced.dispose();
+    }
+
+    @FormTest
+    void aFormOwnedWindowIsNotConfusedWithAnUnownedOne() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window unowned = new Window("unowned");
+        unowned.show();
+        assertNull(wm.getLastWindow().getOwner());
+        assertFalse(wm.getLastWindow().isOwnedByMainWindow(),
+                "an unowned window must not become a child of the main window");
+        unowned.dispose();
+
+        Window ownedByForm = new Window("owned by the form");
+        ownedByForm.setOwnerWindow(Display.getInstance().getCurrent());
+        ownedByForm.show();
+        assertNull(wm.getLastWindow().getOwner(),
+                "the main form has no window peer");
+        assertTrue(wm.getLastWindow().isOwnedByMainWindow(),
+                "but the port still has to be told it owns this window");
+        ownedByForm.dispose();
+    }
+
+    @FormTest
+    void draggingANonScrollableChildDoesNotRecurse() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("drags", new BorderLayout());
+        Label plain = new Label("not scrollable");
+        w.add(BorderLayout.CENTER, plain);
+        w.show();
+
+        // A drag bubbles up looking for something scrollable and used to stop only at
+        // a Form. A Window dispatches drags to the pressed child itself, so bubbling
+        // past it came straight back and recursed until the stack ran out.
+        w.pointerPressed(10, 10);
+        w.pointerDragged(12, 14);
+        w.pointerReleased(12, 14);
+        w.dispose();
+    }
+
+    @FormTest
+    void anUnownedWindowModalBlocksNothing() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("unowned modal");
+        w.setModalityType(Window.MODALITY_WINDOW);
+        w.show();
+
+        // Window modality blocks the owning window. There is none, so it blocks
+        // nothing -- treating that as main-form ownership would block the main form
+        // on a window that never claimed it.
+        assertFalse(Desktop.getInstance().windowMouseWheelEvent(0, 5, 5, 0, 120, false, 0),
+                "the main form is not the owner, so it must not be blocked");
+        w.dispose();
+    }
+
+    @FormTest
+    void showingAChildFirstStillEstablishesTheRealOwner() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+
+        // The owner has never been shown, so it has no peer. Creating the child now
+        // would fix the wrong native owner permanently, since every port establishes
+        // the relation at creation.
+        child.show();
+
+        assertNotNull(wm.getLastWindow().getOwner(),
+                "the owner's native window has to exist before the child's");
+        assertFalse(wm.getLastWindow().isOwnedByMainWindow());
+        owner.dispose();
+    }
+
+    @FormTest
+    void nativeBlockingFollowsTheWholeModalStack() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window plain = new Window("plain");
+        plain.show();
+        TestWindowManager.FakeWindow plainPeer = wm.getLastWindow();
+
+        Window appModal = new Window("application modal");
+        appModal.setModalityType(Window.MODALITY_APPLICATION);
+        appModal.show();
+        TestWindowManager.FakeWindow appPeer = wm.getLastWindow();
+
+        // Application modality blocks every other window natively, not just the main
+        // one: a blocked window's own title bar is outside the framework's filter.
+        assertFalse(wm.isMainWindowInputEnabled());
+        assertFalse(plainPeer.isInputEnabled());
+        assertTrue(appPeer.isInputEnabled(), "the modal window itself stays usable");
+
+        Window inner = new Window("window modal");
+        inner.setOwnerWindow(appModal);
+        inner.setModalityType(Window.MODALITY_WINDOW);
+        inner.show();
+        inner.dispose();
+
+        // Releasing the inner modal must not re-enable what the outer one still
+        // blocks. A port counting its own depth got this wrong.
+        assertFalse(wm.isMainWindowInputEnabled(),
+                "the application modal is still up");
+        assertFalse(plainPeer.isInputEnabled());
+
+        appModal.dispose();
+        assertTrue(wm.isMainWindowInputEnabled(), "nothing blocks any more");
+        assertTrue(plainPeer.isInputEnabled());
+        plain.dispose();
+    }
+
+    @FormTest
+    void aWindowShownUnderAnApplicationModalIsBlockedNatively() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window appModal = new Window("application modal");
+        appModal.setModalityType(Window.MODALITY_APPLICATION);
+        appModal.show();
+
+        // Shown *after* the modal, so it registers no blocker of its own and
+        // acquireModal() does nothing for it. Ports enable a native window by
+        // default, so without a resync at registration its title bar stayed live
+        // -- focusable, movable, closable -- under a modal meant to block it.
+        Window later = new Window("opened while blocked");
+        later.show();
+        TestWindowManager.FakeWindow laterPeer = wm.getLastWindow();
+        assertFalse(laterPeer.isInputEnabled(),
+                "a window opened under an application modal must start blocked");
+
+        appModal.dispose();
+        assertTrue(laterPeer.isInputEnabled(), "the modal is gone");
+        later.dispose();
+    }
+
+    @FormTest
+    void aWindowCannotOwnItself() {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("self owned");
+        // show() creates an unshown owner's native window first, so a cycle here
+        // recurses until the stack runs out before either peer exists -- and a
+        // StackOverflowError names none of the windows involved.
+        assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() {
+                w.setOwnerWindow(w);
+            }
+        });
+        w.dispose();
+    }
+
+    @FormTest
+    void aCycleThroughTheOwnerChainIsRejected() {
+        implementation.setMultiWindowSupported(true);
+        final Window a = new Window("a");
+        final Window b = new Window("b");
+        final Window c = new Window("c");
+        b.setOwnerWindow(a);
+        c.setOwnerWindow(b);
+        // a -> c would close the loop a -> c -> b -> a. Only a walk of the whole
+        // chain sees it; comparing against the immediate owner does not.
+        assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() {
+                a.setOwnerWindow(c);
+            }
+        });
+        c.dispose();
+        b.dispose();
+        a.dispose();
+    }
+
+    @FormTest
+    void aGestureIsDispatchedToItsOwnWindow() {
+        implementation.setMultiWindowSupported(true);
+        final int[] mainPinches = new int[1];
+        final int[] windowPinches = new int[1];
+
+        Form main = new Form("main", new BorderLayout());
+        main.add(BorderLayout.CENTER, new PinchCountingComponent(mainPinches));
+        main.show();
+
+        Window w = new Window("windowed", new BorderLayout());
+        w.add(BorderLayout.CENTER, new PinchCountingComponent(windowPinches));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Aimed at the middle of the content, not the corner: the window's title
+        // area covers the top rows and would answer the hit test instead.
+        Desktop.getInstance().windowMagnifyGesture(w.getWindowId(), 150, 120, 1.5f);
+        Desktop.getInstance().windowMagnifyGesture(0, 150, 120, 1.5f);
+        // Disposed before asserting: a window left open by a failing assertion is
+        // painted for the rest of the class and times out every later test.
+        w.dispose();
+
+        assertEquals(1, windowPinches[0], "the gesture belongs to the window it arrived on");
+        assertEquals(1, mainPinches[0], "window 0 is still the main surface");
+    }
+
+    @FormTest
+    void aWheelGestureIntoAWindowHiddenByItsOwnListenerIsDropped() {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("self hiding", new BorderLayout());
+        WheelHidingComponent target = new WheelHidingComponent(w);
+        w.add(BorderLayout.CENTER, target);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.revalidate();
+
+        // The window is showing when the wheel arrives, so it passes the check on the
+        // way in. The listener then hides it and does not consume, which is what leaves
+        // the queued press, drags and release aimed at a hierarchy nobody can see.
+        // Through the port entry point, not Display.windowMouseWheelEvent: the wrapper
+        // is what queues the synthetic gesture after an unconsumed listener, so calling
+        // the inner method directly would never reach the code under test.
+        Display.impl.windowPointerWheelMoved(w.getWindowId(),
+                target.getAbsoluteX() + 2, target.getAbsoluteY() + 2, 0, 3, false, 0);
+        DisplayTest.flushEdt();
+        DisplayTest.flushEdt();
+
+        assertTrue(target.sawWheel(), "the listener has to have run for this to mean anything");
+        // Counted rather than observed through isScrollWheeling(): that flag is set by
+        // the first queued step and cleared by the last, and flushEdt drains all four,
+        // so it reads false either way. The pointer events the gesture dispatches are
+        // what persist.
+        assertEquals(0, target.pointerEvents(),
+                "no scroll gesture may be played into a window the wheel listener hid");
+
+        w.dispose();
+    }
+
+    /// Hides the window it is given when it sees a wheel event, without consuming it.
+    private static final class WheelHidingComponent extends Component {
+        private final Window target;
+        private boolean sawWheel;
+        private int pointerEvents;
+
+        WheelHidingComponent(Window target) {
+            this.target = target;
+        }
+
+        boolean sawWheel() {
+            return sawWheel;
+        }
+
+        int pointerEvents() {
+            return pointerEvents;
+        }
+
+        @Override
+        public void pointerPressed(int x, int y) {
+            pointerEvents++;
+        }
+
+        @Override
+        public void pointerDragged(int x, int y) {
+            pointerEvents++;
+        }
+
+        @Override
+        public void pointerReleased(int x, int y) {
+            pointerEvents++;
+        }
+
+        @Override
+        public boolean fireMouseWheelEvent(com.codename1.ui.events.WheelEvent ev) {
+            sawWheel = true;
+            target.hide();
+            return false;
+        }
+    }
+
+    @FormTest
+    void aGestureOverABlockedWindowIsDropped() {
+        implementation.setMultiWindowSupported(true);
+        final int[] pinches = new int[1];
+        Window blocked = new Window("blocked", new BorderLayout());
+        blocked.add(BorderLayout.CENTER, new PinchCountingComponent(pinches));
+        blocked.setWindowSize(300, 200);
+        blocked.show();
+
+        Window appModal = new Window("application modal");
+        appModal.setModalityType(Window.MODALITY_APPLICATION);
+        appModal.show();
+
+        // Gestures are filtered like every other input event: pinching a window a
+        // modal is blocking has to do nothing, the same way clicking it does.
+        Desktop.getInstance().windowMagnifyGesture(blocked.getWindowId(), 150, 120, 1.5f);
+        int whileBlocked = pinches[0];
+
+        appModal.dispose();
+        Desktop.getInstance().windowMagnifyGesture(blocked.getWindowId(), 150, 120, 1.5f);
+        int afterRelease = pinches[0];
+        blocked.dispose();
+
+        assertEquals(0, whileBlocked, "a blocked window must not see the gesture");
+        assertEquals(1, afterRelease, "and resume once nothing blocks it");
+    }
+
+    /// Counts the pinches it is handed, so a test can tell which tree a gesture
+    /// reached.
+    private static final class PinchCountingComponent extends Component {
+        private final int[] counter;
+
+        PinchCountingComponent(int[] counter) {
+            this.counter = counter;
+        }
+
+        @Override
+        public boolean pinch(float scale) {
+            counter[0]++;
+            return true;
+        }
+    }
+
+    @FormTest
+    void aKeyReleaseIsNotStolenByAClickInAnotherWindow() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Press a key on the main form, then click the window before releasing it.
+        // The two sequences tracked one shared target while there was only ever one
+        // form; with windows this interleaving is ordinary, and the click used to
+        // overwrite the key's target so the release never arrived -- leaving the
+        // component latched in its pressed state.
+        Display.getInstance().keyPressed(-90);
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        Desktop.getInstance().windowPointerPressed(w.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerReleased(w.getWindowId(), px, py);
+        Display.getInstance().keyReleased(-90);
+        DisplayTest.flushEdt();
+        w.dispose();
+
+        assertEquals(1, mainKeys.pressed, "the press reached the main form");
+        assertEquals(1, mainKeys.released,
+                "and so must the release, despite the click on another window");
+    }
+
+    /// Counts the key events it receives, so a test can prove a release was matched
+    /// to the component that saw the press.
+    private static final class KeyCountingComponent extends Component {
+        private int pressed;
+        private int released;
+
+        @Override
+        public void keyPressed(int code) {
+            pressed++;
+        }
+
+        @Override
+        public void keyReleased(int code) {
+            released++;
+        }
+
+        @Override
+        public boolean isFocusable() {
+            return true;
+        }
+    }
+
+    @FormTest
+    void repeatedMonitorReportsCollapseIntoOneNotification() {
+        implementation.setMultiWindowSupported(true);
+        final int[] fired = new int[1];
+        Desktop.getInstance().addMonitorListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                fired[0]++;
+            }
+        });
+
+        // One physical display change is reported many times over: Windows
+        // broadcasts WM_DISPLAYCHANGE to every top level window, and GTK fires
+        // geometry, work-area and scale-factor notifications separately per monitor.
+        for (int iter = 0; iter < 5; iter++) {
+            Desktop.getInstance().monitorsChanged();
+        }
+        DisplayTest.flushEdt();
+        assertEquals(1, fired[0], "five reports of one change must notify once");
+
+        // A later change is a new change, not a duplicate of the one already drained.
+        Desktop.getInstance().monitorsChanged();
+        DisplayTest.flushEdt();
+        assertEquals(2, fired[0]);
+    }
+
+    @FormTest
+    void overlappingKeyPressesAcrossWindowsEachReachTheirOwnTarget() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        final KeyCountingComponent windowKeys = new KeyCountingComponent();
+        w.add(BorderLayout.CENTER, windowKeys);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(windowKeys);
+
+        // Hold a key on the main form, press a different key in the window before
+        // releasing it, then release both. One target for the whole keyboard is not
+        // enough: the second press overwrote the first, so the first release matched
+        // nothing and cleared the field, and the second release then matched nothing
+        // either -- latching a component in each window.
+        Display.getInstance().keyPressed(-91);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -92);
+        Display.getInstance().keyReleased(-91);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), -92);
+        DisplayTest.flushEdt();
+        w.dispose();
+
+        assertEquals(1, mainKeys.pressed);
+        assertEquals(1, windowKeys.pressed);
+        assertEquals(1, mainKeys.released,
+                "the main form's release must survive a press in another window");
+        assertEquals(1, windowKeys.released,
+                "and so must the window's own");
+    }
+
+    @FormTest
+    void theMainFormReportsTheMonitorItIsActuallyOn() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        // Two displays, with the application's main window on the second one.
+        java.util.List<TestWindowManager.FakeMonitor> two =
+                new java.util.ArrayList<TestWindowManager.FakeMonitor>();
+        two.add(new TestWindowManager.FakeMonitor(0, 0, 1440, 900, 1.0, 96, "primary"));
+        two.add(new TestWindowManager.FakeMonitor(1440, 0, 2560, 1440, 2.0, 192, "second"));
+        wm.setMonitors(two);
+        wm.setMainWindowMonitor(1);
+
+        Form main = new Form("main");
+        main.show();
+
+        Monitor m = Desktop.getInstance().getMonitorFor(main);
+        assertEquals(1, m.getIndex(),
+                "a Form has no window peer, but its monitor is still answerable");
+        assertFalse(m.isPrimary(),
+                "reporting the primary monitor here gave the wrong work area and scale");
+    }
+
+    @FormTest
+    void aKeyReleaseArrivingOnAnotherWindowStillReachesThePressTarget() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Press on the main form, then have the *window* report the release. That is
+        // what a desktop window system does: key-up goes to whatever holds focus at
+        // the time, so it names the window the user moved to rather than the one the
+        // key went down in. Recording the press target is not enough on its own --
+        // it has to be where the release is delivered, not merely something the
+        // packet is checked against.
+        Display.getInstance().keyPressed(-93);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), -93);
+        DisplayTest.flushEdt();
+        w.dispose();
+
+        assertEquals(1, mainKeys.pressed);
+        assertEquals(1, mainKeys.released,
+                "the release belongs to the component that saw the press");
+    }
+
+    @FormTest
+    void aDisabledComponentInAWindowIsNotActivatable() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("disabled", new BorderLayout());
+        final int[] fired = new int[1];
+        Button b = new Button("nope");
+        b.setEnabled(false);
+        b.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                fired[0]++;
+            }
+        });
+        w.add(BorderLayout.CENTER, b);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Button.pointerPressed has no enabled check of its own -- it relies on the
+        // top level never calling it -- so dispatching unconditionally let a disabled
+        // button enter its pressed state and fire on release.
+        w.pointerPressed(150, 120);
+        w.pointerReleased(150, 120);
+        int firedCount = fired[0];
+        boolean stillReleased = b.getState() == Button.STATE_DEFAULT;
+        w.dispose();
+
+        assertEquals(0, firedCount, "a disabled button must not fire inside a window");
+        assertTrue(stillReleased, "and must not be left in a pressed state");
+    }
+
+    @FormTest
+    void aPressDraggedOutOfAButtonInAWindowIsCancelled() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("drag out", new BorderLayout());
+        final int[] fired = new int[1];
+        Button b = new Button("press me");
+        b.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                fired[0]++;
+            }
+        });
+        w.add(BorderLayout.CENTER, b);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Press on the button, drag well clear of it, release there. Form cancels the
+        // press through its awaiting-release list; the window never consumed that list
+        // because Button registered through getComponentForm(), which is null here.
+        w.pointerPressed(150, 120);
+        // Outside the window, not merely near its top left. A window has no title area
+        // any more -- its title is native chrome -- so the content pane fills it and a
+        // centred button covers every in-window point, including the (2,2) this used to
+        // treat as outside.
+        w.pointerDragged(-20, -20);
+        w.pointerReleased(-20, -20);
+        int firedCount = fired[0];
+        w.dispose();
+
+        assertEquals(0, firedCount,
+                "releasing outside the button must not fire its action");
+    }
+
+    @FormTest
+    void aReleaseFinishingAPressSurvivesAModalOpenedByThatPress() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("presser", new BorderLayout());
+        final KeyCountingComponent keys = new KeyCountingComponent();
+        w.add(BorderLayout.CENTER, keys);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(keys);
+
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -94);
+        DisplayTest.flushEdt();
+
+        // The press handler opens an application modal, so the release arrives with
+        // its own window blocked. Dropping it strands the component in its pressed
+        // state for good and never clears the recorded target, so the *next* release
+        // matches the wrong thing. Modality is there to stop new interaction, not to
+        // abandon a gesture already under way.
+        Window modal = new Window("modal");
+        modal.setModalityType(Window.MODALITY_APPLICATION);
+        modal.show();
+
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), -94);
+        DisplayTest.flushEdt();
+        int released = keys.released;
+
+        // A press that never happened stays blocked: this one leaves no record.
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -95);
+        DisplayTest.flushEdt();
+        int pressedWhileBlocked = keys.pressed;
+
+        modal.dispose();
+        w.dispose();
+
+        assertEquals(1, released,
+                "the release completing an accepted press must reach its target");
+        assertEquals(1, pressedWhileBlocked,
+                "but a new press on a blocked window must still be dropped");
+    }
+
+    @FormTest
+    void focusChangesInAWindowRunTheFocusLifecycle() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("focus", new BorderLayout());
+        final FocusCountingComponent a = new FocusCountingComponent();
+        final FocusCountingComponent b = new FocusCountingComponent();
+        Container box = new Container(new BorderLayout());
+        box.add(BorderLayout.NORTH, a);
+        box.add(BorderLayout.SOUTH, b);
+        w.add(BorderLayout.CENTER, box);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Toggling the focus flag and repainting is not the same as running the
+        // lifecycle: components build real behaviour on these notifications --
+        // TextArea enables its input handling in focusGainedInternal -- so without
+        // them an arrow key traversed away from a field instead of moving its caret.
+        w.setFocused(a);
+        w.setFocused(b);
+        int aGained = a.gained;
+        int aLost = a.lost;
+        int bGained = b.gained;
+        w.dispose();
+
+        assertEquals(1, aGained, "the first component must be told it gained focus");
+        assertEquals(1, aLost, "and told when it loses it");
+        assertEquals(1, bGained, "and the second must be told it gained it");
+    }
+
+    /// Counts the focus notifications it receives.
+    private static final class FocusCountingComponent extends Component {
+        private int gained;
+        private int lost;
+
+        @Override
+        public boolean isFocusable() {
+            return true;
+        }
+
+        @Override
+        public void fireFocusGained() {
+            super.fireFocusGained();
+            gained++;
+        }
+
+        @Override
+        public void fireFocusLost() {
+            super.fireFocusLost();
+            lost++;
+        }
+    }
+
+    @FormTest
+    void aLongPressInAWindowReachesThePressedComponent() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("long press", new BorderLayout());
+        final int[] longPresses = new int[1];
+        Button b = new Button("hold me") {
+            @Override
+            public void longPointerPress(int x, int y) {
+                longPresses[0]++;
+            }
+        };
+        w.add(BorderLayout.CENTER, b);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        w.pointerPressed(150, 120);
+        w.longPointerPress(150, 120);
+        int count = longPresses[0];
+        w.dispose();
+
+        assertEquals(1, count,
+                "Component's implementation only fires the window's own listeners, so "
+                        + "a long press reached nothing inside a window");
+    }
+
+    @FormTest
+    void aLongKeyPressInAWindowReachesTheFocusedComponent() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("long key", new BorderLayout());
+        final int[] longKeys = new int[1];
+        Component target = new Component() {
+            @Override
+            public boolean isFocusable() {
+                return true;
+            }
+
+            @Override
+            protected void longKeyPress(int keyCode) {
+                longKeys[0]++;
+            }
+        };
+        w.add(BorderLayout.CENTER, target);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(target);
+
+        // Display dispatches a long key press to the top level and Component's
+        // implementation is empty, so without an override it reached nothing -- the
+        // keyboard twin of the long-press defect.
+        w.longKeyPress(-95);
+        int count = longKeys[0];
+        w.dispose();
+
+        assertEquals(1, count, "a long key press must reach the focused component");
+    }
+
+    @FormTest
+    void overlappingPointerPressesInTwoWindowsEachGetTheirRelease() {
+        implementation.setMultiWindowSupported(true);
+        Window a = new Window("a", new BorderLayout());
+        final PressCountingComponent ca = new PressCountingComponent();
+        a.add(BorderLayout.CENTER, ca);
+        a.setWindowSize(300, 200);
+        a.show();
+
+        Window b = new Window("b", new BorderLayout());
+        final PressCountingComponent cb = new PressCountingComponent();
+        b.add(BorderLayout.CENTER, cb);
+        b.setWindowSize(300, 200);
+        b.show();
+
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        // Two contacts down in two windows at once -- the Linux port deliberately
+        // tracks a touch sequence per window, so this is reachable on a touchscreen.
+        // A single shared target let B's press erase A's, after which both releases
+        // were dropped and both components stayed latched.
+        Desktop.getInstance().windowPointerPressed(a.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerPressed(b.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerReleased(a.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerReleased(b.getWindowId(), px, py);
+        DisplayTest.flushEdt();
+        int ra = ca.released;
+        int rb = cb.released;
+        b.dispose();
+        a.dispose();
+
+        assertEquals(1, ra, "the first window's release must reach its component");
+        assertEquals(1, rb, "and so must the second window's");
+    }
+
+    /// Counts pointer releases, so a test can prove each window's press was matched.
+    private static final class PressCountingComponent extends Component {
+        private int released;
+
+        @Override
+        public void pointerReleased(int x, int y) {
+            released++;
+        }
+    }
+
+    @FormTest
+    void aPressInOneWindowDoesNotCancelAnothersLongPress() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window a = new Window("a", new BorderLayout());
+        a.add(BorderLayout.CENTER, new Label("a"));
+        a.setWindowSize(300, 200);
+        a.show();
+        Window b = new Window("b", new BorderLayout());
+        b.add(BorderLayout.CENTER, new Label("b"));
+        b.setWindowSize(300, 200);
+        b.show();
+
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        // Press in A, then in B. The long-press timer was a single set of fields, so
+        // B's press replaced A's coordinates and clock, and releasing either one
+        // cancelled the other's pending long press.
+        Desktop.getInstance().windowPointerPressed(a.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerPressed(b.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerReleased(a.getWindowId(), px, py);
+        DisplayTest.flushEdt();
+
+        boolean bStillArmed = longPressArmedFor(b.getWindowId());
+        b.dispose();
+        a.dispose();
+
+        assertTrue(bStillArmed,
+                "releasing one window's contact must not cancel another window's "
+                        + "pending long press");
+    }
+
+    /// Reads Display's per-window long-press table, which is private state with no
+    /// public accessor.
+    private static boolean longPressArmedFor(int windowId) throws Exception {
+        if (windowId == 0) {
+            java.lang.reflect.Field f = Display.class.getDeclaredField("longPointerCharged");
+            f.setAccessible(true);
+            return f.getBoolean(Display.getInstance());
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w != null && w.hasLongPointerArmed();
+    }
+
+    @FormTest
+    void aBlockedWindowsPressDoesNotLeaveALongPressArmed() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window blocked = new Window("blocked", new BorderLayout());
+        blocked.add(BorderLayout.CENTER, new Label("content"));
+        blocked.setWindowSize(300, 200);
+        blocked.show();
+
+        Window modal = new Window("modal");
+        modal.setModalityType(Window.MODALITY_APPLICATION);
+        modal.show();
+
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        // The timer is charged when the press is queued, before modality has had a
+        // say, and the event dispatch thread fires longPointerPress directly without
+        // re-checking -- so a context menu could open behind the modal for a press
+        // the component never received.
+        Desktop.getInstance().windowPointerPressed(blocked.getWindowId(), px, py);
+        DisplayTest.flushEdt();
+        boolean armed = longPressArmedFor(blocked.getWindowId());
+
+        modal.dispose();
+        blocked.dispose();
+        assertFalse(armed,
+                "a press rejected by modality must not leave its long press armed");
+    }
+
+    @FormTest
+    void windowLevelPointerListenersFire() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("listeners", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+        final int[] counts = new int[3];
+        w.addPointerPressedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                counts[0]++;
+            }
+        });
+        w.addPointerDraggedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                counts[1]++;
+            }
+        });
+        w.addPointerReleasedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                counts[2]++;
+            }
+        });
+
+        // These dispatchers were never fired, so listeners attached to a Window did
+        // nothing -- and material pull to refresh went with them, since Component
+        // installs its refresh listeners on the top level.
+        w.pointerPressed(150, 120);
+        w.pointerDragged(150, 130);
+        w.pointerReleased(150, 130);
+        w.dispose();
+
+        assertEquals(1, counts[0], "the window's pointer pressed listener must fire");
+        assertEquals(1, counts[1], "and its dragged listener");
+        assertEquals(1, counts[2], "and its released listener");
+    }
+
+    @FormTest
+    void aPressInOneWindowDoesNotClearAnothersDragOccurred() {
+        implementation.setMultiWindowSupported(true);
+        final boolean[] seen = new boolean[1];
+        Window a = new Window("a", new BorderLayout());
+        a.add(BorderLayout.CENTER, new Component() {
+            @Override
+            public void pointerReleased(int x, int y) {
+                seen[0] = Display.getInstance().hasDragOccured();
+            }
+        });
+        a.setWindowSize(300, 200);
+        a.show();
+        Window b = new Window("b", new BorderLayout());
+        b.add(BorderLayout.CENTER, new Label("b"));
+        b.setWindowSize(300, 200);
+        b.show();
+
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        int[] py2 = new int[]{160};
+        Desktop.getInstance().windowPointerPressed(a.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerDragged(a.getWindowId(), px, py2);
+        DisplayTest.flushEdt();
+        // B's press cleared the global flag after A had already dragged, so releasing
+        // A made List and friends read hasDragOccured() as false and treat a
+        // completed drag as a click.
+        Desktop.getInstance().windowPointerPressed(b.getWindowId(), px, py);
+        DisplayTest.flushEdt();
+        Desktop.getInstance().windowPointerReleased(a.getWindowId(), px, py2);
+        DisplayTest.flushEdt();
+        b.dispose();
+        a.dispose();
+
+        // Read from inside A's own release dispatch, which is where List and
+        // ContainerList consult it -- and the only context where the answer is
+        // defined, now that the selector is restored when dispatch unwinds.
+        assertTrue(seen[0],
+                "a press in another window must not erase this window's drag state");
+    }
+
+    @FormTest
+    void aDraggableComponentInAWindowGetsDragAndDropPrimed() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("dnd", new BorderLayout());
+        Label draggable = new Label("drag me");
+        draggable.setDraggable(true);
+        w.add(BorderLayout.CENTER, draggable);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Component.pointerDragged checks dragAndDropInitialized and silently does
+        // nothing without it, so drag and drop was unusable in a window.
+        w.pointerPressed(150, 120);
+        boolean primed = draggable.isDragAndDropInitialized();
+        w.dispose();
+
+        assertTrue(primed, "a press must prime drag and drop, as Form does");
+    }
+
+    @FormTest
+    void multiTouchDragsStillNotifyWindowListeners() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("multi", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+        final int[] drags = new int[1];
+        w.addPointerDraggedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                drags[0]++;
+            }
+        });
+
+        // The listener block was added to the scalar overload only, so a gesture
+        // stopped notifying the moment it became multi touch.
+        w.pointerDragged(new int[]{150, 160}, new int[]{120, 130});
+        int count = drags[0];
+        w.dispose();
+
+        assertEquals(1, count, "a multi touch drag must notify window listeners too");
+    }
+
+    @FormTest
+    void aMinimizedWindowStopsQueueingRepaints() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("minimized", new BorderLayout());
+        Label content = new Label("content");
+        w.add(BorderLayout.CENTER, content);
+        w.setWindowSize(300, 200);
+        w.show();
+        DisplayTest.flushEdt();
+
+        w.hideNotify();
+        // paintOpenWindows skips a window that is not showing while hasPendingPaints
+        // still counts its queue, so anything queued here can never drain and the
+        // event dispatch thread spins until the window is restored.
+        content.repaint();
+        w.repaint();
+        boolean pendingWhileMinimized = Display.impl.hasPendingPaints();
+        w.dispose();
+
+        assertFalse(pendingWhileMinimized,
+                "a minimized window must not queue paint work that cannot drain");
+    }
+
+    @FormTest
+    void manyWindowsGesturingDoNotStarveALaterOne() {
+        implementation.setMultiWindowSupported(true);
+        // The concern this replaces was a fixed table of drag-history slots: a handful
+        // of long-lived windows exhausted it and a later window could record neither
+        // drag state nor velocity. Each window now owns its history, so there is no
+        // table to exhaust -- but the behaviour is worth pinning down regardless of how
+        // it is stored.
+        Window[] windows = new Window[10];
+        try {
+            for (int iter = 0; iter < windows.length; iter++) {
+                windows[iter] = new Window("w" + iter, new BorderLayout());
+                windows[iter].add(BorderLayout.CENTER, new Label("c"));
+                windows[iter].setWindowSize(300, 200);
+                windows[iter].show();
+                int[] px = new int[] { 150 };
+                int[] py = new int[] { 120 };
+                Desktop.getInstance().windowPointerPressed(windows[iter].getWindowId(), px, py);
+                Desktop.getInstance().windowPointerReleased(windows[iter].getWindowId(), px, py);
+                DisplayTest.flushEdt();
+            }
+
+            Window later = new Window("later", new BorderLayout());
+            later.setWindowSize(400, 300);
+            DragCountingComponent c = new DragCountingComponent();
+            later.add(BorderLayout.CENTER, c);
+            later.show();
+            later.asContainer().revalidate();
+            try {
+                implementation.windowPointerPressedForTest(later.getWindowId(), 100, 100);
+                for (int iter = 0; iter < 12; iter++) {
+                    implementation.windowPointerDraggedForTest(later.getWindowId(),
+                            100 + iter * 20, 100);
+                }
+                DisplayTest.flushEdt();
+                assertTrue(c.drags > 0,
+                        "a window opened after ten others have gestured must still be "
+                                + "able to drag");
+            } finally {
+                later.dispose();
+            }
+        } finally {
+            for (int iter = 0; iter < windows.length; iter++) {
+                if (windows[iter] != null) {
+                    windows[iter].dispose();
+                }
+            }
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void aNestedPressSurvivesTheOuterReleaseTeardown() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("nested", new BorderLayout());
+        final Window[] self = new Window[]{w};
+        Component target = new Component() {
+            @Override
+            public void pointerReleased(int x, int y) {
+                // Stands in for a handler that enters invokeAndBlock and has a fresh
+                // press dispatched to the same window before it returns.
+                self[0].pointerPressed(150, 120);
+            }
+        };
+        w.add(BorderLayout.CENTER, target);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        w.pointerPressed(150, 120);
+        w.pointerReleased(150, 120);
+        // The replacement press must still be installed: tearing down by window
+        // rather than by gesture erased it.
+        boolean replacementHeld = w.getCurrentPointerPress() != null;
+        w.dispose();
+
+        assertTrue(replacementHeld,
+                "a press installed during the outer release must survive its teardown");
+    }
+
+    @FormTest
+    void anActivatedDragIsFinishedWhenReleasedInAWindow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("dnd release", new BorderLayout());
+        final int[] finished = new int[1];
+        Label draggable = new Label("drag me") {
+            @Override
+            protected void dragFinishedImpl(int x, int y) {
+                super.dragFinishedImpl(x, y);
+                finished[0]++;
+            }
+        };
+        draggable.setDraggable(true);
+        w.add(BorderLayout.CENTER, draggable);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        w.pointerPressed(150, 120);
+        // Enough movement to activate the drag rather than merely scroll.
+        w.pointerDragged(150, 121);
+        w.pointerDragged(160, 140);
+        w.pointerDragged(170, 160);
+        w.pointerReleased(170, 160);
+        int count = finished[0];
+        w.dispose();
+
+        // Component hides the component when the drag activates and only
+        // dragFinishedImpl restores it and runs the drop, so releasing through the
+        // ordinary path left it invisible with the drop unfinished.
+        assertEquals(1, count, "an activated drag must be finished, not merely released");
+    }
+
+    @FormTest
+    void aBlockedWindowsKeyPressDoesNotLeaveTimersArmed() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window blocked = new Window("blocked keys", new BorderLayout());
+        blocked.add(BorderLayout.CENTER, new Label("content"));
+        blocked.setWindowSize(300, 200);
+        blocked.show();
+
+        Window modal = new Window("modal");
+        modal.setModalityType(Window.MODALITY_APPLICATION);
+        modal.show();
+
+        // keyPressedImpl arms the repeat and long-key timers before modality has had
+        // a say, and the paint loop fires them directly without re-checking, so
+        // holding a key could drive a component behind the modal.
+        // A positive key code, because the timers are only armed for a code that can
+        // repeat -- with a negative one the test would pass without testing anything,
+        // which is what the first version of it did.
+        Desktop.getInstance().windowKeyPressed(blocked.getWindowId(), 65);
+        DisplayTest.flushEdt();
+        boolean armed = keyRepeatArmedFor(blocked.getWindowId());
+
+        modal.dispose();
+        blocked.dispose();
+        assertFalse(armed,
+                "a key press rejected by modality must not leave its timers armed");
+    }
+
+    /// Reads Display's per-window key repeat table, which has no public accessor.
+    private static boolean keyRepeatArmedFor(int windowId) throws Exception {
+        // Asked of the surface that owns the timer rather than reflected out of a table
+        // in Display. The main surface keeps its own fields; a window keeps its own.
+        if (windowId == 0) {
+            java.lang.reflect.Field f = Display.class.getDeclaredField("keyRepeatCharged");
+            f.setAccessible(true);
+            return f.getBoolean(Display.getInstance());
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w != null && w.hasKeyRepeatArmed();
+    }
+
+    @FormTest
+    void anAutorepeatInAnotherWindowKeepsTheOriginalPressTarget() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        Display.getInstance().keyPressed(-97);
+        // The native ports forward every autorepeat as another press; this one
+        // arrives while the other window has focus.
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -97);
+        Display.getInstance().keyReleased(-97);
+        DisplayTest.flushEdt();
+        int released = mainKeys.released;
+        w.dispose();
+
+        assertEquals(1, released,
+                "a repeat elsewhere must not steal the original press's target");
+    }
+
+    @FormTest
+    void theWindowAnimationLockBehavesLikeAForms() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("anim lock", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // An idle window must grant the lock, a second caller must be refused while
+        // it is held, and releasing must not throw. The previous implementation
+        // returned isAnimating() -- so it granted the lock only when something else
+        // was already animating -- and released by handing null to flushAnimation,
+        // which either invoked it on the spot or queued it for the event dispatch
+        // thread to invoke: an NPE either way.
+        boolean first = w.grabAnimationLock();
+        boolean second = w.grabAnimationLock();
+        w.releaseAnimationLock();
+        boolean afterRelease = w.grabAnimationLock();
+        w.releaseAnimationLock();
+        DisplayTest.flushEdt();
+        w.dispose();
+
+        assertTrue(first, "an idle window must grant the lock");
+        assertFalse(second, "a second caller must be refused while it is held");
+        assertTrue(afterRelease, "and it must be grantable again after release");
+    }
+
+    @FormTest
+    void anUnrelatedModalIsStillBlockedByAnApplicationModal() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window appModal = new Window("application modal");
+        appModal.setModalityType(Window.MODALITY_APPLICATION);
+        appModal.show();
+
+        // Unowned, so not nested inside the first one. Being modal itself must not
+        // exempt it from application modality -- the self check used to return for
+        // any modal, which let this one accept input.
+        Window unrelated = new Window("unrelated modal");
+        unrelated.setModalityType(Window.MODALITY_APPLICATION);
+        unrelated.show();
+        TestWindowManager.FakeWindow unrelatedPeer = wm.getLastWindow();
+        boolean blocked = !unrelatedPeer.isInputEnabled();
+
+        // Disposed before the nested case: while it is up, the nested modal is
+        // legitimately blocked *by it* -- an unrelated application modal blocks
+        // everything outside its own chain, this window included. Leaving it open
+        // made the first version of this test assert the opposite.
+        unrelated.dispose();
+
+        // A modal nested inside the first is still exempt from it.
+        Window nested = new Window("nested modal");
+        nested.setOwnerWindow(appModal);
+        nested.setModalityType(Window.MODALITY_APPLICATION);
+        nested.show();
+        boolean nestedUsable = wm.getLastWindow().isInputEnabled();
+
+        nested.dispose();
+        appModal.dispose();
+
+        assertTrue(blocked, "an unrelated modal must still be blocked by an application modal");
+        assertTrue(nestedUsable, "but a modal nested inside it must stay usable");
+    }
+
+    @FormTest
+    void aKeyReleasedAfterFocusMovedCancelsThePressingWindowsRepeat() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Pressed on the main surface, released while the other window has focus.
+        // Cancelling by the releasing window left the main surface repeating every
+        // 10ms with the key physically up.
+        Display.getInstance().keyPressed(66);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), 66);
+        DisplayTest.flushEdt();
+        boolean stillArmed = keyRepeatArmedFor(0) || keyRepeatArmedFor(w.getWindowId());
+        w.dispose();
+
+        assertFalse(stillArmed,
+                "releasing a key must cancel the repeat armed by its press");
+    }
+
+    @FormTest
+    void aReleaseDuringAPressCallbackFindsItsAcceptedPress() {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("nested press", new BorderLayout());
+        final int[] released = new int[1];
+        final boolean[] reentered = new boolean[1];
+        Component target = new Component() {
+            @Override
+            public void pointerPressed(int x, int y) {
+                if (!reentered[0]) {
+                    reentered[0] = true;
+                    // Stands in for a callback entering a nested loop (showModal)
+                    // during which the physical release is processed.
+                    int[] px = new int[]{150};
+                    int[] py = new int[]{120};
+                    Desktop.getInstance().windowPointerReleased(w.getWindowId(), px, py);
+                    DisplayTest.flushEdt();
+                }
+            }
+
+            @Override
+            public void pointerReleased(int x, int y) {
+                released[0]++;
+            }
+        };
+        w.add(BorderLayout.CENTER, target);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(target);
+
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        Desktop.getInstance().windowPointerPressed(w.getWindowId(), px, py);
+        DisplayTest.flushEdt();
+        int count = released[0];
+        w.dispose();
+
+        // Recording the press only after the callback returned meant a release
+        // processed inside it saw no accepted press.
+        assertEquals(1, count, "a release during the press callback must find its press");
+    }
+
+    @FormTest
+    void hidingAWindowCancelsItsKeyTimers() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("hide timers", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // A key handler can hide its own window. The window stays registered, so a
+        // repeat armed by the press that got us here would keep firing into a tree
+        // the user cannot see -- and the key-up may never arrive once the native
+        // window has lost focus.
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), 67);
+        DisplayTest.flushEdt();
+        w.hide();
+        boolean armed = keyRepeatArmedFor(w.getWindowId());
+        w.dispose();
+
+        assertFalse(armed, "hiding a window must cancel the timers armed for it");
+    }
+
+    @FormTest
+    void settingOnlyTheSizeLeavesPlacementToTheWindowManager() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("size only", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        // The documented pre-show call. Routing it through setWindowBounds handed the
+        // port the placeholder (0,0) as though the application had chosen it.
+        w.setWindowSize(420, 260);
+        w.show();
+        boolean positionSet = wm.getLastWindow().isPositionSet();
+        w.dispose();
+
+        assertFalse(positionSet,
+                "setting only the size must leave the position unspecified");
+    }
+
+    @FormTest
+    void hidingAWindowUnlatchesTheComponentThatTookThePress() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("latched", new BorderLayout());
+        Button b = new Button("fire me");
+        w.add(BorderLayout.CENTER, b);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(b);
+
+        // The scenario the hide cleanup exists for: the component takes the press and
+        // the window goes away before the release. Dropping the records without
+        // telling the component left it in STATE_PRESSED, still latched when the
+        // window was shown again.
+        // The test implementation maps a key code straight to its game action, so
+        // GAME_FIRE is the code that reaches Button.pressed().
+        b.keyPressed(Display.GAME_FIRE);
+        int pressedState = b.getState();
+        w.hide();
+        int afterHide = b.getState();
+        w.dispose();
+
+        assertEquals(Button.STATE_PRESSED, pressedState, "the press must latch it first");
+        assertTrue(afterHide != Button.STATE_PRESSED,
+                "hiding the window must unlatch the component that took the press");
+    }
+
+    @FormTest
+    void minimizingAWindowCancelsItsTimersToo() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("minimize timers", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), 68);
+        DisplayTest.flushEdt();
+        // Native minimization arrives through hideNotify, not hide(), and bypassed
+        // the cleanup entirely -- the window stays registered either way.
+        w.hideNotify();
+        boolean armed = keyRepeatArmedFor(w.getWindowId());
+        w.dispose();
+
+        assertFalse(armed, "minimizing must cancel the timers armed for the window");
+    }
+
+    @FormTest
+    void hidingDuringADragRestoresTheDraggedComponent() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("drag hide", new BorderLayout());
+        Label draggable = new Label("drag me");
+        draggable.setDraggable(true);
+        w.add(BorderLayout.CENTER, draggable);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        w.pointerPressed(150, 120);
+        w.pointerDragged(150, 121);
+        w.pointerDragged(165, 145);
+        w.pointerDragged(175, 165);
+        // Component hides the dragged component when the drag activates; only
+        // dragFinishedImpl restores it, and dragInitiated does not.
+        w.hide();
+        boolean visible = draggable.isVisible();
+        boolean stillInitialized = draggable.isDragAndDropInitialized();
+        w.dispose();
+
+        assertTrue(visible, "hiding mid-drag must restore the dragged component");
+        assertFalse(stillInitialized, "and must clear its drag-and-drop state");
+    }
+
+    @FormTest
+    void losingFocusCancelsHeldInput() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("focus loss", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), 69);
+        DisplayTest.flushEdt();
+        // The user switches to another application while holding the key. The
+        // key-up goes to whoever has focus now, so nothing else would ever stop
+        // this window repeating.
+        Desktop.getInstance().windowFocusChanged(w.getWindowId(), false);
+        DisplayTest.flushEdt();
+        boolean armed = keyRepeatArmedFor(w.getWindowId());
+        w.dispose();
+
+        assertFalse(armed, "losing focus must cancel input held in the window");
+    }
+
+    @FormTest
+    void aPacketQueuedBeforeHideDoesNotRestartTheGesture() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("late packet", new BorderLayout());
+        Button b = new Button("press me");
+        w.add(BorderLayout.CENTER, b);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Queued, then the window is hidden before the event dispatch thread drains
+        // it. Dispatching the press re-latches the component the hide just
+        // unlatched, with no release coming -- the timer is armed at queue time, so
+        // the observable damage is the component's state rather than the timer's.
+        Desktop.getInstance().windowPointerPressed(w.getWindowId(),
+                new int[]{150}, new int[]{120});
+        w.hide();
+        DisplayTest.flushEdt();
+        boolean latched = b.getState() == Button.STATE_PRESSED;
+        w.dispose();
+
+        assertFalse(latched,
+                "a packet queued before the hide must not re-latch the component");
+    }
+
+    @FormTest
+    void aOneShotTimerBoundToAWindowStopsAfterFiring() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("one shot", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        final int[] fired = new int[1];
+        // A one-shot deregistered itself from the *current form* rather than from the
+        // window it was bound to, so it stayed in the window's animation list and
+        // fired again every interval, forever.
+        com.codename1.ui.util.UITimer t =
+                com.codename1.ui.util.UITimer.timer(1, false, w, new Runnable() {
+                    @Override
+                    public void run() {
+                        fired[0]++;
+                    }
+                });
+        // Driven directly rather than through the paint loop: what changed is which
+        // top level the one-shot deregisters itself from, and the animation pass is
+        // not what this needs to observe.
+        int registeredBefore;
+        int registeredAfter;
+        try {
+            java.lang.reflect.Field af = Window.class.getDeclaredField("animatableComponents");
+            af.setAccessible(true);
+            java.util.ArrayList<?> anims = (java.util.ArrayList<?>) af.get(w);
+            registeredBefore = anims.size();
+            java.lang.reflect.Method tick =
+                    com.codename1.ui.util.UITimer.class.getDeclaredMethod("testEllapse");
+            tick.setAccessible(true);
+            Thread.sleep(3);
+            tick.invoke(t);
+            registeredAfter = ((java.util.ArrayList<?>) af.get(w)).size();
+        } catch (Exception err) {
+            throw new RuntimeException(err);
+        }
+        w.dispose();
+
+        // Firing is what deregisters a one-shot. It used to deregister from the
+        // current form instead, leaving it in the window's list to fire forever.
+        assertEquals(1, fired[0], "the timer must have fired");
+        assertEquals(1, registeredBefore, "it registers with the window it is bound to");
+        assertEquals(0, registeredAfter, "and deregisters from that same window");
+    }
+
+    @FormTest
+    void theUtilityWindowFlagReachesThePort() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("palette");
+        w.setUtilityWindow(true);
+        w.show();
+        assertTrue(wm.getLastWindow().isUtility(),
+                "setUtilityWindow only stored a field before; nothing reached the port");
+        w.dispose();
+    }
+
+    @FormTest
+    void anIconifiedWindowStopsBeingPainted() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("iconified", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.show();
+        assertTrue(w.isWindowShowing());
+
+        // What a port reports when the platform minimizes the window. Container's
+        // implementation is inert, which would leave it counted as visible: still
+        // painted, and its animations still keeping the event dispatch thread awake.
+        w.hideNotify();
+        assertFalse(w.isWindowShowing(),
+                "a minimized window must stop counting as visible");
+
+        w.showNotify();
+        assertTrue(w.isWindowShowing(), "restoring must resume painting");
+        w.dispose();
+    }
+
+    @FormTest
+    void hidingAModalWindowReleasesTheCallerWithoutDisposingIt() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("hide ends the wait", new BorderLayout());
+        w.setCloseOperation(Window.HIDE_ON_CLOSE);
+        w.show();
+        DisplayTest.flushEdt();
+
+        final Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                w.showModal();
+            }
+        }, "cn1-test-modal-caller");
+        caller.start();
+        for (int iter = 0; iter < 100 && !Desktop.getInstance().isWindowInputBlocked(0); iter++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(5);
+        }
+        try {
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                    "precondition: the modal is up and blocking");
+
+            // hide(), not dispose(). The window is closed as far as the user is
+            // concerned, so parking the caller on something nobody can see or reach
+            // would hang it -- HIDE_ON_CLOSE reaches exactly this path.
+            w.hide();
+            for (int iter = 0; iter < 200 && caller.isAlive(); iter++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            caller.join(2000);
+            assertFalse(caller.isAlive(), "hiding a modal window has to release its caller");
+
+            // And the guarantee the documentation has to state: it comes back still
+            // live, so cleanup that only suits a destroyed window must not assume it.
+            assertFalse(w.isWindowDisposed(),
+                    "the window is reusable after this, not disposed");
+            assertFalse(Desktop.getInstance().isWindowInputBlocked(0),
+                    "and it stops blocking everything behind it");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+            caller.join(2000);
+        }
+    }
+
+    @FormTest
+    void showModalOnAWindowAlreadyUpStillBlocks() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("late modal", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+        assertFalse(Desktop.getInstance().isWindowInputBlocked(0),
+                "it starts non-modal, which is what makes this the interesting case");
+
+        // showModal() on a window shown earlier. show() is a no-op for a window
+        // already on screen, so the blocker it would have taken has to come from
+        // somewhere -- without it the caller waits while the user carries on using
+        // everything underneath.
+        final Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                w.showModal();
+            }
+        });
+        caller.start();
+        for (int iter = 0; iter < 100 && !Desktop.getInstance().isWindowInputBlocked(0); iter++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(5);
+        }
+        try {
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                    "a window made modal after it was shown still has to block");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+            caller.join(2000);
+        }
+        assertFalse(caller.isAlive(), "and disposing it releases the caller");
+    }
+
+    @FormTest
+    void modalityChangedOffTheEdtReachesThePortOnIt() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("modality", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            // The release and the acquire mutate Desktop's modal stack and call the
+            // port, so they belong on the same thread as everything else that does.
+            Thread background = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.setModalityType(Window.MODALITY_APPLICATION);
+                }
+            });
+            background.start();
+            background.join();
+            DisplayTest.flushEdt();
+
+            assertEquals(java.util.Collections.emptyList(), wm.getOffEdtCalls(),
+                    "a modality change has to reach the port on the event dispatch "
+                            + "thread, however it was made");
+            assertEquals(Window.MODALITY_APPLICATION, w.getModalityType(),
+                    "and it takes effect once the hop has run");
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                    "the blocker is taken, not merely recorded");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void showingAWindowThatIsAlreadyUpFiresNothing() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("already up", new BorderLayout());
+        final int[] shown = new int[1];
+        w.addWindowListener(new ActionListener<WindowEvent>() {
+            @Override
+            public void actionPerformed(WindowEvent evt) {
+                if (evt.getType() == WindowEvent.Type.Shown) {
+                    shown[0]++;
+                }
+            }
+        });
+        w.show();
+        DisplayTest.flushEdt();
+        assertEquals(1, shown[0], "showing it once is one showing");
+
+        // Nothing about the window changed, so nothing happened: repeating the
+        // transition tells listeners doing initialization or persistence to do it
+        // again for what the user sees as a single showing.
+        w.show();
+        DisplayTest.flushEdt();
+        assertEquals(1, shown[0], "showing it again while it is up is not a second showing");
+
+        // And a real transition still counts.
+        w.hide();
+        DisplayTest.flushEdt();
+        w.show();
+        DisplayTest.flushEdt();
+        assertEquals(2, shown[0], "hiding and showing it again is a second showing");
+        w.dispose();
+    }
+
+    @FormTest
+    void synchronousWindowReadsFromABackgroundThreadRunOnTheEdt()
+            throws InterruptedException {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("bg reads", new BorderLayout());
+        w.setWindowSize(300, 200);
+        w.show();
+        DisplayTest.flushEdt();
+
+        // getWindowBounds() and capture() both go straight to the WindowManager, whose
+        // contract is EDT-only. On the Linux and Windows ports a peer names a slot in a
+        // fixed native window table and those slots are reused, so a background reader
+        // could be answered about whichever window now holds the slot. capture()'s
+        // fallback is worse still: it paints the live component hierarchy, racing the
+        // frame the event dispatch thread is drawing.
+        try {
+        final Rectangle[] bounds = new Rectangle[1];
+        final Object[] captured = new Object[1];
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                bounds[0] = w.getWindowBounds();
+                captured[0] = w.capture();
+            }
+        }, "cn1-test-reader");
+        t.start();
+        // The reads marshal onto this thread, so it has to keep dispatching while they
+        // wait -- joining here instead would deadlock the pair.
+        long deadline = System.currentTimeMillis() + 5000;
+        while (t.isAlive() && System.currentTimeMillis() < deadline) {
+            DisplayTest.flushEdt();
+        }
+        t.join(1000);
+        assertFalse(t.isAlive(), "the background reads have to complete, not hang");
+
+        assertNotNull(bounds[0], "the read still has to answer the caller");
+        assertEquals(300, bounds[0].getWidth(), "and answer correctly");
+        assertNull(wm.getReadOffEdtBy(),
+                "the window manager must never be read off the EDT");
+        } finally {
+            // As elsewhere here: a leaked registered window turns one real failure into
+            // several confusing ones in the tests that run after it.
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void disposingAnOwnerAlsoDisposesAChildThatWasNeverShown() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner", new BorderLayout());
+        owner.setWindowSize(300, 200);
+        final Window child = new Window("child", new BorderLayout());
+        child.setWindowSize(200, 150);
+        child.setOwnerWindow(owner);
+        try {
+            owner.show();
+            DisplayTest.flushEdt();
+
+            // The child has an owner but has never been shown, so it is not in Desktop's
+            // registry -- that only holds windows that have been shown. Ownership used to
+            // be read back out of that registry, so this child was invisible to its
+            // owner's disposal and outlived it, against setOwnerWindow's contract.
+            assertFalse(child.isWindowDisposed(), "precondition: the child is still alive");
+
+            owner.dispose();
+            DisplayTest.flushEdt();
+
+            assertTrue(child.isWindowDisposed(),
+                    "a window is disposed with its owner whether or not it was ever shown");
+
+            // And the consequence that made it more than bookkeeping: show() brings an
+            // unshown owner up first, so a child left alive here could never be opened.
+            IllegalStateException refused = assertThrows(IllegalStateException.class,
+                    new org.junit.jupiter.api.function.Executable() {
+                        @Override
+                        public void execute() {
+                            child.show();
+                        }
+                    },
+                    "showing a window disposed with its owner has to be refused");
+            assertTrue(refused.getMessage().contains("disposed"), refused.getMessage());
+        } finally {
+            // As elsewhere here: a leaked registered window turns one real failure into
+            // several confusing ones in the tests that run after it.
+            owner.dispose();
+            child.dispose();
+        }
+    }
+
+    @FormTest
+    void aShownChildIsStillDisposedWithItsOwner() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner shown", new BorderLayout());
+        owner.setWindowSize(300, 200);
+        Window child = new Window("child shown", new BorderLayout());
+        child.setWindowSize(200, 150);
+        child.setOwnerWindow(owner);
+        owner.show();
+        child.show();
+        DisplayTest.flushEdt();
+        try {
+            assertTrue(child.isWindowShowing(), "precondition: the child is up");
+
+            owner.dispose();
+            DisplayTest.flushEdt();
+            assertTrue(child.isWindowDisposed(),
+                    "the case that already worked has to go on working");
+        } finally {
+            owner.dispose();
+            child.dispose();
+        }
+    }
+
+    @FormTest
+    void aShowListenerThatHidesTheWindowStillSeesShownBeforeHidden() {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("reversing show listener", new BorderLayout());
+        w.setWindowSize(300, 200);
+
+        // Only the two transitions under test. A window also reports Resized and
+        // Moved while it is being brought up, and those say nothing about this.
+        final java.util.List<String> order = new java.util.ArrayList<String>();
+        w.addWindowListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                WindowEvent.Type t = ((WindowEvent) e).getType();
+                if (t == WindowEvent.Type.Shown || t == WindowEvent.Type.Hidden) {
+                    order.add(t.name());
+                }
+            }
+        });
+
+        // A show listener is allowed to change its mind. Shown used to be published
+        // after the listeners ran, so this produced "Hidden, Shown" -- an ordering that
+        // cannot happen, and one that makes lifecycle-driven cleanup tear down and then
+        // immediately set back up over a window that is not on screen.
+        w.addShowListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                w.hide();
+            }
+        });
+
+        try {
+            w.show();
+            DisplayTest.flushEdt();
+
+            assertEquals(java.util.Arrays.asList("Shown", "Hidden"), order,
+                    "the reversal has to be reported in the order it happened");
+            assertFalse(w.isWindowShowing(), "and the window really is hidden afterwards");
+        } finally {
+            // As elsewhere here: a leaked registered window turns one real failure into
+            // several confusing ones in the tests that run after it.
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void focusLeavingTheMainSurfaceDisarmsItsHeldKeys() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        KeyCountingComponent c = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, c);
+        main.show();
+        DisplayTest.flushEdt();
+        main.setFocused(c);
+
+        // A key held down on the main form, and then focus moves away -- to a secondary
+        // window, or to another application. The key-up goes wherever focus went, so
+        // nothing else disarms the repeat.
+        Display.getInstance().keyPressed(70);
+        DisplayTest.flushEdt();
+        assertTrue(keyRepeatArmedFor(0),
+                "the press arms the repeat, which is the state under test");
+
+        Desktop.getInstance().windowFocusChanged(0, false);
+        DisplayTest.flushEdt();
+        assertFalse(keyRepeatArmedFor(0),
+                "focus leaving the main surface has to disarm its held keys; window "
+                        + "zero is not a registered Window, so the window-keyed path "
+                        + "skipped it and the form repeated for as long as it stayed open");
+        Display.getInstance().keyReleased(70);
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void arrowKeysStayInsideAWholeWindowOverlay() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("overlay traversal", new BorderLayout());
+        w.setWindowSize(400, 300);
+
+        // Behind the overlay.
+        Button behind = new Button("behind");
+        w.add(BorderLayout.CENTER, behind);
+
+        // The whole-window overlay -- what getFormLayeredPane() installs, where a
+        // form-mode InteractionDialog or a side menu lives. It is a sibling of the
+        // content pane, so getActualPane() cannot reach it and the content-area
+        // layeredPane is not it either.
+        Container overlay = w.getFormLayeredPane(Window.class, true);
+        Button top = new Button("top");
+        Button bottom = new Button("bottom");
+        overlay.setLayout(new BorderLayout());
+        overlay.add(BorderLayout.NORTH, top);
+        overlay.add(BorderLayout.SOUTH, bottom);
+
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            w.setFocused(top);
+            w.asContainer().revalidate();
+            DisplayTest.flushEdt();
+
+            // Down from a control in the overlay has to reach the other control in the
+            // overlay, not the component behind it.
+            Desktop.getInstance().windowKeyPressed(w.getWindowId(), Display.GAME_DOWN);
+            Desktop.getInstance().windowKeyReleased(w.getWindowId(), Display.GAME_DOWN);
+            DisplayTest.flushEdt();
+            assertSame(bottom, w.getFocused(),
+                    "traversal has to search the whole-window overlay before what is under it");
+        } finally {
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void arrowKeysMoveFocusBetweenAWindowsControls() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("keyboard", new BoxLayout(BoxLayout.Y_AXIS));
+        Button top = new Button("top");
+        Button middle = new Button("middle");
+        Button bottom = new Button("bottom");
+        w.add(top);
+        w.add(middle);
+        w.add(bottom);
+        w.setWindowSize(400, 300);
+        w.show();
+        w.asContainer().revalidate();
+        DisplayTest.flushEdt();
+
+        w.setFocused(top);
+        // The fake implementation maps a key code to a game action identically, so the
+        // game action is what gets sent.
+        //
+        // Container's directional lookups answer null, which is right for an ordinary
+        // container and wrong for a top level: every arrow key resolved through them,
+        // so a window could not be navigated from the keyboard at all.
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), Display.GAME_DOWN);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), Display.GAME_DOWN);
+        DisplayTest.flushEdt();
+        assertSame(middle, w.getFocused(),
+                "the down arrow has to move focus to the next control down");
+
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), Display.GAME_DOWN);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), Display.GAME_DOWN);
+        DisplayTest.flushEdt();
+        assertSame(bottom, w.getFocused(), "and again to the one after it");
+
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), Display.GAME_UP);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), Display.GAME_UP);
+        DisplayTest.flushEdt();
+        assertSame(middle, w.getFocused(), "and the up arrow comes back");
+        w.dispose();
+    }
+
+    @FormTest
+    void anExplicitNextFocusWinsOverThePositionalScanInAWindow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("explicit", new BoxLayout(BoxLayout.Y_AXIS));
+        Button top = new Button("top");
+        Button middle = new Button("middle");
+        Button bottom = new Button("bottom");
+        w.add(top);
+        w.add(middle);
+        w.add(bottom);
+        // Skips the middle, which the positional scan would have chosen.
+        top.setNextFocusDown(bottom);
+        w.setWindowSize(400, 300);
+        w.show();
+        w.asContainer().revalidate();
+        DisplayTest.flushEdt();
+
+        w.setFocused(top);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), Display.GAME_DOWN);
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), Display.GAME_DOWN);
+        DisplayTest.flushEdt();
+        assertSame(bottom, w.getFocused(),
+                "a component's own next-focus has to win over the positional scan, as "
+                        + "it does on a form");
+        w.dispose();
+    }
+
+    @FormTest
+    void reShowingAHiddenWindowHasNotPaintedItsNewContentYet() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("re-shown", new BorderLayout());
+        Label l = new Label("before");
+        w.add(BorderLayout.CENTER, l);
+        w.show();
+        w.markPainted();
+        assertTrue(w.hasPaintedOnce(), "it painted while it was up");
+
+        w.hide();
+        DisplayTest.flushEdt();
+        // Free to change while nothing was painting it, which is the whole point:
+        // whatever the surface still holds is a picture of the old content.
+        l.setText("after");
+        w.show();
+        DisplayTest.flushEdt();
+
+        assertFalse(w.hasPaintedOnce(),
+                "a window brought back has not painted its current content yet; saying "
+                        + "otherwise lets a waiter capture the raster from before the hide");
+        w.markPainted();
+        assertTrue(w.hasPaintedOnce(), "and it counts again once it really has painted");
+        w.dispose();
+    }
+
+    @FormTest
+    void anInterruptedModalWaitKeepsBlockingUntilTheWindowGoesAway() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("modal", new BorderLayout());
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.show();
+        DisplayTest.flushEdt();
+        assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                "an application modal blocks the main form while it is up");
+
+        // showModal() from another thread: the window is already showing, so the show
+        // it performs is a no-op and the thread goes straight into the wait, which
+        // invokeAndBlock runs inline off the event dispatch thread. Interrupting it
+        // there is the case under test.
+        final Thread waiter = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                w.showModal();
+            }
+        });
+        waiter.start();
+        for (int iter = 0; iter < 100 && waiter.isAlive(); iter++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(5);
+            // Repeated rather than once: an interrupt that lands before the wait starts
+            // is consumed by whatever was running, and the flag has to be set again for
+            // the wait itself to see it. Harmless once the thread is gone.
+            waiter.interrupt();
+        }
+        waiter.join(2000);
+        assertFalse(waiter.isAlive(),
+                "an interrupted showModal() has to return rather than park for good");
+
+        assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                "the window is still on screen and still modal, so it must go on "
+                        + "blocking; dropping its blocker here leaves a modal window "
+                        + "visible with input reaching the windows behind it");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+        assertFalse(Desktop.getInstance().isWindowInputBlocked(0),
+                "and the blocker goes when the window really does");
+    }
+
+    @FormTest
+    void aResizeDropsPaintWorkQueuedAgainstTheOldSize() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("resizes", new BorderLayout());
+        Label l = new Label("content");
+        w.add(BorderLayout.CENTER, l);
+        w.show();
+        w.markPainted();
+        l.repaint();
+
+        w.sizeChangedInternal(900, 700);
+
+        // Those rectangles were computed against the old geometry. A port that
+        // reallocates its buffer on resize would paint them into a fresh, larger one
+        // and leave the rest unpainted -- which is exactly what a capture caught.
+        assertFalse(w.hasPaintedOnce(),
+                "frames painted at the old size do not count once the window resized");
+        assertEquals(900, w.getWidth());
+        w.dispose();
+    }
+
+    @FormTest
+    void hidingAWindowStopsItPinningPaintWork() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("hides", new BorderLayout());
+        Label l = new Label("content");
+        w.add(BorderLayout.CENTER, l);
+        w.show();
+        w.hide();
+
+        // A hidden window is never painted, so anything queued on its surface would
+        // never drain -- and an undrained queue keeps the event dispatch thread awake.
+        assertFalse(w.isVisible(),
+                "hiding must mark the hierarchy invisible so its components stop enqueuing");
+        l.repaint();
+        assertFalse(Display.impl.hasPendingPaints(),
+                "a hidden window must not leave paint work that nothing will ever drain");
+        w.dispose();
+    }
+
+    @FormTest
+    void captureUsesThePortsReadbackWhenItHasOneAndRendersWhenItDoesNot() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("shot", new BorderLayout());
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // A port that can read its own window back must be used: re-rendering the
+        // hierarchy produces the content the window *should* be showing, so it cannot
+        // tell a correct window from one whose raster and hierarchy disagree -- which
+        // is the whole thing the windowed screenshot goldens exist to catch.
+        Object readback = implementation.createImage(new int[64 * 32], 64, 32);
+        wm.setCaptureResult(readback);
+        Image shot = w.capture();
+        assertNotNull(shot);
+        assertEquals(1, wm.getCaptureCalls(), "the port must be asked first");
+        assertEquals(64, shot.getWidth(),
+                "capture() must hand back the port's readback, not a re-render at the "
+                        + "window's size");
+        assertEquals(32, shot.getHeight());
+
+        // A port with no readback still owes a capture, so the re-render remains --
+        // at the window's own size rather than the main display's.
+        wm.setCaptureResult(null);
+        Image rendered = w.capture();
+        assertNotNull(rendered, "a port that cannot read back still owes a capture");
+        assertEquals(w.getWidth(), rendered.getWidth());
+        assertEquals(w.getHeight(), rendered.getHeight());
+
+        w.dispose();
+    }
+
+    @FormTest
+    void animatedComponentsRegisterWithTheWindowTheyLiveIn() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("animated", new BorderLayout());
+        w.setWindowSize(400, 300);
+        com.codename1.components.Switch sw = new com.codename1.components.Switch();
+        w.add(BorderLayout.CENTER, sw);
+        w.show();
+        w.revalidate();
+
+        // getComponentForm() is null by design inside a Window, so every component that
+        // registered its animation through it threw on an ordinary interaction there --
+        // a tapped Switch could not toggle at all. The registration has to resolve
+        // through the top level instead.
+        boolean before = sw.isValue();
+        sw.pointerPressed(sw.getAbsoluteX() + 2, sw.getAbsoluteY() + 2);
+        sw.pointerReleased(sw.getAbsoluteX() + 2, sw.getAbsoluteY() + 2);
+
+        // The toggle completes on the animation, so the observable result here is that
+        // the interaction was accepted and an animation was registered against the
+        // window rather than throwing on the way.
+        assertTrue(w.isWindowShowing());
+        assertEquals(before, sw.isValue(),
+                "the value flips when the animation finishes, not on release");
+
+        // The guard around a registration matters as much as the registration: several
+        // of these sites sat inside an `if (getComponentForm() != null)`, so moving only
+        // the call left it unreachable in a Window -- a fix that changed nothing. That
+        // is now Component.registerForAnimation()'s problem rather than each caller's.
+
+        // ImageViewer registers the same way from its animated setZoom path, which is
+        // an ordinary operation rather than an edge case.
+        com.codename1.components.ImageViewer viewer =
+                new com.codename1.components.ImageViewer(Image.createImage(32, 32));
+        w.add(BorderLayout.NORTH, viewer);
+        w.revalidate();
+        viewer.setZoom(2f);
+        assertNotNull(viewer.getImage(), "zooming in a window must not throw");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void anInfiniteProgressAnimatesAndTearsDownInsideAWindow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("busy", new BorderLayout());
+        w.setWindowSize(300, 200);
+        com.codename1.components.InfiniteProgress progress =
+                new com.codename1.components.InfiniteProgress();
+        w.add(BorderLayout.CENTER, progress);
+        w.show();
+        w.revalidate();
+
+        // The spinner decided whether to animate by comparing Display.getCurrent() --
+        // which only ever names a Form -- with its own getComponentForm(), null inside
+        // a Window. That is false for every spinner in a window, so it registered
+        // nothing and sat completely static.
+        assertTrue(progress.animate(false),
+                "an infinite progress in a shown window must animate");
+
+        // And teardown resolved the form with a fallback to the current form, which
+        // threw in a window-only application -- during Window.dispose(), before the
+        // native peer and paint surface were released.
+        w.dispose();
+        assertTrue(w.isWindowDisposed(),
+                "dispose must complete rather than throw on the way through teardown");
+    }
+
+    @FormTest
+    void builtInComponentsInitialiseAndAnimateInsideAWindow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("built ins", new BorderLayout());
+        w.setWindowSize(400, 300);
+
+        // AutoCompleteTextField registered its pointer listeners straight off
+        // getComponentForm() in initComponent, so the first show() of a window
+        // containing one threw before anything else could run.
+        AutoCompleteTextField auto =
+                new AutoCompleteTextField("alpha", "beta", "gamma");
+        w.add(BorderLayout.NORTH, auto);
+
+        // A Label with an animated icon registered through a local Form variable in
+        // checkAnimation() -- the indirect form the first sweep's direct-call grep did
+        // not match -- so the icon stayed frozen.
+        Label animated = new Label(makeAnimatedImage());
+        w.add(BorderLayout.CENTER, animated);
+
+        w.show();
+        w.revalidate();
+
+        assertTrue(w.isWindowShowing(),
+                "showing a window with built-in components must not throw");
+
+        // The label's registration is silently skipped rather than throwing when it
+        // resolves a null form, so "did not throw" proves nothing about it. The window's
+        // own animation list is the observable: the icon animates only if the label is
+        // in it.
+        assertTrue(windowAnimates(w, animated),
+                "a label with an animated icon must register with the window it lives "
+                        + "in; resolving the form instead leaves the icon frozen");
+
+        w.dispose();
+    }
+
+    /// True when the window has the given component in its animation list. Read
+    /// reflectively because the list is private -- and it is the only observable that
+    /// separates "registered with the window" from "silently skipped", which is what
+    /// the null-form guard does.
+    private static boolean windowAnimates(Window w, Object cmp) {
+        try {
+            java.lang.reflect.Field f =
+                    Window.class.getDeclaredField("animatableComponents");
+            f.setAccessible(true);
+            return ((java.util.List) f.get(w)).contains(cmp);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    @FormTest
+    void selectingACalendarDayInsideAWindowDoesNotThrow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("calendar", new BorderLayout());
+        w.setWindowSize(400, 400);
+        Calendar cal = new Calendar();
+        w.add(BorderLayout.CENTER, cal);
+        w.show();
+        w.revalidate();
+
+        // MonthView.actionPerformed() asked getComponentForm().isSingleFocusMode()
+        // unconditionally, so every ordinary day selection updated the date, fired its
+        // listeners, and then threw on the way out.
+        final boolean[] fired = new boolean[1];
+        cal.addActionListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                fired[0] = true;
+            }
+        });
+        Button day = findFirstDayButton(cal);
+        assertNotNull(day, "the month view should contain day buttons");
+        day.pressed();
+        day.released();
+
+        assertTrue(fired[0], "selecting a day must fire its listeners");
+        assertTrue(w.isWindowShowing(), "and must not throw on the way out");
+        w.dispose();
+    }
+
+    @FormTest
+    void groupedRadioButtonsAndTextAreasWorkInsideAWindow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("radios", new BorderLayout());
+        w.setWindowSize(400, 300);
+
+        // initNamedGroup() stored the ButtonGroup as a client property on the form and
+        // dereferenced it without a guard, so showing a window containing a grouped
+        // radio button threw before the native window was even mapped.
+        Container box = new Container(new com.codename1.ui.layouts.BoxLayout(
+                com.codename1.ui.layouts.BoxLayout.Y_AXIS));
+        RadioButton first = new RadioButton("first");
+        RadioButton second = new RadioButton("second");
+        first.setGroup("choice");
+        second.setGroup("choice");
+        box.add(first);
+        box.add(second);
+        w.add(BorderLayout.CENTER, box);
+        w.show();
+        w.revalidate();
+
+        assertTrue(w.isWindowShowing(),
+                "a window with a grouped radio button must show");
+
+        // The group has to actually work, not merely not throw: selecting the second
+        // must clear the first, which only happens if both joined the same group.
+        first.setSelected(true);
+        second.setSelected(true);
+        assertTrue(second.isSelected());
+        assertFalse(first.isSelected(),
+                "both radio buttons must have joined the same named group");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void aWindowTaggedPressReachesAnEditingTextAreaWithoutThrowing() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("editing", new BorderLayout());
+        w.setWindowSize(400, 300);
+        TextArea area = new TextArea("text");
+        Button other = new Button("elsewhere");
+        w.add(BorderLayout.NORTH, area);
+        w.add(BorderLayout.SOUTH, other);
+        w.show();
+        w.revalidate();
+
+        final boolean[] fired = new boolean[1];
+        area.addActionListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                fired[0] = true;
+            }
+        });
+
+        // The press listener is registered on the window, but its body resolved
+        // getComponentForm() -- null there -- and did nothing. So the documented
+        // pre-click action event never fired and the other component's handler could
+        // observe an uncommitted value.
+        implementation.setFocusedEditingText(area);
+        assertTrue(area.isEditing(), "the area should be in editing state");
+
+        // Tagged with the window's id: the untagged entry point is window 0, the main
+        // surface, and the press would never reach this window at all.
+        Desktop.getInstance().windowPointerPressed(w.getWindowId(),
+                new int[]{other.getAbsoluteX() + 2},
+                new int[]{other.getAbsoluteY() + 2});
+        flushSerialCalls();
+
+        // Deliberately not asserting that *this* listener fired the early event. The
+        // press path fires an action event and sets suppressActionEvent by another
+        // route as well, so both assertions pass against the un-fixed listener and
+        // would prove nothing. What this does pin down is that a window-tagged press
+        // reaches an editing text area in a window and is handled without throwing;
+        // the listener body's own fix is covered by reading, and stated as such.
+        assertTrue(fired[0], "the press must be handled and its action event delivered");
+        assertTrue(w.isWindowShowing(), "and must not throw on the way");
+        w.dispose();
+    }
+
+    @FormTest
+    void editingATextFieldInsideAWindowReachesThePort() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("editor", new BorderLayout());
+        w.setWindowSize(400, 300);
+        TextField field = new TextField("hello");
+        w.add(BorderLayout.CENTER, field);
+        w.show();
+        w.revalidate();
+
+        // Display.editString() resolved getComponentForm() and returned outright when
+        // it was null -- which it always is inside a Window. That guard rejected every
+        // editor in a window before impl.editStringImpl() was reached, so none of the
+        // port level editor routing could run however correct the ports were. The
+        // windowed screenshot goldens could not see it either: a field that never
+        // enters editing still renders.
+        Display.getInstance().editString(field, 20, TextArea.ANY, "hello", 0);
+
+        java.lang.reflect.Field active = com.codename1.testing.TestCodenameOneImplementation
+                .class.getDeclaredField("activeTextEditor");
+        active.setAccessible(true);
+        assertSame(field, active.get(implementation),
+                "editing a text field in a window must reach the port");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void commandsAddedToAWindowReachThePort() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("commands", new BorderLayout());
+        w.setWindowSize(300, 200);
+
+        // Added before show(): the peer does not exist yet, so these have to be
+        // published when it does rather than silently lost.
+        Command before = new Command("Before");
+        w.addCommand(before);
+        w.show();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+
+        // The command list used to be private bookkeeping that nothing consumed, so a
+        // command added to a window was never displayed and never activated -- unlike
+        // the identical call on a Form.
+        assertEquals(1, wm.getPublishedCommands(peer).size(),
+                "commands added before show() must reach the port once it exists");
+        assertSame(before, wm.getPublishedCommands(peer).get(0));
+
+        Command after = new Command("After");
+        w.addCommand(after);
+        assertEquals(2, wm.getPublishedCommands(peer).size(),
+                "and a command added afterwards must be published too");
+
+        w.removeCommand(before);
+        assertEquals(1, wm.getPublishedCommands(peer).size());
+        assertSame(after, wm.getPublishedCommands(peer).get(0));
+
+        w.removeAllCommands();
+        assertEquals(0, wm.getPublishedCommands(peer).size());
+
+        w.dispose();
+    }
+
+    @FormTest
+    void commandMutationsFromABackgroundThreadAreMarshalledOntoTheEdt()
+            throws InterruptedException {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("bg commands", new BorderLayout());
+        w.setWindowSize(300, 200);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+
+        try {
+
+            // addCommand() used to mutate the unsynchronized list and reach
+            // WindowManager.setCommands() on whatever thread called it, while the SPI
+            // contract is EDT-only. That races an EDT show(), removal or disposal and can
+            // hand a peer to the port during teardown.
+            final Command fromBackground = new Command("Background");
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.addCommand(fromBackground);
+                }
+            }, "cn1-test-background");
+            t.start();
+            t.join();
+
+            // Joining the background thread proves the call returned; the work must NOT
+            // have been done on it. This test body runs on the EDT, so nothing queued can
+            // have been dispatched yet.
+            assertEquals(0, wm.getPublishedCommands(peer).size(),
+                    "the mutation must be deferred to the EDT, not run on the caller");
+
+            DisplayTest.flushEdt();
+
+            assertEquals(1, wm.getPublishedCommands(peer).size(),
+                    "and it must actually arrive once the EDT runs it");
+            assertSame(fromBackground, wm.getPublishedCommands(peer).get(0));
+            assertNull(wm.getCommandsPublishedOffEdtBy(),
+                    "the port must never be called off the EDT");
+
+            // removeCommand() and removeAllCommands() publish through the same path.
+            Thread remove = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.removeCommand(fromBackground);
+                }
+            }, "cn1-test-background-remove");
+            remove.start();
+            remove.join();
+            assertEquals(1, wm.getPublishedCommands(peer).size(),
+                    "removal is deferred the same way");
+            DisplayTest.flushEdt();
+            assertEquals(0, wm.getPublishedCommands(peer).size());
+            assertNull(wm.getCommandsPublishedOffEdtBy(),
+                    "including on the removal path");
+
+        } finally {
+            // A failed assertion must not leak a registered window into later tests:
+            // Desktop keeps it in the registry and the next test counting windows sees
+            // it, turning one real failure into three confusing ones.
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void anAnimationInBothRegistriesRunsOncePerFrame() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("anim", new BorderLayout());
+        w.setWindowSize(300, 200);
+        w.show();
+
+        final int[] ticks = new int[1];
+        com.codename1.ui.animations.Animation a =
+                new com.codename1.ui.animations.Animation() {
+                    @Override
+                    public boolean animate() {
+                        ticks[0]++;
+                        return false;
+                    }
+
+                    @Override
+                    public void paint(com.codename1.ui.Graphics g) {
+                    }
+                };
+
+        // A component can legitimately sit in both registries -- an explicitly animated
+        // scrollable whose fading scrollbar is also running. Form skips entries already
+        // handled by the public list; without the same exclusion the motion advances at
+        // double speed and any side effect happens twice per frame.
+        w.registerAnimated(a);
+        w.registerAnimatedInternal(a);
+
+        w.repaintAnimations();
+        assertEquals(1, ticks[0],
+                "an animation in both registries must run once per frame, not twice");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void emblemValidationInstallsItsGlassPaneInsideAWindow() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("validate", new BorderLayout());
+        w.setWindowSize(300, 200);
+        TextField field = new TextField("");
+        w.add(BorderLayout.CENTER, field);
+        w.show();
+        w.revalidate();
+        assertNull(w.getGlassPane(), "no glass pane before validation runs");
+
+        // setValid() is driven directly rather than through addConstraint: the full
+        // constraint path pulls in listener wiring that wedges the event dispatch
+        // thread in this harness, and the glass pane installation is what is under
+        // test. It is package private, hence the reflective call.
+        com.codename1.ui.validation.Validator v = new com.codename1.ui.validation.Validator();
+        v.setValidationFailureHighlightMode(
+                com.codename1.ui.validation.Validator.HighlightMode.EMBLEM);
+        java.lang.reflect.Method setValid = com.codename1.ui.validation.Validator.class
+                .getDeclaredMethod("setValid", Component.class, boolean.class);
+        setValid.setAccessible(true);
+        setValid.invoke(v, field, false);
+
+        // The emblem is drawn by a glass pane, and the guard that installed it resolved
+        // the form -- null inside a Window -- so EMBLEM validation showed nothing there.
+        assertNotNull(w.getGlassPane(),
+                "emblem validation must install its glass pane on the window");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void aBlockedWindowStillRefusesItsCloseRequest() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner", new BorderLayout());
+        owner.setWindowSize(400, 300);
+        owner.show();
+
+        final int[] closes = new int[1];
+        owner.addCloseListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                closes[0]++;
+            }
+        });
+
+        Window modal = new Window("modal", new BorderLayout());
+        modal.setWindowSize(200, 150);
+        modal.setModalityType(Window.MODALITY_APPLICATION);
+        modal.show();
+        flushSerialCalls();
+
+        // A close arrives outside the packed input queue, so it bypasses the modality
+        // filter that guards every other event. The check moved onto the event dispatch
+        // thread -- the modal stack is mutated there, so reading it from the port's
+        // callback thread raced -- and this asserts the move kept the behaviour.
+        Desktop.getInstance().windowCloseRequested(owner.getWindowId());
+        flushSerialCalls();
+        assertEquals(0, closes[0],
+                "a window blocked by an application modal must not close");
+
+        modal.dispose();
+        flushSerialCalls();
+
+        Desktop.getInstance().windowCloseRequested(owner.getWindowId());
+        flushSerialCalls();
+        assertEquals(1, closes[0],
+                "and must close again once the modal is gone");
+
+        owner.dispose();
+    }
+
+    @FormTest
+    void aCommandBackedButtonNotifiesTheWindowsCommandListeners() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("cmd button", new BorderLayout());
+        w.setWindowSize(300, 200);
+
+        final int[] commandRuns = new int[1];
+        Command cmd = new Command("Go") {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                commandRuns[0]++;
+            }
+        };
+        final int[] listenerSaw = new int[1];
+        w.addCommandListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                listenerSaw[0]++;
+            }
+        });
+
+        Button b = new Button(cmd);
+        w.add(BorderLayout.CENTER, b);
+        w.show();
+        w.revalidate();
+
+        // Button.fireActionEvent forwarded the post-command event through the form,
+        // null in a window, so the window's command listeners never saw the activation.
+        b.pressed();
+        b.released();
+        flushSerialCalls();
+
+        assertEquals(1, commandRuns[0], "the command runs exactly once");
+        assertEquals(1, listenerSaw[0],
+                "and the window's command listeners must be notified once");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void enablingTextSelectionInsideAWindowDoesNotThrow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("selection", new BorderLayout());
+        w.setWindowSize(300, 200);
+        TextArea area = new TextArea("selectable");
+        w.add(BorderLayout.CENTER, area);
+        w.show();
+        w.revalidate();
+
+        // TextSelection is exposed on every TopLevelContainer, but setEnabled resolved
+        // the root's form and dereferenced the null result, so enabling it threw in
+        // every secondary window.
+        TextSelection sel = w.getTextSelection();
+        assertNotNull(sel);
+        sel.setEnabled(true);
+        assertTrue(sel.isEnabled(), "text selection must enable inside a window");
+
+        sel.setEnabled(false);
+        assertFalse(sel.isEnabled());
+
+        w.dispose();
+    }
+
+    @FormTest
+    void centeringOnAFormUsesTheMainWindowNotTheWorkArea() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        // The main window deliberately does not fill the work area, which is the case
+        // that separates the two behaviours.
+        wm.setMainWindowBounds(200, 100, 600, 400);
+
+        Window w = new Window("centred", new BorderLayout());
+        w.setWindowSize(200, 100);
+        w.show();
+
+        // A Form lives in the application's main native window, so centring over a Form
+        // has to centre over that window. Falling through to centerOnDesktop() centred
+        // on the monitor work area instead -- a different place whenever the main
+        // window has been moved or does not fill the screen.
+        w.centerOn(Display.getInstance().getCurrent());
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(200 + (600 - 200) / 2, peer.getX(),
+                "centred horizontally over the main window");
+        assertEquals(100 + (400 - 100) / 2, peer.getY(),
+                "centred vertically over the main window");
+
+        w.dispose();
+    }
+
+    @FormTest
+    void aCommandListInsideAWindowNotifiesItsCommandListeners() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("cmd list", new BorderLayout());
+        w.setWindowSize(300, 200);
+
+        final int[] commandRuns = new int[1];
+        Command cmd = new Command("Pick") {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                commandRuns[0]++;
+            }
+        };
+        final int[] listenerSaw = new int[1];
+        w.addCommandListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                listenerSaw[0]++;
+            }
+        });
+
+        List<Command> list = new List<Command>(new Command[]{cmd});
+        list.setCommandList(true);
+        w.add(BorderLayout.CENTER, list);
+        w.show();
+        w.revalidate();
+
+        // List.fireActionEvent invoked the command and then dispatched the follow-up
+        // through the form, null in a window, so the window's command listeners never
+        // saw the activation.
+        list.setSelectedIndex(0);
+        list.fireActionEvent();
+        flushSerialCalls();
+
+        assertEquals(1, commandRuns[0], "the command runs exactly once");
+        assertEquals(1, listenerSaw[0],
+                "and the window's command listeners must be notified once");
+
+        w.dispose();
+    }
+
+    /// The text a toolbar is currently showing as its title, or null.
+    private static String titleTextOf(Toolbar tb) {
+        Component cmp = tb.getTitleComponent();
+        return cmp instanceof Label ? ((Label) cmp).getText() : null;
+    }
+
+    /// The first day cell in a calendar's month view.
+    /// Runs the animation manager until nothing is in progress and its post-animation
+    /// queue has drained, which is where work handed to `AnimationManager#flushAnimation`
+    /// during a layout animation ends up.
+    private void pumpAnimations(Window w) {
+        AnimationManager mgr = w.getAnimationManager();
+        long deadline = System.currentTimeMillis() + 5000;
+        while (mgr.isAnimating() && System.currentTimeMillis() < deadline) {
+            mgr.updateAnimations();
+            flushSerialCalls();
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        // updateAnimations() drains the post-animation queue only on a pass that finds
+        // the animation list already empty, and the pass that empties it is not that
+        // pass -- so a single trailing call is one short.
+        for (int iter = 0; iter < 5; iter++) {
+            mgr.updateAnimations();
+            flushSerialCalls();
+        }
+    }
+
+    /// Finds the button a `Command` was rendered into, anywhere under the top level.
+    private static Button findButtonForCommand(Container c, Command cmd) {
+        for (int iter = 0; iter < c.getComponentCount(); iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof Button && ((Button) cmp).getCommand() == cmd) {
+                return (Button) cmp;
+            }
+            if (cmp instanceof Container) {
+                Button b = findButtonForCommand((Container) cmp, cmd);
+                if (b != null) {
+                    return b;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// Finds the first button carrying a `Command`, which is how the test reaches a
+    /// toolbar's back arrow without a public accessor for it.
+    private static Button findFirstCommandButton(Container c) {
+        for (int iter = 0; iter < c.getComponentCount(); iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof Button && ((Button) cmp).getCommand() != null) {
+                return (Button) cmp;
+            }
+            if (cmp instanceof Container) {
+                Button b = findFirstCommandButton((Container) cmp);
+                if (b != null) {
+                    return b;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Button findFirstDayButton(Container c) {
+        for (int iter = 0; iter < c.getComponentCount(); iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof Button && ((Button) cmp).getText().length() > 0
+                    && Character.isDigit(((Button) cmp).getText().charAt(0))) {
+                return (Button) cmp;
+            }
+            if (cmp instanceof Container) {
+                Button b = findFirstDayButton((Container) cmp);
+                if (b != null) {
+                    return b;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// An image that reports itself as an animation, which is what drives the
+    /// registration path under test.
+    private static Image makeAnimatedImage() {
+        return new Image(null) {
+            @Override
+            public boolean isAnimation() {
+                return true;
+            }
+
+            @Override
+            public boolean animate() {
+                return false;
+            }
+
+            @Override
+            public int getWidth() {
+                return 8;
+            }
+
+            @Override
+            public int getHeight() {
+                return 8;
+            }
+        };
+    }
+
+    @FormTest
+    void legacyPullToRefreshRegistersItsAnimationOnTheWindow() {
+        implementation.setMultiWindowSupported(true);
+        final AtomicInteger registered = new AtomicInteger();
+        Window w = new Window("pull", new BorderLayout()) {
+            @Override
+            public void registerAnimated(Animation cmp) {
+                registered.incrementAndGet();
+                super.registerAnimated(cmp);
+            }
+        };
+        Container scrollable = new Container(new BorderLayout());
+        scrollable.setScrollableY(true);
+        w.add(BorderLayout.CENTER, scrollable);
+        w.show();
+
+        LookAndFeel laf = UIManager.getInstance().getLookAndFeel();
+        assertTrue(laf instanceof DefaultLookAndFeel,
+                "This test drives the default look and feel's legacy pull-to-refresh path");
+        try {
+            // Also initializes the pull container the legacy path draws through.
+            int threshold = laf.getPullToRefreshHeight();
+            Graphics g = Image.createImage(60, 60).getGraphics();
+
+            // First pass swaps the "pull down to refresh" label into the container.
+            laf.drawPullToRefresh(g, scrollable, false);
+            // Crossing the threshold swaps in "release to refresh", and that swap is
+            // what registers the icon rotation animation on the top level. Before the
+            // migration this went through getComponentForm(), which is null in a
+            // Window, so the gesture threw on the EDT instead of animating.
+            scrollable.setScrollY(-(threshold + 1));
+            laf.drawPullToRefresh(g, scrollable, false);
+
+            assertTrue(registered.get() > 0,
+                    "Pull-to-refresh must register its animation on the Window that hosts it");
+        } finally {
+            // The look and feel keeps the pull container in a field shared by every
+            // test in this JVM, so a failure here must still tear the window down or
+            // it cascades into unrelated tests.
+            w.dispose();
+        }
+    }
+
+
+    @FormTest
+    void movingAShownWindowInvalidatesItsCachedMonitor() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        java.util.List<TestWindowManager.FakeMonitor> two =
+                new ArrayList<TestWindowManager.FakeMonitor>();
+        two.add(new TestWindowManager.FakeMonitor(0, 0, 1440, 900, 1.0, 96, "primary"));
+        two.add(new TestWindowManager.FakeMonitor(1440, 0, 2560, 1440, 2.0, 192, "second"));
+        wm.setMonitors(two);
+
+        Window w = new Window("mover", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+
+        // Populate the cache while the window is still on the primary display.
+        assertEquals(0, w.getMonitor().getIndex());
+        assertEquals(1.0, w.getScale(), 0.0001);
+
+        // Now it sits on the second display. A real port reports this through the
+        // monitor-change callback, which is queued back to the event dispatch thread
+        // -- so a move followed by a query in the same turn has to answer correctly
+        // without it, or centerOnDesktop() sends the window back where it came from.
+        peer.setMonitor(1);
+        w.setWindowLocation(1500, 100);
+
+        assertEquals(1, w.getMonitor().getIndex(),
+                "a move must invalidate the cached monitor");
+        assertEquals(2.0, w.getScale(), 0.0001,
+                "and the scale that is answered from it");
+        w.dispose();
+    }
+
+    @FormTest
+    void aWindowMoveBetweenMonitorsIsNotADesktopTopologyEvent() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        java.util.List<TestWindowManager.FakeMonitor> two =
+                new ArrayList<TestWindowManager.FakeMonitor>();
+        two.add(new TestWindowManager.FakeMonitor(0, 0, 1440, 900, 1.0, 96, "primary"));
+        two.add(new TestWindowManager.FakeMonitor(1440, 0, 2560, 1440, 2.0, 192, "second"));
+        wm.setMonitors(two);
+
+        final int[] fired = new int[1];
+        Desktop.getInstance().addMonitorListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                fired[0]++;
+            }
+        });
+
+        Window w = new Window("dragged", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+        assertEquals(0, w.getMonitor().getIndex());
+
+        // Dragging one window onto another display is not a change of topology.
+        // addMonitorListener is documented for a monitor being attached, removed or
+        // reconfigured, so firing it here made every move across a mixed-DPI desktop
+        // re-run whatever display reconfiguration work the application does.
+        try {
+            peer.setMonitor(1);
+            Desktop.getInstance().windowMonitorChanged(w.getWindowId());
+            DisplayTest.flushEdt();
+
+            assertEquals(0, fired[0],
+                    "moving a window between monitors must not notify monitor listeners");
+            assertEquals(1, w.getMonitor().getIndex(),
+                    "but the window itself must follow the display it is now on");
+            assertEquals(2.0, w.getScale(), 0.0001);
+
+            // A real topology change still notifies.
+            Desktop.getInstance().monitorsChanged();
+            DisplayTest.flushEdt();
+            assertEquals(1, fired[0], "an attach, removal or reconfiguration still notifies");
+        } finally {
+            // A window left undisposed by a failing assertion keeps the event dispatch
+            // thread busy and times out whatever runs next, which buries the real
+            // failure under an unrelated one.
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void terminalEventsReportTheGeometryTheWindowActuallyHad() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("mover", new BorderLayout());
+        w.setWindowBounds(new Rectangle(10, 20, 400, 300));
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+
+        final java.util.List<Rectangle> disposedBounds = new ArrayList<Rectangle>();
+        w.addWindowListener(new ActionListener<WindowEvent>() {
+            @Override
+            public void actionPerformed(WindowEvent evt) {
+                if (evt.getType() == WindowEvent.Type.Disposed) {
+                    disposedBounds.add(evt.getBounds());
+                }
+            }
+        });
+
+        // The user drags and resizes it natively. Nothing in the application asked for
+        // this geometry, so it lives only in the peer.
+        wm.setBounds(peer, 640, 480, 900, 700);
+        w.dispose();
+
+        assertEquals(1, disposedBounds.size(), "disposal must report exactly once");
+        Rectangle r = disposedBounds.get(0);
+        // Before the snapshot, disposal nulled the peer first and getWindowBounds()
+        // fell back to the originally requested rectangle -- so a listener persisting
+        // geometry across runs restored the window to where it was never left.
+        assertEquals(640, r.getX(), "the final native position, not the requested one");
+        assertEquals(480, r.getY());
+        assertEquals(900, r.getWidth());
+        assertEquals(700, r.getHeight());
+    }
+
+    @FormTest
+    void anInteractionDialogShowsOnTheWindowItWasGiven() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        w.show();
+        w.revalidate();
+
+        com.codename1.components.InteractionDialog dlg =
+                new com.codename1.components.InteractionDialog("in the window");
+        dlg.setAnimateShow(false);
+        try {
+            // Without a host the dialog resolves Display.getCurrent() and lands in the
+            // main form's layered pane -- so it appears on the main window while the
+            // window that asked for it is merely dimmed.
+            dlg.setTopLevelHost(w);
+            dlg.show(10, 10, 10, 10);
+            flushSerialCalls();
+
+            assertSame(w, dlg.getTopLevelContainer(),
+                    "the dialog must be attached to the window it was given");
+            assertNull(dlg.getComponentForm(),
+                    "and therefore to no form at all");
+        } finally {
+            dlg.dispose();
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void anInteractionDialogWithNoHostStillUsesTheCurrentForm() {
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        com.codename1.components.InteractionDialog dlg =
+                new com.codename1.components.InteractionDialog("on the form");
+        dlg.setAnimateShow(false);
+        try {
+            // The historical behaviour, which every single-window application relies on.
+            dlg.show(10, 10, 10, 10);
+            flushSerialCalls();
+            assertSame(main, dlg.getComponentForm(),
+                    "an unhosted dialog must still land on the current form");
+        } finally {
+            dlg.dispose();
+        }
+    }
+
+    private static int invokeHostGeometry(Toolbar tb, String method) throws Exception {
+        java.lang.reflect.Method m = Toolbar.class.getDeclaredMethod(method);
+        m.setAccessible(true);
+        return ((Integer) m.invoke(tb)).intValue();
+    }
+
+    /// The side menu's dialog, found by walking the window rather than through an
+    /// accessor the toolbar does not expose.
+    private static com.codename1.components.InteractionDialog findSideMenuDialog(Container c) {
+        for (int iter = 0; iter < c.getComponentCount(); iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof com.codename1.components.InteractionDialog) {
+                return (com.codename1.components.InteractionDialog) cmp;
+            }
+            if (cmp instanceof Container) {
+                com.codename1.components.InteractionDialog inner =
+                        findSideMenuDialog((Container) cmp);
+                if (inner != null) {
+                    return inner;
+                }
+            }
+        }
+        return null;
+    }
+
+    @FormTest
+    void aPopupForAWindowComponentOpensInThatWindow() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        Button anchor = new Button("anchor");
+        w.add(BorderLayout.CENTER, anchor);
+        w.show();
+        w.revalidate();
+
+        com.codename1.components.InteractionDialog dlg =
+                new com.codename1.components.InteractionDialog("popup");
+        dlg.setAnimateShow(false);
+        try {
+            // The popup is anchored to a component in the window, and its rectangle is
+            // in that window's coordinate space. Resolving the current form instead
+            // opened it over the main window at coordinates that mean nothing there.
+            dlg.showPopupDialog(anchor);
+            flushSerialCalls();
+
+            assertSame(w, dlg.getTopLevelContainer(),
+                    "a popup anchored in a window must open in that window");
+            assertNull(dlg.getComponentForm());
+        } finally {
+            dlg.dispose();
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void aModalityChangeMadeWhileMinimizedSurvivesRestoration() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("modal", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.show();
+        flushSerialCalls();
+        try {
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                    "an application modal window blocks the main window");
+
+            // The platform minimizes it. A minimized window is still open and still
+            // modal -- isModalFinished() says so itself.
+            w.hideNotify();
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                    "minimizing a modal window does not end the modal");
+
+            // Changing modality here released the old blocker and declined to take the
+            // new one, and showNotify() never reacquires, so the window came back
+            // visibly non-modal while getModalityType() still said otherwise.
+            w.setModalityType(Window.MODALITY_APPLICATION);
+            assertEquals(Window.MODALITY_APPLICATION, w.getModalityType());
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                    "a modality change while minimized must keep the window modal");
+
+            w.showNotify();
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                    "and it must still be modal once restored");
+        } finally {
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void aPickerInsideAWindowOpensItsPopupThere() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        com.codename1.ui.spinner.Picker picker = new com.codename1.ui.spinner.Picker();
+        picker.setType(com.codename1.ui.Display.PICKER_TYPE_STRINGS);
+        picker.setStrings("one", "two", "three");
+        picker.setSelectedString("one");
+        w.add(BorderLayout.CENTER, picker);
+        w.show();
+        w.revalidate();
+        try {
+            // The lightweight popup is the default wherever the platform has no native
+            // picker, which is every desktop port. This threw "Attempt to show
+            // interaction dialog while button is not on form" because it insisted on a
+            // Form, making a standard component unusable in every secondary window.
+            picker.pressed();
+            picker.released();
+            flushSerialCalls();
+
+            com.codename1.components.InteractionDialog popup = findDialogIn(w);
+            assertNotNull(popup, "the picker's popup must open inside the window");
+        } finally {
+            w.dispose();
+        }
+    }
+
+    /// The first InteractionDialog anywhere under the given container.
+    private static com.codename1.components.InteractionDialog findDialogIn(Container c) {
+        for (int iter = 0; iter < c.getComponentCount(); iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof com.codename1.components.InteractionDialog) {
+                return (com.codename1.components.InteractionDialog) cmp;
+            }
+            if (cmp instanceof Container) {
+                com.codename1.components.InteractionDialog inner = findDialogIn((Container) cmp);
+                if (inner != null) {
+                    return inner;
+                }
+            }
+        }
+        return null;
+    }
+
+    @FormTest
+    void anOpenPickerInAWindowIsEditableAndCanBeStopped() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        com.codename1.ui.spinner.Picker picker = new com.codename1.ui.spinner.Picker();
+        picker.setType(com.codename1.ui.Display.PICKER_TYPE_STRINGS);
+        picker.setStrings("one", "two", "three");
+        picker.setSelectedString("one");
+        w.add(BorderLayout.CENTER, picker);
+        w.show();
+        w.revalidate();
+        try {
+            picker.pressed();
+            picker.released();
+            flushSerialCalls();
+
+            // registerAsInputDevice resolved a Form and so skipped every registration
+            // inside a window: the popup opened but reported isEditing() false, which
+            // is what window-level input-device replacement and stopEditing() both go
+            // through -- so nothing could dismiss it.
+            assertTrue(picker.isEditing(),
+                    "an open picker in a window must report itself as editing");
+            assertNotNull(w.getCurrentInputDevice(),
+                    "and must register as the window's current input device");
+
+            final boolean[] stopped = new boolean[1];
+            picker.stopEditing(new Runnable() {
+                @Override
+                public void run() {
+                    stopped[0] = true;
+                }
+            });
+            flushSerialCalls();
+            // The popup closes with a dispose animation, so the callback is queued
+            // behind it rather than running inline.
+            pumpAnimations(w);
+            assertTrue(stopped[0], "stopEditing must close it and run the callback");
+        } finally {
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void aValidationErrorPopupAppearsInsideItsWindow() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        TextField field = new TextField("");
+        w.add(BorderLayout.CENTER, field);
+        w.show();
+        w.revalidate();
+        try {
+            com.codename1.ui.validation.Validator v =
+                    new com.codename1.ui.validation.Validator();
+            v.setShowErrorMessageForFocusedComponent(true);
+            v.addConstraint(field,
+                    new com.codename1.ui.validation.LengthConstraint(3, "too short"));
+            assertFalse(v.isValid(), "an empty field must fail the length constraint");
+
+            // Driven the way the framework drives it. Going through setFocused() does
+            // not work here: showing the window already focused its only focusable
+            // child, so setFocused() short-circuits and nothing fires -- a test built
+            // that way passes whatever the code does.
+            //
+            // The listener compared getComponentForm() with the current Form, and in a
+            // window that is null against a non-null form, so it returned every time
+            // and the configured popup never appeared.
+            field.fireFocusGained();
+            flushSerialCalls();
+            pumpAnimations(w);
+
+            assertNotNull(findDialogIn(w),
+                    "the validation error popup must appear inside the window");
+        } finally {
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void geometryChangedOffTheEdtIsMarshalled() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("marshalled", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+
+        try {
+            // The developer guide promises that moving a window from a background
+            // thread is marshalled the way Form.show() is. Unmarshalled, this mutated
+            // the pending geometry and the cached monitor while the event dispatch
+            // thread was reading them, and drove the window manager concurrently with
+            // the callbacks reporting the result.
+            final boolean[] onEdt = new boolean[]{true};
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    onEdt[0] = Display.getInstance().isEdt();
+                    w.setWindowLocation(120, 90);
+                    w.setWindowSize(640, 480);
+                }
+            });
+            t.start();
+            t.join(5000);
+            assertFalse(onEdt[0], "the mutation has to be made off the EDT to prove anything");
+
+            // The point of the fix is that the work is *deferred*, so that is what is
+            // asserted. Checking only the end state proves nothing: an unmarshalled
+            // mutation reaches the same numbers, just on the wrong thread.
+            Rectangle before = w.getWindowBounds();
+            assertEquals(400, before.getWidth(),
+                    "the background call must not have touched the window yet");
+            assertEquals(300, before.getHeight());
+
+            flushSerialCalls();
+
+            Rectangle b = w.getWindowBounds();
+            assertEquals(120, b.getX(), "the queued move must have been applied");
+            assertEquals(90, b.getY());
+            assertEquals(640, b.getWidth(), "and the queued resize with it");
+            assertEquals(480, b.getHeight());
+        } finally {
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void aBackgroundResizeThenMoveKeepsBothChanges() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("resize then move", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        assertNotNull(wm.getLastWindow());
+
+        try {
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.setWindowSize(800, 600);
+                    w.setWindowLocation(10, 10);
+                }
+            });
+            t.start();
+            t.join(5000);
+            flushSerialCalls();
+
+            // setWindowLocation used to read the bounds before entering the event
+            // dispatch thread, so it queued a full rectangle carrying the size from
+            // *before* the queued resize -- the resize was applied and then silently
+            // undone by the move.
+            Rectangle b = w.getWindowBounds();
+            assertEquals(10, b.getX());
+            assertEquals(10, b.getY());
+            assertEquals(800, b.getWidth(),
+                    "the move must not carry a size read before the queued resize");
+            assertEquals(600, b.getHeight());
+        } finally {
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void windowsCreatedConcurrentlyGetDistinctIds() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        final int threads = 8;
+        final int perThread = 25;
+        final java.util.List<Integer> ids =
+                java.util.Collections.synchronizedList(new ArrayList<Integer>());
+        final java.util.List<Window> made =
+                java.util.Collections.synchronizedList(new ArrayList<Window>());
+        Thread[] workers = new Thread[threads];
+        for (int iter = 0; iter < threads; iter++) {
+            workers[iter] = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    for (int i = 0; i < perThread; i++) {
+                        Window w = new Window("concurrent");
+                        made.add(w);
+                        ids.add(Integer.valueOf(w.getWindowId()));
+                    }
+                }
+            });
+        }
+        try {
+            for (Thread t : workers) {
+                t.start();
+            }
+            for (Thread t : workers) {
+                t.join(10000);
+            }
+
+            // A constructor cannot be marshalled, so two background threads really do
+            // allocate ids concurrently. A collision gives two native windows one id,
+            // and windowById() returns the first match -- so every input and lifecycle
+            // callback for the second would land on the first.
+            assertEquals(threads * perThread, ids.size(), "every window must be built");
+            java.util.Set<Integer> unique = new java.util.HashSet<Integer>(ids);
+            assertEquals(ids.size(), unique.size(), "window ids must be unique");
+        } finally {
+            for (Window w : made) {
+                w.dispose();
+            }
+        }
+    }
+
+    @FormTest
+    void heldInputTimersStopAtAWindowThatBecameBlocked() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        flushSerialCalls();
+
+        Window w = new Window("target", new BorderLayout());
+        w.setWindowSize(400, 300);
+        RepeatCountingComponent c = new RepeatCountingComponent();
+        c.setFocusable(true);
+        w.add(BorderLayout.CENTER, c);
+        w.show();
+        w.asContainer().revalidate();
+        w.setFocused(c);
+        flushSerialCalls();
+
+        Window modal = new Window("modal", new BorderLayout());
+        modal.setWindowSize(200, 150);
+        try {
+            // A key held down in the window. The timers are driven with an explicit
+            // clock rather than by waiting out the 800ms first-repeat delay, so the
+            // test is deterministic instead of timing-dependent.
+            Desktop.getInstance().windowKeyPressed(w.getWindowId(), 65);
+            DisplayTest.flushEdt();
+            w.serviceInputTimers(System.currentTimeMillis() + 5000, 500);
+            assertTrue(c.repeats > 0, "a held key repeats into the window that saw it");
+
+            // A modal goes up over everything. The held key has not been released, so
+            // the timer is still armed -- but its repeats must stop reaching a window
+            // the user can no longer interact with.
+            modal.setModalityType(Window.MODALITY_APPLICATION);
+            modal.show();
+            flushSerialCalls();
+            int before = c.repeats;
+            w.serviceInputTimers(System.currentTimeMillis() + 10000, 500);
+            assertEquals(before, c.repeats,
+                    "a window blocked by a modal must not receive repeats or long presses");
+        } finally {
+            modal.dispose();
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    /// Counts key repeats reaching a component.
+    private static final class RepeatCountingComponent extends Component {
+        private int repeats;
+
+        @Override
+        public void keyRepeated(int keyCode) {
+            repeats++;
+        }
+
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            return new com.codename1.ui.geom.Dimension(120, 90);
+        }
+    }
+
+    @FormTest
+    void aBurstOfResizesDeliversTheFinalSize() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("resized", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        assertNotNull(wm.getLastWindow());
+        try {
+            // Live resizing produces far more notifications than the packed stack
+            // holds, and the one it drops can be the last -- leaving the hierarchy
+            // laid out for a size the native surface has already moved past.
+            for (int iter = 0; iter < 500; iter++) {
+                Desktop.getInstance().windowSizeChanged(w.getWindowId(), 500 + iter, 400 + iter);
+            }
+            flushSerialCalls();
+
+            assertEquals(999, w.getWidth(), "the final size must survive the burst");
+            assertEquals(899, w.getHeight());
+        } finally {
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void restoringAWindowTheApplicationHidDoesNotPutItBackOnScreen() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("Hidden", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        w.hide();
+        assertFalse(w.isWindowShowing(), "hide() leaves the window not showing");
+
+        w.restore();
+        // The native window would come back with the framework still counting it
+        // hidden: the hierarchy stays invisible and the paint loop skips it, so the
+        // platform would show a blank or stale window that isWindowShowing() denies.
+        assertEquals(0, peer.getRestoreCount(),
+                "restore() must not put back a window the application hid -- that is "
+                        + "show()'s job, which restores the whole lifecycle");
+        assertFalse(w.isWindowShowing(),
+                "and the framework's own view of it must not change either");
+        w.dispose();
+    }
+
+    @FormTest
+    void restoringAMinimizedWindowStillReachesThePlatform() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("Minimized", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        w.minimize();
+        // The guard is deliberately not "iconified only": the platform has not reported
+        // the minimize yet at this point, and an application that minimizes and
+        // immediately restores still has to get its window back.
+        w.restore();
+        assertEquals(1, peer.getRestoreCount(),
+                "a minimized window must still be restorable, including before the "
+                        + "platform has reported the minimize");
+        w.dispose();
+    }
+
+    @FormTest
+    void aKeyRepeatFollowsTheWindowThatSawThePressNotTheFocusedOne() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        final KeyCountingComponent windowKeys = new KeyCountingComponent();
+        w.add(BorderLayout.CENTER, windowKeys);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(windowKeys);
+
+        // Hold a key on the main form, then let the autorepeat arrive tagged with the
+        // window, which is what happens when focus moves while the key is still down --
+        // the platform sends every repeat to whatever is focused now.
+        Display.getInstance().keyPressed(-93);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -93);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -93);
+        DisplayTest.flushEdt();
+
+        assertEquals(3, mainKeys.pressed,
+                "every repeat of a held key belongs to the top level that saw it go down");
+        assertEquals(0, windowKeys.pressed,
+                "the newly focused window must not enter a pressed state for a key it "
+                        + "never saw go down -- no release is coming for it");
+
+        // And the release still resolves to the same place, so nothing is left latched.
+        Desktop.getInstance().windowKeyReleased(w.getWindowId(), -93);
+        DisplayTest.flushEdt();
+        assertEquals(1, mainKeys.released);
+        assertEquals(0, windowKeys.released);
+        w.dispose();
+    }
+
+    /// Counts the terminal visibility events a window reports.
+    private static int[] countHiddenAndDisposed(Window w) {
+        final int[] counts = new int[2];
+        w.addWindowListener(new ActionListener<WindowEvent>() {
+            @Override
+            public void actionPerformed(WindowEvent evt) {
+                if (evt.getType() == WindowEvent.Type.Hidden) {
+                    counts[0]++;
+                } else if (evt.getType() == WindowEvent.Type.Disposed) {
+                    counts[1]++;
+                }
+            }
+        });
+        return counts;
+    }
+
+    @FormTest
+    void disposingAShownWindowReportsHiddenExactlyOnce() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("shown", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.show();
+        int[] counts = countHiddenAndDisposed(w);
+        w.dispose();
+        assertEquals(1, counts[0], "taking a window off screen is one Hidden");
+        assertEquals(1, counts[1]);
+    }
+
+    @FormTest
+    void disposingAnAlreadyHiddenWindowDoesNotReportHiddenTwice() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("hidden", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.show();
+        int[] counts = countHiddenAndDisposed(w);
+        w.hide();
+        assertEquals(1, counts[0], "hide() reports the transition");
+        w.dispose();
+        // A listener persisting geometry or running teardown off Hidden would do it
+        // twice for one disappearance.
+        assertEquals(1, counts[0],
+                "dispose() must not repeat a transition hide() already reported");
+        assertEquals(1, counts[1], "and must still report Disposed");
+    }
+
+    @FormTest
+    void disposingAWindowThatWasNeverShownReportsNoHidden() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("never shown", new BorderLayout());
+        w.setWindowSize(320, 240);
+        int[] counts = countHiddenAndDisposed(w);
+        w.dispose();
+        assertEquals(0, counts[0],
+                "a window that was never on screen cannot have gone off it");
+        assertEquals(1, counts[1]);
+    }
+
+    @FormTest
+    void anActivationFailureReportedOnTheEdtAppliesInThatSameTurn() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("refused", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.show();
+        assertTrue(w.isWindowShowing());
+
+        // A port validates the failure against the request token it belongs to and then
+        // reports it. Queueing the framework half into a later turn lets a retrying
+        // show() run in between and be undone by a failure that no longer applies to
+        // it, so the report has to take effect in the turn that validated it.
+        Desktop.getInstance().windowActivationFailed(w.getWindowId());
+
+        assertFalse(w.isWindowShowing(),
+                "the failure has to take effect in the caller's own turn, not a later "
+                        + "one, or a retry started in between is the thing it lands on");
+        assertFalse(w.isWindowDisposed(),
+                "the window is still registered -- a later show() may ask the platform "
+                        + "again; only its visibility and modality are given up");
+        w.dispose();
+    }
+
+    @FormTest
+    void hidingAnOwnerReleasesItsModalChildsGripOnTheApplication() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Display d = Display.getInstance();
+        Window owner = new Window("owner", new BorderLayout());
+        owner.setWindowSize(400, 300);
+        owner.show();
+        Window modal = new Window("modal", new BorderLayout());
+        modal.setWindowSize(200, 150);
+        modal.setOwnerWindow(owner);
+        modal.setModalityType(Window.MODALITY_APPLICATION);
+        modal.show();
+        DisplayTest.flushEdt();
+        // An unrelated window, because what an application modal costs when it will not
+        // let go is every other surface, not just the one that opened it.
+        Window bystander = new Window("bystander", new BorderLayout());
+        bystander.setWindowSize(300, 200);
+        bystander.show();
+        DisplayTest.flushEdt();
+        TestWindowManager.FakeWindow bystanderPeer = wm.getLastWindow();
+        try {
+            assertFalse(bystanderPeer.isInputEnabled(),
+                    "an application modal blocks unrelated windows while it is up");
+
+            // The owner is hidden by the application. Every port cascades that to the
+            // children it owns and reports them through windowHideNotify, which is the
+            // minimize path -- so the child keeps its modal registration on purpose.
+            owner.hide();
+            Desktop.getInstance().windowHideNotify(modal.getWindowId());
+            DisplayTest.flushEdt();
+
+            assertTrue(bystanderPeer.isInputEnabled(),
+                    "with its owner hidden the modal is on nobody's screen, so it must "
+                            + "not go on blocking every other window with nothing "
+                            + "available to dismiss it");
+
+            // And it takes the block back when the owner returns, rather than being
+            // permanently disarmed.
+            owner.show();
+            Desktop.getInstance().windowShowNotify(modal.getWindowId());
+            DisplayTest.flushEdt();
+            assertFalse(bystanderPeer.isInputEnabled(),
+                    "the modal blocks again once its owner is back on screen");
+        } finally {
+            bystander.dispose();
+            modal.dispose();
+            owner.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void centeringFromABackgroundThreadUsesTheSizeItWillActuallyHave() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("centre", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            // Both calls made off the event dispatch thread, in this order, while the
+            // queue is not draining -- which is the sequence the bug needs. setWindowSize
+            // marshals, so the resize is still pending when centerOnDesktop runs; reading
+            // the bounds before marshalling therefore centred for the size the window is
+            // about to stop having.
+            Thread background = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.setWindowSize(200, 100);
+                    w.centerOnDesktop();
+                }
+            });
+            background.start();
+            background.join();
+            DisplayTest.flushEdt();
+
+            int[] work = wm.getMonitorWorkArea(0, new int[4]);
+            TestWindowManager.FakeWindow peer = wm.getLastWindow();
+            assertEquals(work[0] + (work[2] - 200) / 2, peer.getX(),
+                    "centred for the new width, not the width the resize replaced");
+            assertEquals(work[1] + (work[3] - 100) / 2, peer.getY(),
+                    "centred for the new height, not the height the resize replaced");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void restoringFromABackgroundThreadDoesNotReachThePortBeforeTheOwner() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("restore-me", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            final TestWindowManager.FakeWindow peer = wm.getLastWindow();
+            w.minimize();
+            DisplayTest.flushEdt();
+            int before = peer.getRestoreCount();
+
+            Thread background = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.restore();
+                }
+            });
+            background.start();
+            background.join();
+
+            // The point of marshalling: nothing has reached the port yet, so the owner
+            // chain showOwnerChain() may have queued still runs first. Calling straight
+            // through from the background thread restored the child ahead of its owner
+            // and put a WindowManager call outside the only context the SPI is defined
+            // in.
+            assertEquals(before, peer.getRestoreCount(),
+                    "restore() from a background thread must be queued, not handed "
+                            + "straight to the port");
+            DisplayTest.flushEdt();
+            assertEquals(before + 1, peer.getRestoreCount(),
+                    "and it must still happen once the queue drains");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    /// A scrollable container that can be put into a glide, so a press can be made to
+    /// land on something still moving.
+    private static final class GlidingContainer extends Container {
+        GlidingContainer() {
+            super(new BorderLayout());
+            setScrollableY(true);
+        }
+
+        void startGliding() {
+            // The same field Form and Window both read to decide a container is still
+            // moving; setting it directly is what makes the state reachable in a test.
+            draggedMotionY = Motion.createLinearMotion(0, 1000, 10000);
+            draggedMotionY.start();
+        }
+
+        boolean isGliding() {
+            return draggedMotionY != null;
+        }
+    }
+
+    @FormTest
+    void aPressOnAGlidingContainerHandsTheScrollOverInsteadOfSwallowingTheGesture() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("glide", new BorderLayout());
+        w.setWindowSize(400, 300);
+        GlidingContainer scroller = new GlidingContainer();
+        DragCountingComponent c = new DragCountingComponent();
+        scroller.add(BorderLayout.CENTER, c);
+        w.add(BorderLayout.CENTER, scroller);
+        w.show();
+        w.asContainer().revalidate();
+        scroller.startGliding();
+
+        try {
+            // A press onto the moving container, then the rest of the physical gesture.
+            implementation.windowPointerPressedForTest(w.getWindowId(), 100, 100);
+            DisplayTest.flushEdt();
+            assertFalse(scroller.isGliding(), "the press has to stop the momentum scroll");
+            for (int iter = 0; iter < 12; iter++) {
+                implementation.windowPointerDraggedForTest(w.getWindowId(), 100, 100 + iter * 20);
+            }
+            DisplayTest.flushEdt();
+            assertTrue(c.drags > 0,
+                    "the same gesture must be able to take the scroll over; stopping the "
+                            + "motion with no drag target made the user lift and press again");
+        } finally {
+            // In a finally so a failure here cannot leave a window showing and time out
+            // the next test's setup.
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void aPressListenerThatBlocksDoesNotLeaveTheGestureLatched() {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("nested", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        w.asContainer().revalidate();
+
+        // The handle has to exist by the time a listener runs, because a listener can
+        // enter a nested event loop and the matching release is processed inside it.
+        final Object[] seen = new Object[1];
+        w.addPointerPressedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                seen[0] = w.getCurrentPointerPress();
+            }
+        });
+        try {
+            implementation.windowPointerPressedForTest(w.getWindowId(), 100, 100);
+            DisplayTest.flushEdt();
+            assertNotNull(seen[0],
+                    "the press handle must be recorded before listeners run, or a listener "
+                            + "that blocks sees no gesture and the release inside it clears "
+                            + "nothing");
+            assertSame(seen[0], w.getCurrentPointerPress(),
+                    "and it must be the same gesture the rest of the press path uses");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void pullToRefreshOverlayFollowsTheComponentToANewHost() {
+        implementation.setMultiWindowSupported(true);
+        boolean material = com.codename1.components.InfiniteProgress.isDefaultMaterialDesignMode();
+        com.codename1.components.InfiniteProgress.setDefaultMaterialDesignMode(true);
+        Form origin = new Form("origin", new BorderLayout());
+        Window later = new Window("later", new BorderLayout());
+        try {
+            // Built while the component lives in a Form: that is where the drag listener
+            // is created, and where it used to capture its host once and for all.
+            // Taller than the window on purpose: the pull gesture is gated on the
+            // container actually being scrollable, which needs content that overflows.
+            Container scroller = new Container(new com.codename1.ui.layouts.BoxLayout(
+                    com.codename1.ui.layouts.BoxLayout.Y_AXIS));
+            scroller.setScrollableY(true);
+            for (int iter = 0; iter < 40; iter++) {
+                scroller.add(new Label("row " + iter));
+            }
+            scroller.setPullToRefresh(new Runnable() {
+                @Override
+                public void run() {
+                }
+            });
+            origin.add(BorderLayout.CENTER, scroller);
+            origin.show();
+            DisplayTest.flushEdt();
+
+            // Moved to a window, which re-registers the same listener instance on it.
+            origin.removeComponent(scroller);
+            later.setWindowSize(400, 300);
+            later.add(BorderLayout.CENTER, scroller);
+            later.show();
+            later.asContainer().revalidate();
+            DisplayTest.flushEdt();
+
+            // A pull gesture on the window.
+            int x = scroller.getAbsoluteX() + 10;
+            later.pointerPressed(x, scroller.getAbsoluteY() + 2);
+            later.pointerDragged(x, scroller.getAbsoluteY() + 60);
+            DisplayTest.flushEdt();
+
+            assertTrue(later.getLayeredPane(
+                            com.codename1.components.InfiniteProgress.class, true)
+                            .getComponentCount() > 0,
+                    "the refresh overlay belongs to the top level the component is in "
+                            + "now, not the one it was initialised in");
+            assertEquals(0, origin.getLayeredPane(
+                            com.codename1.components.InfiniteProgress.class, true)
+                            .getComponentCount(),
+                    "and nothing may be added to the top level it left");
+        } finally {
+            later.dispose();
+            com.codename1.components.InfiniteProgress.setDefaultMaterialDesignMode(material);
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void aWindowKeepsPaintingWhileTheMainFormTransitions() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("independent", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.add(BorderLayout.CENTER, new Label("alive"));
+        w.show();
+        DisplayTest.flushEdt();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        try {
+            // Put the main surface into a transition. The event loop takes an early
+            // return while one is running, which is right for the main surface and
+            // wrong for a window that has no part in it.
+            Form next = new Form("next", new BorderLayout());
+            next.setTransitionInAnimator(
+                    com.codename1.ui.animations.CommonTransitions.createFade(300));
+            next.show();
+
+            int before = peer.getPaintCount();
+            for (int iter = 0; iter < 6; iter++) {
+                w.repaint();
+                DisplayTest.flushEdt();
+            }
+
+            assertTrue(peer.getPaintCount() > before,
+                    "a secondary window is an independent native window and must keep "
+                            + "painting while the main form transitions; it painted "
+                            + before + " times before and " + peer.getPaintCount()
+                            + " after");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void windowAttributesSetOffTheEdtReachThePortOnIt() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("attributes", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            // Same reason as the window controls: the Linux and Windows ports resolve a
+            // peer to a slot in a native table on whatever thread calls them, and a
+            // slot is reused once its window is disposed -- so an attribute set from a
+            // background thread can land on whichever window took the slot, or race the
+            // teardown freeing it.
+            Thread background = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.setDecorated(false);
+                    w.setTitle("renamed");
+                    w.setUtilityWindow(true);
+                    w.setWindowIcon(null);
+                    w.setMinimumWindowSize(new com.codename1.ui.geom.Dimension(120, 90));
+                    w.setResizable(false);
+                }
+            });
+            background.start();
+            background.join();
+            DisplayTest.flushEdt();
+
+            assertEquals(java.util.Collections.emptyList(), wm.getOffEdtCalls(),
+                    "every window attribute has to reach the port on the event dispatch "
+                            + "thread, however it was set");
+            // The field is assigned on the calling thread, so the getter answers what
+            // the caller asked for whether or not the platform has caught up.
+            assertEquals("renamed", w.getTitle(),
+                    "the getter stays consistent with the call that set it");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void windowControlsCalledOffTheEdtReachThePortOnIt() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("controls", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            // The window manager SPI is defined on the event dispatch thread, and the
+            // ports take that literally: the Windows one resolves the peer to a slot
+            // index on whatever thread calls it and hands that index to the native
+            // layer, so a background caller can read a slot an EDT disposal is tearing
+            // down. What matters is therefore which thread the call arrives on.
+            Thread background = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.minimize();
+                    w.toggleMaximize();
+                    w.requestWindowFocus();
+                }
+            });
+            background.start();
+            background.join();
+            DisplayTest.flushEdt();
+
+            assertEquals(java.util.Collections.emptyList(), wm.getOffEdtCalls(),
+                    "every window control has to reach the port on the event dispatch "
+                            + "thread, however it was called");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void aMovedListenerSeesTheMonitorTheWindowMovedTo() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setMonitors(java.util.Arrays.asList(
+                new TestWindowManager.FakeMonitor(0, 0, 1440, 900, 1.0, 96, "left"),
+                new TestWindowManager.FakeMonitor(1440, 0, 1920, 1080, 2.0, 192, "right")));
+        final Window w = new Window("travelling", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        try {
+            assertEquals("left", w.getMonitor().getName(),
+                    "it starts on the first monitor");
+
+            final String[] seen = new String[1];
+            w.addWindowListener(new ActionListener<WindowEvent>() {
+                @Override
+                public void actionPerformed(WindowEvent evt) {
+                    if (evt.getType() == WindowEvent.Type.Moved && seen[0] == null) {
+                        seen[0] = w.getMonitor().getName();
+                    }
+                }
+            });
+
+            // The platform moves it to the other monitor and reports the move. The
+            // monitor-changed notification is a separate one, queued after this.
+            peer.setMonitor(1);
+            Desktop.getInstance().windowMoved(w.getWindowId());
+            DisplayTest.flushEdt();
+
+            assertEquals("right", seen[0],
+                    "a Moved listener must see the monitor the window moved to, not the "
+                            + "one it came from");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    /// Counts pointer drags reaching a component.
+    private static final class DragCountingComponent extends Component {
+        private int drags;
+
+        @Override
+        public void pointerDragged(int x, int y) {
+            drags++;
+        }
+
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            return new com.codename1.ui.geom.Dimension(200, 150);
+        }
+    }
+
+    @FormTest
+    void disposingWindowsMidPressDoesNotExhaustTheDragFilter() {
+        implementation.setMultiWindowSupported(true);
+        // Comfortably more than the fixed table this used to be tracked in, so a leak
+        // of one entry per window would have used the whole table up by the end.
+        int windows = 12;
+        for (int iter = 0; iter < windows; iter++) {
+            Window doomed = new Window("doomed" + iter, new BorderLayout());
+            doomed.setWindowSize(400, 300);
+            doomed.add(BorderLayout.CENTER, new DragCountingComponent());
+            doomed.show();
+            doomed.asContainer().revalidate();
+            // Pressed and then disposed without a release, which is what happens when
+            // a window is closed from inside its own pressed handler or the platform
+            // takes the pointer away. The filter state belongs to the window, so it
+            // goes with it; a table keyed by window id would keep the entry forever,
+            // since window ids are not reused.
+            implementation.windowPointerPressedForTest(doomed.getWindowId(), 100, 100);
+            doomed.dispose();
+            DisplayTest.flushEdt();
+        }
+
+        // A fresh window must still get the activation filter. Starved of entries,
+        // the filter falls through and delivers the jitter as a real drag.
+        Window w = new Window("after", new BorderLayout());
+        w.setWindowSize(400, 300);
+        DragCountingComponent c = new DragCountingComponent();
+        w.add(BorderLayout.CENTER, c);
+        w.show();
+        w.asContainer().revalidate();
+        implementation.windowPointerPressedForTest(w.getWindowId(), 100, 100);
+        implementation.windowPointerDraggedForTest(w.getWindowId(), 101, 100);
+        DisplayTest.flushEdt();
+        assertEquals(0, c.drags,
+                "a pixel of jitter is still not a drag after windows were disposed "
+                        + "mid-press; the filter must not be starved");
+
+        // And the filter still passes a real drag, so this is not just a dead window.
+        for (int iter = 0; iter < 12; iter++) {
+            implementation.windowPointerDraggedForTest(w.getWindowId(), 100 + iter * 20, 100);
+        }
+        DisplayTest.flushEdt();
+        assertTrue(c.drags > 0, "real movement must still reach the component");
+        w.dispose();
+    }
+
+    @FormTest
+    void everyOpenWindowFiltersItsOwnDragNoMatterHowMany() {
+        implementation.setMultiWindowSupported(true);
+        // More than the fixed table of eight this used to be tracked in. Past that,
+        // the ninth window onwards got no filter at all and jitter reached it as a
+        // drag, which is the failure a per-window filter cannot have.
+        int count = 16;
+        java.util.List<Window> windows = new java.util.ArrayList<Window>();
+        java.util.List<DragCountingComponent> targets =
+                new java.util.ArrayList<DragCountingComponent>();
+        try {
+            for (int iter = 0; iter < count; iter++) {
+                Window w = new Window("concurrent" + iter, new BorderLayout());
+                w.setWindowSize(400, 300);
+                DragCountingComponent c = new DragCountingComponent();
+                w.add(BorderLayout.CENTER, c);
+                w.show();
+                w.asContainer().revalidate();
+                windows.add(w);
+                targets.add(c);
+            }
+            DisplayTest.flushEdt();
+
+            // Every one of them is pressed and jittered, all at once.
+            for (Window w : windows) {
+                implementation.windowPointerPressedForTest(w.getWindowId(), 100, 100);
+            }
+            for (Window w : windows) {
+                implementation.windowPointerDraggedForTest(w.getWindowId(), 101, 100);
+            }
+            DisplayTest.flushEdt();
+            for (int iter = 0; iter < count; iter++) {
+                assertEquals(0, targets.get(iter).drags,
+                        "window " + iter + " must filter its own jitter even with "
+                                + count + " windows dragging at once");
+            }
+
+            // And a real drag in the last one still gets through, so the filter is
+            // doing its job rather than swallowing everything.
+            Window last = windows.get(count - 1);
+            for (int iter = 0; iter < 12; iter++) {
+                implementation.windowPointerDraggedForTest(last.getWindowId(),
+                        100 + iter * 20, 100);
+            }
+            DisplayTest.flushEdt();
+            assertTrue(targets.get(count - 1).drags > 0,
+                    "real movement still reaches the last window");
+        } finally {
+            for (Window w : windows) {
+                w.dispose();
+            }
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void jitterInAWindowIsNotADragButRealMovementIs() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("drag", new BorderLayout());
+        w.setWindowSize(400, 300);
+        DragCountingComponent c = new DragCountingComponent();
+        w.add(BorderLayout.CENTER, c);
+        w.show();
+        w.asContainer().revalidate();
+
+        // A press then a pixel of movement. Unfiltered this reached the component
+        // straight away, activating drag and drop and moving a draggable component on
+        // what the user meant as a click.
+        implementation.windowPointerPressedForTest(w.getWindowId(), 100, 100);
+        implementation.windowPointerDraggedForTest(w.getWindowId(), 101, 100);
+        DisplayTest.flushEdt();
+        assertEquals(0, c.drags,
+                "a pixel of jitter after a press is not a drag");
+
+        // Movement well past the threshold is.
+        for (int iter = 0; iter < 12; iter++) {
+            implementation.windowPointerDraggedForTest(w.getWindowId(), 100 + iter * 20, 100);
+        }
+        DisplayTest.flushEdt();
+        assertTrue(c.drags > 0,
+                "movement across the window is a drag and still has to get through");
+        w.dispose();
+    }
+
+    @FormTest
+    void aKeyReleaseSurvivesAFloodOfPointerTraffic() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent keys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, keys);
+        main.show();
+        main.setFocused(keys);
+
+        Display.getInstance().keyPressed(-97);
+
+        // Enough pointer traffic to fill the input stack while the event dispatch
+        // thread has not drained it. Hover rather than drag: drags coalesce into a
+        // single slot, so any number of them would never fill anything -- which is
+        // also why the first version of this test passed without the reserve and
+        // proved nothing.
+        for (int iter = 0; iter < 400; iter++) {
+            Display.getInstance().pointerHover(new int[]{iter % 100}, new int[]{iter % 100});
+        }
+        Display.getInstance().keyReleased(-97);
+        DisplayTest.flushEdt();
+
+        assertEquals(1, keys.pressed, "the press was accepted before the flood");
+        assertEquals(1, keys.released,
+                "and its release has to get through, or the component it went to stays "
+                        + "pressed and the key goes on repeating");
+    }
+
+    /// Whether any key-repeat slot is currently armed.
+    private static boolean anyKeyRepeatArmed() throws Exception {
+        if (keyRepeatArmedFor(0)) {
+            return true;
+        }
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            if (open[iter].hasKeyRepeatArmed()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @FormTest
+    void aRejectedKeyPressArmsNoRepeat() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent keys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, keys);
+        main.show();
+        main.setFocused(keys);
+
+        // Refused for certain, rather than by filling the stack to an exact boundary:
+        // drop mode is the same rejection the queue makes when it is full, and the
+        // question here is what happens to the timers when a press is refused, not how
+        // it came to be refused.
+        java.lang.reflect.Field drop = Display.class.getDeclaredField("dropEvents");
+        drop.setAccessible(true);
+        drop.setBoolean(Display.getInstance(), true);
+        try {
+            Display.getInstance().keyPressed(65);
+        } finally {
+            drop.setBoolean(Display.getInstance(), false);
+        }
+        DisplayTest.flushEdt();
+
+        assertEquals(0, keys.pressed,
+                "the press was refused, so the component never saw it");
+        // The repeat and long-press timers fire straight into the top level, so arming
+        // them off a refused press sends keyRepeated() to a component that never got
+        // keyPressed() -- and with the key still held, sends it every frame.
+        assertFalse(anyKeyRepeatArmed(),
+                "and nothing may be armed off a press that was never accepted");
+    }
+
+    @FormTest
+    void aRejectedPointerPressArmsNoLongPress() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+
+        java.lang.reflect.Field drop = Display.class.getDeclaredField("dropEvents");
+        drop.setAccessible(true);
+        drop.setBoolean(Display.getInstance(), true);
+        try {
+            Display.getInstance().pointerPressed(new int[]{40}, new int[]{40});
+        } finally {
+            drop.setBoolean(Display.getInstance(), false);
+        }
+        DisplayTest.flushEdt();
+
+        // longPointerPress() is delivered straight to the top level, so arming it off a
+        // refused press sends a long press to a component that never got
+        // pointerPressed().
+        boolean anyArmed = longPressArmedFor(0);
+        Window[] open = Desktop.getInstance().getWindows();
+        for (int iter = 0; iter < open.length; iter++) {
+            if (open[iter].hasLongPointerArmed()) {
+                anyArmed = true;
+            }
+        }
+        assertFalse(anyArmed,
+                "nothing may be armed off a pointer press that was never accepted");
+    }
+
+    @FormTest
+    void desktopAnswersBeforeDisplayHasAnImplementation() throws Exception {
+        // The fallback monitor and the monitor listener are both documented to work
+        // during startup, which is when an application knows it wants them. Both used
+        // to dereference Display.impl and throw at exactly that moment.
+        java.lang.reflect.Field impl = Display.class.getDeclaredField("impl");
+        impl.setAccessible(true);
+        Object saved = impl.get(null);
+        impl.set(null, null);
+        try {
+            Monitor[] monitors = Desktop.getInstance().getMonitors();
+            assertEquals(1, monitors.length,
+                    "an uninitialized platform still reports its single display");
+            assertNotNull(Desktop.getInstance().getPrimaryMonitor());
+            Desktop.getInstance().addMonitorListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                }
+            });
+        } finally {
+            impl.set(null, saved);
+        }
+    }
+
+    @FormTest
+    void aLiveResizeDoesNotFillTheInputStack() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        java.lang.reflect.Field sp = Display.class.getDeclaredField("inputEventStackPointer");
+        sp.setAccessible(true);
+        int before = sp.getInt(Display.getInstance());
+
+        // A drag-resize produces hundreds of these. Queueing each one fills the stack,
+        // and then the final size is dropped -- leaving the hierarchy laid out for a
+        // size the surface no longer has -- along with any release behind it.
+        for (int iter = 1; iter <= 400; iter++) {
+            Display.getInstance().sizeChanged(300 + iter, 200 + iter);
+        }
+        int after = sp.getInt(Display.getInstance());
+
+        assertTrue(after - before <= 3,
+                "a live resize must cost one queued packet, not one per notification; "
+                        + "grew by " + (after - before) + " slots");
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void twoWindowsDraggingAtOnceKeepSeparateActivationState() {
+        implementation.setMultiWindowSupported(true);
+        Window a = new Window("a", new BorderLayout());
+        a.setWindowSize(400, 300);
+        DragCountingComponent ca = new DragCountingComponent();
+        a.add(BorderLayout.CENTER, ca);
+        a.show();
+        a.asContainer().revalidate();
+
+        Window b = new Window("b", new BorderLayout());
+        b.setWindowSize(400, 300);
+        DragCountingComponent cb = new DragCountingComponent();
+        b.add(BorderLayout.CENTER, cb);
+        b.show();
+        b.asContainer().revalidate();
+
+        // A touchscreen can have a contact down in two windows at once, and the
+        // framework keys press targets and drag histories per window already. Shared
+        // activation state lets a gesture in one window carry the other past its
+        // threshold, or reset it.
+        implementation.windowPointerPressedForTest(a.getWindowId(), 100, 100);
+        implementation.windowPointerPressedForTest(b.getWindowId(), 100, 100);
+        for (int iter = 0; iter < 12; iter++) {
+            implementation.windowPointerDraggedForTest(a.getWindowId(), 100 + iter * 20, 100);
+        }
+        // b has only jittered, so it must not be dragging just because a is.
+        implementation.windowPointerDraggedForTest(b.getWindowId(), 101, 100);
+        DisplayTest.flushEdt();
+
+        assertTrue(ca.drags > 0, "the window that actually moved is dragging");
+        assertEquals(0, cb.drags,
+                "a drag activated in one window must not carry another window's jitter "
+                        + "past its own threshold");
+        a.dispose();
+        b.dispose();
+    }
+}

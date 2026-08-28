@@ -2,3 +2,14 @@
  * The homepage and shared navigation styles moved to zz-cn1-design-system.css.
  * Keep this file as a stable Hugo asset entry point for downstream overrides.
  */
+.cn1-exp004-copy--reach {
+  display: none;
+}
+
+html[data-cn1-exp004-arm="reach"] .cn1-exp004-copy--ownership {
+  display: none;
+}
+
+html[data-cn1-exp004-arm="reach"] .cn1-exp004-copy--reach {
+  display: block;
+}

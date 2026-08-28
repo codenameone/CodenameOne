@@ -1,0 +1,195 @@
+name: Ad cn1lib iOS native check
+
+# The Objective-C in an ad cn1lib is shipped as source: our builds never
+# compile it, the customer's Xcode is the first compiler that ever sees it, and
+# the pod it is written against keeps moving underneath it. That is how
+# cn1-admob reached users referencing GADSimulatorID, which the Google Mobile
+# Ads SDK removed in version 12, and BRIDGE_RETAINED, which has never existed
+# anywhere in the port. Both surfaced as a failed app build.
+#
+# So the native sources are compiled here against the very pod the library
+# pins, in a throwaway static-library target. A static library archives .o
+# files without linking, so the externs the real build supplies (the translated
+# AdMobCallback entry point) do not have to resolve.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'maven/cn1-admob/**'
+      - 'maven/cn1-applovin/**'
+      - 'maven/cn1-unity-levelplay/**'
+      - 'vm/ByteCodeTranslator/src/cn1_globals.h'
+      - '.github/workflows/ad-cn1lib-ios-native-check.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'maven/cn1-admob/**'
+      - 'maven/cn1-applovin/**'
+      - 'maven/cn1-unity-levelplay/**'
+      - 'vm/ByteCodeTranslator/src/cn1_globals.h'
+      - '.github/workflows/ad-cn1lib-ios-native-check.yml'
+
+concurrency:
+  # These jobs run on macOS, where the runner pool is small and a queued run
+  # holds its slots until it finishes. Without this, a branch that is pushed
+  # several times queues every superseded run behind the current one -- five
+  # obsolete runs of this workflow, 6 macOS jobs each, sat queued on this
+  # branch before it was added.
+  #
+  # Keyed on the pull request number rather than head_ref, which is the source
+  # branch name with no fork identity in it: two pull requests opened from
+  # different forks that both use a common branch name -- master, patch-1 --
+  # would share a group and cancel each other's check. On push to master there
+  # is no pull request, so the group falls back to the unique run_id and every
+  # master commit is still checked in full.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  compile-native-sources:
+    name: clang ${{ matrix.lib }} (ARC ${{ matrix.arc }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        lib: [cn1-admob, cn1-applovin, cn1-unity-levelplay]
+        # Both memory models, because which one applies is not ours to assume.
+        # The generated app target is manual-retain-release
+        # (CLANG_ENABLE_OBJC_ARC = NO in
+        # vm/ByteCodeTranslator/src/template/template.xcodeproj), and that is
+        # what compiles a cn1lib's sources today -- but IPhoneBuilder also adds
+        # -fobjc-arc to individual files (arcPhaseFixScript does it for
+        # CN1Vision.m, CN1Language.m and CN1Inference.m), so ARC is reachable
+        # too. Checking only one model would accept, for instance, a __bridge
+        # cast that is an error under MRR, or a missing release that ARC hides.
+        arc: [NO, YES]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve the pod this library pins
+        id: pod
+        # Read it out of codenameone_library_required.properties rather than
+        # repeating it here, so the version the check compiles against is the
+        # version apps build against, by construction.
+        run: |
+          set -euo pipefail
+          props="maven/${{ matrix.lib }}/common/codenameone_library_required.properties"
+          line="$(sed -n 's/^codename1\.arg\.ios\.pods=//p' "$props" | head -1)"
+          if [ -z "$line" ]; then
+              echo "::error::No codename1.arg.ios.pods in $props"; exit 1
+          fi
+          name="${line%% *}"
+          version=""
+          if [ "$name" != "$line" ]; then
+              version="${line#* }"
+          fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Pod: $name ${version:-(unpinned)}"
+
+      - name: Stage the probe sources
+        run: |
+          set -euxo pipefail
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
+          mkdir -p "$PROBE/CN1AdProbe"
+          # Objective-C and Objective-C++ alike. check-cn1lib-native-coverage.py
+          # counts a .mm file as an iOS native source, so staging only .m would
+          # let a broken Objective-C++ bridge be reported as covered while
+          # nothing ever compiled it.
+          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.h "$PROBE/CN1AdProbe/" 2>/dev/null || true
+          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.m "$PROBE/CN1AdProbe/" 2>/dev/null || true
+          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.mm "$PROBE/CN1AdProbe/" 2>/dev/null || true
+          # An empty probe would build green and check nothing. find is used
+          # rather than ls because ls reports failure when either glob is
+          # unmatched, which is the normal case for a library with no .mm.
+          staged=$(find "$PROBE/CN1AdProbe" -maxdepth 1 \( -name '*.m' -o -name '*.mm' \) | wc -l)
+          if [ "$staged" -eq 0 ]; then
+              echo "::error::No Objective-C sources staged for ${{ matrix.lib }}"; exit 1
+          fi
+
+          # These sources call back into Java through the generated entry point
+          # and use JAVA_INT / JAVA_OBJECT / fromNSString without importing
+          # anything: in a real build the translator's <app>-Prefix.pch pulls in
+          # cn1_globals.h for them. Reproduce that here, using the port's own
+          # header so a change to those macros is caught too.
+          cp vm/ByteCodeTranslator/src/cn1_globals.h "$PROBE/"
+          # Generated per translation from the app's class list; nothing in the
+          # ad bridges reads it, so an empty stand-in is enough to let
+          # cn1_globals.h parse on its own.
+          printf '#pragma once\n' > "$PROBE/cn1_class_method_index.h"
+          cat > "$PROBE/CN1AdProbe-Prefix.pch" <<'PCH'
+          #ifdef __OBJC__
+          #import <UIKit/UIKit.h>
+          #import <Foundation/Foundation.h>
+          #endif
+          #include "cn1_globals.h"
+          PCH
+          ls -la "$PROBE" "$PROBE/CN1AdProbe"
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Synthesise the Xcode project
+        run: |
+          set -euxo pipefail
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
+          # The heredoc is quoted so the shell leaves it alone; the matrix
+          # value below is substituted by Actions before this script runs, so
+          # the generated project carries a literal YES or NO.
+          cat > "$PROBE/project.yml" <<'YML'
+          name: CN1AdProbe
+          options:
+            bundleIdPrefix: com.codenameone.cn1ads
+            deploymentTarget:
+              iOS: "15.0"
+          targets:
+            CN1AdProbe:
+              type: library.static
+              platform: iOS
+              sources:
+                - path: CN1AdProbe
+              settings:
+                base:
+                  CLANG_ENABLE_MODULES: YES
+                  CLANG_ENABLE_OBJC_ARC: ${{ matrix.arc }}
+                  CODE_SIGNING_ALLOWED: NO
+                  GCC_PREFIX_HEADER: CN1AdProbe-Prefix.pch
+                  GCC_PRECOMPILE_PREFIX_HEADER: NO
+                  HEADER_SEARCH_PATHS: $(inherited) $(SRCROOT)
+          YML
+          cd "$PROBE"
+          xcodegen generate --spec project.yml
+
+      - name: pod install
+        run: |
+          set -euxo pipefail
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
+          cd "$PROBE"
+          {
+            echo "platform :ios, '15.0'"
+            echo "target 'CN1AdProbe' do"
+            echo "  use_frameworks!"
+            if [ -n "${{ steps.pod.outputs.version }}" ]; then
+              echo "  pod '${{ steps.pod.outputs.name }}', '${{ steps.pod.outputs.version }}'"
+            else
+              echo "  pod '${{ steps.pod.outputs.name }}'"
+            fi
+            echo "end"
+          } > Podfile
+          cat Podfile
+          pod install --repo-update
+
+      - name: xcodebuild
+        run: |
+          set -euxo pipefail
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
+          cd "$PROBE"
+          xcodebuild -workspace CN1AdProbe.xcworkspace \
+                     -scheme CN1AdProbe \
+                     -configuration Debug \
+                     -sdk iphonesimulator \
+                     -destination 'generic/platform=iOS Simulator' \
+                     CODE_SIGNING_ALLOWED=NO \
+                     build

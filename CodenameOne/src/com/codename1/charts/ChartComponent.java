@@ -29,7 +29,6 @@ import com.codename1.charts.views.AbstractChart;
 import com.codename1.charts.views.XYChart;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Animation;
@@ -992,6 +991,13 @@ public class ChartComponent extends Component {
     }
 
     private class ZoomTransition implements Animation, IZoomTransition {
+        /// The top level this transition registered on, so cleanup removes it from
+        /// that one rather than from wherever the chart resolves to when the motion
+        /// ends. A chart removed or reparented in between leaves the animation on the
+        /// original for good: its hasAnimations() stays true, the event dispatch thread
+        /// never sleeps, and the finished branch runs every frame.
+        private com.codename1.ui.TopLevelContainer animationHost;
+
         private final Rectangle currentViewPort;
         private final Rectangle newViewPort;
         private final Transform origTransform;
@@ -1012,8 +1018,9 @@ public class ChartComponent extends Component {
 
         @Override
         public void start() {
-            Form f = ChartComponent.this.getComponentForm();
+            com.codename1.ui.TopLevelContainer f = ChartComponent.this.getTopLevelContainer();
             if (f != null) {
+                animationHost = f;
                 f.registerAnimated(this);
                 this.motion.start();
             } else {
@@ -1022,9 +1029,9 @@ public class ChartComponent extends Component {
         }
 
         public void cleanup() {
-            Form f = ChartComponent.this.getComponentForm();
-            if (f != null) {
-                f.deregisterAnimated(this);
+            if (animationHost != null) {
+                animationHost.deregisterAnimated(this);
+                animationHost = null;
             }
         }
 
@@ -1087,6 +1094,13 @@ public class ChartComponent extends Component {
     }
 
     private class ZoomTransitionXY implements Animation, IZoomTransition {
+        /// The top level this transition registered on, so cleanup removes it from
+        /// that one rather than from wherever the chart resolves to when the motion
+        /// ends. A chart removed or reparented in between leaves the animation on the
+        /// original for good: its hasAnimations() stays true, the event dispatch thread
+        /// never sleeps, and the finished branch runs every frame.
+        private com.codename1.ui.TopLevelContainer animationHost;
+
         private final BBox currentViewPort;
         private final BBox newViewPort;
         private final Motion motion;
@@ -1101,8 +1115,9 @@ public class ChartComponent extends Component {
 
         @Override
         public void start() {
-            Form f = ChartComponent.this.getComponentForm();
+            com.codename1.ui.TopLevelContainer f = ChartComponent.this.getTopLevelContainer();
             if (f != null) {
+                animationHost = f;
                 f.registerAnimated(this);
                 this.motion.start();
             } else {
@@ -1111,9 +1126,9 @@ public class ChartComponent extends Component {
         }
 
         public void cleanup() {
-            Form f = ChartComponent.this.getComponentForm();
-            if (f != null) {
-                f.deregisterAnimated(this);
+            if (animationHost != null) {
+                animationHost.deregisterAnimated(this);
+                animationHost = null;
             }
         }
 

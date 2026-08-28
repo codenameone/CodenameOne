@@ -855,6 +855,21 @@ public class CN extends CN1Constants {
         return Display.impl.isDesktop();
     }
 
+    /// Indicates whether this platform can open desktop windows, so an application
+    /// can offer them where they exist and stay on one surface where they do not.
+    ///
+    /// Shorthand for `Desktop#isSupported()`, kept here because this is where an
+    /// application already asks what the platform can do. Constructing a
+    /// `com.codename1.ui.Window` on a platform that answers false throws rather than
+    /// quietly degrading to a `Form`, so this is the guard to branch on.
+    ///
+    /// #### Returns
+    ///
+    /// true if this platform supports `com.codename1.ui.Window`
+    public static boolean isMultiWindowSupported() {
+        return Desktop.isSupported();
+    }
+
     /// Indicates whether the application is running on a smartwatch form factor
     /// (Apple Watch / Wear OS). Notice that this is often a guess derived from
     /// the device metadata.

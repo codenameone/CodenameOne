@@ -33,15 +33,19 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.Set;
 
@@ -60,8 +64,14 @@ import java.util.Set;
 ///   2. ParparVM's iOS class scan and the JavaSE simulator both see them.
 ///   3. The project's `target/classes` takes precedence over any cn1-core
 ///      JAR stub of the same internal name on the classpath at runtime.
+/// COMPILE resolution is required, not optional. A processor discovers which
+/// annotations are build hint annotations by reading the annotation package off
+/// this classpath, and without a declared scope Maven does not resolve it:
+/// getCompileClasspathElements() throws, the package is not found, and every
+/// annotated hint is silently skipped.
 @Mojo(name = "process-annotations",
       defaultPhase = LifecyclePhase.PROCESS_CLASSES,
+      requiresDependencyResolution = ResolutionScope.COMPILE,
       threadSafe = true)
 public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
 
@@ -103,7 +113,20 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
         }
 
         ProcessorContext ctx = new ProcessorContext(outputDirectory, stubSourceDirectory,
-                index, getLog());
+                index, getLog(), getCN1ProjectDir(), rawProjectSettings(), mainClassBinaryName(),
+                // The roots Maven is actually compiling, so a processor asking
+                // whether a class still has a source is not guessing at the
+                // layout.
+                compileSourceRoots(project, userProperties()),
+                // The charset javac is given, so a processor reading a source
+                // back decodes the text that was actually compiled rather than
+                // one of the single-byte encodings that all decode without
+                // error and disagree about every non-ASCII character.
+                sourceEncodingOf(project, userProperties()),
+                // Where the build hint annotations are, so the processor reads
+                // what a member sets from the annotation rather than from a
+                // generated table naming each of them.
+                compileClasspathOf(project));
 
         // start()
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
@@ -219,6 +242,21 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
             getLog().info("cn1: emitted " + resources.size() + " generated resource(s) under "
                     + outputDirectory);
         }
+
+        // The build hint manifest records the main class's own bytes so the
+        // simulator, which has no bytecode reader, can tell a current manifest
+        // from one an earlier build left behind. A processor may REPLACE that
+        // class through emitClass -- BindingAnnotationProcessor does, for a
+        // two-way @Bindable setter -- and those are flushed above, after every
+        // finish(). So the stamp is corrected here, which is the first moment
+        // the class on disk is final. A no-op when there is no manifest.
+        try {
+            com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .restampClassDigest(outputDirectory);
+        } catch (IOException ioe) {
+            throw new MojoExecutionException(
+                    "Could not stamp the build hint manifest under " + outputDirectory, ioe);
+        }
     }
 
     private static boolean intersects(Set<String> a, Set<String> b) {
@@ -237,5 +275,94 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
         List<AnnotationProcessor> out = new ArrayList<AnnotationProcessor>();
         for (AnnotationProcessor p : sl) out.add(p);
         return Collections.unmodifiableList(out);
+    }
+
+    /// Loads `codenameone_settings.properties` exactly as it sits on disk.
+    ///
+    /// Deliberately not the inherited `properties` field: that one has the
+    /// `-D` command line overlaid on top of it, and a hint passed with `-D` is
+    /// the documented way to override one for a single build. A processor that
+    /// compared annotations against the overlaid view would report a conflict
+    /// for the one case that is supposed to win.
+    private Properties rawProjectSettings() {
+        File f = getProjectPropertiesFile();
+        if (f == null || !f.exists()) {
+            return null;
+        }
+        Properties p = new Properties();
+        InputStream in = null;
+        try {
+            in = new FileInputStream(f);
+            p.load(in);
+        } catch (IOException ex) {
+            getLog().warn("cn1: could not read " + f + ": " + ex.getMessage());
+            return null;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // nothing useful to do on close failure of a read-only stream
+                }
+            }
+        }
+        return p;
+    }
+
+    /// `codename1.packageName` + `codename1.mainName`, or null when the project
+    /// declares no main class.
+    ///
+    /// From the EFFECTIVE settings, not the file: `execute()` has already
+    /// overlaid `-D codename1.mainName` / `codename1.packageName` onto
+    /// `properties`, and `CN1BuildMojo` computes the main class it expects from
+    /// that same overlaid table. Reading the file here stamped the manifest for
+    /// a class the merge was not looking for, so it refused the manifest and
+    /// the annotated hints were silently dropped -- while
+    /// `failOnMisplacedAnnotations` reported the entry point the build had
+    /// actually selected as the wrong place to put them.
+    ///
+    /// The RAW file is still what the duplicate-hint check reads, which is the
+    /// one thing `-D` must NOT feed: a hint passed on the command line is an
+    /// override of the file's value, not a second declaration of it.
+    String mainClassBinaryName() {
+        Properties p = properties != null ? properties : rawProjectSettings();
+        if (p == null) {
+            return null;
+        }
+        String main = p.getProperty("codename1.mainName");
+        String pkg = p.getProperty("codename1.packageName");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        main = main.trim();
+        if (pkg == null || pkg.trim().length() == 0) {
+            return main;
+        }
+        return pkg.trim() + "." + main;
+    }
+
+    /// The module's compile classpath, or an empty list when Maven cannot
+    /// resolve it.
+    ///
+    /// Not fatal: a processor that cannot find the annotations says so itself,
+    /// and failing the build here would break goals that do not need them.
+    private java.util.List<String> compileClasspathOf(
+            org.apache.maven.project.MavenProject module) {
+        if (module == null) {
+            return java.util.Collections.emptyList();
+        }
+        try {
+            return module.getCompileClasspathElements();
+        } catch (org.apache.maven.artifact.DependencyResolutionRequiredException ex) {
+            // Loud. An unresolved classpath means the annotation package cannot
+            // be found, and a processor that reads it then finds nothing to do
+            // -- so every annotated hint would be skipped with no other sign. The
+            // mojo declares COMPILE resolution precisely so this cannot happen;
+            // reaching it means that declaration was lost.
+            getLog().warn("cn1: the compile classpath for " + module.getArtifactId()
+                    + " is unresolved, so build hint annotations cannot be read: "
+                    + ex.getMessage());
+            return java.util.Collections.emptyList();
+        }
     }
 }
