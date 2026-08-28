@@ -142,14 +142,16 @@ public class Sheet extends Container {
     private final ActionListener formPointerListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
-            Form f = getComponentForm();
+            // The top level, not the form: getComponentForm() is null by design inside
+            // a Window, so tapping outside a sheet there did nothing.
+            TopLevelContainer f = getTopLevelContainer();
             if (f == null) {
                 return;
             }
             if (Display.impl.isScrollWheeling()) {
                 return;
             }
-            Component cmp = f.getComponentAt(evt.getX(), evt.getY());
+            Component cmp = f.asContainer().getComponentAt(evt.getX(), evt.getY());
             if (Sheet.this.contains(cmp) || Sheet.this == cmp || cmp.isOwnedBy(Sheet.this)) { //NOPMD CompareObjectsWithEquals
                 // do nothing.
             } else {
@@ -358,7 +360,18 @@ public class Sheet extends Container {
     /// that asks for no inset puts these back rather than leaving the inset of the previous border
     /// behind.
     private ArrayList<ContentPaneInset> contentPaneInsets;
-    private Form form;
+    /// The top level this sheet attached its listeners to, which may be a window.
+    private TopLevelContainer form;
+
+    /// The top level this sheet was shown on, held for the whole showing.
+    ///
+    /// show() and hide() used to resolve the current form independently, so a sheet
+    /// shown on one form and hidden after navigating to another tore down the wrong
+    /// layered pane and left itself on screen.
+    private TopLevelContainer shownHost;
+
+    /// The top level the application named, or null to work it out.
+    private TopLevelContainer hostTopLevel;
     private final Rectangle sheetBounds = new Rectangle();
     private boolean trackSheetBounds;
     private Rectangle sheetEntry;
@@ -468,6 +481,42 @@ public class Sheet extends Container {
 
     }
 
+    /// Sets the top level this sheet appears on, which may be a
+    /// `com.codename1.ui.Window` rather than the current `Form`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the top level to show on, or null to work it out
+    public void setTopLevelHost(TopLevelContainer host) {
+        this.hostTopLevel = host;
+    }
+
+    /// Returns the top level set with `#setTopLevelHost(TopLevelContainer)`.
+    ///
+    /// #### Returns
+    ///
+    /// the explicit host, or null when none was set
+    public TopLevelContainer getTopLevelHost() {
+        return hostTopLevel;
+    }
+
+    /// The top level to show on: the explicit host, else the one this sheet is already
+    /// attached to, else the focused window, else the current form.
+    ///
+    /// #### Returns
+    ///
+    /// the host top level, or null when there is none
+    private TopLevelContainer resolveHost() {
+        if (hostTopLevel != null) {
+            return hostTopLevel;
+        }
+        TopLevelContainer attached = getTopLevelContainer();
+        if (attached != null) {
+            return attached;
+        }
+        return CN.getCurrentTopLevel();
+    }
+
     /// Gets the current sheet on the current form or null if no sheet is currently being displayed.
     ///
     /// #### Returns
@@ -475,10 +524,23 @@ public class Sheet extends Container {
     /// The current sheet or null.
     ///
     public static Sheet getCurrentSheet() {
-        if (CN.getCurrentForm() == null) {
+        return getCurrentSheet(CN.getCurrentTopLevel());
+    }
+
+    /// Gets the sheet currently showing on the given top level, or null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to look on, may be null
+    ///
+    /// #### Returns
+    ///
+    /// The current sheet or null.
+    public static Sheet getCurrentSheet(TopLevelContainer top) {
+        if (top == null) {
             return null;
         }
-        Container cnt = CN.getCurrentForm().getFormLayeredPaneIfExists();
+        Container cnt = TopLevelSupport.formLayeredPaneIfExists(top);
         if (cnt == null) {
             return null;
         }
@@ -535,11 +597,11 @@ public class Sheet extends Container {
         if (allowClose != this.allowClose) {
             this.allowClose = allowClose;
             if (!allowClose && isInitialized()) {
-                form.removePointerPressedListener(formPointerListener);
+                form.asContainer().removePointerPressedListener(formPointerListener);
                 detachSwipeListeners(form);
                 dragging = false;
             } else if (allowClose && isInitialized()) {
-                form.addPointerPressedListener(formPointerListener);
+                form.asContainer().addPointerPressedListener(formPointerListener);
                 attachSwipeListeners(form);
             }
             if (parentSheet == null) {
@@ -579,22 +641,22 @@ public class Sheet extends Container {
         }
     }
 
-    private void attachSwipeListeners(Form f) {
+    private void attachSwipeListeners(TopLevelContainer f) {
         if (f == null) {
             return;
         }
-        f.addPointerPressedListener(formSwipePressedListener);
-        f.addPointerDraggedListener(formSwipeDraggedListener);
-        f.addPointerReleasedListener(formSwipeReleasedListener);
+        f.asContainer().addPointerPressedListener(formSwipePressedListener);
+        f.asContainer().addPointerDraggedListener(formSwipeDraggedListener);
+        f.asContainer().addPointerReleasedListener(formSwipeReleasedListener);
     }
 
-    private void detachSwipeListeners(Form f) {
+    private void detachSwipeListeners(TopLevelContainer f) {
         if (f == null) {
             return;
         }
-        f.removePointerPressedListener(formSwipePressedListener);
-        f.removePointerDraggedListener(formSwipeDraggedListener);
-        f.removePointerReleasedListener(formSwipeReleasedListener);
+        f.asContainer().removePointerPressedListener(formSwipePressedListener);
+        f.asContainer().removePointerDraggedListener(formSwipeDraggedListener);
+        f.asContainer().removePointerReleasedListener(formSwipeReleasedListener);
     }
 
     /// Gets the content pane of the sheet.  All sheet content should be added to the content pane
@@ -853,11 +915,22 @@ public class Sheet extends Container {
 
         int topPadding = statusBarStyle.getPaddingTop() + statusBarStyle.getPaddingBottom() + titleAreaStyle.getPaddingTop();
         int positionInt = getPositionInt();
+        // The host's safe area and height, not the display's. A window has no notch to
+        // avoid and its own height is what the sheet has to fit, so measuring the main
+        // display padded a sheet in a window for a cutout that is not in front of it.
+        TopLevelContainer safeHost = resolveHost();
         Rectangle displaySafeArea = new Rectangle();
-        Display.getInstance().getDisplaySafeArea(displaySafeArea);
+        if (safeHost != null) {
+            Rectangle hostSafe = safeHost.getSafeArea();
+            displaySafeArea.setBounds(hostSafe.getX(), hostSafe.getY(),
+                    hostSafe.getWidth(), hostSafe.getHeight());
+        } else {
+            Display.getInstance().getDisplaySafeArea(displaySafeArea);
+        }
         // Use original bottom padding to prevent accumulation
         int bottomPadding = originalPadding[2];
-        int safeAreaBottomPadding = CN.getDisplayHeight() - (displaySafeArea.getY() + displaySafeArea.getHeight());
+        int safeAreaBottomPadding = TopLevelSupport.hostHeight(safeHost)
+                - (displaySafeArea.getY() + displaySafeArea.getHeight());
         bottomPadding = bottomPadding + safeAreaBottomPadding;
         if (positionInt == S || positionInt == C) {
             // For Center and South position we use margin to
@@ -875,7 +948,13 @@ public class Sheet extends Container {
 
         // END Deal with iPhoneX notch
 
-        Form f = CN.getCurrentForm();
+        TopLevelContainer f = resolveHost();
+        if (f == null) {
+            throw new IllegalStateException(
+                    "Sheet.show() has no top level to show on: no window is focused and "
+                    + "no form is current");
+        }
+        shownHost = f;
         if (f.getAnimationManager().isAnimating()) {
             f.getAnimationManager().flushAnimation(new Runnable() {
                 @Override
@@ -888,7 +967,7 @@ public class Sheet extends Container {
         if (getParent() != null) {
             remove();
         }
-        Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);
+        Container cnt = f.getFormLayeredPane(Sheet.class, true);
         if (!(cnt.getLayout() instanceof BorderLayout)) {
             cnt.setLayout(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
 
@@ -1279,7 +1358,13 @@ public class Sheet extends Container {
     }
 
     private void hide(int duration) {
-        final Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);
+        // The host the sheet was shown on, not whatever is current now: navigating
+        // away between show and hide used to tear down the wrong layered pane.
+        TopLevelContainer host = shownHost != null ? shownHost : resolveHost();
+        if (host == null) {
+            return;
+        }
+        final Container cnt = host.getFormLayeredPane(Sheet.class, true);
         setX(getHiddenX(cnt));
         setY(getHiddenY(cnt));
         cnt.animateUnlayout(duration, 255, new Runnable() {
@@ -1287,9 +1372,13 @@ public class Sheet extends Container {
             public void run() {
                 Container parent = cnt.getParent();
 
-                if (parent != null && parent.getComponentForm() != null) {
+                // The top level, not the form. getComponentForm() is null inside a
+                // Window, so this whole block was skipped there and the sheet was left
+                // on screen with its close event never fired.
+                TopLevelContainer parentTop = TopLevelSupport.of(parent);
+                if (parent != null && parentTop != null) {
                     cnt.remove();
-                    Form parentForm = parent.getComponentForm();
+                    Container parentForm = parentTop.asContainer();
                     parentForm.revalidateLater();
                     // revalidateLater() only schedules work for the next
                     // paint cycle, but cnt.remove() does not by itself wake
@@ -1319,7 +1408,7 @@ public class Sheet extends Container {
             hide(duration);
             return;
         }
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f == null) {
             hide(duration);
             return;
@@ -1350,9 +1439,10 @@ public class Sheet extends Container {
             @Override
             public void run() {
                 Container parent = cnt.getParent();
-                if (parent != null && cnt.getComponentForm() != null) {
+                TopLevelContainer parentTop = TopLevelSupport.of(cnt);
+                if (parent != null && parentTop != null) {
                     cnt.remove();
-                    Form parentForm = parent.getComponentForm();
+                    Container parentForm = parentTop.asContainer();
                     parentForm.revalidateLater();
                     // revalidateLater() only schedules work for the next
                     // paint cycle, but cnt.remove() does not by itself wake
@@ -1405,9 +1495,9 @@ public class Sheet extends Container {
     @Override
     protected void initComponent() {
         super.initComponent();
-        form = getComponentForm();
+        form = getTopLevelContainer();
         if (form != null && allowClose) {
-            form.addPointerPressedListener(formPointerListener);
+            form.asContainer().addPointerPressedListener(formPointerListener);
             attachSwipeListeners(form);
         }
     }
@@ -1415,7 +1505,7 @@ public class Sheet extends Container {
     @Override
     protected void deinitialize() {
         if (form != null) {
-            form.removePointerPressedListener(formPointerListener);
+            form.asContainer().removePointerPressedListener(formPointerListener);
             detachSwipeListeners(form);
             form = null;
         }

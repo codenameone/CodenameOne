@@ -1864,6 +1864,17 @@ public class Dialog extends Form implements AbstractDialog {
 
     /// {@inheritDoc}
     ///
+    /// A hosted dialog owns the commands activated inside it even though it is
+    /// parented. Without this the walk goes past it to the window, whose command
+    /// listeners are not the dialog's -- so pressing the dialog's own OK button set no
+    /// lastCommandPressed and never disposed it, and a modal wait on it never ended.
+    @Override
+    boolean isCommandHost() {
+        return getParent() == null || layerHost != null;
+    }
+
+    /// {@inheritDoc}
+    ///
     /// A dialog in a window's layered pane has no previous form to return to and was
     /// never handed to `Display#setCurrent(Form)`, so none of the base teardown applies
     /// to it. It comes back out of the layer instead.

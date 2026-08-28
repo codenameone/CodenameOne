@@ -146,44 +146,34 @@ class DialogInWindowTest extends UITestBase {
         implementation.setMultiWindowSupported(true);
         new Form("main", new BorderLayout()).show();
         DisplayTest.flushEdt();
-        Window w = new Window("host", new BorderLayout());
+        final Window w = new Window("host", new BorderLayout());
         w.setWindowSize(500, 400);
         Button anchor = new Button("anchor");
         w.add(BorderLayout.CENTER, anchor);
         w.show();
         DisplayTest.flushEdt();
 
-        Dialog d = new Dialog();
+        // showPopupDialog blocks until the popup goes, so the popup disposes itself the
+        // moment it is on screen. That keeps the whole case on one thread: a background
+        // caller parked in invokeAndBlock outlives the test if anything goes wrong.
+        final Dialog d = new Dialog();
+        final boolean[] hostedOnTheWindow = new boolean[1];
         d.setLayout(new BorderLayout());
         d.add(BorderLayout.CENTER, new Label("popup"));
+        d.addShowListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                hostedOnTheWindow[0] = isUnder(w, d);
+                d.dispose();
+            }
+        });
         assertNull(d.getTopLevelHost(), "precondition: no host was named");
 
-        // showPopupDialog blocks, so drive it from a background thread and dismiss it.
-        d.setDisposeWhenPointerOutOfBounds(true);
-        final Dialog dlg = d;
-        Thread caller = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                dlg.showPopupDialog(anchor);
-            }
-        }, "cn1-test-popup");
-        caller.start();
-        try {
-            for (int i = 0; i < 200 && dlg.getParent() == null; i++) {
-                DisplayTest.flushEdt();
-                sleepQuietly();
-            }
-            assertTrue(isUnder(w, dlg),
-                    "a popup takes its host from the anchor, whose coordinate space it points into");
-        } finally {
-            dlg.dispose();
-            for (int i = 0; i < 200 && caller.isAlive(); i++) {
-                DisplayTest.flushEdt();
-                sleepQuietly();
-            }
-            joinQuietly(caller);
-        }
+        d.showPopupDialog(anchor);
         DisplayTest.flushEdt();
+
+        assertTrue(hostedOnTheWindow[0],
+                "a popup takes its host from the anchor, whose coordinate space it points into");
         assertNull(d.getTopLevelHost(),
                 "the inferred host belongs to that one showing and must not outlive it");
         w.dispose();
@@ -191,10 +181,12 @@ class DialogInWindowTest extends UITestBase {
     }
 
     @FormTest
-    void aCommandButtonInAWindowHostedDialogReachesTheDialog() throws Exception {
-        // The regression guard for the command host walk. Before it the button told
-        // the Window, whose listeners are not the dialog's, so lastCommandPressed
-        // stayed null and a modal showDialog() never returned.
+    void aCommandButtonInAWindowHostedDialogReachesTheDialog() {
+        // The regression guard for the command host walk. Before it the button reported
+        // to the Window, whose command listeners are not the dialog's, so the dialog
+        // never learned its own button had been pressed: lastCommandPressed stayed null
+        // and autoDispose never fired. Asserting on the dispose is what makes this a
+        // test of the routing rather than of the button.
         implementation.setMultiWindowSupported(true);
         new Form("main", new BorderLayout()).show();
         DisplayTest.flushEdt();
@@ -203,44 +195,25 @@ class DialogInWindowTest extends UITestBase {
         w.show();
         DisplayTest.flushEdt();
 
-        final Dialog d = new Dialog("confirm");
+        Dialog d = new Dialog("confirm");
         d.setLayout(new BorderLayout());
-        d.add(BorderLayout.CENTER, new Label("delete?"));
         Command ok = new Command("OK");
-        d.addCommand(ok);
+        Button okButton = new Button(ok);
+        d.add(BorderLayout.CENTER, okButton);
         d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(w, d), "precondition: the dialog is up on the window");
 
-        final Command[] result = new Command[1];
-        Thread caller = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                result[0] = d.showDialog();
-            }
-        }, "cn1-test-dialog-caller");
-        caller.start();
-        try {
-            for (int i = 0; i < 200 && d.getParent() == null; i++) {
-                DisplayTest.flushEdt();
-                sleepQuietly();
-            }
-            assertTrue(isUnder(w, d), "precondition: the dialog is up on the window");
+        okButton.pressed();
+        okButton.released();
+        DisplayTest.flushEdt();
 
-            d.dispatchCommand(ok, new com.codename1.ui.events.ActionEvent(ok));
-            for (int i = 0; i < 400 && caller.isAlive(); i++) {
-                DisplayTest.flushEdt();
-                sleepQuietly();
-            }
-            joinQuietly(caller);
-            assertFalse(caller.isAlive(),
-                    "a command must end the wait, or a modal dialog in a window never returns");
-            assertSame(ok, result[0], "and showDialog() has to report which command it was");
-        } finally {
-            d.dispose();
-            DisplayTest.flushEdt();
-            joinQuietly(caller);
-            w.dispose();
-            DisplayTest.flushEdt();
-        }
+        assertTrue(d.isDisposed(),
+                "a command from a button inside the dialog has to reach the dialog itself");
+        assertNull(d.getParent(), "and take it back out of the window's layer");
+        w.dispose();
+        DisplayTest.flushEdt();
     }
 
     @FormTest
@@ -294,8 +267,16 @@ class DialogInWindowTest extends UITestBase {
         DisplayTest.flushEdt();
 
         assertFalse(isUnder(w, d), "a menu dialog stays on the main surface");
+
+        // Clear the menu flag before disposing. Dialog.dispose() deliberately skips
+        // super.dispose() for a menu, so a menu disposed as one never restores the form
+        // it replaced -- it would stay Display.getCurrent() for every later test in the
+        // JVM, which is a leak this test has no business creating.
+        d.setMenu(false);
         d.dispose();
         DisplayTest.flushEdt();
+        assertFalse(Display.getInstance().getCurrent() instanceof Dialog,
+                "the surface has to be handed back, or the next test inherits this dialog");
         w.dispose();
         DisplayTest.flushEdt();
     }
@@ -394,21 +375,5 @@ class DialogInWindowTest extends UITestBase {
         DisplayTest.flushEdt();
         w.dispose();
         DisplayTest.flushEdt();
-    }
-
-    private static void sleepQuietly() {
-        try {
-            Thread.sleep(5);
-        } catch (InterruptedException err) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private static void joinQuietly(Thread t) {
-        try {
-            t.join(2000);
-        } catch (InterruptedException err) {
-            Thread.currentThread().interrupt();
-        }
     }
 }
