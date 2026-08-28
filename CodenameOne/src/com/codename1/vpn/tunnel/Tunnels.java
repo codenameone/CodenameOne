@@ -197,6 +197,15 @@ public final class Tunnels {
     /// @hidden not part of the public API; called by the ports.
     public static void deliverAck(int requestId, boolean ok, int errorOrdinal,
             String message) {
+        // The pending entry goes HERE, because this is the one point every
+        // platform passes through. claim() covers the ports that run the
+        // tunnel in this process; iOS runs it in another and never claims,
+        // so its starts accumulated a tunnel object -- and everything the
+        // application had closed over -- once per reconnect, for the life of
+        // the process. Removing here is a no-op where claim already did it.
+        synchronized (Tunnels.class) {
+            PENDING.remove(Integer.valueOf(requestId));
+        }
         EdtResult<Boolean> r = VpnRequests.takeAck(requestId);
         if (r == null) {
             return;

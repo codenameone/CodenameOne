@@ -989,6 +989,64 @@ void com_codename1_impl_ios_IOSNative_vpnSetStatusListening___boolean(
 /// The saved provider manager, so a stop does not have to reload it.
 static NETunnelProviderManager *cn1vpTunnelManager = nil;
 
+/// Watches a starting tunnel so the app is told when it is actually up.
+///
+/// startVPNTunnelAndReturnError answers whether the REQUEST was accepted.
+/// The extension launches afterwards and applies its network settings
+/// asynchronously, so a tunnel that fails to launch, or whose
+/// setTunnelNetworkSettings errors, does so long after that call returned
+/// YES. Acknowledging there reported a tunnel that was never up.
+@interface CN1VpnTunnelWatcher : NSObject
+@property (nonatomic, assign) int requestId;
+@property (nonatomic, assign) BOOL answered;
+- (void)statusChanged:(NSNotification *)note;
+@end
+
+static CN1VpnTunnelWatcher *cn1vpTunnelWatcher = nil;
+
+/// Stops watching and releases the watcher.
+///
+/// No lock: every path that touches it -- the start, the stop and the
+/// notification -- runs on the main queue.
+static void cn1vpStopWatchingTunnel(void) {
+    if (cn1vpTunnelWatcher == nil) {
+        return;
+    }
+    [[NSNotificationCenter defaultCenter] removeObserver:cn1vpTunnelWatcher];
+    [cn1vpTunnelWatcher release];
+    cn1vpTunnelWatcher = nil;
+}
+
+@implementation CN1VpnTunnelWatcher
+
+- (void)statusChanged:(NSNotification *)note {
+    if (self.answered) {
+        return;
+    }
+    NEVPNStatus status = ((NEVPNConnection *)note.object).status;
+    if (status == NEVPNStatusConnected) {
+        self.answered = YES;
+        cn1vpTunnelAck(self.requestId, YES, 0, nil);
+        cn1vpStopWatchingTunnel();
+        return;
+    }
+    if (status == NEVPNStatusDisconnected || status == NEVPNStatusInvalid) {
+        // The extension refused to come up, or came up and stopped before it
+        // connected. Either way the app asked for a tunnel and has not got
+        // one, and this SPI calls an operation that never answers worse than
+        // one that fails.
+        self.answered = YES;
+        cn1vpTunnelAck(self.requestId, NO, CN1_VPN_ERR_UNKNOWN,
+                @"The packet tunnel extension did not start; check its"
+                @" provisioning profile and entitlement");
+        cn1vpStopWatchingTunnel();
+    }
+    // Connecting and Reasserting are passed over: they are the states this
+    // is waiting through.
+}
+
+@end
+
 /// Loads or creates the manager for this app's packet tunnel.
 ///
 /// NETunnelProviderManager is per app, and loading is asynchronous, so this
@@ -1072,13 +1130,32 @@ void com_codename1_impl_ios_IOSNative_vpnStartTunnel___int_java_lang_String(
                 NETunnelProviderSession *session =
                         (NETunnelProviderSession *)m.connection;
                 BOOL ok = [session startVPNTunnelAndReturnError:&startError];
-                if (ok) {
-                    [cn1vpTunnelManager release];
-                    cn1vpTunnelManager = [m retain];
-                    cn1vpTunnelAck(rid, YES, 0, nil);
-                } else {
+                if (!ok) {
                     cn1vpFail(rid, CN1_VPN_ERR_UNKNOWN, startError);
+                    [wire release];
+                    return;
                 }
+                [cn1vpTunnelManager release];
+                cn1vpTunnelManager = [m retain];
+                // NOT acknowledged here; see CN1VpnTunnelWatcher. The call
+                // above accepted the REQUEST, and the extension that has to
+                // launch and apply its settings has not run yet.
+                cn1vpStopWatchingTunnel();
+                cn1vpTunnelWatcher = [[CN1VpnTunnelWatcher alloc] init];
+                cn1vpTunnelWatcher.requestId = rid;
+                [[NSNotificationCenter defaultCenter]
+                        addObserver:cn1vpTunnelWatcher
+                        selector:@selector(statusChanged:)
+                        name:NEVPNStatusDidChangeNotification
+                        object:session];
+                // Checked once immediately: a connection that is already up,
+                // or that connects between the start and this line, posts no
+                // further notification and would leave the request pending
+                // for ever.
+                [cn1vpTunnelWatcher statusChanged:
+                        [NSNotification notificationWithName:
+                                NEVPNStatusDidChangeNotification
+                                object:session]];
                 [wire release];
             }];
         }];
@@ -1089,6 +1166,10 @@ void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId) {
     int rid = (int)requestId;
+    // A start still waiting for its extension is superseded by this stop;
+    // leaving the watcher armed would have it read the teardown as that
+    // start's answer.
+    cn1vpStopWatchingTunnel();
     if (cn1vpTunnelManager != nil) {
         [(NETunnelProviderSession *)cn1vpTunnelManager.connection stopVPNTunnel];
         cn1vpTunnelAck(rid, YES, 0, nil);
