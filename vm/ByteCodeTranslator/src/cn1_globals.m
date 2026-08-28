@@ -7837,6 +7837,7 @@ static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize) 
 #endif /* CN1_CONSERVATIVE_GC_ROOTS */
 
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
+cn1GcMallocRetry:
     CN1_CLAZZ_REGISTER(parent); // first-alloc-per-class: exact clazz registry for the GC guard
     if(isAppSuspended) {
         mallocWhileSuspended += size;
@@ -7991,14 +7992,19 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
         }
         invokedGC = NO;
         threadStateData->threadActive = JAVA_TRUE;
-        // The retry is a TAIL call and every optimised build turns it into a jump, so a
-        // run of failures does not grow the stack. It is also unchanged from before this
-        // work -- what was wrong here was requesting the collection in a way that could not
-        // wake or start the collector, so the wait fell straight through and the retry
-        // raced round again with nothing having been collected. Bounding the retry count
-        // is a separate question about what a VM with no way to fail an allocation should
-        // do when it truly runs out, and it is not this change.
-        return codenameOneGcMalloc(threadStateData, size, parent);
+        // Retry by LOOPING, not by recursing. This used to be
+        // `return codenameOneGcMalloc(threadStateData, size, parent);`, and the tail call
+        // it looks like is not one: CN1_GC_PARK_CAPTURE takes the address of a local, which
+        // blocks the optimisation, and clang -O2 emits a plain `bl` (checked in the
+        // generated assembly rather than assumed). Every failed allocation therefore added
+        // a frame, so a process that is genuinely out of memory answered by recursing until
+        // it ran out of stack as well.
+        //
+        // A backward goto is exactly what the recursion did -- same arguments, same
+        // re-execution of the counters and the class registration above -- without the
+        // frame. The retry stays unbounded because this VM has no way to fail an
+        // allocation; what changed is that failing repeatedly no longer costs stack.
+        goto cn1GcMallocRetry;
     }
     if(needsZeroing) {
         memset(o, 0, size);
