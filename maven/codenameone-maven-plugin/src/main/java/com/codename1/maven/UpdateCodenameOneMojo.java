@@ -40,6 +40,7 @@ import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
@@ -279,15 +280,35 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
         return false;
     }
 
+    /**
+     * Identifies this plugin to the repository. NOT cosmetic: the Codename One
+     * repository is behind Cloudflare, whose Browser Integrity Check rejects the
+     * JDK's default "Java/1.8.0_x" agent with a 403 (error 1010). It accepts
+     * "Java/11" and later, so a bare openStream() works on a modern JDK and fails
+     * on JDK 8 -- and the failure is silent, because findLatestVersion falls back
+     * to Maven Central, which no longer receives new releases. A JDK 8 user would
+     * be told the last version published before the cutover is the latest one,
+     * indefinitely. ToolingHelpClient hit the same trap against a different
+     * Cloudflare-fronted endpoint.
+     */
+    private static final String USER_AGENT = "codenameone-maven-plugin";
+
     private String readLatestVersion(String url) throws IOException, XmlPullParserException {
         MetadataXpp3Reader reader = new MetadataXpp3Reader();
-        try (Reader input = new InputStreamReader(new URL(url).openStream(), "UTF-8")) {
+        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+        connection.setRequestProperty("User-Agent", USER_AGENT);
+        connection.setConnectTimeout(20000);
+        connection.setReadTimeout(20000);
+        // Follows redirects by default, which the repository's custom domain uses.
+        try (Reader input = new InputStreamReader(connection.getInputStream(), "UTF-8")) {
             Metadata metadata = reader.read(input, false);
             String latest = metadata.getVersioning().getLatest();
             if (latest == null || latest.trim().isEmpty()) {
                 throw new IOException("No <latest> version in " + url);
             }
             return latest;
+        } finally {
+            connection.disconnect();
         }
     }
     

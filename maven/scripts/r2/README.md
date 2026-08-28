@@ -199,6 +199,30 @@ otherwise a probe for a not-yet-published artifact caches the negative and the a
 invisible until it expires. CI polls also append a cache-busting query parameter, so a
 release cannot be blocked even if that rule is removed.
 
+**Browser Integrity Check must not apply to `/maven2/*`.** BIC is a heuristic on the
+request's browser signature, and a package repository has no browsers in front of it. It
+currently rejects `Python-urllib/*` and -- the one that matters -- the JDK's default
+`Java/1.8.0_x` agent, with HTTP 403 and Cloudflare error 1010. `Java/11` and later pass,
+as do Maven, Gradle, sbt, Ivy, Coursier, Artifactory, Nexus, curl, wget and okhttp, all
+verified against the live domain.
+
+Two reasons this is not "fine because Maven works":
+
+1. The rule set is Cloudflare's, not ours, and it changes without notice. This domain is
+   now the only source of every Codename One release, so a signature Cloudflare decides
+   to distrust breaks builds globally with a 403 nobody can attribute.
+2. Anything of ours that reaches the repository over plain `HttpURLConnection` inherits
+   the JDK agent and fails on JDK 8. `UpdateCodenameOneMojo.readLatestVersion` did
+   exactly this, and the failure was silent: it falls back to Maven Central, which no
+   longer receives releases, so a JDK 8 user was told the last pre-cutover version was
+   the newest one, indefinitely. It now sends an explicit `User-Agent`, as
+   `ToolingHelpClient` already had to for another Cloudflare-fronted endpoint.
+
+The code fix stands on its own, but it only covers our own callers. Turning BIC off for
+this path is the part that covers everyone else's toolchain, and it cannot be done from
+this repository -- the R2 API token is deliberately scoped to object read/write on the
+bucket and cannot touch zone settings.
+
 ## Configuration
 
 GitHub secrets — note these are deliberately *not* named `CLOUDFLARE_*`, because
