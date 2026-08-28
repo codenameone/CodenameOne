@@ -2142,7 +2142,17 @@ void codenameOneGCMark() {
     // heap ref store, preserving snapshot-time references they concurrently overwrite.
     // The release fence orders this ahead of any thread being unblocked (963).
 #if !defined(CN1_DISABLE_SATB)
-    __atomic_store_n(&gcSatbActive, 1, __ATOMIC_RELEASE);
+    __atomic_store_n(&gcSatbActive, 1, __ATOMIC_SEQ_CST);
+    // MARK STARTUP HANDSHAKES WITH BULK COPIES, exactly as termination does. A copy that
+    // registered while the flags were down decided not to log; if this arming raced it, the
+    // rest of its memcpy would publish references into a destination the mark may already
+    // have walked past, with nothing logged for them. Native threads make that reachable
+    // rather than theoretical -- they are never cooperatively paused, so nothing else in
+    // this mark waits for them. Waiting here is bounded by one copy, and it is the reason
+    // cn1SatbBulkEnter registers BEFORE it reads the flags: seq_cst on both sides makes the
+    // store-then-load pair non-reorderable, so either the copy sees the armed flag and
+    // logs, or this sees its registration and waits for it.
+    cn1SatbBulkQuiesce();
 #endif
     struct ThreadLocalData* d = getThreadLocalData();
     //int marked = 0;
@@ -10899,14 +10909,63 @@ static long long cn1StallLastNs = 0;   // previous second's summed thread stall 
 // clocks with them -- summing live threads there reports one thread and 100% duty on a
 // run that was stalled throughout. Per-cause totals survive thread death (they are
 // process-wide), so the honest denominator is the peak thread count that produced them.
-// Run-total thread-time: the integral of the live mutator count over the whole run, in
-// nanoseconds. The whole-run duty figure used peak threads times wall time, which assumes
-// every thread that ever existed simultaneously existed for the entire run -- on a workload
-// whose population changes (a burst of helpers, sequential thread-churn generations) that
-// denominator is too big and the duty it produces too high, hiding the very pauses this
-// instrument exists to report. Accumulated by the probe thread from the same slices that
-// feed the 1Hz line.
-static _Atomic long long cn1StallThreadTimeTotalNs = 0;
+// Thread-time already banked by threads that have EXITED, in nanoseconds.
+//
+// The duty denominator is the integral of the live mutator count over time. Two earlier
+// shapes of it were both wrong. Peak threads times wall time assumes every thread that ever
+// existed did so for the whole run, which overstates the denominator and so overstates duty
+// on any workload whose population changes. Sampling the live count once per probe slice
+// fixed that but still missed any thread that both started and exited INSIDE one slice: its
+// stalls stayed in the numerator while its lifetime was never counted at all, which
+// understates duty and can drive it negative on short thread bursts.
+//
+// So the integral is computed exactly instead of sampled. Each thread's lifetime is banked
+// here by markDeadThread as it exits, and cn1StallThreadTimeNs adds the live threads' time
+// so far. No polling interval appears in the answer.
+static _Atomic long long cn1StallThreadTimeRetiredNs = 0;
+
+// Stamped as a thread is registered; cn1MonotonicMillis is static to this file.
+void cn1StallRegisterThread(struct ThreadLocalData* t) {
+    if(t != 0) {
+        t->gcThreadStartMs = (long long)cn1MonotonicMillis();
+    }
+}
+
+// Banked as a thread exits, from markDeadThread with the critical section held. Counts only
+// lightweight non-collector threads, the same population as the numerator.
+void cn1StallRetireThread(struct ThreadLocalData* t) {
+    if(t == 0 || !t->lightweightThread
+       || t == atomic_load_explicit(&cn1GcThreadTld, memory_order_relaxed)) {
+        return;
+    }
+    long long lived = (long long)cn1MonotonicMillis() - t->gcThreadStartMs;
+    if(lived > 0) {
+        atomic_fetch_add_explicit(&cn1StallThreadTimeRetiredNs, lived * 1000000LL,
+                                  memory_order_relaxed);
+    }
+}
+
+// The exact integral at this instant: what exited plus what is still running.
+static long long cn1StallThreadTimeNs(void) {
+    long long total = atomic_load_explicit(&cn1StallThreadTimeRetiredNs, memory_order_relaxed);
+    long long now = (long long)cn1MonotonicMillis();
+    JAVA_OBJECT gcThread = get_static_java_lang_System_gcThreadInstance();
+    lockCriticalSection();
+    for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
+        struct ThreadLocalData* t = allThreads[iter];
+        if(t == 0 || !t->lightweightThread) {
+            continue;
+        }
+        if(gcThread != JAVA_NULL && t->currentThreadObject == gcThread) {
+            continue;
+        }
+        if(now > t->gcThreadStartMs) {
+            total += (now - t->gcThreadStartMs) * 1000000LL;
+        }
+    }
+    unlockCriticalSection();
+    return total;
+}
 static _Atomic int cn1StallPeakThreads = 0;
 
 // The aggregate mutator stall clock, and how many mutators are alive to have earned it.
@@ -10986,16 +11045,10 @@ static void cn1ReportStalls(void) {
     // figure deliberately leaves out. See cn1StallMutatorNs.
     long long totalNs = atomic_load_explicit(&cn1StallMutatorNs, memory_order_relaxed);
     int threads = atomic_load_explicit(&cn1StallPeakThreads, memory_order_relaxed);
-    // Divide by accumulated THREAD-TIME, not peak threads times wall time. See
-    // cn1StallThreadTimeTotalNs. It is zero only when the probe thread never ran (the
-    // emitters off), in which case there is no integral to use and the old approximation
-    // is all there is -- it is reported with the peak count beside it, so a reader can see
-    // which one they are looking at.
-    long long threadTimeNs = atomic_load_explicit(&cn1StallThreadTimeTotalNs,
-                                                  memory_order_relaxed);
-    if(threadTimeNs <= 0) {
-        threadTimeNs = (long long)wallMs * 1000000LL * threads;
-    }
+    // Divide by real THREAD-TIME, not peak threads times wall time. Exact rather than
+    // sampled, and independent of whether the probe thread ever ran: see
+    // cn1StallThreadTimeRetiredNs.
+    long long threadTimeNs = cn1StallThreadTimeNs();
     fprintf(stderr, "[GCSTALL] wallMs=%lld threads=%d threadMs=%lld threadStallMs=%lld"
                     " dutyPct=%.1f cyclesOnDemand=%ld cyclesAfterIdle=%ld\n",
             wallMs, threads, threadTimeNs / 1000000LL, totalNs / 1000000LL,
@@ -11053,7 +11106,7 @@ static void cn1ReportStalls(void) {
 static void* cn1GcProbeThread(void* ignored) {
     // Thread-time integral for the window about to be reported: the sum over the window of
     // (live mutators * slice), in nanoseconds. It is the denominator the duty figure needs.
-    long long cn1StallThreadTimeNs = 0;
+    long long lastThreadTimeNs = cn1StallThreadTimeNs();
     long long lastSliceMs = cn1GcProbeElapsedMs();
     for(;;) {
         // A plain usleep(1000000) is not a second here. The signal-based thread stop
@@ -11078,10 +11131,6 @@ static void* cn1GcProbeThread(void* ignored) {
                     long long unusedNs = 0;
                     int liveNow = 0;
                     cn1StallSumThreads(&unusedNs, &liveNow);
-                    cn1StallThreadTimeNs += (long long)liveNow * sliceMs * 1000000LL;
-                    atomic_fetch_add_explicit(&cn1StallThreadTimeTotalNs,
-                                              (long long)liveNow * sliceMs * 1000000LL,
-                                              memory_order_relaxed);
                     // Track the peak here rather than at emit time: the whole-run
                     // [GCSTALL] line divides by it, and a run shorter than one emit
                     // interval would otherwise report threads=0 and dutyPct=-1.
@@ -11139,6 +11188,8 @@ static void* cn1GcProbeThread(void* ignored) {
             int threads = 0;
             cn1StallSumThreads(&nowNs, &threads);
             long long deltaNs = nowNs - cn1StallLastNs;
+            long long threadTimeNowNs = cn1StallThreadTimeNs();
+            long long threadTimeDeltaNs = threadTimeNowNs - lastThreadTimeNs;
             long long nowMs = cn1GcProbeElapsedMs();
             // No clamp on deltaNs. The source is monotonic now (see cn1StallSumThreads);
             // the clamp that used to sit here existed only to hide a dying thread taking
@@ -11146,8 +11197,8 @@ static void* cn1GcProbeThread(void* ignored) {
             fprintf(stderr, "[GCSTALL-T] v=1 tMs=%lld threads=%d stallMs=%lld dutyPct=%.1f"
                             " volume=%ld budget=%ld lowMem=%ld handshake=%ld pending=%ld\n",
                     nowMs, threads, deltaNs / 1000000LL,
-                    (cn1StallThreadTimeNs > 0)
-                        ? 100.0 * (1.0 - (double)deltaNs / (double)cn1StallThreadTimeNs)
+                    (threadTimeDeltaNs > 0)
+                        ? 100.0 * (1.0 - (double)deltaNs / (double)threadTimeDeltaNs)
                         : -1.0,
                     atomic_load_explicit(&cn1StallCount[CN1_STALL_PACING_VOLUME], memory_order_relaxed),
                     atomic_load_explicit(&cn1StallCount[CN1_STALL_PACING_BUDGET], memory_order_relaxed),
@@ -11155,7 +11206,7 @@ static void* cn1GcProbeThread(void* ignored) {
                     atomic_load_explicit(&cn1StallCount[CN1_STALL_HANDSHAKE], memory_order_relaxed),
                     atomic_load_explicit(&cn1StallCount[CN1_STALL_PENDING_FULL], memory_order_relaxed));
             cn1StallLastNs = nowNs;
-            cn1StallThreadTimeNs = 0;
+            lastThreadTimeNs = threadTimeNowNs;
         }
         fflush(stderr);
     }
@@ -11591,9 +11642,8 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     // No deletion half: the destination was allocated one line up and holds nothing that
     // could be in the snapshot. Off-mark this is one predicted-not-taken flag load.
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
-    // Both flags; see the note at java_lang_System_arraycopy.
-    if(__builtin_expect(gcSatbActive || gcSatbTerminating, 0)
-       && !cls->primitiveType && cn1SatbBulkEnter()) {
+    // No flag precheck; see the note at java_lang_System_arraycopy.
+    if(!cls->primitiveType && cn1SatbBulkEnter()) {
         cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(*src).data, src->length);
         cn1SatbBulkExit();
     }

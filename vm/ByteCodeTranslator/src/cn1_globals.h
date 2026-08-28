@@ -1235,6 +1235,14 @@ struct ThreadLocalData {
     char         gcSigRegs[4096];            // raw copy of the interrupted ucontext (GPRs)
     volatile sig_atomic_t gcSigRegsLen;      // valid bytes in gcSigRegs
 #endif
+#ifdef CN1_GC_CONFORM
+    // Monotonic ms at which this thread was registered. The duty denominator is the
+    // integral of the live MUTATOR count over time, and sampling that population at slice
+    // boundaries misses any thread that both starts and exits inside one slice -- its
+    // stalls stay in the numerator while its lifetime is never counted. Stamping here and
+    // banking the lifetime in markDeadThread makes the integral exact instead of sampled.
+    long long gcThreadStartMs;
+#endif
 };
 
 //#define BLOCK_FOR_GC() while(threadStateData->threadBlockedByGC) { usleep(500); }

@@ -991,15 +991,17 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     // see zero and finish its final drain in that gap -- after which the insertion half
     // logs nothing while the memmove below publishes those references regardless. See
     // cn1SatbBulkEnter.
-    // TEST BOTH FLAGS. gcSatbActive alone is unsafe to sample out here: mark termination
-    // clears and re-sets it during its trial-clear protocol, so a copy that read 0 in that
-    // window would skip the barrier and then publish its references into a mark the
-    // collector reopened a moment later. gcSatbTerminating stays up across every trial, so
-    // the pair is never both-zero while a mark can still reopen. cn1SatbBulkEnter re-reads
-    // them while REGISTERED, which is what makes the answer authoritative; this precheck is
-    // only the off-mark fast path, and stays two relaxed loads.
-    if(__builtin_expect(gcSatbActive || gcSatbTerminating, 0)
-       && !cls->primitiveType && cn1SatbBulkEnter()) {
+    // NO FLAG PRECHECK. Sampling gcSatbActive out here is unsafe at BOTH ends of a mark:
+    // termination clears and re-raises it during the trial-clear protocol, and startup arms
+    // it without waiting for a copy that already looked. Either way the copy skips the
+    // barrier and then publishes into a live mark. Registering first and reading the flags
+    // while registered is the whole point of the protocol, and it is what lets
+    // codenameOneGCMark and mark termination both wait for an in-flight copy.
+    //
+    // The cost lands only on OBJECT arrays: cls->primitiveType is a load and a branch, and
+    // it rejects the byte[]/char[] copies that dominate arraycopy traffic before any atomic
+    // is executed.
+    if(!cls->primitiveType && cn1SatbBulkEnter()) {
         // One acquisition of the SATB mutex per 256 references rather than per reference;
         // this used to be two locked enqueues per element. See cn1SatbEnqueueRangeLocked.
         cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)(*dstArr).data) + dstOffset, length);
@@ -1735,6 +1737,11 @@ struct ThreadLocalData* getThreadLocalData() {
         i->threadBlockedByGC = JAVA_FALSE;
         i->threadActive = JAVA_FALSE;
         i->threadKilled = JAVA_FALSE;
+#ifdef CN1_GC_CONFORM
+        // Malloc'd, so this starts as garbage. See gcThreadStartMs in cn1_globals.h.
+        { extern void cn1StallRegisterThread(struct ThreadLocalData* t);
+          cn1StallRegisterThread(i); }
+#endif
         i->interrupted = JAVA_FALSE;
         
         i->currentThreadObject = 0;
@@ -2388,6 +2395,14 @@ void markDeadThread(struct ThreadLocalData *d)
             d->threadActive = JAVA_FALSE;
             found = iter;
             nThreadsToKill++;
+#ifdef CN1_GC_CONFORM
+            // Bank this thread's lifetime before its TLD leaves allThreads, so the duty
+            // denominator keeps it. Mirrors cn1StallMutatorNs on the numerator side: both
+            // have to survive the thread that earned them, and both count only lightweight
+            // non-collector threads so the two describe one population.
+            { extern void cn1StallRetireThread(struct ThreadLocalData* t);
+              cn1StallRetireThread(d); }
+#endif
             collectThreadResources(d);
             break;
         }
