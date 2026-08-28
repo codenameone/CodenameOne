@@ -169,6 +169,23 @@ class IPhoneBuilderVoipModesTest {
                 "and a longer mode that contains it is not it");
     }
 
+    @Test
+    public void aSpacedKeyIsStillTheKey() {
+        // "<key >UIBackgroundModes</key >" is the same plist, and every
+        // decision downstream is about whether the PROJECT supplies
+        // something -- so reading its declaration as absent is the direction
+        // that hurts: the build generates its own array beside the project's
+        // and plist assembly refuses a fragment that declares the key twice.
+        assertTrue(IPhoneBuilder.injectedModesIncludeVoip(
+                "<key >UIBackgroundModes</key ><array><string>voip</string>"
+                + "</array>"),
+                "spacing in the key does not change which key it is");
+        assertFalse(IPhoneBuilder.injectedModesIncludeVoip(
+                "<key >UIBackgroundModesExtra</key ><array><string>voip"
+                + "</string></array>"),
+                "and a longer key that starts with ours is not ours");
+    }
+
     private static String builderSource() throws Exception {
         java.io.File f = new java.io.File(BUILDER_SOURCE);
         assertTrue(f.exists(), "builder source must be readable: "

@@ -328,16 +328,52 @@ public class IPhoneBuilder extends Executor {
     /// One place where "the value of this key" is decided, because every
     /// reader that worked it out for itself got it wrong in a different way.
     private static int plistValueStart(String live, String key) {
-        String marker = "<key>" + key + "</key>";
-        int at = live.indexOf(marker);
-        if (at < 0) {
+        int after = plistKeyEnd(live, key, 0);
+        if (after < 0) {
             return -1;
         }
-        int i = at + marker.length();
+        int i = after;
         while (i < live.length() && Character.isWhitespace(live.charAt(i))) {
             i++;
         }
         return i < live.length() && live.charAt(i) == '<' ? i : -1;
+    }
+
+    /// The index just past the `</key>` of the next `<key>` element naming
+    /// `key` at or after `from`, or -1.
+    ///
+    /// Structural rather than a literal `"<key>" + key + "</key>"` search:
+    /// `<key >UIBackgroundModes</key >` is the same plist and only the
+    /// serializer writes the compact spelling, so a project that formatted
+    /// its own ios.plistInject that way had its declaration read as absent
+    /// -- and every decision downstream is about whether the project
+    /// supplies something.
+    static int plistKeyEnd(String live, String key, int from) {
+        int at = from;
+        while (at >= 0 && at < live.length()) {
+            at = live.indexOf("<key", at);
+            if (at < 0) {
+                return -1;
+            }
+            int open = plistElementOpen(live, at, "key");
+            if (open < 0) {
+                at++;
+                continue;
+            }
+            int stop = live.indexOf("</key", open);
+            if (stop < 0) {
+                return -1;
+            }
+            int end = live.indexOf('>', stop);
+            if (end < 0) {
+                return -1;
+            }
+            if (key.equals(live.substring(open, stop).trim())) {
+                return end + 1;
+            }
+            at = end + 1;
+        }
+        return -1;
     }
 
     /// The index just past the tag NAME of the element opening at `start`.
@@ -843,9 +879,8 @@ public class IPhoneBuilder extends Executor {
         // one it supplies, and reading it as supplied skipped generating the
         // real one -- so the app shipped with no voip mode at all.
         String live = plistWithoutComments(injected);
-        int key = live.indexOf("<key>UIBackgroundModes</key>");
-        while (key >= 0) {
-            int after = key + "<key>UIBackgroundModes</key>".length();
+        int after = plistKeyEnd(live, "UIBackgroundModes", 0);
+        while (after >= 0) {
             // The key's IMMEDIATE value. Scanning forward for the next
             // <array> anywhere meant a UIBackgroundModes given some other
             // value -- a <string>, a <false/> -- was answered from an
@@ -860,7 +895,7 @@ public class IPhoneBuilder extends Executor {
             }
             int open = plistElementOpen(live, probe, "array");
             if (open > 0) {
-                int close = live.indexOf("</array>", open);
+                int close = live.indexOf("</array", open);
                 if (close < 0) {
                     return false;
                 }
@@ -868,10 +903,10 @@ public class IPhoneBuilder extends Executor {
                 if (arrayHasString(body, "voip")) {
                     return true;
                 }
-                key = live.indexOf("<key>UIBackgroundModes</key>", close);
+                after = plistKeyEnd(live, "UIBackgroundModes", close);
                 continue;
             }
-            key = live.indexOf("<key>UIBackgroundModes</key>", after);
+            after = plistKeyEnd(live, "UIBackgroundModes", after);
         }
         return false;
     }
@@ -5326,7 +5361,7 @@ public class IPhoneBuilder extends Executor {
                     // background modes as user supplied, skipped
                     // ios.background_modes, and left the real key absent --
                     // an app registered for VoIP pushes that nothing wakes.
-                    if (injected.contains("<key>UIBackgroundModes</key>")) {
+                    if (plistKeyEnd(injected, "UIBackgroundModes", 0) >= 0) {
                         if (!injectedModesIncludeVoip(injected)) {
                             // Failed rather than warned. The two mechanisms
                             // cannot be combined -- plist assembly refuses a
