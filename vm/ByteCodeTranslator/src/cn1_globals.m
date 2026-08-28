@@ -796,6 +796,25 @@ long long cn1StallNowNs(void) {
 // ts may be null: the signal-stop handler has no usable thread state to charge, and the
 // duty-cycle line below is a sum over live threads, so an uncharged stall is simply not
 // counted there while still appearing in the per-cause table.
+// Stall charged to a JAVA MUTATOR, process-wide and monotonic. cn1StallNs[] is the wrong
+// numerator for a duty figure: it also collects stalls charged to threads the denominator
+// cannot count. cn1GcSignalHandler charges CN1_STALL_SIGNAL_STOP to whatever thread the
+// signal interrupted, and under conservative roots that includes NATIVE threads, which are
+// not lightweightThread and so contribute no thread-time. Measured, those are 1.9-4.2% of
+// the total on the churn and thread-churn shapes and 2.4-15.4% under CN1_GC_SIGNAL_STOP=1 --
+// a numerator inflated against its own denominator, which biases duty down and can drive it
+// negative on a native-thread-heavy workload.
+//
+// The collector is excluded for the same reason it is excluded from the count: it is not a
+// mutator. Comparing thread-local pointers rather than resolving
+// System.gcThreadInstance here, because this runs inside a signal handler, where a plain
+// atomic load is safe and reaching into Java statics is not. cn1StallSumThreads publishes
+// the pointer as it walks (it has to identify that thread anyway); until the first walk it
+// is null and the collector would be counted, which costs nothing in practice -- measured,
+// the collector records no stalls at all -- and self-corrects within one probe slice.
+static _Atomic long long cn1StallMutatorNs = 0;
+static struct ThreadLocalData* _Atomic cn1GcThreadTld = 0;
+
 void cn1StallRecord(int cause, long long ns, struct ThreadLocalData* ts) {
     if(ns <= 0 || cause < 0 || cause >= CN1_STALL_CAUSES) {
         return;
@@ -814,6 +833,10 @@ void cn1StallRecord(int cause, long long ns, struct ThreadLocalData* ts) {
         b++;
     }
     atomic_fetch_add_explicit(&cn1StallBuckets[cause][b], 1, memory_order_relaxed);
+    if(ts != 0 && ts->lightweightThread
+       && ts != atomic_load_explicit(&cn1GcThreadTld, memory_order_relaxed)) {
+        atomic_fetch_add_explicit(&cn1StallMutatorNs, ns, memory_order_relaxed);
+    }
 }
 #endif
 
@@ -10769,23 +10792,22 @@ static _Atomic int cn1StallPeakThreads = 0;
 
 // The aggregate mutator stall clock, and how many mutators are alive to have earned it.
 //
-// The TOTAL comes from the process-wide per-cause counters. It used to come from a
-// per-thread counter in ThreadLocalData, summed over the live threads; that counter is
-// gone, because summing the live threads loses a thread's entire history the moment
-// markDeadThread() drops its TLD out of allThreads: the next sample's delta goes
+// The TOTAL comes from cn1StallMutatorNs -- process-wide, so nothing is lost when a thread
+// exits, and mutator-only, so it counts the same population as the thread count beside it.
+// It used to come from a per-thread counter in ThreadLocalData, summed over the live
+// threads; that counter is gone, because summing the live threads loses a thread's entire
+// history the moment markDeadThread() drops its TLD out of allThreads: the next sample's
+// delta goes
 // NEGATIVE, gets clamped to zero, and the 1Hz line then reports 100% duty for exactly the
 // short-lived-thread workloads where duty is most worth knowing -- and keeps doing it
 // until the surviving threads' counters climb back past the vanished total. Measured at
 // exit on both GcSteadyState and ThreadChurn, the live-thread walk returns 0 against a
 // process-wide 9.4-35.2 SECONDS, because by then every mutator has gone.
 //
-// The two sources are otherwise the same number: cn1StallRecord increments the per-cause
-// total and the per-thread field in one call. Substituting one for the other is exact
-// only if the collector never records a stall of its own -- it would be inside the
-// process-wide total and outside the mutator-only walk. All seven CN1_STALL_ADD sites are
-// mutator paths (pacing park, handshake, low memory, pending-table, signal stop), and
-// instrumenting cn1StallRecord to attribute by thread confirms it: gcThreadNs=0 and
-// nullTsRecords=0 on the churn, legacy-heavy and thread-churn shapes alike.
+// Do NOT substitute the sum of cn1StallNs[] here. That total also carries stalls charged to
+// threads this count cannot include -- native threads under conservative roots, and in
+// principle the collector -- and the population mismatch is what cn1StallMutatorNs exists to
+// avoid. See the note there for the measured size of it.
 //
 // The COUNT still comes from the live walk, and still excludes the collector: threadRunner
 // marks every Java thread lightweightThread = JAVA_TRUE, the GC thread included, so
@@ -10793,22 +10815,24 @@ static _Atomic int cn1StallPeakThreads = 0;
 // workers plus main plus the collector divided the stall by six thread-seconds instead of
 // five.
 static void cn1StallSumThreads(long long* outNs, int* outThreads) {
-    long long total = 0;
     int threads = 0;
-    for(int c = 0 ; c < CN1_STALL_CAUSES ; c++) {
-        total += atomic_load_explicit(&cn1StallNs[c], memory_order_relaxed);
-    }
     JAVA_OBJECT gcThread = get_static_java_lang_System_gcThreadInstance();
     lockCriticalSection();
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         struct ThreadLocalData* t = allThreads[iter];
-        if(t != 0 && t->lightweightThread
-           && (gcThread == JAVA_NULL || t->currentThreadObject != gcThread)) {
-            threads++;
+        if(t == 0 || !t->lightweightThread) {
+            continue;
         }
+        if(gcThread != JAVA_NULL && t->currentThreadObject == gcThread) {
+            // Publish it for cn1StallRecord's numerator filter, which cannot resolve the
+            // Java static itself -- it runs in a signal handler. See cn1StallMutatorNs.
+            atomic_store_explicit(&cn1GcThreadTld, t, memory_order_relaxed);
+            continue;
+        }
+        threads++;
     }
     unlockCriticalSection();
-    *outNs = total;
+    *outNs = atomic_load_explicit(&cn1StallMutatorNs, memory_order_relaxed);
     *outThreads = threads;
 }
 
@@ -10838,10 +10862,10 @@ static long long cn1StallPercentileUs(int cause, double q) {
 // 1Hz series behind, and a run that ends cleanly leaves the distribution too.
 static void cn1ReportStalls(void) {
     long long wallMs = cn1GcProbeElapsedMs();
-    long long totalNs = 0;
-    for(int c = 0 ; c < CN1_STALL_CAUSES ; c++) {
-        totalNs += atomic_load_explicit(&cn1StallNs[c], memory_order_relaxed);
-    }
+    // Mutator-only, to match the thread count it is divided by; the per-cause table below
+    // still reports every stall the process took, including the native-thread ones this
+    // figure deliberately leaves out. See cn1StallMutatorNs.
+    long long totalNs = atomic_load_explicit(&cn1StallMutatorNs, memory_order_relaxed);
     int threads = atomic_load_explicit(&cn1StallPeakThreads, memory_order_relaxed);
     fprintf(stderr, "[GCSTALL] wallMs=%lld threads=%d threadStallMs=%lld dutyPct=%.1f"
                     " cyclesOnDemand=%ld cyclesAfterIdle=%ld\n",

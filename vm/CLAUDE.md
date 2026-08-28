@@ -105,18 +105,28 @@ a workload whose threads come and go, and all three inflated it.
 - **The collector was in the denominator.** `threadRunner` sets `lightweightThread =
   JAVA_TRUE` on every Java thread, the GC thread included, so a four-worker run divided the
   aggregate stall by six thread-seconds instead of five. `cn1StallSumThreads` excludes
-  `System.gcThreadInstance`. The headline pair this branch reports is 38% -> 86%; anything
-  quoting 51% -> 90% predates the correction.
+  `System.gcThreadInstance`. Re-derived on the corrected instrument, interleaved, median of
+  three, the headline pair this branch reports is **37% -> 85%**; anything quoting
+  51% -> 90% predates the correction.
 - **The stall clock died with the thread that earned it.** It used to be summed from a
   per-thread counter over the LIVE threads, and `markDeadThread()` drops a TLD out of
   `allThreads` on exit -- so the next sample's delta went negative, got clamped to zero, and
   the line reported **100% duty exactly at a thread-generation boundary**. Measured at exit
   the live-thread walk returned 0 against a process-wide 9.4-35.2 seconds. The total now
-  comes from the process-wide per-cause counters (`cn1StallNs[]`), which nothing removes,
-  and the per-thread counter is gone. Substituting one for the other is exact only because
-  the collector never records a stall of its own -- all seven `CN1_STALL_ADD` sites are
-  mutator paths, and instrumenting `cn1StallRecord` to attribute by thread confirms it
-  (`gcThreadNs=0`, `nullTsRecords=0` on every shape).
+  comes from `cn1StallMutatorNs`, a process-wide accumulator that nothing removes, and the
+  per-thread counter is gone.
+- **The numerator counted threads the denominator could not.** `cn1StallNs[]` looks like the
+  obvious process-wide total and is the wrong one: `cn1GcSignalHandler` charges
+  `CN1_STALL_SIGNAL_STOP` to whatever thread the signal interrupted, and under conservative
+  roots that includes NATIVE threads, which are not `lightweightThread` and contribute no
+  thread-time. Measured, they are **1.9-4.2% of the total on the churn and thread-churn
+  shapes and 2.4-15.4% under `CN1_GC_SIGNAL_STOP=1`** -- enough to bias duty down, and to
+  drive it negative on anything native-thread-heavy. `cn1StallMutatorNs` counts only
+  lightweight, non-collector threads, so numerator and denominator describe one population;
+  with it the two stop modes agree (81.4-82.9%) where they previously did not. It excludes
+  the collector by comparing thread-local POINTERS, published by `cn1StallSumThreads` as it
+  walks, because the filter runs inside a signal handler where reaching into a Java static
+  is not safe.
 - **The "1Hz" line was not 1Hz, and a short window printed NEGATIVE duty.** `usleep` returns
   early on `EINTR` and the signal-based thread stop delivers to the probe thread too, so the
   series collapsed to ~20ms windows -- and four threads easily accrue more stall than 20ms
