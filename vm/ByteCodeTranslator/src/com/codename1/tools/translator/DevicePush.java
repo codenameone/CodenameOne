@@ -735,26 +735,48 @@ public final class DevicePush {
     private static String peerId() throws IOException {
         Path f = Paths.get(System.getProperty("user.home"), ".codenameone", "devruntime-peer");
         if (Files.exists(f)) {
-            return new String(Files.readAllBytes(f), StandardCharsets.UTF_8).trim();
+            String existing = new String(Files.readAllBytes(f), StandardCharsets.UTF_8).trim();
+            if (!existing.isEmpty()) {
+                return existing;
+            }
+            // A 0-byte file the concurrent-CREATE_NEW pattern used to leave
+            // during the moment between open and write should not be treated
+            // as an id; fall through and rewrite it.
         }
         String id = hex(randomBytes(16));
         createParent(f);
-        // CREATE_NEW gives us an atomic "create if absent" on both POSIX and
-        // Windows. Two concurrent pushes (a Maven build and an IDE run
-        // starting at the same time) would otherwise both pass the existence
-        // check above, generate different ids, race on the write, and end up
-        // returning ids that no longer match the file on disk. Every pairing
-        // secret keyed by those ids would then belong to whichever id one
-        // process happens to hold in memory -- and a later push could not
-        // reuse a pairing established by the loser. Losing the CREATE_NEW
-        // race means the other process just persisted the winner's id; read
-        // and return that instead.
+        // Two-step publish: write the id to a temp file, then atomically move
+        // it into place. CREATE_NEW alone is not enough -- it makes the
+        // target's creation exclusive but leaves a 0-byte window between
+        // open and write, during which a concurrent Files.readAllBytes on
+        // the losing side would return "" and the caller would derive
+        // pairing state under an identity that is not the persisted id.
+        // A UUID in the temp name keeps two processes from stomping on each
+        // other's temp file; ATOMIC_MOVE without REPLACE_EXISTING fails if
+        // the destination already exists, so the loser reads what the
+        // winner wrote instead of overwriting it.
+        Path tmp = f.resolveSibling(f.getFileName() + ".tmp."
+                + java.util.UUID.randomUUID());
+        Files.write(tmp, id.getBytes(StandardCharsets.UTF_8),
+                StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
         try {
-            Files.write(f, id.getBytes(StandardCharsets.UTF_8),
-                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            Files.move(tmp, f, StandardCopyOption.ATOMIC_MOVE);
             return id;
         } catch (FileAlreadyExistsException raced) {
+            Files.deleteIfExists(tmp);
             return new String(Files.readAllBytes(f), StandardCharsets.UTF_8).trim();
+        } catch (AtomicMoveNotSupportedException atomicUnsupported) {
+            // Some filesystems (a network share, an ex-FAT volume) refuse
+            // ATOMIC_MOVE. Fall back to a plain move -- the race window
+            // reopens on those filesystems but the alternative is refusing
+            // to push there at all.
+            try {
+                Files.move(tmp, f);
+                return id;
+            } catch (FileAlreadyExistsException raced) {
+                Files.deleteIfExists(tmp);
+                return new String(Files.readAllBytes(f), StandardCharsets.UTF_8).trim();
+            }
         }
     }
 

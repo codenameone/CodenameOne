@@ -274,7 +274,7 @@ public final class InterpBundleReader {
     /// descriptor's default so a field with no ConstantValue reads as its
     /// zero.
     private static Object readConstantValue(DataInputStream in, InterpBundle b, String desc)
-            throws java.io.IOException {
+            throws IOException {
         byte tag = in.readByte();
         switch (tag) {
             case 1:

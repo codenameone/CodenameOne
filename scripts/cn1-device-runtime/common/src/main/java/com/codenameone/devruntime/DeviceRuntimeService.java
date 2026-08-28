@@ -758,11 +758,26 @@ public class DeviceRuntimeService {
      * the secret and the bundle matched, so what remains is a human deciding --
      * and closing the connection under them would run the program while the
      * desktop was told the push failed.</p>
+     *
+     * <p>Serialised through {@link #approvalLock}: a paired peer without an
+     * {@code Always} approval could otherwise send several valid pushes
+     * concurrently -- the pre-auth reservation is already released by the
+     * time we get here -- and each connection's {@code callSeriallyAndWait}
+     * would open a modal dialog on top of the last, obscuring which bundle
+     * the user is being asked about and freezing the runtime UI until every
+     * prompt is dismissed. A peer with {@code Always} still returns without
+     * prompting, so the lock costs nothing on the fast path.</p>
      */
     private boolean approveWhileWaiting(String peerId, Progress progress) {
         progress.allowLongWait();
-        return DeviceRuntimePairing.approve(peerId);
+        synchronized (approvalLock) {
+            return DeviceRuntimePairing.approve(peerId);
+        }
     }
+
+    /// One approval prompt on screen at a time, across every connection this
+    /// device is serving. See {@link #approveWhileWaiting}.
+    private final Object approvalLock = new Object();
 
     /**
      * Serves a connection this device accepted, under a deadline.
