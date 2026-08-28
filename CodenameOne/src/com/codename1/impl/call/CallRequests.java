@@ -216,8 +216,15 @@ public final class CallRequests {
         // and pauses, an action listener arriving computes and delivers true,
         // and the stale false lands last -- leaving the port holding CallKit
         // actions until they time out while a live action listener waits for
-        // them. The bridge implementations are setters, so there is nothing
-        // here to deadlock against.
+        // them.
+        //
+        // This holds only while every setJavaReady is a SETTER. Android's
+        // grew a queue of system-started calls to hand over, and draining it
+        // inline would run application code under this monitor and under
+        // Calls.LISTENERS -- so that port posts the drain to a later EDT
+        // pass instead. A port that answers setJavaReady by calling back
+        // into application code has to do the same; there is no lock this
+        // side can take that would make it safe.
         synchronized (CallRequests.class) {
             boolean before = actionsWanted || pushesWanted;
             if (isActions) {

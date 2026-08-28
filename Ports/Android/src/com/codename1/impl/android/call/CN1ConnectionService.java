@@ -216,8 +216,49 @@ public class CN1ConnectionService extends ConnectionService {
                 WAITING_STARTS.clear();
             }
         }
-        if (drain != null) {
-            for (PendingStart p : drain) {
+        if (drain == null) {
+            return;
+        }
+        // POSTED, not delivered here, and the reason is two layers up. This
+        // method is called from Calls.addActionListener while it holds
+        // LISTENERS, and from CallRequests.updateReadiness while it holds
+        // its own monitor -- whose comment says in as many words that the
+        // delivery is safe inside the lock because "the bridge
+        // implementations are setters, so there is nothing here to deadlock
+        // against". Draining inline made this one a dispatcher instead, and
+        // broke that: a start request reaches the app's
+        // startCallRequested while both monitors are held, so a callback
+        // that waits on a worker which registers or removes a listener
+        // deadlocks the worker on LISTENERS and the EDT behind it.
+        //
+        // A later EDT pass runs the same code with both monitors released.
+        // The delay costs nothing that matters: the call is already DIALING
+        // in Telecom and the watchdog that bounds it is measured in seconds.
+        Drain d = new Drain(drain);
+        if (com.codename1.ui.Display.isInitialized()) {
+            com.codename1.ui.Display.getInstance().callSerially(d);
+        } else {
+            // No EDT to post to, so nothing can be holding those monitors
+            // either -- this is the cold path, where the framework has not
+            // started.
+            d.run();
+        }
+    }
+
+    /// Hands the held starts over on a later pass; see setJavaReady.
+    ///
+    /// A named class rather than an anonymous one so it holds no synthetic
+    /// reference to whatever registered the listener.
+    private static final class Drain implements Runnable {
+        private final List<PendingStart> pending;
+
+        Drain(List<PendingStart> pending) {
+            this.pending = pending;
+        }
+
+        @Override
+        public void run() {
+            for (PendingStart p : pending) {
                 p.deliver();
             }
         }
