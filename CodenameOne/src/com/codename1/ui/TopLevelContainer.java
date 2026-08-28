@@ -37,6 +37,10 @@ import com.codename1.ui.plaf.UIManager;
 /// interface, rather than through `Component#getComponentForm()`. The latter keeps
 /// its original meaning and returns `null` for a component hosted inside a `Window`.
 ///
+/// This interface is implemented by `Form` and `Window` only. It is not intended to
+/// be implemented outside the framework -- several of its collaborators are package
+/// private -- and it may gain members in any release.
+///
 /// Members that belong to a `Component` or a `Container` are deliberately absent --
 /// reach them through `#asContainer()` instead. So are the parts of `Form` that model
 /// mobile navigation, such as form transitions, the back command and the menu bar;
@@ -382,7 +386,34 @@ public interface TopLevelContainer {
     /// #### Returns
     ///
     /// the safe area rectangle
-    Rectangle getSafeArea();
+    /// The colour painted over this top level while a dialog or menu covers it,
+    /// including its alpha in the high byte.
+    ///
+    /// #### Returns
+    ///
+    /// the tint colour
+    int getTintColor();
+
+    /// Sets the colour painted over this top level while a dialog or menu covers it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tintColor`: the tint colour, alpha in the high byte
+    void setTintColor(int tintColor);
+
+    /// Whether this top level is the one the user can currently see.
+    ///
+    /// `Display#getCurrent()` only ever names a `Form`, so comparing against it
+    /// answers false for every window -- which is why anything that gated on it
+    /// stopped working the moment it was put in one. A window is on screen in its own
+    /// right, and answers for itself.
+    ///
+    /// #### Returns
+    ///
+    /// true when this top level is showing
+    boolean isTopLevelShowing();
+
+        Rectangle getSafeArea();
 
     /// Returns the height hidden behind the virtual keyboard, which is zero on a
     /// platform without one.

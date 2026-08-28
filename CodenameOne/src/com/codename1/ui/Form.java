@@ -1395,6 +1395,20 @@ public class Form extends Container implements TopLevelContainer {
         return menuBar.getSoftButtons()[offset];
     }
 
+    /// {@inheritDoc}
+    ///
+    /// The height of the soft button bar as the popup placement code has always
+    /// measured it: the bar's own height plus its vertical margins, and nothing at all
+    /// when there are not at least two soft buttons.
+    @Override
+    int softButtonAreaHeight() {
+        if (getSoftButtonCount() > 1) {
+            Component c = getSoftButton(0).getParent();
+            return c.getHeight() + c.getStyle().getVerticalMargins();
+        }
+        return 0;
+    }
+
     /// Returns the style of the menu
     ///
     /// #### Returns
@@ -2135,7 +2149,7 @@ public class Form extends Container implements TopLevelContainer {
     }
 
     @Override
-    boolean isTopLevelShowing() {
+    public boolean isTopLevelShowing() {
         return Display.getInstance().getCurrent() == this; //NOPMD CompareObjectsWithEquals
     }
 
@@ -2157,6 +2171,17 @@ public class Form extends Container implements TopLevelContainer {
     @Override
     void commandActivatedFromComponent(Command cmd, ActionEvent ev) {
         actionCommandImplNoRecurseComponent(cmd, ev);
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// Exactly the condition under which `#getTopLevelContainer()` answers `this`, so
+    /// the walk that looks for a command host ends where the top level walk already
+    /// ended for every hierarchy that exists today. An embedded form keeps handing its
+    /// commands outwards, as it always has.
+    @Override
+    boolean isCommandHost() {
+        return getParent() == null;
     }
 
     @Override
@@ -2642,9 +2667,12 @@ public class Form extends Container implements TopLevelContainer {
             }
         }
         if (getParent() != null) {
-            Form f = getParent().getComponentForm();
-            if (f != null) {
-                f.deregisterAnimated(this);
+            // The top level, not the form. getComponentForm() is null by design inside
+            // a Window, so an embedded form there was never deregistered -- the mirror
+            // of the registration below, which never happened either.
+            Container host = TopLevelSupport.rootOf(getParent());
+            if (host != null) {
+                host.deregisterAnimatedInternal(this);
             }
         }
         super.deinitializeImpl();
@@ -2659,16 +2687,27 @@ public class Form extends Container implements TopLevelContainer {
     void initComponentImpl() {
         super.initComponentImpl();
         dragged = null;
-        if (Display.getInstance().isNativeCommands()) {
-            Display.impl.setNativeCommands(menuBar.getCommands());
-        } else if (isDesktopNativeChrome() && toolbar != null) {
-            // bridge the (hidden) toolbar's commands to the native desktop menu bar
-            Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
+        // Only a form that owns the surface publishes its commands to the platform.
+        // An embedded one -- a Dialog hosted in a window's layered pane, a form inside
+        // an EmbeddedContainer -- would otherwise overwrite the real surface's native
+        // menu bar with its own.
+        if (getParent() == null) {
+            if (Display.getInstance().isNativeCommands()) {
+                Display.impl.setNativeCommands(menuBar.getCommands());
+            } else if (isDesktopNativeChrome() && toolbar != null) {
+                // bridge the (hidden) toolbar's commands to the native desktop menu bar
+                Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
+            }
         }
         if (getParent() != null) {
-            Form f = getParent().getComponentForm();
+            // The top level, not the form. Inside a Window getComponentForm() is null,
+            // so an embedded form registered its animations with nobody: Form.animate()
+            // was never ticked, and every animateLayout() on it or its children either
+            // did nothing or waited forever. The listeners below were dropped the same
+            // way, and they are Container level calls, so the top level takes them.
+            Container f = TopLevelSupport.rootOf(getParent());
             if (f != null) {
-                f.registerAnimated(this);
+                f.registerAnimatedInternal(this);
                 if (pointerPressedListeners != null) {
                     for (ActionListener l : (Collection<ActionListener>) pointerPressedListeners.getListenerCollection()) {
                         f.addPointerPressedListener(l);

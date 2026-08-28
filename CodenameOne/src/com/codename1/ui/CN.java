@@ -455,6 +455,18 @@ public class CN extends CN1Constants {
         return Display.INSTANCE.getCurrent();
     }
 
+    /// The top level the user is currently working in, which may be a `Window`.
+    ///
+    /// `#getCurrentForm()` only ever names a `Form`, so on the desktop it reports the
+    /// main surface even while the user is looking at another window.
+    ///
+    /// #### Returns
+    ///
+    /// the focused window when one has focus, otherwise the current form, or null
+    public static TopLevelContainer getCurrentTopLevel() {
+        return Display.INSTANCE.getCurrentTopLevel();
+    }
+
     /// Return the width of the display
     ///
     /// #### Returns

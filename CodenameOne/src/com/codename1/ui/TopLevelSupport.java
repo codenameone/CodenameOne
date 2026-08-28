@@ -186,6 +186,38 @@ final class TopLevelSupport {
         return top.asContainer();
     }
 
+    /// Resolves the container that a command activated inside the given component
+    /// should be reported to.
+    ///
+    /// Not the same as `#rootOf(Component)`. A `Dialog` shown inside a window's
+    /// layered pane is a parented `Form`, so the top level walk goes past it to the
+    /// `Window` -- whose command listeners are somebody else's. The dialog never
+    /// heard that its own button had been pressed, which left `lastCommandPressed`
+    /// null and the modal wait running forever.
+    ///
+    /// For every hierarchy that has no hosted dialog in it this returns the very
+    /// container `rootOf` would, because `Form` and `Window` both answer
+    /// `Container#isCommandHost()` with the unparented test that `getTopLevelContainer`
+    /// already uses.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component the command was activated from, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the container to notify, or null when the component is detached
+    static Container commandHostOf(Component cmp) {
+        Component c = cmp;
+        while (c != null) {
+            if (c instanceof Container && ((Container) c).isCommandHost()) {
+                return (Container) c;
+            }
+            c = c.getParent();
+        }
+        return null;
+    }
+
     /// Registers a component for animation with the top level it lives in, using the
     /// internal registration that skips the public bookkeeping.
     ///
@@ -243,6 +275,106 @@ final class TopLevelSupport {
         if (top != null) {
             top.asContainer().deregisterAnimatedInternal(a);
         }
+    }
+
+    /// The form wide layered pane of the given top level if one exists, without
+    /// creating one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to ask, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the layered pane, or null when there is none or no top level
+    static Container formLayeredPaneIfExists(TopLevelContainer top) {
+        return top == null ? null : top.asContainer().getFormLayeredPaneIfExists();
+    }
+
+    /// The content area layered pane of the given top level if one exists, without
+    /// creating one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to ask, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the layered pane, or null when there is none or no top level
+    static Container layeredPaneIfExists(TopLevelContainer top) {
+        return top == null ? null : top.asContainer().getLayeredPaneIfExists();
+    }
+
+    /// The height the top level's soft button bar costs, zero for a window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to measure, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the soft button area height
+    static int softButtonAreaHeight(TopLevelContainer top) {
+        return top == null ? 0 : top.asContainer().softButtonAreaHeight();
+    }
+
+    /// The width to measure against for something that will be shown on the given top
+    /// level.
+    ///
+    /// A window is measured by its own size. A form is measured by the display, not by
+    /// its own width, because that is the expression every caller evaluated before
+    /// windows existed and a form is not always laid out when it is asked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the width to size against
+    static int hostWidth(TopLevelContainer top) {
+        if (top != null && top.asContainer().isNativeWindow()) {
+            return top.asContainer().getWidth();
+        }
+        return Display.getInstance().getDisplayWidth();
+    }
+
+    /// The counterpart to `#hostWidth(TopLevelContainer)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the height to size against
+    static int hostHeight(TopLevelContainer top) {
+        if (top != null && top.asContainer().isNativeWindow()) {
+            return top.asContainer().getHeight();
+        }
+        return Display.getInstance().getDisplayHeight();
+    }
+
+    /// The top level the user is currently working in: the focused window when one has
+    /// focus, otherwise the current form.
+    ///
+    /// This is what a caller with no component to resolve from should use --
+    /// `ToastBar.showMessage`, `InfiniteProgress.showInfiniteBlocking`, the static
+    /// `Dialog.show` helpers. Those used to name the current form unconditionally, so
+    /// in a multi window application they put their overlay on the main window while
+    /// the user was looking at another one.
+    ///
+    /// #### Returns
+    ///
+    /// the top level to act on, or null when the application has neither
+    static TopLevelContainer current() {
+        if (Display.impl != null && Display.impl.getWindowManager() != null) {
+            Window focused = Desktop.getInstance().getFocusedWindow();
+            if (focused != null && focused.isWindowShowing()) {
+                return focused;
+            }
+        }
+        return Display.getInstance().getCurrent();
     }
 
     /// Throws when the running platform has no windowing system, so that misuse

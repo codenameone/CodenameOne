@@ -1838,6 +1838,42 @@ public class Container extends Component implements Iterable<Component> {
         return 0;
     }
 
+    /// The form wide layered pane if one has already been created, without creating
+    /// one. Inert unless this container is a top level.
+    ///
+    /// Overlays need this to tear themselves down: asking through the creating
+    /// accessor would build a layer just to discover there was nothing in it.
+    ///
+    /// #### Returns
+    ///
+    /// the layered pane, or null when none has been created
+    Container getFormLayeredPaneIfExists() {
+        return null;
+    }
+
+    /// The content area layered pane if one has already been created, without
+    /// creating one. Inert unless this container is a top level.
+    ///
+    /// #### Returns
+    ///
+    /// the layered pane, or null when none has been created
+    Container getLayeredPaneIfExists() {
+        return null;
+    }
+
+    /// The height this top level's soft button bar takes out of its own content.
+    ///
+    /// A `Form` may draw one; a window never does, so it costs nothing there. Callers
+    /// that used to reach for `Form#getSoftButtonCount()` and
+    /// `Form#getSoftButton(int)` ask this instead, which is answerable by both.
+    ///
+    /// #### Returns
+    ///
+    /// the soft button area height, or zero when there is none
+    int softButtonAreaHeight() {
+        return 0;
+    }
+
     /// Whether this top level is holding a pointer press over the given component,
     /// which is what decides if selection still paints. Each top level answers from
     /// its own press coordinates: those are top level relative, so another one's
@@ -1876,6 +1912,27 @@ public class Container extends Component implements Iterable<Component> {
     ///
     /// - `ev`: the event that activated it
     void commandActivatedFromComponent(Command cmd, ActionEvent ev) {
+    }
+
+    /// Whether this container is the one a command activated inside it should be
+    /// reported to.
+    ///
+    /// This is deliberately not the same question as "is this the top level". A
+    /// `Dialog` hosted in a window's layered pane is a `Form` with a parent, so
+    /// `Component#getTopLevelContainer()` walks straight past it to the `Window` --
+    /// and the window's command listeners are not the dialog's. The dialog would
+    /// never learn that its own OK button had been pressed, so `lastCommandPressed`
+    /// stayed null and the modal wait never ended.
+    ///
+    /// The default is false, so the walk passes over every ordinary container and
+    /// stops exactly where `getTopLevelContainer()` stops for every hierarchy that
+    /// exists today.
+    ///
+    /// #### Returns
+    ///
+    /// true if commands activated below this container belong to it
+    boolean isCommandHost() {
+        return false;
     }
 
     /// Restores the command a text field displaced while it was being edited. Inert

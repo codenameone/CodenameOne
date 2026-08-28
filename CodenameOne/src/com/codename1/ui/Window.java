@@ -169,6 +169,11 @@ public class Window extends Container implements TopLevelContainer {
     private final ArrayList<Container> pendingRevalidateQueue = new ArrayList<Container>();
 
     private UIManager uiManager;
+    private int tintColor;
+    /// Whether `#tintColor` has been resolved yet. The default comes from the look and
+    /// feel, which a window cannot read at construction time -- its `UIManager` may be
+    /// set afterwards -- so it is resolved on first use rather than in the constructor.
+    private boolean tintColorSet;
     private VirtualInputDevice currentInputDevice;
     private final TextSelection textSelection = new TextSelection(this);
     private boolean enableCursors;
@@ -439,6 +444,18 @@ public class Window extends Container implements TopLevelContainer {
 
     /// {@inheritDoc}
     @Override
+    Container getFormLayeredPaneIfExists() {
+        return windowLayeredPane;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    Container getLayeredPaneIfExists() {
+        return layeredPane;
+    }
+
+    /// {@inheritDoc}
+    @Override
     public Painter getGlassPane() {
         return glassPane;
     }
@@ -602,7 +619,7 @@ public class Window extends Container implements TopLevelContainer {
     }
 
     @Override
-    boolean isTopLevelShowing() {
+    public boolean isTopLevelShowing() {
         return isWindowShowing();
     }
 
@@ -619,6 +636,12 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     void commandActivatedFromComponent(Command cmd, ActionEvent ev) {
         dispatchCommandNoRecurse(cmd, ev);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    boolean isCommandHost() {
+        return getParent() == null;
     }
 
     @Override
@@ -1089,6 +1112,31 @@ public class Window extends Container implements TopLevelContainer {
     public void setUIManager(UIManager uiManager) {
         this.uiManager = uiManager;
         refreshTheme(false);
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// Note the window does not paint this itself, unlike `Form`. Its layered pane
+    /// repaints the whole window underneath whatever sits in the pane
+    /// (`#getFormLayeredPane(java.lang.Class, boolean)`), so a tint applied in
+    /// `#paint(Graphics)` would be composited once for the window and once more for
+    /// that backdrop, and read visibly darker than the same tint on a form. What
+    /// covers the window paints the tint instead, exactly once.
+    @Override
+    public int getTintColor() {
+        if (!tintColorSet) {
+            tintColorSet = true;
+            tintColor = getUIManager().getLookAndFeel().getDefaultFormTintColor();
+        }
+        return tintColor;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setTintColor(int tintColor) {
+        this.tintColor = tintColor;
+        this.tintColorSet = true;
+        repaint();
     }
 
     /// {@inheritDoc}

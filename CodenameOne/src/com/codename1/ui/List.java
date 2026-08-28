@@ -1681,14 +1681,16 @@ public class List<T> extends Component implements ActionSource {
                 if (i != null && i instanceof Command && ((Command) i).isEnabled()) {
                     ((Command) i).actionPerformed(a);
                     if (!a.isConsumed()) {
-                        // The top level rather than the form: getComponentForm() is null
-                        // by design inside a Window, so a command list there invoked the
-                        // command and then told nobody -- the window's command listeners
-                        // never saw the activation. Neither branch re-invokes the
-                        // command, which has just run above.
-                        TopLevelContainer top = getTopLevelContainer();
-                        if (top != null) {
-                            top.asContainer().commandActivatedFromList((Command) i, a);
+                        // The command host rather than the form: getComponentForm() is
+                        // null by design inside a Window, so a command list there invoked
+                        // the command and then told nobody -- the window's command
+                        // listeners never saw the activation. It is also not simply the
+                        // top level: a Dialog hosted in a window's layered pane is a
+                        // parented Form, which that walk goes straight past. Neither
+                        // branch re-invokes the command, which has just run above.
+                        Container host = TopLevelSupport.commandHostOf(this);
+                        if (host != null) {
+                            host.commandActivatedFromList((Command) i, a);
                         }
                     }
                 }
