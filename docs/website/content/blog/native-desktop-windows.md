@@ -43,9 +43,13 @@ series: ["release-2026-08-28"]
 
 The [migration post](/blog/maven-central-cloudflare-r2/) explains the cutover and retention policy. Add the blocks before running `mvn cn1:update`, or the newest version Maven Central can see will remain the last pre-cutover release.
 
-A desktop application stops behaving like a desktop application when its inspector, second document, and tool palette must all become overlays inside one main view. That was Codename One's limit. Even our desktop ports had one current `Form` and treated the whole application as one display surface.
+## More than one native window
 
-[PR #5556](https://github.com/codenameone/CodenameOne/pull/5556) removes that architectural limit. A desktop application can now open several operating-system windows. Each window has its own Codename One component tree, focus owner, animation list, repaint region, native peers, and text editing. `Form` remains the application's main surface, so existing mobile and single-window applications keep the model they already use.
+Codename One was built for phones. A phone application had one current `Form`, one display size, one focus owner, and one paint target. Keeping those answers in global `Display` state made the mobile model simple. `Display.getInstance().getCurrent()` always had one answer.
+
+The desktop ports inherited that assumption. An editor could show a document, inspector, and tool palette, but only by arranging them inside the same `Form`. A second operating-system window needs different answers to the same questions. It has its own component tree, size, focus owner, paint queue, and native input target. One global current form cannot describe both surfaces.
+
+[PR #5556](https://github.com/codenameone/CodenameOne/pull/5556) separates the state that belongs to each rendered surface from the state of the main application. A desktop application can now open several operating-system windows. Each window has its own Codename One component tree, focus owner, animation list, repaint region, native peers, and text editing. `Form` remains the application's main surface, so existing mobile and single-window applications keep the model they already use.
 
 We did not turn every screen into a window or replace `Form`. We separated the assumptions that were accidentally global from the parts that really belong to the main application surface.
 

@@ -135,7 +135,7 @@ A command-line `-Dcodename1.arg.<name>=...` override still wins. A CN1Lib can st
 
 The old hint set was partially restated in the developer guide, the Settings tool, the simulator, the Maven plugin's separator map, and an agent reference. Only 147 of roughly 520 names appeared in more than one of those places.
 
-The annotations are now the source of truth for the 87 hints they expose. The remaining hints live in `maven/build-hint-catalog`, including dynamic families and build-service-only settings. Together they describe all 497 hints read by the builders. The generated developer guide table now contains 570 rows with type, default, and annotation columns.
+The annotations are now the source of truth for the 87 hints they expose. The remaining hints live in `maven/build-hint-catalog`, including dynamic families and build-service-only settings. Together they describe all 497 hints read by the builders. The generated developer guide table now contains 577 rows with type, default, and annotation columns.
 
 The Settings tool reads the catalog instead of scraping an AsciiDoc table and guessing types from prose. It validates closed value sets and identifies hints owned by an annotation, so it cannot add a duplicate property behind your back.
 
