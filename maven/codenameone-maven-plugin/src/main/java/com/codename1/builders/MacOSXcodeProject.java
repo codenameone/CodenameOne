@@ -397,6 +397,23 @@ public class MacOSXcodeProject {
             if (overrides.networkServer(c.usesServerSockets)) {
                 ent.put(ENT_NETWORK_SERVER, Boolean.TRUE);
             }
+        }
+        // Resource access is not a sandbox permission, which is why these sit
+        // outside the block above -- the same reasoning as APNs and the JIT
+        // exception below. The hardened runtime refuses the camera, the
+        // microphone, Bluetooth, location and the calendar unless the signed
+        // binary carries the matching entitlement, exactly as the sandbox does,
+        // and it refuses them silently at the point of first use. A Developer ID
+        // build is hardened and unsandboxed by DEFAULT, so keying these on the
+        // sandbox shipped a signed application that was denied the very
+        // resources whose usage descriptions it was already carrying -- and the
+        // explicit macos.entitlements.device.* overrides could not rescue it
+        // either, because they never got as far as being read.
+        //
+        // Everything that stayed inside the block is genuinely sandbox-only:
+        // the sandbox flag itself, the network client and server, and the
+        // filesystem grants. The hardened runtime does not gate any of those.
+        if (overrides.isSandbox() || overrides.isHardenedRuntime()) {
             if (overrides.camera(c.usesCamera)) {
                 ent.put(ENT_CAMERA, Boolean.TRUE);
             }

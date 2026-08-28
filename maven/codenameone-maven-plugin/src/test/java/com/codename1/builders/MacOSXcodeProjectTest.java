@@ -180,6 +180,60 @@ public class MacOSXcodeProjectTest {
         assertNull(ent.get(MacOSXcodeProject.ENT_LOCATION));
     }
 
+    /**
+     * The hardened runtime gates resource access on its own, so a Developer ID
+     * build needs these entitlements even though it is not sandboxed.
+     *
+     * <p>Keying them on the sandbox meant the default Developer ID
+     * configuration -- unsandboxed and hardened -- was signed without the
+     * camera, microphone, Bluetooth, location or calendar entitlement, and the
+     * hardened runtime then refused those resources at first use while the app
+     * carried the usage descriptions that had already prompted the user. The
+     * explicit macos.entitlements.device.* overrides could not rescue it
+     * either: they were never reached.</p>
+     */
+    @Test
+    public void hardenedDeveloperIdBuildsStillEarnTheirResourceEntitlements() {
+        MacOSXcodeProject.MacOSCapabilities caps = new MacOSXcodeProject.MacOSCapabilities();
+        caps.usesCamera = true;
+        caps.usesMicrophone = true;
+        caps.usesLocation = true;
+        caps.usesCalendar = true;
+        caps.usesServerSockets = true;
+
+        // Developer ID on its defaults: not sandboxed, hardened.
+        Map<String, Object> devId = MacOSXcodeProject.entitlements(false, false, caps, false);
+        assertEquals(Boolean.TRUE, devId.get(MacOSXcodeProject.ENT_CAMERA));
+        assertEquals(Boolean.TRUE, devId.get(MacOSXcodeProject.ENT_MICROPHONE));
+        assertEquals(Boolean.TRUE, devId.get(MacOSXcodeProject.ENT_LOCATION));
+        assertEquals(Boolean.TRUE, devId.get(MacOSXcodeProject.ENT_CALENDARS));
+
+        // And the genuinely sandbox-only grants stay out of it. The hardened
+        // runtime gates none of these, so emitting them here would be claiming
+        // authority the build does not need.
+        assertNull("the sandbox flag itself belongs to the sandbox",
+                devId.get(MacOSXcodeProject.ENT_SANDBOX));
+        assertNull(devId.get(MacOSXcodeProject.ENT_NETWORK_CLIENT));
+        assertNull(devId.get(MacOSXcodeProject.ENT_NETWORK_SERVER));
+        assertNull(devId.get(MacOSXcodeProject.ENT_FILES_USER_SELECTED));
+
+        // With the hardened runtime turned off and no sandbox there is nothing
+        // left to gate access, so nothing is asked for.
+        MacOSBuildHints.EntitlementOverrides unhardened =
+                new MacOSBuildHints.EntitlementOverrides(
+                        false, true, MacOSBuildHints.EntitlementOverrides.UNSET, "readwrite",
+                        false, false, null,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        null);
+        assertNull(MacOSXcodeProject.entitlements(false, unhardened, caps, false)
+                .get(MacOSXcodeProject.ENT_CAMERA));
+    }
+
     @Test
     public void pushRegistrationEarnsTheApnsEntitlementOnBothChannels() {
         MacOSXcodeProject.MacOSCapabilities caps = new MacOSXcodeProject.MacOSCapabilities();
