@@ -40,4 +40,16 @@ public interface AbstractDialog {
     void setTopLevelHost(TopLevelContainer host);
     /// The top level set with `#setTopLevelHost(TopLevelContainer)`, or null.
     TopLevelContainer getTopLevelHost();
+    /// Whether this dialog is backed by a real operating system window rather than
+    /// being drawn inside the application's own surface.
+    ///
+    /// Only desktop platforms have a windowing system. Everywhere else the request is
+    /// silently ignored and the dialog shows the ordinary way, so shared code does not
+    /// have to guard it.
+    boolean isNativeWindowMode();
+    /// Sets whether this dialog opens in a window of its own. Takes effect the next
+    /// time it is shown.
+    void setNativeWindowMode(boolean nativeWindowMode);
+    /// The window backing this dialog while it is showing, or null.
+    Window getNativeWindow();
 }

@@ -487,14 +487,34 @@ public class TestWindowManager extends WindowManager {
     @Override
     public int getWidth(Object peer) {
         FakeWindow w = win(peer);
-        return w == null ? 0 : w.width;
+        return w == null ? 0 : Math.max(0, w.width - chromeWidth);
     }
 
     @Override
     public int getHeight(Object peer) {
         FakeWindow w = win(peer);
-        return w == null ? 0 : w.height;
+        return w == null ? 0 : Math.max(0, w.height - chromeHeight);
     }
+
+    /// How much of a window's frame is chrome rather than drawable area.
+    ///
+    /// Real decorated windows have a title bar and borders outside the surface Codename
+    /// One paints into, so `setBounds` and `getWidth`/`getHeight` do not describe the
+    /// same rectangle. Zero by default, which keeps every existing test seeing the
+    /// frame size it always did.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the horizontal chrome in pixels
+    ///
+    /// - `height`: the vertical chrome in pixels
+    public void setChromeInsets(int width, int height) {
+        chromeWidth = width;
+        chromeHeight = height;
+    }
+
+    private int chromeWidth;
+    private int chromeHeight;
 
     @Override
     public void setResizable(Object peer, boolean resizable) {

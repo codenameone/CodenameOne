@@ -28,6 +28,7 @@ import com.codename1.io.Log;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
@@ -216,6 +217,21 @@ public class Dialog extends Form implements AbstractDialog {
     /// historical way by taking over the main surface. Every behaviour that belongs to
     /// that historical path is gated on this being null.
     private Window layerHost;
+
+    /// What this dialog was told about native window mode, or null when it was not
+    /// told. A `Boolean` rather than a boolean so "unset" is distinguishable, which is
+    /// what makes instance beats static beats theme expressible.
+    private Boolean nativeWindowMode;
+
+    /// The window backing this dialog, non-null for exactly the lifetime of one
+    /// native mode showing.
+    private Window nativeWindow;
+
+    /// True while the dialog's own title is hidden because the window draws one.
+    private boolean nativeTitleHidden;
+
+    /// True while an anchored popup is being shown, which never opens a window.
+    private boolean inPopupShow;
 
     /// The layer inside `#layerHost` this dialog was added to. Held rather than
     /// re-fetched: `Window#getFormLayeredPane(java.lang.Class, boolean)` re-applies
@@ -962,6 +978,100 @@ public class Dialog extends Form implements AbstractDialog {
     /// - `defaultTitleCentered`: true to use the centered title layout by default
     public static void setDefaultTitleCentered(boolean defaultTitleCentered) {
         Dialog.defaultTitleCentered = defaultTitleCentered;
+    }
+
+    /// Whether newly created dialogs open in a native operating system window on the
+    /// desktop.
+    private static boolean defaultNativeWindowMode;
+
+    /// Whether `#defaultNativeWindowMode` has been resolved from the theme yet.
+    private static boolean defaultNativeWindowModeInitialized;
+
+    private static void initDefaultNativeWindowMode() {
+        if (!defaultNativeWindowModeInitialized) {
+            defaultNativeWindowModeInitialized = true;
+            defaultNativeWindowMode = UIManager.getInstance()
+                    .isThemeConstant("defaultNativeWindowModeBool", defaultNativeWindowMode);
+        }
+    }
+
+    /// Whether newly created dialogs are backed by a real operating system window on
+    /// desktop platforms.
+    ///
+    /// This default can be configured globally with the theme constant
+    /// `defaultNativeWindowModeBool`.
+    ///
+    /// #### Returns
+    ///
+    /// true when new dialogs open in their own window
+    public static boolean isDefaultNativeWindowMode() {
+        initDefaultNativeWindowMode();
+        return defaultNativeWindowMode;
+    }
+
+    /// Sets whether newly created dialogs are backed by a real operating system window
+    /// on desktop platforms.
+    ///
+    /// This overrides the theme constant `defaultNativeWindowModeBool` for the rest of
+    /// the application's life.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeWindowMode`: true to open new dialogs in their own window
+    public static void setDefaultNativeWindowMode(boolean nativeWindowMode) {
+        defaultNativeWindowModeInitialized = true;
+        Dialog.defaultNativeWindowMode = nativeWindowMode;
+    }
+
+    /// Whether this dialog is backed by a real operating system window.
+    ///
+    /// Resolved when the dialog is shown, in this order: what
+    /// `#setNativeWindowMode(boolean)` was told, else
+    /// `#isDefaultNativeWindowMode()`, else the theme constant behind it. A platform
+    /// with no windowing system ignores all three and shows the dialog the ordinary
+    /// way -- the setting is a preference about how to render, not a contract, so
+    /// shared code does not have to guard it.
+    ///
+    /// #### Returns
+    ///
+    /// true when this dialog asks for its own window
+    public boolean isNativeWindowMode() {
+        if (nativeWindowMode != null) {
+            return nativeWindowMode.booleanValue();
+        }
+        return isDefaultNativeWindowMode();
+    }
+
+    /// Sets whether this dialog is backed by a real operating system window.
+    ///
+    /// Takes effect the next time the dialog is shown. A dialog already on screen is
+    /// never moved between the two: there is no safe point to reparent a live, focused,
+    /// possibly editing hierarchy while a caller is parked waiting for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeWindowMode`: true to open this dialog in its own window
+    public void setNativeWindowMode(boolean nativeWindowMode) {
+        this.nativeWindowMode = Boolean.valueOf(nativeWindowMode);
+    }
+
+    /// The window backing this dialog while it is showing.
+    ///
+    /// #### Returns
+    ///
+    /// the window, or null when the dialog is not in one
+    public Window getNativeWindow() {
+        return nativeWindow;
+    }
+
+    /// Called once the window backing this dialog has been configured and before it is
+    /// shown, so an application can adjust it -- make it resizable, give it an icon,
+    /// take its decoration away.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the window about to be shown
+    protected void initNativeWindow(Window w) {
     }
 
     private static void initDefaultInteractionDialogMode() {
@@ -1906,6 +2016,270 @@ public class Dialog extends Form implements AbstractDialog {
         showModal(h / 100 * 20, h / 100 * 10, w / 100 * 20, w / 100 * 20, true, modal, reverse);
     }
 
+    /// Whether this showing opens a real operating system window.
+    ///
+    /// #### Returns
+    ///
+    /// true to open a window of its own
+    private boolean usesNativeWindow() {
+        if (!Desktop.isSupported()) {
+            return false;
+        }
+        // A menu is framework furniture, and an anchored popup points at a rectangle in
+        // somebody else's coordinate space -- neither is a thing to give a title bar to.
+        if (isMenu() || inPopupShow) {
+            return false;
+        }
+        return isNativeWindowMode();
+    }
+
+    /// Shows this dialog as a real operating system window and, when modal, waits there
+    /// until it is disposed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `modal`: whether to wait here until the dialog is disposed
+    private void showInNativeWindow(boolean modal) {
+        Display.getInstance().flushEdt();
+        TopLevelContainer host = resolveHost();
+        Window w = new Window(getTitle() == null ? "" : getTitle(), new BorderLayout());
+        nativeWindow = w;
+        // Before show(). Window.setOwnerWindow throws once the peer exists, because
+        // every port fixes the ownership relation when it creates the native window.
+        if (host != null) {
+            w.setOwnerWindow(host);
+        }
+        w.setCloseOperation(Window.DO_NOTHING_ON_CLOSE);
+        w.setResizable(false);
+        w.setDecorated(true);
+        w.getContentPane().setScrollableY(false);
+        attachNativePayload(w);
+        publishNativeMenuCommands(w);
+        w.addCommandListener(new NativeCommandBridge(this));
+        w.addCloseListener(new NativeCloseBridge(this));
+        w.addWindowListener(new NativeDisposeBridge(this));
+        initNativeWindow(w);
+        hideOwnTitleIfDecorated(w);
+        sizeAndPlaceNativeWindow(w, host);
+        if (modal) {
+            // MODALITY_WINDOW, not APPLICATION. Desktop.blocks() already blocks the main
+            // surface when the owner is a Form, and exempts a dialog opened from another
+            // dialog's window -- which is exactly what a modal Dialog has always meant.
+            // APPLICATION would newly freeze unrelated windows.
+            w.setModalityType(Window.MODALITY_WINDOW);
+            w.showModal();
+            finishNativeShowing();
+        } else {
+            w.show();
+        }
+    }
+
+    /// Puts the dialog into the window.
+    ///
+    /// The whole dialog goes in, not just its content, for the same reason the layered
+    /// path does it that way: a dialog is positioned by margins written into its own
+    /// title and content styles, and moving only the content leaves that arithmetic
+    /// describing something that is no longer there. Taking the content pane out is
+    /// also not a thing a `Form` supports -- `Form#removeComponent(Component)` forwards
+    /// to the content pane, so asking a form to remove its own content pane asks that
+    /// pane to remove itself from itself.
+    ///
+    /// Nothing inside the dialog resolves to the dialog as a result:
+    /// `Form#getTopLevelContainer()` hands the walk upwards once it is parented, so
+    /// buttons, repaints and focus all reach the window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the window to move into
+    private void attachNativePayload(Window w) {
+        // Margins written by an earlier showing would inset the box inside the window.
+        applyDialogMargins(0, 0, 0, 0, false);
+        savedBgPainter = getStyle().getBgPainter();
+        getStyle().setBgPainter(NO_OP_PAINTER);
+        w.getContentPane().addComponent(BorderLayout.CENTER, this);
+    }
+
+    /// Takes the dialog back out of the window. Idempotent.
+    private void detachNativePayload() {
+        if (getParent() != null) {
+            remove();
+        }
+        if (savedBgPainter != null) {
+            getStyle().setBgPainter(savedBgPainter);
+            savedBgPainter = null;
+        }
+    }
+
+    /// Hands menu style commands to the window so the platform can put them wherever it
+    /// shows a window's commands.
+    ///
+    /// Button bar commands are deliberately not published: `placeButtonCommands` never
+    /// calls `addCommand`, so a dialog with an OK and a Cancel button has a command
+    /// count of zero and no native menu is built for them. They are buttons inside the
+    /// dialog and they stay that way.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the window to publish to
+    private void publishNativeMenuCommands(Window w) {
+        int count = getCommandCount();
+        for (int i = 0; i < count; i++) {
+            w.addCommand(getCommand(i));
+        }
+    }
+
+    /// Hides the dialog's own title while the operating system draws one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the window
+    private void hideOwnTitleIfDecorated(Window w) {
+        if (!w.isDecorated() || nativeTitleHidden) {
+            return;
+        }
+        nativeTitleHidden = true;
+        getTitleArea().setVisible(false);
+        getTitleComponent().setVisible(false);
+    }
+
+    /// Puts the dialog's own title back.
+    private void restoreOwnTitle() {
+        if (!nativeTitleHidden) {
+            return;
+        }
+        nativeTitleHidden = false;
+        getTitleArea().setVisible(true);
+        getTitleComponent().setVisible(true);
+    }
+
+    /// Sizes the window to the dialog's content and centres it on its host.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the window
+    ///
+    /// - `host`: the top level it belongs to, may be null
+    private void sizeAndPlaceNativeWindow(Window w, TopLevelContainer host) {
+        revalidate();
+        Dimension pref = getDialogPreferredSize();
+        int cw = Math.max(1, pref.getWidth());
+        int ch = Math.max(1, pref.getHeight());
+        // Never null: Desktop reports a single monitor covering the display even where
+        // there is no windowing system.
+        Monitor m = host != null ? Desktop.getInstance().getMonitorFor(host)
+                : Desktop.getInstance().getPrimaryMonitor();
+        Rectangle work = m.getWorkArea();
+        if (work.getWidth() > 0) {
+            cw = Math.min(cw, work.getWidth() * 9 / 10);
+        }
+        if (work.getHeight() > 0) {
+            ch = Math.min(ch, work.getHeight() * 9 / 10);
+        }
+        // The drawable size, not the frame's: a decorated window's chrome sits outside
+        // the surface, so asking for a frame this size clips the box by the title bar.
+        w.setWindowContentSize(cw, ch);
+        if (host != null) {
+            w.centerOn(host);
+        } else {
+            w.centerOnDesktop();
+        }
+    }
+
+    /// A command reached the window this dialog is in.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command
+    ///
+    /// - `ev`: the event that carried it
+    void nativeCommandActivated(Command cmd, ActionEvent ev) {
+        if (cmd != null) {
+            actionCommandImplNoRecurseComponent(cmd, ev);
+        }
+    }
+
+    /// The user activated the window's own close control.
+    void nativeCloseRequested(ActionEvent evt) {
+        // Vetoed so the dialog owns the teardown. Letting the window dispose itself
+        // first would leave the dialog believing it was still showing.
+        evt.consume();
+        Command back = getBackCommand();
+        if (back != null) {
+            dispatchCommand(back, new ActionEvent(back, ActionEvent.Type.Command));
+            return;
+        }
+        dispose();
+    }
+
+    /// Takes this dialog back out of its window. Idempotent, and marshalled onto the
+    /// event dispatch thread.
+    ///
+    /// `Window#dispose()` publishes its disposed flag and wakes the parked caller before
+    /// it fires the event this hangs off, so the caller can get here first.
+    void finishNativeShowing() {
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    finishNativeShowing();
+                }
+            });
+            return;
+        }
+        if (nativeWindow == null) {
+            return;
+        }
+        nativeWindow = null;
+        detachNativePayload();
+        restoreOwnTitle();
+    }
+
+    /// Routes a window's command activations back into the dialog.
+    private static final class NativeCommandBridge implements ActionListener {
+        private final Dialog dlg;
+
+        NativeCommandBridge(Dialog dlg) {
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            dlg.nativeCommandActivated(evt.getCommand(), evt);
+        }
+    }
+
+    /// Routes the window's close control back into the dialog.
+    private static final class NativeCloseBridge implements ActionListener {
+        private final Dialog dlg;
+
+        NativeCloseBridge(Dialog dlg) {
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            dlg.nativeCloseRequested(evt);
+        }
+    }
+
+    /// Tears the dialog down however its window died -- disposed by the dialog, by an
+    /// owner cascade, or by the desktop shutting down.
+    private static final class NativeDisposeBridge implements ActionListener {
+        private final Dialog dlg;
+
+        NativeDisposeBridge(Dialog dlg) {
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            if (evt instanceof WindowEvent
+                    && ((WindowEvent) evt).getType() == WindowEvent.Type.Disposed) {
+                dlg.finishNativeShowing();
+            }
+        }
+    }
+
     /// Whether this showing goes into a window's layered pane rather than taking over
     /// the main surface.
     ///
@@ -2181,6 +2555,10 @@ public class Dialog extends Form implements AbstractDialog {
         this.bottom = bottom;
         this.left = left;
         this.right = right;
+        if (usesNativeWindow()) {
+            showInNativeWindow(modal);
+            return;
+        }
         if (usesHostLayer()) {
             showInHostLayer(top, bottom, left, right, includeTitle, modal);
             return;
@@ -2231,6 +2609,32 @@ public class Dialog extends Form implements AbstractDialog {
     ///
     /// the command that might have been triggered by the user within the dialog if commands are placed in the dialog
     public Command showPopupDialog(Rectangle rect) {
+        inPopupShow = true;
+        try {
+            return showPopupDialogImpl(rect);
+        } finally {
+            inPopupShow = false;
+        }
+    }
+
+    /// The body of `#showPopupDialog(Rectangle)`.
+    ///
+    /// Split out so the popup flag is cleared however the showing ends. An anchored
+    /// popup never opens an operating system window: the rectangle it points at is in
+    /// its host's coordinate space, and nothing exposes where a window's drawable
+    /// actually starts on the desktop, so the popup would land off by the height of
+    /// the host's title bar with no way to correct for it. A separate window would also
+    /// never see the click that is supposed to dismiss it, and would steal focus from
+    /// the window that opened it every time it appeared.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: the rectangle to point at
+    ///
+    /// #### Returns
+    ///
+    /// the command the user triggered, if any
+    private Command showPopupDialogImpl(Rectangle rect) {
         if ("Dialog".equals(getDialogUIID())) {
             setDialogUIID("PopupDialog");
             if ("DialogTitle".equals(getTitleComponent().getUIID())) {
@@ -2617,9 +3021,14 @@ public class Dialog extends Form implements AbstractDialog {
         }
         setDisposed(true);
 
-        // the dispose parent method might send us back to the form while the command
-        // within the dialog might be directing us to another form causing a "blip"
-        if (!menu) {
+        if (nativeWindow != null) {
+            // The window fires Disposed, which is what actually tears the dialog down.
+            // None of the base teardown applies: there is no previous form, because
+            // Display.setCurrent was never called for this showing.
+            nativeWindow.dispose();
+        } else if (!menu) {
+            // the dispose parent method might send us back to the form while the command
+            // within the dialog might be directing us to another form causing a "blip"
             super.dispose();
         }
         // A host worked out from a popup's anchor belongs to that one showing. Left in

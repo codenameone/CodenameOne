@@ -1429,6 +1429,52 @@ public class Window extends Container implements TopLevelContainer {
         return new Rectangle(out[0], out[1], out[2], out[3]);
     }
 
+    /// Sizes this window so its Codename One drawable area is the given size, rather
+    /// than its native frame.
+    ///
+    /// `#setWindowSize(int, int)` asks the platform for a frame of that size. On a
+    /// decorated window the title bar and borders sit outside the surface Codename One
+    /// paints into, so the drawable comes back smaller -- and content sized to fit is
+    /// clipped along the bottom by exactly the height of the title bar. This asks for
+    /// the drawable size instead and lets the window work out its own chrome.
+    ///
+    /// The correction is applied once, after the native window exists, and only when
+    /// the platform actually disagrees. A port whose chrome varies with the size it is
+    /// given cannot make this oscillate.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the drawable width in pixels
+    ///
+    /// - `height`: the drawable height in pixels
+    public void setWindowContentSize(final int width, final int height) {
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    setWindowContentSize(width, height);
+                }
+            });
+            return;
+        }
+        setWindowSize(width, height);
+        if (nativePeer == null) {
+            // No peer to measure against yet. show() applies the pending size, and the
+            // caller can ask again once the window is up if it needs the exact fit.
+            return;
+        }
+        int drawableW = getWidth();
+        int drawableH = getHeight();
+        if (drawableW <= 0 || drawableH <= 0) {
+            return;
+        }
+        int chromeW = width - drawableW;
+        int chromeH = height - drawableH;
+        if (chromeW != 0 || chromeH != 0) {
+            setWindowSize(width + chromeW, height + chromeH);
+        }
+    }
+
     /// Moves and resizes this window.
     ///
     /// #### Parameters
@@ -2156,6 +2202,14 @@ public class Window extends Container implements TopLevelContainer {
     /// Both steps happen in the same hop so no input can be dispatched between the
     /// window appearing and the block taking effect.
     private void showAndBlock() {
+        // Disposed while this hop was queued. showModal() from a background thread
+        // schedules this onto the event dispatch thread, so anything on that thread --
+        // a timeout, a command, an owner going away -- can dispose the window before it
+        // runs. Showing it then throws out of a dispatch nobody is in a position to
+        // catch, and there is nothing left to show or to block behind.
+        if (isWindowDisposed()) {
+            return;
+        }
         show();
         acquireModal();
         // The windows this one blocks have to be told as well, which acquireModal()

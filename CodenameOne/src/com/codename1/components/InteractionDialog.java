@@ -343,6 +343,176 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// #### Parameters
     ///
     /// - `host`: the top level to show on, or null for the current form
+    /// Whether this dialog is backed by a real operating system window.
+    ///
+    /// Resolved when the dialog is shown: what `#setNativeWindowMode(boolean)` was
+    /// told, else `Dialog#isDefaultNativeWindowMode()` and the theme constant behind
+    /// it. A platform with no windowing system ignores all of it and shows the dialog
+    /// on its host's layered pane as before.
+    ///
+    /// #### Returns
+    ///
+    /// true when this dialog asks for its own window
+    public boolean isNativeWindowMode() {
+        if (nativeWindowMode != null) {
+            return nativeWindowMode.booleanValue();
+        }
+        return Dialog.isDefaultNativeWindowMode();
+    }
+
+    /// Sets whether this dialog is backed by a real operating system window.
+    ///
+    /// Takes effect the next time the dialog is shown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeWindowMode`: true to open this dialog in its own window
+    public void setNativeWindowMode(boolean nativeWindowMode) {
+        this.nativeWindowMode = Boolean.valueOf(nativeWindowMode);
+    }
+
+    /// The window backing this dialog while it is showing.
+    ///
+    /// #### Returns
+    ///
+    /// the window, or null when the dialog is not in one
+    public com.codename1.ui.Window getNativeWindow() {
+        return nativeWindow;
+    }
+
+    /// Called once the window backing this dialog has been configured and before it is
+    /// shown, so an application can adjust it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the window about to be shown
+    protected void initNativeWindow(com.codename1.ui.Window w) {
+    }
+
+    /// Whether this showing opens a real operating system window.
+    ///
+    /// An anchored popup never does: it points at a rectangle in its host's coordinate
+    /// space, and a separate window neither shares that space nor sees the click that
+    /// is meant to dismiss it.
+    ///
+    /// #### Returns
+    ///
+    /// true to open a window of its own
+    private boolean usesNativeWindow() {
+        return com.codename1.ui.Desktop.isSupported() && !inPopupShow && isNativeWindowMode();
+    }
+
+    /// True while an anchored popup is being shown.
+    private boolean inPopupShow;
+
+    /// Shows this dialog as a real operating system window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `modal`: whether to park the caller until the dialog goes
+    private void showInNativeWindow(boolean modal) {
+        TopLevelContainer host = resolveHost();
+        com.codename1.ui.Window w = new com.codename1.ui.Window(
+                getTitle() == null ? "" : getTitle(), new BorderLayout());
+        nativeWindow = w;
+        if (host != null) {
+            w.setOwnerWindow(host);
+        }
+        w.setCloseOperation(com.codename1.ui.Window.DO_NOTHING_ON_CLOSE);
+        w.setResizable(false);
+        w.setDecorated(true);
+        w.getContentPane().setScrollableY(false);
+        Style unselectedStyle = getUnselectedStyle();
+        unselectedStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS,
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
+        unselectedStyle.setMargin(TOP, 0);
+        unselectedStyle.setMargin(BOTTOM, 0);
+        unselectedStyle.setMargin(LEFT, 0);
+        unselectedStyle.setMargin(RIGHT, 0);
+        remove();
+        w.getContentPane().addComponent(BorderLayout.CENTER, this);
+        w.addCloseListener(new NativeCloseBridge(this));
+        w.addWindowListener(new NativeDisposeBridge(this));
+        initNativeWindow(w);
+        revalidate();
+        int cw = Math.max(1, getPreferredW());
+        int ch = Math.max(1, getPreferredH());
+        w.setWindowContentSize(cw, ch);
+        if (host != null) {
+            w.centerOn(host);
+        } else {
+            w.centerOnDesktop();
+        }
+        startPendingTimeout();
+        if (modal) {
+            w.setModalityType(com.codename1.ui.Window.MODALITY_WINDOW);
+            w.showModal();
+            finishNativeShowing();
+        } else {
+            w.show();
+        }
+    }
+
+    /// Takes this dialog back out of its window. Idempotent, and on the event dispatch
+    /// thread.
+    void finishNativeShowing() {
+        if (!CN.isEdt()) {
+            CN.callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    finishNativeShowing();
+                }
+            });
+            return;
+        }
+        if (nativeWindow == null) {
+            return;
+        }
+        nativeWindow = null;
+        disposed = true;
+        if (getParent() != null) {
+            remove();
+        }
+    }
+
+    /// The user activated the window's own close control.
+    void nativeCloseRequested(ActionEvent evt) {
+        evt.consume();
+        dispose();
+    }
+
+    /// Routes the window's close control back into the dialog.
+    private static final class NativeCloseBridge implements ActionListener {
+        private final InteractionDialog dlg;
+
+        NativeCloseBridge(InteractionDialog dlg) {
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            dlg.nativeCloseRequested(evt);
+        }
+    }
+
+    /// Tears the dialog down however its window died.
+    private static final class NativeDisposeBridge implements ActionListener {
+        private final InteractionDialog dlg;
+
+        NativeDisposeBridge(InteractionDialog dlg) {
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            if (evt instanceof com.codename1.ui.events.WindowEvent
+                    && ((com.codename1.ui.events.WindowEvent) evt).getType()
+                        == com.codename1.ui.events.WindowEvent.Type.Disposed) {
+                dlg.finishNativeShowing();
+            }
+        }
+    }
+
     public void setTopLevelHost(TopLevelContainer host) {
         this.hostTopLevel = host;
         // An explicit choice replaces an inferred one outright, and there is no longer
@@ -378,6 +548,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
     }
 
     private TopLevelContainer hostTopLevel;
+
+    /// What this dialog was told about native window mode, or null when it was not
+    /// told. A `Boolean` rather than a boolean so "unset" is distinguishable from off.
+    private Boolean nativeWindowMode;
+
+    /// The window backing this dialog, non-null for exactly one native mode showing.
+    private com.codename1.ui.Window nativeWindow;
 
     /// A timeout set before the dialog was shown, waiting for a host to bind to.
     private long pendingTimeout;
@@ -519,6 +696,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
     public void show(int top, int bottom, int left, int right) {
         getUnselectedStyle().setOpacity(255);
         disposed = false;
+        if (usesNativeWindow()) {
+            showInNativeWindow(false);
+            return;
+        }
         TopLevelContainer f = resolveHost();
         if (f == null) {
             return;
@@ -593,6 +774,12 @@ public class InteractionDialog extends Container implements AbstractDialog {
     public void dispose() {
         disposed = true;
         releaseInferredHost();
+        if (nativeWindow != null) {
+            // The window fires Disposed, which is what takes the dialog back out. None
+            // of the layered pane teardown below applies -- there is no layer.
+            nativeWindow.dispose();
+            return;
+        }
         Container p = getParent();
         if (p != null) {
             TopLevelContainer f = p.getTopLevelContainer();
@@ -1043,6 +1230,27 @@ public class InteractionDialog extends Container implements AbstractDialog {
     }
 
     private void showPopupDialogImpl(Rectangle rect, boolean bias) {
+        inPopupShow = true;
+        try {
+            showPopupDialogBody(rect, bias);
+        } finally {
+            inPopupShow = false;
+        }
+    }
+
+    /// The body of `#showPopupDialogImpl(Rectangle, boolean)`.
+    ///
+    /// Split out so the popup flag is cleared however the showing ends. An anchored
+    /// popup never opens an operating system window: the rectangle it points at is in
+    /// its host's coordinate space, and nothing exposes where a window's drawable
+    /// begins on the desktop.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: the rectangle to point at
+    ///
+    /// - `bias`: the portrait placement bias
+    private void showPopupDialogBody(Rectangle rect, boolean bias) {
         if (rect == null) {
             throw new IllegalArgumentException("rect cannot be null");
         }
@@ -1595,6 +1803,15 @@ public class InteractionDialog extends Container implements AbstractDialog {
         // centred it in the wrong coordinate space, and on a window smaller than the
         // display the margins could exceed the host outright and leave the dialog
         // clipped or off screen.
+        if (usesNativeWindow()) {
+            // Real window modality rather than the polling loop below: the framework
+            // blocks input for it and the caller is parked properly instead of waking
+            // every ten milliseconds to ask again.
+            disposed = false;
+            getUnselectedStyle().setOpacity(255);
+            showInNativeWindow(true);
+            return lastCommandPressed;
+        }
         TopLevelContainer host = resolveHost();
         int width = host == null
                 ? Display.getInstance().getDisplayWidth() : host.asContainer().getWidth();
