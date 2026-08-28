@@ -102,13 +102,13 @@ include::_generated-build-hints.adoc[]
 
 By default a cloud build always uses the current Codename One release. With a _versioned build_ you can instead pin the build to a specific previously released framework version, so you get reproducible output over time. This helps when stabilizing a release, supporting an older app, or isolating a regression: if an app that built correctly in the past starts failing, rebuilding against the last known good version tells you whether the change came from your code or from the framework and build server.
 
-Set the `build.cn1Version` build hint to the version you want to target. Versions use the standard Maven release scheme published to Maven Central, for example `7.0.182`:
+Set the `build.cn1Version` build hint to the version you want to target. Versions use the standard Maven release scheme, for example `7.0.182`:
 
 ----
 codename1.arg.build.cn1Version=7.0.182
 ----
 
-The build server fetches that version's framework artifacts from Maven Central and builds against them. To keep your simulator and local compile classpath aligned with the same release, set the matching `cn1.version` in your project `pom.xml`.
+The build server fetches that version's framework artifacts from the Codename One Maven repository and builds against them, falling back to Maven Central for releases published before the move. To keep your simulator and local compile classpath aligned with the same release, set the matching `cn1.version` in your project `pom.xml`.
 
 Versioned builds are a Pro and Enterprise feature, and how far back you can target depends on the subscription tier:
 

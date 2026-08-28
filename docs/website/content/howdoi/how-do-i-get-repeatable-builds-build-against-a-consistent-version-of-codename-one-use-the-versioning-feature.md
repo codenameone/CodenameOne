@@ -15,11 +15,11 @@ thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-4-1.
 {{< youtube "w7xvlw3rI6Y" >}}
 Repeatable builds matter when you are trying to stabilize a release, investigate a regression, or keep a production app on a known-good Codename One version instead of automatically moving with the latest server-side changes. Versioned builds are the feature designed for that job.
 
-The core idea is simple. Instead of always building against the current Codename One release, you tell the build server to target a specific published Codename One version. The native build is then performed using the framework artifacts for that exact release, which the build server fetches from Maven Central. If your application built and ran correctly against that version before, you have a way to stay there while you validate later updates on your own schedule.
+The core idea is simple. Instead of always building against the current Codename One release, you tell the build server to target a specific published Codename One version. The native build is then performed using the framework artifacts for that exact release, which the build server fetches from the Codename One Maven repository. If your application built and ran correctly against that version before, you have a way to stay there while you validate later updates on your own schedule.
 
 ## How to enable a versioned build
 
-Set the `build.cn1Version` build hint to the Maven release version you want to target. Versions follow the standard Maven scheme published to Maven Central, for example `7.0.182`.
+Set the `build.cn1Version` build hint to the Maven release version you want to target. Versions follow the standard Maven scheme, for example `7.0.182`. Releases published before the move to the Codename One Maven repository still resolve from Maven Central, so any version the feature accepted before it still accepts.
 
 In a Maven project, add the hint to `codenameone_settings.properties` using the `codename1.arg.` prefix:
 

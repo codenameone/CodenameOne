@@ -317,13 +317,39 @@ bash update-version.sh 8.0.1
 
 ## Deployment and Release
 
-### Maven Central Deployment
+### Release Deployment
 
-See `maven/README.adoc` for full process. Summary:
+Releases go to the Codename One Maven repository at
+<https://repo.codenameone.com/maven2> (Cloudflare R2), **not** to Maven Central.
+Central keeps every version published before the cutover and nothing is removed
+from it, but it receives no new ones. Do not add a Central publication step back;
+the reasons and the rules the publishing scripts enforce are in
+`maven/scripts/r2/README.md`.
+
+`central-publishing-maven-plugin` is still what builds a release. That is not a
+leftover: it stages a complete Maven layout with all four checksums and `.asc`
+signatures, which is exactly the tree R2 needs. Every build passes
+`-DskipPublishing=true`, so it stages and never uploads. It still needs a `central`
+server entry in `settings.xml` or it NPEs before staging, which is why the release
+workflow keeps `server-id: central` with no credentials attached.
+
+See `maven/README.adoc` for the full process. Summary:
 1. Update to release version: `bash update-version.sh X.Y.Z`
-2. Push tags (triggers GitHub Actions workflow)
+2. Push tags, **one at a time** (triggers `.github/workflows/release.yml`) --
+   a third tag pushed during a running release replaces the pending second one
+   and it is never published
 3. Update to next SNAPSHOT: `bash update-version.sh X.Y.Z+1-SNAPSHOT`
-4. Close and release staging repository on Sonatype
+
+Some artifacts are resolved by a release at a version that is not the release's
+own -- `codenameone-designer` and `codenameone-javase-svg` at
+`cn1.designer.version`, and `cn1-builder-resources-{common,android}` at their
+pinned version. They are published nowhere but Maven Central, so they have to be
+copied into the repository once. `maven/scripts/r2/frozen-coordinates.py`
+**derives** that set from the tree; do not replace it with a hand-written list,
+which was wrong twice in its single commit of existence. After bumping any such
+pin, run the *Seed frozen artifacts to R2* workflow before the next release tag.
+The release refuses to build while a pinned version is absent from the
+repository, so the ordering is enforced rather than remembered.
 
 ### Build Server
 

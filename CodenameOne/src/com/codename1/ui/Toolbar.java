@@ -3038,6 +3038,72 @@ public class Toolbar extends Container {
         return cmds;
     }
 
+    /// {@inheritDoc}
+    ///
+    /// A theme change (dark/light switch, a CSS live update) reaches the
+    /// component tree through `Form#refreshTheme(boolean)`, which walks the
+    /// form. The on-top side menu is not on that walk: it lives in an
+    /// `InteractionDialog` that `InteractionDialog#dispose()` detaches from
+    /// the form, so while the menu is closed -- which is whenever the user is
+    /// looking at the form and flipping the theme -- nothing re-resolves its
+    /// styles and it re-opens painted in the previous theme until the app is
+    /// restarted (issue #5612).
+    ///
+    /// The menu is refreshed here whether or not it is currently attached.
+    /// Attachment would only prove that a form walk *could* reach it, not that
+    /// this call came from one: `refreshTheme` is public, and an app that calls
+    /// it on the toolbar while the menu is open gets no form traversal at all.
+    /// Refreshing an attached menu a second time costs nothing and changes
+    /// nothing -- a merge preserves the style's modified flags, so it resolves
+    /// to the same values -- and the toolbar's own subtree has always been
+    /// refreshed twice anyway, because `Form#refreshTheme(boolean)` calls this
+    /// method and then walks the form that the toolbar is a child of.
+    @Override
+    public void refreshTheme(boolean merge) {
+        super.refreshTheme(merge);
+        refreshSideMenuTheme(sidemenuDialog != null
+                ? sidemenuDialog : permanentSideMenuContainer, merge);
+        refreshSideMenuTheme(rightSidemenuDialog != null
+                ? rightSidemenuDialog : permanentRightSideMenuContainer, merge);
+    }
+
+    /// Re-resolves the styles of one side menu container and lays it out again,
+    /// so that a font or padding change is applied the next time it is shown
+    /// rather than on the first interaction after that.
+    ///
+    /// A form may carry its own `UIManager`. `Component#getUIManager()` finds
+    /// it by walking up to the form, which a closed side menu cannot do -- it
+    /// has no parent, so it falls back to the global singleton and would be
+    /// re-styled from the wrong theme, then reopen looking unlike the form it
+    /// belongs to. Pin the toolbar's manager onto it first.
+    ///
+    /// The pin is then kept in step on every refresh, open or closed, because
+    /// `Container#getUIManager()` prefers a pinned manager over the parent
+    /// chain: once pinned, the menu no longer follows its form on its own. A
+    /// later `Form#setUIManager(UIManager)` -- which refreshes as it assigns --
+    /// would otherwise keep re-styling an open menu from the manager it was
+    /// pinned with, while the rest of the form moved to the new one. Comparing
+    /// against the resolved manager keeps this a no-op for a menu that is
+    /// attached and unpinned, where the hierarchy already gives the same
+    /// answer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the side menu container, null when that menu was never built
+    ///
+    /// - `merge`: passed through to `Component#refreshTheme(boolean)`
+    private void refreshSideMenuTheme(Container cnt, boolean merge) {
+        if (cnt == null) {
+            return;
+        }
+        UIManager uim = getUIManager();
+        if (cnt.getUIManager() != uim) { //NOPMD CompareObjectsWithEquals
+            cnt.setUIManager(uim);
+        }
+        cnt.refreshTheme(merge);
+        cnt.revalidate();
+    }
+
     /// Returns the commands within the right side menu which can be useful for
     /// things like unit testing. Notice that you should not mutate the commands
     /// or the iteratable set in any way!

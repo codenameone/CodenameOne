@@ -212,10 +212,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     }
 
     /**
-     * Codename One releases are moving off Maven Central to repo.codenameone.com, so a
-     * generated project must declare that repository. Losing it is invisible at
-     * generation time -- Central still serves every already-published version -- and
-     * only surfaces after the cutover, as a project that never sees a new release.
+     * Codename One releases are published to repo.codenameone.com, not Maven Central, so
+     * a generated project must declare that repository. Losing it is invisible at
+     * generation time -- Central still serves every version published before the
+     * cutover -- and surfaces only as a project that never sees a new release.
      *
      * Both lists are asserted because Maven resolves dependencies through
      * &lt;repositories&gt; and build plugins through &lt;pluginRepositories&gt;: a

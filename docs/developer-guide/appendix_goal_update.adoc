@@ -13,7 +13,7 @@ include::../demos/common/src/main/snippets/developer-guide/appendix-goal-update.
 **Parameters**
 
 newVersion::
-(Optional) The version to update to. This should be a version number available on Maven central. Will accept a value of "LATEST" to cause it to resolve to the latest version available on Maven central.
+(Optional) The version to update to. This should be a published Codename One version. Will accept a value of "LATEST" to cause it to resolve to the latest version in the Codename One Maven repository. `LATEST` never downgrades a project: if the newest version offered is older than the one the project already uses, the goal reports it and leaves `cn1.version` and `cn1.plugin.version` untouched.
 +
 If this parameter is omitted, then it will be implicitly set to `LATEST`, but it won't update the `cn1.version` or `cn1.plugin.version` properties if they're set to a SNAPSHOT version.
 

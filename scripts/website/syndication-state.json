@@ -1730,6 +1730,31 @@
         "canonical_set": true,
         "syndicated_at": "2026-08-22T19:01:10+00:00"
       }
+    },
+    "sqlite-portable-encrypted": {
+      "hashnode": {
+        "url": "https://debugagent.com/sqlite-across-every-port-one-contract-one-encrypted-file-format",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a91a27f00708d452f5abb47",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-28T15:01:16+00:00"
+      },
+      "devto": {
+        "id": 4515621,
+        "url": "https://dev.to/codenameone/sqlite-across-every-port-one-contract-one-encrypted-file-format-2fmo",
+        "syndicated_at": "2026-08-28T19:01:48+00:00"
+      },
+      "foojay": {
+        "id": 125444,
+        "url": "https://foojay.io/wp-admin/post.php?post=125444&action=edit",
+        "preview_url": "https://foojay.io/?p=125444",
+        "featured_media_id": 125443,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-08-28T19:02:47+00:00"
+      }
     }
   }
 }

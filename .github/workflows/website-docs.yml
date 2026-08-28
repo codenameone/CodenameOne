@@ -217,6 +217,10 @@ jobs:
           node docs/website/scripts/test-cn1-exp-004.mjs
           node docs/website/scripts/test-cn1-crisp-events.mjs
 
+      - name: Validate EXP-004 queryable counter
+        working-directory: docs/website/workers/exp004-telemetry
+        run: node test/integration.mjs
+
       - name: Validate Playground JS bundle output
         run: test -f docs/website/public/playground-app/index.html
 
@@ -326,6 +330,31 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && env.CLOUDFLARE_TOKEN == '' }}
         run: |
           echo "::warning::Skipping Cloudflare Pages preview deploy because no API token secret is configured. Set CLOUDFLARE_TOKEN (preferred) or CF_API_TOKEN."
+
+      - name: Deploy and verify isolated EXP-004 counter preview
+        if: ${{ github.event_name == 'pull_request' && env.CLOUDFLARE_TOKEN != '' }}
+        working-directory: docs/website/workers/exp004-telemetry
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          worker_name="cn1-exp004-pr-${PR_NUMBER}-${RUN_ID}-${RUN_ATTEMPT}"
+          cleanup() {
+            npx --yes wrangler@4 delete "${worker_name}" --force >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          deploy_log="$(mktemp)"
+          npx --yes wrangler@4 deploy --env preview --name "${worker_name}" 2>&1 | tee "${deploy_log}"
+          worker_url="$(grep -Eo 'https://[A-Za-z0-9._-]+\.workers\.dev' "${deploy_log}" | tail -n1 || true)"
+          if [ -z "${worker_url}" ]; then
+            echo "wrangler deployed the preview Worker but printed no workers.dev URL" >&2
+            exit 1
+          fi
+          node test/integration.mjs "${worker_url}"
 
       - name: Deploy PR preview to Cloudflare Pages
         id: cf_preview
@@ -509,6 +538,23 @@ jobs:
         if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.deploy_production && (github.ref_name == 'main' || github.ref_name == 'master'))) && env.CLOUDFLARE_TOKEN == '' }}
         run: |
           echo "::warning::Skipping Cloudflare Pages deploy because no API token secret is configured. Set CLOUDFLARE_TOKEN (preferred) or CF_API_TOKEN."
+
+      - name: Deploy EXP-004 telemetry counter
+        if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.deploy_production && (github.ref_name == 'main' || github.ref_name == 'master'))) && env.CLOUDFLARE_TOKEN != '' }}
+        working-directory: docs/website/workers/exp004-telemetry
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy --env production
+          snapshot="$(curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors https://www.codenameone.com/api/exp004/snapshot)"
+          node -e '
+            const data = JSON.parse(process.argv[1]);
+            if (data.experiment_id !== "EXP-004" || !data.coverage_start || !data.counts) {
+              throw new Error("production EXP-004 snapshot failed validation");
+            }
+          ' "${snapshot}"
 
       - name: Deploy to Cloudflare Pages
         if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.deploy_production && (github.ref_name == 'main' || github.ref_name == 'master'))) && env.CLOUDFLARE_TOKEN != '' }}
