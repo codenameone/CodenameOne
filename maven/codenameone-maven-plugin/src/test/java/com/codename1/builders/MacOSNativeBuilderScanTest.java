@@ -108,6 +108,39 @@ public class MacOSNativeBuilderScanTest {
     }
 
     /**
+     * Display.getBluetooth() has to reach the ENTITLEMENTS, not only the define.
+     *
+     * <p>The call names com.codename1.bluetooth in its return type alone, and
+     * neither scan reads return types -- so the capability scan, which keys on
+     * the invoked owner, cannot see it however it is written. The native-feature
+     * scan catches it with an explicit Display test and enables CoreBluetooth.
+     * An application that reaches Bluetooth only that way therefore linked the
+     * framework and shipped with no entitlement and no usage description, and
+     * macOS denied it at first use in any sandboxed or hardened build.</p>
+     *
+     * <p>Carried from the one scan that can see it rather than re-derived here,
+     * which is what the calendar and push answers already do and for the reason
+     * their comments give: detecting a thing twice is how the entitlement and
+     * the compiled-in code come to disagree.</p>
+     */
+    @Test
+    public void bluetoothThroughDisplayIsSeenByTheFeatureScanThatCanSeeIt() {
+        assertTrue("the feature scan is the one that recognises the Display call",
+                MacOSNativeBuilder.reachesBluetoothViaDisplay(
+                        "com/codename1/ui/Display", "getBluetooth"));
+        assertTrue("CN is the same API under another name",
+                MacOSNativeBuilder.reachesBluetoothViaDisplay(
+                        "com/codename1/ui/CN", "getBluetooth"));
+
+        assertFalse("another Display getter is not Bluetooth",
+                MacOSNativeBuilder.reachesBluetoothViaDisplay(
+                        "com/codename1/ui/Display", "getProperty"));
+        assertFalse("and the name only counts on Display",
+                MacOSNativeBuilder.reachesBluetoothViaDisplay(
+                        "com/example/MyForm", "getBluetooth"));
+    }
+
+    /**
      * A camera session opens the microphone unless the application says not to.
      *
      * <p>CameraSessionOptions.captureAudio is initialised to true and CN1Camera

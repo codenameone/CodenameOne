@@ -68,6 +68,14 @@ public class MacOSNativeBuilder extends Executor {
     /// Whether the class scan found a local-calendar entry point, carried from
     /// the native-feature scan to the permission generation that runs later.
     private boolean calendarDetected;
+    /// Bluetooth, carried the same way and for the same reason. The
+    /// native-feature scan sees Display.getBluetooth(), which names
+    /// com.codename1.bluetooth only in its RETURN type; the capability scan
+    /// reads the invoked owner and cannot. An application that reaches
+    /// Bluetooth only through Display therefore linked CoreBluetooth and
+    /// shipped without the entitlement or the usage description, and was
+    /// denied at first use in any sandboxed or hardened build.
+    private boolean bluetoothDetected;
 
     /// Whether the application registers for push, taken from the
     /// native-feature scan rather than the capability scan -- one detection,
@@ -574,6 +582,7 @@ public class MacOSNativeBuilder extends Executor {
         // framework and is refused access to it at first use, and an unsandboxed
         // one is terminated for a missing privacy string.
         calendarDetected = usesCalendar[0];
+        bluetoothDetected = usesBluetooth[0];
         pushDetected = usesPush[0];
 
         // The application's entry point. A Codename One main class is a
@@ -889,6 +898,10 @@ public class MacOSNativeBuilder extends Executor {
         // The calendar answer comes from the native-feature scan rather than
         // this one, because it is the same answer that decides whether EventKit
         // is linked at all -- one detection, one result.
+        // Bluetooth joins them: one detection, one result. Re-deriving it here
+        // from the invoked class is exactly how the entitlement and the
+        // compiled-in code came to disagree.
+        caps.usesBluetooth |= bluetoothDetected;
         caps.usesCalendar = calendarDetected;
         // Push comes from the native-feature scan for the same reason the
         // calendar does: it is the same answer that decided whether
@@ -1338,7 +1351,7 @@ public class MacOSNativeBuilder extends Executor {
             if (usesLocalCalendar(cls, method)) {
                 usesCalendar[0] = true;
             }
-            if (isDisplay(cls) && method.indexOf("getBluetooth") > -1) {
+            if (reachesBluetoothViaDisplay(cls, method)) {
                 // Display.getBluetooth() names com.codename1.bluetooth only in
                 // its return type, which this scan does not read. An application
                 // that goes on to call something on the result is caught by the
@@ -1549,6 +1562,16 @@ public class MacOSNativeBuilder extends Executor {
         boolean captures = method.indexOf("capturePhoto") > -1
                 || method.indexOf("captureVideo") > -1;
         return captures && (cls.startsWith("com/codename1/capture/") || isDisplay(cls));
+    }
+
+    /// Whether an invoked method obtains the Bluetooth API through Display.
+    ///
+    /// Named and package-visible so a test can drive the real rule: the call
+    /// names com.codename1.bluetooth in its RETURN type alone, which no scan
+    /// here reads, so this explicit test is the only thing that sees it.
+    static boolean reachesBluetoothViaDisplay(String cls, String method) {
+        return cls != null && method != null
+                && isDisplay(cls) && method.indexOf("getBluetooth") > -1;
     }
 
     private static boolean isDisplay(String cls) {
