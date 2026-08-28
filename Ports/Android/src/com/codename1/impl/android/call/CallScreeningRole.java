@@ -169,39 +169,32 @@ class CallScreeningRole {
                 finish(requestId, whenDone, false);
                 return;
             }
-            // The SHARED channel, not just this feature's own dialogs.
-            // rolePending below stops two ROLE prompts overlapping, and that
-            // is not the only way the channel is busy: any
-            // startActivityForResult in the app -- a file chooser, a share
-            // sheet, another feature's consent -- owns the single listener
-            // CodenameOneActivity keeps, and setIntentResultListener returns
-            // without installing while one is waiting. Launching anyway sent
-            // the role result to whoever was already listening and left this
-            // request in CallRequests for ever.
+            // OUR prompt first, then the shared channel. Both tests in one
+            // critical section, and in this order.
+            //
+            // Reversed -- which is how this was written -- the queue below
+            // could not be reached in the case it exists for. A role prompt
+            // this class put on screen makes isWaitingForResult() true, so a
+            // second caller was answered BUSY, or for a permission-mask
+            // caller (requestId < 0) answered with the role simply absent,
+            // while the very prompt that grants it was still up. The busy
+            // test claimed to be about somebody else's dialog and fired
+            // first for our own.
+            //
+            // rolePending true means the channel is ours: queue. False and
+            // busy means it really is another flow -- a file chooser, a
+            // share sheet, another feature's consent -- which owns the
+            // single listener CodenameOneActivity keeps, and
+            // setIntentResultListener returns without installing while one
+            // is waiting. Launching anyway sent the role result to whoever
+            // was already listening and left this request in CallRequests
+            // for ever.
             //
             // BUSY rather than a refusal: the user has not declined
             // anything, and an app that retries when its other dialog closes
             // gets the prompt.
-            if (activity instanceof com.codename1.impl.android
-                    .CodenameOneActivity
-                    && ((com.codename1.impl.android.CodenameOneActivity)
-                            activity).isWaitingForResult()) {
-                if (requestId >= 0) {
-                    Calls.deliverAck(requestId, false,
-                            com.codename1.call.CallError.BUSY.ordinal(),
-                            "Another dialog is already waiting for a result;"
-                            + " ask for the screening role once it closes");
-                }
-                if (whenDone != null) {
-                    whenDone.run();
-                }
-                return;
-            }
-            // One dialog at a time. CodenameOneActivity keeps a SINGLE
-            // result listener and setIntentResultListener ignores a
-            // replacement while it is waiting, so a second request started
-            // over the first left one of them in CallRequests for ever with
-            // no error anywhere.
+            boolean queued = false;
+            boolean busy = false;
             synchronized (CallScreeningRole.class) {
                 if (rolePending) {
                     // QUEUED behind the prompt, not answered now. Answering
@@ -218,9 +211,27 @@ class CallScreeningRole {
                     // Added under the monitor the result drains under, so a
                     // waiter cannot be parked after the drain has run.
                     ROLE_WAITERS.add(new RoleResult(requestId, whenDone));
-                    return;
+                    queued = true;
+                } else if (channelBusy(activity)) {
+                    busy = true;
+                } else {
+                    rolePending = true;
                 }
-                rolePending = true;
+            }
+            if (queued) {
+                return;
+            }
+            if (busy) {
+                if (requestId >= 0) {
+                    Calls.deliverAck(requestId, false,
+                            com.codename1.call.CallError.BUSY.ordinal(),
+                            "Another dialog is already waiting for a result;"
+                            + " ask for the screening role once it closes");
+                }
+                if (whenDone != null) {
+                    whenDone.run();
+                }
+                return;
             }
             try {
                 com.codename1.impl.android.AndroidNativeUtil
@@ -290,6 +301,19 @@ class CallScreeningRole {
     }
 
     /// A reflective answer as an `Intent`, or null when it is not one.
+    /// Whether the one activity-result listener is already taken.
+    ///
+    /// CodenameOneActivity keeps a SINGLE listener and
+    /// setIntentResultListener returns WITHOUT installing while one is
+    /// waiting, so a prompt launched then has its result delivered to that
+    /// flow and its own request is never answered. Only meaningful once
+    /// rolePending has said the waiting dialog is not our own.
+    private static boolean channelBusy(Activity activity) {
+        return activity instanceof com.codename1.impl.android.CodenameOneActivity
+                && ((com.codename1.impl.android.CodenameOneActivity) activity)
+                        .isWaitingForResult();
+    }
+
     private static Intent asIntent(Object o) {
         if (o instanceof Intent) {
             return (Intent) o;

@@ -1180,11 +1180,6 @@ public class AndroidVpnBridge implements VpnBridge {
         return ++tunnelGeneration;
     }
 
-    /// Whether this consent still speaks for the current start.
-    private synchronized boolean currentTunnel(int generation) {
-        return generation == tunnelGeneration;
-    }
-
     @Override
     public void startCustomTunnel(final int requestId, final String setupWire) {
         if (!isCustomTunnelSupported()) {
@@ -1228,7 +1223,7 @@ public class AndroidVpnBridge implements VpnBridge {
         }
         if (consent == null) {
             endOperation(mine);
-            launchTunnel(requestId, setupWire);
+            launchTunnel(requestId, setupWire, generation);
             return;
         }
         Activity a = currentActivity();
@@ -1269,17 +1264,45 @@ public class AndroidVpnBridge implements VpnBridge {
         }
     }
 
-    /// Starts the service now that consent is in force.
-    void launchTunnel(int requestId, String setupWire) {
+    /// Starts the service now that consent is in force, unless a stop has
+    /// won in the meantime.
+    ///
+    /// The check is HERE rather than at the callers, because there are two
+    /// of them and only one had it: an app whose consent was already granted
+    /// takes the pre-authorized path, where prepare() answers null and this
+    /// was reached without any generation test at all. A stop landing while
+    /// prepare() was in flight was acknowledged, and then the tunnel came up
+    /// anyway. One check in the one place every start passes through is the
+    /// difference between a rule and a rule with an exception nobody
+    /// remembered.
+    ///
+    /// @param generation the value sampled when this start began
+    void launchTunnel(int requestId, String setupWire, int generation) {
         try {
             Intent i = new Intent(context, CN1VpnService.class);
             i.putExtra(CN1VpnService.EXTRA_SETUP, setupWire);
             i.putExtra(CN1VpnService.EXTRA_REQUEST, requestId);
+            // The test and the send in ONE critical section, matched by the
+            // bump-and-send in stopCustomTunnel. Split, a stop could move the
+            // generation between them and its intent still reach the service
+            // first, which is the ordering this is about.
+            //
             // startService, not startForegroundService: a VpnService is
             // exempt from the background start restriction precisely because
             // the user has just consented to it, and asking for a foreground
             // service would demand a notification the tunnel does not need.
-            context.startService(i);
+            boolean sent;
+            synchronized (this) {
+                sent = generation == tunnelGeneration;
+                if (sent) {
+                    context.startService(i);
+                }
+            }
+            if (!sent) {
+                failStart(requestId, VpnError.UNKNOWN,
+                        "The tunnel start was superseded by a stop before the"
+                        + " service was asked to run");
+            }
         } catch (RuntimeException refused) {
             failStart(requestId, VpnError.UNKNOWN, describe(refused));
         }
@@ -1292,15 +1315,18 @@ public class AndroidVpnBridge implements VpnBridge {
                     VpnError.NOT_SUPPORTED.ordinal(), null);
             return;
         }
-        // BEFORE the service is told, so a consent answering while this is
-        // in flight already sees a generation it does not own. See
-        // tunnelGeneration.
-        nextTunnelGeneration();
         try {
             Intent i = new Intent(context, CN1VpnService.class);
             i.setAction(CN1VpnService.ACTION_STOP);
             i.putExtra(CN1VpnService.EXTRA_REQUEST, requestId);
-            context.startService(i);
+            // The bump BEFORE the service is told, and in the same critical
+            // section, so a start cannot read the old generation here and
+            // still send its intent after this one. See tunnelGeneration and
+            // the matching block in launchTunnel.
+            synchronized (this) {
+                tunnelGeneration++;
+                context.startService(i);
+            }
         } catch (RuntimeException refused) {
             // A service that is not running cannot be told to stop, and the
             // app asking for a stopped tunnel to stop has got what it asked
@@ -1339,19 +1365,15 @@ public class AndroidVpnBridge implements VpnBridge {
             // reservation this one was still holding.
             bridge.endOperation(token);
             if (resultCode == Activity.RESULT_OK) {
-                if (!bridge.currentTunnel(generation)) {
-                    // A stop won while this prompt was on screen, and it has
-                    // already been acknowledged. Launching now would bring a
-                    // VPN up seconds after the app was told it was down --
-                    // and the service's own generation cannot refuse it,
-                    // because this start would be the newest thing it had
-                    // ever seen.
-                    failStart(requestId, VpnError.UNKNOWN,
-                            "The tunnel start was superseded while the"
-                            + " consent prompt was open");
-                    return;
-                }
-                bridge.launchTunnel(requestId, setupWire);
+                // The generation goes to launchTunnel rather than being
+                // tested here: a stop winning while this prompt was on
+                // screen has already been acknowledged, and launching now
+                // would bring a VPN up seconds after the app was told it was
+                // down -- the service's own generation cannot refuse it,
+                // because this start would be the newest thing it had ever
+                // seen. Testing it there covers the pre-authorized path too,
+                // which is the one this check originally missed.
+                bridge.launchTunnel(requestId, setupWire, generation);
                 return;
             }
             // USER_DECLINED rather than an error: refusing a VPN prompt is
