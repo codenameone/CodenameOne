@@ -642,7 +642,23 @@ public final class DevicePush {
     private static Socket accept(int port, boolean loopbackOnly, int timeoutMs) throws IOException {
         if (explicitDevice != null) {
             Socket direct = new Socket();
-            direct.connect(new InetSocketAddress(explicitDevice, port), 4000);
+            try {
+                direct.connect(new InetSocketAddress(explicitDevice, port), 4000);
+            } catch (IOException refused) {
+                // iOS deliberately answers `null` from IOSImplementation.
+                // listenSocket, so an iPhone the user typed in never accepts
+                // an incoming connection -- the on-device UI already labels
+                // that address `(dial-out only)`. Point the user at the
+                // paired flow (the runtime dials out; the desktop listens)
+                // rather than letting the failure read as a network
+                // problem, and let the original refusal escape after.
+                throw new IOException("could not reach " + explicitDevice + ":" + port
+                        + ". If this is an iOS device, --device does not work "
+                        + "on iOS -- the runtime cannot accept an incoming "
+                        + "connection. Run the app on the device and let it "
+                        + "dial in, or use pairing (--lan) so the desktop "
+                        + "listens for the device instead.", refused);
+            }
             System.out.println("connected to " + explicitDevice);
             return direct;
         }
