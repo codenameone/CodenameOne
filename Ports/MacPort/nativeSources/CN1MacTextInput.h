@@ -78,6 +78,13 @@ void CN1MacTextInputNotifyEditorAction(void);
 /// silently dropped, which is a text field that types nothing.
 @property (nonatomic) BOOL pureEditor;
 
+/// The action the client asked Return to report: DONE, NEXT, SEARCH, SEND, or
+/// DEFAULT. There is no return key to RELABEL on a Mac, which is what the
+/// platform cannot do; the value still has to travel, because a client that
+/// asked for SEARCH behaves differently from one that asked for SEND, and
+/// reporting DEFAULT to both ran the wrong one.
+@property (nonatomic) int actionType;
+
 /// YES when this field was opened with clipboard access disabled.
 ///
 /// Set from the blockCopyPaste argument editStringAt already carries -- the

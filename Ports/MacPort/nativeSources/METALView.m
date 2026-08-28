@@ -1588,9 +1588,20 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
         return;
     }
     if (selector == @selector(insertTab:) || selector == @selector(insertBacktab:)) {
-        // Tab moves focus rather than inserting, which is the AppKit
-        // convention and matches what the framework does with a done event.
+        // Tab moves focus rather than inserting, which is the AppKit convention.
+        //
+        // The two are told apart, and traversal is asked for explicitly. Ending
+        // the session and reporting an editor action was not the same thing: the
+        // pure editor reads that action as 0, which is "insert a newline", so Tab
+        // put a line break into the field it was supposed to leave -- and
+        // Shift-Tab, arriving here as the same case, did whatever Tab did.
+        BOOL forward = (selector == @selector(insertTab:));
         [session commitFinished:YES];
+        extern JAVA_VOID com_codename1_impl_mac_MacImplementation_macTraverseTextEditing___boolean(
+                CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN forward);
+        struct ThreadLocalData *threadStateData = getThreadLocalData();
+        com_codename1_impl_mac_MacImplementation_macTraverseTextEditing___boolean(
+                threadStateData, forward ? JAVA_TRUE : JAVA_FALSE);
         return;
     }
     if (selector == @selector(cancelOperation:)) {

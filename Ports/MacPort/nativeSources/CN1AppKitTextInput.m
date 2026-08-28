@@ -97,7 +97,8 @@ void CN1MacTextInputNotifyFinishComposing(void) {
 /// editor-action channel, the latter is for caret and editing key commands.
 void CN1MacTextInputNotifyEditorAction(void) {
     com_codename1_impl_ios_IOSImplementation_tiEditorAction___int(
-            CN1_THREAD_GET_STATE_PASS_ARG 0);
+            CN1_THREAD_GET_STATE_PASS_ARG
+            (JAVA_INT)[CN1MacTextInputSession sharedSession].actionType);
 }
 
 @implementation CN1MacTextInputSession {
@@ -233,11 +234,16 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_setTextInputBounds___int_int_int_int(
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType) {
-    // autoCorrect / autoCapitalize / constraint / actionType have no AppKit
-    // equivalent for a custom drawn surface: correction and capitalization are a
-    // system wide input source behaviour rather than a per field one, and there
-    // is no return key to relabel. They are accepted and ignored so the shared
-    // Java side needs no macOS special case.
+    // autoCorrect / autoCapitalize / constraint have no AppKit equivalent for a
+    // custom drawn surface: correction and capitalization are a system wide
+    // input source behaviour rather than a per field one. They are accepted and
+    // ignored so the shared Java side needs no macOS special case.
+    //
+    // actionType is NOT ignored. What macOS cannot do is relabel the return key;
+    // what the client asked for still decides what pressing it MEANS, and
+    // reporting DEFAULT for a session that asked for SEARCH ran the wrong
+    // handler.
+    [CN1MacTextInputSession sharedSession].actionType = (int)actionType;
     NSString *initial = initialText != JAVA_NULL
         ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG initialText)
         : @"";
@@ -327,6 +333,10 @@ void CN1MacTextInputBegin(NSString *text, BOOL multiline, CGRect bounds, int max
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     NSString *initial = text != nil ? text : @"";
     session.pureEditor = NO;
+    // The legacy TextField/TextArea path carries no action, so Return means the
+    // default. Reset rather than left standing: the session is shared, and a
+    // SEARCH field edited before this one would otherwise lend it its action.
+    session.actionType = 0;
     session.blockCopyPaste = blockCopyPaste;
     // Carried into the session because nothing downstream enforces it: an
     // over-long value reaches TextArea.setText(), which raises maxSize to fit

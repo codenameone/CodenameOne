@@ -135,15 +135,22 @@ final class MacCameraCapture {
         // form being restored over itself.
         final boolean[] finished = {false};
 
+        // Declared before Cancel so that cancelling mid-recording can reach it.
+        // Closing the session stops the capture but does not finish the file the
+        // recorder had already started writing, so a cancelled recording left a
+        // part-written mp4 in the application home for ever -- and the callback
+        // said "cancelled", so nothing downstream knew to clean it up.
+        final VideoRecording[] recording = {null};
+
         cancel.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
+                discard(recording[0]);
                 finish(finished, session, previous, response, null);
             }
         });
 
         if (video) {
-            final VideoRecording[] recording = {null};
             shutter.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
@@ -200,6 +207,39 @@ final class MacCameraCapture {
         }
 
         capture.show();
+    }
+
+    /// Stops a recording the user is abandoning and removes what it wrote.
+    ///
+    /// Closing the session stops the capture, but the recorder has already been
+    /// writing to the destination and nothing else will ever finish or claim
+    /// that file: the callback reports a cancellation, so no application is told
+    /// a path to clean up. Stopped first so the file is closed before it is
+    /// deleted -- removing one still being written is how a half-flushed file
+    /// survives on some filesystems.
+    private static void discard(VideoRecording recording) {
+        if (recording == null) {
+            return;
+        }
+        String path = recording.getRequestedPath();
+        try {
+            if (recording.isRecording()) {
+                recording.stop();
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+        if (path == null) {
+            return;
+        }
+        try {
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            if (fs.exists(path)) {
+                fs.delete(path);
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+        }
     }
 
     /// The photo the low level API produced, as a file, because the Capture API

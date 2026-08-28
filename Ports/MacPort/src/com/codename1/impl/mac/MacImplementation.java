@@ -417,6 +417,49 @@ public class MacImplementation extends IOSImplementation {
         return MacCameraCapture.hasCamera();
     }
 
+    /// Moves editing to the next or previous field, for Tab and Shift-Tab.
+    ///
+    /// Called from the text input path while a session owns the responder. Tab
+    /// there used to end editing and report an editor action, which the pure
+    /// editor reads as action 0 -- insert a newline -- so Tab typed a line break
+    /// into a single line field instead of moving on, and Shift-Tab did the same
+    /// thing forwards.
+    ///
+    /// Traversal comes from the form's own tab iterator, which is what decides
+    /// the order everywhere else, so Tab here visits the fields in the order the
+    /// framework already believes they are in.
+    public static void macTraverseTextEditing(final boolean forward) {
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                com.codename1.ui.Form form = com.codename1.ui.Display.getInstance().getCurrent();
+                com.codename1.ui.Component current = form == null ? null : form.getFocused();
+                if (current == null) {
+                    return;
+                }
+                // The focused component's OWN form, not the current one: with a
+                // secondary Window up they are different, and traversing the
+                // main form's fields from a window's field would move focus out
+                // of the window the user is typing in.
+                com.codename1.ui.Form owner = current.getComponentForm();
+                if (owner == null) {
+                    return;
+                }
+                com.codename1.ui.Component target = forward
+                        ? owner.getNextComponent(current)
+                        : owner.getPreviousComponent(current);
+                if (target == null || !target.isFocusable()) {
+                    return;
+                }
+                target.requestFocus();
+                // Editing follows focus, which is what Tab means in a form being
+                // filled in. A component with no editor treats this as a no-op,
+                // so a Tab landing on a button simply focuses it.
+                target.startEditingAsync();
+            }
+        });
+    }
+
     /// @inheritDoc
     ///
     /// Driven from the portable camera session rather than from a native picker.
@@ -437,6 +480,26 @@ public class MacImplementation extends IOSImplementation {
     /// file through the same session.
     @Override
     public void captureVideo(com.codename1.ui.events.ActionListener response) {
+        MacCameraCapture.captureVideo(response);
+    }
+
+    /// @inheritDoc
+    ///
+    /// The constrained overload, overridden as well because the two do not reach
+    /// each other here. The iOS port routes the no-constraint call INTO this one,
+    /// so overriding only the other left an application calling
+    /// Capture.captureVideo(constraints, ...) dispatched to the inherited UIKit
+    /// path -- which checks INCLUDE_CAMERA_USAGE, a define this builder never
+    /// sets, and threw the iOS build-hint exception rather than recording.
+    ///
+    /// The constraints themselves are not applied: the session records at the
+    /// device's own settings, and VideoCaptureConstraints documents that a
+    /// platform may return something other than what was asked for. Reporting a
+    /// video the caller can use is better than refusing one because a preferred
+    /// size could not be honoured.
+    @Override
+    public void captureVideo(com.codename1.capture.VideoCaptureConstraints constraints,
+            com.codename1.ui.events.ActionListener response) {
         MacCameraCapture.captureVideo(response);
     }
 
