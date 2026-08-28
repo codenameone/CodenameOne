@@ -4238,10 +4238,17 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
         } else {
             if([v superview] == nil) {
 #if TARGET_OS_OSX
-                // Re-shown into its own window, for the same reason it was added
-                // there: eaglView is the main surface on this port.
-                [(peerHost != nil ? peerHost
-                     : (METALView *)[[CodenameOne_GLViewController instance] eaglView])
+                // Back into the window it was placed in, which the peer itself
+                // remembers. Resolving the host from what is painting instead
+                // put a peer returning from lightweight mode -- a transition, a
+                // form change -- onto the main surface, undoing the placement
+                // peerInitialized got right, and the Java attachToOwningWindow()
+                // cannot correct it because that path knows only Catalyst slots.
+                extern NSView *CN1MacPeerOwnerHostView(NSView *peer);
+                METALView *owner = (METALView *)CN1MacPeerOwnerHostView((NSView *)v);
+                [(owner != nil ? owner
+                     : (peerHost != nil ? peerHost
+                        : (METALView *)[[CodenameOne_GLViewController instance] eaglView]))
                         addPeerComponent:v];
 #else
                 [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
@@ -4361,6 +4368,11 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int_int
                     : (METALView *)[[CodenameOne_GLViewController instance] eaglView]))
                     addPeerComponent:v];
         }
+        // Remembered on the peer whether or not it was used just now: a peer is
+        // attached again every time it returns from lightweight mode, and those
+        // later attaches are not told which window it belongs to.
+        extern void CN1MacPeerSetOwnerWindowId(NSView *peer, int windowId);
+        CN1MacPeerSetOwnerWindowId((NSView *)v, windowId);
         if(w > 0 && h > 0) {
             CGFloat scale = cn1MacPeerScale(v);
             [v setFrame:CGRectMake(x / scale, y / scale, w / scale, h / scale)];

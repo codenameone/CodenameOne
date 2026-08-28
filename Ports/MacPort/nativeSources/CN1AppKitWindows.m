@@ -25,6 +25,7 @@
 #import "CN1MacHost.h"
 #import "CN1AppKitCompat.h"
 #import "CN1AppKitWindows.h"
+#import <objc/runtime.h>
 #import "CodenameOne_GLViewController.h"
 #include "cn1_globals.h"
 #include "java_lang_String.h"
@@ -1099,6 +1100,36 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowRequestFocus___int(CODENAME_
 /// Called from the main queue at the moment the peer is attached, so a window
 /// destroyed in the meantime answers nil and the peer falls back to the main
 /// surface instead of being added to a view that no longer has a window.
+/// The window a peer was attached to, remembered ON the peer.
+///
+/// A peer is added to a view more than once: at initialization, and again every
+/// time it comes back from lightweight mode -- a transition, a form change. Only
+/// the first of those is told which Window the component belongs to, and the
+/// later ones run wherever the framework happens to be, so resolving the host
+/// from whatever is painting put a re-shown peer on the main surface even though
+/// it had been placed correctly to begin with. Storing the answer on the view
+/// means every attach after the first uses the same one.
+static const void *CN1MacPeerOwnerKey = &CN1MacPeerOwnerKey;
+
+void CN1MacPeerSetOwnerWindowId(NSView *peer, int windowId) {
+    if (peer == nil) {
+        return;
+    }
+    objc_setAssociatedObject(peer, CN1MacPeerOwnerKey,
+                             windowId < 0 ? nil : [NSNumber numberWithInt:windowId],
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+/// The rendering view of the window this peer was placed in, or nil when it was
+/// never placed in one or that window has since gone.
+NSView *CN1MacPeerOwnerHostView(NSView *peer) {
+    if (peer == nil) {
+        return nil;
+    }
+    NSNumber *windowId = objc_getAssociatedObject(peer, CN1MacPeerOwnerKey);
+    return windowId == nil ? nil : CN1MacPeerHostViewForWindowId([windowId intValue]);
+}
+
 NSView *CN1MacPeerHostViewForWindowId(int windowId) {
     if (windowId < 0) {
         return nil;

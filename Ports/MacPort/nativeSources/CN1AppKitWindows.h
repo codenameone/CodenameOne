@@ -54,5 +54,17 @@
 /// is left alone rather than assumed.
 void CN1MacWindowSetAcceptsKey(NSWindow *w, BOOL accepts);
 
+/// The rendering view of the window with this framework id, or nil.
+NSView *CN1MacPeerHostViewForWindowId(int windowId);
+
+/// Remembers, on the peer itself, which window it was placed in, so that every
+/// later re-attach can put it back there instead of wherever the framework
+/// happens to be painting. -1 forgets.
+void CN1MacPeerSetOwnerWindowId(NSView *peer, int windowId);
+
+/// The rendering view this peer was placed in, or nil if it never was or that
+/// window has gone.
+NSView *CN1MacPeerOwnerHostView(NSView *peer);
+
 #endif
 #endif
