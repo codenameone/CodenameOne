@@ -1393,25 +1393,58 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
                 }];
                 return;
             }
+            // A WARM cancellation. Ending the live call is the visible half
+            // and it is not the whole obligation: PushKit's requirement is
+            // per PUSH, not per call. It asks for a
+            // reportNewIncomingCallWithUUID before this handler's completion
+            // runs and documents no exemption for a push whose call is
+            // already on screen -- so a server that retracts a call the user
+            // has not answered yet, which is the ordinary way a caller hangs
+            // up while ringing, got the app terminated and its VoIP delivery
+            // revoked for repeating it. The cold branch above was written for
+            // exactly this rule; this one only ended the call and returned.
+            //
+            // The real call ends FIRST, so what follows is reported into a
+            // call list this push has already emptied -- the same situation
+            // the cold branch reports into, rather than a second incoming
+            // call arriving beside one that is still ringing.
             [cn1clEnsureProvider() reportCallWithUUID:uuid endedAtDate:nil reason:r];
             @synchronized (cn1clLock) {
                 [cn1clCalls removeObjectForKey:uuidString];
                 cn1clDropAudioLocked(uuidString);
             }
-            completion();
-            // AFTER the completion, so PushKit's deadline is satisfied first
-            // whatever Java does with this.
-            //
-            // Sent unconditionally. A retraction that beats the drain names a
-            // call Java has never heard of and the facade ignores it; one
-            // that arrives after the drain names a session Java has adopted,
-            // which without this stayed RINGING for the life of the process
-            // with every later operation on it answering INVALID_ID.
-            com_codename1_impl_ios_IOSCallCallbacks_callEnded___java_lang_String_int(
-                    getThreadLocalData(), cn1clJString(uuidString),
-                    r == CXCallEndedReasonUnanswered
-                            ? CN1_CALL_END_UNANSWERED
-                            : CN1_CALL_END_REMOTE);
+            // A FRESH uuid, not the one just ended. Reporting a uuid CallKit
+            // has seen answers CXErrorCodeIncomingCallErrorCallUUIDAlreadyExists
+            // -- which this file already has to downgrade to an update
+            // elsewhere -- and a report that FAILS is not a report, so it
+            // would leave the obligation exactly as unmet as skipping it.
+            // Reported and ended inside one completion block, so it is an
+            // acknowledgement to PushKit and never a call anyone sees.
+            NSUUID *ack = [NSUUID UUID];
+            CXCallUpdate *retracted = [[[CXCallUpdate alloc] init] autorelease];
+            retracted.remoteHandle =
+                    [[[CXHandle alloc] initWithType:CXHandleTypeGeneric
+                                             value:@" "] autorelease];
+            [cn1clEnsureProvider() reportNewIncomingCallWithUUID:ack
+                    update:retracted completion:^(NSError *error) {
+                [cn1clEnsureProvider() reportCallWithUUID:ack
+                        endedAtDate:nil reason:CXCallEndedReasonRemoteEnded];
+                completion();
+                // AFTER the completion, so PushKit's deadline is satisfied
+                // first whatever Java does with this.
+                //
+                // Sent unconditionally. A retraction that beats the drain
+                // names a call Java has never heard of and the facade
+                // ignores it; one that arrives after the drain names a
+                // session Java has adopted, which without this stayed
+                // RINGING for the life of the process with every later
+                // operation on it answering INVALID_ID.
+                com_codename1_impl_ios_IOSCallCallbacks_callEnded___java_lang_String_int(
+                        getThreadLocalData(), cn1clJString(uuidString),
+                        r == CXCallEndedReasonUnanswered
+                                ? CN1_CALL_END_UNANSWERED
+                                : CN1_CALL_END_REMOTE);
+            }];
             return;
         }
         completion();
