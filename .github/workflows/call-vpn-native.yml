@@ -48,6 +48,7 @@ jobs:
       - name: Clang -fsyntax-only on the call and VPN native impls
         run: |
           set -euo pipefail
+          ROOT="$PWD"
           cd Ports/iOSPort/nativeSources
           SDK="$(xcrun --show-sdk-path --sdk iphoneos)"
           # A separate step from the one above because these files need two
@@ -98,11 +99,18 @@ jobs:
           # IOSCallCallbacks symbol the native sources CALL is declared, so
           # drift in the direction that matters is a build error rather than
           # a mystery about implicit declarations.
-          python3 scripts/gen-ios-callback-stub.py \
-            Ports/iOSPort/src/com/codename1/impl/ios/IOSCallCallbacks.java \
+          #
+          # Run from $ROOT, because this step has already cd'd into the
+          # native sources: repository-relative paths from here resolve
+          # under Ports/iOSPort/nativeSources and none of them exist. With
+          # set -e that aborts the step before either clang configuration
+          # runs, which disables the whole check rather than failing it --
+          # the quietest way a gate can stop gating.
+          python3 "$ROOT/scripts/gen-ios-callback-stub.py" \
+            "$ROOT/Ports/iOSPort/src/com/codename1/impl/ios/IOSCallCallbacks.java" \
             "$STUB/com_codename1_impl_ios_IOSCallCallbacks.h" \
-            Ports/iOSPort/nativeSources/CN1Call.m \
-            Ports/iOSPort/nativeSources/CN1Vpn.m
+            "$ROOT/Ports/iOSPort/nativeSources/CN1Call.m" \
+            "$ROOT/Ports/iOSPort/nativeSources/CN1Vpn.m"
           # Both configurations: the halves an app that never referenced the
           # packages links, and the halves one that did links.
           for label in off on; do
