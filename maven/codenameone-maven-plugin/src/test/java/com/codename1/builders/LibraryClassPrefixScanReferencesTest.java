@@ -154,6 +154,54 @@ class LibraryClassPrefixScanReferencesTest {
     }
 
     @Test
+    void aGenericSignatureCounts() throws Exception {
+        // javac ERASES a generic member -- List<...Call> becomes
+        // ()Ljava/util/List; -- and puts the real type in the member's
+        // Signature attribute. Collecting the descriptor and skipping every
+        // attribute therefore left a library whose only mention of a package
+        // is a generic declaration exactly as invisible as the plain
+        // descriptor case was.
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        DataOutputStream d = new DataOutputStream(out);
+        d.writeInt(0xCAFEBABE);
+        d.writeShort(0);
+        d.writeShort(52);
+        d.writeShort(5);
+        d.writeByte(1);
+        d.writeUTF("()Ljava/util/List;");      // #1 erased descriptor
+        d.writeByte(1);
+        d.writeUTF("get");                     // #2 name
+        d.writeByte(1);
+        d.writeUTF("Signature");               // #3 attribute name
+        d.writeByte(1);
+        d.writeUTF("()Ljava/util/List<L" + USED + ";>;"); // #4 the real type
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);                       // interfaces
+        d.writeShort(0);                       // fields
+        d.writeShort(1);                       // one method
+        d.writeShort(0);
+        d.writeShort(2);
+        d.writeShort(1);
+        d.writeShort(1);                       // one attribute
+        d.writeShort(3);
+        d.writeInt(2);
+        d.writeShort(4);
+        d.writeShort(0);                       // class attributes
+        d.flush();
+        Set<String> refs =
+                LibraryClassPrefixScan.classReferences(out.toByteArray());
+        boolean sawIt = false;
+        for (String r : refs) {
+            if (r.indexOf(USED) >= 0) {
+                sawIt = true;
+            }
+        }
+        assertTrue(sawIt, "the generic signature is a reference: " + refs);
+    }
+
+    @Test
     void somethingThatIsNotAClassFileIsNotParsed() {
         // Null, not empty: the caller falls back to the raw scan rather than
         // reading "no references" as "does not use anything", which would

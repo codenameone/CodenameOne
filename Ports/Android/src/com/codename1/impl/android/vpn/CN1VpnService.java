@@ -375,11 +375,12 @@ public class CN1VpnService extends VpnService {
             // turn a transient DNS failure into a refusal for a tunnel that
             // would have worked.
             throw new UnresolvedGateway("The VPN gateway '"
-                    + TunnelWire.server(fields) + "' could not be resolved,"
-                    + " and this setup routes all traffic into the tunnel --"
-                    + " so the tunnel's own connection to it would be"
-                    + " captured by the tunnel. Try again once the name"
-                    + " resolves, or give the address the transport dials.");
+                    + TunnelWire.server(fields) + "' is not an address this"
+                    + " device could resolve or parse, and this setup routes"
+                    + " all traffic into the tunnel -- so the tunnel's own"
+                    + " connection to it would be captured by the tunnel."
+                    + " Check the literal, or try again once the name"
+                    + " resolves.");
         }
         boolean excluded = servers.length > 0;
         if (excluded && Build.VERSION.SDK_INT >= 33) {
@@ -475,7 +476,19 @@ public class CN1VpnService extends VpnService {
             return new String[0];
         }
         if (isLiteral(server)) {
-            return new String[] {server};
+            // LOOKS like a literal is not IS one. isLiteral answers by
+            // shape -- four dot-separated numbers, or something with a colon
+            // -- so "999.999.999.999" and a malformed v6 came back as
+            // successfully resolved. addSplitRoutes could not then parse the
+            // address, so it added the route whole and the tunnel came up
+            // acknowledged with its gateway neither excluded nor reachable.
+            //
+            // Parsed here, through the platform, which is what addSplitRoutes
+            // would have used anyway. Failing reads as unresolved, so a bad
+            // literal under a default route is refused exactly as a name DNS
+            // cannot answer is.
+            return addressBytes(server) == null
+                    ? new String[0] : new String[] {server};
         }
         try {
             java.net.InetAddress[] all =

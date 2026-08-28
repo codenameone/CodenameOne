@@ -323,6 +323,22 @@ static NSData *cn1vpStoreSecret(NSString *account, NSString *secret) {
     NSMutableDictionary *add = [NSMutableDictionary dictionaryWithDictionary:
             cn1vpSecretQuery(account)];
     [add setObject:value forKey:(__bridge id)kSecValueData];
+    // AFTER FIRST UNLOCK, not the when-unlocked default.
+    //
+    // NetworkExtension reads the password and shared-secret references
+    // itself, and with an on-demand profile it does that whenever a rule
+    // fires -- including while the device is locked. Under the default
+    // accessibility the read fails there, so a profile that installed
+    // perfectly could not authenticate on exactly the connections
+    // on-demand exists to make, and the failure is a system-level
+    // authentication error with nothing in the app to explain it.
+    //
+    // AfterFirstUnlock rather than Always: the secret still cannot be read
+    // before the user has unlocked once since boot, which is the weakest
+    // protection that lets a background reassert work. It is also what
+    // Apple's own guidance names for this case.
+    [add setObject:(__bridge id)kSecAttrAccessibleAfterFirstUnlock
+            forKey:(__bridge id)kSecAttrAccessible];
     [add setObject:(__bridge id)kCFBooleanTrue
             forKey:(__bridge id)kSecReturnPersistentRef];
     CFTypeRef result = NULL;

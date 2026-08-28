@@ -367,7 +367,15 @@ final class LibraryClassPrefixScan {
                             && utf8[descriptor] != null) {
                         out.add(utf8[descriptor]);
                     }
-                    skipAttributes(in);
+                    // The SIGNATURE attribute too. javac erases a generic
+                    // member -- List<com.codename1.call.session.Call>
+                    // becomes ()Ljava/util/List; -- and puts the real type
+                    // in Signature, so the descriptor collected above says
+                    // nothing about it. Skipping every attribute therefore
+                    // left a library whose only mention of a package is a
+                    // generic declaration exactly as invisible as the
+                    // descriptor case this walk was added for.
+                    readAttributes(in, utf8, count, out);
                 }
             }
             return out;
@@ -382,18 +390,30 @@ final class LibraryClassPrefixScan {
         }
     }
 
-    /// Skips an `attributes` table, whatever it holds.
+    /// Walks an `attributes` table, collecting a `Signature` and skipping
+    /// the rest.
     ///
     /// Only the SHAPE is read -- a count, then a name index and a length per
     /// attribute -- so an attribute this has never heard of costs nothing.
     /// That is the same reason the constant pool is walked by hand rather
-    /// than through a bytecode library.
-    private static void skipAttributes(java.io.DataInputStream in)
+    /// than through a bytecode library. Signature is the one whose CONTENT
+    /// matters: it carries the type a generic member erased away.
+    private static void readAttributes(java.io.DataInputStream in,
+            String[] utf8, int count, Set<String> out)
             throws java.io.IOException {
         int attributes = in.readUnsignedShort();
         for (int i = 0; i < attributes; i++) {
-            in.readUnsignedShort();
+            int name = in.readUnsignedShort();
             long length = in.readInt() & 0xffffffffL;
+            if (length == 2 && name > 0 && name < count
+                    && "Signature".equals(utf8[name])) {
+                int signature = in.readUnsignedShort();
+                if (signature > 0 && signature < count
+                        && utf8[signature] != null) {
+                    out.add(utf8[signature]);
+                }
+                continue;
+            }
             while (length > 0) {
                 long skipped = in.skip(length);
                 if (skipped <= 0) {
