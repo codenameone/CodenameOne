@@ -899,9 +899,15 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         // unable to bring it back, because that path checks isMiniaturized and
         // would have found NO.
         BOOL wasMiniaturized = old.isMiniaturized;
+        // Whether it was maximized. The frame it had BEFORE being maximized is
+        // not readable -- AppKit keeps it privately, as the target zoom: would
+        // restore to -- so it is recovered below by un-zooming the outgoing
+        // window once it is off screen. Rebuilding at the maximized frame
+        // instead would make the screen-sized geometry the window's normal one,
+        // and the next toggleMaximize() would have nothing to go back to.
+        BOOL wasZoomed = old.isZoomed;
         BOOL decorated = (old.styleMask & NSWindowStyleMaskTitled) != 0;
         BOOL resizable = (old.styleMask & NSWindowStyleMaskResizable) != 0;
-        NSRect content = [old contentRectForFrameRect:old.frame];
         NSString *title = old.title;
         METALView *view = rec.view;
         // Everything else the window had been told, carried across. The
@@ -939,6 +945,15 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
             [old removeChildWindow:child];
         }
         [old orderOut:nil];
+        if (wasZoomed) {
+            // After orderOut, so it costs nothing visible: the window is already
+            // off screen, and this only moves its frame back to what the user
+            // had before maximizing so it can be read.
+            [old zoom:nil];
+        }
+        // Read here rather than with the other state above, because the line
+        // above is what makes it the pre-zoom rectangle.
+        NSRect content = [old contentRectForFrameRect:old.frame];
         [old close];
 
         NSWindow *fresh = cn1MakeWindow(content, decorated, resizable, utility != 0);
@@ -1014,6 +1029,13 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
             // Dock to click.
             [fresh orderFront:nil];
             [fresh miniaturize:nil];
+        }
+        if (wasZoomed) {
+            // Built at the pre-zoom frame and maximized after, rather than built
+            // maximized: this is what leaves AppKit holding the user's own frame
+            // as the restore target, which is the whole point of carrying the
+            // state across.
+            [fresh zoom:nil];
         }
         [fresh makeFirstResponder:view];
         if (wasModal) {
