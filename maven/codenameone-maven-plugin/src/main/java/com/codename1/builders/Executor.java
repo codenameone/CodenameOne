@@ -1680,19 +1680,43 @@ public abstract class Executor {
             return;
         }
         try {
-            java.util.zip.ZipFile zip = new java.util.zip.ZipFile(archive);
+            ScanBudgetExceeded refused = null;
             try {
-                scanArchiveEntriesForPermissions(zip, tmp, archive.getName(), message);
-            } finally {
-                zip.close();
+                java.util.zip.ZipFile zip = new java.util.zip.ZipFile(archive);
+                try {
+                    scanArchiveEntriesForPermissions(zip, tmp, archive.getName(), message);
+                } finally {
+                    zip.close();
+                }
+            } catch (ScanBudgetExceeded stopped) {
+                refused = new ScanBudgetExceeded("scanning " + archive.getName()
+                        + " for protected API usage was refused: " + stopped.getMessage()
+                        + ". Its remaining entries cannot be read, so the permissions and "
+                        + "entitlements it would justify cannot be determined");
+            } catch (IOException ex) {
+                // A library that cannot be read must not fail the build, but it must
+                // not pass silently either: the entitlements it would have justified
+                // are the ones now missing.
+                message.append("WARNING: could not scan ").append(archive.getName())
+                        .append(" for protected API usage (").append(ex.toString()).append(")\n");
             }
+            // Whatever was extracted before the failure is still scanned. This
+            // call used to sit inside the try, so an archive that failed on its
+            // last entry threw away the answers from every entry before it --
+            // classes already on disk, already parsed for, and simply dropped.
             scanClassesForPermissions(tmp, scanner);
-        } catch (IOException ex) {
-            // A library that cannot be read must not fail the build, but it must
-            // not pass silently either: the entitlements it would have justified
-            // are the ones now missing.
-            message.append("WARNING: could not scan ").append(archive.getName())
-                    .append(" for protected API usage (").append(ex.toString()).append(")\n");
+            if (refused != null) {
+                // Rethrown rather than warned about, unlike an unreadable
+                // archive. That one says nothing either way and is common and
+                // benign; a refusal means a readable archive we chose to stop
+                // reading, so the rest is UNKNOWN. Both ways of guessing at an
+                // unknown are harmful here -- a missing permission is a denial
+                // on the device, an invented one is a question from a store
+                // reviewer -- so there is no conservative answer to pick, only a
+                // loud one. Every builder turns this into a build failure naming
+                // the archive, which the developer can split or shrink.
+                throw refused;
+            }
         } finally {
             deletePermissionScanTemp(tmp);
         }

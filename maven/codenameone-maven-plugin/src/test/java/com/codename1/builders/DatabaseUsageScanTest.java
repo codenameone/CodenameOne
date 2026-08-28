@@ -33,6 +33,7 @@ import java.io.OutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * The bundled SQLite engine, and its cipher, ship only for applications that use the database.
@@ -518,6 +519,66 @@ class DatabaseUsageScanTest {
 
         assertTrue(executor.scanForDatabaseUsage(root).usesDatabase(),
                 "an outer archive refused on the entry count must not read as clean");
+    }
+
+    /// The permission scan must not report "no protected API" for an archive it
+    /// was refused. Both ways of guessing at what it did not read are harmful --
+    /// a missing permission is a denial on the device, an invented one is a
+    /// question from a store reviewer -- so the refusal is raised and every
+    /// builder turns it into a build failure naming the archive.
+    ///
+    /// It also has to keep what it DID extract: the scan of the temp directory
+    /// used to sit inside the same try, so an archive that failed on its last
+    /// entry threw away the answers from every entry before it.
+    @Test
+    void aRefusedPermissionScanFailsRatherThanReportingNothing() throws IOException {
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs() || lib.isDirectory());
+        java.util.zip.ZipOutputStream jar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "bomb.jar")));
+        try {
+            jar.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Seen.class"));
+            jar.write(classCalling("rawKey"));
+            jar.closeEntry();
+            jar.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Huge.class"));
+            byte[] chunk = new byte[1024 * 1024];
+            for (int i = 0; i < 32; i++) {
+                jar.write(chunk);
+            }
+            jar.closeEntry();
+        } finally {
+            jar.close();
+        }
+
+        final java.util.List<String> seen = new java.util.ArrayList<String>();
+        Executor.ClassScanner recording = new Executor.ClassScanner() {
+            @Override
+            public void usesClass(String cls) {
+                seen.add(cls);
+            }
+
+            @Override
+            public void usesClassMethod(String cls, String method) {
+                seen.add(cls + "." + method);
+            }
+
+            @Override
+            public void implementsInterface(String cls, String iface) {
+                seen.add(cls + " implements " + iface);
+            }
+        };
+
+        try {
+            executor.scanClassesForPermissions(lib, recording);
+            fail("a refused permission scan must not report success");
+        } catch (IOException refused) {
+            assertTrue(refused.getMessage().contains("bomb.jar"),
+                    "the failure has to name the archive: " + refused.getMessage());
+        }
+
+        // And the class extracted before the refusal was still handed to the
+        // scanner rather than dropped on the way out.
+        assertFalse(seen.isEmpty(), "what was extracted before the refusal is still scanned");
     }
 
     /// A class that references nothing this scan looks for.
