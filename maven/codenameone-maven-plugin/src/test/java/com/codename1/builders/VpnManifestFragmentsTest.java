@@ -208,6 +208,36 @@ class VpnManifestFragmentsTest {
     }
 
     @Test
+    public void xmlSpacingAroundEqualsIsStillXml() {
+        // android:name = "x" is the same declaration as android:name="x",
+        // and either quoting is valid. Read as a literal substring, a
+        // project that formatted its manifest that way had its service
+        // reported ABSENT -- so the build appended a SECOND declaration of
+        // the same class -- and its attributes reported MISSING, refusing a
+        // configuration that was correct.
+        String spaced = bindable()
+                .replace("android:name=\"", "android:name = \"")
+                .replace("android:permission=\"", "android:permission =\"")
+                .replace("android:exported=\"true\"",
+                        "android:exported\t=\ntrue".replace("\ntrue",
+                                "\n'true'"));
+        assertEquals("", VpnManifestFragments.services(true, spaced),
+                "a spaced but complete declaration is complete: " + spaced);
+        assertTrue(VpnManifestFragments.declares(spaced,
+                VpnManifestFragments.TUNNEL_SERVICE),
+                "and it is a declaration, so nothing is appended beside it");
+        // The name is a WHOLE attribute, not a substring of a longer one.
+        String decoy = "        <service android:nameGroup=\""
+                + VpnManifestFragments.TUNNEL_SERVICE + "\" />\n";
+        assertFalse(VpnManifestFragments.declares(decoy,
+                VpnManifestFragments.TUNNEL_SERVICE),
+                "android:nameGroup is not android:name");
+        assertTrue(VpnManifestFragments.services(true, decoy)
+                .contains(VpnManifestFragments.BIND_VPN_SERVICE),
+                "so the real element is still generated");
+    }
+
+    @Test
     public void aCommentedOutDeclarationIsNotADeclaration() {
         // The lesson the call fragments learned twice: commenting a
         // declaration out is how a developer disables one, and treating it

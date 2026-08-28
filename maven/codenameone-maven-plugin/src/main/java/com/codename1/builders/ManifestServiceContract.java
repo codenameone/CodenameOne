@@ -94,20 +94,41 @@ final class ManifestServiceContract {
      * @return the index of the opening angle bracket, or -1
      */
     private static int liveServiceStart(String live, String name) {
-        int at = live.indexOf("<service");
+        int at = elementStart(live, "<service", 0);
         while (at >= 0) {
             int close = live.indexOf('>', at);
             if (close < 0) {
                 return -1;
             }
             String tag = live.substring(at, close);
-            // Both quotings, because an app hand-writing android.xapplication
-            // is writing XML by hand and either is valid there.
-            if (tag.contains("android:name=\"" + name + "\"")
-                    || tag.contains("android:name='" + name + "'")) {
+            if (name.equals(attributeValue(tag, "android:name"))) {
                 return at;
             }
-            at = live.indexOf("<service", close);
+            at = elementStart(live, "<service", close);
+        }
+        return -1;
+    }
+
+    /**
+     * Returns the index of the next {@code element} start tag at or after
+     * {@code from}, or -1.
+     *
+     * <p>The ELEMENT, not the prefix: a bare {@code indexOf("<service")}
+     * also matches {@code <serviceGroup}, and the tag it then read belongs
+     * to something else entirely.</p>
+     */
+    private static int elementStart(String live, String element, int from) {
+        int at = live.indexOf(element, from);
+        while (at >= 0) {
+            int after = at + element.length();
+            if (after >= live.length()) {
+                return -1;
+            }
+            char c = live.charAt(after);
+            if (isSpace(c) || c == '>' || c == '/') {
+                return at;
+            }
+            at = live.indexOf(element, at + 1);
         }
         return -1;
     }
@@ -188,8 +209,7 @@ final class ManifestServiceContract {
     /** Whether {@code tag} sets {@code attribute} to exactly {@code value}. */
     private static boolean hasAttribute(String tag, String attribute,
             String value) {
-        return tag.contains(attribute + "=\"" + value + "\"")
-                || tag.contains(attribute + "='" + value + "'");
+        return value.equals(attributeValue(tag, attribute));
     }
 
     /**
@@ -223,22 +243,57 @@ final class ManifestServiceContract {
         return false;
     }
 
-    /** The value of {@code attribute} in {@code tag}, or null. */
+    /**
+     * The value of {@code attribute} in {@code tag}, or null.
+     *
+     * <p>Whitespace around the {@code =} is legal XML, and either quoting
+     * is, so {@code android:name = 'x'} is the same declaration as
+     * {@code android:name="x"}. Read as a literal substring instead, a
+     * project that formatted its manifest that way had its service reported
+     * ABSENT -- so the builder appended a second declaration of the same
+     * class -- and its attributes reported MISSING, refusing a configuration
+     * that was correct.</p>
+     *
+     * <p>The name is matched as a whole attribute: {@code android:name} must
+     * not be found inside {@code android:nameGroup}, and must not be the
+     * tail of a longer prefixed name.</p>
+     */
     private static String attributeValue(String tag, String attribute) {
-        for (int q = 0; q < 2; q++) {
-            char quote = q == 0 ? '"' : '\'';
-            String marker = attribute + "=" + quote;
-            int at = tag.indexOf(marker);
-            if (at < 0) {
-                continue;
+        int at = tag.indexOf(attribute);
+        while (at >= 0) {
+            int i = at + attribute.length();
+            boolean whole = at == 0 || !isNameChar(tag.charAt(at - 1));
+            while (i < tag.length() && isSpace(tag.charAt(i))) {
+                i++;
             }
-            int from = at + marker.length();
-            int end = tag.indexOf(quote, from);
-            if (end >= 0) {
-                return tag.substring(from, end);
+            if (whole && i < tag.length() && tag.charAt(i) == '=') {
+                i++;
+                while (i < tag.length() && isSpace(tag.charAt(i))) {
+                    i++;
+                }
+                if (i < tag.length()
+                        && (tag.charAt(i) == '"' || tag.charAt(i) == '\'')) {
+                    char quote = tag.charAt(i);
+                    int end = tag.indexOf(quote, i + 1);
+                    return end < 0 ? null : tag.substring(i + 1, end);
+                }
+                return null;
             }
+            at = tag.indexOf(attribute, at + 1);
         }
         return null;
+    }
+
+    /** Whether this character can appear inside an XML attribute name. */
+    private static boolean isNameChar(char c) {
+        return c == ':' || c == '_' || c == '-' || c == '.'
+                || (c >= '0' && c <= '9')
+                || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+
+    /** Whether this character is XML whitespace. */
+    private static boolean isSpace(char c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\r';
     }
 
     /**
@@ -251,27 +306,27 @@ final class ManifestServiceContract {
      * -- and the generated element was suppressed for it.</p>
      */
     private static boolean filtersOn(String body, String action) {
-        int at = body.indexOf("<intent-filter");
+        int at = elementStart(body, "<intent-filter", 0);
         while (at >= 0) {
             int end = body.indexOf("</intent-filter>", at);
             String filter = end < 0 ? body.substring(at)
                     : body.substring(at, end);
-            int action_ = filter.indexOf("<action");
-            while (action_ >= 0) {
-                int close = filter.indexOf('>', action_);
+            int actionAt = elementStart(filter, "<action", 0);
+            while (actionAt >= 0) {
+                int close = filter.indexOf('>', actionAt);
                 if (close < 0) {
                     break;
                 }
-                String tag = filter.substring(action_, close);
+                String tag = filter.substring(actionAt, close);
                 if (hasAttribute(tag, "android:name", action)) {
                     return true;
                 }
-                action_ = filter.indexOf("<action", close);
+                actionAt = elementStart(filter, "<action", close);
             }
             if (end < 0) {
                 return false;
             }
-            at = body.indexOf("<intent-filter", end);
+            at = elementStart(body, "<intent-filter", end);
         }
         return false;
     }
