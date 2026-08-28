@@ -780,6 +780,27 @@ public class IPhoneBuilder extends Executor {
                         + " would not be the one it built. Give the bundle"
                         + " identifier itself.");
             }
+            // INSIDE the host's namespace. Apple requires an embedded app
+            // extension's bundle identifier to be the containing app's plus
+            // a suffix, and rejects the archive at embedded-binary
+            // validation otherwise -- at upload, long after every check here
+            // has passed, and with a message about the binary rather than
+            // about this hint. A matching extension profile does not save
+            // it: the profile can be issued for an App ID that is simply not
+            // allowed to sit inside this app.
+            String host = request.getPackageName();
+            if (host != null && host.length() > 0
+                    && !(value.startsWith(host + ".")
+                            && value.length() > host.length() + 1)) {
+                throw new IllegalArgumentException("ios.call.directory"
+                        + ".buildSettings.PRODUCT_BUNDLE_IDENTIFIER is '"
+                        + value + "', which is not inside '" + host + "'."
+                        + " An app extension's bundle identifier has to be"
+                        + " the containing app's followed by a suffix, so"
+                        + " Apple would reject the archive when it validates"
+                        + " the embedded binary. Use something like '" + host
+                        + ".calldirectory'.");
+            }
             return value;
         }
         return IOSCallDirectoryExtensionBuilder.bundleId(
