@@ -256,9 +256,11 @@ public class MacOSNativeBuilder extends Executor {
         final boolean[] usesBluetooth = {false};
         final boolean[] usesCalendar = {false};
         final boolean[] usesPush = {false};
+        final boolean[] usesLocation = {false};
         try {
             scanClassesForPermissions(classesDir, new NativeFeatureScanner(usesCrypto,
-                    usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush));
+                    usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush,
+                    usesLocation));
             // btres too, for the reason the capability scan reads it: unzip routes a
             // submitted cn1lib's jar there rather than unpacking it beside the loose
             // classes. A library that is the only thing calling SecureRandom left
@@ -266,7 +268,8 @@ public class MacOSNativeBuilder extends Executor {
             // buffer untouched -- commonly all zeroes. A random source that silently
             // returns a constant is the worst failure in this file.
             scanClassesForPermissions(buildinRes, new NativeFeatureScanner(usesCrypto,
-                    usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush));
+                    usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush,
+                    usesLocation));
         } catch (IOException ex) {
             throw new BuildException("Failed to scan the application for native feature usage", ex);
         }
@@ -356,11 +359,13 @@ public class MacOSNativeBuilder extends Executor {
         boolean microphoneEnabled = usesMicrophone[0];
         boolean bluetoothEnabled = usesBluetooth[0];
         boolean calendarEnabled = usesCalendar[0];
+        boolean locationEnabled = usesLocation[0];
         for (MacOSBuildHints.EntitlementOverrides o : channelOverrides) {
             pushEnabled = pushEnabled || o.push(false);
             microphoneEnabled = microphoneEnabled || o.microphone(false);
             bluetoothEnabled = bluetoothEnabled || o.bluetooth(false);
             calendarEnabled = calendarEnabled || o.calendars(false);
+            locationEnabled = locationEnabled || o.location(false);
         }
         if (usesLocalNotifications[0] || pushEnabled) {
             File iosNative = new File(nativeSources, "IOSNative.m");
@@ -386,13 +391,33 @@ public class MacOSNativeBuilder extends Executor {
         // compiled away -- so the entitlement and the usage description were
         // written for a feature that could not run.
         //
-        // Camera and location are deliberately NOT wired up the same way.
-        // INCLUDE_CAMERA_USAGE would compile a UIImagePickerController path that
-        // macOS does not have, and INCLUDE_LOCATION_USAGE would create a manager
-        // whose delegate callbacks live in the !TARGET_OS_OSX half of
-        // CodenameOne_GLViewController.m and are never compiled here -- an
-        // application would get a location manager that reports nothing at all.
-        // Both report unsupported from MacImplementation instead.
+        // Location is wired up the same way, and for the same reason: Core
+        // Location is one framework across both platforms and the natives behind
+        // it carry no UIKit, so the define is the only thing between an
+        // application and a working fix. The delegate callbacks that deliver the
+        // fix are compiled here too -- they sit outside the !TARGET_OS_OSX
+        // region of CodenameOne_GLViewController.m, which an earlier version of
+        // this comment had wrong.
+        //
+        // Camera is still NOT wired up: INCLUDE_CAMERA_USAGE compiles a
+        // UIImagePickerController path, and macOS has no such class.
+        // MacImplementation.hasCamera() reports false for it.
+        if (locationEnabled) {
+            File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
+            if (!controllerHeader.exists()) {
+                throw new BuildException("The application uses location but "
+                        + "CodenameOne_GLViewController.h is missing from the staged native "
+                        + "sources at " + controllerHeader.getAbsolutePath());
+            }
+            try {
+                replaceInFile(controllerHeader, "//#define INCLUDE_LOCATION_USAGE",
+                        "#define INCLUDE_LOCATION_USAGE");
+            } catch (Exception ex) {
+                throw new BuildException("Failed to enable location in CodenameOne_GLViewController.h", ex);
+            }
+        }
+        log("Location " + (locationEnabled ? "enabled" : "disabled"));
+
         if (microphoneEnabled) {
             File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
             if (!controllerHeader.exists()) {
@@ -974,30 +999,14 @@ public class MacOSNativeBuilder extends Executor {
         out.usesCamera = scanned.usesCamera;
         out.usesMicrophone = scanned.usesMicrophone;
         out.usesBluetooth = scanned.usesBluetooth;
-        // Location is deliberately NOT taken from the scan on this port.
-        //
-        // The scan is right that the application references location, and the
-        // port still cannot serve it: MacImplementation.getLocationManager()
-        // returns null and there is no Core Location native here at all. Seeding
-        // from the scan therefore put a location entitlement and a location
-        // privacy string into the bundle of an application that can never ask
-        // for a fix -- a privacy-sensitive capability declared for a feature
-        // that does not exist, which is exactly what App Store review and a
-        // user reading the privacy label are entitled to ask about.
-        //
-        // An explicit override still turns it on, for a project whose own native
-        // interface talks to Core Location: false is passed as the DETECTED
-        // value below, so an unset override stays off while an explicit ON does
-        // not. When this port grows a location backend, this seeds from the scan
-        // again like its neighbours.
-        out.usesLocation = false;
+        out.usesLocation = scanned.usesLocation;
         out.usesServerSockets = scanned.usesServerSockets;
         for (String channel : hints.getChannels()) {
             MacOSBuildHints.EntitlementOverrides o = hints.entitlementsFor(channel);
             out.usesCamera |= o.camera(scanned.usesCamera);
             out.usesMicrophone |= o.microphone(scanned.usesMicrophone);
             out.usesBluetooth |= o.bluetooth(scanned.usesBluetooth);
-            out.usesLocation |= o.location(false);
+            out.usesLocation |= o.location(scanned.usesLocation);
             out.usesServerSockets |= o.networkServer(scanned.usesServerSockets);
         }
         return out;
@@ -1170,16 +1179,18 @@ public class MacOSNativeBuilder extends Executor {
         private final boolean[] usesBluetooth;
         private final boolean[] usesCalendar;
         private final boolean[] usesPush;
+        private final boolean[] usesLocation;
 
         NativeFeatureScanner(boolean[] usesCrypto, boolean[] usesLocalNotifications,
                 boolean[] usesMicrophone, boolean[] usesBluetooth, boolean[] usesCalendar,
-                boolean[] usesPush) {
+                boolean[] usesPush, boolean[] usesLocation) {
             this.usesCrypto = usesCrypto;
             this.usesLocalNotifications = usesLocalNotifications;
             this.usesMicrophone = usesMicrophone;
             this.usesBluetooth = usesBluetooth;
             this.usesCalendar = usesCalendar;
             this.usesPush = usesPush;
+            this.usesLocation = usesLocation;
         }
 
         @Override
@@ -1213,6 +1224,13 @@ public class MacOSNativeBuilder extends Executor {
 
             if (cls.startsWith("com/codename1/calendar/LocalCalendarSource")) {
                 usesCalendar[0] = true;
+            }
+            // The same test the capability scan uses, and for the same reason:
+            // MapComponent is the one maps class that reads the LocationManager,
+            // and an application using it never names the location API itself.
+            if (cls.startsWith("com/codename1/location/")
+                    || cls.equals("com/codename1/maps/MapComponent")) {
+                usesLocation[0] = true;
             }
             if (!cls.startsWith("com/codename1/security/")) {
                 return;

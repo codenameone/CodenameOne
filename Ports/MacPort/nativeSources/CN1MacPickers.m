@@ -132,7 +132,14 @@ static long long cn1RoundToStep(long long value, long long step) {
         long long minutes = self.durationMinutesField != nil
             ? (long long)self.durationMinutesField.integerValue : 0;
         long long total = hours * 3600000LL + minutes * 60000LL;
-        if (self.minuteStep > 1) {
+        // Only where minutes are on screen. An hours-only picker shows no
+        // minutes at all, so rounding its value by a minute step can only put
+        // minutes INTO it that nobody chose and nobody can see: one hour with a
+        // seven minute step committed 63 minutes. The lightweight picker builds
+        // no minute spinner for this type, so its value is never touched by the
+        // step either -- rounding here made the two disagree about the same
+        // configuration.
+        if (self.minuteStep > 1 && self.durationMinutesField != nil) {
             long long stepMs = (long long)self.minuteStep * 60000LL;
             total = (long long)cn1RoundToStep((long long)total, (long long)stepMs);
             // Rounding is the last thing to touch the value, so it can carry it
