@@ -11298,12 +11298,30 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// the oldest goes first, because the newest is the one the user just acted
     /// on.
     private static final int MAX_PENDING_PUSHES = 16;
-    private static final java.util.ArrayList<String[]> pendingPushes =
-            new java.util.ArrayList<String[]>();
+
+    /// One held push: the message, its type, and the id of the notification it came from.
+    ///
+    /// The id has to be held with the message rather than derived later. It names the completion
+    /// grant the operating system gave for THAT notification, and the whole point of holding a
+    /// message is that other notifications may arrive before it is delivered.
+    private static final class PendingPush {
+        final String message;
+        final String type;
+        final long completionId;
+
+        PendingPush(String message, String type, long completionId) {
+            this.message = message;
+            this.type = type;
+            this.completionId = completionId;
+        }
+    }
+
+    private static final java.util.ArrayList<PendingPush> pendingPushes =
+            new java.util.ArrayList<PendingPush>();
 
     /// Delivers every push held from before a callback existed, in order.
     private static void firePendingPush() {
-        String[][] held;
+        PendingPush[] held;
         // The SAME lock the queueing path takes. A push arrives on the native UI
         // thread while the callback is installed on the EDT, so without this the
         // two interleave: pushReceived reads a null callback, this drains an
@@ -11316,18 +11334,19 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             // Copied and cleared inside the lock: pushReceived is re-entered
             // below and must not see the queue it is draining.
-            held = pendingPushes.toArray(new String[pendingPushes.size()][]);
+            held = pendingPushes.toArray(new PendingPush[pendingPushes.size()]);
             pendingPushes.clear();
         }
         // Delivered OUTSIDE the lock: pushReceived queues serially onto the EDT
         // and calls into the native layer, and holding a lock across that invites
         // the deadlock this is not worth.
-        for (String[] pair : held) {
-            pushReceived(pair[0], pair[1]);
+        for (PendingPush p : held) {
+            pushReceived(p.message, p.type, p.completionId);
         }
     }
 
-    public static void pushReceived(final String message, final String type) {
+    public static void pushReceived(final String message, final String type,
+            final long completionId) {
         if(pushCallback != null) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
@@ -11341,7 +11360,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     } finally {
                         if (!"true".equals(Display.getInstance().getProperty("delayPushCompletion", "false")) &&
                             !"true".equals(Display.getInstance().getProperty("ios.delayPushCompletion", "false"))) {
-                            nativeInstance.firePushCompletionHandler();
+                            nativeInstance.firePushCompletionHandler(completionId);
                         }
                     }
                 }
@@ -11367,6 +11386,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             // releasing the grant up front, breaks the case that does work.
             boolean deliverNow = false;
             boolean evicted = false;
+            long evictedCompletionId = 0;
             synchronized (pendingPushes) {
                 // Rechecked under the lock. The callback may have been installed
                 // between the test above and here, in which case queueing would
@@ -11375,21 +11395,23 @@ public class IOSImplementation extends CodenameOneImplementation {
                     deliverNow = true;
                 } else {
                     if (pendingPushes.size() >= MAX_PENDING_PUSHES) {
-                        pendingPushes.remove(0);
+                        evictedCompletionId = pendingPushes.remove(0).completionId;
                         evicted = true;
                     }
-                    pendingPushes.add(new String[] {message, type});
+                    pendingPushes.add(new PendingPush(message, type, completionId));
                 }
             }
             if (deliverNow) {
-                pushReceived(message, type);
+                pushReceived(message, type, completionId);
                 return;
             }
             if (evicted) {
                 // The evicted one will never be delivered, so ITS grant is
                 // released -- otherwise the queue cap would leak a background
-                // task the system is still waiting on.
-                nativeInstance.firePushCompletionHandler();
+                // task the system is still waiting on. Its own id, not this
+                // message's: the two are different notifications, and releasing
+                // the wrong one is what the ids exist to prevent.
+                nativeInstance.firePushCompletionHandler(evictedCompletionId);
             }
             /*
             // Removing this section because the race condition shouldn't happen
@@ -11411,6 +11433,25 @@ public class IOSImplementation extends CodenameOneImplementation {
             */
         }
     }
+    /// @inheritDoc
+    ///
+    /// Releases the oldest completion grant the operating system is still waiting on.
+    ///
+    /// This is the other half of `ios.delayPushCompletion`. With that hint set, pushReceived()
+    /// deliberately does NOT release the grant when the callback returns, because the application
+    /// asked to keep running -- and until now nothing released it afterwards either: the base
+    /// implementation of this method does nothing, so the grant was simply held until the system
+    /// took the process down. An application following the documented pattern never actually got
+    /// its background time honoured.
+    ///
+    /// Oldest first, because the application cannot say which push it means -- it is handed a
+    /// message, not an id. An application that handles its pushes in order and calls this once per
+    /// push therefore releases each of them in turn.
+    @Override
+    public void notifyPushCompletion() {
+        nativeInstance.releaseOldestPushCompletionHandler();
+    }
+
     public static void pushRegistered(final String deviceKey) {
         if(instance != null) {
             instance.systemOut("Push handleRegistration() Sending registration to server: " + deviceKey);

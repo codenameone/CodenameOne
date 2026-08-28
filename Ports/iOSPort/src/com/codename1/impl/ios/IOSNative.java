@@ -1896,7 +1896,15 @@ public final class IOSNative {
 
     native void registerPushCategories();
     
-    native void firePushCompletionHandler();
+    // completionId names the notification whose grant is being released -- see the registry in
+    // IOSNative.m. 0 means the notification carried no grant, which is every platform that does not
+    // wake an app for a push, and is a no-op.
+    native void firePushCompletionHandler(long completionId);
+
+    // Releases the OLDEST outstanding grant. This is what Display.notifyPushCompletion() asks for:
+    // the application says its background work is finished without naming a push, because it has no
+    // id with which to name one.
+    native void releaseOldestPushCompletionHandler();
 
     native boolean isMultiGallerySelectSupported();
 

@@ -1361,23 +1361,132 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
 #endif
 }
 #ifdef INCLUDE_CN1_PUSH_2
-typedef void (^CN1PushCompletionHandlerType)();
+typedef void (^CN1PushCompletionHandlerType)(void);
 
-extern CN1PushCompletionHandlerType cn1PushCompletionHandler;
-int pushReceivedCount=0;
+// One record per notification rather than one global.
+//
+// The system hands over a completion block with each notification: its grant of
+// execution time, to be called exactly once, after which the process may be
+// suspended. A single global could only ever describe the most recent
+// notification, so a second one arriving before the first had been handled
+// overwrote it -- the first grant was leaked and never called, the shared count
+// no longer described either notification, and whichever callback finished first
+// released the OTHER one early. Both halves of that are what the grant exists to
+// prevent, and an application that keeps failing to call these gets its
+// background delivery throttled.
+//
+// The id travels with each message into Java and comes back with the completion,
+// so a grant is released by the notification it belongs to. Everything here runs
+// on the main queue: the routing calls come from the delegate, and the Java-facing
+// entry points below hop over.
+static NSMutableDictionary *cn1PushCompletions = nil;
+// Oldest first, and only for notifyPushCompletion(), which an application calls
+// with no way of saying which push it means.
+static NSMutableArray *cn1PushCompletionOrder = nil;
+static long long cn1NextPushCompletionId = 1;
+static NSString * const CN1PushHandlerKey = @"handler";
+static NSString * const CN1PushCountKey = @"count";
+
+/// Registers a notification's completion block and returns the id to carry with
+/// every message that notification produces. 0 when there is no block, which is
+/// every platform that does not grant background time for a push.
+long long CN1PushCompletionBegin(CN1PushCompletionHandlerType handler) {
+    if (handler == nil) {
+        return 0;
+    }
+    if (cn1PushCompletions == nil) {
+        cn1PushCompletions = [[NSMutableDictionary alloc] init];
+        cn1PushCompletionOrder = [[NSMutableArray alloc] init];
+    }
+    long long cid = cn1NextPushCompletionId++;
+    NSNumber *key = [NSNumber numberWithLongLong:cid];
+    CN1PushCompletionHandlerType copied = [handler copy];
+    [cn1PushCompletions setObject:[NSMutableDictionary dictionaryWithObjectsAndKeys:
+            copied, CN1PushHandlerKey,
+            [NSNumber numberWithInt:0], CN1PushCountKey, nil] forKey:key];
+    [copied release];
+    [cn1PushCompletionOrder addObject:key];
+    return cid;
+}
+
+static void cn1FirePushCompletion(NSNumber *key) {
+    NSMutableDictionary *record = [cn1PushCompletions objectForKey:key];
+    if (record == nil) {
+        return;
+    }
+    CN1PushCompletionHandlerType handler =
+            [[[record objectForKey:CN1PushHandlerKey] retain] autorelease];
+    // Removed BEFORE the block runs: a handler that routes another push must not
+    // find this record still outstanding.
+    [cn1PushCompletions removeObjectForKey:key];
+    [cn1PushCompletionOrder removeObject:key];
+    if (handler != nil) {
+        handler();
+    }
+}
+
+/// One more message from this notification is on its way to the application.
+void CN1PushCompletionRetain(long long cid) {
+    NSMutableDictionary *record = cid == 0 ? nil
+            : [cn1PushCompletions objectForKey:[NSNumber numberWithLongLong:cid]];
+    if (record == nil) {
+        return;
+    }
+    [record setObject:[NSNumber numberWithInt:
+            [[record objectForKey:CN1PushCountKey] intValue] + 1] forKey:CN1PushCountKey];
+}
+
+/// One message has been handled. The grant is released when the last one has.
+void CN1PushCompletionRelease(long long cid) {
+    NSNumber *key = [NSNumber numberWithLongLong:cid];
+    NSMutableDictionary *record = cid == 0 ? nil : [cn1PushCompletions objectForKey:key];
+    if (record == nil) {
+        return;
+    }
+    int count = [[record objectForKey:CN1PushCountKey] intValue] - 1;
+    [record setObject:[NSNumber numberWithInt:count] forKey:CN1PushCountKey];
+    if (count <= 0) {
+        cn1FirePushCompletion(key);
+    }
+}
+
+/// Routing has emitted every message this notification will produce. One that
+/// produced none has nothing that will ever release it, so it is released here.
+void CN1PushCompletionFinishRouting(long long cid) {
+    NSNumber *key = [NSNumber numberWithLongLong:cid];
+    NSMutableDictionary *record = cid == 0 ? nil : [cn1PushCompletions objectForKey:key];
+    if (record != nil && [[record objectForKey:CN1PushCountKey] intValue] <= 0) {
+        cn1FirePushCompletion(key);
+    }
+}
+
+/// Releases the oldest outstanding grant. This is what an application asks for
+/// through Display.notifyPushCompletion(), which says "the background work is
+/// done" without naming a push -- it has no id to name one with. Oldest first,
+/// so an application that finishes its pushes in order and calls this once per
+/// push releases each of them.
+void CN1PushCompletionReleaseOldest(void) {
+    if ([cn1PushCompletionOrder count] == 0) {
+        return;
+    }
+    NSNumber *key = [[[cn1PushCompletionOrder objectAtIndex:0] retain] autorelease];
+    cn1FirePushCompletion(key);
+}
 #endif
 
-void com_codename1_impl_ios_IOSNative_firePushCompletionHandler__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+void com_codename1_impl_ios_IOSNative_firePushCompletionHandler___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG completionId) {
+#ifdef INCLUDE_CN1_PUSH_2
+    long long cid = (long long)completionId;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1PushCompletionRelease(cid);
+    });
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_releaseOldestPushCompletionHandler__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CN1_PUSH_2
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (cn1PushCompletionHandler != nil) {
-            pushReceivedCount--;
-            if (pushReceivedCount <= 0) {
-                cn1PushCompletionHandler();
-                Block_release(cn1PushCompletionHandler);
-                cn1PushCompletionHandler = nil;
-            }
-        }
+        CN1PushCompletionReleaseOldest();
     });
 #endif
 }

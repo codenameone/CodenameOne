@@ -868,16 +868,24 @@ id currentNotificationResponse = nil;
 -(void)cn1RoutePush:(NSDictionary*)userInfo withAction:(NSString*)actionId {
     [self cn1RoutePush:userInfo withAction:actionId withCompletionHandler:nil];
 }
-typedef void (^CN1PushCompletionHandlerType)();
-CN1PushCompletionHandlerType cn1PushCompletionHandler = 0;
-int pushReceivedCount=0;
+typedef void (^CN1PushCompletionHandlerType)(void);
+// The completion grant is tracked per notification, in IOSNative.m, because a
+// single global cannot describe two notifications at once -- see the comment
+// there. Routing registers the block once, counts the messages it emits, and
+// carries the id into Java with each of them.
+extern long long CN1PushCompletionBegin(CN1PushCompletionHandlerType handler);
+extern void CN1PushCompletionRetain(long long cid);
+extern void CN1PushCompletionFinishRouting(long long cid);
 -(void)cn1RoutePush:(NSDictionary*)userInfo withAction:(NSString*)actionId withCompletionHandler:(void (^)())completionHandler{
+    // Registered once for the whole notification, before anything is emitted.
+    // It used to be Block_copy'd at each emit site, which overwrote the global
+    // even WITHIN one notification: a type 3 payload emits twice and leaked the
+    // first copy every time.
+    long long cn1PushCid = CN1PushCompletionBegin(completionHandler);
     NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
     if(apsInfo == nil) {
         //afterDidFinishLaunchingWithOptionsMarkerEntry
-        if (completionHandler != nil) {
-            completionHandler();
-        }
+        CN1PushCompletionFinishRouting(cn1PushCid);
         return;
     }
     // Managed push carries the canonical typed envelope as a JSON object. Route it
@@ -888,12 +896,10 @@ int pushReceivedCount=0;
         NSData *jsonData = [NSJSONSerialization dataWithJSONObject:cn1Envelope options:0 error:&jsonError];
         if (jsonData != nil && jsonError == nil) {
             NSString *jsonString = [[[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding] autorelease];
-            pushReceivedCount = 1;
-            if (completionHandler != nil) {
-                cn1PushCompletionHandler = Block_copy(completionHandler);
-            }
-            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
-                    CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG jsonString), JAVA_NULL);
+            CN1PushCompletionRetain(cn1PushCid);
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(
+                    CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG jsonString), JAVA_NULL,
+                    (JAVA_LONG)cn1PushCid);
             return;
         }
     }
@@ -921,7 +927,6 @@ int pushReceivedCount=0;
         }
 #endif
     }
-    pushReceivedCount=0;
     if( [apsInfo valueForKey:@"alert"] != NULL)
     {
         pushIncludedBody = YES;
@@ -934,11 +939,8 @@ int pushReceivedCount=0;
                 com_codename1_push_PushContent_setTitle___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [alertValueD valueForKey:@"title"]));
                 com_codename1_push_PushContent_setBody___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [alertValueD valueForKey:@"body"]));
                 alertValue = [NSString stringWithFormat:@"%@;%@", [alertValueD valueForKey:@"title"], [alertValueD valueForKey:@"body"]];
-                if (completionHandler != nil) {
-                    cn1PushCompletionHandler = Block_copy(completionHandler);
-                }
-                pushReceivedCount++;
-                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"4"));
+                CN1PushCompletionRetain(cn1PushCid);
+                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"4"), (JAVA_LONG)cn1PushCid);
             } else {
                 CN1Log(@"Received push type 4 but missing either title or body");
             }
@@ -950,18 +952,12 @@ int pushReceivedCount=0;
             com_codename1_push_PushContent_setBody___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue));
             if ([userInfo valueForKey:@"meta"] != NULL) {
                 // If there was a meta argument, then this is a type 3 push
-                if (completionHandler != nil) {
-                    cn1PushCompletionHandler = Block_copy(completionHandler);
-                }
-                pushReceivedCount++;
-                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"3"));
+                CN1PushCompletionRetain(cn1PushCid);
+                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"3"), (JAVA_LONG)cn1PushCid);
             } else {
                 // If there was no meta argument, then this is a type 1
-                if (completionHandler != nil) {
-                    cn1PushCompletionHandler = Block_copy(completionHandler);
-                }
-                pushReceivedCount++;
-                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"1"));
+                CN1PushCompletionRetain(cn1PushCid);
+                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"1"), (JAVA_LONG)cn1PushCid);
             }
         }
     }
@@ -969,24 +965,18 @@ int pushReceivedCount=0;
     {
         NSString* alertValue = [userInfo valueForKey:@"meta"];
         if (pushIncludedBody) {
-            if (completionHandler != nil) {
-                cn1PushCompletionHandler = Block_copy(completionHandler);
-            }
-            pushReceivedCount++;
+            CN1PushCompletionRetain(cn1PushCid);
             // If the push included a body, then this is a type 3 push (we don't need to set type here because it was set when the body was sent to the push callback)
-            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), nil);
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), nil, (JAVA_LONG)cn1PushCid);
         } else {
             // If the push did not include a body, then it is a type 2 push
-            if (completionHandler != nil) {
-                cn1PushCompletionHandler = Block_copy(completionHandler);
-            }
-            pushReceivedCount++;
-            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"2"));
+            CN1PushCompletionRetain(cn1PushCid);
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"2"), (JAVA_LONG)cn1PushCid);
         }
     }
-    if (pushReceivedCount == 0 && completionHandler != nil) {
-        completionHandler();
-    }
+    // A notification that produced no message for the application still holds a
+    // grant, and nothing downstream will ever release it.
+    CN1PushCompletionFinishRouting(cn1PushCid);
 }
 
 

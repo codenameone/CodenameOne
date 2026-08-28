@@ -116,6 +116,13 @@ static NSString * const CN1MacDeliveryPush = @"push";
 static NSString * const CN1MacDeliveryActionId = @"cn1ActionId";
 static NSString * const CN1MacDeliveryText = @"cn1TextResponse";
 
+/// macOS grants no background execution time for a push, so there is no
+/// completion handler to release and no id naming one. application:didReceiveRemoteNotification:
+/// takes no handler here, unlike its UIKit counterpart, and the notification
+/// centre handlers this port does get are for PRESENTATION and are called as
+/// soon as the decision is made.
+#define CN1_MAC_NO_PUSH_GRANT ((JAVA_LONG)0)
+
 /// Decodes one APNs payload the way the shared iOS router does and hands each
 /// part to the application.
 ///
@@ -198,8 +205,9 @@ static void cn1MacDeliverPush(NSDictionary *userInfo, NSString *actionId, NSStri
 #ifndef CN1_USE_ARC
             [jsonString autorelease];
 #endif
-            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
-                threadStateData, fromNSString(threadStateData, jsonString), JAVA_NULL);
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(
+                threadStateData, fromNSString(threadStateData, jsonString), JAVA_NULL,
+                CN1_MAC_NO_PUSH_GRANT);
             return;
         }
     }
@@ -236,9 +244,9 @@ static void cn1MacDeliverPush(NSDictionary *userInfo, NSString *actionId, NSStri
                 threadStateData, fromNSString(threadStateData, body));
             // "title;body" is the type 4 wire form the Java side parses.
             NSString *combined = [NSString stringWithFormat:@"%@;%@", title, body];
-            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(
                 threadStateData, fromNSString(threadStateData, combined),
-                fromNSString(threadStateData, @"4"));
+                fromNSString(threadStateData, @"4"), CN1_MAC_NO_PUSH_GRANT);
         } else if (body != nil) {
             // A body with no title is the common APNs dictionary form and means
             // exactly what the string form means, so it is reported as that
@@ -251,17 +259,17 @@ static void cn1MacDeliverPush(NSDictionary *userInfo, NSString *actionId, NSStri
             includedBody = YES;
             com_codename1_push_PushContent_setBody___java_lang_String(
                 threadStateData, fromNSString(threadStateData, body));
-            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(
                 threadStateData, fromNSString(threadStateData, body),
-                fromNSString(threadStateData, meta != nil ? @"3" : @"1"));
+                fromNSString(threadStateData, meta != nil ? @"3" : @"1"), CN1_MAC_NO_PUSH_GRANT);
         }
     } else if ([alert isKindOfClass:[NSString class]]) {
         includedBody = YES;
         com_codename1_push_PushContent_setBody___java_lang_String(
             threadStateData, fromNSString(threadStateData, (NSString *)alert));
-        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(
             threadStateData, fromNSString(threadStateData, (NSString *)alert),
-            fromNSString(threadStateData, meta != nil ? @"3" : @"1"));
+            fromNSString(threadStateData, meta != nil ? @"3" : @"1"), CN1_MAC_NO_PUSH_GRANT);
     }
 
     if (meta != nil) {
@@ -269,9 +277,9 @@ static void cn1MacDeliverPush(NSDictionary *userInfo, NSString *actionId, NSStri
             ? (NSString *)meta : [meta description];
         // A null type when the body already went out: the type was reported
         // with it, and repeating it would count the same push twice.
-        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(
             threadStateData, fromNSString(threadStateData, metaText),
-            includedBody ? JAVA_NULL : fromNSString(threadStateData, @"2"));
+            includedBody ? JAVA_NULL : fromNSString(threadStateData, @"2"), CN1_MAC_NO_PUSH_GRANT);
     }
 }
 
