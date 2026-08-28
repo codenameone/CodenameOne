@@ -296,6 +296,33 @@ public class MacOSBuildHintsTest {
                 perChannel.getInstallerIdentityFor("appStore"));
         assertEquals("Developer ID Installer: B",
                 perChannel.getInstallerIdentityFor("developerID"));
+
+        // And one channel overriding is enough to leave the shared value
+        // unambiguous for the other. Two packages are produced, but only one of
+        // them would ever consume this certificate, so refusing it made
+        // buildPkg fail for a Developer ID Installer the developer had
+        // supplied. Counting packaged channels rather than sharing ones is the
+        // same defect the case above already records, one level in.
+        MacOSBuildHints oneOverridden = parse(raw("macos.distribution", "both",
+                "macos.packaging", "pkg",
+                "macos.signingIdentity.installer", "Developer ID Installer: Shared",
+                "macos.signingIdentity.installer.appStore",
+                "3rd Party Mac Developer Installer: A"), "p");
+        assertEquals("3rd Party Mac Developer Installer: A",
+                oneOverridden.getInstallerIdentityFor("appStore"));
+        assertEquals("Developer ID Installer: Shared",
+                oneOverridden.getInstallerIdentityFor("developerID"));
+
+        // A blank override is not an override. It is how a settings file spells
+        // "unset", so both channels are still claimants and the shared value is
+        // still refused -- otherwise an empty hint would quietly re-enable the
+        // misapplication this guard exists to stop.
+        MacOSBuildHints blankOverride = parse(raw("macos.distribution", "both",
+                "macos.packaging", "pkg",
+                "macos.signingIdentity.installer", "3rd Party Mac Developer Installer: Someone",
+                "macos.signingIdentity.installer.appStore", "   "), "p");
+        assertNull(blankOverride.getInstallerIdentityFor("appStore"));
+        assertNull(blankOverride.getInstallerIdentityFor("developerID"));
     }
 
     @Test

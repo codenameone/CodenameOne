@@ -388,9 +388,8 @@ public class MacOSBuildHints {
      * that ships one channel, which is nearly all of them.</p>
      */
     public String getInstallerIdentityFor(String channel) {
-        String perChannel = DISTRIBUTION_APP_STORE.equals(channel)
-                ? installerIdentityAppStore : installerIdentityDeveloperID;
-        if (perChannel != null && perChannel.trim().length() > 0) {
+        String perChannel = perChannelInstallerIdentity(channel);
+        if (perChannel != null) {
             return perChannel;
         }
         // Refused only when TWO packages would be signed with it. The App Store
@@ -402,17 +401,39 @@ public class MacOSBuildHints {
         // signed and the shared hint is the right answer for it. Counting
         // channels instead rejected that perfectly valid configuration and made
         // buildPkg fail for a missing identity the developer had supplied.
-        int packagedChannels = 0;
+        //
+        // A channel that named its own installer certificate is not a claimant
+        // on this one either, for the same reason: it already has an answer and
+        // will never reach here. So an App Store override standing beside a
+        // shared Developer ID Installer leaves exactly one package on the shared
+        // value, and counting the packaged channels rather than the sharing ones
+        // refused it -- failing buildPkg for a certificate the developer had in
+        // fact supplied, which is the same defect one level in.
+        int sharingChannels = 0;
         for (String channel2 : getChannels()) {
             String packagingFor = getPackagingFor(channel2);
-            if ("pkg".equals(packagingFor) || "both".equals(packagingFor)) {
-                packagedChannels++;
+            if (!"pkg".equals(packagingFor) && !"both".equals(packagingFor)) {
+                continue;
+            }
+            if (perChannelInstallerIdentity(channel2) == null) {
+                sharingChannels++;
             }
         }
-        if (packagedChannels > 1) {
+        if (sharingChannels > 1) {
             return null;
         }
         return installerIdentity;
+    }
+
+    /**
+     * The installer certificate named for exactly this channel, or null when it
+     * named none. Blank counts as none, the same as absent -- an empty hint is
+     * how a settings file spells "unset".
+     */
+    private String perChannelInstallerIdentity(String channel) {
+        String value = DISTRIBUTION_APP_STORE.equals(channel)
+                ? installerIdentityAppStore : installerIdentityDeveloperID;
+        return value != null && value.trim().length() > 0 ? value : null;
     }
 
     /**
