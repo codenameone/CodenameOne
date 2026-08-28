@@ -117,6 +117,10 @@ public class AndroidVpnBridge implements VpnBridge {
     /// teardown on its own account.
     private volatile boolean stopRequested;
 
+    /// A status written while an operation held the bridge, awaiting its
+    /// release. Guarded by `this`, like the status it mirrors.
+    private VpnStatus pendingPublication;
+
     /// Whether an install or removal owns the profile right now.
     ///
     /// Covers the WHOLE operation rather than just the consent dialog: the
@@ -354,14 +358,13 @@ public class AndroidVpnBridge implements VpnBridge {
                     installedWire = wire;
                     Preferences.set(WIRE_PREF, strip(wire));
                 }
-                // Status FIRST, reservation after. Released here, a removal
-                // could claim it, delete the profile just provisioned and
-                // publish NOT_CONFIGURED -- and this thread would then
-                // overwrite that with DISCONNECTED. Both calls report
-                // success, load() finds no profile, and getStatus insists
-                // one is merely disconnected. The reservation is not held
-                // until the work is done; it is held until the last thing
-                // the work PUBLISHES has been published.
+                // The status is WRITTEN here and PUBLISHED by
+                // endOperation; see setStatus. Written before the release
+                // because a removal could otherwise claim the bridge in
+                // between, delete the profile just provisioned and publish
+                // NOT_CONFIGURED, which this thread would then overwrite --
+                // both calls reporting success while load() finds no profile
+                // and getStatus insists one is merely disconnected.
                 setStatus(VpnStatus.DISCONNECTED);
                 endOperation(mine);
                 Vpn.deliverAck(requestId, true, 0, null);
@@ -485,8 +488,10 @@ public class AndroidVpnBridge implements VpnBridge {
                 }
             }
             // The same ordering as the already-authorized path above: the
-            // status this install publishes has to land before anything else
-            // may claim the profile.
+            // status is written while the reservation is still held so
+            // nothing else can claim the profile in between, and published
+            // by endOperation so the listener runs with the bridge free.
+            // See setStatus.
             if (approved) {
                 bridge.setStatus(VpnStatus.DISCONNECTED);
             }
@@ -741,11 +746,27 @@ public class AndroidVpnBridge implements VpnBridge {
     /// publishing anything -- and they pass the same token, so a finally that
     /// runs after the acknowledgement handed the reservation to somebody else
     /// leaves it alone.
+    /// Releases the reservation and publishes whatever the operation wrote.
+    ///
+    /// The publication belongs here rather than in setStatus; see the note
+    /// there. It happens after the owner is cleared and outside the monitor,
+    /// so a listener is free to start the very operation it was told about.
+    ///
+    /// Only the holder publishes. This is called again from every finally,
+    /// and a second call finds the owner already null, so a status is never
+    /// announced twice.
     private void endOperation(Object token) {
+        VpnStatus publish;
         synchronized (this) {
-            if (operationOwner == token) {
-                operationOwner = null;
+            if (operationOwner != token) {
+                return;
             }
+            operationOwner = null;
+            publish = pendingPublication;
+            pendingPublication = null;
+        }
+        if (publish != null) {
+            Vpn.deliverStatusChanged(publish.ordinal());
         }
     }
 
@@ -975,13 +996,45 @@ public class AndroidVpnBridge implements VpnBridge {
         setStatus(available ? VpnStatus.CONNECTED : VpnStatus.DISCONNECTED);
     }
 
+    /// Moves to a new status and tells whoever is listening.
+    ///
+    /// The two halves are deliberately separated in time when an operation
+    /// owns the bridge. Vpn.deliverStatusChanged runs the listener INLINE
+    /// when the caller is already on the EDT, which is where an app calls
+    /// Vpn.install() from -- so publishing from inside a reservation ran
+    /// application code while the reservation was still held, and a listener
+    /// that reacted to the new profile by calling Vpn.start() was refused
+    /// with UNKNOWN every single time. Not a race: the ordinary path.
+    ///
+    /// Writing the status and releasing the reservation cannot simply be
+    /// swapped, either, which is why this is not a one-line reordering.
+    /// Releasing first lets a removal claim the bridge, delete the profile
+    /// just provisioned and publish NOT_CONFIGURED, and then this thread
+    /// overwrites that with a status describing a profile that no longer
+    /// exists. So the WRITE stays inside the reservation and the
+    /// PUBLICATION moves out of it, to endOperation.
+    ///
+    /// Deferring means an operation that writes a status it then rolls back
+    /// -- stopVpn setting DISCONNECTING and restoring it when the platform
+    /// refuses -- publishes only where it ended up, rather than announcing a
+    /// state that never existed and then taking it back.
     void setStatus(VpnStatus s) {
-        boolean notify;
+        boolean publishNow;
         synchronized (this) {
             this.status = s;
-            notify = listening;
+            if (!listening) {
+                // Nothing to publish, and nothing to remember: a listener
+                // registering later reads getStatus() rather than a backlog.
+                pendingPublication = null;
+                return;
+            }
+            if (operationOwner != null) {
+                pendingPublication = s;
+                return;
+            }
+            publishNow = true;
         }
-        if (notify) {
+        if (publishNow) {
             // OUTSIDE the monitor: the delivery reaches application code,
             // which calls straight back in here.
             Vpn.deliverStatusChanged(s.ordinal());

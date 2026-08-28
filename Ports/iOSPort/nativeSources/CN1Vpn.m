@@ -734,10 +734,22 @@ void com_codename1_impl_ios_IOSNative_vpnLoadProfile___int(
                     getThreadLocalData(), requestId, cn1vpJString(@""));
             return;
         }
+        // NEVPNProtocolIKEv2 IS an NEVPNProtocolIPSec -- it derives from it
+        // -- so the SPECIFIC test has to come first here or every IKEv2
+        // profile would be read back as IPSEC.
         int proto = [cfg isKindOfClass:[NEVPNProtocolIKEv2 class]]
                 ? CN1_VPN_PROTO_IKEV2 : CN1_VPN_PROTO_IPSEC;
         NSString *remoteId = @"";
         NSString *localId = @"";
+        // And the same inheritance is why ONE test covers both protocols
+        // below: localIdentifier and remoteIdentifier are declared on
+        // NEVPNProtocolIPSec, and IKEv2 inherits them rather than
+        // redeclaring them -- which is exactly why the install path can set
+        // them on an NEVPNProtocolIKEv2. A review read this as skipping the
+        // identifiers for IKEv2 and losing them from the loaded record; the
+        // isKindOfClass answer for an IKEv2 configuration is YES, so both
+        // are read. Spelled out because the two tests look inconsistent
+        // until you know the hierarchy, and the compiler cannot say so.
         if ([cfg isKindOfClass:[NEVPNProtocolIPSec class]]) {
             NEVPNProtocolIPSec *ip = (NEVPNProtocolIPSec *)cfg;
             remoteId = ip.remoteIdentifier == nil ? @"" : ip.remoteIdentifier;
