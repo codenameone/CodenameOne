@@ -2810,6 +2810,59 @@ public class Form extends Container implements TopLevelContainer {
     /// be glued onto the content pane
     ///
     /// - `modal`: indictes if this is a modal or modeless dialog true for modal dialogs
+    /// Places the dialog box by writing the given insets into the title and content
+    /// pane margins.
+    ///
+    /// Extracted from `#showModal(int, int, int, int, boolean, boolean, boolean)`
+    /// unchanged so a dialog shown on a `com.codename1.ui.Window` can be positioned by
+    /// the identical arithmetic instead of a second copy of it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: space in pixels above the dialog
+    ///
+    /// - `bottom`: space in pixels below the dialog
+    ///
+    /// - `left`: space in pixels left of the dialog
+    ///
+    /// - `right`: space in pixels right of the dialog
+    ///
+    /// - `includeTitle`: whether the title hangs at the top or is glued to the content
+    void applyDialogMargins(int top, int bottom, int left, int right, boolean includeTitle) {
+        if (!title.isVisible()) {
+            includeTitle = false;
+        }
+        Style titleStyle = title.getStyle();
+        titleStyle.removeListeners();
+
+        Style contentStyle = contentPane.getUnselectedStyle();
+        contentStyle.removeListeners();
+
+        if (includeTitle) {
+            titleStyle.setMargin(Component.TOP, top, false);
+            titleStyle.setMargin(Component.BOTTOM, 0, false);
+            titleStyle.setMargin(Component.LEFT, left, false);
+            titleStyle.setMargin(Component.RIGHT, right, false);
+
+            contentStyle.setMargin(Component.TOP, 0, false);
+            contentStyle.setMargin(Component.BOTTOM, bottom, false);
+            contentStyle.setMargin(Component.LEFT, left, false);
+            contentStyle.setMargin(Component.RIGHT, right, false);
+        } else {
+            titleStyle.setMargin(Component.TOP, 0, false);
+            titleStyle.setMargin(Component.BOTTOM, 0, false);
+            titleStyle.setMargin(Component.LEFT, 0, false);
+            titleStyle.setMargin(Component.RIGHT, 0, false);
+
+            contentStyle.setMargin(Component.TOP, top, false);
+            contentStyle.setMargin(Component.BOTTOM, bottom, false);
+            contentStyle.setMargin(Component.LEFT, left, false);
+            contentStyle.setMargin(Component.RIGHT, right, false);
+        }
+        titleStyle.setMarginUnit(null);
+        contentStyle.setMarginUnit(null);
+    }
+
     void showModal(int top, int bottom, int left, int right, boolean includeTitle, boolean modal, boolean reverse) {
         Display.getInstance().flushEdt();
         if (previousForm == null) {
@@ -2831,38 +2884,7 @@ public class Form extends Container implements TopLevelContainer {
         previousForm.tint = true;
         Painter p = getStyle().getBgPainter();
         if (top > 0 || bottom > 0 || left > 0 || right > 0) {
-            if (!title.isVisible()) {
-                includeTitle = false;
-            }
-            Style titleStyle = title.getStyle();
-            titleStyle.removeListeners();
-
-            Style contentStyle = contentPane.getUnselectedStyle();
-            contentStyle.removeListeners();
-
-            if (includeTitle) {
-                titleStyle.setMargin(Component.TOP, top, false);
-                titleStyle.setMargin(Component.BOTTOM, 0, false);
-                titleStyle.setMargin(Component.LEFT, left, false);
-                titleStyle.setMargin(Component.RIGHT, right, false);
-
-                contentStyle.setMargin(Component.TOP, 0, false);
-                contentStyle.setMargin(Component.BOTTOM, bottom, false);
-                contentStyle.setMargin(Component.LEFT, left, false);
-                contentStyle.setMargin(Component.RIGHT, right, false);
-            } else {
-                titleStyle.setMargin(Component.TOP, 0, false);
-                titleStyle.setMargin(Component.BOTTOM, 0, false);
-                titleStyle.setMargin(Component.LEFT, 0, false);
-                titleStyle.setMargin(Component.RIGHT, 0, false);
-
-                contentStyle.setMargin(Component.TOP, top, false);
-                contentStyle.setMargin(Component.BOTTOM, bottom, false);
-                contentStyle.setMargin(Component.LEFT, left, false);
-                contentStyle.setMargin(Component.RIGHT, right, false);
-            }
-            titleStyle.setMarginUnit(null);
-            contentStyle.setMarginUnit(null);
+            applyDialogMargins(top, bottom, left, right, includeTitle);
             initDialogBgPainter(p, previousForm);
             revalidate();
         } else {

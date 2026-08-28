@@ -200,6 +200,21 @@ public class Dialog extends Form implements AbstractDialog {
     private boolean interactionDialogMode = defaultInteractionDialogMode;
     private boolean titleCentered = defaultTitleCentered;
 
+    /// The top level this dialog was told to appear on, or null to work it out.
+    private TopLevelContainer hostTopLevel;
+
+    /// True while `#hostTopLevel` holds a host worked out from a popup's anchor rather
+    /// than one the application asked for. Such a host belongs to that one showing.
+    private boolean hostTopLevelInferred;
+
+    /// The host in force before a popup inferred one, put back when the popup goes.
+    private TopLevelContainer hostTopLevelBeforeInference;
+
+    /// The window this dialog is currently hosted in, or null when it is shown the
+    /// historical way by taking over the main surface. Every behaviour that belongs to
+    /// that historical path is gated on this being null.
+    private Window layerHost;
+
     /// Constructs a Dialog with a title
     ///
     /// #### Parameters
@@ -1596,6 +1611,150 @@ public class Dialog extends Form implements AbstractDialog {
         }
     }
 
+    /// The top level this dialog appears on when it is shown.
+    ///
+    /// A dialog is not attached to anything at the moment it is shown, so it cannot
+    /// resolve its own host the way an attached component can. Left unset it uses the
+    /// focused window, else the current `Form` -- which is the historical behaviour and
+    /// the right answer for an application with one window. Set it to put the dialog on
+    /// a particular `com.codename1.ui.Window` instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the top level to show on, or null to work it out
+    public void setTopLevelHost(TopLevelContainer host) {
+        this.hostTopLevel = host;
+        // An explicit choice replaces an inferred one outright, and there is no longer
+        // an earlier host worth restoring.
+        this.hostTopLevelInferred = false;
+        this.hostTopLevelBeforeInference = null;
+    }
+
+    /// Returns the top level set with `#setTopLevelHost(TopLevelContainer)`.
+    ///
+    /// #### Returns
+    ///
+    /// the explicit host, or null when none was set
+    public TopLevelContainer getTopLevelHost() {
+        return hostTopLevel;
+    }
+
+    /// The top level to show on: the explicit host, else the one this dialog is already
+    /// attached to, else the focused window, else the current form.
+    ///
+    /// The middle rung is guarded on actually being parented. A `Dialog` is a `Form`,
+    /// so `getTopLevelContainer()` answers `this` for an unattached one -- asking
+    /// unguarded would make every dialog its own host.
+    ///
+    /// #### Returns
+    ///
+    /// the host top level, or null when there is none
+    TopLevelContainer resolveHost() {
+        if (hostTopLevel != null) {
+            return hostTopLevel;
+        }
+        if (getParent() != null) {
+            TopLevelContainer attached = getTopLevelContainer();
+            if (attached != null && attached != this) { //NOPMD CompareObjectsWithEquals
+                return attached;
+            }
+        }
+        return TopLevelSupport.current();
+    }
+
+    /// Records a host worked out from a popup's anchor, remembering whatever was set
+    /// before so the inference does not outlive the popup.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inferred`: the anchor's top level
+    private void inferHost(TopLevelContainer inferred) {
+        if (inferred == null || inferred == this) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
+        if (!hostTopLevelInferred) {
+            hostTopLevelBeforeInference = hostTopLevel;
+        }
+        hostTopLevel = inferred;
+        hostTopLevelInferred = true;
+    }
+
+    /// Drops a host inferred from a popup's anchor and restores whatever was set before.
+    private void releaseInferredHost() {
+        if (hostTopLevelInferred) {
+            hostTopLevel = hostTopLevelBeforeInference;
+            hostTopLevelBeforeInference = null;
+            hostTopLevelInferred = false;
+        }
+    }
+
+    /// The container this dialog measures itself against, or null when the main surface
+    /// is the measure.
+    ///
+    /// Returning null rather than the `Form` is deliberate: the historical path then
+    /// evaluates the exact expression it always did, so nothing about a single window
+    /// application can shift by a pixel.
+    ///
+    /// #### Returns
+    ///
+    /// the window to measure against, or null for the display
+    private Container hostBounds() {
+        TopLevelContainer h = resolveHost();
+        return h != null && h.asContainer().isNativeWindow() ? h.asContainer() : null;
+    }
+
+    /// The width to size against: the host window's, or the display's.
+    ///
+    /// #### Returns
+    ///
+    /// the width in pixels
+    private int hostWidth() {
+        Container c = hostBounds();
+        return c == null ? Display.getInstance().getDisplayWidth() : c.getWidth();
+    }
+
+    /// The height to size against: the host window's, or the display's.
+    ///
+    /// #### Returns
+    ///
+    /// the height in pixels
+    private int hostHeight() {
+        Container c = hostBounds();
+        return c == null ? Display.getInstance().getDisplayHeight() : c.getHeight();
+    }
+
+    /// Whether a popup should be laid out as though the surface were portrait.
+    ///
+    /// A window has no orientation, so its own shape is all there is to go on.
+    ///
+    /// #### Returns
+    ///
+    /// true to use the portrait placement
+    private boolean hostPrefersPortrait() {
+        boolean bias = Display.getInstance().isPortrait();
+        TopLevelContainer h = resolveHost();
+        return h == null ? bias : h.asContainer().prefersPortraitLayout(bias);
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// Overridden rather than editing `Form`, because the base version measures the
+    /// display before it works out the margins and would centre a window hosted dialog
+    /// in the wrong coordinate space -- on a window smaller than the display the
+    /// margins could exceed the host outright and leave the dialog clipped or off
+    /// screen. With no window host this delegates, so the historical path evaluates
+    /// exactly the expression it always did.
+    @Override
+    void showDialog(boolean modal, boolean reverse) {
+        if (hostBounds() == null) {
+            super.showDialog(modal, reverse);
+            return;
+        }
+        int h = hostHeight() - getMenuBar().getPreferredH() - super.getTitleComponent().getPreferredH();
+        int w = hostWidth();
+        showModal(h / 100 * 20, h / 100 * 10, w / 100 * 20, w / 100 * 20, true, modal, reverse);
+    }
+
     @Override
     void showModal(int top, int bottom, int left, int right, boolean includeTitle, boolean modal, boolean reverse) {
         if (Display.isInitialized() && Display.getInstance().isMinimized()) {
@@ -1632,6 +1791,11 @@ public class Dialog extends Form implements AbstractDialog {
         componentPos.setX(componentPos.getX() - c.getScrollX());
         componentPos.setY(componentPos.getY() - c.getScrollY());
 
+        // The rectangle above is in the anchor's coordinate space, so the popup has to
+        // appear on the anchor's own top level -- there is nowhere else that rectangle
+        // means anything. This overrides a host set earlier rather than deferring to
+        // it, and is put back when the popup goes.
+        inferHost(c.getTopLevelContainer());
         return showPopupDialog(componentPos);
     }
 
@@ -1726,8 +1890,8 @@ public class Dialog extends Form implements AbstractDialog {
 
         prefWidth += getUIManager().getLookAndFeel().getVerticalScrollWidth();
 
-        int availableHeight = Display.getInstance().getDisplayHeight() - menuHeight - title.getPreferredH();
-        int availableWidth = Display.getInstance().getDisplayWidth();
+        int availableHeight = hostHeight() - menuHeight - title.getPreferredH();
+        int availableWidth = hostWidth();
         int width = Math.min(availableWidth, prefWidth);
         int x = 0;
         int y = 0;
@@ -1737,7 +1901,7 @@ public class Dialog extends Form implements AbstractDialog {
         if (popupDirectionBiasPortrait != null) {
             showPortrait = popupDirectionBiasPortrait.booleanValue();
         } else {
-            showPortrait = Display.getInstance().isPortrait();
+            showPortrait = hostPrefersPortrait();
         }
 
         // if we don't have enough space then disregard device orientation
@@ -1898,7 +2062,7 @@ public class Dialog extends Form implements AbstractDialog {
     public Dimension getDialogPreferredSize() {
         Component contentPane = super.getContentPane();
         Style contentPaneStyle = getDialogStyle();
-        int width = Display.getInstance().getDisplayWidth();
+        int width = hostWidth();
         int prefHeight = contentPane.getPreferredH();
         int prefWidth = contentPane.getPreferredW();
         prefWidth = Math.min(prefWidth, width);
@@ -1925,8 +2089,8 @@ public class Dialog extends Form implements AbstractDialog {
             setTitle("");
         }
         this.position = position;
-        int height = Display.getInstance().getDisplayHeight();
-        int width = Display.getInstance().getDisplayWidth();
+        int height = hostHeight();
+        int width = hostWidth();
         if (top > -1) {
             refreshTheme();
         }
@@ -2038,6 +2202,10 @@ public class Dialog extends Form implements AbstractDialog {
         if (!menu) {
             super.dispose();
         }
+        // A host worked out from a popup's anchor belongs to that one showing. Left in
+        // place it would silently redirect the next plain show() to whatever surface
+        // the last popup happened to be anchored on.
+        releaseInferredHost();
     }
 
     /// Shows a modal dialog and returns the command pressed within the modal dialog
@@ -2261,7 +2429,7 @@ public class Dialog extends Form implements AbstractDialog {
     /// Allows a dialog component to grow or shrink to its new preferred size
     public void growOrShrink() {
         getDialogComponent().setShouldCalcPreferredSize(true);
-        growOrShrinkImpl(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+        growOrShrinkImpl(hostWidth(), hostHeight());
         forceRevalidate();
     }
 

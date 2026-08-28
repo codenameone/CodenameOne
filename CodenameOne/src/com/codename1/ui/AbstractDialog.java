@@ -31,4 +31,13 @@ public interface AbstractDialog {
     void dispose();
     /// Shows the dialog and returns the selected command if applicable.
     Command showDialog();
+    /// Sets the top level this dialog appears on, which may be a
+    /// `com.codename1.ui.Window` rather than the current `Form`.
+    ///
+    /// A dialog is not attached to anything at the moment it is shown, so it cannot
+    /// work its own surface out the way an attached component can. Both implementations
+    /// fall back to the focused window, then the current form, when this is left unset.
+    void setTopLevelHost(TopLevelContainer host);
+    /// The top level set with `#setTopLevelHost(TopLevelContainer)`, or null.
+    TopLevelContainer getTopLevelHost();
 }
