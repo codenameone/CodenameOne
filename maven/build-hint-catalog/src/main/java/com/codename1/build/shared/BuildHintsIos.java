@@ -133,7 +133,7 @@ final class BuildHintsIos {
                         + "`com.apple.developer.networking.networkextension`, which Apple grants case by case "
                         + "rather than self-serve. Generating the target without the grant fails codesigning "
                         + "with an error naming an entitlement nobody asked for, so referencing the package "
-                        + "alone leaves the tunnel unbuilt. Left false, the build produces no extension and "
+                        + "alone doesn't produce one. Left false, the build produces no extension and "
                         + "`Tunnels.isSupported()` answers false."));
 
         h.add(new Hint("ios.vpn.tunnel.class")

@@ -5388,6 +5388,15 @@ public class IPhoneBuilder extends Executor {
                 // "allow-vpn\n" here would either change nothing or, without
                 // the trim, emit an empty second element that fails
                 // codesigning differently.
+                //
+                // The RAW door -- ios.entitlementsInject, which replaces a
+                // generated key rather than adding to it -- is checked in the
+                // BuildDaemon twin and deliberately NOT here. Nothing in this
+                // file reads that hint; the fragment is passed through and
+                // merged by buildNamespacedEntitlements, which lives only
+                // there. A copy here would be a check over a value this
+                // builder never sees, so a twin diff showing this asymmetry
+                // is reading the right answer.
                 String vpnEntitlement = request.getArg("ios.entitlements.com"
                         + ".apple.developer.networking.vpn.api", null);
                 // A BLANK hint counts as absent. buildNamespacedEntitlements

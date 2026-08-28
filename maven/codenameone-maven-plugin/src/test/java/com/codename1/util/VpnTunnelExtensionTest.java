@@ -159,6 +159,32 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void bothRouteHelpersFilterTheOtherFamily() {
+        // The v6 helper skipped v4 entries and the v4 helper skipped
+        // nothing, so address("10.0.0.2/32").route("::/0") built an
+        // NEIPv4Route whose destination was "::" and whose mask was a dotted
+        // quad. That is not a route the system can install, and it does not
+        // fail alone -- the whole NEPacketTunnelNetworkSettings object is
+        // rejected, so a setup naming one v6 route brought down the v4 half
+        // with it.
+        //
+        // Asserted as a pair rather than on the v4 helper alone: the defect
+        // was the ASYMMETRY, and a filter added to one side is exactly what
+        // produced it.
+        String src = provider();
+        for (String helper : new String[] {"cn1tnRoutes(NSString",
+                "cn1tnRoutes6(NSString"}) {
+            int at = src.indexOf(helper);
+            assertTrue(at >= 0, helper + " has to exist");
+            String body = src.substring(at, src.indexOf("return out;", at));
+            assertTrue(body.contains("rangeOfString:@\":\"")
+                    && body.contains("continue;"),
+                    helper + " has to skip entries of the other family,"
+                    + " not build a route class for them");
+        }
+    }
+
+    @Test
     void searchDomainsReachTheLink() {
         // TunnelSetup documents iOS applying these, and field 4 was carried
         // across the wire and then never read -- so a short hostname that

@@ -114,7 +114,7 @@ everything it closed over is still there.
 
 On iOS it would run inside a *Network Extension*: a separate process with its
 own bundle identifier, its own provisioning profile and a hard memory limit.
-**That half remains unbuilt.** The extension has to carry a virtual machine to
+**That half isn't built.** The extension has to carry a virtual machine to
 run your Java, and the translation that would give it one without the
 application shell -- which uses UIKit APIs an extension may not call -- has
 not been written. `ios.vpn.tunnel` fails the build rather than producing an

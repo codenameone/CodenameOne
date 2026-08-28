@@ -212,6 +212,19 @@ public class AndroidCallBridge implements CallBridge {
     /// be worse than the failure it is guarding. The catches are the four
     /// reflection can raise rather than a bare Exception, which the
     /// SpotBugs gate reports for this package.
+    /// A reflective answer as an `int`, or the fallback.
+    ///
+    /// Guarded with `instanceof` rather than cast-and-catch: ParparVM does
+    /// not check CHECKCAST, so a cast that fails under a handler does not
+    /// throw and the handler never runs. Kept out of the reflective `try`
+    /// for the same reason, as [CallScreeningRole] does with its Intents.
+    private static int asInt(Object o, int fallback) {
+        if (o instanceof Integer) {
+            return ((Integer) o).intValue();
+        }
+        return fallback;
+    }
+
     private boolean notificationsWillShow() {
         try {
             Object nm = context.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -236,9 +249,21 @@ public class AndroidCallBridge implements CallBridge {
                 }
                 Object importance = channel.getClass()
                         .getMethod("getImportance").invoke(channel);
-                // IMPORTANCE_NONE. The channel exists and the user has
-                // silenced it, so nothing this port posts will be seen.
-                return !Integer.valueOf(0).equals(importance);
+                // HIGH or better, not merely "not silenced".
+                //
+                // The channel is created IMPORTANCE_HIGH because that is
+                // what a heads-up notification and a full-screen intent
+                // need, and the user can lower it afterwards. Testing only
+                // for IMPORTANCE_NONE accepted LOW and MIN, where the
+                // notification is posted and shown in the shade and the
+                // phone never visibly rings -- so getAvailability answered
+                // AVAILABLE, the report succeeded, and the call arrived
+                // somewhere the user was not looking.
+                //
+                // A ringing UI the user cannot see is the same failure as no
+                // UI at all, which is the argument the POST_NOTIFICATIONS
+                // check beside this one already makes.
+                return asInt(importance, 0) >= 4;
             }
             return true;
         } catch (NoSuchMethodException notOnThisPlatform) {
@@ -586,8 +611,10 @@ public class AndroidCallBridge implements CallBridge {
                     CallError.UNAUTHORIZED.ordinal(),
                     "An incoming self-managed call rings through a"
                     + " notification, and this app cannot show one: grant"
-                    + " POST_NOTIFICATIONS and enable the incoming call"
-                    + " channel. Calls.getAvailability() reports this as"
+                    + " POST_NOTIFICATIONS and set the incoming call channel"
+                    + " to high importance -- at anything lower the system"
+                    + " files the notification in the shade instead of"
+                    + " ringing. Calls.getAvailability() reports this as"
                     + " NOT_PERMITTED before a call is reported.");
             return false;
         }

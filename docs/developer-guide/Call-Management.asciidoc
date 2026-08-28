@@ -72,8 +72,12 @@ one, with Answer and Decline wired to the same listeners as everywhere else.
 Two consequences are yours: the labels come from the
 `android.call.incomingTitle`, `android.call.answerLabel` and
 `android.call.declineLabel` build hints and are English until you set them,
-and the user can silence the *Incoming calls* notification channel, after
-which the call still arrives but doesn't ring.
+and the user can turn the *Incoming calls* notification channel down in
+Settings. Anything below high importance files the notification in the shade
+instead of ringing, so the port treats it as it treats a revoked
+`POST_NOTIFICATIONS`: `Calls.getAvailability()` answers `NOT_PERMITTED` and
+`reportIncomingCall` is refused, rather than reporting a call that rings
+nowhere.
 
 *Implement `providerReset`.* It means every call your app had is gone,
 because the user switched calling off or the platform recovered from an error.
