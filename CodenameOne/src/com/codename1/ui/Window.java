@@ -1282,8 +1282,11 @@ public class Window extends Container implements TopLevelContainer {
 
     /// Sets whether the platform draws a title bar and border for this window.
     ///
-    /// An undecorated window paired with a `Toolbar` is how an application draws its
-    /// own chrome.
+    /// An undecorated window draws no chrome of its own either, and
+    /// `#getDragRegionStatus(int, int)` refuses to drag it, so the application has to
+    /// supply both. A `Toolbar` is not the way to do that: it is installed through
+    /// `Form#setToolbar(Toolbar)` and is bound to a form throughout, so it cannot be
+    /// put on a window.
     ///
     /// #### Parameters
     ///

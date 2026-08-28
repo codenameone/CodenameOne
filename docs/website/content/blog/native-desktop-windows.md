@@ -163,6 +163,8 @@ _Native Linux: text editing attached to the secondary window._
 
 `Dialog`, `Sheet`, `ToastBar`, and a `ComboBox` popup still resolve through the current form. They are not window-aware in this release. `InteractionDialog` can target a window, and you can build an overlay in the window's own layered pane. Form transitions, `HTMLComponent`, tooltips, and accessibility on secondary windows are also outside the first release.
 
+**Update:** every item in this paragraph has since been closed, and `Dialog` and `InteractionDialog` gained an opt-in that backs them with a real operating system window. A `Picker` in a window still uses its lightweight popup, `Toolbar` is still bound to a form, and Mac Catalyst still presents system sheets from its main scene. Form transitions between windows remain out, and the developer guide now explains why rather than listing them: two operating system windows are composited by the window server, so there is no shared graphics context to draw an in-between frame into.
+
 `Display.getDisplayWidth()` and `getDisplayHeight()` continue to describe the main surface. Code inside a window should ask its top level for size. This preserves existing behavior, but it means a component with a hidden global display assumption needs to be corrected before it can live in a secondary window.
 
 Mac Catalyst exposed a deeper problem. It can create a second scene, but several ordinary desktop operations are missing or incomplete. The multi-window opt-in also changes the main scene's geometry. Catalyst was the wrong foundation for a first-class Mac desktop port.

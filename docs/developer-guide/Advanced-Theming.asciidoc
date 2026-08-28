@@ -123,6 +123,9 @@ Internally, Codename One has many built-in constants, and the list keeps growing
 |defaultCommandImage
 |Image to give a command with no icon
 
+|defaultNativeWindowModeBool
+|`true` to back every newly created `Dialog` and `InteractionDialog` with a real operating system window on desktop platforms. Ignored where there is no windowing system, so it changes nothing on mobile or the web. Equivalent to `Dialog.setDefaultNativeWindowMode(boolean)`, and overridden for one dialog by `setNativeWindowMode(boolean)`
+
 |dialogButtonCommandsBool
 |Place commands in the dialogs as buttons
 
