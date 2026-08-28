@@ -460,6 +460,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         return surfaceBridge;
     }
 
+    private com.codename1.documents.spi.DocumentProviderBridge documentProviderBridge;
+
+    @Override
+    public com.codename1.documents.spi.DocumentProviderBridge getDocumentProviderBridge() {
+        if (documentProviderBridge == null) {
+            File documentsHome = new File(System.getProperty("user.home")
+                    + File.separator + getAppHomeDir(), "cn1documents");
+            documentProviderBridge = new JavaSEDocumentProviderBridge(documentsHome);
+        }
+        return documentProviderBridge;
+    }
+
     /// Returns the JavaSE app-intents bridge, created lazily on first use. The desktop has no
     /// assistant and no system search index, so the bridge records what the application publishes
     /// and the simulator presents it -- which lets an intent be built and debugged with no device,

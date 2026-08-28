@@ -61,7 +61,18 @@ public class IOSAppExtensionSigningPreflightTest {
             + "<plist version=\"1.0\"><dict>\n";
 
     /** A profile of the shape the parser insists on, covering one App ID. */
+    /// The App Group a default-configured project asks for: "group." plus the package name.
+    private static final String GROUP = "group.com.example.app";
+
     private File profile(String name, String appIdentifier) throws Exception {
+        return profile(name, appIdentifier, null);
+    }
+
+    /// @param appGroup the App Group the profile grants, or null for one that grants none
+    private File profile(String name, String appIdentifier, String appGroup) throws Exception {
+        String groups = appGroup == null ? ""
+                : "<key>com.apple.security.application-groups</key><array><string>"
+                        + appGroup + "</string></array>";
         String plist = HEAD
                 + "<key>Name</key><string>" + name + "</string>\n"
                 + "<key>UUID</key><string>0f7ac3c1-4d0e-4e8a-9d1f-8b6a2c5e7d90</string>\n"
@@ -69,6 +80,7 @@ public class IOSAppExtensionSigningPreflightTest {
                 + "<key>DeveloperCertificates</key><array><data>Zm9v</data></array>\n"
                 + "<key>Entitlements</key><dict>"
                 + "<key>application-identifier</key><string>" + appIdentifier + "</string>"
+                + groups
                 + "<key>get-task-allow</key><false/></dict>\n"
                 + "</dict></plist>";
         byte[] payload = plist.getBytes("UTF-8");
@@ -118,6 +130,167 @@ public class IOSAppExtensionSigningPreflightTest {
 
     private static List<IOSProvisioningPreflight.Problem> check(Properties p, File ios) {
         return IOSProvisioningPreflight.checkAppExtensions(p, true, ios);
+    }
+
+    // ---- extensions the builder GENERATES, which never appear on disk ----
+
+    private static List<IOSProvisioningPreflight.Problem> checkGenerated(Properties p) {
+        return IOSProvisioningPreflight.checkGeneratedExtensions(p, true);
+    }
+
+    @Test
+    public void generatedDocumentProviderWithNoProfileOfItsOwnIsRefused() throws Exception {
+        // No folder under ios/app_extensions -- the builder synthesizes this target from hints --
+        // so the folder-driven check cannot see it and this one has to.
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        List<IOSProvisioningPreflight.Problem> problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).fatal);
+        assertTrue(problems.get(0).message,
+                problems.get(0).message.contains("com.example.app.CN1Documents"));
+    }
+
+    @Test
+    public void generatedDocumentProviderWithItsOwnProfileIsAccepted() throws Exception {
+        // Both profiles grant the App Group: the extension declares it, and the app carries it
+        // too, since the two meet in the container it names.
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Ext", "ABCD1234.com.example.app.CN1Documents", GROUP).getAbsolutePath());
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
+    @Test
+    public void anOverriddenBundleIdIsWhatTheProfileIsJudgedAgainst() throws Exception {
+        // The project can rename the generated target through its build settings, and the builder
+        // applies that override. Judged against the default name, the profile issued for the real
+        // identifier is refused here and one issued for a target nobody is building passes --
+        // moving the failure into Xcode, after the archive, which is what this class exists to
+        // prevent.
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.arg.ios.documentProvider.buildSettings.PRODUCT_BUNDLE_IDENTIFIER",
+                "com.example.app.files");
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Ext", "ABCD1234.com.example.app.files", GROUP).getAbsolutePath());
+        assertTrue(checkGenerated(p).isEmpty());
+
+        // And the profile for the DEFAULT name, which is now the wrong one, is refused.
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Stale", "ABCD1234.com.example.app.CN1Documents", GROUP).getAbsolutePath());
+        List<IOSProvisioningPreflight.Problem> problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message,
+                problems.get(0).message.contains("com.example.app.files"));
+    }
+
+    @Test
+    public void anExtensionProfileWithoutTheAppGroupIsRefused() throws Exception {
+        // A profile is a snapshot of the capabilities its App ID had when it was issued, so one
+        // made before App Groups was enabled matches the bundle id and still cannot sign a target
+        // that declares the group -- and the failure lands in Xcode, talking about an entitlement.
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        // Grants NO group at all, which is what a profile issued before the capability was
+        // enabled looks like: the case this exists to catch, not an inconclusive one.
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Ext", "ABCD1234.com.example.app.CN1Documents").getAbsolutePath());
+        List<IOSProvisioningPreflight.Problem> problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message, problems.get(0).message.contains("App Group"));
+
+        // Grants some OTHER group: judged the same way and for the same reason.
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Other", "ABCD1234.com.example.app.CN1Documents",
+                        "group.com.example.other").getAbsolutePath());
+        problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message, problems.get(0).message.contains("App Group"));
+
+        // Grants the group the build will ask for: accepted.
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Right", "ABCD1234.com.example.app.CN1Documents", GROUP).getAbsolutePath());
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
+    @Test
+    public void anExtensionPathThatIsNotAProfileIsNotJudged() throws Exception {
+        // An ordinary plist parses perfectly well and is not a profile, so parse answers null.
+        // Reading its fields threw out of the Maven build instead of producing a provisioning
+        // problem; an unreadable file is check()'s to report, not this method's.
+        File notAProfile = tmp.newFile("Info.plist");
+        OutputStream out = new FileOutputStream(notAProfile);
+        try {
+            out.write(("<?xml version=\"1.0\"?><plist version=\"1.0\"><dict>"
+                    + "<key>CFBundleName</key><string>Demo</string></dict></plist>")
+                    .getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                notAProfile.getAbsolutePath());
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
+    @Test
+    public void anExtensionProfileForAnotherAppIdIsRefused() throws Exception {
+        // Grants the right App Group and belongs to something else. Supplied as this extension's
+        // profile it satisfies the "has a profile of its own" check, and nothing else looked at
+        // it -- so Xcode refused it for the name, after the archive had been paid for.
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Other", "ABCD1234.com.example.other", GROUP).getAbsolutePath());
+        List<IOSProvisioningPreflight.Problem> problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message, problems.get(0).message.contains("cannot sign"));
+    }
+
+    @Test
+    public void aWildcardAppIdDoesNotCoverTheGeneratedDocumentProvider() throws Exception {
+        // A wildcard covers the bundle ID and still cannot sign this extension: it declares the
+        // App Group it resolves its container from, and Apple does not offer App Groups on a
+        // wildcard App ID. Passing it here would move the failure to Xcode, where the message
+        // is about an entitlement rather than about the profile nobody supplied.
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.*"));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        List<IOSProvisioningPreflight.Problem> problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message, problems.get(0).message.contains("App Groups"));
+
+        // Giving the extension a profile of its own does not settle it, because the app's own
+        // wildcard profile cannot carry the App Group either -- the builder puts that group in
+        // the app's entitlements too. The refusal moves to the app's profile, which is the one
+        // that then has to change.
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Ext", "ABCD1234.com.example.app.CN1Documents", GROUP).getAbsolutePath());
+        problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message,
+                problems.get(0).message.contains("app's own provisioning profile"));
+    }
+
+    @Test
+    public void anAppThatDoesNotPublishDocumentsIsNotChecked() throws Exception {
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        assertTrue(checkGenerated(p).isEmpty());
+        // Opting out generates no target, so there is nothing to sign and nothing to refuse.
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.arg.ios.documentProvider.extension", "false");
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
+    @Test
+    public void anUnreadableAppProfileIsNotReportedAsAnExtensionProblem() throws Exception {
+        // check() reports that as itself; refusing the build here would name the wrong cause.
+        Properties p = new Properties();
+        p.setProperty("codename1.packageName", "com.example.app");
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        assertTrue(checkGenerated(p).isEmpty());
     }
 
     // ---- the failure this exists to catch ----
@@ -182,7 +355,79 @@ public class IOSAppExtensionSigningPreflightTest {
         File ios = iosDir();
         extensionFolder(ios, "MyExtension");
         Properties p = settings(profile("Dist", "ABCD1234.com.example.app"));
-        p.setProperty("codename1.ios.release.appext.MyExtension.provision", "/certs/ext.mobileprovision");
+        p.setProperty("codename1.ios.release.appext.MyExtension.provision",
+                profile("Ext", "ABCD1234.com.example.app.MyExtension").getAbsolutePath());
+        assertTrue(check(p, ios).isEmpty());
+    }
+
+    @Test
+    public void oppositeBuildTypeProfileDoesNotSatisfyIt() throws Exception {
+        // A release build holding only the DEBUG-qualified profile. CN1BuildMojo's
+        // resolveAppExtensionBuildTypeQualifiers promotes the matching qualifier to the plain key
+        // and removes the other one without promoting it, so this build would reach the server
+        // with no extension profile at all. Passing it here would move the failure to signing.
+        File ios = iosDir();
+        extensionFolder(ios, "MyExtension");
+        Properties p = settings(profile("Dist", "ABCD1234.com.example.app"));
+        p.setProperty("codename1.ios.debug.appext.MyExtension.provision",
+                profile("Ext", "ABCD1234.com.example.app.MyExtension").getAbsolutePath());
+        assertEquals(1, check(p, ios).size());
+    }
+
+    @Test
+    public void generatedExtensionOppositeBuildTypeProfileDoesNotSatisfyIt() throws Exception {
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.arg.ios.debug.appext.CN1Documents.provisioningURL",
+                "https://example.com/ext");
+        assertEquals(1, checkGenerated(p).size());
+    }
+
+    @Test
+    public void generatedExtensionMatchingBuildTypeProfileSatisfiesIt() throws Exception {
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.arg.ios.release.appext.CN1Documents.provisioningURL",
+                "https://example.com/ext");
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
+    @Test
+    public void anExplicitlyBlankQualifierBeatsTheUnqualifiedFallback() throws Exception {
+        // What the wizard writes when it could not produce a development profile: the unqualified
+        // key keeps the DISTRIBUTION profile for older tooling, and the debug key is blanked. A
+        // debug build that accepted the fallback would sign the extension with a distribution
+        // profile and fail on the server, so the blank has to win here.
+        File ios = iosDir();
+        extensionFolder(ios, "MyExtension");
+        File appProfile = profile("Dist", "ABCD1234.com.example.app");
+        Properties p = settings(appProfile);
+        // The debug build needs an app profile of its own, or the check returns before it looks
+        // at any extension.
+        p.setProperty(IOSProvisioningPreflight.provisioningProfileSettingKey(false),
+                appProfile.getAbsolutePath());
+        p.setProperty("codename1.ios.appext.MyExtension.provision",
+                profile("Ext", "ABCD1234.com.example.app.MyExtension").getAbsolutePath());
+        p.setProperty("codename1.ios.debug.appext.MyExtension.provision", "");
+        assertEquals(1, IOSProvisioningPreflight.checkAppExtensions(p, false, ios).size());
+        // The release build is unaffected: its own profile is there.
+        assertTrue(IOSProvisioningPreflight.checkAppExtensions(p, true, ios).isEmpty());
+    }
+
+    @Test
+    public void aProfilePathThatIsNotThereDoesNotSatisfyIt() throws Exception {
+        // CN1BuildMojo warns that the file is missing, skips encoding it and submits the build
+        // anyway, so a stale path leaves the extension with no profile on the server. Accepting
+        // the setting here would wave through exactly the late failure this check prevents.
+        File ios = iosDir();
+        extensionFolder(ios, "MyExtension");
+        Properties p = settings(profile("Dist", "ABCD1234.com.example.app"));
+        p.setProperty("codename1.ios.appext.MyExtension.provision", "/nowhere/ext.mobileprovision");
+        assertEquals(1, check(p, ios).size());
+
+        // A path that IS there satisfies it.
+        File real = profile("Ext", "ABCD1234.com.example.app.MyExtension");
+        p.setProperty("codename1.ios.appext.MyExtension.provision", real.getAbsolutePath());
         assertTrue(check(p, ios).isEmpty());
     }
 

@@ -45,6 +45,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class BuildHintCatalogTest {
 
     @Test
+    public void documentProviderHintsAreDiscoverableFromTheSettingsUi() {
+        // The Settings app is how all four IDEs edit build hints, and it learns them from the
+        // catalog. A hint documented only in its feature chapter is invisible here -- a feature a
+        // developer can use but cannot find -- and one declared without a type gets whatever
+        // editor the default implies rather than the one it needs.
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+        assertEquals(BuildHintType.BOOLEAN, catalog.get("ios.documentProvider.enabled").type());
+        assertEquals(BuildHintType.BOOLEAN, catalog.get("ios.documentProvider.extension").type());
+        assertEquals(BuildHintType.BOOLEAN,
+                catalog.get("android.documentProvider.enabled").type());
+        assertEquals(BuildHintType.TEXT, catalog.get("ios.documentProvider.appGroup").type());
+        assertEquals(BuildHintType.TEXT, catalog.get("ios.documentProvider.displayName").type());
+        assertEquals(BuildHintType.VERSION,
+                catalog.get("ios.documentProvider.deploymentTarget").type());
+        // Searching is how the hint is actually found in the UI.
+        assertFalse(catalog.search("documentProvider").isEmpty());
+    }
+
+    @Test
     public void carriesTheHintsTheDeveloperGuideDocuments() {
         BuildHintCatalog catalog = BuildHintCatalog.load();
         assertNotNull(catalog.get("android.debug"));

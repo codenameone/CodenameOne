@@ -96,6 +96,7 @@ The fast path creates the common Apple signing setup:
 * Debug signing settings for the development certificate/profile pair.
 * Release signing settings for the App Store certificate/profile pair.
 * Mac App Store or Developer ID assets when you use the Mac Signing page.
+* App extension assets for each extension the project generates. Apple signs an app extension against its own App ID, so a project using External Surfaces or the Document Provider also gets an App Group, a separate App ID for the extension, and an App Store and a development profile for it, all installed into the project settings.
 
 Development provisioning requires at least one registered device. If no devices are registered, the wizard defers development profile creation and continues with the App Store signing assets. Register the device in the *Devices* section and run *Auto Setup* again to fill in the debug signing settings.
 

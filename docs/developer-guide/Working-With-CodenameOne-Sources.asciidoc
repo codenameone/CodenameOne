@@ -34,7 +34,7 @@ The default build runs every module and its unit tests. Append `-DskipTests`
 if you want to skip the test phases to speed up local builds.
 
 The version printed by Maven will end with `-SNAPSHOT` when you build
-from the `master` branch. Release builds from Maven Central omit the suffix.
+from the `master` branch. Published releases omit the suffix.
 
 === Installing the Maven archetypes
 
@@ -82,13 +82,13 @@ include::../demos/common/src/main/snippets/developer-guide/working-with-codename
 ----
 
 Open the project in your IDE and build or run it. Maven will resolve the local
-snapshot instead of downloading the latest release from Maven Central.
+snapshot instead of downloading the latest published release.
 
 === Why build from source
 
 Building the SDK yourself gives you:
 
-* Immediate access to fixes and features before they reach Maven Central.
+* Immediate access to fixes and features before they reach a release.
 * The ability to inspect, debug, and change the framework when you need custom
  behavior.
 * A path to contribute improvements back to the Codename One core.

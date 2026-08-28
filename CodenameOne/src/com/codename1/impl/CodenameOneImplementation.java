@@ -6407,6 +6407,18 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the platform bridge used by the `com.codename1.documents` API to expose the
+    /// application's documents to the system file browser. Ports supporting document providers
+    /// override this; the base implementation returns null which renders the whole API an inert
+    /// no-op.
+    ///
+    /// #### Returns
+    ///
+    /// the document provider bridge, or null when unsupported
+    public com.codename1.documents.spi.DocumentProviderBridge getDocumentProviderBridge() {
+        return null;
+    }
+
     /// Returns the platform bridge used by the `com.codename1.intents` API to expose the
     /// application's capabilities to the system -- assistant intents, app shortcuts and device
     /// search. Ports supporting intents override this; the base implementation returns null, which

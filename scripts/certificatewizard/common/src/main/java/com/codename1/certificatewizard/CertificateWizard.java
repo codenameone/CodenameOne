@@ -1234,13 +1234,134 @@ public class CertificateWizard extends Lifecycle {
         }
     }
 
+    /// Enables every App Group an extension in this project needs on the MAIN App ID, before any
+    /// of the app's own profiles are created.
+    ///
+    /// A provisioning profile is a snapshot of the App ID's capabilities at the moment it is
+    /// issued, and nothing in this flow reissues the app's profiles afterwards. Enabling the
+    /// group later -- which is where the per-extension setup does it, because that is where the
+    /// group is needed for the extension -- left the app's own development and App Store profiles
+    /// without com.apple.security.application-groups, while the builder puts that entitlement in
+    /// the app. The device build then cannot sign, on the path the wizard recommends.
+    ///
+    /// Whether a profile can still sign what this build produces.
+    ///
+    /// Apple marks a profile INVALID when its App ID's capabilities change, which is exactly what
+    /// enabling the App Group does -- so the profiles that have to be reissued say so themselves,
+    /// and this reads that rather than guessing. It used to retire every matching profile
+    /// whenever the groups were asserted, because the signing state carries no per-bundle group
+    /// association to compare against; asserting them is not the same as changing them, so a
+    /// second run of automatic setup deleted profiles that were perfectly good -- a colleague's
+    /// among them, since they belong to the App ID rather than to whoever made them.
+    private static boolean isUsableProfile(SigningState.Profile profile) {
+        return profile.status() == null || "ACTIVE".equals(profile.status());
+    }
+
+    /// Profile IDs already retired in this run, so a delete that does not take cannot loop.
+    private final java.util.Set<Long> reissuedProfiles = new java.util.HashSet<Long>();
+
+    /// True when this project will actually be given a generated document provider extension.
+    ///
+    /// Both hints decide it, exactly as they do in the builder
+    /// (`usesDocuments && ios.documentProvider.extension != false`) and in the signing preflight.
+    /// Keying on `enabled` alone would have the wizard create an App ID, an App Group and two
+    /// profiles for an extension the build then skips -- and, worse, reissue the app's own
+    /// profiles to carry a capability it does not need.
+    private boolean documentProviderRequested() {
+        return binding != null
+                && "true".equals(readSetting(binding.settings(),
+                        "codename1.arg.ios.documentProvider.enabled"))
+                && !"false".equals(readSetting(binding.settings(),
+                        "codename1.arg.ios.documentProvider.extension"));
+    }
+
+    private void autoSetupMainAppGroups(String bundleIdentifier, String appName, Runnable next) {
+        boolean widgets = binding != null
+                && ProjectIO.readSurfacesManifest(binding.projectDir()) != null;
+        boolean documents = documentProviderRequested();
+        if (!widgets && !documents) {
+            next.run();
+            return;
+        }
+        ProjectDefaults defaults = projectDefaults();
+        // One group per extension kind, de-duplicated: a project using both usually shares one.
+        List<String> wanted = new ArrayList<String>();
+        // Whatever the project already declares comes first. enableAppGroupCapability REPLACES the
+        // App ID's group association rather than adding to it, so a group the developer configured
+        // by hand -- for a share extension, say -- would be dropped here and then be missing from
+        // the reissued profile, while the builder still writes it into the entitlements from
+        // ios.app_groups. That combination cannot sign. The wizard has no way to read the App ID's
+        // current association back from the service, so the project's own hint is the source: it
+        // is also exactly the set the next build will demand.
+        if (binding != null) {
+            String declared = readSetting(binding.settings(), "codename1.arg.ios.app_groups");
+            for (String group : WizardDecisions.declaredAppGroups(declared)) {
+                addIfMissing(wanted, group);
+            }
+        }
+        if (widgets) {
+            addIfMissing(wanted, resolveAppGroupIdentifier(defaults));
+        }
+        if (documents) {
+            addIfMissing(wanted, resolveDocumentProviderAppGroup(defaults));
+        }
+        if (wanted.isEmpty()) {
+            next.run();
+            return;
+        }
+        showPageMessage("Enabling App Groups on " + bundleIdentifier + "...", false);
+        enableGroupsOnMainBundle(bundleIdentifier, appName, wanted, 0,
+                new ArrayList<String>(), next);
+    }
+
+    /// Creates each wanted group in turn, then enables the whole set on the main App ID at once.
+    /// Enabling replaces the capability's group list rather than adding to it, so they have to
+    /// travel together.
+    private void enableGroupsOnMainBundle(String bundleIdentifier, String appName,
+            List<String> wanted, int index, List<String> appleIds, Runnable next) {
+        if (index >= wanted.size()) {
+            SigningState.BundleId mainBundle = findBundleByIdentifier(bundleIdentifier, "IOS");
+            if (mainBundle == null) {
+                showPageMessage("Main bundle ID could not be found after refresh.", true);
+                return;
+            }
+            service.enableAppGroupCapability(mainBundle.id(), appleIds, r -> {
+                if (!r.ok) {
+                    showPageMessage(r.message, true);
+                    return;
+                }
+                refreshForAutoSetup(next);
+            });
+            return;
+        }
+        findOrCreateAppGroup(wanted.get(index), appName + " Shared", group -> {
+            appleIds.add(group.id());
+            refreshForAutoSetup(() -> enableGroupsOnMainBundle(bundleIdentifier, appName, wanted,
+                    index + 1, appleIds, next));
+        });
+    }
+
+    private static void addIfMissing(List<String> list, String value) {
+        if (value != null && value.length() > 0 && !list.contains(value)) {
+            list.add(value);
+        }
+    }
+
     private void autoSetupDefaultProfiles(String bundleIdentifier, String appName) {
+        // The group goes on the App ID first; everything after this issues profiles that have to
+        // carry it.
+        autoSetupMainAppGroups(bundleIdentifier, appName,
+                () -> autoSetupDefaultProfilesAfterGroups(bundleIdentifier, appName));
+    }
+
+    private void autoSetupDefaultProfilesAfterGroups(String bundleIdentifier, String appName) {
         autoSetupCertificate(bundleIdentifier, appName, PROFILE_DEVELOPMENT,
                 () -> autoSetupCertificate(bundleIdentifier, appName, PROFILE_APP_STORE,
                         () -> autoSetupMacProject(PROFILE_MAC_STORE,
                                 () -> autoSetupMacProject(PROFILE_MAC_DIRECT,
                                         () -> autoSetupWidgetExtension(bundleIdentifier, appName,
-                                                () -> showPageMessage("Automatic signing setup completed.", false))))));
+                                                () -> autoSetupDocumentProviderExtension(bundleIdentifier, appName,
+                                                        () -> showPageMessage("Automatic signing setup completed.", false)))))));
     }
 
     private void autoSetupMacProject(String profileType) {
@@ -1304,6 +1425,33 @@ public class CertificateWizard extends Lifecycle {
         return firstNonEmpty(fromManifest, WizardDecisions.defaultAppGroup(defaults.packageName));
     }
 
+    /// The bundle id to provision for the document provider.
+    ///
+    /// The project can rename the generated target through the extension's build settings, and
+    /// the builder applies that override to the Xcode target. Provisioning the default name
+    /// instead would create an App ID and profiles for a target nobody is building: the wizard
+    /// would finish reporting success, and the build would then fail in signing -- which is also
+    /// what the provisioning preflight now reports, having learned to read the same override.
+    private String resolveDocumentProviderBundleId(ProjectDefaults defaults) {
+        return WizardDecisions.documentProviderExtensionBundleId(defaults.packageName,
+                binding == null ? null : readSetting(binding.settings(),
+                        "codename1.arg.ios.documentProvider.buildSettings"
+                                + ".PRODUCT_BUNDLE_IDENTIFIER"));
+    }
+
+    /// The App Group to provision for the document provider.
+    ///
+    /// A project that already names one in ios.documentProvider.appGroup keeps it. Falling
+    /// through to the shared resolver would provision a different group and then let the
+    /// installer overwrite the hint with it -- silently moving the shared container out from
+    /// under content the app had already published, which then disappears until the next
+    /// publish.
+    private String resolveDocumentProviderAppGroup(ProjectDefaults defaults) {
+        String configured = binding == null ? null
+                : readSetting(binding.settings(), "codename1.arg.ios.documentProvider.appGroup");
+        return firstNonEmpty(configured, resolveAppGroupIdentifier(defaults));
+    }
+
     private static String surfacesAppGroup(ProjectIO.SurfacesManifest manifest) {
         return manifest == null ? null : manifest.appGroup();
     }
@@ -1326,118 +1474,213 @@ public class CertificateWizard extends Lifecycle {
         });
     }
 
+    /// What differs between the app extensions the wizard can sign for. Everything else --
+    /// find-or-create the App Group, enable it on the app and on the extension, create an App
+    /// Store profile and a development one, download both, write them into the project -- is the
+    /// same sequence against the same API, so it is written once here rather than once per
+    /// extension.
+    private static final class ExtensionSigning {
+        /// The target name Codename One generates, and the last component of the extension's
+        /// bundle id.
+        final String extensionName;
+        /// Human-readable, for messages and for the generated profile names.
+        final String label;
+        /// The extension's own App ID.
+        final String bundleIdentifier;
+        /// Writes the downloaded profiles into the project settings.
+        final SigningInstaller installer;
+        /// Which App Group this extension shares with the app.
+        final AppGroupResolver appGroup;
+
+        ExtensionSigning(String extensionName, String label, String bundleIdentifier,
+                AppGroupResolver appGroup, SigningInstaller installer) {
+            this.extensionName = extensionName;
+            this.label = label;
+            this.bundleIdentifier = bundleIdentifier;
+            this.appGroup = appGroup;
+            this.installer = installer;
+        }
+    }
+
+    private interface AppGroupResolver {
+        String resolve(ProjectDefaults defaults);
+    }
+
+    private interface SigningInstaller {
+        void install(ProjectDefaults defaults, String releasePath, String debugPath)
+                throws Exception;
+    }
+
     private void autoSetupWidgetExtension(String bundleIdentifier, String appName, Runnable next) {
         if (binding == null || ProjectIO.readSurfacesManifest(binding.projectDir()) == null) {
             next.run();
             return;
         }
         ProjectDefaults defaults = projectDefaults();
-        final String groupId = resolveAppGroupIdentifier(defaults);
-        final String extIdentifier = WizardDecisions.widgetExtensionBundleId(defaults.packageName);
-        if (extIdentifier == null || groupId == null) {
+        String extIdentifier = WizardDecisions.widgetExtensionBundleId(defaults.packageName);
+        if (extIdentifier == null) {
             next.run();
             return;
         }
-        showPageMessage("Setting up widget extension signing...", false);
-        findOrCreateAppGroup(groupId, appName + " Shared", group -> refreshForAutoSetup(() ->
-                autoSetupWidgetExtensionAfterGroup(bundleIdentifier, appName, defaults, groupId, extIdentifier,
-                        group, next)));
+        autoSetupExtension(new ExtensionSigning("CN1Widgets", "widget extension", extIdentifier,
+                this::resolveAppGroupIdentifier,
+                (d, release, debug) -> SigningAssetInstaller.applyWidgetExtensionSigning(
+                        binding.settings(), resolveAppGroupIdentifier(d), release, debug)),
+                bundleIdentifier, appName, next);
     }
 
-    private void autoSetupWidgetExtensionAfterGroup(String bundleIdentifier, String appName,
-            ProjectDefaults defaults, String groupId, String extIdentifier, SigningState.AppGroup group,
+    private void autoSetupDocumentProviderExtension(String bundleIdentifier, String appName,
             Runnable next) {
-        SigningState.BundleId mainBundle = findBundleByIdentifier(bundleIdentifier, "IOS");
-        if (mainBundle == null) {
-            showPageMessage("Main bundle ID could not be found after refresh.", true);
+        // Detected from the build hints rather than from a manifest: the document provider needs
+        // no build-time declaration of what it will publish, so the hints are the only signal
+        // that this project wants the extension at all.
+        if (!documentProviderRequested()) {
+            next.run();
             return;
         }
+        ProjectDefaults defaults = projectDefaults();
+        String extIdentifier = resolveDocumentProviderBundleId(defaults);
+        if (extIdentifier == null) {
+            next.run();
+            return;
+        }
+        autoSetupExtension(new ExtensionSigning("CN1Documents", "document provider extension",
+                extIdentifier,
+                this::resolveDocumentProviderAppGroup,
+                (d, release, debug) -> SigningAssetInstaller.applyDocumentProviderSigning(
+                        binding.settings(), resolveDocumentProviderAppGroup(d), release, debug)),
+                bundleIdentifier, appName, next);
+    }
+
+    private void autoSetupExtension(ExtensionSigning ext, String bundleIdentifier, String appName,
+            Runnable next) {
+        ProjectDefaults defaults = projectDefaults();
+        // The group that gets created and enabled must be the one the installer will write, or
+        // the project ends up pointed at a container nothing provisioned.
+        final String groupId = ext.appGroup.resolve(defaults);
+        if (groupId == null) {
+            next.run();
+            return;
+        }
+        showPageMessage("Setting up " + ext.label + " signing...", false);
+        findOrCreateAppGroup(groupId, appName + " Shared", group -> refreshForAutoSetup(() ->
+                autoSetupExtensionAfterGroup(ext, bundleIdentifier, appName, defaults, group, next)));
+    }
+
+    private void autoSetupExtensionAfterGroup(ExtensionSigning ext, String bundleIdentifier,
+            String appName, ProjectDefaults defaults, SigningState.AppGroup group, Runnable next) {
+        // The main App ID is deliberately left alone here. enableAppGroupCapability REPLACES the
+        // association rather than adding to it, so a per-extension call carrying only its own
+        // group would wipe whatever the other extensions need: with widgets and documents on
+        // different groups, widget setup would leave only the widget group and document setup
+        // only the document group, and profiles issued from that App ID afterwards would be
+        // missing one of them. autoSetupMainAppGroups already associated the union, once.
         List<String> groupIds = new ArrayList<String>();
         groupIds.add(group.id());
-        service.enableAppGroupCapability(mainBundle.id(), groupIds, r -> {
-            if (!r.ok) {
-                showPageMessage(r.message, true);
-                return;
-            }
-            ensureWidgetExtensionBundle(appName, defaults, extIdentifier, groupIds, next);
-        });
+        ensureExtensionBundle(ext, appName, defaults, groupIds, next);
     }
 
-    private void ensureWidgetExtensionBundle(String appName, ProjectDefaults defaults, String extIdentifier,
-            List<String> groupIds, Runnable next) {
-        SigningState.BundleId ext = findBundleByIdentifier(extIdentifier, "IOS");
-        if (ext != null) {
-            enableWidgetExtensionGroupAndProfile(appName, defaults, extIdentifier, groupIds, next);
+    private void ensureExtensionBundle(ExtensionSigning ext, String appName,
+            ProjectDefaults defaults, List<String> groupIds, Runnable next) {
+        SigningState.BundleId existing = findBundleByIdentifier(ext.bundleIdentifier, "IOS");
+        if (existing != null) {
+            enableExtensionGroupAndProfile(ext, appName, defaults, groupIds, next);
             return;
         }
-        showPageMessage("Creating widget extension bundle ID " + extIdentifier + "...", false);
-        service.createBundleId(extIdentifier, appName + " Widgets", true, r -> {
+        showPageMessage("Creating " + ext.label + " bundle ID " + ext.bundleIdentifier + "...", false);
+        service.createBundleId(ext.bundleIdentifier, appName + " " + ext.extensionName, true, r -> {
             if (!r.ok) {
                 showPageMessage(r.message, true);
                 return;
             }
             refreshForAutoSetup(() ->
-                    enableWidgetExtensionGroupAndProfile(appName, defaults, extIdentifier, groupIds, next));
+                    enableExtensionGroupAndProfile(ext, appName, defaults, groupIds, next));
         });
     }
 
-    private void enableWidgetExtensionGroupAndProfile(String appName, ProjectDefaults defaults,
-            String extIdentifier, List<String> groupIds, Runnable next) {
-        SigningState.BundleId ext = findBundleByIdentifier(extIdentifier, "IOS");
-        if (ext == null) {
-            showPageMessage("Widget extension bundle ID could not be found after refresh.", true);
+    private void enableExtensionGroupAndProfile(ExtensionSigning ext, String appName,
+            ProjectDefaults defaults, List<String> groupIds, Runnable next) {
+        SigningState.BundleId bundle = findBundleByIdentifier(ext.bundleIdentifier, "IOS");
+        if (bundle == null) {
+            showPageMessage(capitalize(ext.label) + " bundle ID could not be found after refresh.",
+                    true);
             return;
         }
-        service.enableAppGroupCapability(ext.id(), groupIds, r -> {
+        service.enableAppGroupCapability(bundle.id(), groupIds, r -> {
             if (!r.ok) {
                 showPageMessage(r.message, true);
                 return;
             }
-            createWidgetExtensionProfile(appName, defaults, extIdentifier, next);
+            createExtensionProfile(ext, appName, defaults, next);
         });
     }
 
-    private void createWidgetExtensionProfile(String appName, ProjectDefaults defaults, String extIdentifier,
-            Runnable next) {
+    private void createExtensionProfile(ExtensionSigning ext, String appName,
+            ProjectDefaults defaults, Runnable next) {
         // The extension needs a distribution profile for release builds and a development
         // profile for debug device builds, mirroring codename1.ios.release.provision /
         // codename1.ios.debug.provision on the app itself. The App Store profile is
         // required; the development profile is skipped gracefully when no development
         // certificate or registered device is available.
-        ensureWidgetExtensionProfile(appName, extIdentifier, PROFILE_APP_STORE, releasePath ->
-                ensureWidgetExtensionProfile(appName, extIdentifier, PROFILE_DEVELOPMENT, debugPath ->
-                        installWidgetExtensionSigning(defaults, releasePath, debugPath, next)));
+        ensureExtensionProfile(ext, appName, PROFILE_APP_STORE, releasePath ->
+                ensureExtensionProfile(ext, appName, PROFILE_DEVELOPMENT, debugPath ->
+                        installExtensionSigning(ext, defaults, releasePath, debugPath, next)));
     }
 
-    private void ensureWidgetExtensionProfile(String appName, String extIdentifier, String profileType,
+    private void ensureExtensionProfile(ExtensionSigning ext, String appName, String profileType,
             com.codename1.util.OnComplete<String> onPath) {
-        SigningState.Profile existing = findProfile(extIdentifier, profileType);
-        if (existing != null) {
-            downloadWidgetExtensionProfile(existing, profileType, onPath);
+        SigningState.Profile existing = findProfile(ext.bundleIdentifier, profileType);
+        if (existing != null && !isUsableProfile(existing) && existing.id() != null
+                && reissuedProfiles.add(existing.id())) {
+            // The same snapshot problem as the app's own profiles: the extension's App ID was
+            // given the App Group a moment ago in enableExtensionGroupAndProfile, and Apple marks
+            // the profiles that predate a capability change INVALID. One of those cannot sign the
+            // generated extension -- it carries no application-groups entitlement while the
+            // extension declares one -- and the failure names the extension's bundle ID rather
+            // than the cause. A profile that is still ACTIVE already covers the current
+            // capabilities and is left where it is.
+            showPageMessage("Reissuing the " + ext.label + " "
+                    + profileTypeLabel(profileType) + " profile, which the App Group change "
+                    + "invalidated...", false);
+            service.deleteProfile(existing.id(), r -> {
+                if (!r.ok) {
+                    showPageMessage(r.message, true);
+                    return;
+                }
+                refreshForAutoSetup(() ->
+                        ensureExtensionProfile(ext, appName, profileType, onPath));
+            });
             return;
         }
-        SigningState.BundleId ext = findBundleByIdentifier(extIdentifier, "IOS");
+        if (existing != null) {
+            downloadExtensionProfile(ext, existing, profileType, onPath);
+            return;
+        }
+        SigningState.BundleId bundle = findBundleByIdentifier(ext.bundleIdentifier, "IOS");
         List<SigningState.Certificate> compatible = WizardDecisions.compatibleCertificates(state, profileType);
         boolean development = PROFILE_DEVELOPMENT.equals(profileType);
-        if (ext == null || compatible.isEmpty()) {
+        if (bundle == null || compatible.isEmpty()) {
             if (development) {
                 onPath.completed(null);
                 return;
             }
-            showPageMessage("No distribution certificate was available for the widget extension profile.", true);
+            showPageMessage("No distribution certificate was available for the " + ext.label
+                    + " profile.", true);
             return;
         }
         List<String> certs = new ArrayList<String>();
         certs.add(compatible.get(0).appleCertId());
         List<String> devices = deviceIdsFor(profileType);
-        if (!WizardDecisions.canCreateProfile(profileType, ext.id(), certs, devices, appName)) {
-            showPageMessage("Skipped the widget extension development profile: register a device to create development signing assets.", true);
+        if (!WizardDecisions.canCreateProfile(profileType, bundle.id(), certs, devices, appName)) {
+            showPageMessage("Skipped the " + ext.label + " development profile: register a device "
+                    + "to create development signing assets.", true);
             onPath.completed(null);
             return;
         }
-        String profileName = appName + " Widgets " + (development ? "Development" : "App Store");
-        showPageMessage("Creating widget extension provisioning profile " + profileName + "...", false);
-        service.createProfile(profileName, profileType, ext.id(), certs, devices, r -> {
+        String profileName = appName + " " + ext.extensionName + " "
+                + (development ? "Development" : "App Store");
+        showPageMessage("Creating " + ext.label + " provisioning profile " + profileName + "...", false);
+        service.createProfile(profileName, profileType, bundle.id(), certs, devices, r -> {
             if (!r.ok) {
                 showPageMessage(r.message, true);
                 // A failed development profile shouldn't drop the App Store profile that
@@ -1448,23 +1691,25 @@ public class CertificateWizard extends Lifecycle {
                 return;
             }
             refreshForAutoSetup(() -> {
-                SigningState.Profile created = findProfile(extIdentifier, profileType);
+                SigningState.Profile created = findProfile(ext.bundleIdentifier, profileType);
                 if (created == null) {
-                    showPageMessage("Widget extension profile was created but could not be found after refresh.", true);
+                    showPageMessage(capitalize(ext.label) + " profile was created but could not be "
+                            + "found after refresh.", true);
                     if (development) {
                         onPath.completed(null);
                     }
                     return;
                 }
-                downloadWidgetExtensionProfile(created, profileType, onPath);
+                downloadExtensionProfile(ext, created, profileType, onPath);
             });
         });
     }
 
-    private void downloadWidgetExtensionProfile(SigningState.Profile profile, String profileType,
-            com.codename1.util.OnComplete<String> onPath) {
+    private void downloadExtensionProfile(ExtensionSigning ext, SigningState.Profile profile,
+            String profileType, com.codename1.util.OnComplete<String> onPath) {
         String fileName = PROFILE_DEVELOPMENT.equals(profileType)
-                ? "CN1Widgets_Development.mobileprovision" : "CN1Widgets.mobileprovision";
+                ? ext.extensionName + "_Development.mobileprovision"
+                : ext.extensionName + ".mobileprovision";
         service.downloadProfile(profile.id(), fileName, r -> {
             if (!r.ok) {
                 showPageMessage(r.message, true);
@@ -1477,20 +1722,28 @@ public class CertificateWizard extends Lifecycle {
         });
     }
 
-    private void installWidgetExtensionSigning(ProjectDefaults defaults, String releasePath, String debugPath,
-            Runnable next) {
+    private void installExtensionSigning(ExtensionSigning ext, ProjectDefaults defaults,
+            String releasePath, String debugPath, Runnable next) {
         try {
-            String groupId = resolveAppGroupIdentifier(defaults);
-            SigningAssetInstaller.applyWidgetExtensionSigning(binding.settings(), groupId, releasePath, debugPath);
+            ext.installer.install(defaults, releasePath, debugPath);
             clearPageMessage();
-            ToastBar.showMessage("Widget extension signing installed", FontImage.MATERIAL_CHECK);
+            ToastBar.showMessage(capitalize(ext.label) + " signing installed",
+                    FontImage.MATERIAL_CHECK);
             if (next != null) {
                 next.run();
             }
         } catch (Exception ex) {
             Log.e(ex);
-            showPageMessage("Failed to update widget extension settings: " + friendlyMessage(ex), true);
+            showPageMessage("Failed to update " + ext.label + " settings: " + friendlyMessage(ex),
+                    true);
         }
+    }
+
+    private static String capitalize(String s) {
+        if (s == null || s.isEmpty()) {
+            return s;
+        }
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     private void generateAndroidKeystore(String alias, String password, String dname) {
@@ -1568,6 +1821,38 @@ public class CertificateWizard extends Lifecycle {
             return;
         }
         SigningState.Profile existing = findProfile(bundleIdentifier, profileType);
+        if (existing != null && !isUsableProfile(existing) && existing.id() != null
+                && reissuedProfiles.add(existing.id())) {
+            // A provisioning profile is a snapshot of the capabilities the App ID had when it
+            // was issued, and Apple marks the ones a capability change left behind INVALID.
+            // Installing such a profile gives the build no application-groups entitlement while
+            // the builder puts that group in the app, and the next device build cannot sign.
+            // Deleting it here is safe: the branch below recreates it from the same certificate
+            // and devices. A profile that is still ACTIVE is not touched -- it covers the App
+            // ID's current capabilities, and it may well be a colleague's.
+            //
+            // Keyed by profile ID, not by profile type. An account can hold several development
+            // or App Store profiles for one bundle ID, and findProfile answers with one of them:
+            // stopping after the first delete would let the next re-entry find another equally
+            // stale profile and install it. Each re-entry now retires one more, and the set still
+            // ends the recursion -- a delete the service reports but does not perform returns the
+            // same ID, which is already in the set, so the flow falls through and installs it
+            // rather than deleting forever.
+            showPageMessage("Reissuing " + profileTypeLabel(profileType)
+                    + ", which the App Group change invalidated...", false);
+            service.deleteProfile(existing.id(), r -> {
+                if (!r.ok) {
+                    showPageMessage(r.message, true);
+                    return;
+                }
+                // Re-enter: the profile is gone now, so the creation path below runs. Guarded by
+                // reissuedProfiles so a delete the service reports but does not perform cannot
+                // turn this into a loop.
+                refreshForAutoSetup(() ->
+                        autoSetupProfile(bundleIdentifier, appName, profileType, next));
+            });
+            return;
+        }
         if (existing != null) {
             installPair(compatible.get(0), existing, profileTypeLabel(profileType) + " signing assets installed",
                     next);

@@ -23,6 +23,7 @@
 package com.codename1.maven;
 
 import org.apache.maven.artifact.repository.metadata.Metadata;
+import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Reader;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
@@ -40,7 +41,9 @@ import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
 
 /**
  * A mojo that updates Codename One.
@@ -49,11 +52,17 @@ import java.net.URL;
 @Mojo(name = "update")
 public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
 
-    /** Where releases are published now. Asked first. */
+    /** Where releases are published. The only source for a project that declares it. */
     private static final String R2_METADATA_URL =
             "https://repo.codenameone.com/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml";
 
-    /** Where releases were published before the migration. Fallback only. */
+    /**
+     * Where releases were published before the migration. Its {@code <latest>} is frozen
+     * at the last pre-cutover release, so it is offered ONLY to a project whose pom does
+     * not declare the Codename One repository and therefore could not resolve anything
+     * newer anyway. It is never a fallback for a project that does declare it -- see
+     * findLatestVersion.
+     */
     private static final String MAVEN_CENTRAL_METADATA_URL =
             "https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml";
 
@@ -84,11 +93,43 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
         }
 
         if ("LATEST".equals(newVersion)) {
+            String resolved = null;
             try {
-                newVersion = findLatestVersion();
+                resolved = findLatestVersion();
             } catch (Exception ex) {
-                getLog().error("Failed to find latest version from Maven central", ex);
+                getLog().error("Failed to find the latest Codename One version", ex);
             }
+            // "LATEST" is a request, not a version. Leaving it in newVersion wrote the
+            // literal string into cn1.version and cn1.plugin.version below, so a failure
+            // to look the version up corrupted the pom it was asked to update -- into
+            // one that resolves nothing. Returning is also better than falling through
+            // to the else branch, which would report "already up to date".
+            if (resolved == null || resolved.trim().isEmpty() || "LATEST".equals(resolved)) {
+                getLog().error("Could not determine the latest Codename One version. "
+                        + "Leaving cn1.version and cn1.plugin.version unchanged; pass "
+                        + "-DnewVersion=<version> to set one explicitly.");
+                return;
+            }
+            // Belt and braces over the removed Central fallback: a stale or
+            // misconfigured -Dcn1.metadataUrl mirror could still answer with an older
+            // release, and nothing downstream compares versions for order.
+            //
+            // This guards every path that reaches here, not just the automatic one.
+            // "LATEST" is a symbolic request in both cases -- it means "whatever is
+            // newest", so resolving it to something older is self-contradictory no
+            // matter who asked. A concrete -DnewVersion=7.0.x never reaches this block
+            // and is left alone, because naming a version IS a request for it,
+            // downgrade included.
+            if (wouldDowngrade(resolved, existingCn1Version)
+                    || wouldDowngrade(resolved, existingCn1PluginVersion)) {
+                getLog().warn("The newest version offered (" + resolved + ") is older than "
+                        + "this project's (cn1.version=" + existingCn1Version
+                        + ", cn1.plugin.version=" + existingCn1PluginVersion
+                        + "), so it is not an update. Leaving both unchanged; pass "
+                        + "-DnewVersion=" + resolved + " if a downgrade is intended.");
+                return;
+            }
+            newVersion = resolved;
         }
 
 
@@ -220,20 +261,34 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
                     + "releases.");
             return readLatestVersion(MAVEN_CENTRAL_METADATA_URL);
         }
-        IOException primaryFailure;
-        try {
-            return readLatestVersion(metadataUrl);
-        } catch (IOException ex) {
-            primaryFailure = ex;
-            getLog().debug("Could not read " + metadataUrl + ", falling back to Maven Central", ex);
+        // Deliberately NO fallback to Maven Central here. Central no longer receives
+        // releases, so its <latest> is frozen at the last version published before the
+        // cutover and can never be newer than this repository's. Falling back to it
+        // during an outage of this repository would hand back that frozen version, and
+        // the caller compares versions only for inequality -- so cn1:update would
+        // silently DOWNGRADE a post-cutover project to the last Central release. That
+        // fallback was harmless only while both repositories carried the same releases.
+        //
+        // Failing is the honest outcome: the caller leaves the pom untouched and says
+        // it could not determine the latest version.
+        return readLatestVersion(metadataUrl);
+    }
+
+    /**
+     * @return true if moving to {@code candidate} would take a project currently on
+     * {@code current} backwards.
+     *
+     * A -SNAPSHOT current version is never treated as downgraded by a release. Moving
+     * off a development build onto a published one is an ordinary thing to ask for, and
+     * ComparableVersion ranks 8.0-SNAPSHOT above 7.0.267 purely on the numbering -- so
+     * without this a contributor running -DnewVersion=LATEST on a snapshot project
+     * would be refused the very thing the command means.
+     */
+    private static boolean wouldDowngrade(String candidate, String current) {
+        if (current == null || current.trim().isEmpty() || current.endsWith("-SNAPSHOT")) {
+            return false;
         }
-        try {
-            return readLatestVersion(MAVEN_CENTRAL_METADATA_URL);
-        } catch (IOException fallbackFailure) {
-            // Report the primary failure: it is the one that matters, and the fallback
-            // failing too usually just means the machine is offline.
-            throw primaryFailure;
-        }
+        return new ComparableVersion(candidate).compareTo(new ComparableVersion(current)) < 0;
     }
 
     /** Host of a metadata URL, for both the containment test and the message. */
@@ -279,15 +334,45 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
         return false;
     }
 
+    /**
+     * Identifies this plugin to the repository. NOT cosmetic: the Codename One
+     * repository is behind Cloudflare, whose Browser Integrity Check rejects the
+     * JDK's default "Java/1.8.0_x" agent with a 403 (error 1010). It accepts
+     * "Java/11" and later, so a bare openStream() works on a modern JDK and fails
+     * on JDK 8 -- and the failure is silent, because findLatestVersion falls back
+     * to Maven Central, which no longer receives new releases. A JDK 8 user would
+     * be told the last version published before the cutover is the latest one,
+     * indefinitely. ToolingHelpClient hit the same trap against a different
+     * Cloudflare-fronted endpoint.
+     */
+    private static final String USER_AGENT = "codenameone-maven-plugin";
+
     private String readLatestVersion(String url) throws IOException, XmlPullParserException {
         MetadataXpp3Reader reader = new MetadataXpp3Reader();
-        try (Reader input = new InputStreamReader(new URL(url).openStream(), "UTF-8")) {
+        // URLConnection, not HttpURLConnection. cn1.metadataUrl is a user-settable
+        // parameter, so it can legitimately be a file: URL pointing at an offline
+        // mirror; casting would throw ClassCastException, which is not an IOException
+        // and so escapes every IOException handler between here and executeImpl.
+        // setRequestProperty and the timeouts are declared on URLConnection, so the
+        // cast bought nothing here in the first place.
+        URLConnection connection = new URL(url).openConnection();
+        connection.setRequestProperty("User-Agent", USER_AGENT);
+        connection.setConnectTimeout(20000);
+        connection.setReadTimeout(20000);
+        // Follows redirects by default, which the repository's custom domain uses.
+        try (Reader input = new InputStreamReader(connection.getInputStream(), "UTF-8")) {
             Metadata metadata = reader.read(input, false);
             String latest = metadata.getVersioning().getLatest();
             if (latest == null || latest.trim().isEmpty()) {
                 throw new IOException("No <latest> version in " + url);
             }
             return latest;
+        } finally {
+            // Only HTTP connections have one, and only when the connection was
+            // actually made -- a file: URL has nothing to release.
+            if (connection instanceof HttpURLConnection) {
+                ((HttpURLConnection) connection).disconnect();
+            }
         }
     }
     

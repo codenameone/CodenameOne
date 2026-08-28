@@ -1,0 +1,164 @@
+== Document Provider
+
+An app's documents normally live inside it. The user opens your app to reach them, and no other app can. A document provider changes that: the content you publish appears as a location in the system file browser - the Files app on iOS, the storage picker on Android. It can be browsed, previewed and opened by other apps without your app being launched at all.
+
+Codename One generates the platform plumbing for you from build hints. There is no native code in your project on any platform.
+
+=== When you need this
+
+If all you want is for the files your app already writes to be visible in the Files app under the device's own heading, you need no extension and none of this chapter. Two plist keys do it:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/document-provider.properties[tag=document-provider-properties-004,indent=0]
+----
+
+That exposes your app's own documents directory as-is. Use the document provider when you want something the directory listing can't give you: a tree that doesn't match your storage layout, content fetched from a server on demand, names and types that differ from the file names, or a location that appears even when the device holds none of the content yet.
+
+=== How it works
+
+On iOS the file browser doesn't talk to your app. It talks to an *app extension* - a separate process the system starts on demand, which runs while your app is dead and can't call your Java code. That single fact shapes the whole API.
+
+You don't answer questions from the browser; you *publish*: a tree of `DocumentNode` objects is serialized into a container both processes can read, and the generated extension serves the browser from it. Publish whenever your data changes - after a sync, after a login - not in response to being browsed, because you won't be asked.
+
+Android has no such split; the provider runs inside your app. The API is the same there anyway, so one publishing discipline works everywhere.
+
+=== Publishing a tree
+
+Build a tree and publish it. Each file node names its content in one of two ways.
+
+*From the shared directory.* Write the bytes under `getSharedDirectory()` and give the node a relative `path`. Nothing else is involved - no server, no network code - and the content opens instantly because it's already on the device.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/documents/DocumentProviderSnippets.java[tag=publishLocal,indent=0]
+----
+
+[NOTE]
+====
+On iOS the shared directory is inside the App Group container, not your app's own sandbox. A file written to `FileSystemStorage`'s home directory is *not* visible to the extension. Always resolve paths against `getSharedDirectory()`.
+====
+
+[WARNING]
+====
+Update published content by writing a new file and republishing the tree against it, never by rewriting a file already in the published tree. Another app can be reading a published file at any moment, and rewriting one in place refills the same file underneath that reader, which sees the two versions spliced together. Publish the replacement under a new name and call `publish` again: the readers already open finish the old file, and the ones that come after open the new one.
+====
+
+*From your server.* Give the node a `remoteId` and tell the extension where to fetch it. The index can then list far more than the device holds, which is what a cloud drive wants.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/documents/DocumentProviderSnippets.java[tag=publishRemote,indent=0]
+----
+
+A node may carry both. The local copy always wins, which is how a cached document opens without a round trip.
+
+The location is read-only. Your app is the only writer, so the browser offers no editing, renaming or deleting and never presents a save that would fail. To change what people see, publish again.
+
+Folders nest as you would expect:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/documents/DocumentProviderSnippets.java[tag=nestFolders,indent=0]
+----
+
+[IMPORTANT]
+====
+Node ids must be stable for the lifetime of the item. The platform remembers them (a favourite in the Files app, a recent document, a running download), so reusing an id for different content, or renumbering ids on every publish, makes the browser point at the wrong thing. Derive the id from your own record key, never from list order.
+====
+
+Call `clear()` on logout. The published content outlives your process, so documents left behind stay browsable by whoever holds the device:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/documents/DocumentProviderSnippets.java[tag=clear,indent=0]
+----
+
+`isSupported()` tells you whether this platform can show the location, which is worth checking before offering a setting for it. Everything else is a safe no-op where the feature is unavailable, so no other platform guards are needed:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/documents/DocumentProviderSnippets.java[tag=isSupported,indent=0]
+----
+
+=== Build hints
+
+Referencing `com.codename1.documents` is enough to generate the extension. These hints configure it:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/document-provider.properties[tag=document-provider-properties-001,indent=0]
+----
+
+`ios.documentProvider.enabled` is redundant for the build itself - the build detects the reference - but the Certificate Wizard and the signing preflight can't read your bytecode, so setting the hint tells them to create and check the extension's signing assets. The wizard sets it for you.
+
+The App Group defaults to `group.<your package>`. It must start with `group.`, which Apple requires, and it's the entire transport between your app and the extension: without it the location appears empty.
+
+Optional:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/document-provider.properties[tag=document-provider-properties-002,indent=0]
+----
+
+`displayName` names the location in the browser and defaults to your app's display name. `deploymentTarget` defaults to 16.0. Below 16.0 Codename One generates the older `NSFileProviderExtension` instead, which Apple has deprecated; the two claim the same extension point, so a build gets one or the other and never both. Your app's own deployment target is unaffected either way - the extension simply never runs on older systems.
+
+Set `ios.documentProvider.extension=false` to skip the whole iOS lowering and leave the API an inert no-op. Xcode build settings for the extension target can be overridden with `ios.documentProvider.buildSettings.SETTING=value`.
+
+Android needs no configuration. The provider is declared in the manifest with the authority `<your package>.documents` when the app references the API.
+
+=== The remote endpoint
+
+When a node with a `remoteId` is opened and no local copy exists, the reader issues:
+
+....
+GET <endpoint>/fetch?id=<remoteId>
+Authorization: Bearer <token>
+....
+
+The reader expects the file's bytes with status 200. Anything else is reported to the user as a failure to open the document. The token is the one you passed to `setRemoteEndpoint`.
+
+The request is made by the extension, not by your app, so it must succeed without any state your app holds in memory - the token is all it carries. Publish a fresh token whenever you renew one; the reader picks up the latest value each time it runs.
+
+This is what the published index looks like on disk, which is worth knowing when you are working out why a location looks wrong:
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/document-provider.json[tag=document-provider-json-001,indent=0]
+----
+
+=== Signing
+
+Apple signs an app extension against its *own* App ID. Your app's profile covers your app's bundle id and nothing beneath it, so the generated `CN1Documents` target needs an App ID of its own - `<your package>.CN1Documents` - with the same App Group, and its own provisioning profile.
+
+The <<certificate-wizard,Certificate Wizard>> does every step: it creates the App Group, enables it on both App IDs, creates the extension's App ID, generates an App Store profile and a development profile for it, downloads them and writes them into your project settings. That's the recommended route.
+
+To do it by hand, create the App ID and profiles in the Apple Developer portal and name them:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/document-provider.properties[tag=document-provider-properties-003,indent=0]
+----
+
+The unqualified `codename1.ios.appext.CN1Documents.provision` is the fallback for both build types. You can also host the profile and name the URL in `ios.appext.CN1Documents.provisioningURL`.
+
+Supply nothing and Xcode fails minutes into a cloud build with:
+
+....
+Provisioning profile "MyApp_Distribution" has app ID "com.example.myapp", which doesn't
+match the bundle ID "com.example.myapp.CN1Documents"
+....
+
+Codename One refuses that build before sending it, naming the extension and the bundle id its App ID has to match.
+
+A wildcard App ID (`com.example.*`) isn't a way around this, unlike for other extensions. It covers the bundle id, and it still can't sign this extension: the extension declares the App Group it shares with the app, and Apple doesn't offer the App Groups capability on a wildcard App ID at all. Signing fails on the entitlement rather than on the name, so the build is refused here too. The app's own profile has the same problem, because it carries the same group. Both need explicit App IDs - which is what the Certificate Wizard creates.
+
+A Mac build embeds no extension and needs no signing assets for one: Apple's FileProvider framework is unavailable to Mac Catalyst apps, so the Mac slice of an iOS project can't host a provider however it's entitled. `isSupported()` answers `false` there and every publish call is a no-op, so the same code runs unchanged.
+
+A local "ios-source" build needs none of this either: you sign the generated Xcode project in Xcode as usual.
+
+=== Testing
+
+`isSupported()` answers `false` in the simulator, and every publish call is a safe no-op there, so your code needs no guards beyond the one shown above. The simulator still writes everything a device would, under `cn1documents` in the app's home directory, so you can read back exactly what a device would have been handed.
+
+On a device, publish a tree and open the Files app: the location appears under "Browse" alongside iCloud Drive. On Android it appears in the storage picker. A local "ios-source" build produces the `CN1Documents` target in the generated Xcode project, so you can confirm the extension compiles and is embedded before signing anything.

@@ -1,14 +1,14 @@
 # Building Against a Codename One SNAPSHOT From Git
 
-**This is an edge case.** Most projects should consume Codename One from Maven Central — pinned to a released version, no compilation of the framework itself, no surprises. Reach for the snapshot workflow only when you need to test an in-flight CN1 fix, reproduce a bug against the latest code, or contribute a patch.
+**This is an edge case.** Most projects should consume Codename One from the Codename One Maven repository (`https://repo.codenameone.com/maven2`, which generated projects already declare) — pinned to a released version, no compilation of the framework itself, no surprises. Reach for the snapshot workflow only when you need to test an in-flight CN1 fix, reproduce a bug against the latest code, or contribute a patch.
 
 ## When to use a SNAPSHOT
 
 - You are reproducing a bug against the latest CN1 framework commit to confirm it still happens before reporting it.
 - You are patching CN1 itself and want to validate the patch in this project before opening a PR upstream.
-- The fix you need landed in the CN1 repo but hasn't shipped to Maven Central yet.
+- The fix you need landed in the CN1 repo but hasn't shipped in a release yet.
 
-For day-to-day app development against a stable release, **don't do this** — pin to the latest Central release in `pom.xml` and rely on the normal Maven resolution path. SNAPSHOTs change without warning and can break the build.
+For day-to-day app development against a stable release, **don't do this** — pin to the latest release in `pom.xml` and rely on the normal Maven resolution path. SNAPSHOTs change without warning and can break the build.
 
 ## The workflow
 
@@ -81,7 +81,7 @@ mvn -pl common cn1:run        # picks up the freshly-installed SNAPSHOT
 
 `-pl <module>` targets just the module you changed, instead of rebuilding the whole framework each iteration.
 
-## Reverting to a Maven Central release
+## Reverting to a published release
 
 When you're done, set the versions back to whatever release you want to pin. Drop the `-SNAPSHOT`:
 

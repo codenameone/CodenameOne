@@ -6,7 +6,7 @@ This document tells you (1) how to discover what *is* supported, and (2) where t
 
 ## How to discover the supported API
 
-The supported API surface is defined by two artifacts that the Codename One Maven plugin resolves from Maven Central. The `bytecode-compliance` goal compares your compiled bytecode against both jars and fails on anything not present.
+The supported API surface is defined by two artifacts that the Codename One Maven plugin resolves from the Codename One Maven repository. The `bytecode-compliance` goal compares your compiled bytecode against both jars and fails on anything not present.
 
 | Artifact | What's inside |
 | --- | --- |

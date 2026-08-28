@@ -659,6 +659,54 @@ final class BuildHintsIos {
                 .type(HintType.STRING)
                 .platform("ios"));
 
+        h.add(new Hint("ios.documentProvider.enabled")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("ios")
+                .doc("Declares that this project publishes documents to the system file browser. "
+                        + "The build detects a reference to com.codename1.documents on its own, so "
+                        + "this is redundant for the build itself; it exists because the "
+                        + "Certificate Wizard and the signing preflight work without reading "
+                        + "bytecode and need to know that the CN1Documents extension will be "
+                        + "generated."));
+
+        h.add(new Hint("ios.documentProvider.appGroup")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("App Group id starting with 'group.' shared by the app and the generated "
+                        + "CN1Documents extension, defaulting to 'group.' followed by the app's "
+                        + "package name. This id carries everything the two processes share: "
+                        + "the app publishes its index into the group and the extension reads it "
+                        + "from there, so without it the published location appears empty."));
+
+        h.add(new Hint("ios.documentProvider.displayName")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("Name shown for this location in the file browser. Defaults to the app's "
+                        + "display name."));
+
+        h.add(new Hint("ios.documentProvider.deploymentTarget")
+                .group(HintGroup.IOS)
+                .type(HintType.VERSION)
+                .def("16.0")
+                .platform("ios")
+                .doc("Minimum OS version the generated extension runs on. At or above 16.0 the "
+                        + "extension is an NSFileProviderReplicatedExtension; below it Codename "
+                        + "One generates the deprecated NSFileProviderExtension instead. The host "
+                        + "app's own deployment target is unaffected."));
+
+        h.add(new Hint("ios.documentProvider.extension")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("ios")
+                .doc("Set false to skip the iOS lowering entirely -- no extension target, no app "
+                        + "group, no plist keys -- leaving com.codename1.documents an inert no-op "
+                        + "at runtime."));
+
         h.add(new Hint("ios.superfastBuild")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)

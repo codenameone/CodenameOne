@@ -6307,6 +6307,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return surfaceBridge;
     }
 
+    private com.codename1.documents.spi.DocumentProviderBridge documentProviderBridge;
+
+    @Override
+    public com.codename1.documents.spi.DocumentProviderBridge getDocumentProviderBridge() {
+        if (documentProviderBridge == null) {
+            documentProviderBridge =
+                    new com.codename1.impl.android.documents.AndroidDocumentProviderBridge();
+        }
+        return documentProviderBridge;
+    }
+
     private com.codename1.intents.spi.IntentBridge intentBridge;
 
     @Override

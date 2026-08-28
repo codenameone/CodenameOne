@@ -750,12 +750,13 @@
                 <module>errorprone-checks</module>
             </modules>
         </profile>
-        <!-- The Game Builder editor is published to Maven Central by the release
-             workflow as a separate Java-17 pass over scripts/gamebuilder (its
-             gamebuilder-central profile), not from this reactor: it is a CN1 app
-             that depends on the core/javase/plugin built here and compiles at
-             Java 17, while this reactor builds at Java 8. See
-             .github/workflows/release-on-maven-central.yml and
-             scripts/gamebuilder/pom.xml. -->
+        <!-- The Game Builder editor is published by the release workflow as a
+             separate Java-17 pass over scripts/gamebuilder (its gamebuilder-central
+             profile), not from this reactor: it is a CN1 app that depends on the
+             core/javase/plugin built here and compiles at Java 17, while this
+             reactor builds at Java 8. The profile keeps its "-central" name because
+             it configures central-publishing-maven-plugin, which is what stages the
+             signed tree; releases go to the Codename One R2 repository, not Central.
+             See .github/workflows/release.yml and scripts/gamebuilder/pom.xml. -->
     </profiles>
 </project>
