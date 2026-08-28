@@ -35,6 +35,7 @@ import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -401,5 +402,39 @@ class ExecutorArchiveExtractionTest {
         }
         zos.close();
         return raw.toByteArray();
+    }
+
+    /// The database scan reads class entries straight into memory for ASM, and
+    /// used to do it with an unbounded buffer -- so one crafted entry could
+    /// expand until the build JVM died. This is that entry: a highly compressible
+    /// run of zeroes far past the per-entry ceiling.
+    @Test
+    void databaseScanRefusesAnOversizedClassEntry() throws Exception {
+        Executor.PermScanBudget budget = new Executor.PermScanBudget();
+        byte[] bomb = new byte[17 * 1024 * 1024];
+        IOException e = assertThrows(IOException.class, () ->
+                budget.readEntry(new ByteArrayInputStream(bomb), "Bomb.class", -1));
+        assertTrue(e.getMessage().contains("refusing to keep reading"), e.getMessage());
+    }
+
+    /// A declared size past the ceiling is refused before a byte is read: the
+    /// size is a hint out of the same untrusted file, so it can only ever be a
+    /// reason to stop early, never the bound itself.
+    @Test
+    void databaseScanRefusesAnEntryThatDeclaresTooMuch() throws Exception {
+        Executor.PermScanBudget budget = new Executor.PermScanBudget();
+        IOException e = assertThrows(IOException.class, () ->
+                budget.readEntry(new ByteArrayInputStream(new byte[1]), "Liar.class",
+                        64L * 1024 * 1024));
+        assertTrue(e.getMessage().contains("refusing to read it"), e.getMessage());
+    }
+
+    /// And an ordinary class still comes back whole.
+    @Test
+    void databaseScanReadsAnOrdinaryEntry() throws Exception {
+        Executor.PermScanBudget budget = new Executor.PermScanBudget();
+        byte[] cls = "not really bytecode".getBytes(StandardCharsets.UTF_8);
+        assertArrayEquals(cls,
+                budget.readEntry(new ByteArrayInputStream(cls), "Fine.class", cls.length));
     }
 }

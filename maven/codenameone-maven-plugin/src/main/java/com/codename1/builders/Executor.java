@@ -836,12 +836,15 @@ public abstract class Executor {
     protected DatabaseUsage scanForDatabaseUsage(File classesDir) throws IOException {
         boolean[] found = {false, false};
         if (classesDir != null && classesDir.isDirectory()) {
-            scanForDatabaseUsage(classesDir, "", found);
+            // One budget for the whole scan, so a hundred small archives cannot
+            // add up to what one big one is refused for.
+            scanForDatabaseUsage(classesDir, "", found, new PermScanBudget());
         }
         return new DatabaseUsage(found[0], found[1]);
     }
 
-    private void scanForDatabaseUsage(File dir, String relativePath, boolean[] found)
+    private void scanForDatabaseUsage(File dir, String relativePath, boolean[] found,
+            PermScanBudget budget)
             throws IOException {
         File[] children = dir.listFiles();
         if (children == null) {
@@ -855,18 +858,18 @@ public abstract class Executor {
             String childPath = relativePath.length() == 0
                     ? child.getName() : relativePath + "/" + child.getName();
             if (child.isDirectory()) {
-                scanForDatabaseUsage(child, childPath, found);
+                scanForDatabaseUsage(child, childPath, found, budget);
             } else if (child.getName().endsWith(".aar")) {
                 // An Android archive carries its bytecode in a nested classes.jar, and the
                 // generated gradle links it like any other dependency, so encryption configured
                 // inside one has to count exactly as a plain jar's does.
-                scanArchiveForDatabaseUsage(child, found);
+                scanArchiveForDatabaseUsage(child, found, budget);
             } else if (child.getName().endsWith(".jar")) {
                 // A library can be the only thing that touches the database: the application calls
                 // the library, and Android stages the jar into libs and links it through the
                 // generated fileTree. Reading loose class files alone reported no database use and
                 // dropped the engine out from under code that runs it.
-                scanArchiveForDatabaseUsage(child, found);
+                scanArchiveForDatabaseUsage(child, found, budget);
             } else if (child.getName().endsWith(".class")
                     && !isFrameworkDatabaseClass(childPath)) {
                 inspectClassForDatabaseUsage(readAllBytes(child), found);
@@ -875,7 +878,8 @@ public abstract class Executor {
     }
 
     /// Reads the class entries of a library archive, which carry the same weight as loose ones.
-    private void scanArchiveForDatabaseUsage(File archive, boolean[] found) {
+    private void scanArchiveForDatabaseUsage(File archive, boolean[] found,
+            PermScanBudget budget) {
         java.util.zip.ZipFile zip = null;
         try {
             zip = new java.util.zip.ZipFile(archive);
@@ -900,7 +904,7 @@ public abstract class Executor {
                     try {
                         java.io.InputStream nested = zip.getInputStream(entry);
                         try {
-                            scanNestedArchiveForDatabaseUsage(nested, found);
+                            scanNestedArchiveForDatabaseUsage(nested, found, budget);
                         } finally {
                             nested.close();
                         }
@@ -919,7 +923,9 @@ public abstract class Executor {
                 try {
                     java.io.InputStream in = zip.getInputStream(entry);
                     try {
-                        inspectClassForDatabaseUsage(readAllBytes(in), found);
+                        budget.entry(name);
+                        inspectClassForDatabaseUsage(
+                                budget.readEntry(in, name, entry.getSize()), found);
                     } finally {
                         in.close();
                     }
@@ -945,15 +951,16 @@ public abstract class Executor {
     }
 
     /// Reads the class entries of an archive inside an archive, which is where an AAR keeps them.
-    private void scanNestedArchiveForDatabaseUsage(java.io.InputStream nested, boolean[] found)
-            throws IOException {
+    private void scanNestedArchiveForDatabaseUsage(java.io.InputStream nested, boolean[] found,
+            PermScanBudget budget) throws IOException {
         java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(nested);
         java.util.zip.ZipEntry entry = in.getNextEntry();
         while (entry != null && !(found[0] && found[1])) {
             String name = entry.getName();
             if (!entry.isDirectory() && name.endsWith(".class")
                     && !isFrameworkDatabaseClass(name)) {
-                inspectClassForDatabaseUsage(readAllBytes(in), found);
+                budget.entry(name);
+                inspectClassForDatabaseUsage(budget.readEntry(in, name, entry.getSize()), found);
             }
             entry = in.getNextEntry();
         }
@@ -1391,6 +1398,45 @@ public abstract class Executor {
          */
         void drain(InputStream in, String name, long declared) throws IOException {
             copy(in, null, name, declared);
+        }
+
+        /**
+         * Reads one entry into memory under the same budget as {@link #copy}.
+         *
+         * <p>For a scan that hands the bytes straight to ASM rather than to a
+         * file. The database scan used to do this with an unbounded
+         * ByteArrayOutputStream, so one crafted entry in a submitted jar could
+         * expand until the build JVM died -- on a shared build host, taking
+         * whatever else was running with it. The bytes are charged as they
+         * arrive, which is the only check a compression bomb cannot lie its way
+         * past, and the declared size is a hint used to refuse early rather than
+         * a bound.</p>
+         */
+        byte[] readEntry(InputStream in, String name, long declared) throws IOException {
+            if (declared > PERM_SCAN_MAX_ENTRY_BYTES) {
+                throw new IOException("entry " + name + " declares " + declared
+                        + " bytes; refusing to read it");
+            }
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(
+                    declared > 0 && declared < 65536 ? (int) declared : 8192);
+            byte[] buf = new byte[8192];
+            int n;
+            long entryBytes = 0;
+            while ((n = in.read(buf)) != -1) {
+                entryBytes += n;
+                total += n;
+                if (entryBytes > PERM_SCAN_MAX_ENTRY_BYTES) {
+                    throw new IOException("class entry " + name + " expands past "
+                            + PERM_SCAN_MAX_ENTRY_BYTES + " bytes; refusing to keep reading");
+                }
+                if (total > PERM_SCAN_MAX_TOTAL_BYTES) {
+                    throw new IOException("class entries expand beyond the "
+                            + PERM_SCAN_MAX_TOTAL_BYTES
+                            + " byte scan budget; refusing to keep reading");
+                }
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
         }
 
         void copy(InputStream in, File out, String name, long declared) throws IOException {
