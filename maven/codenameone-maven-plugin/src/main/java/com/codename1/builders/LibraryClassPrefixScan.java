@@ -421,6 +421,27 @@ final class LibraryClassPrefixScan {
                 }
                 continue;
             }
+            // ANNOTATIONS carry type references too, and only as pool
+            // indices: "@Handler(com.codename1.call.session.Call.class)"
+            // puts the descriptor in a class_info_index that nothing else
+            // points at, so a library whose only mention of a package is an
+            // annotation -- and which finds the annotated type reflectively
+            // at runtime -- was invisible. Parsing succeeded, so the raw
+            // text fallback never ran either.
+            //
+            // Read into memory rather than streamed, because the grammar
+            // needs to look ahead and a malformed one must cost this
+            // attribute rather than the class. Only these attributes; a Code
+            // attribute is skipped as before.
+            if (name > 0 && name < count && isAnnotationAttribute(utf8[name])
+                    && length < 1 << 20) {
+                byte[] body = new byte[(int) length];
+                in.readFully(body);
+                collectAnnotationTypes(body, utf8, count, out,
+                        utf8[name].endsWith("ParameterAnnotations"),
+                        "AnnotationDefault".equals(utf8[name]));
+                continue;
+            }
             while (length > 0) {
                 long skipped = in.skip(length);
                 if (skipped <= 0) {
@@ -433,6 +454,109 @@ final class LibraryClassPrefixScan {
                 length -= skipped;
             }
         }
+    }
+
+    /// Whether an attribute name is one whose body is annotation data this
+    /// can read.
+    ///
+    /// Deliberately NOT the type-annotation attributes: their target_info
+    /// varies by target kind, and misreading it would desynchronise the
+    /// walk. They are skipped whole, as anything else unknown is.
+    private static boolean isAnnotationAttribute(String name) {
+        return "RuntimeVisibleAnnotations".equals(name)
+                || "RuntimeInvisibleAnnotations".equals(name)
+                || "RuntimeVisibleParameterAnnotations".equals(name)
+                || "RuntimeInvisibleParameterAnnotations".equals(name)
+                || "AnnotationDefault".equals(name);
+    }
+
+    /// Collects every annotation type and class literal in an annotation
+    /// attribute body.
+    ///
+    /// A malformed body costs this attribute and nothing else: the walk has
+    /// already read past it, so a bad parse here cannot desynchronise the
+    /// rest of the class.
+    private static void collectAnnotationTypes(byte[] body, String[] utf8,
+            int count, Set<String> out, boolean parameters,
+            boolean defaultValue) {
+        try {
+            int[] at = new int[]{0};
+            if (defaultValue) {
+                readElementValue(body, at, utf8, count, out);
+                return;
+            }
+            int groups = 1;
+            if (parameters) {
+                groups = body[at[0]++] & 0xff;
+            }
+            for (int g = 0; g < groups; g++) {
+                int annotations = u2(body, at);
+                for (int a = 0; a < annotations; a++) {
+                    readAnnotation(body, at, utf8, count, out);
+                }
+            }
+        } catch (RuntimeException malformed) { //NOPMD EmptyCatchBlock
+            // Not this class's problem to report; the rest of the walk is
+            // unaffected because the body was consumed by length.
+        }
+    }
+
+    /// One `annotation` structure: its type, then its element pairs.
+    private static void readAnnotation(byte[] body, int[] at, String[] utf8,
+            int count, Set<String> out) {
+        collect(u2(body, at), utf8, count, out);
+        int pairs = u2(body, at);
+        for (int i = 0; i < pairs; i++) {
+            u2(body, at);
+            readElementValue(body, at, utf8, count, out);
+        }
+    }
+
+    /// One `element_value`, which is where a class literal lives.
+    private static void readElementValue(byte[] body, int[] at, String[] utf8,
+            int count, Set<String> out) {
+        int tag = body[at[0]++] & 0xff;
+        switch (tag) {
+            case 'e':
+                collect(u2(body, at), utf8, count, out);
+                u2(body, at);
+                break;
+            case 'c':
+                // The class literal itself.
+                collect(u2(body, at), utf8, count, out);
+                break;
+            case '@':
+                readAnnotation(body, at, utf8, count, out);
+                break;
+            case '[': {
+                int values = u2(body, at);
+                for (int i = 0; i < values; i++) {
+                    readElementValue(body, at, utf8, count, out);
+                }
+                break;
+            }
+            default:
+                // Every constant kind, including 's': a String element is a
+                // literal, and the constant it names is not collected for
+                // the same reason a CONSTANT_String is not.
+                u2(body, at);
+                break;
+        }
+    }
+
+    /// Adds the Utf8 at `index`, when there is one.
+    private static void collect(int index, String[] utf8, int count,
+            Set<String> out) {
+        if (index > 0 && index < count && utf8[index] != null) {
+            out.add(utf8[index]);
+        }
+    }
+
+    /// The next big-endian u2, advancing the cursor.
+    private static int u2(byte[] body, int[] at) {
+        int v = ((body[at[0]] & 0xff) << 8) | (body[at[0] + 1] & 0xff);
+        at[0] += 2;
+        return v;
     }
 
     /// Whether this entry IS one of the classes being looked for, rather

@@ -105,8 +105,31 @@ public final class TunnelHost {
     public void pump() {
         PacketBuffer[] buffers = transport.buffers();
         int n = transport.read(buffers);
-        for (int i = 0; i < n; i++) {
-            tunnel.deliver(buffers[i]);
+        deliver(buffers, n);
+    }
+
+    /// Hands a batch to the tunnel, unless the tunnel has stopped.
+    ///
+    /// Under the lifecycle lock, so onPacket cannot BEGIN after onStop. The
+    /// read that produced this batch is deliberately outside it -- a
+    /// blocking transport parks there and closing it is what ends the park
+    /// -- so a stop can land between the read and the delivery. Unordered,
+    /// the application was handed packets after being told the tunnel was
+    /// over, for signalling and media it had already released.
+    ///
+    /// A stop from another thread therefore waits for the batch in flight,
+    /// which is the same trade the start sequence makes: ordering the two is
+    /// the point.
+    private void deliver(PacketBuffer[] buffers, int n) {
+        synchronized (lifecycle) {
+            synchronized (this) {
+                if (stopped) {
+                    return;
+                }
+            }
+            for (int i = 0; i < n; i++) {
+                tunnel.deliver(buffers[i]);
+            }
         }
     }
 
@@ -156,9 +179,7 @@ public final class TunnelHost {
                 // the difference is known.
                 return;
             }
-            for (int i = 0; i < n; i++) {
-                tunnel.deliver(buffers[i]);
-            }
+            deliver(buffers, n);
         }
     }
 }

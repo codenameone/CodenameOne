@@ -239,6 +239,56 @@ class LibraryClassPrefixScanReferencesTest {
     }
 
     @Test
+    void anAnnotationClassLiteralCounts() throws Exception {
+        // "@Handler(com.codename1.call.session.Call.class)" puts the
+        // descriptor in a class_info_index inside RuntimeVisibleAnnotations
+        // and nothing else points at it, so a library that finds the
+        // annotated type reflectively was invisible -- and parsing SUCCEEDED,
+        // so the raw text fallback never ran either.
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        DataOutputStream d = new DataOutputStream(out);
+        d.writeInt(0xCAFEBABE);
+        d.writeShort(0);
+        d.writeShort(52);
+        d.writeShort(5);
+        d.writeByte(1);
+        d.writeUTF("RuntimeVisibleAnnotations");   // #1 attribute name
+        d.writeByte(1);
+        d.writeUTF("Lcom/example/Handler;");       // #2 annotation type
+        d.writeByte(1);
+        d.writeUTF("value");                       // #3 element name
+        d.writeByte(1);
+        d.writeUTF("L" + USED + ";");              // #4 the class literal
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);          // interfaces
+        d.writeShort(0);          // fields
+        d.writeShort(0);          // methods
+        d.writeShort(1);          // one class attribute
+        d.writeShort(1);
+        d.writeInt(2 + 2 + 2 + 2 + 1 + 2);
+        d.writeShort(1);          // one annotation
+        d.writeShort(2);          //   type #2
+        d.writeShort(1);          //   one pair
+        d.writeShort(3);          //     name #3
+        d.writeByte('c');         //     a class literal
+        d.writeShort(4);          //     #4
+        d.writeShort(0);
+        d.flush();
+        Set<String> refs =
+                LibraryClassPrefixScan.classReferences(out.toByteArray());
+        boolean sawIt = false;
+        for (String r : refs) {
+            if (r.indexOf(USED) >= 0) {
+                sawIt = true;
+            }
+        }
+        assertTrue(sawIt, "an annotation class literal is a reference: "
+                + refs);
+    }
+
+    @Test
     void somethingThatIsNotAClassFileIsNotParsed() {
         // Null, not empty: the caller falls back to the raw scan rather than
         // reading "no references" as "does not use anything", which would
