@@ -213,11 +213,25 @@ public class AndroidVpnBridge implements VpnBridge {
         return declaresTunnelService();
     }
 
-    /// Whether the manifest declares the tunnel service.
+    /// Whether the manifest declares the tunnel service in a form Android
+    /// will bind.
     ///
-    /// A VpnService that is not declared, or is declared without
-    /// BIND_VPN_SERVICE, is one Android silently refuses to bind.
+    /// The NAME is not the test, which is what this used to do while its own
+    /// comment said otherwise. Android binds a VpnService only when the
+    /// declaration also carries `android:permission="BIND_VPN_SERVICE"` --
+    /// the service requiring that its binder be the system -- and it finds
+    /// it by the `android.net.VpnService` action. A declaration missing
+    /// either is refused at bind time, so establish() answers null on a
+    /// build that otherwise looks complete, and saying the capability is
+    /// there sends an app down exactly that path.
+    ///
+    /// The builder refuses to emit one, and refuses to stand aside for a
+    /// project-supplied declaration that lacks either -- see
+    /// VpnManifestFragments. This is the same question asked of the manifest
+    /// that actually shipped, which is the one that can have come from a
+    /// merge, an older build, or a cn1lib.
     private boolean declaresTunnelService() {
+        String name = CN1VpnService.class.getName();
         try {
             android.content.pm.PackageManager pm = context.getPackageManager();
             android.content.pm.ServiceInfo[] services = pm.getPackageInfo(
@@ -226,20 +240,55 @@ public class AndroidVpnBridge implements VpnBridge {
             if (services == null) {
                 return false;
             }
-            String name = CN1VpnService.class.getName();
-            for (int i = 0; i < services.length; i++) {
-                if (name.equals(services[i].name)) {
-                    return true;
-                }
+            boolean permitted = false;
+            for (int i = 0; i < services.length && !permitted; i++) {
+                permitted = name.equals(services[i].name)
+                        && BIND_VPN_SERVICE.equals(services[i].permission);
             }
+            if (!permitted) {
+                return false;
+            }
+            // And that the system can FIND it. Starting is an explicit
+            // intent and needs no filter, but a VpnService without the
+            // action is not one as far as the platform is concerned -- it
+            // never appears as an always-on VPN and the consent flow has
+            // nothing to name.
+            return resolvesTo(pm.queryIntentServices(
+                    new Intent("android.net.VpnService"), 0), name);
         } catch (Exception missing) {
             // A package manager that cannot answer says nothing about the
             // manifest, and claiming the capability on a guess is the
             // failure this method exists to avoid.
             return false;
         }
+    }
+
+    /// Whether any of these resolutions names this service class.
+    ///
+    /// In its own method, outside any `try`, for the reason asIntent gives:
+    /// reading a typed List inserts a checkcast on every get(), and under a
+    /// handler that catches Exception that is a cast whose failure the
+    /// handler appears to cover -- which ParparVM would not deliver.
+    private static boolean resolvesTo(java.util.List<
+            android.content.pm.ResolveInfo> matches, String name) {
+        if (matches == null) {
+            return false;
+        }
+        for (int i = 0; i < matches.size(); i++) {
+            android.content.pm.ResolveInfo match = matches.get(i);
+            if (match != null && match.serviceInfo != null
+                    && name.equals(match.serviceInfo.name)) {
+                return true;
+            }
+        }
         return false;
     }
+
+    /// What the tunnel service requires of its binder, so only the system
+    /// may. Mirrors VpnManifestFragments.BIND_VPN_SERVICE; the two are one
+    /// contract read from either end.
+    private static final String BIND_VPN_SERVICE =
+            "android.permission.BIND_VPN_SERVICE";
 
     @Override
     public int getVpnCapabilities() {

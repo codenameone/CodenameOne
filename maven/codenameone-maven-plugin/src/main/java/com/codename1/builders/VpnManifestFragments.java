@@ -48,6 +48,13 @@ final class VpnManifestFragments {
     static final String TUNNEL_SERVICE =
             "com.codename1.impl.android.vpn.CN1VpnService";
 
+    /** What the SERVICE requires of its binder, so only the system may. */
+    static final String BIND_VPN_SERVICE =
+            "android.permission.BIND_VPN_SERVICE";
+
+    /** The action the system looks a VPN service up by. */
+    static final String VPN_ACTION = "android.net.VpnService";
+
     private VpnManifestFragments() {
     }
 
@@ -124,7 +131,36 @@ final class VpnManifestFragments {
     }
 
     static String services(boolean tunnel, String existing) {
-        if (!tunnel || declares(existing, TUNNEL_SERVICE)) {
+        if (!tunnel) {
+            return "";
+        }
+        if (declares(existing, TUNNEL_SERVICE)) {
+            // The project declared the service itself, so the build stands
+            // aside -- but only if what it declared can actually be bound.
+            // Suppressing on the NAME alone let a declaration missing
+            // android:permission or the android.net.VpnService action
+            // replace the working one, and the result is a build that looks
+            // complete and cannot establish: Android refuses the binding,
+            // establish() answers null, and Tunnels.isSupported() went on
+            // saying yes.
+            //
+            // Refused rather than merged. Rewriting XML the project wrote is
+            // guesswork about intent, and the two mechanisms cannot both own
+            // one element -- the same reason the VoIP background mode fails
+            // a build instead of combining with ios.plistInject.
+            String missing = whatABindableServiceLacks(existing);
+            if (missing != null) {
+                throw new IllegalArgumentException("The android.xapplication"
+                        + " build hint declares " + TUNNEL_SERVICE
+                        + " itself, so the build leaves it alone -- but that"
+                        + " declaration " + missing + ". Android would refuse"
+                        + " to bind it as a VPN and the tunnel would fail at"
+                        + " establish() with nothing to say why. Remove the"
+                        + " declaration and let the build supply it, or add"
+                        + " android:permission=\"android.permission"
+                        + ".BIND_VPN_SERVICE\" and an <intent-filter> with"
+                        + " the android.net.VpnService action.");
+            }
             return "";
         }
         // android:permission is what makes this a VPN service: it says only
@@ -139,13 +175,92 @@ final class VpnManifestFragments {
         // Android 14 refuses a promotion whose type the manifest does not
         // declare. An older platform ignores an attribute it does not know.
         return "\n        <service android:name=\"" + TUNNEL_SERVICE + "\""
-                + " android:permission=\"android.permission.BIND_VPN_SERVICE\""
+                + " android:permission=\"" + BIND_VPN_SERVICE + "\""
                 + " android:foregroundServiceType=\"systemExempted\""
                 + " android:exported=\"true\">\n"
                 + "            <intent-filter>\n"
-                + "                <action android:name=\"android.net.VpnService\" />\n"
+                + "                <action android:name=\"" + VPN_ACTION
+                + "\" />\n"
                 + "            </intent-filter>\n"
                 + "        </service>\n";
+    }
+
+    /**
+     * Returns what a project-declared tunnel service is missing, or null
+     * when it is one Android will bind.
+     *
+     * <p>Two things make a {@code <service>} a VPN service, and neither is
+     * the class name. {@code android:permission} says only the system, which
+     * holds {@code BIND_VPN_SERVICE}, may bind it -- without it the binding
+     * is refused. And the {@code android.net.VpnService} action is how the
+     * system finds it at all. A declaration carrying neither still matched
+     * the name test that suppresses the generated one.</p>
+     *
+     * @param existing the accumulated fragment
+     * @return a phrase naming what is absent, or null when nothing is
+     */
+    static String whatABindableServiceLacks(String existing) {
+        String live = withoutComments(existing == null ? "" : existing);
+        int at = liveServiceStart(live, TUNNEL_SERVICE);
+        if (at < 0) {
+            return null;
+        }
+        int close = live.indexOf('>', at);
+        String tag = live.substring(at, close);
+        boolean permitted = tag.contains("android:permission=\""
+                        + BIND_VPN_SERVICE + "\"")
+                || tag.contains("android:permission='"
+                        + BIND_VPN_SERVICE + "'");
+        // A self-closing element has no body, so it cannot carry a filter.
+        String body = "";
+        if (live.charAt(close - 1) != '/') {
+            int end = live.indexOf("</service>", close);
+            body = end < 0 ? live.substring(close) : live.substring(close, end);
+        }
+        boolean filtered = body.contains("android:name=\"" + VPN_ACTION + "\"")
+                || body.contains("android:name='" + VPN_ACTION + "'");
+        if (!permitted && !filtered) {
+            return "has neither android:permission=\"" + BIND_VPN_SERVICE
+                    + "\" nor the " + VPN_ACTION + " intent filter";
+        }
+        if (!permitted) {
+            return "has no android:permission=\"" + BIND_VPN_SERVICE + "\"";
+        }
+        if (!filtered) {
+            return "has no <intent-filter> with the " + VPN_ACTION
+                    + " action";
+        }
+        return null;
+    }
+
+    /**
+     * Returns the index of the LIVE {@code <service>} tag for {@code name},
+     * or -1.
+     *
+     * <p>Split out so the suppression test and the attribute test agree on
+     * WHICH element they are talking about; two searches that found it
+     * separately is how a check ends up describing a different declaration
+     * from the one it guards.</p>
+     *
+     * @param live     the fragment with comments already removed
+     * @param name     the service class name
+     * @return the index of the opening angle bracket, or -1
+     */
+    private static int liveServiceStart(String live, String name) {
+        int at = live.indexOf("<service");
+        while (at >= 0) {
+            int close = live.indexOf('>', at);
+            if (close < 0) {
+                return -1;
+            }
+            String tag = live.substring(at, close);
+            if (tag.contains("android:name=\"" + name + "\"")
+                    || tag.contains("android:name='" + name + "'")) {
+                return at;
+            }
+            at = live.indexOf("<service", close);
+        }
+        return -1;
     }
 
     /**
