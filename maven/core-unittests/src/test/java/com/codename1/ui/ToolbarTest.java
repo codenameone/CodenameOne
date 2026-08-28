@@ -42,6 +42,7 @@ class ToolbarTest extends UITestBase {
     private static final int LIGHT_COLOR = 0xff0000;
     private static final int DARK_COLOR = 0x00ff00;
     private static final int FORM_MANAGER_COLOR = 0x0000ff;
+    private static final int SWAPPED_MANAGER_COLOR = 0x00ffff;
 
     private boolean originalOnTop;
     private boolean originalPermanent;
@@ -632,6 +633,66 @@ class ToolbarTest extends UITestBase {
         assertEquals(FORM_MANAGER_COLOR, b.getUnselectedStyle().getFgColor(),
                 "A closed side menu must resolve against the form's UIManager, "
                         + "not the global one");
+    }
+
+    /// Pinning the form's UIManager onto a closed menu means Container's own
+    /// manager now shadows the parent chain, so once pinned the menu stops
+    /// following the form by itself. Swapping the form's manager while the menu
+    /// is open has to update that pin, or the menu keeps the manager it was
+    /// pinned with and drifts away from the form it belongs to.
+    @FormTest
+    void openOnTopSideMenuFollowsALaterUIManagerSwap() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+        installLightAndDarkSideMenuTheme();
+
+        UIManager firstManager = UIManager.createInstance();
+        java.util.Hashtable firstTheme = new java.util.Hashtable();
+        firstTheme.put("SideCommand.fgColor", hex(FORM_MANAGER_COLOR));
+        firstManager.addThemeProps(firstTheme);
+
+        UIManager secondManager = UIManager.createInstance();
+        java.util.Hashtable secondTheme = new java.util.Hashtable();
+        secondTheme.put("SideCommand.fgColor", hex(SWAPPED_MANAGER_COLOR));
+        secondManager.addThemeProps(secondTheme);
+
+        Form form = new Form("t", new BorderLayout());
+        form.setUIManager(firstManager);
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        Command cmd = toolbar.addCommandToSideMenu("Item", null, evt -> {
+        });
+        form.revalidate();
+        flushSerialCalls();
+
+        // Refreshing while the menu is closed is what pins firstManager on it.
+        form.refreshTheme(true);
+        flushSerialCalls();
+
+        Button b = toolbar.findCommandComponent(cmd);
+        assertNotNull(b, "The side menu command should have a button");
+        assertEquals(FORM_MANAGER_COLOR, b.getUnselectedStyle().getFgColor(),
+                "The closed menu should have taken the form's first UIManager");
+
+        toolbar.openSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+        assertTrue(toolbar.isSideMenuShowing(), "The side menu should be open");
+
+        form.setUIManager(secondManager);
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        assertEquals(SWAPPED_MANAGER_COLOR, b.getUnselectedStyle().getFgColor(),
+                "Swapping the form's UIManager while the menu is open must reach the menu");
+
+        toolbar.closeSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
     }
 
     /// An app may call the public refreshTheme on the toolbar itself, with no

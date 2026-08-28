@@ -3075,11 +3075,17 @@ public class Toolbar extends Container {
     /// it by walking up to the form, which a closed side menu cannot do -- it
     /// has no parent, so it falls back to the global singleton and would be
     /// re-styled from the wrong theme, then reopen looking unlike the form it
-    /// belongs to. Pin the toolbar's manager onto it first. Pinning on every
-    /// refresh rather than once keeps it correct across a later
-    /// `Form#setUIManager(UIManager)`, which refreshes as it assigns. An
-    /// attached menu is left alone: its parent chain already answers, and the
-    /// hierarchy is the more authoritative source.
+    /// belongs to. Pin the toolbar's manager onto it first.
+    ///
+    /// The pin is then kept in step on every refresh, open or closed, because
+    /// `Container#getUIManager()` prefers a pinned manager over the parent
+    /// chain: once pinned, the menu no longer follows its form on its own. A
+    /// later `Form#setUIManager(UIManager)` -- which refreshes as it assigns --
+    /// would otherwise keep re-styling an open menu from the manager it was
+    /// pinned with, while the rest of the form moved to the new one. Comparing
+    /// against the resolved manager keeps this a no-op for a menu that is
+    /// attached and unpinned, where the hierarchy already gives the same
+    /// answer.
     ///
     /// #### Parameters
     ///
@@ -3091,7 +3097,7 @@ public class Toolbar extends Container {
             return;
         }
         UIManager uim = getUIManager();
-        if (cnt.getComponentForm() == null && cnt.getUIManager() != uim) { //NOPMD CompareObjectsWithEquals
+        if (cnt.getUIManager() != uim) { //NOPMD CompareObjectsWithEquals
             cnt.setUIManager(uim);
         }
         cnt.refreshTheme(merge);
