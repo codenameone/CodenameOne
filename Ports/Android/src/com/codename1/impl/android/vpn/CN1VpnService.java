@@ -359,27 +359,36 @@ public class CN1VpnService extends VpnService {
         String[] routes = TunnelWire.routes(fields);
         if (servers.length == 0
                 && TunnelWire.server(fields).length() > 0
-                && carriesEverything(routes)) {
-            // A NAME that would not resolve, under a route that captures
-            // everything. TunnelSetup.server promises the gateway stays
-            // outside the tunnel, and the only way this service can keep
-            // that promise is to leave the address out of the routes -- it
-            // has no socket to protect, because the app owns the transport.
-            // So with 0.0.0.0/0 or ::/0 and no address to exclude, the
-            // tunnel's own connection to its gateway goes into the TUN it is
-            // trying to serve, and nothing moves. Coming up anyway reported
-            // success and blackholed the device.
+                && routes.length > 0) {
+            // A configured gateway with no address, under ANY route.
+            // TunnelSetup.server promises the gateway stays outside the
+            // tunnel, and the only way this service can keep that promise is
+            // to leave the address out of the routes -- it has no socket to
+            // protect, because the app owns the transport. With no address
+            // to leave out, the tunnel's own connection to its gateway can
+            // go into the TUN it is trying to serve, and nothing moves.
+            // Coming up anyway reported success and blackholed the traffic
+            // the route covers.
             //
-            // Only for a route that carries EVERYTHING. Under a narrower one
-            // the gateway may well sit outside it, and refusing there would
+            // This was gated on a DEFAULT route, on the grounds that a
+            // narrower one might not contain the gateway and refusing would
             // turn a transient DNS failure into a refusal for a tunnel that
-            // would have worked.
+            // would have worked. But which of the two it is cannot be known
+            // here -- that is the same missing address -- and
+            // server("vpn.internal").route("10.0.0.0/8") with the gateway at
+            // 10.0.0.5 is an ordinary split tunnel that captures its own
+            // connection. Refusing a start that MIGHT work is a message the
+            // app can retry on; acknowledging one that cannot is a tunnel
+            // that hangs.
+            //
+            // With no routes at all there is nothing to capture it, so the
+            // refusal does not fire.
             throw new UnresolvedGateway("The VPN gateway '"
                     + TunnelWire.server(fields) + "' is not an address this"
-                    + " device could resolve or parse, and this setup routes"
-                    + " all traffic into the tunnel -- so the tunnel's own"
-                    + " connection to it would be captured by the tunnel."
-                    + " Check the literal, or try again once the name"
+                    + " device could resolve or parse, so it cannot be kept"
+                    + " out of the tunnel's routes -- and a route that"
+                    + " covers it would capture the tunnel's own connection"
+                    + " to it. Check the literal, or try again once the name"
                     + " resolves.");
         }
         boolean excluded = servers.length > 0;
@@ -504,29 +513,6 @@ public class CN1VpnService extends VpnService {
             // it did before this existed.
             return new String[0];
         }
-    }
-
-    /// Whether these routes carry every address of either family.
-    ///
-    /// A prefix of 0 is the default route, and it is what a full-tunnel VPN
-    /// asks for. Anything narrower may or may not contain a given gateway,
-    /// which is not something this can decide without the address it did not
-    /// get.
-    private static boolean carriesEverything(String[] routes) {
-        for (int i = 0; i < routes.length; i++) {
-            try {
-                if (TunnelWire.prefix(routes[i], "route") == 0) {
-                    return true;
-                }
-            } catch (IllegalArgumentException unreadable) {
-                // Not this method's to answer. The route loop below reads
-                // the same block through the same parser and refuses the
-                // whole setup, with a message about the block rather than
-                // about the gateway.
-                return false;
-            }
-        }
-        return false;
     }
 
     /// A configured gateway name that DNS could not answer.

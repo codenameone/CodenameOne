@@ -267,6 +267,20 @@ static void cn1vpEnsureInstallLock(void) {
     });
 }
 
+/// Releases the profile-operation reservation.
+///
+/// In one place because every path out of a control now has to release it:
+/// the reservation is claimed BEFORE the asynchronous load, so an early
+/// return from the completion handler that forgot would refuse every later
+/// install as though an operation were still running.
+static void cn1vpReleaseInstalling(void) {
+    cn1vpEnsureInstallLock();
+    @synchronized (cn1vpInstallLock) {
+        cn1vpInstalling = NO;
+    }
+}
+
+
 /// Whether the shared manager's saved configuration has been read.
 static BOOL cn1vpLoaded = NO;
 
@@ -865,36 +879,46 @@ void com_codename1_impl_ios_IOSNative_vpnStart___int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId) {
 #ifdef CN1_VPN_HAS_NE
+    // RESERVED BEFORE the load, not inside its completion.
+    //
+    // The load is asynchronous against the one shared NEVPNManager, and
+    // claiming the reservation only in the completion left the ORDER of two
+    // overlapping controls decided by which load finished first: a stop
+    // could complete, stop the connection and report success, and the start
+    // that arrived before it could then claim the freed flag and bring the
+    // tunnel up -- the caller told its stop succeeded while the VPN ends
+    // connected. Claimed here, the second control is refused as busy
+    // instead, which is an answer it can act on.
+    cn1vpEnsureInstallLock();
+    @synchronized (cn1vpInstallLock) {
+        if (cn1vpInstalling) {
+            cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
+                    @"A VPN profile operation is in progress; wait for it"
+                    " to finish");
+            return;
+        }
+        cn1vpInstalling = YES;
+    }
     NEVPNManager *manager = [NEVPNManager sharedManager];
     [manager loadFromPreferencesWithCompletionHandler:^(NSError *loadError) {
-        if (loadError != nil || manager.protocolConfiguration == nil) {
+        if (loadError != nil) {
+            // A read that FAILED is not a profile that is absent. Reported
+            // as NOT_CONFIGURED, a transient read or authorization failure
+            // told the app there was nothing installed -- inviting it to
+            // reinstall over a profile that was there all along, and to
+            // hand the user a prompt for a configuration they already have.
+            cn1vpReleaseInstalling();
+            cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
+                    [@"The VPN configuration could not be read: "
+                            stringByAppendingString:
+                                    [loadError localizedDescription]]);
+            return;
+        }
+        if (manager.protocolConfiguration == nil) {
+            cn1vpReleaseInstalling();
             cn1vpAck(requestId, NO, CN1_VPN_ERR_NOT_CONFIGURED,
                     @"No VPN configuration is installed");
             return;
-        }
-        // The SAME reservation install and removal take. This load runs
-        // asynchronously against the one shared NEVPNManager, so without it a
-        // start could reload and bring up the OLD profile while an install
-        // was saving its replacement, or be acknowledged a moment before a
-        // removal deleted the profile it just started -- both requests
-        // reporting success for a tunnel that is absent or wrong. Checked
-        // inside the completion, which is where the manager is actually
-        // touched; an install that began while this load was in flight is
-        // caught here and nowhere else.
-        cn1vpEnsureInstallLock();
-        // CLAIMED, not merely tested. Releasing the lock before touching the
-        // manager left the whole start outside the reservation: an install
-        // could claim it in that gap and be saving a replacement while this
-        // brought the old profile up, both reporting success. A check and an
-        // act that are not one critical section are not a guard at all.
-        @synchronized (cn1vpInstallLock) {
-            if (cn1vpInstalling) {
-                cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
-                        @"A VPN profile operation is in progress; wait for it"
-                        " to finish");
-                return;
-            }
-            cn1vpInstalling = YES;
         }
         NSError *error = nil;
         [[manager connection] startVPNTunnelAndReturnError:&error];
@@ -923,41 +947,49 @@ void com_codename1_impl_ios_IOSNative_vpnStop___int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId) {
 #ifdef CN1_VPN_HAS_NE
+    // RESERVED BEFORE the load, not inside its completion.
+    //
+    // The load is asynchronous against the one shared NEVPNManager, and
+    // claiming the reservation only in the completion left the ORDER of two
+    // overlapping controls decided by which load finished first: a stop
+    // could complete, stop the connection and report success, and the start
+    // that arrived before it could then claim the freed flag and bring the
+    // tunnel up -- the caller told its stop succeeded while the VPN ends
+    // connected. Claimed here, the second control is refused as busy
+    // instead, which is an answer it can act on.
+    cn1vpEnsureInstallLock();
+    @synchronized (cn1vpInstallLock) {
+        if (cn1vpInstalling) {
+            cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
+                    @"A VPN profile operation is in progress; wait for it"
+                    " to finish");
+            return;
+        }
+        cn1vpInstalling = YES;
+    }
     NEVPNManager *manager = [NEVPNManager sharedManager];
     [manager loadFromPreferencesWithCompletionHandler:^(NSError *loadError) {
-        if (loadError != nil || manager.protocolConfiguration == nil) {
+        if (loadError != nil) {
+            // A read that FAILED is not a profile that is absent. Reported
+            // as NOT_CONFIGURED, a transient read or authorization failure
+            // told the app there was nothing installed -- inviting it to
+            // reinstall over a profile that was there all along, and to
+            // hand the user a prompt for a configuration they already have.
+            cn1vpReleaseInstalling();
+            cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
+                    [@"The VPN configuration could not be read: "
+                            stringByAppendingString:
+                                    [loadError localizedDescription]]);
+            return;
+        }
+        if (manager.protocolConfiguration == nil) {
+            cn1vpReleaseInstalling();
             cn1vpAck(requestId, NO, CN1_VPN_ERR_NOT_CONFIGURED,
                     @"No VPN configuration is installed");
             return;
         }
-        // The SAME reservation install and removal take. This load runs
-        // asynchronously against the one shared NEVPNManager, so without it a
-        // start could reload and bring up the OLD profile while an install
-        // was saving its replacement, or be acknowledged a moment before a
-        // removal deleted the profile it just started -- both requests
-        // reporting success for a tunnel that is absent or wrong. Checked
-        // inside the completion, which is where the manager is actually
-        // touched; an install that began while this load was in flight is
-        // caught here and nowhere else.
-        cn1vpEnsureInstallLock();
-        // CLAIMED, not merely tested. Releasing the lock before touching the
-        // manager left the whole start outside the reservation: an install
-        // could claim it in that gap and be saving a replacement while this
-        // brought the old profile up, both reporting success. A check and an
-        // act that are not one critical section are not a guard at all.
-        @synchronized (cn1vpInstallLock) {
-            if (cn1vpInstalling) {
-                cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
-                        @"A VPN profile operation is in progress; wait for it"
-                        " to finish");
-                return;
-            }
-            cn1vpInstalling = YES;
-        }
         [[manager connection] stopVPNTunnel];
-        @synchronized (cn1vpInstallLock) {
-            cn1vpInstalling = NO;
-        }
+        cn1vpReleaseInstalling();
         cn1vpAck(requestId, YES, 0, nil);
     }];
 #else

@@ -111,8 +111,15 @@ class IPhoneBuilderVoipModesTest {
         // The live fragment, and the exact key within it.
         assertTrue(src.contains("plistWithoutComments(inject)"),
                 "appendCallPlist has to test the fragment without comments");
-        assertTrue(src.contains(".contains(\"<key>\" + key + \"</key>\")"),
-                "appendCallPlist has to test the exact plist key");
+        // The PROPERTY, not the spelling that used to provide it. This
+        // pinned .contains("<key>" + key + "</key>") until that literal
+        // turned out to miss "<key >CN1CallAppGroup</key >" -- so the
+        // assertion was holding the implementation in place rather than the
+        // behaviour, and had to be edited to allow the fix.
+        assertTrue(src.contains("plistKeyNamed(plistWithoutComments(inject)"),
+                "appendCallPlist has to find the key as an ELEMENT, so a"
+                + " project that spaced its own tags is still seen to"
+                + " declare it");
     }
 
     @Test

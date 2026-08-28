@@ -328,7 +328,7 @@ public class IPhoneBuilder extends Executor {
     /// One place where "the value of this key" is decided, because every
     /// reader that worked it out for itself got it wrong in a different way.
     private static int plistValueStart(String live, String key) {
-        int after = plistKeyEnd(live, key, 0);
+        int after = plistKeyNamed(live, key, 0);
         if (after < 0) {
             return -1;
         }
@@ -348,30 +348,28 @@ public class IPhoneBuilder extends Executor {
     /// its own ios.plistInject that way had its declaration read as absent
     /// -- and every decision downstream is about whether the project
     /// supplies something.
-    static int plistKeyEnd(String live, String key, int from) {
+    ///
+    /// Built on plistKeyEnd and the tag helpers beside it rather than on a
+    /// second scanner of its own: they already handle the self-closing
+    /// `<key/>` and the markup-versus-text distinction, and two readers of
+    /// one format is how the spellings drifted apart in the first place.
+    static int plistKeyNamed(String live, String key, int from) {
         int at = from;
         while (at >= 0 && at < live.length()) {
             at = live.indexOf("<key", at);
             if (at < 0) {
                 return -1;
             }
-            int open = plistElementOpen(live, at, "key");
-            if (open < 0) {
-                at++;
-                continue;
-            }
-            int stop = live.indexOf("</key", open);
-            if (stop < 0) {
+            int contentStart = plistOpenTagEnd(live, at);
+            int close = contentStart < 0 ? -1
+                    : plistKeyContentEnd(live, at, contentStart);
+            if (contentStart < 0 || close < 0) {
                 return -1;
             }
-            int end = live.indexOf('>', stop);
-            if (end < 0) {
-                return -1;
+            if (key.equals(live.substring(contentStart, close).trim())) {
+                return plistKeyEnd(live, at);
             }
-            if (key.equals(live.substring(open, stop).trim())) {
-                return end + 1;
-            }
-            at = end + 1;
+            at = contentStart;
         }
         return -1;
     }
@@ -405,7 +403,7 @@ public class IPhoneBuilder extends Executor {
         if (value == null || value.trim().length() == 0) {
             return inject;
         }
-        if (plistWithoutComments(inject).contains("<key>" + key + "</key>")) {
+        if (plistKeyNamed(plistWithoutComments(inject), key, 0) >= 0) {
             String tag = injectedPlistValueTag(inject, key);
             if (isCoordinatedCallKey(key) && tag != null
                     && !"string".equals(tag)) {
@@ -879,7 +877,7 @@ public class IPhoneBuilder extends Executor {
         // one it supplies, and reading it as supplied skipped generating the
         // real one -- so the app shipped with no voip mode at all.
         String live = plistWithoutComments(injected);
-        int after = plistKeyEnd(live, "UIBackgroundModes", 0);
+        int after = plistKeyNamed(live, "UIBackgroundModes", 0);
         while (after >= 0) {
             // The key's IMMEDIATE value. Scanning forward for the next
             // <array> anywhere meant a UIBackgroundModes given some other
@@ -903,10 +901,10 @@ public class IPhoneBuilder extends Executor {
                 if (arrayHasString(body, "voip")) {
                     return true;
                 }
-                after = plistKeyEnd(live, "UIBackgroundModes", close);
+                after = plistKeyNamed(live, "UIBackgroundModes", close);
                 continue;
             }
-            after = plistKeyEnd(live, "UIBackgroundModes", after);
+            after = plistKeyNamed(live, "UIBackgroundModes", after);
         }
         return false;
     }
@@ -5361,7 +5359,7 @@ public class IPhoneBuilder extends Executor {
                     // background modes as user supplied, skipped
                     // ios.background_modes, and left the real key absent --
                     // an app registered for VoIP pushes that nothing wakes.
-                    if (plistKeyEnd(injected, "UIBackgroundModes", 0) >= 0) {
+                    if (plistKeyNamed(injected, "UIBackgroundModes", 0) >= 0) {
                         if (!injectedModesIncludeVoip(injected)) {
                             // Failed rather than warned. The two mechanisms
                             // cannot be combined -- plist assembly refuses a

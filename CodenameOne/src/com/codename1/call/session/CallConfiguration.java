@@ -122,8 +122,7 @@ public final class CallConfiguration {
     /// @throws IllegalArgumentException when `types` is present and holds no
     /// usable kind
     public CallConfiguration handleTypes(CallHandleType[] types) {
-        java.util.List<CallHandleType> replacement =
-                new java.util.ArrayList<CallHandleType>();
+        List<CallHandleType> replacement = new ArrayList<CallHandleType>();
         if (types != null) {
             for (CallHandleType type : types) {
                 if (type != null && !replacement.contains(type)) {
