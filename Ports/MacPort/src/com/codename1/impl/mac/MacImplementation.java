@@ -428,6 +428,16 @@ public class MacImplementation extends IOSImplementation {
     /// Traversal comes from the form's own tab iterator, which is what decides
     /// the order everywhere else, so Tab here visits the fields in the order the
     /// framework already believes they are in.
+    /// The low level camera backend, with a permission probe that asks rather
+    /// than assumes -- see MacCameraImpl. The inherited one cannot: iOS resolves
+    /// camera permission when the session runs and offers no synchronous query,
+    /// so its probe returns success unconditionally and
+    /// Camera.requestPermissions() reported granted even after a denial.
+    @Override
+    public com.codename1.impl.CameraImpl createCameraImpl() {
+        return new MacCameraImpl();
+    }
+
     /// This port draws its own controls, so the pointer cursor is its own to
     /// maintain: nothing in the framework pushes one down, and
     /// Component.setCursor() is documented as ignored wherever

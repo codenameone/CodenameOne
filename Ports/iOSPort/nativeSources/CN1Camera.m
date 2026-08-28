@@ -451,6 +451,28 @@ static void cn1CameraReportAccess(int callbackId, BOOL granted) {
             threadStateData, (JAVA_INT)callbackId, granted ? JAVA_TRUE : JAVA_FALSE);
 }
 
+/// The authorization AVFoundation already holds, without prompting for it.
+///
+/// AVAuthorizationStatus is documented as notDetermined 0, restricted 1, denied 2,
+/// authorized 3, and the Java side reads those numbers directly rather than
+/// through a second enum that could drift from Apple's.
+JAVA_INT com_codename1_impl_ios_IOSNative_cameraAuthorizationStatus___boolean_R_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN audio) {
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
+    POOL_BEGIN();
+    AVMediaType type = audio ? AVMediaTypeAudio : AVMediaTypeVideo;
+    JAVA_INT status = (JAVA_INT)[AVCaptureDevice authorizationStatusForMediaType:type];
+    POOL_END();
+    return status;
+#else
+    // Guarded like cn1CameraRequestAccess beside it, and answering "not
+    // determined" rather than "denied": with no camera backend compiled in there
+    // is nothing to be authorized for, and reporting a denial would make the
+    // caller say the user refused something never asked.
+    return 0;
+#endif
+}
+
 void com_codename1_impl_ios_IOSNative_cn1CameraRequestAccess___boolean_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN audio, JAVA_INT callbackId) {
 #if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV

@@ -12294,6 +12294,22 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// sentinel id, and this port's back end returns success for that without asking anyone. So a
     /// capture went ahead while access was undetermined or refused, and the user got a preview that
     /// stayed black or a recording with no sound.
+    /// The CURRENT camera authorization, or the microphone's when `audio` is
+    /// set: 0 not determined, 1 restricted, 2 denied, 3 authorized.
+    ///
+    /// Reading the status AVFoundation already holds; it never prompts, which is
+    /// what makes it answerable synchronously and safe to call from
+    /// CameraImpl.open(). `#requestCameraAccess(boolean, SuccessCallback)` is
+    /// the one that shows a dialog.
+    ///
+    /// Here rather than on IOSNative because that class is package private, and
+    /// the macOS port -- which is where the answer is used -- is a different
+    /// package. Widening the native for one caller would make an internal
+    /// binding part of the surface.
+    public static int cameraAuthorizationStatus(boolean audio) {
+        return nativeInstance.cameraAuthorizationStatus(audio);
+    }
+
     public static void requestCameraAccess(boolean audio,
             com.codename1.util.SuccessCallback<Boolean> callback) {
         int id;

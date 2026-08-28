@@ -1916,6 +1916,15 @@ public final class IOSNative {
     native boolean checkContactsUsage();
     native boolean checkCalendarsUsage();
     native boolean checkCameraUsage();
+
+    /// The CURRENT authorization for the camera, or for the microphone when
+    /// `audio` is set: 0 not determined, 1 restricted, 2 denied, 3 authorized.
+    ///
+    /// Synchronous, unlike cn1CameraRequestAccess, because the caller is
+    /// CameraImpl.open() and that returns a value. Asking is not prompting: this
+    /// reads the status AVFoundation already holds and never shows a dialog, so
+    /// it is safe on any thread and at any time.
+    native int cameraAuthorizationStatus(boolean audio);
     native boolean checkFaceIDUsage();
     native boolean checkLocationUsage();
     /// Whether ios.NSHealthShareUsageDescription was declared. Lives here
