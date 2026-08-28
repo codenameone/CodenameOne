@@ -180,7 +180,21 @@ static long long cn1RoundToStep(long long value, long long step) {
         // application's configured step was simply not enforced -- a picker set
         // to quarter hours committed 07 minutes quite happily.
         JAVA_LONG stepMs = (JAVA_LONG)self.minuteStep * 60000;
-        millis = (JAVA_LONG)cn1RoundToStep((long long)millis, (long long)stepMs);
+        // Rounded in the picker's own time zone, not in UTC. The step is about
+        // the minutes the user can SEE, and epoch milliseconds are aligned to
+        // UTC: in a zone offset by a half or quarter hour -- UTC+05:30,
+        // UTC+05:45 -- a local 10:00 is not on a UTC hour boundary, so an hourly
+        // step snapped it to a local 10:30, which is not on the step the
+        // application configured either. Adding the offset rounds the wall clock
+        // and taking it off again returns an instant. Asked for the date in
+        // hand, so a step across a daylight-saving change uses the offset in
+        // force then. Duration pickers are pinned to GMT, where the offset is
+        // zero and this changes nothing.
+        NSTimeZone *zone = self.datePicker.timeZone != nil
+            ? self.datePicker.timeZone : [NSTimeZone localTimeZone];
+        long long offsetMs = (long long)[zone secondsFromGMTForDate:date] * 1000LL;
+        millis = (JAVA_LONG)(cn1RoundToStep((long long)millis + offsetMs,
+                                            (long long)stepMs) - offsetMs);
     }
     cn1PickerFinish(millis);
 }
@@ -305,9 +319,28 @@ static NSView *cn1BuildDurationView(CN1MacPickerController *controller, int type
     if (type == 5 || type == 7) {
         long long minutes = type == 7 ? totalMinutes : totalMinutes % 60;
         NSInteger maximum = type == 7 ? 999 : 59;
+        int step = minuteStep < 1 ? 1 : minuteStep;
+        // Seeded ON the step. A stepper anchored at a value the step cannot
+        // reach walks off-step for ever -- 7 with a quarter-hour step offers 7,
+        // 22, 37 -- while Done rounds whatever it lands on back onto the step,
+        // so the user picked 22 and the application was handed 15. Showing 7 at
+        // all is a value this picker will not return, and the same rounding is
+        // applied here as on commit so the two agree. Clamped to the highest
+        // value that is both on the step and inside the field's range, for the
+        // same reason the commit path is.
+        if (step > 1) {
+            minutes = cn1RoundToStep(minutes, step);
+            long long highest = ((long long)maximum / step) * step;
+            if (minutes > highest) {
+                minutes = highest;
+            }
+            if (minutes < 0) {
+                minutes = 0;
+            }
+        }
         x = cn1AddDurationField(view, x, &minutesField, @"min",
                                 (NSInteger)MIN(minutes, (long long)maximum),
-                                maximum, minuteStep < 1 ? 1 : minuteStep);
+                                maximum, step);
     }
     controller.durationHoursField = hoursField;
     controller.durationMinutesField = minutesField;
