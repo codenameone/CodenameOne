@@ -61,6 +61,43 @@ jobs:
           done
           echo "Coordinate override: ${COORDINATES:-<none, using the derived set>}"
 
+      - name: Restrict the override to derived frozen coordinates
+        env:
+          COORDINATES: ${{ inputs.coordinates }}
+        # Seeding an artifact that frozen-coordinates.py does not derive would put
+        # content in the bucket that nothing else knows about. The seed would succeed
+        # and the Verify step, which probes exact file paths, would pass -- but
+        # regen-maven-metadata.py takes its frozen set from the same derivation, so it
+        # would treat the new coordinate as an ordinary release, find no completion
+        # marker, omit it from maven-metadata.xml and print a "release not marked
+        # complete" line about it on every future run. A green workflow whose metadata
+        # was never updated is worse than a refusal.
+        #
+        # The override exists to re-seed part of the derived set, which this still
+        # allows. Seeding something outside it is not a use case: by definition no
+        # release resolves it. A human with the credentials can still run the script
+        # directly for an emergency repair.
+        run: |
+          set -f
+          [ -z "$COORDINATES" ] && exit 0
+          derived=$(python3 maven/scripts/r2/frozen-coordinates.py)
+          status=0
+          for coordinate in $COORDINATES; do
+            # Compare artifact:version, ignoring the classifier field on either side.
+            wanted=$(echo "$coordinate" | cut -d: -f1,2)
+            if echo "$derived" | cut -d: -f1,2 | grep -qxF "$wanted"; then
+              echo "ok: $wanted is a derived frozen coordinate"
+            else
+              echo "Refusing '$coordinate': not a derived frozen coordinate." >&2
+              status=1
+            fi
+          done
+          if [ "$status" != "0" ]; then
+            echo "Derived set:" >&2
+            echo "$derived" >&2
+            exit 1
+          fi
+
       - name: Seed
         env:
           COORDINATES: ${{ inputs.coordinates }}
