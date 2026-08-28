@@ -1659,6 +1659,109 @@ static int gcBeltDiagActive = 0;
 static int gcBeltDiagCount = 0;
 #endif
 
+// Enqueue a RANGE of references, taking the SATB mutex once per chunk instead of once per
+// element.
+//
+// cn1SatbEnqueue below locks and unlocks gcSatbMutex for every reference it accepts, which
+// is right for the per-store barrier the translator emits but wrong for the bulk copies:
+// cloning or arraycopying a large object array turned one memcpy into an acquisition per
+// element, contending with the collector's own drain for the length of the array. That cost
+// also got likelier with this issue's other work, because answering the demand signal means
+// a mark is in progress far more of the time.
+//
+// Chunked rather than one hold for the whole range: a single acquisition across a
+// million-element array would block cn1SatbTake for the whole walk, trading a lot of short
+// stalls for one long one. 256 bounds the hold and still cuts acquisitions by that factor.
+//
+// Measured on a driver that arraycopies and clones a 200,000-element Object[] of OLD (so
+// unfiltered) references 400 times while a second thread keeps the collector busy, five
+// interleaved reps, -DCN1_SATB_NO_BULK restoring the per-element shape for the A/B:
+// the copy loop's median goes 576ms -> 494ms with much tighter spread (556-648 -> 492-500).
+//
+// Read the COLLECTOR side of that A/B carefully, because it looks like a regression and is
+// not: markMs 477 -> 648 and satbMs 243 -> 453. The bulk arm logs twice the references
+// (37.9M -> 74.5M) for the simple reason that a faster mutator gets through more copies
+// inside the same mark. Per logged entry the drain costs 6.4ns before and 6.1ns after.
+//
+// Scope, so nobody reads more into this than it says: on the ordinary churn workload
+// (GcSteadyState, with or without CN1_WL_BIGARRAY) the log holds 0-6 entries a cycle --
+// the fresh-reference filter in cn1SatbEnqueue already rejects essentially everything, and
+// satbDrainAlready == satbRefs exactly, in every arm. This path is therefore neutral for
+// normal code and matters only for the bulk object-array copies that the arraycopy and
+// cloneArray barriers added here put through it.
+#define CN1_SATB_BULK_CHUNK 256
+
+static void cn1SatbFlushChunk(JAVA_OBJECT* buf, int n) {
+    if(n <= 0) {
+        return;
+    }
+    pthread_mutex_lock(&gcSatbMutex);
+    if(gcSatbTop + n > gcSatbCap) {
+        long ncap = gcSatbCap ? gcSatbCap : 8192;
+        while(ncap < gcSatbTop + n) {
+            ncap *= 2;
+        }
+        JAVA_OBJECT* grown = (JAVA_OBJECT*)realloc(gcSatbStack, (size_t)ncap * sizeof(JAVA_OBJECT));
+        if(grown == 0) {
+            pthread_mutex_unlock(&gcSatbMutex);
+            return;   // OOM: drop, exactly as the single-entry path does
+        }
+        gcSatbStack = grown;
+        gcSatbCap = ncap;
+    }
+    memcpy(&gcSatbStack[gcSatbTop], buf, (size_t)n * sizeof(JAVA_OBJECT));
+    gcSatbTop += n;
+    pthread_mutex_unlock(&gcSatbMutex);
+}
+
+void cn1SatbEnqueueRange(JAVA_ARRAY_OBJECT* refs, int count) {
+#ifdef CN1_SATB_NO_BULK
+    // Ablation arm: the per-element shape this replaced, one mutex acquisition each.
+    for(int i = 0 ; i < count ; i++) {
+        JAVA_OBJECT o = (JAVA_OBJECT)refs[i];
+        if(o != JAVA_NULL && !CN1_IS_TAGGED(o)) {
+            cn1SatbEnqueue(o);
+        }
+    }
+#else
+    JAVA_OBJECT buf[CN1_SATB_BULK_CHUNK];
+    int n = 0;
+    for(int i = 0 ; i < count ; i++) {
+        JAVA_OBJECT o = (JAVA_OBJECT)refs[i];
+        if(o == JAVA_NULL || CN1_IS_TAGGED(o)) {
+            continue;
+        }
+        // Same filters as cn1SatbEnqueue, applied WITHOUT the lock -- they only read the
+        // object's own mark word.
+#if !defined(CN1_SATB_LOG_FRESH) && !defined(CN1_NURSERY)
+        if(__atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) {
+            continue;
+        }
+#endif
+#ifdef CN1_GC_CONFORM
+        {
+            int __m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_RELAXED);
+#ifdef CN1_DISABLE_BIBOP
+            if(0) {
+#else
+            if(__m == atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed)) {
+#endif
+                atomic_fetch_add_explicit(&cn1GcSatbAlready, 1, memory_order_relaxed);
+            } else if(__m == -1) {
+                atomic_fetch_add_explicit(&cn1GcSatbFresh, 1, memory_order_relaxed);
+            }
+        }
+#endif
+        buf[n++] = o;
+        if(n == CN1_SATB_BULK_CHUNK) {
+            cn1SatbFlushChunk(buf, n);
+            n = 0;
+        }
+    }
+    cn1SatbFlushChunk(buf, n);
+#endif
+}
+
 void cn1SatbEnqueue(JAVA_OBJECT old) {
 #if !defined(CN1_SATB_LOG_FRESH) && !defined(CN1_NURSERY)
     // FRESH-REFERENCE FILTER (issue 5537).
@@ -11134,11 +11237,7 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     // could be in the snapshot. Off-mark this is one predicted-not-taken flag load.
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
     if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType) {
-        JAVA_ARRAY_OBJECT* srcData = (JAVA_ARRAY_OBJECT*)(*src).data;
-        for(int i = 0 ; i < src->length ; i++) {
-            JAVA_OBJECT o = srcData[i];
-            if(o != JAVA_NULL && !CN1_IS_TAGGED(o)) cn1SatbEnqueue(o);
-        }
+        cn1SatbEnqueueRange((JAVA_ARRAY_OBJECT*)(*src).data, src->length);
     }
 #endif
     memcpy( (*arr).data, (*src).data, arr->length * byteSize);

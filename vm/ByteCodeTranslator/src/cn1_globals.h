@@ -1030,6 +1030,7 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 // complete snapshot + incremental barrier. Off-mark: one predicted-not-taken flag load.
 extern volatile int gcSatbActive;
 extern void cn1SatbEnqueue(JAVA_OBJECT old);
+extern void cn1SatbEnqueueRange(JAVA_ARRAY_OBJECT* refs, int count);
 #if defined(CN1_DISABLE_SATB)
 #define CN1_WRITE_BARRIER(target, value) do { } while(0)
 #else

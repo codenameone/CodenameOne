@@ -987,18 +987,12 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     // Both reads happen BEFORE the memmove, which is also what makes this correct for the
     // overlapping src/dst that arraycopy is contractually required to support.
     if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType) {
-        JAVA_ARRAY_OBJECT* dstData = (JAVA_ARRAY_OBJECT*)(*dstArr).data;
+        // One acquisition of the SATB mutex per 256 references rather than per reference;
+        // this used to be two locked enqueues per element. See cn1SatbEnqueueRange.
+        cn1SatbEnqueueRange(((JAVA_ARRAY_OBJECT*)(*dstArr).data) + dstOffset, length);
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
-        JAVA_ARRAY_OBJECT* srcData = (JAVA_ARRAY_OBJECT*)(*srcArr).data;
+        cn1SatbEnqueueRange(((JAVA_ARRAY_OBJECT*)(*srcArr).data) + srcOffset, length);
 #endif
-        for(int i = 0 ; i < length ; i++) {
-            JAVA_OBJECT o = dstData[dstOffset + i];
-            if(o != JAVA_NULL && !CN1_IS_TAGGED(o)) cn1SatbEnqueue(o);
-#ifndef CN1_NO_BULK_INSERTION_BARRIER
-            JAVA_OBJECT n = srcData[srcOffset + i];
-            if(n != JAVA_NULL && !CN1_IS_TAGGED(n)) cn1SatbEnqueue(n);
-#endif
-        }
     }
     /* java.lang.System.arraycopy is contractually overlap-safe (the spec defines
      * it as if copying via a temporary), and callers such as ArrayList.remove
