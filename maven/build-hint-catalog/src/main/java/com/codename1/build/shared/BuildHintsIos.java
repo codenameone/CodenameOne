@@ -463,6 +463,17 @@ final class BuildHintsIos {
                 .type(HintType.STRING)
                 .platform("ios"));
 
+        h.add(new Hint("ios.interpHost")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("ios")
+                .doc("Compile in the ParparVM invoke thunks and symbol sidecar the device runtime "
+                        + "needs to load a pushed program at run time. Off by default because the "
+                        + "cost -- an extra table per host method -- is only justified for the "
+                        + "on-device interpreter app (scripts/cn1-device-runtime). A regular app "
+                        + "leaves this false and gets a smaller binary."));
+
         h.add(new Hint("ios.keyboardOpen")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)
