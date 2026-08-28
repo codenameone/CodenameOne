@@ -196,6 +196,26 @@ public class CallManifestFragmentsTest {
     }
 
     @Test
+    public void theVideoHintIsReadOneWayEverywhere() {
+        // Three places consult this hint. Compared with "true".equals at one
+        // and trimmed at another, " true " turned the camera purpose string
+        // OFF and the provider's video flag ON -- so the app advertised
+        // video and was then denied the camera, or terminated for asking
+        // without a purpose string. Which reading is "right" is not the
+        // point: they disagreed.
+        assertTrue(CallManifestFragments.videoRequested(" true ", null));
+        assertTrue(CallManifestFragments.videoRequested("TRUE", null));
+        assertTrue(CallManifestFragments.videoRequested(null, "\ttrue\n"));
+        assertFalse(CallManifestFragments.videoRequested(null, null));
+        assertFalse(CallManifestFragments.videoRequested("false", "true"),
+                "the platform hint overrides the shared one");
+        assertTrue(CallManifestFragments.videoRequested(null, "true"),
+                "and the shared one is used when there is no override");
+        assertFalse(CallManifestFragments.videoRequested("yes", null),
+                "anything else is not a yes, as every reader already had it");
+    }
+
+    @Test
     public void aDeclarationTelecomCannotBindIsRefused() {
         // Suppressing the generated element on the class NAME alone let an
         // older or partial declaration replace a working one: Telecom

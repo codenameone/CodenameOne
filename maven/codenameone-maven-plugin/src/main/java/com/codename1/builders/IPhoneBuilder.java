@@ -5493,8 +5493,9 @@ public class IPhoneBuilder extends Executor {
                     }
                 }
                 if ((usesCallSession || usesCallVoip)
-                        && "true".equals(request.getArg("ios.call.video",
-                                request.getArg("call.video", "false")))) {
+                        && CallManifestFragments.videoRequested(
+                                request.getArg("ios.call.video", null),
+                                request.getArg("call.video", null))) {
                     // iOS refuses the camera prompt outright without a
                     // purpose string, so a video app that asked for CAMERA
                     // got a denial it could not clear. Behind the project's
@@ -14356,9 +14357,14 @@ public class IPhoneBuilder extends Executor {
             // before Java starts was audio-only and a cold-start VoIP video
             // call was reported through a provider claiming not to support
             // video.
+            // Through the SAME reader the camera disclosure uses. Compared
+            // exactly at one site and trimmed here, " true " turned the
+            // purpose string off and this flag on -- the provider offering
+            // video the app is then denied the camera for.
             inject = appendCallPlist(inject, "CN1CallSupportsVideo",
-                    request.getArg("ios.call.video",
-                            request.getArg("call.video", "false")));
+                    String.valueOf(CallManifestFragments.videoRequested(
+                            request.getArg("ios.call.video", null),
+                            request.getArg("call.video", null))));
             inject = appendCallPlist(inject, "CN1CallIncludesCallsInRecents",
                     request.getArg("ios.call.recents", "true"));
             // The two keys the directory half needs. CN1Call.m refuses

@@ -274,6 +274,30 @@ final class CallManifestFragments {
         return ManifestServiceContract.withoutComments(xml);
     }
 
+    /**
+     * Whether the project asked for video calls.
+     *
+     * <p>One reader for a hint three places consult. Compared with
+     * {@code "true".equals(...)} at one site and trimmed at another,
+     * {@code " true "} turned the camera purpose string off and the
+     * provider's video flag on -- so the app advertised video and was denied
+     * the camera, or terminated for asking without a purpose string. Which
+     * of the two readings was "right" is not the point: they disagreed.</p>
+     *
+     * <p>Trimmed and case-insensitive, matching the most permissive reader
+     * that existed, so no configuration that worked stops working.</p>
+     *
+     * @param platformOverride the {@code ios.} or {@code android.} hint, or
+     *                         null
+     * @param shared           the cross-platform {@code call.video} hint, or
+     *                         null
+     * @return whether video was asked for
+     */
+    static boolean videoRequested(String platformOverride, String shared) {
+        String value = platformOverride != null ? platformOverride : shared;
+        return value != null && "true".equalsIgnoreCase(value.trim());
+    }
+
     /** What only Telecom holds, so only Telecom can bind the connection. */
     static final String BIND_CONNECTION =
             "android.permission.BIND_TELECOM_CONNECTION_SERVICE";
