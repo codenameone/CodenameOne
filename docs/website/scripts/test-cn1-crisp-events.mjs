@@ -40,6 +40,8 @@ function load(
   legacyConsent = null
 ) {
   const timers = [];
+  const fetches = [];
+  let uuid = 0;
   const documentListeners = {};
   const banner = control();
   const accept = control();
@@ -85,6 +87,16 @@ function load(
   }
 
   const window = {
+    crypto: {
+      randomUUID() {
+        uuid += 1;
+        return `00000000-0000-4000-8000-${String(uuid).padStart(12, "0")}`;
+      },
+    },
+    fetch(url, options) {
+      fetches.push({ url, options });
+      return Promise.resolve({ ok: true });
+    },
     location: {
       hostname,
       pathname,
@@ -117,7 +129,15 @@ function load(
     window,
   });
   vm.runInContext(source, context, { filename: scriptPath });
-  return { accept, decline, documentListeners, timers, window, sessionStorage: context.sessionStorage };
+  return {
+    accept,
+    decline,
+    documentListeners,
+    fetches,
+    timers,
+    window,
+    sessionStorage: context.sessionStorage,
+  };
 }
 
 function eventCommands(state) {
@@ -196,6 +216,38 @@ function events(state) {
   assert.equal(recorded[1][0], "InitializrProjectDownloaded");
   assert.equal(recorded[1][1].experiment_arm, "ownership");
   assert.equal(recorded[2][0], "Exp004OwnershipDownload");
+  assert.equal(state.fetches.length, 2,
+    "the queryable counter must mirror the exposure and attributed download");
+  assert.deepEqual(
+    state.fetches.map(({ url, options }) => ({
+      url,
+      method: options.method,
+      keepalive: options.keepalive,
+      body: JSON.parse(options.body),
+    })),
+    [
+      {
+        url: "/api/exp004/collect",
+        method: "POST",
+        keepalive: true,
+        body: {
+          event: "Exp004OwnershipExposure",
+          event_id: "00000000-0000-4000-8000-000000000002",
+          session_key: "00000000-0000-4000-8000-000000000001",
+        },
+      },
+      {
+        url: "/api/exp004/collect",
+        method: "POST",
+        keepalive: true,
+        body: {
+          event: "Exp004OwnershipDownload",
+          event_id: "00000000-0000-4000-8000-000000000003",
+          session_key: "00000000-0000-4000-8000-000000000001",
+        },
+      },
+    ],
+  );
 }
 
 {
@@ -216,6 +268,8 @@ function events(state) {
   const recorded = events(state);
   assert.equal(recorded.length, 1);
   assert.equal(recorded[0][0], "Exp004ReachExposure");
+  assert.equal(state.fetches.length, 1,
+    "accepting consent must start the queryable exposure denominator");
 }
 
 {
@@ -233,6 +287,8 @@ function events(state) {
   const state = load("accepted", "", "/", "reach", false);
   assert.equal(eventCommands(state).length, 0,
     "a preview assignment must never emit production experiment telemetry");
+  assert.equal(state.fetches.length, 0,
+    "a preview assignment must never hit the first-party counter");
 }
 
 {
@@ -246,6 +302,8 @@ function events(state) {
   );
   assert.equal(eventCommands(state).length, 0,
     "a Cloudflare preview host must never emit production experiment telemetry");
+  assert.equal(state.fetches.length, 0,
+    "a Cloudflare preview must never hit the first-party counter");
 }
 
 {
@@ -257,6 +315,8 @@ function events(state) {
     "a direct project download must not be attributed without a current homepage exposure");
   assert.equal(recorded[0][0], "InitializrProjectDownloaded");
   assert.deepEqual(JSON.parse(JSON.stringify(recorded[0][1])), { page: "/initializr/" });
+  assert.equal(state.fetches.length, 0,
+    "an unexposed download must not hit the experiment counter");
 }
 
 {

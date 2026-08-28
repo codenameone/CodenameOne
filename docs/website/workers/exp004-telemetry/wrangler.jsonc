@@ -1,0 +1,59 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "cn1-exp004-telemetry",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "EXP004_COUNTER",
+        "class_name": "Exp004Counter"
+      }
+    ]
+  },
+  "exports": {
+    "Exp004Counter": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+  "env": {
+    "preview": {
+      "name": "cn1-exp004-telemetry-preview",
+      "workers_dev": true,
+      "routes": [],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "EXP004_COUNTER",
+            "class_name": "Exp004Counter"
+          }
+        ]
+      }
+    },
+    "production": {
+      "name": "cn1-exp004-telemetry-production",
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "www.codenameone.com/api/exp004*",
+          "zone_id": "b31d4897098049eb6245f29655530907"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "EXP004_COUNTER",
+            "class_name": "Exp004Counter"
+          }
+        ]
+      }
+    }
+  }
+}

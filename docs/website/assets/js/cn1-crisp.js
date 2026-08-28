@@ -6,6 +6,9 @@
   const CONVERSION_ARRIVAL_KEY = "cn1-conversion-arrival-v1";
   const OSS_ATTRIBUTION_KEY = "cn1-oss-attribution-v1";
   const EXP004_STORAGE_KEY = "cn1-exp-004-arm-v1";
+  const EXP004_COUNTER_SESSION_KEY = "cn1-exp-004-counter-session-v1";
+  const EXP004_COUNTER_EVENT_PREFIX = "cn1-exp-004-counter-event-v1-";
+  const EXP004_COUNTER_ENDPOINT = "/api/exp004/collect";
   const EXP004_ID = "EXP-004";
   const EXP004_HOSTNAME = (window.location && window.location.hostname) || "";
   const EXP004_PREVIEW_HOST = EXP004_HOSTNAME === "localhost" ||
@@ -153,6 +156,55 @@
   const crispEventSessionKey = (name, data) =>
     `cn1-crisp-ev-${crispEventDedupeName(name, data)}`;
 
+  const newExp004CounterId = () => {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+    if (!window.crypto || typeof window.crypto.getRandomValues !== "function") {
+      return null;
+    }
+    const bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-` +
+      `${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-` +
+      hex.slice(10).join("");
+  };
+
+  const reportFirstPartyExp004Event = (name) => {
+    if (!/^Exp004(?:Ownership|Reach)(?:Exposure|Download)$/.test(name) ||
+        typeof window.fetch !== "function") {
+      return false;
+    }
+    try {
+      let sessionKey = sessionStorage.getItem(EXP004_COUNTER_SESSION_KEY);
+      if (!sessionKey) {
+        sessionKey = newExp004CounterId();
+        if (!sessionKey) return false;
+        sessionStorage.setItem(EXP004_COUNTER_SESSION_KEY, sessionKey);
+      }
+      const eventKey = `${EXP004_COUNTER_EVENT_PREFIX}${name}`;
+      let eventId = sessionStorage.getItem(eventKey);
+      if (!eventId) {
+        eventId = newExp004CounterId();
+        if (!eventId) return false;
+        sessionStorage.setItem(eventKey, eventId);
+      }
+      void window.fetch(EXP004_COUNTER_ENDPOINT, {
+        method: "POST",
+        credentials: "same-origin",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event: name, event_id: eventId, session_key: sessionKey })
+      }).catch(() => {});
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
   const fireCrispEvent = (name, data) => {
     // Consent can change after a page schedules a dwell event. Check it at the
     // moment the event fires, before touching either deduplication guard.
@@ -177,6 +229,7 @@
       } catch (e) {
         // sessionStorage unavailable — the per-view guard still applies
       }
+      reportFirstPartyExp004Event(name);
       return true;
     } catch (e) {
       return false;
