@@ -83,22 +83,16 @@ public final class PacketBuffer {
         return out;
     }
 
-    /// Points this buffer at a packet the transport has read.
-    void set(byte[] source, int off, int len, int fam) {
-        if (source != data) {
-            if (data.length < len) {
-                data = new byte[len];
-            }
-            System.arraycopy(source, off, data, 0, len);
-            this.offset = 0;
-        } else {
-            this.offset = off;
-        }
-        this.length = len;
-        this.family = fam == FAMILY_IPV6 ? FAMILY_IPV6 : FAMILY_IPV4;
-    }
-
-    /// Fills this buffer from an application-supplied array.
+    /// Fills this buffer from an array the platform read into.
+    ///
+    /// Always a copy. A transport that reads STRAIGHT into this buffer's
+    /// backing array would want to keep it and move the offset instead, and
+    /// there was a mutator here that took the array and compared it by
+    /// identity to decide which of the two had happened. Nothing called it:
+    /// no transport reads in place yet, and the caller is in a better
+    /// position to say which it means than a reference comparison is. When
+    /// one exists it gets its own door in [TunnelBuffers], named for the
+    /// thing it does.
     void fill(byte[] source, int off, int len) {
         if (data.length < len) {
             data = new byte[len];

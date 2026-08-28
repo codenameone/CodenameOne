@@ -758,10 +758,21 @@ public final class PlatformFeatureCatalog {
         // way to say so.
         e.add(new Entry("com/codename1/call/directory/")
                 .iosFrameworks("CallKit")
-                // 24, where Android's CallScreeningService arrives. The iOS
-                // half needs no floor: the Call Directory extension is iOS 10
-                // and the deployment target has been past that for years.
-                .androidMinimumSdk(24)
+                // No minSdk, for the reason call/session and call/voip have
+                // none. CallDirectory.isSupported() is a runtime query, the
+                // Android bridge reports screening only from API 29, and an
+                // app that referenced the package to label callers on a
+                // modern device should still INSTALL on an old one and fall
+                // back to whatever it does without screening. Raising the
+                // whole app's floor to 24 to hold a class that only ever runs
+                // at 29 bought nothing and cost every pre-24 install.
+                //
+                // What that floor was really protecting is class LOADING:
+                // CN1CallScreeningService extends an API 24 type, so touching
+                // it below 24 is a NoClassDefFoundError. The role check that
+                // did touch it now lives in CallScreeningRole, which extends
+                // nothing -- see the note there. The manifest <service> is
+                // harmless on an old device: nothing binds it.
                 .description("Caller identification and call blocking"));
 
         // VPN configuration management. The iOS entitlements are NOT listed

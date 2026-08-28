@@ -272,7 +272,7 @@ public class AndroidCallBridge implements CallBridge {
         // permission bits -- and reporting it absent while the user held it
         // made requestPermissions look like it had been refused something
         // the app already had.
-        if (CN1CallScreeningService.isRoleHeld(context)) {
+        if (CallScreeningRole.isRoleHeld(context)) {
             mask |= PERMISSION_SCREENING_ROLE;
         }
         return mask;
@@ -349,7 +349,7 @@ public class AndroidCallBridge implements CallBridge {
             // user was never asked about.
             Activity a = currentActivity();
             if (a != null) {
-                CN1CallScreeningService.requestRole(a, new Runnable() {
+                CallScreeningRole.requestRole(a, new Runnable() {
                     @Override
                     public void run() {
                         Calls.deliverPermissionResult(requestId,
@@ -883,7 +883,7 @@ public class AndroidCallBridge implements CallBridge {
         // "disabled" while Android was actively binding the service.
         com.codename1.call.directory.CallDirectory.deliverStatus(requestId,
                 CallWire.join(new String[]{
-                    CallWire.flagOf(CN1CallScreeningService.isRoleHeld(context)),
+                    CallWire.flagOf(CallScreeningRole.isRoleHeld(context)),
                     "-1", "android"}));
     }
 
@@ -901,7 +901,7 @@ public class AndroidCallBridge implements CallBridge {
                     + " activity");
             return;
         }
-        CN1CallScreeningService.requestRole(a, requestId);
+        CallScreeningRole.requestRole(a, requestId);
     }
 
     /// Clears every call this port knows about, for a provider reset.

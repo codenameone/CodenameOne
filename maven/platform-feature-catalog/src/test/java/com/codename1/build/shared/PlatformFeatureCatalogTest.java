@@ -116,6 +116,33 @@ class PlatformFeatureCatalogTest {
     }
 
     @Test
+    void noCallPackageRaisesTheAndroidInstallFloor() {
+        // Every call capability is a RUNTIME query -- Calls.isSupported(),
+        // CallDirectory.isSupported() -- which an app is meant to branch on
+        // and degrade around. A floor here turns each of those into an
+        // install requirement instead, so a phone that would simply have
+        // reported the feature absent cannot run the app at all.
+        //
+        // The directory entry is the one that keeps trying to come back,
+        // because CN1CallScreeningService extends an API 24 class and a floor
+        // reads like the way to keep it from loading. It is not: the guard
+        // has to be that nothing NAMES the class below 24, which is why the
+        // role check lives in CallScreeningRole. A floor here would only hide
+        // that the class-loading question had been answered wrongly.
+        String[] packages = {"com/codename1/call/session/Calls",
+            "com/codename1/call/voip/VoipPush",
+            "com/codename1/call/directory/CallDirectory"};
+        for (String prefix : packages) {
+            List<PlatformFeatureCatalog.Entry> hits =
+                    PlatformFeatureCatalog.matchesFor(prefix);
+            assertEquals(1, hits.size(), prefix);
+            assertEquals(0, hits.get(0).androidMinimumSdk(),
+                    prefix + " must not raise the app's install floor for a"
+                    + " capability it reports at runtime");
+        }
+    }
+
+    @Test
     void managedVpnNeedsNoAndroidFloor() {
         // VpnManager is API 30 but is reached reflectively, so the port
         // reports the capability absent below 30 rather than the whole app

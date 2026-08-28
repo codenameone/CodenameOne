@@ -540,6 +540,17 @@ public class AndroidVpnBridge implements VpnBridge {
             // configuration still existed after the removal it had just
             // reported as successful.
             startRequested = false;
+            // The same argument, for the flag that says a teardown of ours is
+            // still outstanding. remove() after an acknowledged stop() is the
+            // ordinary way to retire a profile, and it leaves one pending by
+            // construction -- stop() reports as soon as the platform accepts,
+            // while the transport lives on for the teardown. Cleared only
+            // here, the removal published NOT_CONFIGURED and the loss that
+            // followed was still ours to hear, so it overwrote that with
+            // DISCONNECTED and getStatus() went back to claiming a profile
+            // this method had just deleted. Ownership of a teardown cannot
+            // outlive the profile being torn down.
+            stopRequested = false;
             if (!isListening()) {
                 stopWatchingTheTunnel();
             }
