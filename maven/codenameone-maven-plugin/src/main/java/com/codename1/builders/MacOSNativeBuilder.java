@@ -227,6 +227,20 @@ public class MacOSNativeBuilder extends Executor {
             // sees, and exactly what the offline signature gate verifies.
             extractJarResource("/MacPort.jar", portClasses);
             extractJarResource("/nativemac.jar", nativeSources);
+            // The themes out of that jar are APPLICATION resources, not native
+            // sources, and have to be where getResourceAsStream() can find them
+            // at run time. The iOS builder gets this for free -- it unzips
+            // nativeios.jar with buildinRes as the resource destination -- while
+            // this one stages the same jar for clang alone.
+            //
+            // The failure was silent and expensive to find. installNativeTheme()
+            // asks for /iOSModernTheme.res, gets null, and falls through to
+            // iOS7Theme.res without a word; iOS7Theme declares no
+            // @darkModeBool, which is the constant UIManager gates the entire
+            // dark palette on, so every dark-appearance screen rendered light
+            // however carefully the application asked for dark. Nothing failed
+            // to build and nothing was logged.
+            stageThemeResources(nativeSources, buildinRes);
         } catch (Exception ex) {
             throw new BuildException("Failed to stage the MacPort native layer. The codenameone "
                     + "maven plugin must provide the codenameone-mac 'bundle' artifact "
@@ -695,7 +709,10 @@ public class MacOSNativeBuilder extends Executor {
      * ships in both ports, and the transitions it declares are the ones
      * CN1MacAppDelegate reports.</p>
      */
-    private void writeStub(BuildRequest request, File stubSource, File classesDir,
+    // Package-visible so a test can read the generated source. The theme mode
+    // it emits decides whether the application has a dark mode at all, and
+    // that is invisible until a screenshot suite runs an hour later.
+    void writeStub(BuildRequest request, File stubSource, File classesDir,
             MacOSBuildHints hints) throws Exception {
         String themeMode = hints.getThemeMode();
         String svgRegistryInstall = new File(classesDir,
@@ -2064,6 +2081,35 @@ public class MacOSNativeBuilder extends Executor {
             throw ex;
         } catch (Exception ex) {
             throw new BuildException("Failed to collect the built application bundle", ex);
+        }
+    }
+
+    /// Copies the theme resources staged for clang into the application's
+    /// resource directory, which is where the runtime looks for them.
+    ///
+    /// A copy rather than a move: the native staging directory is what the
+    /// offline signature gate verifies, and quietly removing files from it would
+    /// make that gate answer about a set the build never assembled.
+    // Package-visible so a test can drive it; the failure it prevents is
+    // invisible until a screenshot suite runs on a macOS runner.
+    static void stageThemeResources(File nativeSources, File buildinRes)
+            throws IOException {
+        File[] staged = nativeSources.listFiles();
+        if (staged == null) {
+            return;
+        }
+        for (File f : staged) {
+            if (!f.isFile() || !f.getName().endsWith(".res")) {
+                continue;
+            }
+            File target = new File(buildinRes, f.getName());
+            if (target.exists()) {
+                // The application's own resource of the same name wins. unzip()
+                // put it there from the submitted archive, and a theme the
+                // developer shipped is not ours to overwrite.
+                continue;
+            }
+            java.nio.file.Files.copy(f.toPath(), target.toPath());
         }
     }
 
