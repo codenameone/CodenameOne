@@ -106,6 +106,10 @@ static long long cn1RoundToStep(long long value, long long step) {
 /// express a duration at all -- see cn1BuildDurationView.
 @property (nonatomic, retain) NSTextField *durationHoursField;
 @property (nonatomic, retain) NSTextField *durationMinutesField;
+/// The largest duration those fields can express, in milliseconds. Their own
+/// maxima stop the USER exceeding it; this is what stops the step rounding
+/// below doing so after the fact.
+@property (nonatomic, assign) long long durationMaxMillis;
 @end
 
 @implementation CN1MacPickerController
@@ -131,6 +135,19 @@ static long long cn1RoundToStep(long long value, long long step) {
         if (self.minuteStep > 1) {
             long long stepMs = (long long)self.minuteStep * 60000LL;
             total = (long long)cn1RoundToStep((long long)total, (long long)stepMs);
+            // Rounding is the last thing to touch the value, so it can carry it
+            // out of the range the fields enforce: 999 minutes at a 60 minute
+            // step rounds up to 1020, and 999h59m at the same step rounds up to
+            // 1000 hours. Both are durations the picker never displayed and its
+            // own fields would have refused. Stepping back to the highest value
+            // that is both on the step and inside the range keeps Done returning
+            // something the control could have shown.
+            if (self.durationMaxMillis > 0 && total > self.durationMaxMillis) {
+                total = (self.durationMaxMillis / stepMs) * stepMs;
+            }
+            if (total < 0) {
+                total = 0;
+            }
         }
         cn1PickerFinish((JAVA_LONG)total);
         return;
@@ -294,6 +311,11 @@ static NSView *cn1BuildDurationView(CN1MacPickerController *controller, int type
     }
     controller.durationHoursField = hoursField;
     controller.durationMinutesField = minutesField;
+    // The same maxima the fields above were given, as a duration: 999 of
+    // whichever unit stands alone, and 999h59m when both are present.
+    controller.durationMaxMillis = (type == 5 || type == 6 ? 999LL * 3600000LL : 0LL)
+            + (type == 5 ? 59LL * 60000LL : 0LL)
+            + (type == 7 ? 999LL * 60000LL : 0LL);
     view.frame = NSMakeRect(0, 0, x, 56);
 #ifndef CN1_USE_ARC
     [view autorelease];
