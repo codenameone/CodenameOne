@@ -139,6 +139,23 @@ arm's `markMs` and `satbMs` read HIGHER at an unchanged 6.4 -> 6.1ns per drained
 Chunked rather than one hold for the whole range, because a single acquisition across a
 million-element array would block `cn1SatbTake` for the entire walk.
 
+**Clearing `gcSatbActive` is a TRIAL, not the end of the mark.** The closing catch after the
+fixpoint can discover objects, and `gcMarkDrain` scans what it discovers -- so with the flag
+already down, an object sits GREY and unwatched while it is scanned. A mutator moving an old
+child out of it into a fresh container in that window logs nothing on either side: the drain
+scans the object the child has already left, the grace pass is long past the destination, and
+the child is unmarked, not fresh, and reachable only from the fresh container. The sweep takes
+it. So the clear is provisional -- an empty catch means closed, a non-empty one puts the
+barrier back UP before that batch is marked and re-runs the fixpoint. It terminates because an
+outer pass repeats only when it marked something NEW, and marks are monotonic and bounded by
+the live set.
+
+`satbReopens` (`CN1_GC_CONFORM`) counts the re-arms, so this is answered by the instrument
+rather than by argument: **0 on the churn workload** -- where the whole thing costs one extra
+empty `cn1SatbTake` a cycle -- **and 1 on `BulkCopyCost`**. Take that 1 seriously: the window
+is reachable rather than theoretical, and it shows up on exactly the bulk copy paths this
+issue put a barrier on.
+
 The flag check and the append are two steps, so the collector can clear `gcSatbActive` and
 run its final `cn1SatbTake()` between chunks and strand entries in a log this cycle never
 drains again. For a single store that window is argued harmless where the flag is cleared;
