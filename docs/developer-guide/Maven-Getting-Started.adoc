@@ -22,6 +22,7 @@ fast with a friendly message if it's older than 11. Build-only goals (such as
 [#creating-app-project]
 === Creating a new project
 
+[#codenameone-initializr]
 ==== Codename One initializr
 
 The easiest way to create a new project is to use the https://www.codenameone.com/initializr[Codename One initializr].
@@ -48,6 +49,31 @@ See https://shannah.github.io/cn1app-archetype-kotlin-template/getting-started.h
 
 ==== Generating a new project from the command-line
 
+[#configure-repository]
+===== Configuring the Codename One repository
+
+Codename One releases are published to the Codename One Maven repository at
+`https://repo.codenameone.com/maven2`, not to Maven Central. A generated project declares
+that repository in its own `pom.xml`, so once you have a project nothing further is needed.
+
+The commands in this section run *before* there is a project, so Maven has no `pom.xml` to
+read the repository from and searches only Maven Central. Central still serves every
+version published before the move, so these commands keep working, but they can't see a
+release published after it. Add the repository to your Maven settings once, in
+`~/.m2/settings.xml` (`%USERPROFILE%\.m2\settings.xml` on Windows), and they can:
+
+[source,xml]
+----
+include::../demos/common/src/main/snippets/developer-guide/maven-getting-started.xml[tag=maven-getting-started-xml-004,indent=0]
+----
+
+Both lists are needed. Maven resolves ordinary dependencies through `<repositories>` and
+build plugins through `<pluginRepositories>`, and the commands below invoke the Codename
+One plugin directly, which is the second list.
+
+TIP: <<codenameone-initializr,Codename One Initializr>> needs none of this. It builds the
+project on the server and hands you one that already declares the repository.
+
 [#cn1app-archetype-example]
 ===== Bare-bones Java project
 
@@ -62,6 +88,8 @@ This will generate a project in the current directory. The project's directory w
 
 
 NOTE: If you haven't used Maven archetypes before, this snippet may be confusing. See https://maven.apache.org/guides/introduction/introduction-to-archetypes.html[Introduction to Maven Archetypes] to get up to speed.
+
+NOTE: `-DarchetypeVersion=LATEST` resolves against whichever repositories Maven knows about. Without the settings from <<configure-repository>>, Maven Central is the only one, so the newest archetype it can offer is the last one published before the move. The generated project is still correct -- it declares the Codename One repository, so `mvn cn1:update` moves it to a current release -- but configuring the repository first gets you there directly.
 
 This command uses the <<#cn1app-archetype>> which has the following Maven coordinates:
 
@@ -93,7 +121,7 @@ Like the `archetype:generate` goal, this will create the project in a directory 
 
 Some notes here:
 
-. The `com.codenameone:codenameone-maven-plugin:{cn1-plugin-release-version}:generate-app-project` argument is the fully qualified goal name for the `generate-app-project`. This is necessary since you aren't running this goal in the context of any existing project. You should adjust the version number (`{cn1-plugin-release-version}`) to reflect the latest available Codename One version, listed as `<release>` in the https://repo.codenameone.com/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml[repository metadata].
+. The `com.codenameone:codenameone-maven-plugin:{cn1-plugin-release-version}:generate-app-project` argument is the fully qualified goal name for the `generate-app-project`. This is necessary since you aren't running this goal in the context of any existing project. You should adjust the version number (`{cn1-plugin-release-version}`) to reflect the latest available Codename One version, listed as `<release>` in the https://repo.codenameone.com/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml[repository metadata]. Because there is no project here, Maven finds that version only if you have <<configure-repository,configured the Codename One repository>> in your Maven settings.
 . The `archetypeGroupId`, `archetypeArtifactId`, and `archetypeVersion` parameters are the same as when using the `archetype:generate` goal, and they will (almost) always refer to the <<cn1app-archetype>>.
 . The `groupId`, `artifactId`, and `version` work the same as for the `archetype:generate` goal. That's, that they specify the coordinates for your newly created project.
 . The `mainName` specifies the Main class name for your app. This is the class name, and shouldn't include the full package. For example, `MyApp`, not "com.example.MyApp"
