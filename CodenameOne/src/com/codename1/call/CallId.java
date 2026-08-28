@@ -22,7 +22,7 @@
  */
 package com.codename1.call;
 
-import java.util.Random;
+import com.codename1.security.SecureRandom;
 
 /// Canonical form of the identifier that names one call everywhere: in this
 /// API, in CallKit, in Telecom, and in the VoIP push payload a server sends.
@@ -57,19 +57,31 @@ public final class CallId {
         '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
     };
 
-    private static final Random RANDOM = new Random();
-
     private CallId() {
     }
 
     /// A fresh random (version 4) identifier in canonical form.
     ///
+    /// From [com.codename1.security.SecureRandom], deliberately, and NOT
+    /// from `java.util.Random`. The device runtime's Random is
+    /// `this(System.currentTimeMillis())` over a 48-bit LCG -- see
+    /// vm/JavaAPI/src/java/util/Random.java -- so two processes that reach
+    /// this class in the same millisecond produce the same sequence of
+    /// identifiers, and it is the SEED that collides rather than the 122
+    /// random bits, which is a far smaller space than the format suggests.
+    /// A call id is not decoration: it is the key CallKit and Telecom hold
+    /// the session under and the token the app's server routes signalling
+    /// by, so two calls sharing one aliases them -- CallKit answers a
+    /// duplicate report with CallUUIDAlreadyExists, and a server hands the
+    /// wrong session an answer or an end.
+    ///
+    /// Every port that supports calling implements secureRandomBytes, so
+    /// this does not narrow where the API works.
+    ///
     /// @return 36 uppercase characters with hyphens
     public static String random() {
         byte[] bytes = new byte[16];
-        synchronized (RANDOM) {
-            RANDOM.nextBytes(bytes);
-        }
+        SecureRandom.fill(bytes);
         // Version 4, variant 1, per RFC 4122. Without these the identifier
         // is still unique but is not a valid UUID, and CallKit rejects it.
         bytes[6] = (byte) ((bytes[6] & 0x0f) | 0x40);

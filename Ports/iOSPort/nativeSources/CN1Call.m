@@ -1552,7 +1552,13 @@ void cn1CallInstallPushRegistry(void) {
         cn1clRegistry = [[PKPushRegistry alloc]
                 initWithQueue:dispatch_get_main_queue()];
         cn1clRegistry.delegate = cn1clPushDelegate;
-        cn1clRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
+        // Under the lock as everywhere else, so the registry is never
+        // publishable with a desiredPushTypes the flag disagrees with.
+        @synchronized (cn1clLock) {
+            cn1clRegistry.desiredPushTypes =
+                    [NSSet setWithObject:PKPushTypeVoIP];
+            cn1clVoipWanted = YES;
+        }
     });
 }
 
@@ -2341,15 +2347,20 @@ void com_codename1_impl_ios_IOSNative_callRegisterVoipPush___int(
     // and parked a request that no credentials could ever answer -- VoIP
     // delivery stayed off until the process restarted. Re-asserting the type
     // is what makes PushKit hand the token over again.
-    if (cn1clRegistry != nil) {
-        cn1clRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
-    }
-    // Ordered with the delegate rather than only with PushKit; see
-    // cn1clVoipWanted. Set before the block so a credentials callback that
-    // answers this registration is never dropped as belonging to an app that
-    // had opted out.
+    // The PushKit switch and its guarded mirror move together, under the
+    // lock. Split, they interleaved into a state neither caller asked for:
+    // an unregister landing between the two writes here emptied
+    // desiredPushTypes and cleared the flag, and then this register restored
+    // only the flag -- so the block below saw "wanted", parked the request,
+    // and PushKit delivery stayed off, leaving an AsyncResource that could
+    // never be answered. Which is the one failure this SPI exists to
+    // prevent, arrived at by two calls that were each individually correct.
     cn1clEnsureState();
     @synchronized (cn1clLock) {
+        if (cn1clRegistry != nil) {
+            cn1clRegistry.desiredPushTypes =
+                    [NSSet setWithObject:PKPushTypeVoIP];
+        }
         cn1clVoipWanted = YES;
     }
     // The token READ and the parking under one lock, and the delegate stores
@@ -2414,9 +2425,6 @@ void com_codename1_impl_ios_IOSNative_callUnregisterVoipPush___int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId) {
 #if defined(CN1_CALL_HAS_PUSHKIT) && defined(CN1_CALL_HAS_CALLKIT)
-    if (cn1clRegistry != nil) {
-        cn1clRegistry.desiredPushTypes = [NSSet set];
-    }
     // Anything still waiting for credentials is failed rather than left
     // parked: with delivery switched off no callback can settle it, and the
     // invalidation path uses -1 and settles nothing. An AsyncResource that
@@ -2424,6 +2432,12 @@ void com_codename1_impl_ios_IOSNative_callUnregisterVoipPush___int(
     NSArray *waiting = nil;
     cn1clEnsureState();
     @synchronized (cn1clLock) {
+        // Inside the lock with the flag, and for the reason register gives:
+        // the switch and its mirror are one state, so they are written under
+        // one ordering or they contradict each other.
+        if (cn1clRegistry != nil) {
+            cn1clRegistry.desiredPushTypes = [NSSet set];
+        }
         // The clear belongs in here with the drain, not above it: this runs
         // on a Java thread, and the token is read under this lock.
         //

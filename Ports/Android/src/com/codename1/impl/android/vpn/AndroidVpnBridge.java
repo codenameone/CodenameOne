@@ -66,6 +66,12 @@ public class AndroidVpnBridge implements VpnBridge {
 
     private static final int MIN_VPN_MANAGER_SDK = 30;
 
+    /// The platform could not say what this app's profile is doing.
+    private static final int PROFILE_STATE_UNKNOWN = Integer.MIN_VALUE;
+
+    /// The platform says there is no provisioned profile at all.
+    private static final int PROFILE_STATE_NONE = Integer.MIN_VALUE + 1;
+
     /// Android's own request code for the consent dialog.
     private static final int PROVISION_REQUEST = 0x7654;
 
@@ -116,6 +122,24 @@ public class AndroidVpnBridge implements VpnBridge {
     /// life of the process. This flag is what makes the stop path observe the
     /// teardown on its own account.
     private volatile boolean stopRequested;
+
+    /// When that teardown was asked for, in wall-clock millis. See
+    /// ownTunnelStillUp: it bounds how long an ambiguous answer may hold the
+    /// status in DISCONNECTING.
+    private volatile long stopRequestedAt;
+
+    /// How long a pending teardown may go unconfirmed before it is taken as
+    /// finished.
+    ///
+    /// Only reached where the platform cannot answer for this app's own
+    /// profile AND some other app's VPN is up, which is the one combination
+    /// in which nothing available says whether our tunnel is gone.
+    /// stopProvisionedVpnProfile is a request Android acts on promptly, so
+    /// after this long either it is down or nothing here will ever learn
+    /// that it is. Settling is the recoverable error of the two: a status
+    /// that says DISCONNECTED slightly early is corrected by the next
+    /// transport event, while DISCONNECTING is a state nothing can leave.
+    private static final long STOP_SETTLE_MILLIS = 8000L;
 
     /// A status written while an operation held the bridge, awaiting its
     /// release. Guarded by `this`, like the status it mirrors.
@@ -214,7 +238,7 @@ public class AndroidVpnBridge implements VpnBridge {
         //
         // Deliberately outside the monitor -- ConnectivityManager is asked
         // here, and setStatus below reaches application code.
-        if (vpnTransportPresent()) {
+        if (ownTunnelStillUp()) {
             synchronized (this) {
                 return status;
             }
@@ -233,13 +257,71 @@ public class AndroidVpnBridge implements VpnBridge {
         return VpnStatus.DISCONNECTED;
     }
 
-    /// Whether the platform has ANY VPN transport up right now.
+    /// Whether this app's own tunnel still appears to be up, for a teardown
+    /// that has been asked for and not yet seen through.
     ///
-    /// Android offers no way to ask whether a PARTICULAR profile's tunnel is
-    /// up, so this answers the weaker question, and the weakness is bounded:
-    /// it is consulted only while this app is waiting for its own teardown,
-    /// where the sole cost of another app's VPN being up is that the settle
-    /// waits for the next call rather than happening on this one.
+    /// Three answers in descending order of authority, because the first two
+    /// are not always available:
+    ///
+    /// 1. The platform's own view of THIS app's provisioned profile. Exact
+    ///    when the device offers it, and the only source here that is about
+    ///    our profile rather than about VPNs in general.
+    /// 2. Otherwise, whether any VPN transport is present. Android will not
+    ///    say WHICH VPN a transport belongs to, so another app's counts --
+    ///    and on its own that was enough to hold this app in DISCONNECTING
+    ///    for as long as a corporate VPN stayed connected, which is to say
+    ///    indefinitely. It is evidence, not proof.
+    /// 3. So the ambiguous answer expires. Past STOP_SETTLE_MILLIS the
+    ///    teardown is taken as done whatever the transport says.
+    ///
+    /// A tunnel of our own that really is going down still settles the
+    /// instant its transport is lost, through onTunnelTransport; none of
+    /// this replaces that, it only covers the case where no loss is coming.
+    private boolean ownTunnelStillUp() {
+        int own = provisionedProfileState();
+        if (own == Reflect.STATE_CONNECTED || own == Reflect.STATE_CONNECTING) {
+            return true;
+        }
+        if (own != PROFILE_STATE_UNKNOWN) {
+            // The platform answered, and it did not say up.
+            return false;
+        }
+        if (!vpnTransportPresent()) {
+            return false;
+        }
+        long since = System.currentTimeMillis() - stopRequestedAt;
+        // Negative would mean the clock went backwards, which is a reason to
+        // stop waiting rather than to wait for ever.
+        return since >= 0 && since < STOP_SETTLE_MILLIS;
+    }
+
+    /// This app's provisioned profile state, or PROFILE_STATE_UNKNOWN.
+    private int provisionedProfileState() {
+        if (Reflect.PROFILE_STATE == null || Reflect.STATE_OF == null) {
+            return PROFILE_STATE_UNKNOWN;
+        }
+        try {
+            Object state = Reflect.PROFILE_STATE.invoke(Reflect.manager(context));
+            if (state == null) {
+                // No profile provisioned; nothing of ours is up.
+                return PROFILE_STATE_NONE;
+            }
+            // Narrowed in asInt, outside this try, for the reason asIntent
+            // gives: ParparVM does not check CHECKCAST, so a cast that fails
+            // under a handler does not throw and cannot be caught --
+            // scripts/check-cast-semantics.sh reports the shape whether or
+            // not an instanceof sits beside it.
+            return asInt(Reflect.STATE_OF.invoke(state),
+                    PROFILE_STATE_UNKNOWN);
+        } catch (Exception e) {
+            // Including the SecurityException a platform throws with nothing
+            // provisioned. Unknown rather than "down": the transport check
+            // and the deadline below are what decide then.
+            return PROFILE_STATE_UNKNOWN;
+        }
+    }
+
+    /// Whether the platform has ANY VPN transport up right now.
     private boolean vpnTransportPresent() {
         if (Build.VERSION.SDK_INT < 21) {
             return false;
@@ -818,6 +900,9 @@ public class AndroidVpnBridge implements VpnBridge {
             //
             // Set AFTER the platform accepted: a refusal must not leave a
             // teardown pending for a tunnel that is still up.
+            // Stamped before the flag, so a reader that sees the flag always
+            // sees a time that is not left over from a previous stop.
+            stopRequestedAt = System.currentTimeMillis();
             stopRequested = true;
             // And something has to be WATCHING. startVpn arms the watcher,
             // but a process that did not start this tunnel never ran it --
@@ -1051,6 +1136,16 @@ public class AndroidVpnBridge implements VpnBridge {
         return context instanceof Activity ? (Activity) context : null;
     }
 
+    /// A reflective answer as an `int`, or the fallback when it is not one.
+    ///
+    /// In its own method, outside any `try`, for the reason asIntent gives.
+    private static int asInt(Object o, int fallback) {
+        if (o instanceof Integer) {
+            return ((Integer) o).intValue();
+        }
+        return fallback;
+    }
+
     /// A reflective answer as an `Intent`, or null when it is not one.
     ///
     /// In its own method, outside any `try`, for the reason
@@ -1096,6 +1191,18 @@ public class AndroidVpnBridge implements VpnBridge {
         private static final Method DELETE;
         private static final Method START;
         private static final Method STOP;
+        /// getProvisionedVpnProfileState, or null where the platform has no
+        /// such method. It arrived well after VpnManager itself, so it is
+        /// looked up separately and its absence is not a failure to load --
+        /// everything else here still works without it.
+        private static final Method PROFILE_STATE;
+        /// VpnProfileState.getState, paired with PROFILE_STATE.
+        private static final Method STATE_OF;
+        /// STATE_CONNECTED and STATE_CONNECTING, read from the class rather
+        /// than written down here: a constant copied into this file would go
+        /// on comparing equal after the platform renumbered it.
+        private static final int STATE_CONNECTED;
+        private static final int STATE_CONNECTING;
         private static final boolean LOADED;
 
         static {
@@ -1127,6 +1234,31 @@ public class AndroidVpnBridge implements VpnBridge {
             START = start;
             STOP = stop;
             LOADED = ok;
+
+            Method profileState = null;
+            Method stateOf = null;
+            int connected = -1;
+            int connecting = -2;
+            try {
+                if (manager != null) {
+                    profileState =
+                            manager.getMethod("getProvisionedVpnProfileState");
+                    Class<?> state = Class.forName("android.net.VpnProfileState");
+                    stateOf = state.getMethod("getState");
+                    connected = state.getField("STATE_CONNECTED").getInt(null);
+                    connecting = state.getField("STATE_CONNECTING").getInt(null);
+                }
+            } catch (Throwable t) {
+                // A platform old enough to have VpnManager without this. The
+                // callers fall back rather than failing; see
+                // ownTunnelStillUp.
+                profileState = null;
+                stateOf = null;
+            }
+            PROFILE_STATE = profileState;
+            STATE_OF = stateOf;
+            STATE_CONNECTED = connected;
+            STATE_CONNECTING = connecting;
         }
 
         static Object manager(Context context) {
