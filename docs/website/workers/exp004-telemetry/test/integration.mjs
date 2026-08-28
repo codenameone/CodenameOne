@@ -11,14 +11,18 @@ const localUrl = "http://127.0.0.1:8797";
 async function waitFor(url, process) {
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
-    if (process?.exitCode !== null) {
+    if (process && process.exitCode !== null) {
       throw new Error(`wrangler exited before becoming ready (${process.exitCode})`);
     }
     try {
       const response = await fetch(`${url}/api/exp004/snapshot`);
-      if (response.ok) return;
+      if (response.ok && (response.headers.get("content-type") || "")
+        .includes("application/json")) {
+        const payload = await response.json();
+        if (payload.experiment_id === "EXP-004") return;
+      }
     } catch (error) {
-      // The local runtime is still starting.
+      // The local runtime or remote hostname is still becoming ready.
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -196,7 +200,9 @@ async function verify(baseUrl) {
 
 const remoteUrl = process.argv[2];
 if (remoteUrl) {
-  await verify(remoteUrl.replace(/\/$/, ""));
+  const normalizedRemoteUrl = remoteUrl.replace(/\/$/, "");
+  await waitFor(normalizedRemoteUrl);
+  await verify(normalizedRemoteUrl);
   console.log("EXP-004 live telemetry integration passed");
 } else {
   const persistPath = await mkdtemp(join(tmpdir(), "cn1-exp004-worker-"));
