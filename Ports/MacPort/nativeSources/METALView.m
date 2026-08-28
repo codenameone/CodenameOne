@@ -1973,12 +1973,30 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
             threadStateData, (JAVA_INT)command, (JAVA_INT)0);
 }
 
+/// Guarded here as well as in validateUserInterfaceItem:, for the reason -copy:
+/// gives immediately below: a key equivalent reaches the responder chain
+/// directly and never asks whether the menu item is enabled. Validation alone
+/// left Command-Z live in a window whose rendering view had become first
+/// responder while the editor session belonged to a different one, and the
+/// command went to the process-global session -- undoing text in a window the
+/// user was not looking at.
+///
+/// The condition is the same one validation answers with, deliberately: two
+/// spellings of "may this view undo" would eventually disagree.
+- (void)cn1PerformEditorUndoRedo:(int)command {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (!session.pureEditor || !cn1OwnsSession(self, session)) {
+        return;
+    }
+    [self cn1SendEditorKeyCommand:command];
+}
+
 - (void)undo:(id)sender {
-    [self cn1SendEditorKeyCommand:16];
+    [self cn1PerformEditorUndoRedo:16];
 }
 
 - (void)redo:(id)sender {
-    [self cn1SendEditorKeyCommand:17];
+    [self cn1PerformEditorUndoRedo:17];
 }
 
 - (void)copy:(id)sender {

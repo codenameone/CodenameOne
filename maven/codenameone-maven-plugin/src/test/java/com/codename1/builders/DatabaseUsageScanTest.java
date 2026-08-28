@@ -492,6 +492,34 @@ class DatabaseUsageScanTest {
                 "an archive refused on the entry count must not read as clean");
     }
 
+    /// The OUTER archive is bounded by the entry count too. Skipping an entry
+    /// there is cheap -- ZipFile is random access -- but cheap per entry is not
+    /// bounded, and its central directory comes out of the same upload. Charging
+    /// only the entries the scan wanted left directories and nested archives
+    /// free to run past the limit, and a nested archive is not even cheap: each
+    /// one costs a whole recursive scan.
+    @Test
+    void theOuterArchiveIsCountedToo() throws IOException {
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs() || lib.isDirectory());
+        java.util.zip.ZipOutputStream jar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "wide.jar")));
+        try {
+            for (int i = 0; i <= Executor.PERM_SCAN_MAX_ENTRIES; i++) {
+                jar.putNextEntry(new java.util.zip.ZipEntry("d" + i + "/"));
+                jar.closeEntry();
+            }
+            jar.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Plain.class"));
+            jar.write(classTouchingNothing());
+            jar.closeEntry();
+        } finally {
+            jar.close();
+        }
+
+        assertTrue(executor.scanForDatabaseUsage(root).usesDatabase(),
+                "an outer archive refused on the entry count must not read as clean");
+    }
+
     /// A class that references nothing this scan looks for.
     private byte[] classTouchingNothing() {
         org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);

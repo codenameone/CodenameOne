@@ -1470,7 +1470,18 @@ void CN1PushCompletionReleaseOldest(void) {
         return;
     }
     NSNumber *key = [[[cn1PushCompletionOrder objectAtIndex:0] retain] autorelease];
-    cn1FirePushCompletion(key);
+    // ONE grant, not the whole record -- which is what the count exists for and
+    // what the named path above does. A legacy type-3 notification emits an
+    // alert message and a metadata message, so its record is retained twice and
+    // an application using ios.delayPushCompletion calls notifyPushCompletion()
+    // once per push() callback. Firing the record on the first of those told iOS
+    // the background work was finished while the second callback was still
+    // running, and the app could be suspended in the middle of it.
+    //
+    // The oldest key only advances once its record reaches zero and is removed,
+    // so a caller that finishes its pushes in order still releases them in
+    // order.
+    CN1PushCompletionRelease([key longLongValue]);
 }
 #endif
 

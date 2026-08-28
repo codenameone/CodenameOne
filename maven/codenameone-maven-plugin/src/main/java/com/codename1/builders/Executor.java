@@ -887,6 +887,16 @@ public abstract class Executor {
             while (entries.hasMoreElements() && !(found[0] && found[1])) {
                 java.util.zip.ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
+                // Charged before any branch, exactly as the permission scanner
+                // beside this one does and for the same reason: skipping an
+                // entry here is cheap, because ZipFile is random access, but
+                // cheap per entry is not the same as bounded, and the central
+                // directory of the OUTER archive is attacker-controlled too.
+                // Charging only the entries this scan wanted left directories,
+                // nested archives and every other name free to iterate past the
+                // advertised limit -- and a nested .jar is not even cheap, since
+                // each one costs a whole recursive scan.
+                budget.entry(name);
                 if (entry.isDirectory()) {
                     continue;
                 }
@@ -932,7 +942,6 @@ public abstract class Executor {
                 try {
                     java.io.InputStream in = zip.getInputStream(entry);
                     try {
-                        budget.entry(name);
                         inspectClassForDatabaseUsage(
                                 budget.readEntry(in, name, entry.getSize()), found);
                     } finally {
