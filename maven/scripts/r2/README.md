@@ -121,6 +121,14 @@ built, so metadata generated from it would list exactly one version and clobber 
 accumulated history. Deriving from the listing is idempotent, repairs partial uploads on
 re-run, and gives the retention job the same code path when it *removes* versions.
 
+Its set of frozen artifacts — the ones exempt from the release-marker requirement, because
+they are seeded rather than released — comes from `frozen-coordinates.py` too. The
+hardcoded set this replaced was wrong in both directions: it listed `sqlite-jdbc`, an
+ordinary reactor module that therefore had its *incomplete* releases advertised, and it
+omitted `cn1-builder-resources-{common,android}`, which would have been seeded and then
+withheld, printing a "release not marked complete" line about their pinned version on
+every future run forever.
+
 Run it after every `publish-staging-to-r2.sh`.
 
 ## Rules

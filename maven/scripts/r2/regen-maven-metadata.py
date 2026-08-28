@@ -57,7 +57,29 @@ REPO_URL = "https://repo.codenameone.com/maven2"
 # release. They are seeded into R2 once by seed-frozen-artifacts.sh and are resolved by
 # exact pinned version, not discovered, so they carry no release marker -- requiring one
 # would leave them permanently invisible and reported as incomplete on every run.
-FROZEN_ARTIFACTS = {"sqlite-jdbc", "codenameone-designer", "codenameone-javase-svg"}
+#
+# Taken from frozen-coordinates.py rather than repeated, because the hardcoded set this
+# replaces was wrong in both directions: it listed sqlite-jdbc, which is an ordinary
+# reactor module published on every tag and so must NOT be exempt from the release
+# marker, and it omitted cn1-builder-resources-{common,android}, which would have been
+# seeded and then refused advertisement, with a "release not marked complete" line about
+# their pinned version printed on every future run forever.
+def _frozen_artifacts():
+    """artifactIds from frozen-coordinates.py, which derives them from the tree."""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frozen-coordinates.py")
+    # A subprocess rather than an import: the file name has a hyphen, so it is not a
+    # legal module name, and shelling out keeps the one derivation authoritative.
+    out = subprocess.run([sys.executable, script], stdout=subprocess.PIPE, check=True,
+                         universal_newlines=True).stdout
+    # Fail rather than silently return an empty set: empty means every seeded artifact
+    # gets held back for a release marker it will never have.
+    artifacts = {line.split(":")[0] for line in out.splitlines() if line.strip()}
+    if not artifacts:
+        raise SystemExit("frozen-coordinates.py produced no coordinates")
+    return artifacts
+
+
+FROZEN_ARTIFACTS = _frozen_artifacts()
 
 RELEASES_PSEUDO_ARTIFACT = "_cn1-releases"
 RELEASE_MARKER = "complete"
