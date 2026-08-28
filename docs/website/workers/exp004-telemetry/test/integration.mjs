@@ -33,7 +33,7 @@ async function post(baseUrl, body, origin = "https://www.codenameone.com") {
       Origin: origin,
       "Sec-Fetch-Site": "same-origin",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ occurred_at: Date.now(), ...body }),
   });
 }
 
@@ -123,9 +123,14 @@ async function verify(baseUrl) {
 
   const ownershipSession = crypto.randomUUID();
   const ownershipToken = await enroll(baseUrl, ownershipSession, "ownership");
+  const ownershipOccurredAt = Math.max(
+    Date.parse(initial.original_experiment_start) + 1_000,
+    Date.now() - 24 * 60 * 60 * 1000,
+  );
   const ownershipExposure = {
     event: "Exp004OwnershipExposure",
     event_id: crypto.randomUUID(),
+    occurred_at: ownershipOccurredAt,
     session_key: ownershipSession,
     submission_token: ownershipToken,
   };
@@ -145,6 +150,15 @@ async function verify(baseUrl) {
     submission_token: crypto.randomUUID(),
   });
   assert.equal(unauthorized.status, 401);
+
+  const futureDated = await post(baseUrl, {
+    event: "Exp004ReachExposure",
+    event_id: crypto.randomUUID(),
+    occurred_at: Date.now() + 10 * 60 * 1000,
+    session_key: reachSession,
+    submission_token: reachToken,
+  });
+  assert.equal(futureDated.status, 400);
 
   const reachDownload = await post(baseUrl, {
     event: "Exp004ReachDownload",
@@ -171,16 +185,13 @@ async function verify(baseUrl) {
     ownership: { exposures: 1, downloads: 1 },
     reach: { exposures: 1, downloads: 1 },
   });
-  assert.equal(snapshot.daily.length, 1);
-  assert.deepEqual(
-    Object.fromEntries(Object.entries(snapshot.daily[0]).filter(([key]) => key !== "date")),
-    {
-      ownership_exposures: 1,
-      ownership_downloads: 1,
-      reach_exposures: 1,
-      reach_downloads: 1,
-    },
+  const ownershipOccurrenceDate = new Date(ownershipOccurredAt)
+    .toISOString().slice(0, 10);
+  const ownershipOccurrenceBucket = snapshot.daily.find(
+    (row) => row.date === ownershipOccurrenceDate
   );
+  assert.equal(ownershipOccurrenceBucket?.ownership_exposures, 1,
+    "daily exposure counts must use the client occurrence date");
 }
 
 const remoteUrl = process.argv[2];

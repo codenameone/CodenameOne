@@ -9,6 +9,7 @@
   const EXP004_COUNTER_SESSION_KEY = "cn1-exp-004-counter-session-v1";
   const EXP004_COUNTER_TOKEN_KEY = "cn1-exp-004-counter-token-v1";
   const EXP004_COUNTER_EVENT_PREFIX = "cn1-exp-004-counter-event-v1-";
+  const EXP004_COUNTER_OCCURRED_PREFIX = "cn1-exp-004-counter-occurred-v1-";
   const EXP004_COUNTER_ACK_PREFIX = "cn1-exp-004-counter-ack-v1-";
   const EXP004_COUNTER_SESSION_ENDPOINT = "/api/exp004/session";
   const EXP004_COUNTER_ENDPOINT = "/api/exp004/collect";
@@ -181,6 +182,7 @@
     sessionKey: null,
     submissionToken: null,
     eventIds: {},
+    occurredAt: {},
     acknowledged: {}
   };
   let exp004CounterSessionPromise = null;
@@ -274,6 +276,17 @@
     }
     exp004CounterMemory.eventIds[name] = eventId;
 
+    const occurredKey = `${EXP004_COUNTER_OCCURRED_PREFIX}${name}`;
+    let occurredAt = Number(readExp004CounterValue(
+      occurredKey,
+      exp004CounterMemory.occurredAt[name]
+    ));
+    if (!Number.isFinite(occurredAt) || occurredAt <= 0) {
+      occurredAt = Date.now();
+      writeExp004CounterValue(occurredKey, occurredAt);
+    }
+    exp004CounterMemory.occurredAt[name] = occurredAt;
+
     const ackKey = `${EXP004_COUNTER_ACK_PREFIX}${name}`;
     if (readExp004CounterValue(ackKey, exp004CounterMemory.acknowledged[name])) {
       return true;
@@ -290,6 +303,7 @@
           body: JSON.stringify({
             event: name,
             event_id: eventId,
+            occurred_at: occurredAt,
             session_key: sessionKey,
             submission_token: submissionToken
           })

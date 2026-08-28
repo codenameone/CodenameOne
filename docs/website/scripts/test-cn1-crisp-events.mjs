@@ -180,6 +180,15 @@ function events(state) {
   return eventCommands(state).map((command) => command[2][0][0]);
 }
 
+function normalizedCounterBody(options) {
+  const body = JSON.parse(options.body);
+  if (Object.hasOwn(body, "occurred_at")) {
+    assert.ok(Number.isInteger(body.occurred_at));
+    body.occurred_at = "<occurred_at>";
+  }
+  return body;
+}
+
 {
   const state = load("accepted");
   state.window.cn1CrispEvents.gettingStartedDwell({ page: "/getting-started/" });
@@ -256,7 +265,7 @@ function events(state) {
       url,
       method: options.method,
       keepalive: options.keepalive,
-      body: JSON.parse(options.body),
+      body: normalizedCounterBody(options),
     })),
     [
       {
@@ -275,6 +284,7 @@ function events(state) {
         body: {
           event: "Exp004OwnershipExposure",
           event_id: "00000000-0000-4000-8000-000000000002",
+          occurred_at: "<occurred_at>",
           session_key: "00000000-0000-4000-8000-000000000001",
           submission_token: "00000000-0000-4000-8000-999999999999",
         },
@@ -286,6 +296,7 @@ function events(state) {
         body: {
           event: "Exp004OwnershipDownload",
           event_id: "00000000-0000-4000-8000-000000000003",
+          occurred_at: "<occurred_at>",
           session_key: "00000000-0000-4000-8000-000000000001",
           submission_token: "00000000-0000-4000-8000-999999999999",
         },
@@ -394,6 +405,8 @@ function events(state) {
   );
   assert.equal(recoveredBody.event_id, failedBody.event_id,
     "a reload must retry a failed counter post with its persisted event ID");
+  assert.equal(recoveredBody.occurred_at, failedBody.occurred_at,
+    "a reload must retain the original event occurrence time");
   assert.equal(
     sharedSession.getItem("cn1-exp-004-counter-ack-v1-Exp004OwnershipExposure"),
     "1",

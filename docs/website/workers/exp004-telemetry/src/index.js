@@ -5,6 +5,8 @@ const ORIGINAL_EXPERIMENT_START = "2026-08-27T04:35:14.000Z";
 const COUNTER_NAME = "homepage-positioning";
 const MAX_BODY_BYTES = 1024;
 const SUBMISSION_TOKEN_TTL_MS = 6 * 60 * 60 * 1000;
+const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
+const ORIGINAL_EXPERIMENT_START_MS = Date.parse(ORIGINAL_EXPERIMENT_START);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EVENT_PATTERN = /^Exp004(Ownership|Reach)(Exposure|Download)$/;
 const ALLOWED_ORIGINS = new Set([
@@ -58,7 +60,7 @@ async function readBoundedJson(request) {
   }
 }
 
-function parseEvent(payload) {
+function parseEvent(payload, now = Date.now()) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return null;
   }
@@ -66,7 +68,10 @@ function parseEvent(payload) {
     ? payload.event.match(EVENT_PATTERN) : null;
   if (!match || !UUID_PATTERN.test(payload.event_id || "") ||
       !UUID_PATTERN.test(payload.session_key || "") ||
-      !UUID_PATTERN.test(payload.submission_token || "")) {
+      !UUID_PATTERN.test(payload.submission_token || "") ||
+      !Number.isInteger(payload.occurred_at) ||
+      payload.occurred_at < ORIGINAL_EXPERIMENT_START_MS ||
+      payload.occurred_at > now + MAX_CLOCK_SKEW_MS) {
     return null;
   }
   return {
@@ -74,6 +79,7 @@ function parseEvent(payload) {
     eventId: payload.event_id.toLowerCase(),
     sessionKey: payload.session_key.toLowerCase(),
     submissionToken: payload.submission_token.toLowerCase(),
+    occurredAt: payload.occurred_at,
     arm: match[1].toLowerCase(),
     kind: match[2].toLowerCase(),
   };
@@ -117,6 +123,7 @@ export class Exp004Counter extends DurableObject {
           arm TEXT NOT NULL CHECK (arm IN ('ownership', 'reach')),
           kind TEXT NOT NULL CHECK (kind IN ('exposure', 'download')),
           occurred_at INTEGER NOT NULL,
+          received_at INTEGER NOT NULL,
           UNIQUE (session_key, kind)
         );
         CREATE INDEX IF NOT EXISTS events_occurred_at
@@ -181,7 +188,7 @@ export class Exp004Counter extends DurableObject {
       "INSERT OR IGNORE INTO sessions (session_key, arm, exposed_at) VALUES (?, ?, ?)",
       input.sessionKey,
       input.arm,
-      now,
+      input.occurredAt,
     );
 
     const session = this.ctx.storage.sql.exec(
@@ -196,24 +203,26 @@ export class Exp004Counter extends DurableObject {
     if (input.kind === "download") {
       const recovered = this.ctx.storage.sql.exec(`
         INSERT OR IGNORE INTO events
-          (event_id, session_key, arm, kind, occurred_at)
-        VALUES (?, ?, ?, 'exposure', ?)
+          (event_id, session_key, arm, kind, occurred_at, received_at)
+        VALUES (?, ?, ?, 'exposure', ?, ?)
         RETURNING event_id
-      `, `derived:${input.eventId}`, input.sessionKey, input.arm, now).toArray();
+      `, `derived:${input.eventId}`, input.sessionKey, input.arm,
+      input.occurredAt, now).toArray();
       recoveredExposure = recovered.length === 1;
     }
 
     const inserted = this.ctx.storage.sql.exec(`
       INSERT OR IGNORE INTO events
-        (event_id, session_key, arm, kind, occurred_at)
-      VALUES (?, ?, ?, ?, ?)
+        (event_id, session_key, arm, kind, occurred_at, received_at)
+      VALUES (?, ?, ?, ?, ?, ?)
       RETURNING event_id
-    `, input.eventId, input.sessionKey, input.arm, input.kind, now).toArray();
+    `, input.eventId, input.sessionKey, input.arm, input.kind,
+    input.occurredAt, now).toArray();
 
     if (input.kind === "download" && inserted.length === 1) {
       this.ctx.storage.sql.exec(
         "UPDATE sessions SET downloaded_at = ? WHERE session_key = ?",
-        now,
+        input.occurredAt,
         input.sessionKey,
       );
     }
