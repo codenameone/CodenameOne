@@ -135,6 +135,14 @@ class MacNative {
 
     native int macMonitorScaleTimes100(int monitor);
 
+    /// Sets the pointer cursor, as one of Component's cursor constants.
+    ///
+    /// Pushed from the event dispatch thread rather than pulled by AppKit,
+    /// because resolving which component is under the pointer means reading the
+    /// component tree, and that may only happen on the dispatch thread. AppKit's
+    /// own cursorUpdate: is answered from the value this leaves behind.
+    native void macSetCursor(int cursor);
+
     native int macMonitorForWindow(int slot);
 
     /// Names the window whose field is about to be edited, so the text session

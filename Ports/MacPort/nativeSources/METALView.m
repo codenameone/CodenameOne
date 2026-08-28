@@ -882,6 +882,19 @@ static int cn1ButtonFromNumber(NSInteger buttonNumber) {
     [self cn1Deliver:event to:pointerReleased type:CN1_POINTER_RELEASED];
 }
 
+/// Asks the framework which cursor belongs at this point.
+///
+/// Declared here rather than called directly so the mangled name lives in one
+/// place: ParparVM encodes the whole Java signature into the symbol, and a
+/// mistyped one links against nothing and fails silently.
+static void cn1MacRequestCursor(int windowId, int x, int y) {
+    extern void com_codename1_impl_mac_MacImplementation_macHoverCursor___int_int_int(
+            CODENAME_ONE_THREAD_STATE, JAVA_INT windowId, JAVA_INT x, JAVA_INT y);
+    struct ThreadLocalData *threadStateData = getThreadLocalData();
+    com_codename1_impl_mac_MacImplementation_macHoverCursor___int_int_int(
+            threadStateData, (JAVA_INT)windowId, (JAVA_INT)x, (JAVA_INT)y);
+}
+
 - (void)mouseMoved:(NSEvent *)event {
     if (!self.cn1InputEnabled) {
         return;
@@ -895,6 +908,11 @@ static int cn1ButtonFromNumber(NSInteger buttonNumber) {
     // misreported as nothing held.
     CN1MacPointerButton(CN1_PE_BUTTON_NONE, cn1HeldButtonMask(), cn1ModifiersOf(event));
     CGPoint p = [self cn1PointFromEvent:event];
+    // The cursor is asked for alongside the hover, not instead of it. AppKit
+    // cannot answer which component is under the pointer -- that is a walk of
+    // the component tree and may only happen on the dispatch thread -- so the
+    // question goes up and the answer comes back through macSetCursor.
+    cn1MacRequestCursor(self.cn1WindowId < 0 ? 0 : self.cn1WindowId, (int)p.x, (int)p.y);
     if (self.cn1WindowId >= 0) {
         CN1MacWindowDeliverHover(self.cn1WindowId, CN1_POINTER_DRAGGED, (int)p.x, (int)p.y);
         return;
@@ -2092,11 +2110,59 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
     [self cn1SetSelection:NSMakeRange(0, session.text.length)];
 }
 
-/// An I-beam over the view. Its absence is the loudest "this is not really a Mac
-/// app" tell after the menu bar.
+/// The cursor the framework last resolved for whatever the pointer is over.
+///
+/// Written from the dispatch thread through macSetCursor and read on the main
+/// thread; an int assignment is atomic on every architecture this ships to, and
+/// a cursor that lags a frame is invisible next to one that is simply wrong.
+static int cn1MacCursor = 0;
+
+/// Maps a Codename One cursor constant onto AppKit's.
+///
+/// AppKit has no wait cursor to offer -- the spinning wait is the system's to
+/// show, not an application's -- and no distinct diagonal resize cursors, so
+/// those fall back to the nearest thing that exists rather than to the arrow,
+/// which would say "nothing here is interactive".
+static NSCursor *cn1MacCursorFor(int cursor) {
+    switch (cursor) {
+        case 1:  return [NSCursor crosshairCursor];          // CROSSHAIR_CURSOR
+        case 2:  return [NSCursor IBeamCursor];              // TEXT_CURSOR
+        case 4: case 5: case 6: case 7:                      // the diagonal resizes
+        case 8: case 9:                                      // N_ and S_RESIZE
+            return [NSCursor resizeUpDownCursor];
+        case 10: case 11:                                    // W_ and E_RESIZE
+            return [NSCursor resizeLeftRightCursor];
+        case 12: return [NSCursor pointingHandCursor];       // HAND_CURSOR
+        case 13: return [NSCursor openHandCursor];           // MOVE_CURSOR
+        default: return [NSCursor arrowCursor];              // DEFAULT_CURSOR, WAIT
+    }
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macSetCursor___int(CODENAME_ONE_THREAD_STATE,
+        JAVA_OBJECT __cn1ThisObject, JAVA_INT cursor) {
+    cn1MacCursor = (int)cursor;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // invalidateCursorRectsForView: rather than setting the cursor here.
+        // AppKit resets the cursor itself whenever the pointer crosses a
+        // boundary, so a cursor set directly is overwritten moments later; the
+        // rect is the thing it consults, and this asks it to consult it again.
+        NSView *view = [CN1MacHost sharedHost].renderingView;
+        if (view != nil && view.window != nil) {
+            [view.window invalidateCursorRectsForView:view];
+        }
+    });
+}
+
+/// The whole surface takes whatever the framework last resolved.
+///
+/// This used to add an arrow over the bounds unconditionally, directly under a
+/// comment promising an I-beam -- so a TextField could never show one however it
+/// was configured, and the port looked like it had no editable text at all. A
+/// blanket arrow is worse than no rect: it overrides what AppKit would otherwise
+/// inherit.
 - (void)resetCursorRects {
     [super resetCursorRects];
-    [self addCursorRect:self.bounds cursor:[NSCursor arrowCursor]];
+    [self addCursorRect:self.bounds cursor:cn1MacCursorFor(cn1MacCursor)];
 }
 
 // ---- protocol members with no AppKit meaning ----------------------------

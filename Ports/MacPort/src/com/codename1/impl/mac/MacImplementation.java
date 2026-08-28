@@ -428,6 +428,54 @@ public class MacImplementation extends IOSImplementation {
     /// Traversal comes from the form's own tab iterator, which is what decides
     /// the order everywhere else, so Tab here visits the fields in the order the
     /// framework already believes they are in.
+    /// This port draws its own controls, so the pointer cursor is its own to
+    /// maintain: nothing in the framework pushes one down, and
+    /// Component.setCursor() is documented as ignored wherever
+    /// isSetCursorSupported() answers false. It answers true here.
+    public boolean isSetCursorSupported() {
+        return true;
+    }
+
+    /// The cursor last handed to AppKit, so an unchanged hover costs nothing.
+    /// A mouse move fires continuously and the native call crosses to the main
+    /// queue; setting the same cursor thousands of times a second is the kind of
+    /// thing that shows up as a busy CPU on an idle app.
+    private static int lastCursor = -1;
+
+    /// Resolves the cursor for a hover and hands it to AppKit.
+    ///
+    /// Invoked from the rendering view's mouseMoved:, which cannot answer the
+    /// question itself: the component under the pointer is found by walking the
+    /// component tree, and that may only be read on the dispatch thread. So the
+    /// walk is scheduled here and the answer is pushed back down.
+    ///
+    /// Resolved against the hovered WINDOW's own top level rather than
+    /// Display.getCurrent(), for the reason the JavaSE port gives at the same
+    /// point: a secondary window's components are the ones under this pointer,
+    /// and reading the current form would answer about the wrong hierarchy.
+    public static void macHoverCursor(final int windowId, final int x, final int y) {
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                com.codename1.ui.TopLevelContainer top = windowId > 0
+                        && com.codename1.ui.Desktop.isSupported()
+                        ? com.codename1.ui.Desktop.getInstance().windowById(windowId)
+                        : com.codename1.ui.Display.getInstance().getCurrent();
+                int cursor = com.codename1.ui.Component.DEFAULT_CURSOR;
+                if (top != null && top.isEnableCursors()) {
+                    com.codename1.ui.Component cmp = top.asContainer().getComponentAt(x, y);
+                    if (cmp != null) {
+                        cursor = cmp.getCursor();
+                    }
+                }
+                if (cursor != lastCursor) {
+                    lastCursor = cursor;
+                    new MacNative().macSetCursor(cursor);
+                }
+            }
+        });
+    }
+
     public static void macTraverseTextEditing(final boolean forward) {
         com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
             @Override
