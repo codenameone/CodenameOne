@@ -4166,20 +4166,38 @@ public class Window extends Container implements TopLevelContainer {
     /// window does not have: commands reach the desktop menu instead.
     @Override
     public void keyPressed(int keyCode) {
+        // Whoever owns the keyboard as the key goes down owns its release, whatever has
+        // happened in between. A focused control is free to close the overlay it is in
+        // from keyPressed -- a button that acts on the press does exactly that -- and
+        // by the time the release arrives the overlay underneath has been uncovered and
+        // focused. Sampling the scope at release time finds that one and hands it a
+        // release whose press it never saw.
+        keyPressScope = keyInputScope;
+        keyPressScopeCode = keyCode;
+        keyPressScopeValid = true;
         if (!focusWithinKeyScope()) {
             return;
         }
         int game = Display.getInstance().getGameAction(keyCode);
         if (focused != null) {
-            if (focused.isEnabled()) {
-                focused.keyPressed(keyCode);
+            // Everything below is asked of the component that took the press, not of
+            // whatever holds the focus once it returns. The handler is free to move the
+            // focus, and a control that closes its dialog on the key down goes further
+            // and leaves the field null -- releasing the overlay's claim on the keyboard
+            // drops the focus with it. Reading the field again then answers for a
+            // component that never saw this key, or dereferences nothing at all.
+            Component pressTarget = focused;
+            if (pressTarget.isEnabled()) {
+                pressTarget.keyPressed(keyCode);
             }
-            if (focused.handlesInput()) {
+            if (pressTarget.handlesInput()) {
                 return;
             }
-            if (focused.getTopLevelContainer() == this) { //NOPMD CompareObjectsWithEquals
+            if (pressTarget.getTopLevelContainer() == this) { //NOPMD CompareObjectsWithEquals
                 updateWindowFocus(game);
             } else {
+                // Includes the torn-down case: initFocused honours the key scope, so
+                // this settles on the overlay that has just been uncovered.
                 focused = null;
                 initFocused();
             }
@@ -4198,12 +4216,23 @@ public class Window extends Container implements TopLevelContainer {
         // at all: fireKeyEvent is how a hosted dialog receives the back key, so
         // returning early here made a dialog with nothing focusable swallow its own
         // way out.
-        // Read before the focused component is given the key, because it is free to
-        // close the overlay that owns the keyboard -- an OK button on the top dialog
-        // does exactly that. Reading afterwards found the dialog underneath newly
-        // exposed and ran its default command for the same release, so one Enter
-        // dismissed two dialogs.
+        // The scope that took the press, when this release belongs to one. Reading it
+        // here -- even before the focused component is given the key -- is not enough
+        // on its own, because the press handler may already have closed the overlay
+        // that owned it.
         Container scopeAtRelease = keyInputScope;
+        if (keyPressScopeValid && keyPressScopeCode == keyCode) {
+            Container pressScope = keyPressScope;
+            keyPressScopeValid = false;
+            keyPressScope = null;
+            if (pressScope != keyInputScope) { //NOPMD CompareObjectsWithEquals
+                // The overlay that took the press has gone, or another has taken the
+                // keyboard since. Either way this release is not addressed to whoever
+                // holds it now, and delivering it would act twice on one keystroke.
+                return;
+            }
+            scopeAtRelease = pressScope;
+        }
         if (focusWithinKeyScope() && focused != null
                 && focused.getTopLevelContainer() == this //NOPMD CompareObjectsWithEquals
                 && focused.isEnabled()) {
@@ -4278,6 +4307,16 @@ public class Window extends Container implements TopLevelContainer {
             keyReleased(keyCode);
         }
     }
+
+    /// The overlay that owned the keyboard when the last key went down.
+    private Container keyPressScope;
+
+    /// The key that scope was recorded for, so an unrelated release does not consume it.
+    private int keyPressScopeCode;
+
+    /// Whether a press has been seen whose release is still to come. Distinct from a
+    /// null scope, which is a real answer meaning the window itself owned the key.
+    private boolean keyPressScopeValid;
 
     /// The overlay that owned the keyboard when the release being dispatched arrived,
     /// or null outside a dispatch.

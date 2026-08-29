@@ -2118,4 +2118,73 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aDialogClosedFromTheKeyPressDoesNotHandItsReleaseDownwards() {
+        // A control that acts on the press rather than the release closes its dialog
+        // before the release arrives, so by then the dialog underneath has been
+        // uncovered and focused. Sampling the scope at release time finds that one --
+        // the earlier fix read it before the release handler ran, which is too late
+        // when the press is what closed things.
+        Window w = openHost(600, 500);
+        final int[] lowerDefault = new int[1];
+        final int[] lowerShortcut = new int[1];
+        int enter = Display.getInstance().getKeyCode(Display.GAME_FIRE);
+
+        Dialog low = new Dialog("lower");
+        low.setLayout(new BorderLayout());
+        low.add(BorderLayout.CENTER, new Label("lower"));
+        low.setDefaultCommand(new Command("lower default") {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                lowerDefault[0]++;
+            }
+        });
+        low.addKeyListener(enter, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                lowerShortcut[0]++;
+            }
+        });
+        low.setTopLevelHost(w);
+        low.showModeless();
+        DisplayTest.flushEdt();
+
+        final Dialog high = new Dialog("upper");
+        high.setLayout(new BorderLayout());
+        // Acts on the press, not the release.
+        Button ok = new Button("OK") {
+            @Override
+            public void keyPressed(int keyCode) {
+                super.keyPressed(keyCode);
+                high.dispose();
+            }
+        };
+        high.add(BorderLayout.CENTER, ok);
+        high.setTopLevelHost(w);
+        high.showModeless();
+        DisplayTest.flushEdt();
+        w.setFocused(ok);
+        DisplayTest.flushEdt();
+
+        w.keyPressed(enter);
+        DisplayTest.flushEdt();
+        assertTrue(high.isDisposed(), "the press closed the dialog on top");
+
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+        assertEquals(0, lowerDefault[0],
+                "the dialog it uncovered must not run its default command");
+        assertEquals(0, lowerShortcut[0], "nor its shortcut");
+
+        // A whole keystroke of its own still works.
+        w.keyPressed(enter);
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+        assertEquals(1, lowerDefault[0], "and it works for a key really meant for it");
+
+        low.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }
