@@ -601,4 +601,39 @@ public class MacOSNativeBuilderScanTest {
         assertEquals("\"arm64 x86_64\"", MacOSNativeBuilder.quotePbxprojValue("\"arm64 x86_64\""));
         assertNull(MacOSNativeBuilder.quotePbxprojValue(null));
     }
+
+    /// Enumerating cameras is not opening a microphone.
+    ///
+    /// getCameras() and getDefault() run a discovery session and nothing else,
+    /// so a bundle that only enumerated devices was carrying
+    /// NSMicrophoneUsageDescription and the audio-input entitlement.
+    @Test
+    public void enumeratingCamerasDoesNotTakeTheMicrophone() {
+        String app = "com/example/MyApp";
+        String cam = "com/codename1/camera/Camera";
+        assertFalse(MacOSNativeBuilder.applicationOpensCameraMicrophone(app, cam, "getCameras"));
+        assertFalse(MacOSNativeBuilder.applicationOpensCameraMicrophone(app, cam, "getDefault"));
+        // open() still does: CameraSessionOptions.captureAudio starts true.
+        assertTrue(MacOSNativeBuilder.applicationOpensCameraMicrophone(app, cam, "open"));
+        // And they are still CAMERA users, which is a separate question.
+        assertTrue(MacOSNativeBuilder.applicationOpensCameraSession(app, cam, "getCameras"));
+    }
+
+    /// requestPermissions is decided by its argument, and an unreadable one
+    /// counts as asking.
+    @Test
+    public void theMicrophonePermissionFollowsItsArgument() {
+        String app = "com/example/MyApp";
+        String cam = "com/codename1/camera/Camera";
+        assertFalse("requestPermissions(false, cb) asks only for video",
+                MacOSNativeBuilder.requestsMicrophonePermission(app, cam, "requestPermissions",
+                        Boolean.FALSE));
+        assertTrue(MacOSNativeBuilder.requestsMicrophonePermission(app, cam, "requestPermissions",
+                Boolean.TRUE));
+        assertTrue("an unresolved argument must count as asking",
+                MacOSNativeBuilder.requestsMicrophonePermission(app, cam, "requestPermissions",
+                        null));
+        // Other methods are not this predicate's business.
+        assertFalse(MacOSNativeBuilder.requestsMicrophonePermission(app, cam, "open", null));
+    }
 }

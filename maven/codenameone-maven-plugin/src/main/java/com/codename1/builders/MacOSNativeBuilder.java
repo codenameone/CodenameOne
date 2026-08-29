@@ -1853,10 +1853,44 @@ public class MacOSNativeBuilder extends Executor {
     /// macos.entitlements.device.microphone=false turns it off for an
     /// application that knows every one of its sessions is silent.
     static boolean applicationOpensCameraMicrophone(String caller, String cls, String method) {
-        // requestPermissions is part of applicationOpensCameraSession now, so
-        // this is simply that test: the probe session it opens carries
-        // CameraSessionOptions' default captureAudio, which is true.
-        return applicationOpensCameraSession(caller, cls, method);
+        if (!applicationOpensCameraSession(caller, cls, method) || method == null) {
+            return false;
+        }
+        // Not every camera call opens an audio input. getCameras() and
+        // getDefault() run a discovery session and nothing else -- they cannot
+        // reach a microphone however the application later uses the result --
+        // so counting them put NSMicrophoneUsageDescription and the audio-input
+        // entitlement in a bundle that only enumerated devices.
+        //
+        // open() does: CameraSessionOptions.captureAudio starts true and
+        // CN1Camera adds an AVMediaTypeAudio input whenever it is set, and the
+        // application's own captureAudio(false) is deliberately not read here
+        // (see the note below). requestPermissions is handled separately, by
+        // its argument.
+        if (method.indexOf("getCameras") > -1 || method.indexOf("getDefault") > -1) {
+            return false;
+        }
+        return true;
+    }
+
+    /// Whether a Camera.requestPermissions call asks for the microphone.
+    ///
+    /// Its first argument IS the audio flag, so unlike a session's
+    /// captureAudio(false) this one can be read: requestPermissions(false, cb)
+    /// asks only for video and takes no microphone. A value the scanner cannot
+    /// resolve -- a variable, or a branch -- arrives as null and counts as
+    /// asking, which is the contract usesClassMethodWithBooleanArgument
+    /// documents and the recoverable direction: an unused permission costs a
+    /// review question, a missing one terminates the process.
+    static boolean requestsMicrophonePermission(String caller, String cls, String method,
+            Boolean audio) {
+        if (!applicationOpensCameraSession(caller, cls, method) || method == null) {
+            return false;
+        }
+        if (method.indexOf("requestPermissions") < 0) {
+            return false;
+        }
+        return audio == null || audio.booleanValue();
     }
 
     /// Whether an APPLICATION class opens a camera through the low level
@@ -1957,7 +1991,16 @@ public class MacOSNativeBuilder extends Executor {
             // never names LocationManager, so the reference lives in a framework
             // class this scan does not read -- which is why the CLASS is the test
             // rather than the location API.
-            if (cls.startsWith("com/codename1/location/")
+            // The classes that REACH the sensor, not the package. Location,
+            // LocationRequest and the listener interfaces are value and callback
+            // types: an application that stores coordinates it received from a
+            // server names Location and asks the device for nothing, and
+            // declaring NSLocationWhenInUseUsageDescription for it is an access
+            // claim it then has to justify.
+            if (cls.equals("com/codename1/location/LocationManager")
+                    || cls.equals("com/codename1/location/GeofenceManager")
+                    || cls.startsWith("com/codename1/location/LocationManager$")
+                    || cls.startsWith("com/codename1/location/GeofenceManager$")
                     || cls.equals("com/codename1/maps/MapComponent")) {
                 caps.usesLocation = true;
             }
@@ -1972,6 +2015,19 @@ public class MacOSNativeBuilder extends Executor {
             // and would have granted the wrong one had the package ever existed.
             if (cls.equals("com/codename1/io/ServerSocket")) {
                 caps.usesServerSockets = true;
+            }
+        }
+
+        /// requestPermissions carries its answer in its first argument, so the
+        /// microphone is decided from the VALUE rather than from the call.
+        /// requestPermissions(false, cb) asks only for video; a value the
+        /// scanner cannot resolve arrives as null and counts as asking, which
+        /// is what usesClassMethodWithBooleanArgument documents.
+        @Override
+        public void usesClassMethodWithBooleanArgument(String cls, String method,
+                Boolean value) {
+            if (requestsMicrophonePermission(scanning, cls, method, value)) {
+                caps.usesMicrophone = true;
             }
         }
 
