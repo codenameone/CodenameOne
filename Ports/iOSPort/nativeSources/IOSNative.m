@@ -10464,20 +10464,27 @@ void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG 
         UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
         [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert + UNAuthorizationOptionSound + UNAuthorizationOptionBadge)
             completionHandler:^(BOOL granted, NSError * _Nullable error) {
-            if (granted) {
-                // NSApplication rather than UIApplication; the APNs handshake
-                // and the delegate callbacks are otherwise identical.
-                [NSApp registerForRemoteNotifications];
-            } else {
-                pendingRemoteNotificationRegistrations--;
-                NSString *msg = @"Permission to receive notifications is not granted";
-                if (error != nil) {
-                    msg = [error localizedDescription];
+            // requestAuthorizationWithOptions calls back on an arbitrary queue,
+            // and everything below is main-thread-owned: NSApp is AppKit, and
+            // pendingRemoteNotificationRegistrations is read on the main thread
+            // by the registration callbacks. The outer dispatch_async covers
+            // the REQUEST, not this completion, so the hop has to be here.
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (granted) {
+                    // NSApplication rather than UIApplication; the APNs handshake
+                    // and the delegate callbacks are otherwise identical.
+                    [NSApp registerForRemoteNotifications];
+                } else {
+                    pendingRemoteNotificationRegistrations--;
+                    NSString *msg = @"Permission to receive notifications is not granted";
+                    if (error != nil) {
+                        msg = [error localizedDescription];
+                    }
+                    struct ThreadLocalData* threadStateData = getThreadLocalData();
+                    com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(
+                        threadStateData, fromNSString(threadStateData, msg));
                 }
-                struct ThreadLocalData* threadStateData = getThreadLocalData();
-                com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(
-                    threadStateData, fromNSString(threadStateData, msg));
-            }
+            });
         }];
     });
 #else
