@@ -1161,7 +1161,13 @@ public class Window extends Container implements TopLevelContainer {
     public void setTintColor(int tintColor) {
         this.tintColor = tintColor;
         this.tintColorSet = true;
-        this.tintColorExplicit = true;
+        // Explicit only when it differs from what the theme would give. A ComboBox
+        // popup and a floating action button's submenu save the current tint, set zero
+        // to opt out of dimming, and put the saved value back -- and treating that
+        // restore as a choice froze the old theme's colour into the window, so a later
+        // theme change left every dialog scrim painting the previous one.
+        this.tintColorExplicit = tintColor
+                != getUIManager().getLookAndFeel().getDefaultFormTintColor();
         repaint();
     }
 
@@ -3706,6 +3712,11 @@ public class Window extends Container implements TopLevelContainer {
             // state without firing the action, which is the whole point here.
             LeadUtil.dragInitiated(pressedCmp);
         }
+        // The awaiting-release list too. It is normally emptied by the release that
+        // never comes here, and a stale entry left in it makes the next gesture's list
+        // hold two -- which takes autoRelease out of its single-component branch, so
+        // dragging off the newly pressed component no longer cancels it.
+        clearComponentsAwaitingRelease();
         pressedCmp = null;
         dragged = null;
         currentPointerPress = null;

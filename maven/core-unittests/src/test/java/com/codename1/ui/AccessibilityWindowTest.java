@@ -470,4 +470,39 @@ class AccessibilityWindowTest extends UITestBase {
             implementation.setAccessibilityTreeSupported(false);
         }
     }
+
+    @FormTest
+    void rebuildingOneSurfaceDoesNotDeclareTheOthersFresh() {
+        // Staleness was one flag for the whole manager. Invalidating one root and then
+        // pulling another cleared it, so the first root's cached tree came back as
+        // though it were current -- which is what a pull-on-demand consumer and the
+        // inspector both read.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        Button mainButton = new Button("on the main form");
+        main.add(BorderLayout.CENTER, mainButton);
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("second", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.add(BorderLayout.CENTER, new Button("in the window"));
+        w.show();
+        DisplayTest.flushEdt();
+
+        AccessibilityManager mgr = AccessibilityManager.getInstance();
+        assertTrue(mentions(mgr.getSnapshot(main), "on the main form"));
+        assertTrue(mentions(mgr.getSnapshot(w), "in the window"));
+
+        // The main form changes; the window does not. Then the window is pulled first.
+        mainButton.setText("renamed on the main form");
+        DisplayTest.flushEdt();
+        mgr.getSnapshot(w);
+
+        assertTrue(mentions(mgr.getSnapshot(main), "renamed on the main form"),
+                "the surface that changed has to be rebuilt however the pulls are ordered");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

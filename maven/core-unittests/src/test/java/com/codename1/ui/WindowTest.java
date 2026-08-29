@@ -5528,4 +5528,50 @@ class WindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void restoringTheThemesOwnTintDoesNotFreezeIt() {
+        // A ComboBox popup and a floating action button's submenu save the tint, set
+        // zero to opt out of dimming, and put the saved value back. Treating that
+        // restore as the application's choice froze the old theme's colour in, so a
+        // later theme change left every dialog scrim painting the previous one.
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("tinted", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+
+        int themeTint = w.getTintColor();
+
+        // The save/override/restore an overlay performs.
+        int saved = w.getTintColor();
+        w.setTintColor(0);
+        w.setTintColor(saved);
+        DisplayTest.flushEdt();
+        assertEquals(themeTint, w.getTintColor());
+
+        // The theme now says something different, and the window has to follow it --
+        // which it can only do if the restore above was not recorded as a choice.
+        LookAndFeel laf = UIManager.getInstance().getLookAndFeel();
+        try {
+            laf.setDefaultFormTintColor(0x00ff00);
+            w.refreshTheme(false);
+            DisplayTest.flushEdt();
+            assertEquals(0x00ff00, w.getTintColor(),
+                    "the tint is still the theme's to decide after an overlay borrowed it");
+
+            // An application that really does choose a colour keeps it.
+            w.setTintColor(0x123456);
+            laf.setDefaultFormTintColor(0x0000ff);
+            w.refreshTheme(false);
+            DisplayTest.flushEdt();
+            assertEquals(0x123456, w.getTintColor(),
+                    "but a colour the application chose survives a refresh");
+        } finally {
+            laf.setDefaultFormTintColor(themeTint);
+        }
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

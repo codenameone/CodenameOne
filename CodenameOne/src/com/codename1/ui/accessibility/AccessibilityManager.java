@@ -65,7 +65,6 @@ public final class AccessibilityManager {
     private static final AccessibilityManager INSTANCE = new AccessibilityManager();
     private long nextId = 1;
     private long generation;
-    private boolean dirty = true;
     private boolean refreshScheduled;
     private int pendingChanges = CHANGE_ALL;
     /// The root the cached snapshot describes. A `Container` rather than a `Form`,
@@ -74,7 +73,7 @@ public final class AccessibilityManager {
 
     /// Snapshots for roots other than the most recent one, so a screen reader moving
     /// between two windows does not rebuild both trees on every hop. Bounded, and
-    /// cleared whole by `#invalidate(Component, int)` -- the dirty flag stays global,
+    /// cleared whole by `#invalidate(Component, int)` -- staleness is tracked per root,
     /// because per root dirtiness is a second thing to get wrong.
     private final LinkedHashMap<Container, AccessibilityTreeSnapshot> snapshotsByRoot =
             new LinkedHashMap<Container, AccessibilityTreeSnapshot>();
@@ -90,6 +89,53 @@ public final class AccessibilityManager {
     /// the same as an empty queue, which is also what disposing every queued root
     /// leaves behind.
     private boolean pendingRootlessRefresh;
+
+    /// The cached roots whose trees are stale.
+    ///
+    /// Staleness used to be one flag for the whole manager, which is wrong the moment
+    /// there is more than one surface: invalidating one root and then rebuilding
+    /// another cleared it, and the first root's cached tree was handed back as though
+    /// it were current. A rebuild clears only the root it rebuilt.
+    private final ArrayList<Container> dirtyRoots = new ArrayList<Container>();
+
+    /// Queues every surface known to be alive, so the refresh rebuilds all of them
+    /// rather than picking one.
+    ///
+    /// Its own method rather than inline in `#invalidate(Component, int)`: the loop
+    /// walks a generic collection, and the compiler's cast for that would sit inside
+    /// that method's catch of Throwable -- which ParparVM does not raise for a failed
+    /// cast, so the repository's cast-semantics gate rejects it.
+    private void queueEveryLiveRoot() {
+        for (Container root : snapshotsByRoot.keySet()) {
+            if (!pendingRoots.contains(root)) {
+                pendingRoots.add(root);
+            }
+        }
+        TopLevelContainer current = CN.getCurrentTopLevel();
+        Container currentRoot = current == null ? null : current.asContainer();
+        if (currentRoot != null && !pendingRoots.contains(currentRoot)) {
+            pendingRoots.add(currentRoot);
+        }
+    }
+
+    /// Marks a root's tree stale.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root, or null for every cached one
+    private void markDirty(Container root) {
+        if (root == null) {
+            for (Container cached : snapshotsByRoot.keySet()) {
+                if (!dirtyRoots.contains(cached)) {
+                    dirtyRoots.add(cached);
+                }
+            }
+            return;
+        }
+        if (!dirtyRoots.contains(root)) {
+            dirtyRoots.add(root);
+        }
+    }
     private AccessibilityTreeSnapshot snapshot = new AccessibilityTreeSnapshot(
             0, Collections.<Long>emptyList(), Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
 
@@ -101,14 +147,13 @@ public final class AccessibilityManager {
     }
 
     public synchronized void invalidate(Component component, int changeType) {
-        dirty = true;
         pendingChanges |= changeType;
         // Deliberately not clearing the per-root cache. The eager refresh below
         // rebuilds one root, so emptying all of them would leave every other surface
         // with nothing to hand an off-EDT reader until that surface happened to mutate
         // -- a screen reader on another window would lose its whole tree. Correctness
-        // on the EDT does not depend on the clear either: `dirty` already forces a
-        // rebuild there, and the rebuild overwrites the entry it replaces. Off the EDT
+        // on the EDT does not depend on the clear either: the root is marked stale and
+        // rebuilt there, and the rebuild overwrites the entry it replaces. Off the EDT
         // a stale tree for the right surface is the documented contract; an empty one
         // is not.
         // The root the changed component actually lives on, not whatever form happens
@@ -125,6 +170,7 @@ public final class AccessibilityManager {
             changedTop = CN.getCurrentTopLevel();
         }
         final Container refreshRoot = changedTop == null ? null : changedTop.asContainer();
+        markDirty(allRoots ? null : refreshRoot);
         try {
             // Most mutations only need to make the cached snapshot stale. Ports
             // that can pull the tree do so on demand, and ports such as Android
@@ -137,8 +183,8 @@ public final class AccessibilityManager {
             // Queued rather than captured. A second invalidation on another root
             // while this one is still pending used to be swallowed by the
             // refreshScheduled flag: the callback rebuilt only the root it had closed
-            // over, and rebuilding it cleared the global dirty flag, so the other
-            // root's tree stayed stale for good -- which off-EDT screen readers, now
+            // over, and the other root was never rebuilt at all, so its tree stayed
+            // stale for good -- which off-EDT screen readers, now
             // that they are handed their own surface's tree, would have read forever.
             // Not capped. The list holds one entry per distinct root, and it is
             // drained by the refresh, so it is bounded by the number of live surfaces
@@ -147,18 +193,7 @@ public final class AccessibilityManager {
             // snapshot cache is capped because it holds whole trees; this holds
             // references to containers that are alive anyway.
             if (allRoots) {
-                // Every surface known to be alive, so the refresh rebuilds all of them
-                // rather than picking one.
-                for (Container root : snapshotsByRoot.keySet()) {
-                    if (!pendingRoots.contains(root)) {
-                        pendingRoots.add(root);
-                    }
-                }
-                TopLevelContainer current = CN.getCurrentTopLevel();
-                Container currentRoot = current == null ? null : current.asContainer();
-                if (currentRoot != null && !pendingRoots.contains(currentRoot)) {
-                    pendingRoots.add(currentRoot);
-                }
+                queueEveryLiveRoot();
             } else if (refreshRoot == null) {
                 // A mutation whose component belongs to no surface at all. Recorded
                 // separately from the queue, because an empty queue can also mean every
@@ -190,10 +225,9 @@ public final class AccessibilityManager {
                         int count = roots.size();
                         for (int iter = 0; iter < count; iter++) {
                             synchronized (AccessibilityManager.this) {
-                                // Forced for each one in turn: the first rebuild clears
-                                // the dirty flag, and every root after it would then be
-                                // served the stale tree this refresh exists to replace.
-                                dirty = true;
+                                // Marked stale again for each one in turn, so none is
+                                // served out of the cache this refresh exists to replace.
+                                markDirty(roots.get(iter));
                             }
                             getSnapshotForRoot(roots.get(iter));
                         }
@@ -247,6 +281,7 @@ public final class AccessibilityManager {
             return;
         }
         snapshotsByRoot.remove(root);
+        dirtyRoots.remove(root);
         // Out of the refresh queue as well, or a refresh already scheduled would walk
         // a hierarchy that has just been destroyed and cache a tree for it -- putting
         // back exactly what this method exists to take away.
@@ -261,7 +296,8 @@ public final class AccessibilityManager {
             snapshot = new AccessibilityTreeSnapshot(generation,
                     Collections.<Long>emptyList(),
                     Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
-            dirty = true;
+            // Nothing is marked stale here: the root that was is gone, and every other
+            // surface's tree is still exactly as current as it was.
         }
     }
 
@@ -296,8 +332,11 @@ public final class AccessibilityManager {
                             Collections.<Long>emptyList(),
                             Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
         }
-        if (!dirty) {
-            if (form == snapshotRoot) {
+        // This root's staleness, not the manager's. Asking the global flag meant that
+        // rebuilding one surface declared every other surface fresh, and the next pull
+        // for one of them was answered out of a cache that had already been invalidated.
+        if (!dirtyRoots.contains(form)) {
+            if (form == snapshotRoot) { //NOPMD CompareObjectsWithEquals
                 return snapshot;
             }
             AccessibilityTreeSnapshot cached = snapshotsByRoot.get(form);
@@ -315,7 +354,7 @@ public final class AccessibilityManager {
             snapshot = emptySnapshot;
             snapshotRoot = null;
             snapshotsByRoot.clear();
-            dirty = false;
+            dirtyRoots.clear();
             pendingChanges = 0;
             return snapshot;
         }
@@ -332,7 +371,7 @@ public final class AccessibilityManager {
         snapshotRoot = form;
         snapshotsByRoot.put(form, updatedSnapshot);
         evictStaleRoots();
-        dirty = false;
+        dirtyRoots.remove(form);
         pendingChanges = 0;
         return snapshot;
     }

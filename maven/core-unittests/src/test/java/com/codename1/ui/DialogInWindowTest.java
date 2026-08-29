@@ -1751,4 +1751,56 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aCancelledPressLeavesNothingWaitingForARelease() {
+        // The cancelled press is never released, so the component it left in the
+        // awaiting-release list stays there. The next gesture's list then holds two,
+        // which takes autoRelease out of its single-component branch -- so dragging off
+        // the newly pressed button no longer cancels it and the release still fires.
+        Window w = openHost(600, 500);
+        final int[] secondFired = new int[1];
+        Button first = new Button("first");
+        Button second = new Button("second");
+        second.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                secondFired[0]++;
+            }
+        });
+        Container row = new Container(new com.codename1.ui.layouts.BoxLayout(
+                com.codename1.ui.layouts.BoxLayout.Y_AXIS));
+        row.add(first);
+        row.add(second);
+        w.add(BorderLayout.CENTER, row);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+
+        // A press on the first button, interrupted by a dialog before its release.
+        w.pointerPressed(first.getAbsoluteX() + 2, first.getAbsoluteY() + 2);
+        DisplayTest.flushEdt();
+
+        Dialog d = new Dialog("interrupting");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        d.dispose();
+        DisplayTest.flushEdt();
+
+        // Now an ordinary gesture on the second button, dragged well off it.
+        int sx = second.getAbsoluteX() + 2;
+        int sy = second.getAbsoluteY() + 2;
+        w.pointerPressed(sx, sy);
+        w.pointerDragged(new int[] {sx}, new int[] {sy + 400});
+        w.pointerReleased(sx, sy + 400);
+        DisplayTest.flushEdt();
+
+        assertEquals(0, secondFired[0],
+                "a press dragged off its button must not fire, whatever an earlier "
+                        + "cancelled gesture left behind");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }
