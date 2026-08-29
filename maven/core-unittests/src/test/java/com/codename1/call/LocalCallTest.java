@@ -1322,6 +1322,86 @@ public class LocalCallTest {
                 ((CallException) err).getError());
     }
 
+    /// A simulation that PARKS an incoming report instead of answering it,
+    /// so a test can put a provider reset in the window between the report
+    /// and the platform's acceptance -- the window that cannot be reached by
+    /// racing the real simulation, because its own timing decides who wins.
+    private static final class Parked extends LocalCallBridge {
+        private int parkedRequest = -1;
+        private final List<String> ended = new ArrayList<String>();
+
+        @Override
+        public void reportIncomingCall(int requestId, String callId,
+                String handleWire, String displayName, int capabilityBits,
+                boolean hasVideo) {
+            parkedRequest = requestId;
+        }
+
+        @Override
+        public void endCall(int requestId, String callId,
+                int endReasonOrdinal) {
+            ended.add(callId);
+            super.endCall(requestId, callId, endReasonOrdinal);
+        }
+    }
+
+    @Test
+    public void aCallTheSystemAcceptedAfterAResetIsEndedNotJustDropped() {
+        // The report reserves its session and reads the reset generation,
+        // then a reset arrives, and only THEN does the platform say it
+        // accepted the call. The acceptance refers to a provider the reset
+        // did not sweep, because the call did not exist when it swept -- so
+        // the system is left showing a ringing call, and this facade has
+        // just decided it owns nothing.
+        //
+        // Failing the app's request was the whole of what happened before.
+        // That is correct and insufficient: the app being told is not the
+        // platform being told, and nothing else was ever going to tell it.
+        // The call would ring until the user dismissed it, addressable by
+        // nothing in Java.
+        Parked parked = new Parked();
+        CallRequests.resetForTest(parked);
+        String id = CallId.random();
+        AsyncResource<CallSession> reported = Calls.reportIncoming(id,
+                CallHandle.phone("+14155551212"), "Ada", false);
+        assertTrue(parked.parkedRequest >= 0,
+                "the report has to have reached the bridge");
+
+        Calls.deliverProviderReset();
+        // The platform answers YES, after the reset.
+        Calls.deliverAck(parked.parkedRequest, true, 0, null);
+
+        CallAwait.assertFailedWith(CallError.PROVIDER_RESET, reported);
+        assertNull(Calls.getSession(id),
+                "the session is gone, which was never in question");
+        assertTrue(parked.ended.contains(id),
+                "and the PLATFORM has to be told to end the call it just"
+                + " accepted, or it keeps ringing one nothing can address");
+    }
+
+    @Test
+    public void aPlatformRefusalIsNotAnsweredByEndingSomebodyElsesCall() {
+        // The retire above must not become "end the call whenever a report
+        // fails". An ordinary refusal means the platform does NOT have the
+        // call, and DUPLICATE_CALL means it has somebody ELSE's under that
+        // id -- the original live one, which an unconditional end would hang
+        // up. That is the failure the discrimination exists to prevent, and
+        // it is worth a test because the two branches sit next to each other
+        // and both end in out.error.
+        Parked parked = new Parked();
+        CallRequests.resetForTest(parked);
+        String id = CallId.random();
+        AsyncResource<CallSession> reported = Calls.reportIncoming(id,
+                CallHandle.phone("+14155551212"), "Ada", false);
+        Calls.deliverAck(parked.parkedRequest, false,
+                CallError.DUPLICATE_CALL.ordinal(), "already live");
+
+        CallAwait.assertFailedWith(CallError.DUPLICATE_CALL, reported);
+        assertTrue(parked.ended.isEmpty(),
+                "a refused report leaves the platform nothing to end, and"
+                + " under a duplicate id what it has is another call");
+    }
+
     @Test
     public void aSystemMuteThatCannotBeRefusedStillMoves() {
         // Telecom reports a mute it has already applied. A listener that

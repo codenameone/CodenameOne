@@ -388,7 +388,18 @@ public final class Calls {
                 // NOT carried out; saying otherwise strands the connection it
                 // created.
                 settleStarted(false);
-                forget(id, session);
+                boolean unclaimed = releaseUnclaimed(id, session);
+                // A refusal means the platform does not hold the call, with
+                // ONE exception: this failure may not have come from the
+                // platform at all. A reset between openAck and the bridge
+                // call is failed here by failAll, and the report still goes
+                // out afterwards -- the port reports it, the platform may
+                // well accept it, and the acknowledgement that says so is
+                // then ignored because its request is gone. Nothing would
+                // ever have told the platform otherwise.
+                if (unclaimed && isProviderReset(error)) {
+                    retire(id);
+                }
                 out.error(error);
                 return;
             }
@@ -405,7 +416,16 @@ public final class Calls {
                 // no operation can address.
                 settleStarted(false);
                 session.setStateInternal(CallState.ENDED);
-                forget(id, session);
+                // And the platform is TOLD. Failing the app's request was the
+                // whole of what happened here before, which left the system
+                // showing a call this facade had just disowned: ringing or
+                // dialing, addressable by nothing in Java, and outliving the
+                // reset that was supposed to have swept everything. Giving up
+                // on a call the platform accepted is not the same as ending
+                // it, and only one of the two is what the app asked for.
+                if (releaseUnclaimed(id, session)) {
+                    retire(id);
+                }
                 out.error(new CallException(CallError.PROVIDER_RESET,
                         "The system's call provider was reset"));
                 return;
@@ -413,6 +433,79 @@ public final class Calls {
             settleStarted(true);
             out.complete(session);
         }
+    }
+
+    /// Whether this failure is the provider reset failing everything in
+    /// flight, rather than the platform refusing one call.
+    ///
+    /// Tested with instanceof rather than caught: ParparVM does not check
+    /// CHECKCAST, so a cast whose failure this expected to handle would hand
+    /// the wrong object on and never reach a catch.
+    private static boolean isProviderReset(Throwable error) {
+        if (!(error instanceof CallException)) {
+            return false;
+        }
+        return ((CallException) error).getError() == CallError.PROVIDER_RESET;
+    }
+
+    /// Releases `callId` if `session` still holds it, and answers whether the
+    /// id is then held by nobody.
+    ///
+    /// Both questions under ONE lock, because the answer to the second is
+    /// what decides whether the platform gets told to end the call, and a
+    /// report landing between them would be hung up by an end that was
+    /// decided before it existed.
+    ///
+    /// "Nobody holds it" rather than "this session held it", which is the
+    /// guard reportEndedRemotely uses and the one this started with. It is
+    /// wrong here, and wrong in a way that made the fix inert rather than
+    /// unsafe: a provider reset CLEARS the map before it fails what is in
+    /// flight, so a handover reached through the reset can never claim to
+    /// have owned the id -- the reset already took it. The question worth
+    /// asking is not who used to hold it but whether ending it would hang up
+    /// somebody else's call, and an unclaimed id cannot.
+    private static boolean releaseUnclaimed(String callId,
+            CallSession session) {
+        synchronized (SESSIONS) {
+            if (SESSIONS.get(callId) == session) { //NOPMD CompareObjectsWithEquals
+                SESSIONS.remove(callId);
+            }
+            return !SESSIONS.containsKey(callId);
+        }
+    }
+
+    /// Ends on the PLATFORM a call this facade has given up on.
+    ///
+    /// Only ever called when releaseUnclaimed() said no session holds the id,
+    /// because both ports resolve an operation by call id alone: a call id is
+    /// reusable the moment the previous call is gone -- a provider reset
+    /// followed by an immediate retry is the ordinary way -- so an unguarded
+    /// end here would hang up whatever holds the id NOW.
+    ///
+    /// A report registering AFTER that check and before this call would still
+    /// be hung up. That sliver is left, on the same reasoning recorded at
+    /// reportEndedRemotely: closing it needs a tombstone or generation-tagged
+    /// native identity, and a tombstone adds a way for an id to become
+    /// permanently unusable. Ending a call nobody has claimed is the failure
+    /// worth preventing; this is the one that was actually reachable.
+    ///
+    /// FAILED rather than LOCAL_ENDED: nobody hung up. The app never saw
+    /// this call, and the system call log should not say that it did.
+    ///
+    /// The acknowledgement is opened and not read. Something has to answer
+    /// the port's request -- an operation that never answers is worse than
+    /// one that fails -- but there is no caller left to tell: the app has
+    /// already been given the reset failure, and whether the platform agreed
+    /// to end a call this facade no longer knows about is not a fact anyone
+    /// can act on.
+    private static void retire(String callId) {
+        CallBridge b = CallRequests.bridge();
+        if (b == null) {
+            return;
+        }
+        int reqId = CallRequests.nextId();
+        CallRequests.openAck(reqId);
+        b.endCall(reqId, callId, CallEndReason.FAILED.ordinal());
     }
 
     /// The session for a call id, or null when this app has none.
