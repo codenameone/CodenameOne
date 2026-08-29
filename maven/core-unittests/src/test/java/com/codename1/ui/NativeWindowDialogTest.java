@@ -911,4 +911,64 @@ class NativeWindowDialogTest extends UITestBase {
         DisplayTest.flushEdt();
         assertTrue(shown.getTitleComponent().isVisible());
     }
+
+    @FormTest
+    void anInteractionDialogTitleReachesTheNativeTitleBarToo() {
+        // The same defect Dialog had: the window took a copy at construction and the
+        // lightweight label is hidden behind the native title bar.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        id.setTitle("before");
+        id.add(BorderLayout.CENTER, new Label("body"));
+        id.setNativeWindowMode(true);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+        assertEquals("before", id.getNativeWindow().getTitle());
+
+        id.setTitle("changed while showing");
+        DisplayTest.flushEdt();
+        assertEquals("changed while showing", id.getNativeWindow().getTitle());
+
+        id.dispose();
+        DisplayTest.flushEdt();
+        // And after teardown it must not raise anything.
+        id.setTitle("after it has gone");
+    }
+
+    @FormTest
+    void anInteractionDialogPutsTheTitleBackTheWayItFoundIt() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        id.setTitle("suppressed");
+        id.add(BorderLayout.CENTER, new Label("body"));
+        id.getTitleComponent().setVisible(false);
+        id.setNativeWindowMode(true);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+        id.dispose();
+        DisplayTest.flushEdt();
+
+        assertFalse(id.getTitleComponent().isVisible(),
+                "a title the application suppressed must stay suppressed");
+
+        com.codename1.components.InteractionDialog shown =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        shown.setTitle("ordinary");
+        shown.add(BorderLayout.CENTER, new Label("body"));
+        shown.setNativeWindowMode(true);
+        shown.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+        shown.dispose();
+        DisplayTest.flushEdt();
+        assertTrue(shown.getTitleComponent().isVisible(),
+                "and the ordinary case still comes back");
+    }
 }

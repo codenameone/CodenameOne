@@ -2725,6 +2725,12 @@ public class Form extends Container implements TopLevelContainer {
     }
 
     private void addTransferred(TopLevelContainer host, int kind, ActionListener l) {
+        // Marked as this form's rather than the host's, so that a hosted overlay
+        // claiming the pointer suppresses the host's own listeners without also
+        // suppressing the ones the application registered on the overlay itself.
+        if (host instanceof Window) {
+            ((Window) host).addPointerScopeExempt(l);
+        }
         switch (kind) {
             case POINTER_PRESSED:
                 host.asContainer().addPointerPressedListener(l);
@@ -2742,6 +2748,9 @@ public class Form extends Container implements TopLevelContainer {
     }
 
     private void removeTransferred(TopLevelContainer host, int kind, ActionListener l) {
+        if (host instanceof Window) {
+            ((Window) host).removePointerScopeExempt(l);
+        }
         switch (kind) {
             case POINTER_PRESSED:
                 host.asContainer().removePointerPressedListener(l);

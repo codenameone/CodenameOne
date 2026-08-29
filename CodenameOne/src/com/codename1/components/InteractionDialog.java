@@ -232,6 +232,14 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// - `title`: the title text.
     public void setTitle(String title) {
         this.title.setText(title);
+        // Onto the operating system's title bar too while this dialog is backed by a
+        // window of its own, exactly as Dialog does. The window took a copy when it was
+        // created and this label is hidden behind the native title bar, so without this
+        // a setTitle from initNativeWindow or after a modeless show would change
+        // nothing the user can see.
+        if (nativeWindow != null && !nativeWindow.isWindowDisposed()) {
+            nativeWindow.setTitle(title == null ? "" : title);
+        }
     }
 
     /// {@inheritDoc}
@@ -479,6 +487,11 @@ public class InteractionDialog extends Container implements AbstractDialog {
             return;
         }
         nativeTitleHidden = true;
+        // What they were, not what they usually are: an application is free to suppress
+        // the title before showing, and this dialog is reusable, so putting both back
+        // visible would resurrect title UI that was deliberately hidden.
+        titleAreaWasVisible = titleArea.isVisible();
+        titleWasVisible = title.isVisible();
         titleArea.setVisible(false);
         title.setVisible(false);
     }
@@ -489,12 +502,18 @@ public class InteractionDialog extends Container implements AbstractDialog {
             return;
         }
         nativeTitleHidden = false;
-        titleArea.setVisible(true);
-        title.setVisible(true);
+        titleArea.setVisible(titleAreaWasVisible);
+        title.setVisible(titleWasVisible);
     }
 
     /// True while the dialog's own title is hidden because the window draws one.
     private boolean nativeTitleHidden;
+
+    /// Whether the title area was visible before the native window hid it.
+    private boolean titleAreaWasVisible;
+
+    /// Whether the title label was visible before the native window hid it.
+    private boolean titleWasVisible;
 
     /// Takes this dialog back out of its window. Idempotent, and on the event dispatch
     /// thread.

@@ -24,6 +24,8 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -1138,6 +1140,89 @@ class DialogInWindowTest extends UITestBase {
         DisplayTest.flushEdt();
         assertTrue(pressesBehind[0] > 0, "and the control is reachable again");
 
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void theHostsOwnPointerListenersDoNotRunUnderAModalDialog() {
+        // The historical path replaced the surface, so the surface's listeners were
+        // simply unreachable while a dialog was up. Hosted in a layer the window stays
+        // current and its listeners run before anything is hit tested, so one that
+        // consumed the press took it away from the dialog altogether.
+        Window w = openHost(600, 500);
+        final int[] hostPresses = new int[1];
+        w.addPointerPressedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                hostPresses[0]++;
+                evt.consume();
+            }
+        });
+        w.addPointerReleasedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                hostPresses[0]++;
+                evt.consume();
+            }
+        });
+
+        w.pointerPressed(10, 10);
+        w.pointerReleased(10, 10);
+        DisplayTest.flushEdt();
+        assertTrue(hostPresses[0] > 0, "the window's own listeners work normally");
+
+        Dialog d = new Dialog("modal");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        int before = hostPresses[0];
+        w.pointerPressed(10, 10);
+        w.pointerReleased(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(before, hostPresses[0],
+                "a press meant for the dialog must not reach the window's listeners");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertTrue(hostPresses[0] > before,
+                "and they work again once the dialog has gone");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aListenerOnTheDialogItselfStillRunsWhileItOwnsThePointer() {
+        // The claim suppresses the window's own listeners, not the ones the application
+        // registered on the dialog -- those are transferred onto the window when the
+        // dialog is embedded, and suppressing them too would break every hosted dialog
+        // that listens for its own presses.
+        Window w = openHost(600, 500);
+        final int[] dialogPresses = new int[1];
+
+        Dialog d = new Dialog("listening");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.addPointerPressedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                dialogPresses[0]++;
+            }
+        });
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertTrue(dialogPresses[0] > 0,
+                "the dialog's own pointer listener has to keep working");
+
+        d.dispose();
+        DisplayTest.flushEdt();
         w.dispose();
         DisplayTest.flushEdt();
     }

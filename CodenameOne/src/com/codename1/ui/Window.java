@@ -2972,12 +2972,9 @@ public class Window extends Container implements TopLevelContainer {
         initialPressY = y;
         currentPointerPress = new Object();
         dragged = null;
-        if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
-            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y);
-            pointerPressedListeners.fireActionEvent(e);
-            if (e.isConsumed()) {
-                return;
-            }
+        if (firePointerEvent(pointerPressedListeners,
+                new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y))) {
+            return;
         }
         // A press dismisses any tooltip so it cannot linger over a drag image or be
         // stranded when the gesture rebuilds the UI, as on a Form.
@@ -3060,13 +3057,10 @@ public class Window extends Container implements TopLevelContainer {
         // the session that it too continued out of a glide.
         boolean pressedDuringDrag = pointerPressedAgainDuringDrag;
         pointerPressedAgainDuringDrag = false;
-        if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
-            e.setPointerPressedDuringDrag(pressedDuringDrag);
-            pointerDraggedListeners.fireActionEvent(e);
-            if (e.isConsumed()) {
-                return;
-            }
+        ActionEvent dragEvent = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
+        dragEvent.setPointerPressedDuringDrag(pressedDuringDrag);
+        if (firePointerEvent(pointerDraggedListeners, dragEvent)) {
+            return;
         }
         autoRelease(x, y);
         Component target = dragged != null ? dragged : pressedCmp;
@@ -3086,15 +3080,13 @@ public class Window extends Container implements TopLevelContainer {
         // The same listener block the scalar overload runs. Adding it there only
         // meant a gesture stopped notifying window listeners the moment it became
         // multi touch, which is where pull to refresh loses its updates.
-        if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerDrag, x[0], y[0]);
-            // Reported but not cleared here, which is what Form's multi-pointer path
-            // does -- the scalar path above owns the reset.
-            e.setPointerPressedDuringDrag(pointerPressedAgainDuringDrag);
-            pointerDraggedListeners.fireActionEvent(e);
-            if (e.isConsumed()) {
-                return;
-            }
+        ActionEvent multiDragEvent =
+                new ActionEvent(this, ActionEvent.Type.PointerDrag, x[0], y[0]);
+        // Reported but not cleared here, which is what Form's multi-pointer path
+        // does -- the scalar path above owns the reset.
+        multiDragEvent.setPointerPressedDuringDrag(pointerPressedAgainDuringDrag);
+        if (firePointerEvent(pointerDraggedListeners, multiDragEvent)) {
+            return;
         }
         autoRelease(x[0], y[0]);
         Component target = dragged != null ? dragged : pressedCmp;
@@ -3125,10 +3117,9 @@ public class Window extends Container implements TopLevelContainer {
         // its own.
         final Component releasingDragged = dragged;
         final Component releasingPressed = pressedCmp;
-        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
+        {
             ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
-            pointerReleasedListeners.fireActionEvent(e);
-            if (e.isConsumed()) {
+            if (firePointerEvent(pointerReleasedListeners, e)) {
                 // A drag that was actually activated still has to be finished, or the
                 // component stays hidden and the drop never runs -- Form does the
                 // same on its consumed path.
@@ -3238,12 +3229,9 @@ public class Window extends Container implements TopLevelContainer {
         // Listeners registered on the window itself run first and can consume the
         // gesture, the same order Form uses. Forwarding to the child without this
         // silently dropped every addLongPressListener attached to the window.
-        if (longPressListeners != null && longPressListeners.hasListeners()) {
-            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y);
-            longPressListeners.fireActionEvent(ev);
-            if (ev.isConsumed()) {
-                return;
-            }
+        if (firePointerEvent(longPressListeners,
+                new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y))) {
+            return;
         }
         // A long press is the touch equivalent of a right click, so it is a context
         // menu request next, exactly as on a Form.
@@ -3640,6 +3628,124 @@ public class Window extends Container implements TopLevelContainer {
         if (restoreFocusTo != null && contains(restoreFocusTo)) {
             setFocused(restoreFocusTo);
         }
+    }
+
+    /// Every container currently claiming the pointer, innermost last. A stack for the
+    /// same reason the keyboard one is.
+    private ArrayList<Container> pointerInputScopes;
+
+    /// Listeners exempt from that claim: the ones a hosted overlay handed to this
+    /// window when it was embedded. They belong to the overlay, so they are the only
+    /// pointer listeners that should still run while an overlay owns the pointer.
+    private ArrayList<ActionListener> pointerScopeExempt;
+
+    /// Claims the pointer for a container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scope`: the container that owns presses until it releases them
+    void pushPointerInputScope(Container scope) {
+        if (scope == null) {
+            return;
+        }
+        if (pointerInputScopes == null) {
+            pointerInputScopes = new ArrayList<Container>();
+        }
+        pointerInputScopes.add(scope);
+    }
+
+    /// Releases a pointer claim, wherever it sits in the stack.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scope`: the container releasing the pointer
+    void removePointerInputScope(Container scope) {
+        if (pointerInputScopes == null || scope == null) {
+            return;
+        }
+        pointerInputScopes.remove(scope);
+        if (pointerInputScopes.isEmpty()) {
+            pointerInputScopes = null;
+        }
+    }
+
+    /// Whether anything currently claims the pointer.
+    ///
+    /// #### Returns
+    ///
+    /// true when no overlay owns presses
+    boolean isPointerInputScopeEmpty() {
+        return pointerInputScopes == null;
+    }
+
+    /// Marks a listener as belonging to an embedded overlay rather than to this window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    void addPointerScopeExempt(ActionListener l) {
+        if (l == null) {
+            return;
+        }
+        if (pointerScopeExempt == null) {
+            pointerScopeExempt = new ArrayList<ActionListener>();
+        }
+        pointerScopeExempt.add(l);
+    }
+
+    /// Drops a listener from the exempt set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    void removePointerScopeExempt(ActionListener l) {
+        if (pointerScopeExempt == null || l == null) {
+            return;
+        }
+        pointerScopeExempt.remove(l);
+        if (pointerScopeExempt.isEmpty()) {
+            pointerScopeExempt = null;
+        }
+    }
+
+    /// Fires a pointer event to this window's own listeners, honouring any overlay's
+    /// claim on the pointer.
+    ///
+    /// A modal dialog used to replace the surface underneath it, so the surface's
+    /// listeners simply never ran. Hosted in a layer the window stays current, and
+    /// without this its listeners still fired for presses on the dialog -- one that
+    /// consumed the event took the press away from the dialog entirely. Only the
+    /// listeners the overlay itself handed over run while it owns the pointer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dispatcher`: this window's listeners for the event, may be null
+    ///
+    /// - `e`: the event
+    ///
+    /// #### Returns
+    ///
+    /// true if the event was consumed
+    private boolean firePointerEvent(EventDispatcher dispatcher, ActionEvent e) {
+        if (pointerInputScopes == null) {
+            if (dispatcher != null && dispatcher.hasListeners()) {
+                dispatcher.fireActionEvent(e);
+            }
+            return e.isConsumed();
+        }
+        if (pointerScopeExempt != null && dispatcher != null && dispatcher.hasListeners()) {
+            // A copy: a listener is free to add or remove listeners as it runs.
+            ArrayList<ActionListener> exempt =
+                    new ArrayList<ActionListener>(pointerScopeExempt);
+            int count = exempt.size();
+            for (int iter = 0; iter < count; iter++) {
+                exempt.get(iter).actionPerformed(e);
+                if (e.isConsumed()) {
+                    break;
+                }
+            }
+        }
+        return e.isConsumed();
     }
 
     /// Whether anything at all currently claims the keyboard.

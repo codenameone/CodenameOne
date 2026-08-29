@@ -2469,6 +2469,13 @@ public class Dialog extends Form implements AbstractDialog {
         // than cleared so a dialog over a dialog gives the keyboard back to the one
         // underneath rather than to the window.
         host.pushKeyInputScope(this);
+        // And the pointer with it. The scrim already stops presses reaching what is
+        // underneath, but the window's own pointer listeners run before anything is hit
+        // tested, so without this a listener on the window still saw every press meant
+        // for the dialog -- and one that consumed it took the press away from the
+        // dialog altogether. The historical path got this for free by replacing the
+        // surface, which left the old one's listeners unreachable.
+        host.pushPointerInputScope(this);
         focusFirstFocusable(host);
 
         onShow();
@@ -2697,6 +2704,7 @@ public class Dialog extends Form implements AbstractDialog {
             // itself once the last claimant has gone, which is the only point at which
             // handing focus back cannot hand it to something still covered.
             host.removeKeyInputScope(this);
+            host.removePointerInputScope(this);
         }
         if (scrim != null) {
             scrim.remove();
