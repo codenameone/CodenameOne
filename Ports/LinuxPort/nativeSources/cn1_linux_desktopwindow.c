@@ -605,6 +605,13 @@ static gboolean cn1DesktopOnGenericEvent(GtkWidget* widget, GdkEvent* e, gpointe
     GdkEventTouchpadPinch* pe = (GdkEventTouchpadPinch*) e;
     if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_BEGIN) {
         w->pinchLastScale = pe->scale > 0 ? pe->scale : 1.0;
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_PINCH_BEGIN,
+                (int) pe->x, (int) pe->y, 0);
+    } else if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_END
+            || pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_CANCEL) {
+        w->pinchLastScale = 1.0;
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_PINCH_END,
+                (int) pe->x, (int) pe->y, 0);
     } else if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_UPDATE) {
         int x = (int) pe->x;
         int y = (int) pe->y;

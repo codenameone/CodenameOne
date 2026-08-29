@@ -32,6 +32,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -226,8 +227,11 @@ class DeviceInputListenersTest extends UITestBase {
 
     /// A producer with no gesture phases must leave nothing behind.
     ///
-    /// Display is a singleton, and Windows, Linux and JavaSE report magnification
-    /// through Desktop.windowMagnifyGesture alone -- no begin, no release. A
+    /// Display is a singleton, and a producer can still report magnification
+    /// through Desktop.windowMagnifyGesture alone -- no begin, no release. The
+    /// native Windows and Linux ports now forward the touchpad's phases, but
+    /// the JavaSE simulator does not: it synthesises a two-pointer drag, which
+    /// Component ends through pointerDragged instead. A
     /// claim recorded for them would never be read and never cleared, so the
     /// component that consumed one pinch, and the whole form hierarchy behind
     /// it, would stay reachable from the singleton for the life of the process,
@@ -254,5 +258,62 @@ class DeviceInputListenersTest extends UITestBase {
         held.setAccessible(true);
         assertNull(held.get(Display.getInstance()),
                 "a gesture with no reported begin must not leave a component held");
+    }
+
+    /// The phased path has to end the gesture on the component that took it.
+    ///
+    /// A touchpad emits no pointer events, so the two-pointer path in Component
+    /// that normally calls pinchReleased() never runs for a trackpad pinch. If
+    /// the port reports the phases and Display drops them, a component that
+    /// zoomed stays in its pinching state after the fingers leave -- an
+    /// ImageViewer never commits currentZoom. That was the state the native
+    /// Windows, Linux and JavaScript ports were in: they delivered the scale
+    /// updates and neither phase.
+    @FormTest
+    void aPhasedMagnifyGestureEndsOnTheComponentThatTookIt() throws Exception {
+        Form form = Display.getInstance().getCurrent();
+        form.setLayout(new BorderLayout());
+        final AtomicInteger released = new AtomicInteger();
+        Container gestureCmp = new Container() {
+            @Override
+            protected boolean pinch(float scale) {
+                return true;
+            }
+
+            @Override
+            protected void pinchReleased(int x, int y) {
+                released.incrementAndGet();
+            }
+        };
+        gestureCmp.setPreferredSize(new Dimension(200, 120));
+        form.add(BorderLayout.CENTER, gestureCmp);
+        form.revalidate();
+
+        int x = gestureCmp.getAbsoluteX() + gestureCmp.getWidth() / 2;
+        int y = gestureCmp.getAbsoluteY() + gestureCmp.getHeight() / 2;
+
+        Display.getInstance().firePinchBeginGesture();
+        Display.getInstance().fireMagnifyGesture(x, y, 1.5f);
+        assertEquals(0, released.get(), "the gesture is still in progress");
+
+        Display.getInstance().firePinchReleaseGesture(x, y);
+        assertEquals(1, released.get(),
+                "the component that consumed the pinch must be told the gesture ended");
+
+        java.lang.reflect.Field held = Display.class.getDeclaredField("pinchGestureTarget");
+        held.setAccessible(true);
+        assertNull(held.get(Display.getInstance()),
+                "the release must clear the claim so the next gesture is not stranded");
+    }
+
+    /// A release with no component having taken the gesture must not throw.
+    ///
+    /// The ports call firePinchReleaseGesture unconditionally at the end of a
+    /// touchpad gesture, including one that passed over nothing that zooms, so
+    /// the no-target case is the common one rather than an edge.
+    @FormTest
+    void aReleaseWithNoTargetIsHarmless() {
+        Display.getInstance().firePinchBeginGesture();
+        Display.getInstance().firePinchReleaseGesture(10, 10);
     }
 }

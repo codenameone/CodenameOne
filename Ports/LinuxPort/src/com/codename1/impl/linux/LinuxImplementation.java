@@ -109,6 +109,11 @@ public class LinuxImplementation extends CodenameOneImplementation {
     private static final int EVENT_MOUSE_WHEEL = 8;
     private static final int EVENT_MOUSE_HWHEEL = 9;
     private static final int EVENT_PINCH = 10;
+    // The pinch phases, forwarded so a component that zoomed learns the gesture
+    // ended. A touchpad emits no pointer events, so the two-pointer path in
+    // Component that normally calls pinchReleased() never runs on this port.
+    private static final int EVENT_PINCH_BEGIN = 20;
+    private static final int EVENT_PINCH_END = 21;
     private static final int EVENT_ROTATE = 11;
     private static final int EVENT_ACCESSIBILITY_ACTION = 12;
     // Additional desktop windows. These always carry a non-zero window id.
@@ -855,6 +860,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     // A positive horizontal notch tilts right (scrolls content
                     // left), i.e. drags the finger left -> negative scrollX.
                     windowPointerWheelMoved(windowId, x, y, -wheelUnits(key), 0, false, 0);
+                    break;
+                case EVENT_PINCH_BEGIN:
+                    Display.getInstance().firePinchBeginGesture();
+                    break;
+                case EVENT_PINCH_END:
+                    Display.getInstance().firePinchReleaseGesture(x, y);
                     break;
                 case EVENT_PINCH:
                     // key is the incremental scale multiplier in 1/10000 units.
