@@ -43,6 +43,24 @@ extern int connections;
 
 const void *CN1FollowTargetBlankKey = &CN1FollowTargetBlankKey;
 
+// Threading, because it looks macOS-specific and is not.
+//
+// Every fireWebView* call below runs the Java listener on whatever thread
+// WebKit invoked the delegate on -- the native main thread -- rather than on
+// the EDT, and neither IOSImplementation.fireWebView*() nor
+// IOSImplementation.setBrowserURL() marshals. So a listener that calls
+// BrowserComponent.setURL() reaches setBrowserURL's unconditional
+// dispatch_sync(dispatch_get_main_queue(), ...) while already on the main
+// thread, which is a deadlock.
+//
+// That is worth knowing and it is NOT introduced by the macOS port: master
+// carries the identical dispatch_sync and the identical unmarshalled
+// fireWebViewDidFinishLoad, and the iOS delegate reaches them the same way.
+// Marshalling only the macOS branch would make the two platforms disagree
+// about which thread a browser listener runs on, and doing it properly means
+// keeping decidePolicyForNavigationAction synchronous because WebKit needs its
+// answer inline. That is a framework-wide change to browser callback
+// threading, and it is not this change.
 @implementation UIWebViewEventDelegate
 
 - (id)initWithCallback:(void*)callback {
