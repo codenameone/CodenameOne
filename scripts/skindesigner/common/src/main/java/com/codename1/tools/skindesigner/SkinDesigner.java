@@ -1218,13 +1218,16 @@ public class SkinDesigner extends Lifecycle {
                 "Px/mm × 100", "", ppmm100, null));
 
         parent.add(sectionLabel("SAFE AREA"));
-        // Points on iOS, dp on Android -- the units Apple and Google publish
-        // their insets in, and the units the device catalog stores. The
+        // The units Apple and Google publish their insets in, and the units
+        // the device catalog stores: points on iOS, dp on Android. The
         // generated skin multiplies them by the device's density scale, so
-        // the field says "pt": typing 47 here for a notched iPhone gets you
-        // the 47pt Apple documents, not 47 physical pixels.
-        parent.add(numericPair("Top", "pt", skin.safeTop, v -> { skin.safeTop = Math.max(0, v); saveState(); },
-                "Bottom", "pt", skin.safeBottom, v -> { skin.safeBottom = Math.max(0, v); saveState(); }));
+        // typing 47 here for a notched iPhone gets you the 47pt Apple
+        // documents, not 47 physical pixels. The label follows the selected
+        // device, because telling someone editing an Android skin that a dp
+        // value is "pt" invites them to convert it as though it were one.
+        String safeUnit = "ios".equals(device.platformName) ? "pt" : "dp";
+        parent.add(numericPair("Top", safeUnit, skin.safeTop, v -> { skin.safeTop = Math.max(0, v); saveState(); },
+                "Bottom", safeUnit, skin.safeBottom, v -> { skin.safeBottom = Math.max(0, v); saveState(); }));
     }
 
     private Label sectionLabel(String text) {
@@ -1845,13 +1848,18 @@ public class SkinDesigner extends Lifecycle {
         p.put("safePortraitWidth", String.valueOf(safeW));
         p.put("safePortraitHeight", String.valueOf(safeH));
 
-        // Landscape is portrait rotated 90° clockwise. The display now has
-        // width = portraitH and height = portraitW. The portrait top inset
-        // becomes the landscape *left* inset; the portrait bottom inset
-        // becomes the landscape right inset.
+        // skin_l.png is skin.png through Image.rotate90Degrees, which maps
+        // source (x, y) to (height - 1 - y, x): the portrait TOP row becomes
+        // the landscape RIGHT column. So the notch is drawn on the right in
+        // landscape, and the top inset has to be the landscape RIGHT inset.
+        // Writing it as safeLandscapeX instead reserved the left edge while
+        // the notch sat on the right, and app content rendered underneath the
+        // opaque shape. snapToSafeAreaInternal derives the right margin as
+        // surfaceWidth - width - x, so putting the BOTTOM inset in X leaves
+        // exactly safeTopPx on the right.
         int landSafeW = Math.max(1, device.resolutionH - safeTopPx - safeBottomPx);
         int landSafeH = device.resolutionW;
-        p.put("safeLandscapeX", String.valueOf(safeTopPx));
+        p.put("safeLandscapeX", String.valueOf(safeBottomPx));
         p.put("safeLandscapeY", "0");
         p.put("safeLandscapeWidth", String.valueOf(landSafeW));
         p.put("safeLandscapeHeight", String.valueOf(landSafeH));
