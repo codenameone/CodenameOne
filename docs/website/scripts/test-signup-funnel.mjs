@@ -36,14 +36,38 @@ function page(name) {
   return fs.readFileSync(file, "utf8");
 }
 
-function assertSignupCta(html, event) {
-  const link = new RegExp(
-    `<a[^>]+href=["']${registerUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'][^>]+data-cn1-conversion=["']${event}["']|` +
-    `<a[^>]+data-cn1-conversion=["']${event}["'][^>]+href=["']${registerUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`,
-    "i"
-  );
-  assert.match(html, link, `${event} must send directly to registration`);
+function anchorElements(html) {
+  return Array.from(html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/gi), ([element]) => {
+    const openingTag = element.match(/^<a\b[^>]*>/i)?.[0] || "";
+    const attributes = {};
+    const attributePattern = /([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+    const source = openingTag.replace(/^<a\b/i, "").replace(/>$/, "");
+    let match;
+    while ((match = attributePattern.exec(source)) !== null) {
+      attributes[match[1].toLowerCase()] = match[2] ?? match[3] ?? match[4] ?? "";
+    }
+    return {
+      attributes,
+      text: element.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+    };
+  });
 }
+
+function assertSignupCta(html, event) {
+  const found = anchorElements(html).some(({ attributes }) =>
+    attributes.href === registerUrl && attributes["data-cn1-conversion"] === event
+  );
+  assert.ok(found, `${event} must send directly to registration`);
+}
+
+assertSignupCta(
+  `<a href="${registerUrl}" data-cn1-conversion="quoted-signup">Create account</a>`,
+  "quoted-signup"
+);
+assertSignupCta(
+  `<a href=${registerUrl} data-cn1-conversion=minified-signup>Create account</a>`,
+  "minified-signup"
+);
 
 const home = page("home");
 const pricing = page("pricing");
@@ -55,9 +79,10 @@ assertSignupCta(pricing, "pricing-free-signup");
 assertSignupCta(compare, "compare-signup");
 assertSignupCta(compare, "compare-final-signup");
 
-assert.match(home, /<a[^>]+href=["']https:\/\/cloud\.codenameone\.com\/register["'][^>]*>[\s\S]*?Sign Up/i,
-  "the global header must expose registration");
-assert.match(home, /href=["']\/initializr\/["']/i,
+assert.ok(anchorElements(home).some(({ attributes, text }) =>
+  attributes.href === registerUrl && text === "Sign Up"
+), "the global header must expose registration");
+assert.ok(anchorElements(home).some(({ attributes }) => attributes.href === "/initializr/"),
   "Initializr must remain available as an explicit project-generation tool");
 assert.doesNotMatch(home, /cn1-exp-004/i,
   "the retired download experiment must not enroll new homepage visitors");
