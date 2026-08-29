@@ -54,14 +54,24 @@ public class MacCameraImpl extends IOSCameraImpl {
             if (video == DENIED || video == RESTRICTED) {
                 throw new IOException("camera access has been denied for this application");
             }
+            boolean audioUndecided = false;
             if (o.isCaptureAudio()) {
                 int audio = IOSImplementation.cameraAuthorizationStatus(true);
                 if (audio == DENIED || audio == RESTRICTED) {
                     throw new IOException("microphone access has been denied for this "
                             + "application, and this session was asked to capture audio");
                 }
+                audioUndecided = audio == NOT_DETERMINED;
             }
-            if (video == NOT_DETERMINED) {
+            // Either requested type being undecided has to prompt, not just the
+            // camera. A session that already holds camera permission but has
+            // never asked for the microphone would otherwise be reported as
+            // fully granted without the microphone prompt ever being shown, and
+            // then record a silent movie. Asking for an already-authorized type
+            // is free: requestAccessForMediaType returns immediately without a
+            // prompt, so the mixed state costs the user one dialog, the one
+            // that was actually missing.
+            if (video == NOT_DETERMINED || audioUndecided) {
                 // Nobody has been asked yet, so ask and WAIT for the answer.
                 // Firing the prompt and returning normally would report the
                 // permission as granted before the user had touched the dialog,
