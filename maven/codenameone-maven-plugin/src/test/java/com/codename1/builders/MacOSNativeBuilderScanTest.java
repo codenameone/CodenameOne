@@ -25,6 +25,7 @@ package com.codename1.builders;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -578,5 +579,26 @@ public class MacOSNativeBuilderScanTest {
                 "\t\t\t\tMACOSX_DEPLOYMENT_TARGET = 13.0;\n\t\t\t\tSDKROOT = macosx;\n");
         assertEquals(1, found.size());
         assertEquals("MACOSX_DEPLOYMENT_TARGET = 13.0;", found.iterator().next());
+    }
+
+    /// The DEFAULT arch is what broke the build, so it is what this pins.
+    ///
+    /// getArch() answers "arm64 x86_64" when no hint is set, and a value with a
+    /// space written bare into a pbxproj makes the old-style plist parser
+    /// abandon the file -- "missing semicolon in dictionary" -- which failed
+    /// every macOS build. The value under test before was x86_64, a single
+    /// token that is legal bare, so the path every unhinted build takes was
+    /// never exercised.
+    @Test
+    public void aPbxprojValueIsQuotedWhenTheFormatRequiresIt() {
+        assertEquals("\"arm64 x86_64\"", MacOSNativeBuilder.quotePbxprojValue("arm64 x86_64"));
+        assertEquals("\"$(ARCHS_STANDARD)\"", MacOSNativeBuilder.quotePbxprojValue("$(ARCHS_STANDARD)"));
+        // Bare identifiers stay bare, so the file keeps the shape Xcode wrote.
+        assertEquals("x86_64", MacOSNativeBuilder.quotePbxprojValue("x86_64"));
+        assertEquals("NO", MacOSNativeBuilder.quotePbxprojValue("NO"));
+        assertEquals("13.0", MacOSNativeBuilder.quotePbxprojValue("13.0"));
+        // An already-quoted value is not quoted twice.
+        assertEquals("\"arm64 x86_64\"", MacOSNativeBuilder.quotePbxprojValue("\"arm64 x86_64\""));
+        assertNull(MacOSNativeBuilder.quotePbxprojValue(null));
     }
 }

@@ -1236,6 +1236,35 @@ public class MacOSNativeBuilder extends Executor {
         return found;
     }
 
+    /// A pbxproj value, quoted when the old-style plist format requires it.
+    ///
+    /// Anything that is not a bare identifier has to be quoted: ARCHS defaults
+    /// to "arm64 x86_64", and writing that unquoted produced
+    /// "missing semicolon in dictionary" from the plist parser and killed the
+    /// whole build. Xcode quotes such values in the template for the same
+    /// reason -- $(ARCHS_STANDARD) is written quoted there too.
+    ///
+    /// This was missed because the value under test was x86_64, a single token
+    /// that is legal bare, so the default path -- the one every build without
+    /// the hint takes -- was never exercised.
+    static String quotePbxprojValue(String value) {
+        if (value == null) {
+            return null;
+        }
+        if (value.length() > 1 && value.startsWith("\"") && value.endsWith("\"")) {
+            return value;
+        }
+        boolean bare = value.length() > 0;
+        for (int iter = 0; iter < value.length(); iter++) {
+            char c = value.charAt(iter);
+            if (!Character.isLetterOrDigit(c) && c != '_' && c != '.') {
+                bare = false;
+                break;
+            }
+        }
+        return bare ? value : "\"" + value + "\"";
+    }
+
     /// Writes a resolved hint into the generated project's build settings.
     ///
     /// buildChannel() passes these to xcodebuild as command-line overrides,
@@ -1253,7 +1282,7 @@ public class MacOSNativeBuilder extends Executor {
         if (!pbxproj.isFile()) {
             return;
         }
-        String replacement = setting + " = " + value.trim() + ";";
+        String replacement = setting + " = " + quotePbxprojValue(value.trim()) + ";";
         try {
             String body = readFileToString(pbxproj);
             if (settingAssignments(body, setting).isEmpty()) {
