@@ -732,7 +732,12 @@ public class MacOSNativeBuilder extends Executor {
         // submitted land -- including a dependency's, because the Maven plugin
         // uploads a jar-with-dependencies and everything on the app's classpath is
         // merged into it. A cn1lib's NativeInterface therefore arrives here, and
-        // findNativeClassesInDir descends into any .jar it finds beside them.
+        // findNativeClassesInDir also has a branch for a .jar sitting beside them,
+        // but do not rely on it: that branch computes the class name as
+        // entryName.substring(baseDir.length() + 1), where entryName is a
+        // zip-internal path like com/foo/Bar.class and baseDir is a long absolute
+        // filesystem path, so it cannot produce a loadable name. Jar-borne
+        // interfaces are therefore not discovered on ANY platform today.
         //
         // Not buildinRes as well, which is where unzip routes a jar submitted as a
         // separate artifact. Reaching those would mean changing findNativeInterfaces,
@@ -1363,6 +1368,9 @@ public class MacOSNativeBuilder extends Executor {
             if (usesLocalCalendar(cls, method)) {
                 usesCalendar[0] = true;
             }
+            if (requestsNativeReview(cls, method)) {
+                usesAppReview[0] = true;
+            }
             if (reachesBluetoothViaDisplay(cls, method)) {
                 // Display.getBluetooth() names com.codename1.bluetooth only in
                 // its return type, which this scan does not read. An application
@@ -1371,6 +1379,26 @@ public class MacOSNativeBuilder extends Executor {
                 usesBluetooth[0] = true;
             }
         }
+    }
+
+    /**
+     * Whether an invoked method is the low-level in-app review entry point.
+     *
+     * <p>The package test in {@code usesClass} catches the
+     * {@code com.codename1.appreview} facade, which is how an application is
+     * expected to ask. It does not catch one that calls
+     * {@code CN.requestNativeInAppReview} or the identical method on
+     * {@code Display} directly, and those are public documented API. Missing
+     * them leaves {@code CN1_USE_APPREVIEW} undefined, so the native request
+     * is compiled out and the callback still reports success -- a review
+     * prompt that silently never appears.</p>
+     */
+    static boolean requestsNativeReview(String cls, String method) {
+        if (cls == null || method == null) {
+            return false;
+        }
+        return (cls.equals("com/codename1/ui/CN") || cls.equals("com/codename1/ui/Display"))
+                && method.equals("requestNativeInAppReview");
     }
 
     /**
