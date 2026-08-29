@@ -2724,12 +2724,37 @@ public class Form extends Container implements TopLevelContainer {
         return moved.isEmpty() ? null : moved;
     }
 
+    /// Maps this class's listener kind onto the one the window's exemption registry
+    /// uses, so the two never drift apart silently.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kind`: a `#POINTER_PRESSED` constant
+    ///
+    /// #### Returns
+    ///
+    /// the matching `Window#POINTER_SCOPE_PRESSED` constant
+    private static int pointerScopeKind(int kind) {
+        switch (kind) {
+            case POINTER_PRESSED:
+                return Window.POINTER_SCOPE_PRESSED;
+            case POINTER_DRAGGED:
+                return Window.POINTER_SCOPE_DRAGGED;
+            case POINTER_RELEASED:
+                return Window.POINTER_SCOPE_RELEASED;
+            default:
+                return Window.POINTER_SCOPE_LONG_PRESS;
+        }
+    }
+
     private void addTransferred(TopLevelContainer host, int kind, ActionListener l) {
         // Marked as this form's rather than the host's, so that a hosted overlay
         // claiming the pointer suppresses the host's own listeners without also
         // suppressing the ones the application registered on the overlay itself.
+        // Recorded with the event and the owner, so a press cannot run this form's
+        // release listeners and a stacked dialog cannot run the ones below it.
         if (host instanceof Window) {
-            ((Window) host).addPointerScopeExempt(l);
+            ((Window) host).addPointerScopeExempt(pointerScopeKind(kind), this, l);
         }
         switch (kind) {
             case POINTER_PRESSED:
@@ -2749,7 +2774,7 @@ public class Form extends Container implements TopLevelContainer {
 
     private void removeTransferred(TopLevelContainer host, int kind, ActionListener l) {
         if (host instanceof Window) {
-            ((Window) host).removePointerScopeExempt(l);
+            ((Window) host).removePointerScopeExempt(pointerScopeKind(kind), l);
         }
         switch (kind) {
             case POINTER_PRESSED:

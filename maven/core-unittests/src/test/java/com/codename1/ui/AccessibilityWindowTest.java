@@ -207,4 +207,58 @@ class AccessibilityWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aSecondRootInvalidatedBeforeTheRefreshRunsIsRebuiltToo() {
+        // The refreshScheduled flag makes a second invalidation share the first one's
+        // queued callback. That callback used to close over a single root, and
+        // rebuilding it cleared the global dirty flag -- so the second root's tree
+        // stayed stale for good, which is what an off-EDT screen reader on it reads.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        try {
+            Form main = new Form("main", new BorderLayout());
+            Button mainButton = new Button("on the main form");
+            main.add(BorderLayout.CENTER, mainButton);
+            main.show();
+            DisplayTest.flushEdt();
+
+            final Window w = new Window("second", new BorderLayout());
+            w.setWindowSize(400, 300);
+            Button windowButton = new Button("in the window");
+            w.add(BorderLayout.CENTER, windowButton);
+            w.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            assertTrue(mentions(mgr.getSnapshot(main), "on the main form"));
+            assertTrue(mentions(mgr.getSnapshot(w), "in the window"));
+
+            // Both change before the queued refresh gets to run.
+            mainButton.setText("renamed on the main form");
+            windowButton.setText("renamed in the window");
+            DisplayTest.flushEdt();
+
+            final AccessibilityTreeSnapshot[] offEdt = new AccessibilityTreeSnapshot[1];
+            Thread t = new Thread(new Runnable() {
+                public void run() {
+                    offEdt[0] = AccessibilityManager.getInstance().getSnapshot(w);
+                }
+            });
+            t.start();
+            t.join(5000);
+
+            assertNotNull(offEdt[0]);
+            assertTrue(mentions(offEdt[0], "renamed in the window"),
+                    "the second root to change has to be rebuilt as well");
+
+            w.dispose();
+            DisplayTest.flushEdt();
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(err);
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+        }
+    }
 }

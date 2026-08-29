@@ -1226,4 +1226,107 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aPressDoesNotRunTheDialogsReleaseOrDragListeners() {
+        // The exemptions are held in one list for every kind and every overlay, so
+        // firing it whole ran a dialog's release and drag listeners on a press.
+        Window w = openHost(600, 500);
+        final int[] pressed = new int[1];
+        final int[] released = new int[1];
+        final int[] dragged = new int[1];
+
+        Dialog d = new Dialog("one dialog");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.addPointerPressedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                pressed[0]++;
+            }
+        });
+        d.addPointerReleasedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                released[0]++;
+            }
+        });
+        d.addPointerDraggedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                dragged[0]++;
+            }
+        });
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(1, pressed[0], "the press listener runs");
+        assertEquals(0, released[0], "the release listener must not run on a press");
+        assertEquals(0, dragged[0], "and neither must the drag listener");
+
+        w.pointerReleased(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(1, released[0], "the release listener runs on a release");
+        assertEquals(1, pressed[0]);
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void onlyTheTopmostDialogHearsThePointer() {
+        // Every overlay that ever handed listeners over is in the same list, so without
+        // filtering by owner a dialog stacked underneath kept hearing presses meant for
+        // the one covering it.
+        Window w = openHost(600, 500);
+        final int[] lowerPresses = new int[1];
+        final int[] upperPresses = new int[1];
+
+        Dialog lower = new Dialog("lower");
+        lower.setLayout(new BorderLayout());
+        lower.add(BorderLayout.CENTER, new Label("lower"));
+        lower.addPointerPressedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                lowerPresses[0]++;
+            }
+        });
+        lower.setTopLevelHost(w);
+        lower.showModeless();
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(1, lowerPresses[0], "the only dialog up hears the press");
+
+        Dialog upper = new Dialog("upper");
+        upper.setLayout(new BorderLayout());
+        upper.add(BorderLayout.CENTER, new Label("upper"));
+        upper.addPointerPressedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                upperPresses[0]++;
+            }
+        });
+        upper.setTopLevelHost(w);
+        upper.showModeless();
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(1, upperPresses[0], "the dialog on top hears it");
+        assertEquals(1, lowerPresses[0], "the one underneath must not");
+
+        upper.dispose();
+        DisplayTest.flushEdt();
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(2, lowerPresses[0],
+                "and hears it again once the one above has gone");
+
+        lower.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

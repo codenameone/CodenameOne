@@ -2972,7 +2972,7 @@ public class Window extends Container implements TopLevelContainer {
         initialPressY = y;
         currentPointerPress = new Object();
         dragged = null;
-        if (firePointerEvent(pointerPressedListeners,
+        if (firePointerEvent(POINTER_SCOPE_PRESSED, pointerPressedListeners,
                 new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y))) {
             return;
         }
@@ -3059,7 +3059,7 @@ public class Window extends Container implements TopLevelContainer {
         pointerPressedAgainDuringDrag = false;
         ActionEvent dragEvent = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
         dragEvent.setPointerPressedDuringDrag(pressedDuringDrag);
-        if (firePointerEvent(pointerDraggedListeners, dragEvent)) {
+        if (firePointerEvent(POINTER_SCOPE_DRAGGED, pointerDraggedListeners, dragEvent)) {
             return;
         }
         autoRelease(x, y);
@@ -3085,7 +3085,7 @@ public class Window extends Container implements TopLevelContainer {
         // Reported but not cleared here, which is what Form's multi-pointer path
         // does -- the scalar path above owns the reset.
         multiDragEvent.setPointerPressedDuringDrag(pointerPressedAgainDuringDrag);
-        if (firePointerEvent(pointerDraggedListeners, multiDragEvent)) {
+        if (firePointerEvent(POINTER_SCOPE_DRAGGED, pointerDraggedListeners, multiDragEvent)) {
             return;
         }
         autoRelease(x[0], y[0]);
@@ -3119,7 +3119,7 @@ public class Window extends Container implements TopLevelContainer {
         final Component releasingPressed = pressedCmp;
         {
             ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
-            if (firePointerEvent(pointerReleasedListeners, e)) {
+            if (firePointerEvent(POINTER_SCOPE_RELEASED, pointerReleasedListeners, e)) {
                 // A drag that was actually activated still has to be finished, or the
                 // component stays hidden and the drop never runs -- Form does the
                 // same on its consumed path.
@@ -3229,7 +3229,7 @@ public class Window extends Container implements TopLevelContainer {
         // Listeners registered on the window itself run first and can consume the
         // gesture, the same order Form uses. Forwarding to the child without this
         // silently dropped every addLongPressListener attached to the window.
-        if (firePointerEvent(longPressListeners,
+        if (firePointerEvent(POINTER_SCOPE_LONG_PRESS, longPressListeners,
                 new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y))) {
             return;
         }
@@ -3637,7 +3637,38 @@ public class Window extends Container implements TopLevelContainer {
     /// Listeners exempt from that claim: the ones a hosted overlay handed to this
     /// window when it was embedded. They belong to the overlay, so they are the only
     /// pointer listeners that should still run while an overlay owns the pointer.
-    private ArrayList<ActionListener> pointerScopeExempt;
+    ///
+    /// Each entry carries the event it was registered for and the overlay it came
+    /// from. Both matter: without the event kind a press would run the overlay's
+    /// release and drag listeners as well, and without the owner a dialog underneath
+    /// the active one would still be hearing presses meant for the one on top.
+    private ArrayList<PointerExemption> pointerScopeExempt;
+
+    /// A pointer listener belonging to an embedded overlay rather than to the window.
+    private static final class PointerExemption {
+        private final int kind;
+        private final Container scope;
+        private final ActionListener listener;
+
+        PointerExemption(int kind, Container scope, ActionListener listener) {
+            this.kind = kind;
+            this.scope = scope;
+            this.listener = listener;
+        }
+    }
+
+    /// Pointer-pressed listeners, for `#addPointerScopeExempt(int, Container,
+    /// ActionListener)`.
+    static final int POINTER_SCOPE_PRESSED = 0;
+
+    /// Pointer-dragged listeners.
+    static final int POINTER_SCOPE_DRAGGED = 1;
+
+    /// Pointer-released listeners.
+    static final int POINTER_SCOPE_RELEASED = 2;
+
+    /// Long-press listeners.
+    static final int POINTER_SCOPE_LONG_PRESS = 3;
 
     /// Claims the pointer for a container.
     ///
@@ -3682,27 +3713,41 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// #### Parameters
     ///
+    /// - `kind`: which pointer event it was registered for, a `#POINTER_SCOPE_PRESSED`
+    ///   constant
+    ///
+    /// - `scope`: the overlay it belongs to
+    ///
     /// - `l`: the listener
-    void addPointerScopeExempt(ActionListener l) {
+    void addPointerScopeExempt(int kind, Container scope, ActionListener l) {
         if (l == null) {
             return;
         }
         if (pointerScopeExempt == null) {
-            pointerScopeExempt = new ArrayList<ActionListener>();
+            pointerScopeExempt = new ArrayList<PointerExemption>();
         }
-        pointerScopeExempt.add(l);
+        pointerScopeExempt.add(new PointerExemption(kind, scope, l));
     }
 
     /// Drops a listener from the exempt set.
     ///
     /// #### Parameters
     ///
+    /// - `kind`: which pointer event it was registered for
+    ///
     /// - `l`: the listener
-    void removePointerScopeExempt(ActionListener l) {
+    void removePointerScopeExempt(int kind, ActionListener l) {
         if (pointerScopeExempt == null || l == null) {
             return;
         }
-        pointerScopeExempt.remove(l);
+        int count = pointerScopeExempt.size();
+        for (int iter = 0; iter < count; iter++) {
+            PointerExemption e = pointerScopeExempt.get(iter);
+            if (e.kind == kind && e.listener == l) { //NOPMD CompareObjectsWithEquals
+                pointerScopeExempt.remove(iter);
+                break;
+            }
+        }
         if (pointerScopeExempt.isEmpty()) {
             pointerScopeExempt = null;
         }
@@ -3726,7 +3771,7 @@ public class Window extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// true if the event was consumed
-    private boolean firePointerEvent(EventDispatcher dispatcher, ActionEvent e) {
+    private boolean firePointerEvent(int kind, EventDispatcher dispatcher, ActionEvent e) {
         if (pointerInputScopes == null) {
             if (dispatcher != null && dispatcher.hasListeners()) {
                 dispatcher.fireActionEvent(e);
@@ -3734,12 +3779,21 @@ public class Window extends Container implements TopLevelContainer {
             return e.isConsumed();
         }
         if (pointerScopeExempt != null && dispatcher != null && dispatcher.hasListeners()) {
+            // Only this event's listeners, and only the topmost overlay's: the list
+            // holds every kind for every overlay that ever handed listeners over, so
+            // firing it whole would run release and drag listeners on a press and would
+            // reach dialogs stacked underneath the one that owns the pointer.
+            Container top = pointerInputScopes.get(pointerInputScopes.size() - 1);
             // A copy: a listener is free to add or remove listeners as it runs.
-            ArrayList<ActionListener> exempt =
-                    new ArrayList<ActionListener>(pointerScopeExempt);
+            ArrayList<PointerExemption> exempt =
+                    new ArrayList<PointerExemption>(pointerScopeExempt);
             int count = exempt.size();
             for (int iter = 0; iter < count; iter++) {
-                exempt.get(iter).actionPerformed(e);
+                PointerExemption entry = exempt.get(iter);
+                if (entry.kind != kind || entry.scope != top) { //NOPMD CompareObjectsWithEquals
+                    continue;
+                }
+                entry.listener.actionPerformed(e);
                 if (e.isConsumed()) {
                     break;
                 }

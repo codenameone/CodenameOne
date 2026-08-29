@@ -81,6 +81,10 @@ public final class AccessibilityManager {
 
     /// How many roots' snapshots to keep.
     private static final int MAX_CACHED_ROOTS = 8;
+
+    /// Roots invalidated since the pending refresh was scheduled, all of which it has
+    /// to rebuild rather than only the one that scheduled it.
+    private final ArrayList<Container> pendingRoots = new ArrayList<Container>();
     private AccessibilityTreeSnapshot snapshot = new AccessibilityTreeSnapshot(
             0, Collections.<Long>emptyList(), Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
 
@@ -120,16 +124,43 @@ public final class AccessibilityManager {
             if (!Display.getInstance().isAccessibilityTreeUpdateRequired()) {
                 return;
             }
+            // Queued rather than captured. A second invalidation on another root
+            // while this one is still pending used to be swallowed by the
+            // refreshScheduled flag: the callback rebuilt only the root it had closed
+            // over, and rebuilding it cleared the global dirty flag, so the other
+            // root's tree stayed stale for good -- which off-EDT screen readers, now
+            // that they are handed their own surface's tree, would have read forever.
+            if (refreshRoot != null && !pendingRoots.contains(refreshRoot)) {
+                pendingRoots.add(refreshRoot);
+                while (pendingRoots.size() > MAX_CACHED_ROOTS) {
+                    pendingRoots.remove(0);
+                }
+            }
             if (!refreshScheduled) {
                 refreshScheduled = true;
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
                     public void run() {
                         int changes;
+                        ArrayList<Container> roots;
                         synchronized (AccessibilityManager.this) {
                             changes = pendingChanges;
+                            roots = new ArrayList<Container>(pendingRoots);
+                            pendingRoots.clear();
                         }
-                        getSnapshotForRoot(refreshRoot);
+                        if (roots.isEmpty()) {
+                            getSnapshotForRoot(null);
+                        }
+                        int count = roots.size();
+                        for (int iter = 0; iter < count; iter++) {
+                            synchronized (AccessibilityManager.this) {
+                                // Forced for each one in turn: the first rebuild clears
+                                // the dirty flag, and every root after it would then be
+                                // served the stale tree this refresh exists to replace.
+                                dirty = true;
+                            }
+                            getSnapshotForRoot(roots.get(iter));
+                        }
                         synchronized (AccessibilityManager.this) {
                             refreshScheduled = false;
                         }
@@ -180,6 +211,10 @@ public final class AccessibilityManager {
             return;
         }
         snapshotsByRoot.remove(root);
+        // Out of the refresh queue as well, or a refresh already scheduled would walk
+        // a hierarchy that has just been destroyed and cache a tree for it -- putting
+        // back exactly what this method exists to take away.
+        pendingRoots.remove(root);
         if (snapshotRoot == root) { //NOPMD CompareObjectsWithEquals
             snapshotRoot = null;
             // The snapshot itself, not only the reference to its root. It holds a node

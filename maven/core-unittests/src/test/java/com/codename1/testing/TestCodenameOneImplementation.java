@@ -841,6 +841,24 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return windowManager;
     }
 
+    /// Whether semantic invalidations are projected eagerly, off by default as on any
+    /// port with no assistive technology attached.
+    private boolean accessibilityTreeSupported;
+
+    /// Turns eager accessibility projection on or off for a test.
+    ///
+    /// #### Parameters
+    ///
+    /// - `supported`: true to have invalidations schedule a rebuild
+    public void setAccessibilityTreeSupported(boolean supported) {
+        this.accessibilityTreeSupported = supported;
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return accessibilityTreeSupported;
+    }
+
     /// Returns the fake window manager as its concrete type, for assertions.
     public TestWindowManager getTestWindowManager() {
         return windowManager;
