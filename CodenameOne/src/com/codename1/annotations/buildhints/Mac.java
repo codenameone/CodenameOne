@@ -84,8 +84,10 @@ public @interface Mac {
     /// `Copyright (c) <year> <vendor>`.
     String copyright() default "";
 
-    /// macOS builds. `true` compiles AES-GCM support into the bundled crypto
-    /// library. `ios.crypto.gcm` is read when this is unset.
+    /// macOS builds. Whether AES-GCM is compiled into the bundled crypto
+    /// library. On by default wherever the crypto API is on, matching what an
+    /// iOS build of the same application gets; set `false` to leave it out and
+    /// keep the symbol set smaller. `ios.crypto.gcm` is read when this is unset.
     @Hint(name = "macos.crypto.gcm")
     Toggle cryptoGcm() default Toggle.DEFAULT;
 

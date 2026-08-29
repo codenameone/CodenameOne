@@ -390,7 +390,16 @@ public class MacOSBuildHintsTest {
     public void everySettingResolvesModernThenLegacyThenTheIosSpelling() {
         assertEquals("true", parse(raw("macNative.crypto.gcm", "true"), "p").getCryptoGcm());
         assertEquals("true", parse(raw("ios.crypto.gcm", "true"), "p").getCryptoGcm());
-        assertEquals("false", parse(raw(), "p").getCryptoGcm());
+        // Unset is ON, not off: an iOS build of the same application gets GCM
+        // whether it asked or not, because IPhoneBuilder's base crypto
+        // replacement uncomments the GCM line by prefix overlap. Defaulting off
+        // here made CryptoApiTest's AES-GCM round trip fail on macOS alone with
+        // CN1_CRYPTO_E_UNSUPPORTED while passing on iOS.
+        assertEquals("true", parse(raw(), "p").getCryptoGcm());
+        // Explicitly off is still honoured, in every spelling, so an application
+        // that wants the smaller symbol set can still say so.
+        assertEquals("false", parse(raw("macos.crypto.gcm", "false"), "p").getCryptoGcm());
+        assertEquals("false", parse(raw("ios.crypto.gcm", "false"), "p").getCryptoGcm());
 
         assertEquals("z.a", parse(raw("macNative.add_libs", "z.a"), "p").getAddLibs());
         assertEquals("i.a", parse(raw("ios.add_libs", "i.a"), "p").getAddLibs());

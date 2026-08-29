@@ -548,8 +548,26 @@ public class MacOSBuildHints {
      * resolver's default, so the order stays macos, then macNative, then the iOS
      * spelling an existing settings file actually carries.</p>
      */
+    /**
+     * AES-GCM, ON by default because that is what iOS actually ships.
+     *
+     * <p>IPhoneBuilder uncomments {@code //#define CN1_INCLUDE_CRYPTO}, and that
+     * string is a strict PREFIX of {@code //#define CN1_INCLUDE_CRYPTO_GCM}
+     * sitting on the next line, while replaceInFile is an unrestricted
+     * String.replace. So every iOS application that touches
+     * com.codename1.security gets GCM whether or not it asked for it. Nothing in
+     * this repository sets ios.crypto.gcm and CryptoApiTest's AES-GCM round trip
+     * passes on iOS regardless, which is the proof.</p>
+     *
+     * <p>macOS parks the GCM directive under a placeholder so the base
+     * replacement cannot reach it, which is correct -- and with an opt-in
+     * default of false it made the same application work on iOS and fail on
+     * macOS with CN1_CRYPTO_E_UNSUPPORTED, surfacing as "crypto operation failed
+     * with code -5". Hence the default here is true; {@code macos.crypto.gcm
+     * =false} still trims the symbols for an application that wants that.</p>
+     */
     public String getCryptoGcm() {
-        return hint(source, "crypto.gcm", source.get("ios.crypto.gcm", "false"));
+        return hint(source, "crypto.gcm", source.get("ios.crypto.gcm", "true"));
     }
 
     /** @see #getCryptoGcm() */

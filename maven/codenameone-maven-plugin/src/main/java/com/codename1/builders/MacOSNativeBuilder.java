@@ -1693,8 +1693,16 @@ public class MacOSNativeBuilder extends Executor {
                     || cls.equals("com/codename1/maps/MapComponent")) {
                 caps.usesLocation = true;
             }
-            if (cls.startsWith("com/codename1/io/websocket/")
-                    || cls.equals("com/codename1/io/ServerSocket")) {
+            // ServerSocket alone. com.apple.security.network.server is the
+            // entitlement to LISTEN, and a sandboxed application that asks for
+            // inbound authority it never uses has to justify it at review.
+            //
+            // The websocket prefix that used to sit here matched nothing: the
+            // client is com.codename1.io.WebSocket, a class rather than a
+            // package, and it dials out -- com.apple.security.network.client
+            // already covers it. So the test granted no entitlement in practice
+            // and would have granted the wrong one had the package ever existed.
+            if (cls.equals("com/codename1/io/ServerSocket")) {
                 caps.usesServerSockets = true;
             }
         }
