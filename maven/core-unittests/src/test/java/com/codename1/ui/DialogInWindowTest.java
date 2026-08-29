@@ -871,4 +871,106 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void hidingTheHostReleasesAModalHostedDialog() throws Exception {
+        // A hidden window cannot be reached, so a modal dialog on it can never be
+        // dismissed and its caller would wait for good.
+        final Window w = openHost(500, 400);
+        w.setCloseOperation(Window.HIDE_ON_CLOSE);
+        final Dialog d = new Dialog("modal");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+
+        Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                d.show(10, 10, 10, 10, true, true);
+            }
+        }, "cn1-test-hidden-host");
+        caller.start();
+        try {
+            for (int i = 0; i < 400 && d.getParent() == null; i++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            assertTrue(isUnder(w, d), "precondition: the modal dialog is up");
+
+            w.hide();
+            for (int i = 0; i < 400 && caller.isAlive(); i++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            caller.join(2000);
+            assertFalse(caller.isAlive(),
+                    "hiding the host has to release a caller parked on a dialog it can "
+                            + "no longer reach");
+            assertTrue(d.isDisposed());
+        } finally {
+            d.dispose();
+            DisplayTest.flushEdt();
+            caller.join(2000);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void hidingTheHostKeepsAModelessHostedDialogForWhenItComesBack() {
+        // The other half, and the reason Hidden is not simply terminal: a window hidden
+        // through HIDE_ON_CLOSE is kept alive to be shown again, and throwing away what
+        // is in its layered pane between the two would lose the content silently.
+        Window w = openHost(500, 400);
+        w.setCloseOperation(Window.HIDE_ON_CLOSE);
+        Dialog d = new Dialog("modeless");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(w, d));
+
+        w.hide();
+        DisplayTest.flushEdt();
+        assertFalse(d.isDisposed(),
+                "nobody is waiting on a modeless dialog, so it survives the hide");
+        assertTrue(isUnder(w, d), "and is still there for the next show");
+
+        w.show();
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(w, d), "which is what the user sees when the window returns");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void minimizingTheHostKeepsItsDialogs() {
+        // Minimizing clears nativeVisible too, but arrives as Minimized rather than
+        // Hidden -- a window the user shrank still has its dialogs when it comes back.
+        Window w = openHost(500, 400);
+        Dialog d = new Dialog("survives minimize");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        w.minimize();
+        DisplayTest.flushEdt();
+        assertFalse(d.isDisposed(), "a minimized window keeps what is on it");
+        assertTrue(isUnder(w, d));
+
+        w.restore();
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(w, d));
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

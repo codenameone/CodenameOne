@@ -258,6 +258,9 @@ public class Dialog extends Form implements AbstractDialog {
     /// Listens for the host window being disposed or hidden out from under this dialog.
     private ActionListener hostWindowListener;
 
+    /// Whether the hosted showing in progress has a caller parked on it.
+    private boolean hostedModal;
+
     /// The host's shape when the dialog was shown, so a resize can tell an orientation
     /// flip from an ordinary resize. True when it was taller than it was wide.
     private boolean hostWasPortrait;
@@ -2384,6 +2387,7 @@ public class Dialog extends Form implements AbstractDialog {
         Display.getInstance().flushEdt();
         Window host = (Window) resolveHost();
         layerHost = host;
+        hostedModal = modal;
         hostWasPortrait = host.getHeight() >= host.getWidth();
         Container layer = host.getFormLayeredPane(Dialog.class, true);
         if (!(layer.getLayout() instanceof LayeredLayout)) {
@@ -2602,11 +2606,28 @@ public class Dialog extends Form implements AbstractDialog {
 
     /// The host window this dialog is on was disposed or hidden.
     void hostWindowGone(ActionEvent evt) {
-        if (!(evt instanceof WindowEvent)) {
+        if (!(evt instanceof WindowEvent) || isDisposed()) {
             return;
         }
         WindowEvent.Type type = ((WindowEvent) evt).getType();
-        if (type == WindowEvent.Type.Disposed && !isDisposed()) {
+        if (type == WindowEvent.Type.Disposed) {
+            dispose();
+            return;
+        }
+        // Hidden is terminal only for a modal dialog, and deliberately not for a
+        // modeless one.
+        //
+        // A hidden window cannot be reached, so a modal dialog on it can never be
+        // dismissed and its caller would wait for good -- Window.showModal() ends its
+        // own wait on exactly this event for the same reason. A modeless dialog has
+        // nobody waiting, and a window hidden through HIDE_ON_CLOSE is kept alive
+        // precisely so it can be shown again: disposing what is in its layered pane
+        // would quietly throw that content away between a hide and the next show.
+        //
+        // Minimizing does not arrive here at all. It clears nativeVisible too, but the
+        // port reports it as Minimized and Window records it separately, so a window the
+        // user shrank keeps its dialogs and gets them back on restore.
+        if (type == WindowEvent.Type.Hidden && hostedModal) {
             dispose();
         }
     }
@@ -2619,6 +2640,7 @@ public class Dialog extends Form implements AbstractDialog {
     private void disposeFromHostLayer() {
         Window host = layerHost;
         layerHost = null;
+        hostedModal = false;
         if (host != null) {
             if (hostSizeListener != null) {
                 host.removeSizeChangedListener(hostSizeListener);
