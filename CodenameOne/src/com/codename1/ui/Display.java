@@ -4927,8 +4927,49 @@ public final class Display extends CN1Constants {
     /// - `key`: the key of the property
     ///
     /// - `defaultValue`: the value to answer when the implementation has none
-    public String getImplementationProperty(String key, String defaultValue) {
+    String getImplementationProperty(String key, String defaultValue) {
         return impl.getProperty(key, defaultValue);
+    }
+
+    /// Whether this port's device subscribes to push through APNs.
+    ///
+    /// A capability, so it is answered by the port and not by
+    /// `#getProperty(String, String)`: `cn1_push_prefix` is a key an
+    /// application may legitimately set -- `Push.getPushKey()` reads exactly
+    /// that override -- and letting the override answer here sent provider
+    /// "native" for a device that registers with APNs, so no deliverable
+    /// subscription was ever created.
+    ///
+    /// Narrow on purpose. The generic port-property accessor behind it stays
+    /// package private: an application has no business reading arbitrary
+    /// implementation properties, and every widening of that surface is
+    /// permanent.
+    ///
+    /// #### Returns
+    ///
+    /// true when the port registers with APNs
+    public boolean isApnsPushDevice() {
+        return "ios".equals(getImplementationProperty("cn1_push_prefix", ""));
+    }
+
+    /// Whether this port follows HTTP redirects below the portable network
+    /// layer, so the framework cannot see where a download actually came from.
+    ///
+    /// A capability for the same reason as `#isApnsPushDevice()`: it decides
+    /// whether a model download must be digest pinned, and reading it through
+    /// `#getProperty(String, String)` would let application or library code
+    /// switch that verification off.
+    ///
+    /// #### Returns
+    ///
+    /// true when redirects are followed natively
+    public boolean isNativeRedirects() {
+        // The literal rather than ModelCache.NATIVE_REDIRECTS_PROPERTY, which is
+        // package private in com.codename1.ai.inference and deliberately staying
+        // that way. InferenceApiTest sets the property through that constant and
+        // asserts the behaviour this method drives, so the two spellings cannot
+        // drift apart without a test failing.
+        return "true".equals(getImplementationProperty("cn1.nativeRedirects", "false"));
     }
 
     /// Sets a local property to the application, this method has no effect on the

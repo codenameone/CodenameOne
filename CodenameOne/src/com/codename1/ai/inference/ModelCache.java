@@ -317,13 +317,12 @@ public final class ModelCache {
         // does it inside the native stack and the digest is the only thing that
         // can say what was actually downloaded. Every other port leaves the
         // default and needs no digest.
-        // getImplementationProperty, not getProperty: this decides whether a
-        // download must be digest-pinned, and getProperty would let
-        // CN.setProperty(NATIVE_REDIRECTS_PROPERTY, "false") turn the
+        // isNativeRedirects(), not getProperty(NATIVE_REDIRECTS_PROPERTY): this
+        // decides whether a download must be digest-pinned, and getProperty
+        // would let CN.setProperty(NATIVE_REDIRECTS_PROPERTY, "false") turn the
         // verification off from application or library code. A port states its
         // own capability; nothing above it may mask that.
-        return "true".equals(Display.getInstance()
-                .getImplementationProperty(NATIVE_REDIRECTS_PROPERTY, "false"));
+        return Display.getInstance().isNativeRedirects();
     }
 
     /// Set to {@code true} by a port whose platform follows HTTP redirects below
