@@ -1291,8 +1291,14 @@ public class Form extends Container implements TopLevelContainer {
         if (keyListeners == null) {
             keyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
         }
-        addKeyListener(keyCode, listener, keyListeners);
-        keyListenerAdded(keyCode, listener);
+        // Only when the map actually gained it. The helper below ignores a duplicate,
+        // so publishing unconditionally put two wrappers on the host for one
+        // registration -- and the single removal that matches it took away one wrapper
+        // and the registration, leaving the other wrapper calling a listener the
+        // application had removed.
+        if (addKeyListener(keyCode, listener, keyListeners)) {
+            keyListenerAdded(keyCode, listener);
+        }
     }
 
     /// A key listener was registered on this form. Inert here; a `Dialog` hosted in a
@@ -1356,7 +1362,7 @@ public class Form extends Container implements TopLevelContainer {
         removeKeyListener(keyCode, listener, gameKeyListeners);
     }
 
-    private void addKeyListener(int keyCode, ActionListener listener, HashMap<Integer, ArrayList<ActionListener>> keyListeners) {
+    private boolean addKeyListener(int keyCode, ActionListener listener, HashMap<Integer, ArrayList<ActionListener>> keyListeners) {
         if (keyListeners == null) {
             keyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
         }
@@ -1366,11 +1372,13 @@ public class Form extends Container implements TopLevelContainer {
             vec = new ArrayList<ActionListener>();
             vec.add(listener);
             keyListeners.put(code, vec);
-            return;
+            return true;
         }
         if (!vec.contains(listener)) {
             vec.add(listener);
+            return true;
         }
+        return false;
     }
 
     private void removeKeyListener(int keyCode, ActionListener listener, HashMap<Integer, ArrayList<ActionListener>> keyListeners) {
@@ -2874,7 +2882,7 @@ public class Form extends Container implements TopLevelContainer {
     private void removeTransferred(TopLevelContainer host, int kind, ActionListener l,
             boolean remove) {
         if (host instanceof Window) {
-            ((Window) host).removePointerScopeExempt(pointerScopeKind(kind), l);
+            ((Window) host).removePointerScopeExempt(pointerScopeKind(kind), this, l);
         }
         if (!remove) {
             return;

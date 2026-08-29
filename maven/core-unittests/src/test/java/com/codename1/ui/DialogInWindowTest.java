@@ -1619,4 +1619,136 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aHostedDialogsDefaultCommandFiresOnEnter() {
+        // Form.keyReleased runs the default command on a fire key. A window forwards a
+        // release to the focused component and the key listeners and nothing else, so
+        // a hosted dialog lost its standard keyboard default.
+        Window w = openHost(600, 500);
+        final int[] fired = new int[1];
+
+        Dialog d = new Dialog("has a default");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        Command ok = new Command("OK") {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                fired[0]++;
+            }
+        };
+        d.setDefaultCommand(ok);
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        int enter = Display.getInstance().getKeyCode(Display.GAME_FIRE);
+        w.keyPressed(enter);
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+        assertTrue(fired[0] > 0, "the dialog's default command has to run on a fire key");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        int before = fired[0];
+        w.keyPressed(enter);
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+        assertEquals(before, fired[0], "and not once the dialog has gone");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void addingTheSameKeyListenerTwiceLeavesNothingBehindOnRemoval() {
+        // The form's map ignores a duplicate, so publishing on every call put two
+        // wrappers on the host for one registration -- and the single removal that
+        // matches it left the other wrapper calling a listener the application had
+        // removed.
+        Window w = openHost(600, 500);
+        final int[] hits = new int[1];
+        ActionListener shortcut = new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                hits[0]++;
+            }
+        };
+
+        Dialog d = new Dialog("double registered");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        d.addKeyListener('z', shortcut);
+        d.addKeyListener('z', shortcut);
+        w.keyPressed('z');
+        w.keyReleased('z');
+        DisplayTest.flushEdt();
+        assertEquals(1, hits[0], "one registration means one call");
+
+        d.removeKeyListener('z', shortcut);
+        w.keyPressed('z');
+        w.keyReleased('z');
+        DisplayTest.flushEdt();
+        assertEquals(1, hits[0], "and removing it stops it completely");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void oneDialogRemovingASharedListenerLeavesTheOthersExemptionAlone() {
+        // Two overlays can share a listener instance for the same event. Matching only
+        // the pair let the dialog on top delete the entry belonging to the one
+        // underneath, which then had its own listener suppressed for good once it owned
+        // the pointer again.
+        Window w = openHost(600, 500);
+        final int[] lowerHits = new int[1];
+        ActionListener shared = new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                lowerHits[0]++;
+            }
+        };
+
+        Dialog low = new Dialog("lower");
+        low.setLayout(new BorderLayout());
+        low.add(BorderLayout.CENTER, new Label("lower"));
+        low.addPointerPressedListener(shared);
+        low.setTopLevelHost(w);
+        low.showModeless();
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(1, lowerHits[0]);
+
+        Dialog high = new Dialog("upper");
+        high.setLayout(new BorderLayout());
+        high.add(BorderLayout.CENTER, new Label("upper"));
+        high.setTopLevelHost(w);
+        high.showModeless();
+        DisplayTest.flushEdt();
+
+        // The top dialog removes a listener it never registered, which the underlying
+        // one is using.
+        high.removePointerPressedListener(shared);
+        DisplayTest.flushEdt();
+
+        high.dispose();
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(2, lowerHits[0],
+                "the dialog underneath keeps its own listener");
+
+        low.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

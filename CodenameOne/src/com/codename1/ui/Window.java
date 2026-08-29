@@ -3762,15 +3762,22 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// - `kind`: which pointer event it was registered for
     ///
+    /// - `scope`: the overlay it belongs to
+    ///
     /// - `l`: the listener
-    void removePointerScopeExempt(int kind, ActionListener l) {
+    void removePointerScopeExempt(int kind, Container scope, ActionListener l) {
         if (pointerScopeExempt == null || l == null) {
             return;
         }
         int count = pointerScopeExempt.size();
         for (int iter = 0; iter < count; iter++) {
             PointerExemption e = pointerScopeExempt.get(iter);
-            if (e.kind == kind && e.listener == l) { //NOPMD CompareObjectsWithEquals
+            // All three, the owner included. Two overlays can share a listener instance
+            // for the same event, and matching on the pair alone let the one on top
+            // delete the entry belonging to the one underneath -- which then had its
+            // own listener suppressed for good, once it owned the pointer again.
+            if (e.kind == kind && e.scope == scope //NOPMD CompareObjectsWithEquals
+                    && e.listener == l) { //NOPMD CompareObjectsWithEquals
                 pointerScopeExempt.remove(iter);
                 break;
             }
@@ -4041,7 +4048,38 @@ public class Window extends Container implements TopLevelContainer {
                 && focused.isEnabled()) {
             focused.keyReleased(keyCode);
         }
+        dispatchDefaultCommand(keyCode);
         fireKeyEvent(keyCode);
+    }
+
+    /// Runs the default command of the overlay holding the keyboard, if a fire key was
+    /// released.
+    ///
+    /// `Form.keyReleased` does this for the surface it owns, and a hosted dialog lost
+    /// it: this window forwards a release to the focused component and to the key
+    /// listeners and nothing else, so Enter stopped invoking the dialog's default
+    /// action -- including the ordinary case where that action is not the focused
+    /// control.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the key that was released
+    private void dispatchDefaultCommand(int keyCode) {
+        if (Display.getInstance().getGameAction(keyCode) != Display.GAME_FIRE) {
+            return;
+        }
+        Container scope = keyInputScope;
+        if (!(scope instanceof Dialog)) {
+            return;
+        }
+        Dialog dlg = (Dialog) scope;
+        Command defaultCmd = dlg.getDefaultCommand();
+        if (defaultCmd != null) {
+            defaultCmd.actionPerformed(new ActionEvent(defaultCmd, keyCode));
+            // The same call Form.keyReleased makes, which builds the event itself --
+            // the no-recurse variant dereferences the one it is handed.
+            dlg.actionCommandImpl(defaultCmd);
+        }
     }
 
     /// {@inheritDoc}
