@@ -174,10 +174,6 @@ public class Window extends Container implements TopLevelContainer {
     /// feel, which a window cannot read at construction time -- its `UIManager` may be
     /// set afterwards -- so it is resolved on first use rather than in the constructor.
     private boolean tintColorSet;
-    /// Whether the tint above was chosen by the application rather than taken from the
-    /// look and feel. An application's choice outlives a theme change; a cached default
-    /// does not.
-    private boolean tintColorExplicit;
     private VirtualInputDevice currentInputDevice;
     private final TextSelection textSelection = new TextSelection(this);
     private boolean enableCursors;
@@ -1145,15 +1141,17 @@ public class Window extends Container implements TopLevelContainer {
         super.refreshTheme(merge);
     }
 
-    /// Drops a tint that came from the look and feel so the next read picks the new
-    /// theme's up, the way `Form#initLaf(UIManager)` reloads it.
+    /// Drops the cached tint so the next read picks the new theme's up.
     ///
-    /// A colour the application set with `#setTintColor(int)` is its choice and
-    /// survives a theme change; only a cached default is invalidated.
+    /// Unconditional, exactly as `Form#initLaf(UIManager)` is: a form reloads its tint
+    /// from the look and feel on every theme change and keeps nothing an application
+    /// set, so a window that tried to preserve one behaved differently from the class
+    /// it is a sibling of. Preserving it also cannot be done honestly -- the overlays
+    /// that borrow the tint (a ComboBox popup, a floating action button's submenu)
+    /// save it, set zero and put it back through this same setter, and nothing in the
+    /// value tells that restoration apart from a deliberate choice.
     private void refreshTintFromLaf() {
-        if (!tintColorExplicit) {
-            tintColorSet = false;
-        }
+        tintColorSet = false;
     }
 
     /// {@inheritDoc}
@@ -1161,13 +1159,6 @@ public class Window extends Container implements TopLevelContainer {
     public void setTintColor(int tintColor) {
         this.tintColor = tintColor;
         this.tintColorSet = true;
-        // Explicit only when it differs from what the theme would give. A ComboBox
-        // popup and a floating action button's submenu save the current tint, set zero
-        // to opt out of dimming, and put the saved value back -- and treating that
-        // restore as a choice froze the old theme's colour into the window, so a later
-        // theme change left every dialog scrim painting the previous one.
-        this.tintColorExplicit = tintColor
-                != getUIManager().getLookAndFeel().getDefaultFormTintColor();
         repaint();
     }
 

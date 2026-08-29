@@ -2068,4 +2068,54 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void twoDialogsSharingAListenerBothKeepItWhenTheOtherCloses() {
+        // A flag saying "handing it over is what put it there" could not express two
+        // owners: the first dialog recorded that it had added the listener and the
+        // second that it had not, so disposing the first removed the only registration
+        // and the second stopped hearing anything.
+        Window w = openHost(600, 500);
+        final int[] hits = new int[1];
+        ActionListener shared = new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                hits[0]++;
+            }
+        };
+
+        Dialog first = new Dialog("first");
+        first.setLayout(new BorderLayout());
+        first.add(BorderLayout.CENTER, new Label("first"));
+        first.addPointerPressedListener(shared);
+        first.setTopLevelHost(w);
+        first.showModeless();
+        DisplayTest.flushEdt();
+
+        Dialog second = new Dialog("second");
+        second.setLayout(new BorderLayout());
+        second.add(BorderLayout.CENTER, new Label("second"));
+        second.addPointerPressedListener(shared);
+        second.setTopLevelHost(w);
+        second.showModeless();
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(1, hits[0],
+                "only the dialog on top hears the press, and it hears it once");
+
+        // The one underneath closes while the top one is still up.
+        first.dispose();
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(2, hits[0],
+                "the dialog still showing keeps its own registration");
+
+        second.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

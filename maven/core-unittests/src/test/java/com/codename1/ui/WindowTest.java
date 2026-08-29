@@ -5530,51 +5530,50 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
-    void restoringTheThemesOwnTintDoesNotFreezeIt() {
-        // A ComboBox popup and a floating action button's submenu save the tint, set
-        // zero to opt out of dimming, and put the saved value back. Treating that
-        // restore as the application's choice froze the old theme's colour in, so a
-        // later theme change left every dialog scrim painting the previous one.
+    void aThemeChangeReloadsTheTintTheWayAFormDoes() {
+        // Form.initLaf overwrites its tint from the look and feel on every theme
+        // change and keeps nothing the application set, so a window preserving one
+        // behaved differently from the class it is a sibling of. It also could not be
+        // done honestly: the overlays that borrow the tint save it, set zero and put it
+        // back through the same setter, and nothing in the value tells that apart from
+        // a deliberate choice.
         implementation.setMultiWindowSupported(true);
         Window w = new Window("tinted", new BorderLayout());
         w.setWindowSize(400, 300);
         w.show();
         DisplayTest.flushEdt();
 
-        int themeTint = w.getTintColor();
-
-        // The save/override/restore an overlay performs.
-        int saved = w.getTintColor();
-        w.setTintColor(0);
-        w.setTintColor(saved);
-        DisplayTest.flushEdt();
-        assertEquals(themeTint, w.getTintColor());
-
-        // The theme now says something different, and the window has to follow it --
-        // which it can only do if the restore above was not recorded as a choice.
         LookAndFeel laf = UIManager.getInstance().getLookAndFeel();
+        int themeTint = laf.getDefaultFormTintColor();
         try {
+            assertEquals(themeTint, w.getTintColor());
+
+            // The save, override and restore an overlay performs leaves the window
+            // following the theme, which is the case that used to freeze it.
+            int saved = w.getTintColor();
+            w.setTintColor(0);
+            w.setTintColor(saved);
             laf.setDefaultFormTintColor(0x00ff00);
             w.refreshTheme(false);
             DisplayTest.flushEdt();
             assertEquals(0x00ff00, w.getTintColor(),
-                    "the tint is still the theme's to decide after an overlay borrowed it");
+                    "the tint follows the theme after an overlay borrowed it");
 
-            // An application that really does choose a colour keeps it.
+            // And a value the application set follows the theme too, exactly as it
+            // does on a form.
             w.setTintColor(0x123456);
+            assertEquals(0x123456, w.getTintColor(), "until the theme changes");
             laf.setDefaultFormTintColor(0x0000ff);
             w.refreshTheme(false);
             DisplayTest.flushEdt();
-            assertEquals(0x123456, w.getTintColor(),
-                    "but a colour the application chose survives a refresh");
+            assertEquals(0x0000ff, w.getTintColor(),
+                    "a theme change reloads it, as Form.initLaf does");
         } finally {
             laf.setDefaultFormTintColor(themeTint);
+            w.dispose();
+            DisplayTest.flushEdt();
         }
-
-        w.dispose();
-        DisplayTest.flushEdt();
     }
-
     @FormTest
     void aContentSizeAskedForBeforeShowingIsStillAContentSize() {
         // Before there is a peer there is no chrome to measure, and the request used to
