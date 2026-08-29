@@ -205,6 +205,23 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         // entries (emitted by the native theme's @media dark block).
         UIManager.getInstance().refreshTheme();
 
+        // What the appearance switch actually achieved, reported per phase.
+        //
+        // A dark capture that comes out light has three possible causes and the
+        // frame alone cannot tell them apart: the override never reached
+        // CN.isDarkMode(), the theme carries no dark styles for the UIID, or the
+        // port resolved them and painted anyway. Printing the flag beside a
+        // resolved colour separates the first two immediately, which is worth a
+        // line in the log on every port -- macOS renders every *_dark frame
+        // light and four rounds of reading the framework did not say why.
+        Style themeProbe = UIManager.getInstance().getComponentStyle("Form");
+        System.out.println("CN1SS:INFO:test=" + baseName() + " appearance=" + suffix
+                + " isDarkMode=" + Display.getInstance().isDarkMode()
+                + " FormBg=" + Integer.toHexString(
+                        themeProbe == null ? 0 : themeProbe.getBgColor())
+                + " darkStyleForForm=" + UIManager.getInstance()
+                        .getComponentStyle("$DarkForm").getBgColor());
+
         annotations.clear();
 
         final String imageName = baseName() + "_" + suffix;
