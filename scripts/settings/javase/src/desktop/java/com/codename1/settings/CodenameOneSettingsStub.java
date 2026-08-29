@@ -239,9 +239,18 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
     }
 
     private static void captureOffscreen(File target) throws Exception {
-        BufferedImage image = new BufferedImage(frm.getContentPane().getWidth(),
-                frm.getContentPane().getHeight(), BufferedImage.TYPE_INT_ARGB);
+        // The Codename One canvas renders into a buffer at DEVICE resolution and
+        // blits it 1:1, so an image sized in Swing's logical points catches only
+        // the top left corner of a Retina window at double magnification - the
+        // capture looked like a zoomed crop and hid whatever it cut off. Size the
+        // image by the display scale and the whole content pane lands in it.
+        double scale = displayScale();
+        BufferedImage image = new BufferedImage(
+                Math.max(1, (int) Math.round(frm.getContentPane().getWidth() * scale)),
+                Math.max(1, (int) Math.round(frm.getContentPane().getHeight() * scale)),
+                BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = image.createGraphics();
+        graphics.scale(scale, scale);
         frm.getContentPane().paint(graphics);
         graphics.dispose();
         ImageIO.write(image, "png", target);
@@ -269,6 +278,15 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
                 System.err.println("On-screen capture skipped: window is not showing");
                 return;
             }
+            // Showing is not the same as frontmost. A Robot grab is a grab of
+            // the SCREEN at these coordinates, so a window that another
+            // application covers writes that application's pixels into a file
+            // named after this one - a diagnostic that shows someone else's
+            // document, and an image that reads as a broken Settings window.
+            if (!frm.isActive()) {
+                System.err.println("On-screen capture skipped: window is not the active window");
+                return;
+            }
             Rectangle bounds = frm.getBounds();
             if (bounds.width <= 0 || bounds.height <= 0) {
                 return;
@@ -278,6 +296,24 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
         } catch (Throwable ex) {
             System.err.println("On-screen capture unavailable: " + ex);
         }
+    }
+
+    /// The device pixels per logical point of the screen the window is on, or 1
+    /// when that cannot be read - a capture at the wrong scale is worth more than
+    /// no capture.
+    private static double displayScale() {
+        try {
+            java.awt.GraphicsConfiguration config = frm.getGraphicsConfiguration();
+            if (config != null) {
+                double scale = config.getDefaultTransform().getScaleX();
+                if (scale > 0) {
+                    return scale;
+                }
+            }
+        } catch (Throwable ex) {
+            System.err.println("Display scale unavailable: " + ex);
+        }
+        return 1;
     }
 
     static String onScreenPath(String screenshot) {
