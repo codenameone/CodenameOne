@@ -206,12 +206,21 @@ def parse_phone_page(html: str) -> dict:
     return out
 
 
+# "ios" as a substring also appears inside Tecno's HIOS and Meizu's Flyme
+# AIOS, which are Android skins -- a plain `"ios" in s` put 113 Android
+# phones on the iOS path, where they picked up iOS themes, SF Pro, iOS
+# override names and (once the catalog carried one) an integral iOS density
+# scale. Match on a word boundary, and let an explicit "Android" win: a
+# Tecno record reads "Android 14, ..., HIOS 14" and names both.
+RE_IOS_OS = re.compile(r"\b(?:ipados|ios)\b", re.I)
+
+
 def detect_platform(os_str: str) -> str:
     s = os_str.lower()
-    if "ios" in s or "ipados" in s:
-        return "ios"
     if "android" in s:
         return "and"
+    if RE_IOS_OS.search(s):
+        return "ios"
     return ""
 
 
@@ -239,7 +248,22 @@ def is_foldable(model: str, display_type: str) -> bool:
     ))
 
 
-def density_scale(plat: str, ppi: int) -> float:
+# Panels that are not their own render target. The iPhone 6/6s/7/8 Plus
+# lay out a 414pt-wide UIKit surface, render it at 3x into a 1242x2208
+# buffer and downsample that onto the 1080x1920 panel, so the pixels a
+# skin is drawn in are 1080/414 per point -- neither 2 nor 3. Keyed on the
+# panel geometry because that is the physical fact that identifies them,
+# and cross-checked by check_density_scales() below, which fails the
+# generator if any Apple device's implied point density leaves the band
+# Apple actually ships. A future downsampled panel breaks the build here
+# rather than silently producing a wrong safe area.
+DOWNSAMPLED_IOS_PANELS = {
+    # panel pixels -> logical point width
+    (1080, 1920): 414,
+}
+
+
+def density_scale(plat: str, ppi: int, w: int = 0, h: int = 0) -> float:
     """Physical pixels covered by one density-independent unit.
 
     ``safeTop``/``safeBottom`` below are authored in density-independent
@@ -249,14 +273,46 @@ def density_scale(plat: str, ppi: int) -> float:
     ``w / 320``: the 320-wide figure is the designer's drawing viewbox
     and has nothing to do with the device's density.
 
-    An iOS point is 1/163 inch and Apple only ships integral @2x/@3x
+    An iOS point is roughly 1/163 inch and Apple ships integral @2x/@3x
     panels, so round to the nearest integer -- 458 ppi is a 3x device
-    even though 458/163 is 2.81. Android dp is 1/160 inch and reported
-    densities are not bucketed cleanly, so keep that one continuous.
+    even though 458/163 is 2.81 -- except on the downsampled panels
+    above, where the answer is not an integer at all. Android dp is
+    1/160 inch and reported densities are not bucketed cleanly, so keep
+    that one continuous.
     """
     if plat == "ios":
+        pw = DOWNSAMPLED_IOS_PANELS.get((w, h))
+        if pw:
+            return round(w / float(pw), 4)
         return float(max(1, round(ppi / 163.0)))
     return round(ppi / 160.0, 3)
+
+
+# Apple's shipped panels land between 132 ppi-per-point (retina iPad) and
+# 163.5 (iPad mini, and the 326ppi iPhones). Anything outside this band
+# means the recorded scale is not the device's real one.
+IOS_POINT_DENSITY_BAND = (120.0, 170.0)
+
+
+def check_density_scales(records: Iterable[dict]) -> list[str]:
+    """Return a message per iOS record whose scale is not believable."""
+    lo, hi = IOS_POINT_DENSITY_BAND
+    bad = []
+    for r in records:
+        if r.get("platform") != "ios":
+            continue
+        scale = r.get("scale") or 0
+        if scale <= 0:
+            bad.append(f"{r['id']}: no scale")
+            continue
+        density = r["ppi"] / scale
+        if not (lo <= density <= hi):
+            bad.append(
+                f"{r['id']} ({r['w']}x{r['h']}, {r['ppi']}ppi): scale {scale} implies "
+                f"{density:.1f} ppi per point, outside {lo}-{hi}. If this panel is "
+                f"downsampled, add it to DOWNSAMPLED_IOS_PANELS."
+            )
+    return bad
 
 
 def normalise(brand: str, model: str, specs: dict) -> Optional[dict]:
@@ -307,14 +363,27 @@ def normalise(brand: str, model: str, specs: dict) -> Optional[dict]:
         "ppi": ppi,
         "inches": inches,
         "platform": plat,
-        "hasNotch": has_notch(name, plat),
-        "hasIsland": has_island(name, plat),
-        "hasHole": has_hole(plat, year),
     }
+    derive_platform_fields(rec)
+    return rec
+
+
+def derive_platform_fields(rec: dict) -> dict:
+    """Fill every field that follows from the platform and the panel.
+
+    Split out of normalise() so a catalog migration can re-derive these
+    from an existing record instead of reimplementing the rules.
+    """
+    plat = rec["platform"]
+    tablet = rec["tablet"]
+    name = rec["name"]
+    rec["hasNotch"] = has_notch(name, plat)
+    rec["hasIsland"] = has_island(name, plat)
+    rec["hasHole"] = has_hole(plat, rec["year"])
     rec["hasHome"] = (plat == "ios" and (rec["hasNotch"] or rec["hasIsland"])) or (
-        plat == "ios" and tablet and year >= 2018
+        plat == "ios" and tablet and rec["year"] >= 2018
     )
-    rec["scale"] = density_scale(plat, ppi)
+    rec["scale"] = density_scale(plat, rec["ppi"], rec["w"], rec["h"])
     # safeTop/safeBottom are density-independent units (iOS points,
     # Android dp), scaled to pixels by rec["scale"] -- see density_scale.
     if rec["hasIsland"]:
@@ -455,6 +524,13 @@ def main() -> int:
             f"{len(merged)} total); leaving {args.out} untouched.\n"
         )
         return 0
+
+    problems = check_density_scales(merged)
+    if problems:
+        sys.stderr.write("\nRefusing to write a catalog with implausible density scales:\n")
+        for msg in problems:
+            sys.stderr.write("  " + msg + "\n")
+        return 1
 
     payload = {
         "version": 3,
