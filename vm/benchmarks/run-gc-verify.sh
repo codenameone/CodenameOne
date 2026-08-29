@@ -29,7 +29,7 @@ unset CN1_GC_FAULT CN1_GC_VERIFY_SOFT CN1_GC_VERIFY_AGING CN1_GC_VERIFY_ALL \
 # Every workload that allocates enough to drive real collection cycles. The
 # point is coverage of ALLOCATION SHAPES, not of answers: page-heap churn,
 # monitors, finalizers, threads, oversized/legacy objects, adopted survivors.
-DRIVERS="${*:-GraceAudit LegacyGrace GcStress MtStress MapTorture SbTorture FusedTest ThreadChurn LargeArrayLoad}"
+DRIVERS="${*:-GraceAudit LegacyGrace BulkCopyBarrier GcStress MtStress MapTorture SbTorture FusedTest ThreadChurn LargeArrayLoad}"
 
 fail=0
 for d in $DRIVERS; do
@@ -101,12 +101,24 @@ fi
 # fix. LargeArrayLoad is the workload that exposed it (26,924 slots freed a
 # cycle early), so with the old bound restored the gate above must reject it.
 printf '%-16s ' "self-test2"
-efOut="$(CN1_GC_FAULT=earlyfree ./target/bin/LargeArrayLoad-verify 2>&1)" || true
+# Keep the exit status and test for the SUMMARY line separately. Reporting only
+# "produced no early frees" conflates three different outcomes -- the fault did
+# not fire, the faulted run died before it could report, and the binary was never
+# built -- and the message names the first, so a crashed run reads as a broken
+# FIX. This gate did exactly that once: the run reported BROKEN, and re-running
+# the same binary twelve times produced earlyFreed=13452 and exit 0 every time,
+# so whatever went wrong was never the thing the message accused.
+efOut="$(CN1_GC_FAULT=earlyfree ./target/bin/LargeArrayLoad-verify 2>&1)" && efExit=0 || efExit=$?
 efCount="$(printf '%s' "$efOut" | sed -n 's/.*earlyFreed=\([0-9]*\).*/\1/p' | tail -1)"
 if [ "${efCount:-0}" -gt 0 ]; then
     echo "detected the injected early-free fault ($efCount slots)"
+elif ! printf '%s' "$efOut" | grep -q 'GC-VERIFY. SUMMARY'; then
+    echo "BROKEN -- faulted run died (exit $efExit) before the verifier summary"
+    printf '%s\n' "$efOut" | tail -20
+    fail=1
 else
     echo "BROKEN -- restoring the pre-fix page-reclaim bound produced no early frees"
+    printf '%s\n' "$efOut" | tail -5
     fail=1
 fi
 
