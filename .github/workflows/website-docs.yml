@@ -211,9 +211,10 @@ jobs:
           node docs/website/scripts/test-initializr-download-bridge.mjs \
             docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
 
-      - name: Validate website experiment telemetry
+      - name: Validate website conversion telemetry
         run: |
           set -euo pipefail
+          node docs/website/scripts/test-signup-funnel.mjs docs/website/public
           node docs/website/scripts/test-cn1-exp-004.mjs
           node docs/website/scripts/test-cn1-crisp-events.mjs
 

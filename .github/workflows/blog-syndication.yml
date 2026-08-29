@@ -2,8 +2,10 @@ name: Syndicate Blog Posts
 
 on:
   schedule:
-    # Daily at 13:00 UTC. Runs from the default branch only, per GitHub's cron rules.
-    - cron: '0 13 * * *'
+    # Daily at 13:17 UTC. GitHub warns that scheduled workflows at the start of
+    # an hour can be delayed or dropped during periods of high Actions load.
+    # Runs from the default branch only, per GitHub's cron rules.
+    - cron: '17 13 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -43,6 +45,7 @@ jobs:
           python3 scripts/website/test_queue_browser_syndication.py
           python3 scripts/website/test_queue_social_posts.py
           python3 scripts/website/test_syndication_health.py
+          node scripts/website/test_syndication_schedule_sla.js
 
       - name: Run API syndication script
         id: syndicate_api

@@ -99,11 +99,14 @@ public final class System {
                         try {
                             System.gcMarkSweep();
                             synchronized(LOCK) {
-                                if(forceGc || isHighFrequencyGC()) {
-                                    forceGc = false;
-                                    LOCK.wait(200);
-                                } else {
-                                    LOCK.wait(30000);
+                                // How long to idle before the next cycle -- 0 means "do
+                                // not idle, a collection is already owed". The decision
+                                // lives in native code beside every other collector
+                                // policy knob, and consumes forceGc as part of making it;
+                                // see java_lang_System_gcIdleWaitMillis___R_int.
+                                int idle = gcIdleWaitMillis();
+                                if(idle > 0) {
+                                    LOCK.wait(idle);
                                 }
                             }
                         } catch (InterruptedException ex) {
@@ -128,6 +131,14 @@ public final class System {
     }
     
     private native static boolean isHighFrequencyGC();
+
+    /**
+     * Milliseconds the collector should idle before starting its next cycle, or 0 to
+     * start one immediately. Consumes the pending force-GC request as part of the
+     * decision, so it must be called exactly once per loop iteration and only while
+     * holding LOCK.
+     */
+    private native static int gcIdleWaitMillis();
     
     /**
      * Returns the current time in milliseconds.
