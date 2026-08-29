@@ -26,6 +26,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.layouts.BorderLayout;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -64,15 +65,29 @@ class TooltipInWindowTest extends UITestBase {
         f.set(null, null);
     }
 
-    /// Counts what the manager decided, without needing a real hover.
+    /// Counts what the manager decided.
     private static final class ProbeTooltipManager extends TooltipManager {
         private int shown;
+        private int prepared;
+
+        @Override
+        protected void prepareTooltip(String tip, Component cmp) {
+            prepared++;
+            super.prepareTooltip(tip, cmp);
+        }
 
         @Override
         protected void showTooltip(String tip, Component cmp) {
             shown++;
             super.showTooltip(tip, cmp);
         }
+    }
+
+    /// Hovers the pointer over the centre of a component, the way the port does.
+    private static void hover(Window w, Component cmp) {
+        int[] x = new int[] {cmp.getAbsoluteX() + cmp.getWidth() / 2};
+        int[] y = new int[] {cmp.getAbsoluteY() + cmp.getHeight() / 2};
+        w.pointerHover(x, y);
     }
 
     @FormTest
@@ -92,6 +107,15 @@ class TooltipInWindowTest extends UITestBase {
 
         ProbeTooltipManager mgr = install();
         try {
+            // Through the window's own hover dispatch, not by calling the manager.
+            // Window.pointerHover is the only hover path a window has, and it used to
+            // drop tooltips on the floor -- so a test that called showTooltip directly
+            // passed while no real hover could ever produce a tooltip.
+            hover(w, b);
+            DisplayTest.flushEdt();
+            assertTrue(mgr.prepared > 0,
+                    "hovering a component in a window has to start the tooltip timer");
+
             mgr.showTooltip("a tip", b);
             DisplayTest.flushEdt();
             assertTrue(mgr.shown > 0);
@@ -148,5 +172,42 @@ class TooltipInWindowTest extends UITestBase {
 
         assertNull(main.getLayeredPaneIfExists(),
                 "nothing to attach to, so nothing is built and nothing throws");
+    }
+
+    @FormTest
+    void hoveringOffATooltippedComponentClearsTheTooltip() {
+        // The other half of the hover contract: moving onto something with no tooltip
+        // has to take the pending one down, or it would fire over the wrong component.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        Button tipped = new Button("hover me");
+        tipped.setTooltip("a tip");
+        Button bare = new Button("nothing here");
+        w.add(BorderLayout.NORTH, tipped);
+        w.add(BorderLayout.SOUTH, bare);
+        w.show();
+        DisplayTest.flushEdt();
+
+        ProbeTooltipManager mgr = install();
+        try {
+            hover(w, tipped);
+            DisplayTest.flushEdt();
+            assertTrue(mgr.prepared > 0);
+
+            int preparedSoFar = mgr.prepared;
+            hover(w, bare);
+            DisplayTest.flushEdt();
+            assertEquals(preparedSoFar, mgr.prepared,
+                    "a component with no tooltip must not schedule one");
+        } finally {
+            mgr.clearTooltip();
+            DisplayTest.flushEdt();
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
     }
 }

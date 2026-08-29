@@ -5431,12 +5431,19 @@ static NSString *cn1CopyPickedDocumentToTemp(NSURL *url) {
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
 #endif // !TARGET_OS_TV (UIImagePickerController delegates)
+// Dismissed through the composer itself rather than through self. UIKit forwards a
+// dismiss sent to a presented controller on to whichever controller presented it, so
+// this works no matter who that was. Sending it to self only ever worked because self
+// was always the presenter: on Mac Catalyst a composer opened from a focused secondary
+// window is presented by that window's controller, and asking the main controller to
+// dismiss something it never presented does nothing at all -- Send and Cancel would
+// both leave the sheet on screen with no way to close it.
 -(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
-	[self dismissModalViewControllerAnimated:YES];
+	[controller dismissViewControllerAnimated:YES completion:nil];
 }
 
 -(void) messageComposeViewController:(MFMessageComposeViewController*)controller didFinishWithResult:(MessageComposeResult)result {
-	[self dismissModalViewControllerAnimated:YES];
+	[controller dismissViewControllerAnimated:YES completion:nil];
 }
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (MessageUI delegates)
 

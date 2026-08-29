@@ -3697,11 +3697,20 @@ public class Window extends Container implements TopLevelContainer {
         Component cmp = resolveComponentAt(x[0], y[0]);
         if (cmp != null) {
             LeadUtil.pointerHover(cmp, x, y);
-            // Deliberately no TooltipManager call. It schedules only when
-            // getComponentForm() is non-null and displays through InteractionDialog on
-            // the current form, so from a window it would either do nothing or put the
-            // tooltip on the main window. It is listed with the other form-coupled
-            // overlays in the developer guide rather than half-wired here.
+        }
+        // The tooltip timer starts here or it never starts at all: this is the only
+        // hover dispatch a window has. The manager resolves the surface through
+        // getTopLevelContainer() and hosts the tooltip on it, so a tooltip raised from
+        // a window appears on that window. Guarded on cmp, which the Form path is not
+        // -- a hover over empty space there would already have been a null dereference.
+        TooltipManager tm = TooltipManager.getInstance();
+        if (tm != null && cmp != null) {
+            String tip = cmp.getTooltip();
+            if (tip != null && tip.length() > 0) {
+                tm.prepareTooltip(tip, cmp);
+            } else {
+                tm.clearTooltip();
+            }
         }
     }
 
