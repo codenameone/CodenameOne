@@ -59,6 +59,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
+import com.codename1.ui.InfiniteContainer;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -107,6 +108,11 @@ public class CodenameOneSettings extends Lifecycle {
     private int fontDeltaPx;
     private float fontPinchAccumulator = 1f;
     private String hintFilter = "";
+    /// Every hint the current filter matches, in display order. The list builds
+    /// rows from it one batch at a time as the reader scrolls.
+    private final List<BuildHintMetadata> hintModel = new java.util.ArrayList<BuildHintMetadata>();
+    private InfiniteContainer hintList;
+    private Label hintCount;
     private String extensionFilter = "";
     private List<ExtensionDescriptor> extensionCatalog;
     private final Map<String, Boolean> expandedExtensions = new LinkedHashMap<String, Boolean>();
@@ -255,19 +261,42 @@ public class CodenameOneSettings extends Lifecycle {
 
     private void buildShell() {
         form.getContentPane().removeAll();
-        page = new Container(BoxLayout.y());
+        // Build Hints owns its own height instead of growing a scroll region.
+        // There are hundreds of hints and every one of them is a multi-line card,
+        // so the scrolled page was tens of screens tall: reaching the bottom took
+        // a wheel marathon (issue #5602) and every wheel notch repainted a huge
+        // container. That page now pins its search and its pager and fills the
+        // space between them with as many rows as actually fit.
+        boolean fillsViewport = section == Section.BUILD_HINTS;
+        page = new Container(fillsViewport ? new BorderLayout() : BoxLayout.y());
         renderPage();
-        pageViewport = new Container(BoxLayout.y());
-        pageViewport.setScrollableY(true);
+        pageViewport = new Container(fillsViewport ? new BorderLayout() : BoxLayout.y());
+        pageViewport.setScrollableY(!fillsViewport);
         pageViewport.setUIID(uiid("SettingsPage"));
         TableLayout contentLayout = new TableLayout(1, 2);
         Container pageRow = new Container(contentLayout);
-        int contentPercent = Display.getInstance().getDisplayWidth() < 1100 || section == Section.EXTENSIONS ? 100 : 72;
-        pageRow.add(contentLayout.createConstraint(0, 0).widthPercentage(contentPercent), page);
+        // Hints take the full width for the same reason Extensions does: a form
+        // wants a readable measure, a list of cards wants the width. Here it also
+        // buys rows -- a description that wraps into two lines instead of three
+        // is a third of a row's height back, and every row back is one more hint
+        // on the page.
+        int contentPercent = Display.getInstance().getDisplayWidth() < 1100
+                || section == Section.EXTENSIONS || section == Section.BUILD_HINTS ? 100 : 72;
+        // A TableLayout row is as tall as its tallest cell wants to be, so the
+        // page only reaches the bottom of the window when the row is told to.
+        TableLayout.Constraint pageCell = contentLayout.createConstraint(0, 0).widthPercentage(contentPercent);
+        if (fillsViewport) {
+            pageCell.heightPercentage(100);
+        }
+        pageRow.add(pageCell, page);
         if (contentPercent < 100) {
             pageRow.add(contentLayout.createConstraint(0, 1).widthPercentage(100 - contentPercent), new Container());
         }
-        pageViewport.add(pageRow);
+        if (fillsViewport) {
+            pageViewport.add(BorderLayout.CENTER, pageRow);
+        } else {
+            pageViewport.add(pageRow);
+        }
         form.add(BorderLayout.NORTH, configureToolbar());
         form.add(BorderLayout.CENTER, BorderLayout.center(pageViewport).add(BorderLayout.WEST, rail()));
         applyFontScale(form);
@@ -575,22 +604,36 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     private void renderBuildHints() {
-        page.add(pageTitle("Build Hints", "Search known hints from the developer guide, or add arbitrary build arguments."));
+        Container header = new Container(BoxLayout.y());
+        // Title and search share a line, and the standing subtitle is gone. Every
+        // other page can spend a third of the window explaining itself because it
+        // scrolls; this one does not scroll -- the list inside it does -- so a
+        // line spent on chrome is a line the rows never get back. A search box
+        // labelled "Search build hints" under a heading that says "Build Hints"
+        // was explaining itself twice anyway.
         Container filter = new Container(new BorderLayout());
         filter.setUIID(uiid("SettingsFilterRow"));
+        filter.add(BorderLayout.WEST, new Label("Build Hints", uiid("SettingsPageTitle")));
         TextField search = new TextField(hintFilter, "Search build hints");
         search.setUIID(uiid("SettingsField"));
         search.addDataChangedListener((type, index) -> {
             hintFilter = search.getText() == null ? "" : search.getText();
             renderBuildHintsList();
         });
-        filter.add(BorderLayout.CENTER, search);
-        page.add(filter);
-        page.add(customHintRow());
-        Container list = new Container(BoxLayout.y());
-        list.setName("buildHintsList");
-        list.setUIID(uiid("SettingsList"));
-        page.add(list);
+        Container searchCell = BorderLayout.center(search);
+        searchCell.setUIID(uiid("SettingsHintSearchCell"));
+        filter.add(BorderLayout.CENTER, searchCell);
+        hintCount = new Label("", uiid("SettingsRowMeta"));
+        Container countCell = BorderLayout.center(hintCount);
+        countCell.setUIID(uiid("SettingsHintSearchCell"));
+        filter.add(BorderLayout.EAST, countCell);
+        header.add(filter);
+        header.add(customHintRow());
+        page.add(BorderLayout.NORTH, header);
+        hintList = new HintList();
+        hintList.setName("buildHintsList");
+        hintList.setUIID(uiid("SettingsList"));
+        page.add(BorderLayout.CENTER, hintList);
         renderBuildHintsList();
     }
 
@@ -642,9 +685,50 @@ public class CodenameOneSettings extends Lifecycle {
         return row;
     }
 
+    /// How many rows a page starts by building. The layout shows the ones that
+    /// fit and hides the rest, so this only has to beat the row count of an
+    /// ordinary window -- building the whole catalog is what made this page
+    /// expensive. A window that fits more than this grows its own window through
+    /// `hintPageFitChanged`.
+    /// How many rows the list asks for at a time. Small enough that the first
+    /// screenful is on the display immediately and a filter keystroke costs
+    /// almost nothing, large enough that a fast drag does not out-run it.
+    private static final int HINT_FETCH_BATCH = 20;
+
+    /// The scrolling list of hint rows.
+    ///
+    /// An `InfiniteContainer` because the rows are not the same height -- a
+    /// description wraps to as many lines as it needs, an active row carries an
+    /// editor, an annotation-owned one carries a paragraph -- and because there
+    /// are hundreds of them. It hands out one batch at a time as the reader
+    /// scrolls, so the page costs a screenful of components instead of the whole
+    /// catalog, which is what made scrolling this page painful (issue #5602).
+    ///
+    /// It scrolls; the page around it does not. A scrollable list inside a
+    /// scrollable page is the arrangement that produces the artifacts, because
+    /// two containers both claim the drag.
+    private final class HintList extends InfiniteContainer {
+        HintList() {
+            super(HINT_FETCH_BATCH);
+        }
+
+        @Override
+        public Component[] fetchComponents(int index, int amount) {
+            if (index < 0 || index >= hintModel.size()) {
+                // Null is how this container is told the data ran out; it takes
+                // the progress spinner away rather than asking again.
+                return null;
+            }
+            int end = Math.min(hintModel.size(), index + amount);
+            Component[] batch = new Component[end - index];
+            for (int i = index; i < end; i++) {
+                batch[i - index] = hintRow(hintModel.get(i));
+            }
+            return batch;
+        }
+    }
+
     private void renderBuildHintsList() {
-        Container list = (Container) page.getComponentAt(page.getComponentCount() - 1);
-        list.removeAll();
         Map<String, BuildHintMetadata> rows = new LinkedHashMap<String, BuildHintMetadata>();
         for (String key : settings.buildHintKeys()) {
             BuildHintMetadata meta = buildHints.get(key);
@@ -655,13 +739,42 @@ public class CodenameOneSettings extends Lifecycle {
         for (BuildHintMetadata meta : buildHints.search(hintFilter)) {
             rows.put(meta.name(), meta);
         }
+        hintModel.clear();
         for (BuildHintMetadata meta : rows.values()) {
             if (!meta.matches(hintFilter)) {
                 continue;
             }
-            list.add(hintRow(meta));
+            hintModel.add(meta);
         }
-        list.revalidate();
+        if (hintCount != null) {
+            int total = hintModel.size();
+            hintCount.setText(total == 1 ? "1 hint" : total + " hints");
+        }
+        if (hintList != null) {
+            // Back to the top with the first batch of the new result set. Before
+            // the list is on the form this does nothing and is not needed: the
+            // container fetches its first batch itself when it initializes.
+            hintList.refresh();
+        }
+    }
+
+    /// Rebuilds one row where it stands, after its own controls changed it --
+    /// Add, Save, or the button that removes the declaration.
+    ///
+    /// Not a rebuild of the list. Refreshing the whole thing would drop the
+    /// reader back at the top of the catalog, which is a long way from the row
+    /// they were working on, and it would move that row: an activated hint sorts
+    /// with the project's own hints, at the front. Neither is something the
+    /// reader asked for by pressing Add.
+    private void refreshHintRow(Component row, BuildHintMetadata meta) {
+        Container parent = row == null ? null : row.getParent();
+        if (parent == null) {
+            renderBuildHintsList();
+            return;
+        }
+        Component replacement = hintRow(meta);
+        parent.replace(row, replacement, null);
+        parent.revalidate();
     }
 
     private void animatePage() {
@@ -738,13 +851,16 @@ public class CodenameOneSettings extends Lifecycle {
                 // so that button stays.
                 Container header = new Container(new BorderLayout());
                 header.add(BorderLayout.CENTER, text);
-                header.add(BorderLayout.EAST, removeHintButton(meta));
+                header.add(BorderLayout.EAST, removeHintButton(row, meta));
                 row.add(header);
             } else {
                 row.add(text);
             }
         } else if (active) {
-            text.add(activeHintEditor(meta, value, effectiveType));
+            Container header = new Container(new BorderLayout());
+            header.add(BorderLayout.CENTER, text);
+            header.add(BorderLayout.EAST, activeHintEditor(row, meta, value, effectiveType));
+            row.add(header);
         } else {
             Container controls = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
             controls.setUIID(uiid("SettingsHintEditor"));
@@ -754,7 +870,7 @@ public class CodenameOneSettings extends Lifecycle {
             if (seed != null) {
                 add.addActionListener(e -> {
                     settings.setBuildHint(meta.name(), seed);
-                    renderBuildHintsList();
+                    refreshHintRow(row, meta);
                     animatePage();
                 });
                 controls.add(add);
@@ -788,7 +904,7 @@ public class CodenameOneSettings extends Lifecycle {
                         return;
                     }
                     settings.setBuildHint(meta.name(), canonicalHintValue(meta, typed));
-                    renderBuildHintsList();
+                    refreshHintRow(row, meta);
                     animatePage();
                 });
                 add.addActionListener(e -> {
@@ -804,24 +920,40 @@ public class CodenameOneSettings extends Lifecycle {
             header.add(BorderLayout.EAST, controls);
             row.add(header);
         }
-        if (active && ownedBy == null) {
-            row.add(text);
+        String description = meta.description();
+        if (description != null && description.trim().length() > 0) {
+            TextArea details = new TextArea(description);
+            details.setUIID(uiid("SettingsRowText"));
+            details.setEditable(false);
+            details.setFocusable(false);
+            // One row is the FLOOR, not the size: growByContent takes the area to
+            // the line count the text actually wraps to at this width. The old
+            // floor of two-to-five rows was a guess made before the width was
+            // known, and it padded every short description with blank lines --
+            // affordable on a page that scrolled, and no longer affordable on one
+            // that has to fit rows between a pinned search box and a pager. A
+            // hint with no description now adds nothing at all rather than an
+            // empty line.
+            details.setRows(1);
+            details.setGrowByContent(true);
+            row.add(details);
         }
-        TextArea details = new TextArea(meta.description());
-        details.setUIID(uiid("SettingsRowText"));
-        details.setEditable(false);
-        details.setFocusable(false);
-        details.setRows(descriptionRows(meta.description()));
-        details.setGrowByContent(true);
-        row.add(details);
         return row;
     }
 
-    private Component activeHintEditor(BuildHintMetadata meta, String value, BuildHintType effectiveType) {
-        TableLayout editorLayout = new TableLayout(1, 2);
-        Container editor = new Container(editorLayout);
-        editor.setUIID(uiid("SettingsHintEditor"));
+    /// The control for a hint that is set: a switch, or its value in a field,
+    /// with the button that removes the declaration.
+    ///
+    /// It sits to the RIGHT of the name, on the same line, exactly where the Add
+    /// button sits on a row that is not set yet. It used to be a band of its own
+    /// below the name -- a full row of height whose left 72% was an empty
+    /// spacer. On a page that scrolled that was only ugly; on a page that fits
+    /// rows between a pinned search box and a pager it was a whole hint's worth
+    /// of space per active row.
+    private Component activeHintEditor(Container row, BuildHintMetadata meta, String value,
+            BuildHintType effectiveType) {
         Container controls = new Container(new BorderLayout());
+        controls.setUIID(uiid("SettingsHintEditor"));
         if (effectiveType == BuildHintType.BOOLEAN) {
             Switch toggle = new Switch(uiid("SettingsSwitch"));
             toggle.setValue("true".equalsIgnoreCase(value));
@@ -831,6 +963,11 @@ public class CodenameOneSettings extends Lifecycle {
         } else {
             TextField valueField = new TextField(value, "value");
             valueField.setUIID(uiid(isValidHintValue(meta, value) ? "SettingsField" : "SettingsFieldError"));
+            // Next to the name the field is as wide as it asks to be, and a
+            // TextField asks for its column count. Its old width came from the
+            // 28% cell of a band that no longer exists, so it has to ask for
+            // enough room to show a path or a URL.
+            valueField.setColumns(16);
             configureHintField(valueField, meta);
             valueField.addDataChangedListener((type, index) -> {
                 String next = valueField.getText() == null ? "" : valueField.getText().trim();
@@ -850,10 +987,8 @@ public class CodenameOneSettings extends Lifecycle {
             });
             controls.add(BorderLayout.CENTER, valueField);
         }
-        controls.add(BorderLayout.EAST, removeHintButton(meta));
-        editor.add(editorLayout.createConstraint(0, 0).widthPercentage(72), new Container());
-        editor.add(editorLayout.createConstraint(0, 1).widthPercentage(28), controls);
-        return editor;
+        controls.add(BorderLayout.EAST, removeHintButton(row, meta));
+        return controls;
     }
 
     private BuildHintType effectiveHintType(BuildHintMetadata meta, String value) {
@@ -874,12 +1009,12 @@ public class CodenameOneSettings extends Lifecycle {
     /// One implementation, used by the ordinary editor and by the conflict row:
     /// removing the declaration is the resolution in both, and the second copy
     /// this replaced was the reason the conflict row had no way out at all.
-    private Button removeHintButton(BuildHintMetadata meta) {
+    private Button removeHintButton(Container row, BuildHintMetadata meta) {
         Button remove = new Button("", uiid("SettingsSmallIconButton"));
         remove.setMaterialIcon(FontImage.MATERIAL_DELETE, 2.2f);
         remove.addActionListener(e -> {
             settings.removeBuildHint(meta.name());
-            renderBuildHintsList();
+            refreshHintRow(row, meta);
             animatePage();
         });
         return remove;
@@ -900,20 +1035,6 @@ public class CodenameOneSettings extends Lifecycle {
     /// absence of the line IS the configuration.
     private String defaultHintValue(BuildHintMetadata meta) {
         return meta.type() == BuildHintType.BOOLEAN ? "true" : null;
-    }
-
-    private int descriptionRows(String text) {
-        int len = text == null ? 0 : text.length();
-        if (len > 260) {
-            return 5;
-        }
-        if (len > 170) {
-            return 4;
-        }
-        if (len > 95) {
-            return 3;
-        }
-        return 2;
     }
 
     private void configureHintField(TextField field, BuildHintMetadata meta) {
