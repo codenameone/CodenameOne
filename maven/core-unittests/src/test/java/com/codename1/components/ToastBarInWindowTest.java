@@ -24,11 +24,13 @@ package com.codename1.components;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Component;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.Window;
 import com.codename1.ui.layouts.BorderLayout;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -158,5 +160,51 @@ class ToastBarInWindowTest extends UITestBase {
 
         w.dispose();
         DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aWindowInstanceStartsFromTheSingletonsConfiguration() {
+        // An application sets the position and the UIIDs once at start-up and then
+        // calls the static helpers. Those reach the window's instance when a window has
+        // focus, and a factory-fresh one quietly ignored every one of those settings.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        ToastBar singleton = ToastBar.getInstance();
+        int originalPosition = singleton.getPosition();
+        String originalUiid = singleton.getDefaultUIID();
+        String originalMessageUiid = singleton.getDefaultMessageUIID();
+        try {
+            singleton.setPosition(Component.TOP);
+            singleton.setDefaultUIID("ConfiguredToastBar");
+            singleton.setDefaultMessageUIID("ConfiguredToastBarMessage");
+
+            Window w = new Window("host", new BorderLayout());
+            w.setWindowSize(500, 400);
+            w.show();
+            DisplayTest.flushEdt();
+
+            ToastBar forWindow = ToastBar.getInstance(w);
+            assertNotSame(singleton, forWindow);
+            assertEquals(Component.TOP, forWindow.getPosition(),
+                    "a window's toast bar starts from the configuration the "
+                            + "application gave the singleton");
+            assertEquals("ConfiguredToastBar", forWindow.getDefaultUIID());
+            assertEquals("ConfiguredToastBarMessage", forWindow.getDefaultMessageUIID());
+
+            // Copied rather than shared, so the window can still differ afterwards.
+            forWindow.setPosition(Component.BOTTOM);
+            assertEquals(Component.TOP, singleton.getPosition(),
+                    "and configuring the window does not reach back into the singleton");
+
+            w.dispose();
+            DisplayTest.flushEdt();
+        } finally {
+            singleton.setPosition(originalPosition);
+            singleton.setDefaultUIID(originalUiid);
+            singleton.setDefaultMessageUIID(originalMessageUiid);
+        }
     }
 }

@@ -197,6 +197,17 @@ public final class ToastBar {
         if (b == null) {
             b = new ToastBar();
             b.host = top;
+            // Configured as the singleton is. An application sets the position, the
+            // layer choice and the UIIDs once at start-up and then calls the static
+            // helpers; those helpers reach this instance when a window has focus, and
+            // a factory-fresh one would have quietly ignored every one of those
+            // settings. Copied rather than shared so a window can still be configured
+            // on its own afterwards.
+            ToastBar defaults = ToastBarHolder.INSTANCE;
+            b.position = defaults.position;
+            b.useFormLayeredPane = defaults.useFormLayeredPane;
+            b.defaultUIID = defaults.defaultUIID;
+            b.defaultMessageUIID = defaults.defaultMessageUIID;
             c.putClientProperty(WINDOW_INSTANCE_PROP, b);
         }
         return b;
