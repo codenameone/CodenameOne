@@ -2429,6 +2429,15 @@ public class Dialog extends Form implements AbstractDialog {
     private void showInHostLayer(int top, int bottom, int left, int right,
             boolean includeTitle, boolean modal) {
         Display.getInstance().flushEdt();
+        // The hosted path has the same re-show case the native one does, and a worse
+        // failure: this dialog is still parented to the old layer, so adding it again
+        // throws -- but only after a second scrim has been built and the field pointing
+        // at the first overwritten, leaving that one covering the window and swallowing
+        // every press with nothing left holding a reference to remove it.
+        if (layerHost != null) {
+            disposeFromHostLayer();
+            setDisposed(false);
+        }
         Window host = (Window) resolveHost();
         layerHost = host;
         hostedModal = modal;

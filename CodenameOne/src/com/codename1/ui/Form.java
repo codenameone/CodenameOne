@@ -3007,7 +3007,12 @@ public class Form extends Container implements TopLevelContainer {
             }
             tracked.add(new TransferredListener(l, added));
         } else {
-            boolean remove = true;
+            // False unless a tracked entry says this form is what put the listener on
+            // the host. Removing a listener this form never registered has always been
+            // a no-op, and defaulting to true turned an application's symmetric
+            // remove-what-you-did-not-add call into a deletion of the window's own
+            // registration.
+            boolean remove = false;
             if (tracked != null) {
                 for (int iter = 0; iter < tracked.size(); iter++) {
                     TransferredListener entry = tracked.get(iter);

@@ -1421,4 +1421,85 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void showingAHostedDialogAgainReplacesItRatherThanStrandingAScrim() {
+        // Still parented to the old layer, so adding it again threw -- but only after a
+        // second scrim had been built and the field pointing at the first overwritten,
+        // leaving that one covering the window and swallowing every press.
+        Window w = openHost(600, 500);
+        final int[] behindPresses = new int[1];
+        w.addPointerPressedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                behindPresses[0]++;
+            }
+        });
+
+        Dialog d = new Dialog("shown twice");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertNotNull(d.getParent());
+
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertNotNull(d.getParent(), "the second showing is attached");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        assertNull(d.getParent(), "and disposal takes it back out");
+
+        Container layer = w.getFormLayeredPane(Dialog.class, true);
+        assertEquals(0, layer.getComponentCount(),
+                "with no scrim stranded in the layer behind it");
+
+        // Which the window can prove: presses reach it again.
+        int before = behindPresses[0];
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertTrue(behindPresses[0] > before,
+                "and the window is interactive again");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void removingAListenerTheDialogNeverAddedLeavesTheWindowsOwnAlone() {
+        // Removing a listener you never registered has always been a no-op. While
+        // hosted it was routed to the window and removed there, deleting a listener the
+        // application had attached to the window itself.
+        Window w = openHost(600, 500);
+        final int[] presses = new int[1];
+        ActionListener windowOnly = new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                presses[0]++;
+            }
+        };
+        w.addPointerPressedListener(windowOnly);
+
+        Dialog d = new Dialog("meddling");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        // The dialog never registered this one.
+        d.removePointerPressedListener(windowOnly);
+        DisplayTest.flushEdt();
+
+        d.dispose();
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(1, presses[0],
+                "the window's own listener must still be there");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

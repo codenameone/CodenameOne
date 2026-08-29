@@ -85,6 +85,11 @@ public final class AccessibilityManager {
     /// Roots invalidated since the pending refresh was scheduled, all of which it has
     /// to rebuild rather than only the one that scheduled it.
     private final ArrayList<Container> pendingRoots = new ArrayList<Container>();
+
+    /// Whether a mutation with no resolvable surface is waiting for the refresh. Not
+    /// the same as an empty queue, which is also what disposing every queued root
+    /// leaves behind.
+    private boolean pendingRootlessRefresh;
     private AccessibilityTreeSnapshot snapshot = new AccessibilityTreeSnapshot(
             0, Collections.<Long>emptyList(), Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
 
@@ -136,7 +141,14 @@ public final class AccessibilityManager {
             // leave it stale, which is the defect this queue exists to fix. The
             // snapshot cache is capped because it holds whole trees; this holds
             // references to containers that are alive anyway.
-            if (refreshRoot != null && !pendingRoots.contains(refreshRoot)) {
+            if (refreshRoot == null) {
+                // A mutation with no surface at all. Recorded separately from the
+                // queue, because an empty queue can also mean every root that was in
+                // it has since been disposed -- and clearing every cached surface is
+                // right for the first and destroys every other window's tree for the
+                // second.
+                pendingRootlessRefresh = true;
+            } else if (!pendingRoots.contains(refreshRoot)) {
                 pendingRoots.add(refreshRoot);
             }
             if (!refreshScheduled) {
@@ -146,12 +158,15 @@ public final class AccessibilityManager {
                     public void run() {
                         int changes;
                         ArrayList<Container> roots;
+                        boolean rootless;
                         synchronized (AccessibilityManager.this) {
                             changes = pendingChanges;
                             roots = new ArrayList<Container>(pendingRoots);
                             pendingRoots.clear();
+                            rootless = pendingRootlessRefresh;
+                            pendingRootlessRefresh = false;
                         }
-                        if (roots.isEmpty()) {
+                        if (rootless) {
                             getSnapshotForRoot(null);
                         }
                         int count = roots.size();

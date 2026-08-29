@@ -316,4 +316,61 @@ class AccessibilityWindowTest extends UITestBase {
         }
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void disposingTheOnlyQueuedWindowLeavesTheOthersReadable() {
+        // Releasing a root takes it out of the refresh queue, which can empty it. An
+        // empty queue used to mean "a mutation with no surface", whose refresh clears
+        // every cached surface -- so one window closing blanked the trees of all the
+        // others for any off-EDT reader.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        try {
+            new Form("main", new BorderLayout()).show();
+            DisplayTest.flushEdt();
+
+            final Window keep = new Window("keep", new BorderLayout());
+            keep.setWindowSize(400, 300);
+            keep.add(BorderLayout.CENTER, new Button("in the window that stays"));
+            keep.show();
+            DisplayTest.flushEdt();
+
+            Window going = new Window("going", new BorderLayout());
+            going.setWindowSize(400, 300);
+            Button doomed = new Button("in the window that closes");
+            going.add(BorderLayout.CENTER, doomed);
+            going.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            assertTrue(mentions(mgr.getSnapshot(keep), "in the window that stays"));
+            assertTrue(mentions(mgr.getSnapshot(going), "in the window that closes"));
+
+            // The doomed window is the only thing queued, and then it goes away.
+            doomed.setText("changed just before closing");
+            going.dispose();
+            DisplayTest.flushEdt();
+
+            final AccessibilityTreeSnapshot[] offEdt = new AccessibilityTreeSnapshot[1];
+            Thread t = new Thread(new Runnable() {
+                public void run() {
+                    offEdt[0] = AccessibilityManager.getInstance().getSnapshot(keep);
+                }
+            });
+            t.start();
+            t.join(5000);
+
+            assertNotNull(offEdt[0]);
+            assertTrue(mentions(offEdt[0], "in the window that stays"),
+                    "a window that did not close keeps its tree");
+
+            keep.dispose();
+            DisplayTest.flushEdt();
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(err);
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+        }
+    }
 }
