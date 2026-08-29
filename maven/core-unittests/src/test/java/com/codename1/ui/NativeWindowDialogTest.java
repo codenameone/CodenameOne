@@ -33,6 +33,7 @@ import com.codename1.ui.plaf.UIManager;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -970,5 +971,37 @@ class NativeWindowDialogTest extends UITestBase {
         DisplayTest.flushEdt();
         assertTrue(shown.getTitleComponent().isVisible(),
                 "and the ordinary case still comes back");
+    }
+
+    @FormTest
+    void showingANativeInteractionDialogAgainClosesTheFirstWindow() {
+        // Showing again without disposing first is something the lightweight path
+        // tolerates. Overwriting the window reference left the first one on screen and
+        // empty, with its own bridges now pointing at the second showing.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        id.add(BorderLayout.CENTER, new Label("body"));
+        id.setNativeWindowMode(true);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+        Window first = id.getNativeWindow();
+        assertNotNull(first);
+
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+        Window second = id.getNativeWindow();
+        assertNotNull(second);
+        assertNotSame(first, second, "the second showing gets its own window");
+        assertTrue(first.isWindowDisposed(),
+                "and the first one must not be left open and empty");
+        assertNotNull(id.getParent(), "the payload is in the second window");
+
+        id.dispose();
+        DisplayTest.flushEdt();
+        assertTrue(second.isWindowDisposed());
     }
 }

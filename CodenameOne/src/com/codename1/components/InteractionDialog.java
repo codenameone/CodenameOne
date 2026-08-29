@@ -424,6 +424,20 @@ public class InteractionDialog extends Container implements AbstractDialog {
     ///
     /// - `modal`: whether to park the caller until the dialog goes
     private void showInNativeWindow(boolean modal) {
+        // Showing again without disposing first is something the lightweight path
+        // tolerates, so this one has to as well. Overwriting the field left the first
+        // window on screen and empty -- the payload having moved into the second --
+        // while its own close and dispose bridges went on acting on this dialog, whose
+        // window was now the second one: closing the abandoned window tore down the
+        // showing the user was actually looking at.
+        Window previous = nativeWindow;
+        if (previous != null) {
+            finishNativeShowing();
+            if (!previous.isWindowDisposed()) {
+                previous.dispose();
+            }
+            disposed = false;
+        }
         TopLevelContainer host = resolveHost();
         Window w = new Window(
                 getTitle() == null ? "" : getTitle(), new BorderLayout());

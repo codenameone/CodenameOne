@@ -3683,6 +3683,33 @@ public class Window extends Container implements TopLevelContainer {
             pointerInputScopes = new ArrayList<Container>();
         }
         pointerInputScopes.add(scope);
+        // Whatever gesture was already in flight ends here. A dialog is routinely shown
+        // from a press -- and a blocking progress dialog is shown while the finger is
+        // still down -- so the component underneath is left pressed, with this window
+        // still holding it as the release target. Suppressing the window's listeners
+        // does not help: the release path dispatches through that saved component, so
+        // lifting the finger over the new dialog would activate the control behind it.
+        cancelPointerGesture();
+    }
+
+    /// Ends the gesture this window is currently tracking, without the window-level
+    /// notification `#cancelPendingInput()` sends -- that one is for a window going
+    /// away, this one is for input changing hands while the window stays put.
+    private void cancelPointerGesture() {
+        if (dragged != null && dragged.isDragAndDropInitialized()) {
+            // No drop target: the user never completed the drag, something took the
+            // pointer away. This still restores visibility and clears the drag flags.
+            LeadUtil.dragFinished(dragged, -1, -1);
+        }
+        if (pressedCmp != null) {
+            // The existing "ended without completing" primitive: it resets the pressed
+            // state without firing the action, which is the whole point here.
+            LeadUtil.dragInitiated(pressedCmp);
+        }
+        pressedCmp = null;
+        dragged = null;
+        currentPointerPress = null;
+        pointerPressedAgainDuringDrag = false;
     }
 
     /// Releases a pointer claim, wherever it sits in the stack.

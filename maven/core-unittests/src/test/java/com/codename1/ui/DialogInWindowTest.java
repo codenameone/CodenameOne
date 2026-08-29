@@ -1329,4 +1329,53 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aDialogShownMidGestureDoesNotLetTheReleaseActivateWhatIsBehindIt() {
+        // Showing a dialog from a press is ordinary, and a blocking progress dialog
+        // goes up while the finger is still down. The window kept holding the button
+        // underneath as the release target, so lifting over the new dialog fired it.
+        Window w = openHost(600, 500);
+        final int[] activations = new int[1];
+        Button behind = new Button("behind");
+        behind.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                activations[0]++;
+            }
+        });
+        w.add(BorderLayout.CENTER, behind);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+
+        int x = behind.getAbsoluteX() + behind.getWidth() / 2;
+        int y = behind.getAbsoluteY() + behind.getHeight() / 2;
+
+        // The press lands on the button, and the dialog goes up before the release.
+        w.pointerPressed(x, y);
+        DisplayTest.flushEdt();
+
+        Dialog d = new Dialog("in the way");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        w.pointerReleased(x, y);
+        DisplayTest.flushEdt();
+        assertEquals(0, activations[0],
+                "the control behind the dialog must not fire on the release");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+
+        // A gesture that starts after the dialog has gone still works.
+        w.pointerPressed(x, y);
+        w.pointerReleased(x, y);
+        DisplayTest.flushEdt();
+        assertEquals(1, activations[0], "and an ordinary press still activates it");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

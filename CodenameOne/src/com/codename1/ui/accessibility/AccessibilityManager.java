@@ -130,11 +130,14 @@ public final class AccessibilityManager {
             // over, and rebuilding it cleared the global dirty flag, so the other
             // root's tree stayed stale for good -- which off-EDT screen readers, now
             // that they are handed their own surface's tree, would have read forever.
+            // Not capped. The list holds one entry per distinct root, and it is
+            // drained by the refresh, so it is bounded by the number of live surfaces
+            // -- while a cap would silently drop the earliest window's refresh and
+            // leave it stale, which is the defect this queue exists to fix. The
+            // snapshot cache is capped because it holds whole trees; this holds
+            // references to containers that are alive anyway.
             if (refreshRoot != null && !pendingRoots.contains(refreshRoot)) {
                 pendingRoots.add(refreshRoot);
-                while (pendingRoots.size() > MAX_CACHED_ROOTS) {
-                    pendingRoots.remove(0);
-                }
             }
             if (!refreshScheduled) {
                 refreshScheduled = true;

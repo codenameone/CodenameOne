@@ -2438,9 +2438,25 @@ static UIView* cn1PresentingView(void) {
     UIView* v = CN1MacWindowPresentingView();
     return v != nil ? v : [CodenameOne_GLViewController instance].view;
 }
+
+/* The scale of the screen the presenting view is actually on, rather than the
+ * process-global scaleValue, which is [UIScreen mainScreen].scale captured for the
+ * main scene. An anchor rectangle arrives in Codename One pixels and has to be
+ * divided by the scale of the surface it will be drawn on; using the main scene's
+ * for a secondary window puts the popover in the wrong place. Falls back to the
+ * global whenever no CN1 window owns the presentation, which is the case this
+ * expression had before. */
+static CGFloat cn1PresentingScale(void) {
+    UIView* v = CN1MacWindowPresentingView();
+    if (v != nil && v.window != nil && v.window.screen != nil) {
+        return v.window.screen.scale;
+    }
+    return scaleValue;
+}
 #else
 #define cn1PresentingController() [CodenameOne_GLViewController instance]
 #define cn1PresentingView() [CodenameOne_GLViewController instance].view
+#define cn1PresentingScale() scaleValue
 #endif
 
 JAVA_INT com_codename1_impl_ios_IOSNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_boolean_R_int(
@@ -11208,14 +11224,20 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
     BOOL useRect = rectangle ? YES:NO;
     __block CGRect cgrect = CGRectMake(0,0,0,0);
     if (useRect){
+        /* Left in Codename One pixels here. The divisor depends on which window ends
+         * up presenting, and that is only known on the main thread inside the block
+         * below. */
         cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
-        cgrect.origin.x = cgrect.origin.x / scaleValue;
-        cgrect.origin.y = cgrect.origin.y / scaleValue;
-        cgrect.size.width = cgrect.size.width / scaleValue;
-        cgrect.size.height = cgrect.size.height / scaleValue;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+        if (useRect){
+            CGFloat presentingScale = cn1PresentingScale();
+            cgrect.origin.x = cgrect.origin.x / presentingScale;
+            cgrect.origin.y = cgrect.origin.y / presentingScale;
+            cgrect.size.width = cgrect.size.width / presentingScale;
+            cgrect.size.height = cgrect.size.height / presentingScale;
+        }
         NSArray* dataToShare;
         if(imagePeer != 0) {
             GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
@@ -11279,15 +11301,21 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
     BOOL useRect = rectangle ? YES:NO;
     __block CGRect cgrect = CGRectMake(0,0,0,0);
     if (useRect){
+        /* Left in Codename One pixels here. The divisor depends on which window ends
+         * up presenting, and that is only known on the main thread inside the block
+         * below. */
         cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
-        cgrect.origin.x = cgrect.origin.x / scaleValue;
-        cgrect.origin.y = cgrect.origin.y / scaleValue;
-        cgrect.size.width = cgrect.size.width / scaleValue;
-        cgrect.size.height = cgrect.size.height / scaleValue;
     }
     int cbId = (int)callbackId;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+        if (useRect){
+            CGFloat presentingScale = cn1PresentingScale();
+            cgrect.origin.x = cgrect.origin.x / presentingScale;
+            cgrect.origin.y = cgrect.origin.y / presentingScale;
+            cgrect.size.width = cgrect.size.width / presentingScale;
+            cgrect.size.height = cgrect.size.height / presentingScale;
+        }
         NSArray* dataToShare;
         if(imagePeer != 0) {
             GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
