@@ -536,4 +536,47 @@ public class MacOSNativeBuilderScanTest {
                 MacOSNativeBuilder.applicationOpensCameraMicrophone(
                         "com/example/MyApp", "com/codename1/ai/vision/CodeScanner", "start"));
     }
+
+    /// The generalised matcher finds any setting, still bounded to its own line.
+    ///
+    /// ARCHS and ENABLE_HARDENED_RUNTIME reach the project only through this,
+    /// because their xcodebuild overrides live in buildChannel() and mac-source
+    /// returns before it runs.
+    @Test
+    public void anySettingAssignmentIsMatchedAndBounded() {
+        // VALID_ARCHS is in the sample deliberately: "ARCHS" is a suffix of it,
+        // and without a leading word boundary the matcher rewrote that line too.
+        String body = "\t\t\t\tARCHS = \"$(ARCHS_STANDARD)\";\n"
+                + "\t\t\t\tVALID_ARCHS = \"$(ARCHS_STANDARD)\";\n"
+                + "\t\t\t\tENABLE_HARDENED_RUNTIME = YES;\n"
+                + "\t\t\t\tSDKROOT = macosx;\n";
+        java.util.Set<String> archs = MacOSNativeBuilder.settingAssignments(body, "ARCHS");
+        assertEquals("VALID_ARCHS must not be matched as ARCHS", 1, archs.size());
+        assertEquals("ARCHS = \"$(ARCHS_STANDARD)\";", archs.iterator().next());
+        // And asking for VALID_ARCHS still finds it.
+        assertEquals(1, MacOSNativeBuilder.settingAssignments(body, "VALID_ARCHS").size());
+
+        java.util.Set<String> hardened =
+                MacOSNativeBuilder.settingAssignments(body, "ENABLE_HARDENED_RUNTIME");
+        assertEquals(1, hardened.size());
+        assertEquals("ENABLE_HARDENED_RUNTIME = YES;", hardened.iterator().next());
+    }
+
+    /// A setting the template no longer carries yields nothing, which is what
+    /// makes the builder report it instead of claiming success.
+    @Test
+    public void anAbsentSettingYieldsNothing() {
+        assertTrue(MacOSNativeBuilder.settingAssignments("SDKROOT = macosx;\n", "ARCHS").isEmpty());
+        assertTrue(MacOSNativeBuilder.settingAssignments(null, "ARCHS").isEmpty());
+        assertTrue(MacOSNativeBuilder.settingAssignments("ARCHS = arm64;", null).isEmpty());
+    }
+
+    /// The deployment-target helper still behaves, since it now delegates.
+    @Test
+    public void theDeploymentTargetHelperStillMatches() {
+        java.util.Set<String> found = MacOSNativeBuilder.deploymentTargetAssignments(
+                "\t\t\t\tMACOSX_DEPLOYMENT_TARGET = 13.0;\n\t\t\t\tSDKROOT = macosx;\n");
+        assertEquals(1, found.size());
+        assertEquals("MACOSX_DEPLOYMENT_TARGET = 13.0;", found.iterator().next());
+    }
 }

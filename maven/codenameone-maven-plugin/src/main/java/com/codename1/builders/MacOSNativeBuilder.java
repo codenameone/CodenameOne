@@ -688,6 +688,14 @@ public class MacOSNativeBuilder extends Executor {
 
         attachEntitlementsToProject(distDir, appName, hints);
         applyDeploymentTargetToProject(distDir, appName, hints);
+        // Both of these are otherwise applied only as xcodebuild command-line
+        // overrides in buildChannel(), which mac-source never reaches -- so the
+        // exported project ignored the hint entirely. Written here, before the
+        // source-only return, so the project a developer opens agrees with what
+        // the same hints would have built.
+        applySettingToProject(distDir, appName, "ARCHS", hints.getArch());
+        applySettingToProject(distDir, appName, "ENABLE_HARDENED_RUNTIME",
+                hints.isHardenedRuntime() ? "YES" : "NO");
 
         resultDir = new File(tmpFile, "result");
         resultDir.mkdirs();
@@ -1200,16 +1208,90 @@ public class MacOSNativeBuilder extends Executor {
     /// the setting once per build configuration and both get the same value;
     /// `replaceInFile` then rewrites every occurrence of each literal.
     static java.util.Set<String> deploymentTargetAssignments(String pbxprojBody) {
+        return settingAssignments(pbxprojBody, "MACOSX_DEPLOYMENT_TARGET");
+    }
+
+    /// The distinct assignments of one build setting in a pbxproj body.
+    ///
+    /// Bounded at BOTH ends. [^;\n] stops the match running past the semicolon
+    /// and swallowing whatever setting follows; the leading lookbehind stops it
+    /// starting in the middle of a longer name. Without that second bound
+    /// "ARCHS" also matches the tail of "VALID_ARCHS = ...", and asking for
+    /// x86_64 rewrote VALID_ARCHS too -- caught by exporting a project and
+    /// reading it, not by the unit test, whose sample body had no VALID_ARCHS
+    /// in it. Same shape as the CN1_INCLUDE_CRYPTO / CN1_INCLUDE_CRYPTO_GCM
+    /// overlap elsewhere in this builder: a name that is a suffix of another.
+    static java.util.Set<String> settingAssignments(String pbxprojBody, String setting) {
         java.util.Set<String> found = new java.util.LinkedHashSet<String>();
-        if (pbxprojBody == null) {
+        if (pbxprojBody == null || setting == null) {
             return found;
         }
         java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("MACOSX_DEPLOYMENT_TARGET = [^;\\n]*;").matcher(pbxprojBody);
+                .compile("(?<![A-Za-z0-9_])" + java.util.regex.Pattern.quote(setting)
+                        + " = [^;\\n]*;")
+                .matcher(pbxprojBody);
         while (m.find()) {
             found.add(m.group());
         }
         return found;
+    }
+
+    /// Writes a resolved hint into the generated project's build settings.
+    ///
+    /// buildChannel() passes these to xcodebuild as command-line overrides,
+    /// which never reach the project file -- and mac-source returns before
+    /// buildChannel runs at all. So an exported project kept the template's
+    /// value and quietly ignored the hint: macos.arch=x86_64 still built
+    /// $(ARCHS_STANDARD), and macos.hardenedRuntime=false still built hardened.
+    /// The project IS the deliverable on that path, so it has to carry the
+    /// answer itself.
+    private void applySettingToProject(File distDir, String appName, String setting, String value) {
+        if (value == null || value.trim().length() == 0) {
+            return;
+        }
+        File pbxproj = new File(new File(distDir, appName + ".xcodeproj"), "project.pbxproj");
+        if (!pbxproj.isFile()) {
+            return;
+        }
+        String replacement = setting + " = " + value.trim() + ";";
+        try {
+            String body = readFileToString(pbxproj);
+            if (settingAssignments(body, setting).isEmpty()) {
+                // Reported, not passed over: the template changed shape and the
+                // symptom is otherwise invisible until someone opens the project
+                // and builds the wrong thing.
+                log("Could not set " + setting + " in the generated Xcode project; "
+                        + "it keeps the template default.");
+                return;
+            }
+            // Rewritten through the SAME bounded pattern that found it, not by
+            // replacing the matched text. replaceInFile is a plain substring
+            // replace, and the text of an ARCHS assignment is a substring of a
+            // VALID_ARCHS one -- so bounding only the search still rewrote
+            // VALID_ARCHS, which is how this was found: by exporting a project
+            // with macos.arch=x86_64 and reading it back.
+            String updated = java.util.regex.Pattern
+                    .compile("(?<![A-Za-z0-9_])" + java.util.regex.Pattern.quote(setting)
+                            + " = [^;\\n]*;")
+                    .matcher(body)
+                    .replaceAll(java.util.regex.Matcher.quoteReplacement(replacement));
+            if (!updated.equals(body)) {
+                // UTF-8 and whole-file, the way replaceInFile writes: only the
+                // matched spans changed, so every other byte -- including the
+                // line endings -- is carried through untouched.
+                java.io.Writer w = new java.io.OutputStreamWriter(
+                        java.nio.file.Files.newOutputStream(pbxproj.toPath()),
+                        java.nio.charset.StandardCharsets.UTF_8);
+                try {
+                    w.write(updated);
+                } finally {
+                    w.close();
+                }
+            }
+        } catch (Exception ex) {
+            log("Could not set " + setting + " in the generated Xcode project ("
+                    + ex + "); set it by hand.");
+        }
     }
 
     /// The file-name suffix for one signing channel. One place, because the
