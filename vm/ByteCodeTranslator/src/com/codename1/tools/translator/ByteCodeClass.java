@@ -895,7 +895,16 @@ public class ByteCodeClass {
                     b.append("_");
                     b.append(bf.getFieldName());
                     if (bf.isVolatile()) {
-                        b.append(" = ATOMIC_VAR_INIT(0);\n");
+                        // No initializer. A static object is zero-initialized by
+                        // the language, and ATOMIC_VAR_INIT expands to a plain
+                        // parenthesized value -- which clang 14 (Debian bookworm,
+                        // and therefore the glibc backend builder image) rejects
+                        // on an atomic POINTER as "initializer element is not a
+                        // compile-time constant". The macro is also deprecated in
+                        // C17 and gone in C23, so this is where it was heading
+                        // regardless. Reached by any `volatile` static reference
+                        // field in user code.
+                        b.append(";\n");
                     } else {
                         b.append(" = 0;\n");
                     }

@@ -1947,7 +1947,17 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
  * signal-stop this just makes the cheaper cooperative path usable; a no-op when conservative
  * roots are off. */
 #define CN1_YIELD_THREAD do { struct ThreadLocalData* __cn1yts = getThreadLocalData(); CN1_GC_PARK_CAPTURE(__cn1yts); __cn1yts->threadActive = JAVA_FALSE; } while(0)
-#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); while (__cn1rts->threadBlockedByGC){ usleep((JAVA_INT)1000);} __cn1rts->threadActive = JAVA_TRUE; __cn1rts->gcParkCaptured = JAVA_FALSE; CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
+/* The capture is cleared through a macro of its own because gcParkCaptured only
+ * EXISTS when conservative roots are compiled in. Referencing it unconditionally
+ * meant -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS -- the A/B arm vm/CLAUDE.md documents
+ * -- did not build at all, so the one measurement that isolates the conservative
+ * scan's cost could not be taken. */
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+#define CN1_GC_PARK_RELEASE(ts) do { (ts)->gcParkCaptured = JAVA_FALSE; } while(0)
+#else
+#define CN1_GC_PARK_RELEASE(ts) do { (void)(ts); } while(0)
+#endif
+#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); while (__cn1rts->threadBlockedByGC){ usleep((JAVA_INT)1000);} __cn1rts->threadActive = JAVA_TRUE; CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
 
 extern struct ThreadLocalData* getThreadLocalData();
 
