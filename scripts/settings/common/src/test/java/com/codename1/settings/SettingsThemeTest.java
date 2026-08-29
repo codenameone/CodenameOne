@@ -181,9 +181,14 @@ public class SettingsThemeTest {
                         Pattern.DOTALL).matcher(source).find(),
                 "Reloading has to put the reader back at the first result; refresh() alone "
                         + "leaves the offset of the result set that was replaced.");
-        assertTrue(source.contains("if (buildHints.contains(meta.name())) {"),
-                "Removing a hint the catalog does not know has to take the result set again -- "
-                        + "rebuilding its row in place leaves a row for a hint that no longer exists.");
+        assertTrue(source.contains("if (isBrowsableHint(meta)) {"),
+                "Removing a hint the browse list does not offer has to take the result set "
+                        + "again -- rebuilding its row in place leaves a row for a hint that "
+                        + "nothing offers.");
+        assertTrue(source.contains("return meta.aliasOf() == null && buildHints.contains(meta.name());"),
+                "A deprecated alias is in the catalog so an existing declaration can be "
+                        + "described, and search() skips it deliberately -- so membership of the "
+                        + "catalog alone does not mean a row survives losing its declaration.");
     }
 
     /// The desktop scrollbar is drawn from UIIDs the look and feel names itself,

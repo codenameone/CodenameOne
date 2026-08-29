@@ -780,6 +780,20 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
+    /// Whether the browse list would still hold this hint with no declaration
+    /// behind it -- which is what decides whether its row can be rebuilt where
+    /// it stands or the result set has to be taken again.
+    ///
+    /// Not simply "is it in the catalog". A deprecated alias IS in the catalog,
+    /// so that a declaration of it can still be described, and `search` skips it
+    /// on purpose: an alias and its target are one setting, and offering both
+    /// gives that setting two controls. So an alias is in this list for exactly
+    /// the reason a custom hint is -- the project named it -- and when that name
+    /// goes, so does the row.
+    private boolean isBrowsableHint(BuildHintMetadata meta) {
+        return meta.aliasOf() == null && buildHints.contains(meta.name());
+    }
+
     /// Rebuilds one row where it stands, after its own controls changed it --
     /// Add, Save, or the button that removes the declaration.
     ///
@@ -1036,14 +1050,14 @@ public class CodenameOneSettings extends Lifecycle {
         remove.setMaterialIcon(FontImage.MATERIAL_DELETE, 2.2f);
         remove.addActionListener(e -> {
             settings.removeBuildHint(meta.name());
-            if (buildHints.contains(meta.name())) {
+            if (isBrowsableHint(meta)) {
                 refreshHintRow(row, meta);
             } else {
-                // A hint the catalog has never heard of is in this list for one
-                // reason: the project declared it. Removing that declaration
-                // removes its only reason to be here, so rebuilding the row left
-                // a hint that exists nowhere offering an Add button, and left the
-                // header counting it. The result set has to be taken again.
+                // This row was in the list on the project's account, not the
+                // catalog's, and the declaration that put it there has just gone.
+                // Rebuilding it left a hint nothing offers showing an Add button,
+                // with the header still counting it, so the result set has to be
+                // taken again.
                 renderBuildHintsList();
             }
             animatePage();
