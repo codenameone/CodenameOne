@@ -103,6 +103,11 @@ public class WindowsImplementation extends CodenameOneImplementation {
     // The pinch phases. Same numbers as the Linux port on purpose: the two
     // desktop wire protocols are parallel and drifting them apart costs more
     // than it saves.
+    /// The magnify factor since the gesture began, which is what
+    /// Component.pinch() is specified to receive. Reset by both phases so a
+    /// gesture cannot inherit the previous one's zoom.
+    private float pinchScale = 1f;
+
     private static final int EVENT_PINCH_BEGIN = 20;
     private static final int EVENT_PINCH_END = 21;
     private static final int EVENT_ROTATE = 11;
@@ -856,14 +861,22 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     windowPointerWheelMoved(windowId, x, y, -wheelUnits(key), 0, false, 0);
                     break;
                 case EVENT_PINCH_BEGIN:
+                    pinchScale = 1f;
                     Display.getInstance().firePinchBeginGesture();
                     break;
                 case EVENT_PINCH_END:
+                    pinchScale = 1f;
                     Display.getInstance().firePinchReleaseGesture(x, y);
                     break;
                 case EVENT_PINCH:
-                    // key is the incremental scale multiplier in 1/10000 units.
-                    com.codename1.ui.Desktop.getInstance().windowMagnifyGesture(windowId, x, y, key / GESTURE_FIXED);
+                    // The native reports the change SINCE THE LAST EVENT, and
+                    // Component.pinch() is specified as the factor since the
+                    // gesture began: ImageViewer computes currentZoom * scale
+                    // and only moves currentZoom in pinchReleased(). Forwarding
+                    // the increment made a whole gesture land on its last tiny
+                    // step, so a pinch barely zoomed at all.
+                    pinchScale *= key / GESTURE_FIXED;
+                    com.codename1.ui.Desktop.getInstance().windowMagnifyGesture(windowId, x, y, pinchScale);
                     break;
                 case EVENT_ROTATE:
                     // key is the incremental rotation in 1/10000 radians.

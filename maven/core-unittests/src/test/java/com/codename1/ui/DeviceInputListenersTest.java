@@ -316,4 +316,49 @@ class DeviceInputListenersTest extends UITestBase {
         Display.getInstance().firePinchBeginGesture();
         Display.getInstance().firePinchReleaseGesture(10, 10);
     }
+
+    /// pinch(scale) is the factor since the gesture BEGAN, not since the last
+    /// event, and this pins that so the next port cannot quietly disagree.
+    ///
+    /// ImageViewer is the reference consumer: it computes currentZoom * scale
+    /// and only moves currentZoom in pinchReleased(), so a port that forwards
+    /// each event's own increment ends a whole gesture on its last tiny step.
+    /// Three ports did exactly that -- the native Windows and Linux ones
+    /// forwarded the incremental multiplier their platform reports, and the
+    /// JavaScript one forwarded a single wheel notch -- while AppKit
+    /// accumulated. The scale a component sees must grow across a gesture.
+    @FormTest
+    void magnifyScaleIsCumulativeAcrossTheGesture() {
+        Form form = Display.getInstance().getCurrent();
+        form.setLayout(new BorderLayout());
+        final java.util.List<Float> seen = new java.util.ArrayList<Float>();
+        Container gestureCmp = new Container() {
+            @Override
+            protected boolean pinch(float scale) {
+                seen.add(Float.valueOf(scale));
+                return true;
+            }
+        };
+        gestureCmp.setPreferredSize(new Dimension(200, 120));
+        form.add(BorderLayout.CENTER, gestureCmp);
+        form.revalidate();
+
+        int x = gestureCmp.getAbsoluteX() + gestureCmp.getWidth() / 2;
+        int y = gestureCmp.getAbsoluteY() + gestureCmp.getHeight() / 2;
+
+        Display.getInstance().firePinchBeginGesture();
+        // What a port must send for three equal outward steps: the running
+        // product, not 1.1 three times over.
+        Display.getInstance().fireMagnifyGesture(x, y, 1.1f);
+        Display.getInstance().fireMagnifyGesture(x, y, 1.21f);
+        Display.getInstance().fireMagnifyGesture(x, y, 1.331f);
+        Display.getInstance().firePinchReleaseGesture(x, y);
+
+        assertEquals(3, seen.size(), "every update should reach the component");
+        assertTrue(seen.get(1).floatValue() > seen.get(0).floatValue()
+                        && seen.get(2).floatValue() > seen.get(1).floatValue(),
+                "the factor must grow across the gesture rather than restart per event; got " + seen);
+        assertEquals(1.331f, seen.get(2).floatValue(), 0.0001f,
+                "the final value is the factor since the gesture began");
+    }
 }

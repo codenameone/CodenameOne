@@ -3867,6 +3867,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     /// gesture.
     private int pinchGestureGeneration;
 
+    /// The magnify factor since the gesture began, which is what
+    /// Component.pinch() is specified to receive.
+    private float pinchScale = 1f;
+
     /// Trackpad pinch, which a desktop browser reports as a wheel event with
     /// ctrlKey set rather than as a gesture of its own. Chrome, Firefox and Edge
     /// all synthesise it that way, and Safari sends it in addition to its own
@@ -3896,6 +3900,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final int y = getClientY(e);
         if (!pinchGestureOpen) {
             pinchGestureOpen = true;
+            pinchScale = 1f;
             nativeCallSerially(new Runnable() {
                 @Override
                 public void run() {
@@ -3937,7 +3942,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // an identical pinch in would not return to where it started. The
         // divisor sets sensitivity only; 100 matches what the deltas a trackpad
         // produces per notch feel like against the native ports.
-        final float scale = (float)Math.exp(-e.getDeltaY() / 100.0);
+        // Accumulated, not per event. Component.pinch() is specified as the
+        // factor since the gesture BEGAN -- ImageViewer computes
+        // currentZoom * scale and only moves currentZoom in pinchReleased() --
+        // so handing it each wheel notch's own increment would end a long
+        // gesture on its last tiny step instead of where the user dragged to.
+        pinchScale *= (float)Math.exp(-e.getDeltaY() / 100.0);
+        final float scale = pinchScale;
         nativeCallSerially(new Runnable() {
             @Override
             public void run() {
