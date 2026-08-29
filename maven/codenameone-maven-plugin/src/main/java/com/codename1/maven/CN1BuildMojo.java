@@ -2399,6 +2399,20 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 } catch (IOException ex) {
                     throw new MojoExecutionException("Failed to collect the generated macOS Xcode project", ex);
                 }
+                // Opened, as the iOS project path beside this one does. The
+                // Mac Native Project IDE shortcut and a plain mac-source build
+                // both default to open=true, and without this they completed
+                // with no Xcode window and no indication that the documented
+                // option had been ignored.
+                //
+                // getWorkspaceOrProject rather than the .xcodeproj directly:
+                // it prefers a workspace when the generated project has one,
+                // which is the thing Xcode should be handed.
+                if (open) {
+                    File projectToOpen = getWorkspaceOrProject(props, output);
+                    getLog().info("Opening macOS Xcode project " + projectToOpen);
+                    openWorkspace(projectToOpen);
+                }
             }
             if (e.getAppBundle() != null) {
                 getLog().info("Built native macOS application: " + e.getAppBundle().getAbsolutePath());
