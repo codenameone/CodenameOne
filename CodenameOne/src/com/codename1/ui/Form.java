@@ -2781,7 +2781,30 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
         for (int iter = 0; iter < moved.size(); iter++) { // NOPMD ForLoopCanBeForeach
-            removeTransferred(host, kind, moved.get(iter));
+            ActionListener l = moved.get(iter);
+            removeTransferred(host, kind, l);
+            // Back into this form's own dispatcher, which was cleared when they were
+            // handed over. Only taking them off the host would lose them outright, so a
+            // dialog shown a second time would have none of the listeners it was built
+            // with.
+            addOwn(kind, l);
+        }
+    }
+
+    private void addOwn(int kind, ActionListener l) {
+        switch (kind) {
+            case POINTER_PRESSED:
+                addPointerPressedListener(l);
+                break;
+            case POINTER_DRAGGED:
+                addPointerDraggedListener(l);
+                break;
+            case POINTER_RELEASED:
+                addPointerReleasedListener(l);
+                break;
+            default:
+                addLongPressListener(l);
+                break;
         }
     }
 

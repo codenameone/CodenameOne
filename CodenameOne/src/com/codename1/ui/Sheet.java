@@ -372,6 +372,9 @@ public class Sheet extends Container {
 
     /// The top level the application named, or null to work it out.
     private TopLevelContainer hostTopLevel;
+
+    /// The surface a child sheet asked this one to be restored on, good for one show.
+    private TopLevelContainer restoreOnHost;
     private final Rectangle sheetBounds = new Rectangle();
     private boolean trackSheetBounds;
     private Rectangle sheetEntry;
@@ -507,6 +510,11 @@ public class Sheet extends Container {
     ///
     /// the host top level, or null when there is none
     private TopLevelContainer resolveHost() {
+        if (restoreOnHost != null) {
+            // A parent being restored by its child's back(): it belongs on the surface
+            // the child was on, or the stack unwinds onto two different windows.
+            return restoreOnHost;
+        }
         if (hostTopLevel != null) {
             return hostTopLevel;
         }
@@ -955,6 +963,8 @@ public class Sheet extends Container {
                     + "no form is current");
         }
         shownHost = f;
+        // Consumed by this showing; it must not decide where the sheet goes next time.
+        restoreOnHost = null;
         if (f.getAnimationManager().isAnimating()) {
             f.getAnimationManager().flushAnimation(new Runnable() {
                 @Override
@@ -1355,9 +1365,11 @@ public class Sheet extends Container {
             // resolve for itself the parent could be added to a different window while
             // this one is still in the first window's layered pane, which duplicates
             // the stack across surfaces instead of unwinding it.
-            if (shownHost != null) {
-                this.parentSheet.setTopLevelHost(shownHost);
-            }
+            // For this one showing only. Writing it through setTopLevelHost would make
+            // it the parent's permanent configuration -- overwriting a host the
+            // application chose, and pinning the sheet to a window that may be long
+            // gone the next time it is shown on its own.
+            this.parentSheet.restoreOnHost = shownHost;
             this.parentSheet.show(duration);
         } else {
             hide(duration);

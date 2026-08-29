@@ -242,8 +242,12 @@ public class Dialog extends Form implements AbstractDialog {
     /// dialog neither blocks nor dismisses on an outside press.
     private Container scrim;
 
-    /// The dialog's own background painter, put back when the hosted showing ends.
+    /// The dialog's own background painter, put back when the showing ends.
     private Painter savedBgPainter;
+
+    /// Whether `#savedBgPainter` holds a saved value. Separate from the value itself
+    /// because null is a painter a style can legitimately have.
+    private boolean savedBgPainterValid;
 
     /// Listens for the host window resizing while this dialog is on it.
     private ActionListener hostSizeListener;
@@ -2135,6 +2139,7 @@ public class Dialog extends Form implements AbstractDialog {
         // Margins written by an earlier showing would inset the box inside the window.
         applyDialogMargins(0, 0, 0, 0, false);
         savedBgPainter = getStyle().getBgPainter();
+        savedBgPainterValid = true;
         getStyle().setBgPainter(NO_OP_PAINTER);
         w.getContentPane().addComponent(BorderLayout.CENTER, this);
     }
@@ -2144,9 +2149,13 @@ public class Dialog extends Form implements AbstractDialog {
         if (getParent() != null) {
             remove();
         }
-        if (savedBgPainter != null) {
+        if (savedBgPainterValid) {
+            // Whether one was saved, not whether it was non-null: a dialog whose style
+            // had no painter would otherwise keep the no-op one for good, and every
+            // later showing of it would paint no background at all.
             getStyle().setBgPainter(savedBgPainter);
             savedBgPainter = null;
+            savedBgPainterValid = false;
         }
     }
 
@@ -2388,6 +2397,7 @@ public class Dialog extends Form implements AbstractDialog {
         Image backdrop = captureBlurBackdrop(host);
 
         savedBgPainter = getStyle().getBgPainter();
+        savedBgPainterValid = true;
         getStyle().setBgPainter(NO_OP_PAINTER);
 
         if (modal || disposeWhenPointerOutOfBounds) {
@@ -2628,9 +2638,13 @@ public class Dialog extends Form implements AbstractDialog {
             scrim = null;
         }
         remove();
-        if (savedBgPainter != null) {
+        if (savedBgPainterValid) {
+            // Whether one was saved, not whether it was non-null: a dialog whose style
+            // had no painter would otherwise keep the no-op one for good, and every
+            // later showing of it would paint no background at all.
             getStyle().setBgPainter(savedBgPainter);
             savedBgPainter = null;
+            savedBgPainterValid = false;
         }
         Container layer = activeLayer;
         activeLayer = null;

@@ -28,6 +28,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -149,5 +150,106 @@ class ComboBoxInWindowTest extends UITestBase {
         assertFalse(combo.shownUnderAncestor,
                 "and on a form it is still a dialog that takes over the surface rather "
                         + "than a component inside the form");
+    }
+
+    /// A combo box whose popup selects an item instead of being dismissed from outside.
+    ///
+    /// The probe above dismisses its popup from a show listener, which is exactly why
+    /// it could not catch this: selecting an item goes down a different path, and that
+    /// path used to leave the popup open and its caller blocked.
+    private static final class SelectingComboBox extends ComboBox<String> {
+        private Dialog popup;
+
+        SelectingComboBox(String... items) {
+            super(items);
+        }
+
+        @Override
+        protected Dialog createPopupDialog(List<String> l) {
+            popup = super.createPopupDialog(l);
+            final List<String> list = l;
+            popup.addShowListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    // Pick the second item the way a tap does.
+                    list.setSelectedIndex(1);
+                    list.fireActionEvent();
+                }
+            });
+            return popup;
+        }
+    }
+
+    @FormTest
+    void selectingAnItemClosesAComboPopupInsideAWindow() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(600, 500);
+        final SelectingComboBox combo = new SelectingComboBox("one", "two", "three");
+        w.add(BorderLayout.NORTH, combo);
+        w.show();
+        DisplayTest.flushEdt();
+
+        Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                combo.fireClicked();
+            }
+        }, "cn1-test-combo-select");
+        caller.start();
+        try {
+            for (int i = 0; i < 400 && caller.isAlive(); i++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            caller.join(2000);
+            assertFalse(caller.isAlive(),
+                    "selecting an item has to close the popup, or its caller is blocked "
+                            + "for good");
+            assertEquals(1, combo.getSelectedIndex(), "and the selection sticks");
+        } finally {
+            if (combo.popup != null) {
+                combo.popup.dispose();
+            }
+            DisplayTest.flushEdt();
+            caller.join(2000);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void selectingAnItemStillClosesAComboPopupOnAForm() throws Exception {
+        Form main = new Form("main", new BorderLayout());
+        final SelectingComboBox combo = new SelectingComboBox("a", "b", "c");
+        main.add(BorderLayout.NORTH, combo);
+        main.show();
+        DisplayTest.flushEdt();
+
+        Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                combo.fireClicked();
+            }
+        }, "cn1-test-combo-select-form");
+        caller.start();
+        try {
+            for (int i = 0; i < 400 && caller.isAlive(); i++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            caller.join(2000);
+            assertFalse(caller.isAlive(), "the single surface path is unchanged");
+            assertEquals(1, combo.getSelectedIndex());
+        } finally {
+            if (combo.popup != null) {
+                combo.popup.dispose();
+            }
+            DisplayTest.flushEdt();
+            caller.join(2000);
+        }
     }
 }

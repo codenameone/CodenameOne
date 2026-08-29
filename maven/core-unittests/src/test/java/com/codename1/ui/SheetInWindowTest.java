@@ -317,4 +317,51 @@ class SheetInWindowTest extends UITestBase {
         settle(main);
         assertNull(Sheet.getCurrentSheet(main));
     }
+
+    @FormTest
+    void restoringAParentSheetDoesNotPinItToThatWindowForGood() {
+        // back() puts the parent back where the child was, but for that showing only:
+        // writing it as the parent's explicit host would overwrite one the application
+        // chose and keep the sheet on a window that may be long gone.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(600, 500);
+        w.show();
+        DisplayTest.flushEdt();
+
+        Sheet parent = new Sheet(null, "Options");
+        parent.getContentPane().add(new Label("parent"));
+        parent.setTopLevelHost(w);
+        parent.show(0);
+        settle(w);
+
+        Sheet child = new Sheet(parent, "Details");
+        child.getContentPane().add(new Label("child"));
+        child.setTopLevelHost(w);
+        child.show(0);
+        settle(w);
+
+        child.back(0);
+        settle(w);
+        assertSame(parent, Sheet.getCurrentSheet(w), "the parent comes back on the window");
+        assertSame(w, parent.getTopLevelHost(),
+                "and the host the application set is still the one it configured");
+
+        parent.back(0);
+        settle(w);
+        w.dispose();
+        DisplayTest.flushEdt();
+
+        // With the window gone the parent must be free to show somewhere else.
+        parent.setTopLevelHost(null);
+        parent.show(0);
+        settle(main);
+        assertSame(parent, Sheet.getCurrentSheet(main),
+                "a sheet reused after its window closed shows on the current surface");
+        parent.back(0);
+        settle(main);
+    }
 }

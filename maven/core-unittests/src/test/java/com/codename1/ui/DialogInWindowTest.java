@@ -801,4 +801,74 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aReusedHostedDialogKeepsThePointerListenersItWasBuiltWith() {
+        // An embedded form hands its pointer listeners to its host and clears its own
+        // dispatchers. Taking them off the host without putting them back would lose
+        // them outright, so the second showing would have none of them.
+        Window w = openHost(500, 400);
+        Dialog d = new Dialog("reused");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        final int[] presses = new int[1];
+        d.addPointerPressedListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                presses[0]++;
+            }
+        });
+        d.setTopLevelHost(w);
+
+        d.showModeless();
+        DisplayTest.flushEdt();
+        w.pointerPressed(5, 5);
+        w.pointerReleased(5, 5);
+        DisplayTest.flushEdt();
+        int afterFirst = presses[0];
+        assertTrue(afterFirst > 0, "the listener fires while the dialog is up");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.pointerPressed(5, 5);
+        w.pointerReleased(5, 5);
+        DisplayTest.flushEdt();
+        assertEquals(afterFirst, presses[0],
+                "and stops firing once the dialog has gone");
+
+        d.showModeless();
+        DisplayTest.flushEdt();
+        w.pointerPressed(5, 5);
+        w.pointerReleased(5, 5);
+        DisplayTest.flushEdt();
+        assertTrue(presses[0] > afterFirst,
+                "a dialog shown again still has the listeners it was built with");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aDialogWithNoBackgroundPainterGetsItsNullBack() {
+        // Whether one was saved, not whether it was non-null: a style can legitimately
+        // have no painter, and the no-op stand-in would otherwise stay for good.
+        Window w = openHost(500, 400);
+        Dialog d = new Dialog("no painter");
+        d.setLayout(new BorderLayout());
+        d.getStyle().setBgPainter(null);
+        d.setTopLevelHost(w);
+
+        d.showModeless();
+        DisplayTest.flushEdt();
+        d.dispose();
+        DisplayTest.flushEdt();
+
+        assertNull(d.getStyle().getBgPainter(),
+                "a dialog that had no painter must not be left with the no-op one");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }
