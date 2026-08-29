@@ -275,11 +275,9 @@ class NativeWindowDialogTest extends UITestBase {
         assertNotNull(w);
         TestWindowManager.FakeWindow peer = wm.getLastWindow();
         assertNotNull(peer);
-        assertTrue(peer.getHeight() > w.getHeight(),
+        assertEquals(40, peer.getHeight() - wm.getHeight(peer),
                 "the frame has to be asked for more than the drawable, or the box is "
                         + "clipped by exactly the height of the title bar");
-        assertEquals(40, peer.getHeight() - w.getHeight(),
-                "and by exactly the chrome, not by a guess");
 
         d.dispose();
         DisplayTest.flushEdt();
@@ -614,6 +612,173 @@ class NativeWindowDialogTest extends UITestBase {
         assertNull(id.getNativeWindow(),
                 "an anchored popup points into its host's coordinate space either way");
         id.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aNativeDialogIsSizedByItsDrawableEvenThoughItIsSizedAtShowTime() {
+        // The dialog is sized as part of showing, so the correction has to happen after
+        // the peer exists. Sizing before it treated the content size as a frame size
+        // and left the box short by the whole title bar.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Dialog d = newDialog("sized at show");
+        d.setNativeWindowMode(true);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        Window w = d.getNativeWindow();
+        assertNotNull(w);
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        // The frame asked for, which is what setWindowContentSize controls. The
+        // component's own width only changes when the port reports a resize, which the
+        // fake manager does not do on setBounds, so asserting on it would be asserting
+        // about the double rather than about the code.
+        assertEquals(50, peer.getHeight() - wm.getHeight(peer),
+                "the frame has to carry the chrome on top of the drawable");
+        assertEquals(20, peer.getWidth() - wm.getWidth(peer));
+
+        d.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aNativeDialogRunsItsShowCallbacks() {
+        // Sounds, onShowCompleted and every show listener. A modal dialog whose show
+        // listener is what disposes it would otherwise never be released.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        final boolean[] shown = new boolean[1];
+        final boolean[] completed = new boolean[1];
+        Dialog d = new Dialog("callbacks") {
+            @Override
+            protected void onShowCompleted() {
+                completed[0] = true;
+            }
+        };
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.addShowListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                shown[0] = true;
+            }
+        });
+        d.setNativeWindowMode(true);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        assertTrue(shown[0], "show listeners have to run in native window mode too");
+        assertTrue(completed[0], "and so does onShowCompleted");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aDialogWhoseWindowIsDisposedElsewhereCountsAsDisposed() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Dialog d = newDialog("externally closed");
+        d.setNativeWindowMode(true);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        Window w = d.getNativeWindow();
+        assertNotNull(w);
+        // Straight through the window, as an owner cascade or a desktop shutdown does.
+        w.dispose();
+        DisplayTest.flushEdt();
+
+        assertTrue(d.isDisposed(),
+                "a dialog whose window died is over, however the window died");
+        assertNull(d.getNativeWindow());
+    }
+
+    @FormTest
+    void anInteractionDialogHidesItsOwnTitleBehindTheWindowChrome() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog("Details", new BorderLayout());
+        id.add(BorderLayout.CENTER, new Label("body"));
+        id.setNativeWindowMode(true);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+
+        Window w = id.getNativeWindow();
+        assertNotNull(w);
+        assertEquals("Details", w.getTitle());
+        assertFalse(id.getTitleComponent().isVisible(),
+                "the platform draws the title, so the dialog must not draw a second one");
+
+        id.dispose();
+        DisplayTest.flushEdt();
+        assertTrue(id.getTitleComponent().isVisible(), "and it comes back afterwards");
+    }
+
+    @FormTest
+    void aDirectionalDisposeClosesTheWindowToo() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        id.add(BorderLayout.CENTER, new Label("body"));
+        id.setNativeWindowMode(true);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+        Window w = id.getNativeWindow();
+        assertNotNull(w);
+
+        // There is no layer to slide out of; the window has to go instead, or a modal
+        // caller waits on a window that stays on screen.
+        id.disposeToTheLeft();
+        DisplayTest.flushEdt();
+
+        assertNull(id.getNativeWindow());
+        assertTrue(w.isWindowDisposed(), "the window goes with it");
+    }
+
+    @FormTest
+    void aNativeInteractionDialogFollowsTheFocusedWindow() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+        Window host = new Window("host", new BorderLayout());
+        host.setWindowSize(600, 500);
+        host.show();
+        DisplayTest.flushEdt();
+        Desktop.getInstance().windowFocusChanged(host.getWindowId(), true);
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        id.add(BorderLayout.CENTER, new Label("body"));
+        id.setNativeWindowMode(true);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+
+        Window w = id.getNativeWindow();
+        assertNotNull(w);
+        assertSame(host, w.getOwnerWindow(),
+                "a dialog opened from a focused window belongs to that window, not the "
+                        + "main form behind it");
+
+        id.dispose();
+        DisplayTest.flushEdt();
+        host.dispose();
         DisplayTest.flushEdt();
     }
 }

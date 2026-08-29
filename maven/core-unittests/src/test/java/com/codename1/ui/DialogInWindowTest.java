@@ -721,4 +721,84 @@ class DialogInWindowTest extends UITestBase {
         second.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void closingTheHostWindowEndsAHostedDialog() {
+        // A window closed through its title bar disposes by default and takes the
+        // layered pane with it. Without hearing about that a modal caller waits on a
+        // dialog whose surface is gone.
+        Window w = openHost(500, 400);
+        Dialog d = new Dialog("hosted");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(w, d), "precondition: the dialog is up");
+
+        Desktop.getInstance().windowCloseRequested(w.getWindowId());
+        DisplayTest.flushEdt();
+
+        assertTrue(d.isDisposed(),
+                "the dialog has to end when the window it is on is closed");
+        assertNull(d.getParent());
+    }
+
+    @FormTest
+    void backGoesToTheTopmostHostedDialogAndDoesNotThrow() {
+        // Two dialogs on one window each listen for the back key. Dispatch runs them in
+        // the order they were shown, so without top-dialog routing the older one closes
+        // instead -- and its listener leaving mid-dispatch used to read past the end of
+        // the list Window.fireKeyEvent was walking.
+        Window w = openHost(600, 500);
+        Dialog first = new Dialog("first");
+        first.setLayout(new BorderLayout());
+        first.setTopLevelHost(w);
+        first.showModeless();
+        DisplayTest.flushEdt();
+
+        Dialog second = new Dialog("second");
+        second.setLayout(new BorderLayout());
+        second.setTopLevelHost(w);
+        second.showModeless();
+        DisplayTest.flushEdt();
+
+        w.keyReleased(MenuBar.backSK);
+        DisplayTest.flushEdt();
+
+        assertTrue(second.isDisposed(), "back closes the dialog on top");
+        assertFalse(first.isDisposed(), "and leaves the one underneath alone");
+
+        w.keyReleased(MenuBar.backSK);
+        DisplayTest.flushEdt();
+        assertTrue(first.isDisposed(), "the next back closes the next one down");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aHostedDialogTakesItsTintFromTheHost() {
+        // ComboBox and the floating action button submenu set the host's tint to zero
+        // to opt out of dimming, and the historical path honours that. Reading the
+        // dialog's own tint instead would dim anyway.
+        Window w = openHost(600, 500);
+        w.setTintColor(0);
+        Dialog d = new Dialog("undimmed");
+        d.setLayout(new BorderLayout());
+        d.setDisposeWhenPointerOutOfBounds(true);
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        Container layer = w.getFormLayeredPaneIfExists();
+        assertNotNull(layer);
+        assertEquals(0, w.getTintColor(),
+                "the host's opt-out is what the scrim has to read");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

@@ -2677,11 +2677,112 @@ public class Form extends Container implements TopLevelContainer {
                 host.deregisterAnimated(this);
             }
         }
+        reclaimTransferredListeners();
         super.deinitializeImpl();
         animMananger.flush();
         componentsAwaitingRelease = null;
         pressedCmp = null;
         dragged = null;
+    }
+
+    /// The four kinds of pointer listener an embedded form hands to its host.
+    private static final int POINTER_PRESSED = 0;
+    private static final int POINTER_DRAGGED = 1;
+    private static final int POINTER_RELEASED = 2;
+    private static final int LONG_PRESS = 3;
+
+    /// The host an embedded form gave its pointer listeners to, or null.
+    private TopLevelContainer transferredListenerHost;
+    private ArrayList<ActionListener> transferredPointerPressed;
+    private ArrayList<ActionListener> transferredPointerDragged;
+    private ArrayList<ActionListener> transferredPointerReleased;
+    private ArrayList<ActionListener> transferredLongPress;
+
+    /// Moves a dispatcher's listeners onto the host and returns what was moved.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dispatcher`: the dispatcher to drain, may be null
+    ///
+    /// - `host`: the top level to add them to
+    ///
+    /// - `kind`: which of the four pointer listener kinds these are
+    ///
+    /// #### Returns
+    ///
+    /// the listeners handed over, or null when there were none
+    private ArrayList<ActionListener> transferListeners(EventDispatcher dispatcher,
+            TopLevelContainer host, int kind) {
+        if (dispatcher == null) {
+            return null;
+        }
+        ArrayList<ActionListener> moved = new ArrayList<ActionListener>();
+        for (ActionListener l : (Collection<ActionListener>) dispatcher.getListenerCollection()) {
+            addTransferred(host, kind, l);
+            moved.add(l);
+        }
+        return moved.isEmpty() ? null : moved;
+    }
+
+    private void addTransferred(TopLevelContainer host, int kind, ActionListener l) {
+        switch (kind) {
+            case POINTER_PRESSED:
+                host.asContainer().addPointerPressedListener(l);
+                break;
+            case POINTER_DRAGGED:
+                host.asContainer().addPointerDraggedListener(l);
+                break;
+            case POINTER_RELEASED:
+                host.asContainer().addPointerReleasedListener(l);
+                break;
+            default:
+                host.asContainer().addLongPressListener(l);
+                break;
+        }
+    }
+
+    private void removeTransferred(TopLevelContainer host, int kind, ActionListener l) {
+        switch (kind) {
+            case POINTER_PRESSED:
+                host.asContainer().removePointerPressedListener(l);
+                break;
+            case POINTER_DRAGGED:
+                host.asContainer().removePointerDraggedListener(l);
+                break;
+            case POINTER_RELEASED:
+                host.asContainer().removePointerReleasedListener(l);
+                break;
+            default:
+                host.asContainer().removeLongPressListener(l);
+                break;
+        }
+    }
+
+    /// Takes back every pointer listener this form handed to a host when it was
+    /// embedded, so nothing on the host still points into a hierarchy that has left.
+    private void reclaimTransferredListeners() {
+        TopLevelContainer host = transferredListenerHost;
+        if (host == null) {
+            return;
+        }
+        transferredListenerHost = null;
+        reclaim(host, transferredPointerPressed, POINTER_PRESSED);
+        transferredPointerPressed = null;
+        reclaim(host, transferredPointerDragged, POINTER_DRAGGED);
+        transferredPointerDragged = null;
+        reclaim(host, transferredPointerReleased, POINTER_RELEASED);
+        transferredPointerReleased = null;
+        reclaim(host, transferredLongPress, LONG_PRESS);
+        transferredLongPress = null;
+    }
+
+    private void reclaim(TopLevelContainer host, ArrayList<ActionListener> moved, int kind) {
+        if (moved == null) {
+            return;
+        }
+        for (int iter = 0; iter < moved.size(); iter++) { // NOPMD ForLoopCanBeForeach
+            removeTransferred(host, kind, moved.get(iter));
+        }
     }
 
     /// {@inheritDoc}
@@ -2710,30 +2811,24 @@ public class Form extends Container implements TopLevelContainer {
             TopLevelContainer f = TopLevelSupport.of(getParent());
             if (f != null) {
                 f.registerAnimated(this);
-                if (pointerPressedListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>) pointerPressedListeners.getListenerCollection()) {
-                        f.asContainer().addPointerPressedListener(l);
-                    }
-                    pointerPressedListeners = null;
-                }
-                if (pointerDraggedListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>) pointerDraggedListeners.getListenerCollection()) {
-                        f.asContainer().addPointerDraggedListener(l);
-                    }
-                    pointerDraggedListeners = null;
-                }
-                if (pointerReleasedListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>) pointerReleasedListeners.getListenerCollection()) {
-                        f.asContainer().addPointerReleasedListener(l);
-                    }
-                    pointerReleasedListeners = null;
-                }
-                if (longPressListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>) longPressListeners.getListenerCollection()) {
-                        f.asContainer().addLongPressListener(l);
-                    }
-                    longPressListeners = null;
-                }
+                // Recorded as they are handed over, because the dispatchers they came
+                // from are cleared here and deinitialization would otherwise have no
+                // way to say which of the host's listeners belonged to this form. Left
+                // on the host they keep firing into a hierarchy that has been removed,
+                // and keep it reachable.
+                transferredListenerHost = f;
+                transferredPointerPressed = transferListeners(
+                        pointerPressedListeners, f, POINTER_PRESSED);
+                pointerPressedListeners = null;
+                transferredPointerDragged = transferListeners(
+                        pointerDraggedListeners, f, POINTER_DRAGGED);
+                pointerDraggedListeners = null;
+                transferredPointerReleased = transferListeners(
+                        pointerReleasedListeners, f, POINTER_RELEASED);
+                pointerReleasedListeners = null;
+                transferredLongPress = transferListeners(
+                        longPressListeners, f, LONG_PRESS);
+                longPressListeners = null;
             }
         }
     }

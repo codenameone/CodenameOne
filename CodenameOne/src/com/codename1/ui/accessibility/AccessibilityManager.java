@@ -175,6 +175,15 @@ public final class AccessibilityManager {
         snapshotsByRoot.remove(root);
         if (snapshotRoot == root) { //NOPMD CompareObjectsWithEquals
             snapshotRoot = null;
+            // The snapshot itself, not only the reference to its root. It holds a node
+            // per component of a hierarchy that has just been destroyed, and it is what
+            // off-EDT accessibility callers are handed -- so a late screen reader query
+            // would read, or act on, a window that is gone.
+            generation++;
+            snapshot = new AccessibilityTreeSnapshot(generation,
+                    Collections.<Long>emptyList(),
+                    Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
+            dirty = true;
         }
     }
 

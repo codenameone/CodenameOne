@@ -174,6 +174,10 @@ public class Window extends Container implements TopLevelContainer {
     /// feel, which a window cannot read at construction time -- its `UIManager` may be
     /// set afterwards -- so it is resolved on first use rather than in the constructor.
     private boolean tintColorSet;
+    /// Whether the tint above was chosen by the application rather than taken from the
+    /// look and feel. An application's choice outlives a theme change; a cached default
+    /// does not.
+    private boolean tintColorExplicit;
     private VirtualInputDevice currentInputDevice;
     private final TextSelection textSelection = new TextSelection(this);
     private boolean enableCursors;
@@ -1132,10 +1136,32 @@ public class Window extends Container implements TopLevelContainer {
     }
 
     /// {@inheritDoc}
+    ///
+    /// A window caches the tint it took from the look and feel, so a theme change has
+    /// to drop it or every later overlay keeps painting the old theme's scrim.
+    @Override
+    public void refreshTheme(boolean merge) {
+        refreshTintFromLaf();
+        super.refreshTheme(merge);
+    }
+
+    /// Drops a tint that came from the look and feel so the next read picks the new
+    /// theme's up, the way `Form#initLaf(UIManager)` reloads it.
+    ///
+    /// A colour the application set with `#setTintColor(int)` is its choice and
+    /// survives a theme change; only a cached default is invalidated.
+    private void refreshTintFromLaf() {
+        if (!tintColorExplicit) {
+            tintColorSet = false;
+        }
+    }
+
+    /// {@inheritDoc}
     @Override
     public void setTintColor(int tintColor) {
         this.tintColor = tintColor;
         this.tintColorSet = true;
+        this.tintColorExplicit = true;
         repaint();
     }
 
@@ -1466,20 +1492,15 @@ public class Window extends Container implements TopLevelContainer {
             setWindowSize(width, height);
             return;
         }
-        // Measured before resizing, from the window as it stands: the frame the
-        // platform reports and the drawable it currently gives us describe the same
-        // moment. Reading the drawable back after a resize instead would measure the
-        // old one, because the new size does not reach the component until the port
-        // reports it.
-        Rectangle frame = getWindowBounds();
-        int drawableW = getWidth();
-        int drawableH = getHeight();
-        int chromeW = 0;
-        int chromeH = 0;
-        if (frame != null && drawableW > 0 && drawableH > 0) {
-            chromeW = Math.max(0, frame.getWidth() - drawableW);
-            chromeH = Math.max(0, frame.getHeight() - drawableH);
-        }
+        // Both numbers come from the port, which is the only thing that knows how much
+        // of a frame is chrome. Asking the component for its width instead compares two
+        // different moments: a window's component size is whatever the last size-changed
+        // callback delivered, so it lags the frame the platform reports and the
+        // difference between them is not the chrome at all.
+        WindowManager wm = manager();
+        int[] frame = wm.getBounds(nativePeer, new int[4]);
+        int chromeW = Math.max(0, frame[2] - wm.getWidth(nativePeer));
+        int chromeH = Math.max(0, frame[3] - wm.getHeight(nativePeer));
         setWindowSize(width + chromeW, height + chromeH);
     }
 
@@ -3724,9 +3745,12 @@ public class Window extends Container implements TopLevelContainer {
             return;
         }
         ActionEvent evt = new ActionEvent(this, keyCode);
-        int len = listeners.size();
-        for (int iter = 0; iter < len; iter++) {
-            listeners.get(iter).actionPerformed(evt);
+        // Over a copy: a listener is entitled to deregister itself or another while it
+        // handles the key -- closing a dialog does exactly that -- and walking the live
+        // list against a length captured before the loop then reads past its end.
+        ActionListener[] snapshot = listeners.toArray(new ActionListener[listeners.size()]);
+        for (int iter = 0; iter < snapshot.length; iter++) { // NOPMD ForLoopCanBeForeach
+            snapshot[iter].actionPerformed(evt);
             if (evt.isConsumed()) {
                 return;
             }
@@ -3991,7 +4015,10 @@ public class Window extends Container implements TopLevelContainer {
     /// - `t`: the transition to animate with, or null to swap immediately
     public void setContent(Component content, Transition t) {
         Container cp = getContentPane();
-        if (t == null || cp.getComponentCount() != 1) {
+        // Null content means "empty the window", which no transition can animate to --
+        // Container.replace dereferences what it is given. The other branch already
+        // treats it as a clear, so supplying a transition must not change the outcome.
+        if (t == null || content == null || cp.getComponentCount() != 1) {
             cp.removeAll();
             if (content != null) {
                 // A BorderLayout content pane -- which is what a window built with one

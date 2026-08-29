@@ -439,7 +439,16 @@ public class InteractionDialog extends Container implements AbstractDialog {
         w.addCloseListener(new NativeCloseBridge(this));
         w.addWindowListener(new NativeDisposeBridge(this));
         initNativeWindow(w);
+        hideOwnTitleIfDecorated(w);
         revalidate();
+        if (modal) {
+            w.setModalityType(Window.MODALITY_WINDOW);
+        }
+        // Shown before it is sized: the size that matters is the drawable, and a window
+        // cannot report how much of its frame is chrome until the platform has made
+        // one. Sizing first asked for a frame the size of the content and left the
+        // dialog clipped by the height of the title bar.
+        w.show();
         int cw = Math.max(1, getPreferredW());
         int ch = Math.max(1, getPreferredH());
         w.setWindowContentSize(cw, ch);
@@ -450,13 +459,42 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
         startPendingTimeout();
         if (modal) {
-            w.setModalityType(Window.MODALITY_WINDOW);
+            // Idempotent for a window already on screen: it takes the blocker and parks
+            // the caller without showing anything twice.
             w.showModal();
             finishNativeShowing();
-        } else {
-            w.show();
         }
     }
+
+    /// Hides the dialog's own title while the platform draws one in the window chrome.
+    ///
+    /// Without this a titled dialog in a decorated window shows the same text twice:
+    /// once in the native title bar and once in the payload underneath it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the window about to be shown
+    private void hideOwnTitleIfDecorated(Window w) {
+        if (!w.isDecorated() || nativeTitleHidden) {
+            return;
+        }
+        nativeTitleHidden = true;
+        titleArea.setVisible(false);
+        title.setVisible(false);
+    }
+
+    /// Puts the dialog's own title back.
+    private void restoreOwnTitle() {
+        if (!nativeTitleHidden) {
+            return;
+        }
+        nativeTitleHidden = false;
+        titleArea.setVisible(true);
+        title.setVisible(true);
+    }
+
+    /// True while the dialog's own title is hidden because the window draws one.
+    private boolean nativeTitleHidden;
 
     /// Takes this dialog back out of its window. Idempotent, and on the event dispatch
     /// thread.
@@ -475,6 +513,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
         nativeWindow = null;
         disposed = true;
+        restoreOwnTitle();
         if (getParent() != null) {
             remove();
         }
@@ -551,7 +590,11 @@ public class InteractionDialog extends Container implements AbstractDialog {
         if (attached != null) {
             return attached;
         }
-        return Display.getInstance().getCurrent();
+        // The top level the user is in, not the current form. Falling back to the form
+        // put a dialog opened from a focused window onto the main surface, owned by it
+        // and blocking it, while the window it came from stayed live. This is the
+        // fallback AbstractDialog documents and the one Dialog already uses.
+        return CN.getCurrentTopLevel();
     }
 
     private TopLevelContainer hostTopLevel;
@@ -892,6 +935,17 @@ public class InteractionDialog extends Container implements AbstractDialog {
     private void disposeTo(int direction, final Runnable onFinish) {
         disposed = true;
         releaseInferredHost();
+        if (nativeWindow != null) {
+            // There is no layered pane to slide out of, and no direction that means
+            // anything for a window the platform draws. Animating the payload here
+            // would leave the operating system window on screen and, for a modal
+            // showDialog(), its caller parked on a window that never goes away.
+            nativeWindow.dispose();
+            if (onFinish != null) {
+                onFinish.run();
+            }
+            return;
+        }
         final Container p = getParent();
         if (p != null) {
             final TopLevelContainer f = p.getTopLevelContainer();

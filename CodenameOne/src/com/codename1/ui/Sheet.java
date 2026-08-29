@@ -1351,6 +1351,13 @@ public class Sheet extends Container {
     public void back(int duration) {
         if (this.parentSheet != null) {
             fireBackEvent();
+            // On the host this sheet was shown on, not whatever is focused now. Left to
+            // resolve for itself the parent could be added to a different window while
+            // this one is still in the first window's layered pane, which duplicates
+            // the stack across surfaces instead of unwinding it.
+            if (shownHost != null) {
+                this.parentSheet.setTopLevelHost(shownHost);
+            }
             this.parentSheet.show(duration);
         } else {
             hide(duration);

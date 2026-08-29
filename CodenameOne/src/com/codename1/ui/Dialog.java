@@ -251,6 +251,9 @@ public class Dialog extends Form implements AbstractDialog {
     /// Listens for the back key while this dialog is on a window.
     private ActionListener hostBackListener;
 
+    /// Listens for the host window being disposed or hidden out from under this dialog.
+    private ActionListener hostWindowListener;
+
     /// The host's shape when the dialog was shown, so a resize can tell an orientation
     /// flip from an ordinary resize. True when it was taller than it was wide.
     private boolean hostWasPortrait;
@@ -358,7 +361,21 @@ public class Dialog extends Form implements AbstractDialog {
 
         @Override
         public void actionPerformed(ActionEvent evt) {
-            dlg.hostBackPressed();
+            dlg.hostBackPressed(evt);
+        }
+    }
+
+    /// Ends a hosted dialog when the window it is on goes away.
+    private static final class HostWindowListener implements ActionListener {
+        private final Dialog dlg;
+
+        HostWindowListener(Dialog dlg) {
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            dlg.hostWindowGone(evt);
         }
     }
 
@@ -2070,17 +2087,30 @@ public class Dialog extends Form implements AbstractDialog {
         w.addWindowListener(new NativeDisposeBridge(this));
         initNativeWindow(w);
         hideOwnTitleIfDecorated(w);
-        sizeAndPlaceNativeWindow(w, host);
         if (modal) {
             // MODALITY_WINDOW, not APPLICATION. Desktop.blocks() already blocks the main
             // surface when the owner is a Form, and exempts a dialog opened from another
             // dialog's window -- which is exactly what a modal Dialog has always meant.
             // APPLICATION would newly freeze unrelated windows.
             w.setModalityType(Window.MODALITY_WINDOW);
+        }
+        // Shown before it is sized, because the size that matters is the drawable and a
+        // window cannot report its chrome until the platform has made one. Sizing first
+        // asked for a frame of the content's size and left the box clipped along the
+        // bottom by exactly the height of the title bar.
+        w.show();
+        sizeAndPlaceNativeWindow(w, host);
+        // The same callbacks the historical path runs, and for the same reasons: the
+        // dialog sound, a subclass's onShowCompleted, and every show listener. A modal
+        // dialog whose show listener is what disposes it would otherwise never be
+        // released. Before the wait below, so a listener that disposes is honoured.
+        onShow();
+        onShowCompletedImpl();
+        if (modal) {
+            // Idempotent for a window already on screen: it takes the modal blocker and
+            // parks the caller without showing anything a second time.
             w.showModal();
             finishNativeShowing();
-        } else {
-            w.show();
         }
     }
 
@@ -2240,6 +2270,12 @@ public class Dialog extends Form implements AbstractDialog {
             return;
         }
         nativeWindow = null;
+        // The window can die without the dialog having asked -- an owner disposing its
+        // children, the desktop shutting down, someone calling dispose() on what
+        // getNativeWindow() handed them. The dialog is over either way, and leaving the
+        // flag clear would send a later dispose() down the ordinary Form teardown for a
+        // showing that never went through it.
+        setDisposed(true);
         detachNativePayload();
         restoreOwnTitle();
     }
@@ -2355,7 +2391,11 @@ public class Dialog extends Form implements AbstractDialog {
         getStyle().setBgPainter(NO_OP_PAINTER);
 
         if (modal || disposeWhenPointerOutOfBounds) {
-            scrim = new DialogScrim(this, getTintColor(), backdrop);
+            // The host's tint, not the dialog's. The historical path dims the previous
+            // form and paints that form's tintColor, which is why ComboBox and the
+            // floating action button submenu set the host's tint to zero to opt out of
+            // dimming. Reading the dialog's own would ignore that and dim anyway.
+            scrim = new DialogScrim(this, host.getTintColor(), backdrop);
             layer.addComponent(scrim);
         }
 
@@ -2370,6 +2410,12 @@ public class Dialog extends Form implements AbstractDialog {
         host.addSizeChangedListener(hostSizeListener);
         hostBackListener = new HostBackListener(this);
         host.addKeyListener(MenuBar.backSK, hostBackListener);
+        // A window closed through its own title bar disposes by default, and takes the
+        // layered pane and everything in it with it. Without this a modal caller waits
+        // on a dialog whose surface is gone, and a modeless one keeps the dead window
+        // alive through layerHost.
+        hostWindowListener = new HostWindowListener(this);
+        host.addWindowListener(hostWindowListener);
         focusFirstFocusable(host);
 
         onShow();
@@ -2507,13 +2553,52 @@ public class Dialog extends Form implements AbstractDialog {
     /// The back key was pressed while this dialog was on a window.
     ///
     /// A window has no menu bar to map the key to a command, so the dialog does it.
-    void hostBackPressed() {
+    void hostBackPressed(ActionEvent evt) {
+        // Every hosted dialog on this window listens for the key, and they are called
+        // in the order they were shown -- so without this the oldest dialog answers a
+        // back aimed at the one on top of it. Consumed so the ones underneath do not
+        // also act on it.
+        if (!isTopmostHostedDialog()) {
+            return;
+        }
+        evt.consume();
         Command back = getBackCommand();
         if (back != null) {
             dispatchCommand(back, new ActionEvent(back, ActionEvent.Type.Command));
             return;
         }
         dispose();
+    }
+
+    /// Whether this is the last dialog added to its host's shared layer, which is the
+    /// one the user sees on top.
+    ///
+    /// #### Returns
+    ///
+    /// true when nothing is stacked above this dialog
+    private boolean isTopmostHostedDialog() {
+        Container layer = activeLayer;
+        if (layer == null) {
+            return false;
+        }
+        Dialog last = null;
+        for (Component cmp : layer.getChildrenAsList(true)) {
+            if (cmp instanceof Dialog) {
+                last = (Dialog) cmp;
+            }
+        }
+        return last == this; //NOPMD CompareObjectsWithEquals
+    }
+
+    /// The host window this dialog is on was disposed or hidden.
+    void hostWindowGone(ActionEvent evt) {
+        if (!(evt instanceof WindowEvent)) {
+            return;
+        }
+        WindowEvent.Type type = ((WindowEvent) evt).getType();
+        if (type == WindowEvent.Type.Disposed && !isDisposed()) {
+            dispose();
+        }
     }
 
     /// Takes this dialog back out of its host window's layered pane.
@@ -2532,6 +2617,10 @@ public class Dialog extends Form implements AbstractDialog {
             if (hostBackListener != null) {
                 host.removeKeyListener(MenuBar.backSK, hostBackListener);
                 hostBackListener = null;
+            }
+            if (hostWindowListener != null) {
+                host.removeWindowListener(hostWindowListener);
+                hostWindowListener = null;
             }
         }
         if (scrim != null) {
