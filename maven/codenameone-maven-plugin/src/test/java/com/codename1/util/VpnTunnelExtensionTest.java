@@ -158,21 +158,36 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
-    void aFilteredIpv6ListDoesNotBecomeTheDefaultRoute() {
-        // A setup listing only v4 routes on a v6 interface asked for no v6
-        // traffic. Falling back to the default route after filtering them
-        // all out captured every v6 packet instead -- the opposite of the
-        // request. The default belongs to an EMPTY input, where the app
-        // named no routes at all.
-        String src = provider();
-        int helper = src.indexOf("cn1tnRoutes6");
-        assertTrue(helper >= 0);
-        String body = src.substring(helper);
-        int guard = body.indexOf("if ([list length] == 0)");
-        int tail = body.indexOf("return out;");
-        assertTrue(guard >= 0 && tail > guard,
-                "the empty-input default stays, and the filtered list is"
-                + " returned as it stands");
+    void anEmptyRouteListNeverBecomesTheDefaultRoute() {
+        // Two ways a list ends up empty, and now one answer. A setup listing
+        // only v4 routes on a v6 interface asked for no v6 traffic; a setup
+        // naming no routes at all asked for none either. Inventing the
+        // default route for either captures every packet on the device --
+        // the opposite of the request, and the one direction where guessing
+        // wrong cannot be undone by the app.
+        //
+        // The filtered case was fixed first and the empty-input case was
+        // deliberately left defaulting, on the reasoning that a tunnel
+        // carrying nothing is useless so an app naming no routes must have
+        // meant all of them. That reasoning is refuted by both the API and
+        // the other port: TunnelSetup.route documents the full tunnel as an
+        // explicit 0.0.0.0/0 or ::/0, never as an absence, and Android's
+        // CN1VpnService adds exactly the routes it was given with no
+        // fallback -- so one setup carried nothing there and everything
+        // here.
+        String src = code(provider());
+        assertFalse(src.contains("defaultRoute"),
+                "neither helper may invent a route the setup did not ask"
+                + " for");
+        for (String helper : new String[] {"cn1tnRoutes(NSString",
+                "cn1tnRoutes6(NSString"}) {
+            int at = src.indexOf(helper);
+            assertTrue(at >= 0, helper + " has to exist");
+            String body = src.substring(at, src.indexOf("return out;", at));
+            assertFalse(body.contains("[list length] == 0"),
+                    helper + " may not special-case an empty list: an empty"
+                    + " list is already the right answer");
+        }
     }
 
     @Test
