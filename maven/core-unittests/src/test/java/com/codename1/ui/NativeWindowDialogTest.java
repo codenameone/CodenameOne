@@ -182,7 +182,10 @@ class NativeWindowDialogTest extends UITestBase {
         DisplayTest.flushEdt();
         assertNull(d.getParent(),
                 "and comes back out, or it can never be shown again");
-        assertTrue(d.getTitleArea().isVisible(),
+        // The title component, not the title area: a Dialog's title area is already
+        // invisible before a native window touches it, so asserting on that would pass
+        // whatever the restore did.
+        assertTrue(d.getTitleComponent().isVisible(),
                 "with its own title restored");
 
         d.showModeless();
@@ -530,12 +533,12 @@ class NativeWindowDialogTest extends UITestBase {
         Window w = d.getNativeWindow();
         assertNotNull(w);
         assertEquals("Delete document", w.getTitle());
-        assertFalse(d.getTitleArea().isVisible(),
+        assertFalse(d.getTitleComponent().isVisible(),
                 "the platform draws the title, so the dialog must not draw it twice");
 
         d.dispose();
         DisplayTest.flushEdt();
-        assertTrue(d.getTitleArea().isVisible(), "and it comes back afterwards");
+        assertTrue(d.getTitleComponent().isVisible(), "and it comes back afterwards");
     }
 
     @FormTest
@@ -844,5 +847,68 @@ class NativeWindowDialogTest extends UITestBase {
         assertNull(d.getNativeWindow());
 
         DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aTitleSetWhileShowingReachesTheNativeTitleBar() {
+        // The dialog's own title label is hidden behind the OS title bar, so a
+        // setTitle after showing -- onShow is the ordinary place for one -- used to
+        // change nothing the user could see.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        final Dialog d = newDialog("before");
+        d.setNativeWindowMode(true);
+        d.addShowListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                d.setTitle("decided at show time");
+            }
+        });
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        assertEquals("decided at show time", d.getNativeWindow().getTitle());
+
+        d.setTitle("changed later still");
+        DisplayTest.flushEdt();
+        assertEquals("changed later still", d.getNativeWindow().getTitle());
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        // And setting one on a disposed dialog must not raise anything.
+        d.setTitle("after it has gone");
+
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aNativeDialogPutsTheTitleBackTheWayItFoundIt() {
+        // An application is free to suppress the title before showing, and a dialog is
+        // reusable: restoring "visible" unconditionally resurrected title UI that had
+        // been deliberately hidden the next time it was shown the ordinary way.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Dialog d = newDialog("suppressed");
+        d.getTitleComponent().setVisible(false);
+        d.setNativeWindowMode(true);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        d.dispose();
+        DisplayTest.flushEdt();
+
+        assertFalse(d.getTitleComponent().isVisible(),
+                "the title was suppressed before the dialog was shown, and must stay so");
+
+        // The ordinary case still comes back visible.
+        Dialog shown = newDialog("ordinary");
+        shown.setNativeWindowMode(true);
+        shown.showModeless();
+        DisplayTest.flushEdt();
+        shown.dispose();
+        DisplayTest.flushEdt();
+        assertTrue(shown.getTitleComponent().isVisible());
     }
 }

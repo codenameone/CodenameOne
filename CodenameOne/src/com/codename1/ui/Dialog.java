@@ -230,6 +230,12 @@ public class Dialog extends Form implements AbstractDialog {
     /// True while the dialog's own title is hidden because the window draws one.
     private boolean nativeTitleHidden;
 
+    /// Whether the title area was visible before the native window hid it.
+    private boolean titleAreaWasVisible;
+
+    /// Whether the title component was visible before the native window hid it.
+    private boolean titleComponentWasVisible;
+
     /// True while an anchored popup is being shown, which never opens a window.
     private boolean inPopupShow;
 
@@ -1220,6 +1226,14 @@ public class Dialog extends Form implements AbstractDialog {
     @Override
     public final void setTitle(String title) {
         dialogTitle.setText(title);
+        // Onto the operating system's title bar too while this dialog is backed by a
+        // window of its own. The window carries a copy taken when it was created and
+        // the dialog's own title label is hidden behind the native title bar, so
+        // without this a setTitle after showing -- from onShow, or from any later
+        // update -- would change nothing the user can see.
+        if (nativeWindow != null && !nativeWindow.isWindowDisposed()) {
+            nativeWindow.setTitle(title == null ? "" : title);
+        }
     }
 
     /// {@inheritDoc}
@@ -2200,6 +2214,13 @@ public class Dialog extends Form implements AbstractDialog {
             return;
         }
         nativeTitleHidden = true;
+        // What they were, not what they usually are. An application is free to hide
+        // the title area or the title itself before showing, and a dialog is reusable
+        // -- putting both back visible on teardown would resurrect title UI the
+        // application had deliberately suppressed the next time it is shown hosted or
+        // the legacy way.
+        titleAreaWasVisible = getTitleArea().isVisible();
+        titleComponentWasVisible = getTitleComponent().isVisible();
         getTitleArea().setVisible(false);
         getTitleComponent().setVisible(false);
     }
@@ -2210,8 +2231,8 @@ public class Dialog extends Form implements AbstractDialog {
             return;
         }
         nativeTitleHidden = false;
-        getTitleArea().setVisible(true);
-        getTitleComponent().setVisible(true);
+        getTitleArea().setVisible(titleAreaWasVisible);
+        getTitleComponent().setVisible(titleComponentWasVisible);
     }
 
     /// Sizes the window to the dialog's content and centres it on its host.

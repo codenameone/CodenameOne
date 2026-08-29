@@ -94,7 +94,14 @@ public final class AccessibilityManager {
     public synchronized void invalidate(Component component, int changeType) {
         dirty = true;
         pendingChanges |= changeType;
-        snapshotsByRoot.clear();
+        // Deliberately not clearing the per-root cache. The eager refresh below
+        // rebuilds one root, so emptying all of them would leave every other surface
+        // with nothing to hand an off-EDT reader until that surface happened to mutate
+        // -- a screen reader on another window would lose its whole tree. Correctness
+        // on the EDT does not depend on the clear either: `dirty` already forces a
+        // rebuild there, and the rebuild overwrites the entry it replaces. Off the EDT
+        // a stale tree for the right surface is the documented contract; an empty one
+        // is not.
         // The root the changed component actually lives on, not whatever form happens
         // to be current: a change inside a window used to schedule a rebuild of the
         // main form's tree instead, so the window's own tree stayed stale.

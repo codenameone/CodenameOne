@@ -161,4 +161,50 @@ class AccessibilityWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void achangeOnOneSurfaceLeavesTheOtherSurfacesReadable() throws Exception {
+        // An eager refresh rebuilds exactly one root and then notifies every window
+        // bridge. Dropping the cached tree of every other surface left a screen reader
+        // on those windows with nothing at all until its own window happened to change.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        Button mainButton = new Button("on the main form");
+        main.add(BorderLayout.CENTER, mainButton);
+        main.show();
+        DisplayTest.flushEdt();
+
+        final Window w = new Window("second", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.add(BorderLayout.CENTER, new Button("in the window"));
+        w.show();
+        DisplayTest.flushEdt();
+
+        AccessibilityManager mgr = AccessibilityManager.getInstance();
+        assertTrue(mentions(mgr.getSnapshot(main), "on the main form"));
+        assertTrue(mentions(mgr.getSnapshot(w), "in the window"));
+
+        // Something on the main form changes; the window did not. The eager refresh
+        // then rebuilds that one root, which is what getSnapshot(main) does here --
+        // leaving the main form as the most recently built surface.
+        mainButton.setText("renamed on the main form");
+        DisplayTest.flushEdt();
+        assertTrue(mentions(mgr.getSnapshot(main), "renamed on the main form"));
+
+        final AccessibilityTreeSnapshot[] offEdt = new AccessibilityTreeSnapshot[1];
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                offEdt[0] = AccessibilityManager.getInstance().getSnapshot(w);
+            }
+        });
+        t.start();
+        t.join(5000);
+
+        assertNotNull(offEdt[0]);
+        assertTrue(mentions(offEdt[0], "in the window"),
+                "the untouched window must still have a tree to hand a screen reader");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }
