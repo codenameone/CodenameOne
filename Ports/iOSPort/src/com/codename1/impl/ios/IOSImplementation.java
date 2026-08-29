@@ -4290,9 +4290,26 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
 
+    /// True everywhere the native shadow actually draws, which is not macOS.
+    ///
+    /// nativeDrawShadowMutable is a UIKit helper and its TARGET_OS_OSX branch is
+    /// empty -- AppKit's equivalent is a different API rather than a renamed
+    /// one, so it has not been ported. Answering true there sent
+    /// Component.useNativeShadowRendering() down the native path, which drew
+    /// nothing at all: an elevation shadow simply vanished, with no error and
+    /// nothing in Java able to notice. Answering false routes the caller to the
+    /// framework's own elevation rendering, which paints.
+    ///
+    /// Delete this override, not the capability, when the AppKit path lands.
     @Override
     public boolean isDrawShadowSupported() {
-        return true;
+        return !isMacPlatform();
+    }
+
+    /// Whether this is the native macOS port rather than an iOS or Mac Catalyst
+    /// build. Catalyst reports "ios" and is unaffected.
+    private boolean isMacPlatform() {
+        return "mac".equals(getPlatformName());
     }
 
     @Override
@@ -7583,7 +7600,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         boolean isDrawShadowSupported() {
-            return true;
+            // Same reason as the port-level answer above: this is the path that
+            // calls nativeDrawShadowMutable, whose macOS branch is empty.
+            return !isMacPlatform();
         }
 
         void nativeDrawShadow(long image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
