@@ -131,12 +131,78 @@ public class SettingsThemeTest {
     @Test
     public void activeBuildHintControlsStayAlignedToTheRight() throws Exception {
         String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
-        assertTrue(source.contains("widthPercentage(72), new Container()"));
-        assertTrue(source.contains("widthPercentage(28), controls"));
+        // The controls sit EAST of the name, on the name's own line, which is
+        // where the Add button of an inactive row sits. They used to be a band of
+        // their own below the name, held right by a TableLayout whose left 72%
+        // was an empty spacer; that band cost a full row of height on a page that
+        // now has to fit its rows between a pinned search box and a pager.
+        assertFalse(source.contains("widthPercentage(72), new Container()"));
+        assertTrue(source.contains("header.add(BorderLayout.EAST, activeHintEditor(row, meta, value, effectiveType))"));
         // The delete control is EAST of the editor. The button itself moved into
         // removeHintButton so the conflict row can reuse it -- what this asserts
         // is where it sits, which is unchanged.
-        assertTrue(source.contains("controls.add(BorderLayout.EAST, removeHintButton(meta))"));
+        assertTrue(source.contains("controls.add(BorderLayout.EAST, removeHintButton(row, meta))"));
+    }
+
+    /// The list scrolls; the page around it does not (issue #5602). Two nested
+    /// scrollable containers both claim the drag, which is the arrangement that
+    /// produces scrolling artifacts -- so the search box and the custom hint form
+    /// are pinned and the rows scroll under them.
+    @Test
+    public void buildHintsListScrollsAndThePageAroundItDoesNot() throws Exception {
+        String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
+        assertTrue(source.contains("boolean fillsViewport = section == Section.BUILD_HINTS;"));
+        assertTrue(source.contains("pageViewport.setScrollableY(!fillsViewport);"));
+        assertTrue(source.contains("private final class HintList extends InfiniteContainer"),
+                "The rows must come from an InfiniteContainer: it scrolls, it handles rows "
+                        + "of differing heights, and it builds them a batch at a time instead "
+                        + "of turning the whole catalog into components.");
+        assertTrue(source.contains("hintList.reload()"),
+                "A new result set must reload the list rather than being appended to it.");
+    }
+
+    /// Two ways the list could show something that is not the result set.
+    ///
+    /// The scroll offset survives `InfiniteContainer.refresh()`, because that
+    /// class overrides `resetScroll()` with an empty body so pull to refresh
+    /// does not jump -- so a search run from halfway down the scrolled catalog
+    /// left the offset past the end of a short result and the list came up
+    /// blank under a header counting two matches.
+    ///
+    /// And a hint the catalog has never heard of is in the list only because
+    /// the project declares it, so rebuilding its row after the declaration was
+    /// removed left a hint that exists nowhere offering an Add button, with the
+    /// header still counting it.
+    @Test
+    public void theListCannotShowResultsThatAreNoLongerThere() throws Exception {
+        String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
+        assertTrue(source.contains("void reload() {"));
+        assertTrue(Pattern.compile("void reload\\(\\) \\{\\s*refresh\\(\\);\\s*setScrollY\\(0\\);",
+                        Pattern.DOTALL).matcher(source).find(),
+                "Reloading has to put the reader back at the first result; refresh() alone "
+                        + "leaves the offset of the result set that was replaced.");
+        assertTrue(source.contains("if (isBrowsableHint(meta)) {"),
+                "Removing a hint the browse list does not offer has to take the result set "
+                        + "again -- rebuilding its row in place leaves a row for a hint that "
+                        + "nothing offers.");
+        assertTrue(source.contains("return meta.aliasOf() == null && buildHints.contains(meta.name());"),
+                "A deprecated alias is in the catalog so an existing declaration can be "
+                        + "described, and search() skips it deliberately -- so membership of the "
+                        + "catalog alone does not mean a row survives losing its declaration.");
+    }
+
+    /// The desktop scrollbar is drawn from UIIDs the look and feel names itself,
+    /// so it is invisible until the theme gives it a colour -- and it cannot use
+    /// the app's Dark-suffix trick, because nothing asks for a "DesktopScrollDark".
+    @Test
+    public void desktopScrollbarIsStyledForBothThemes() throws Exception {
+        String css = Files.readString(THEME_CSS, StandardCharsets.UTF_8);
+        Set<String> selectors = cssSelectors(css);
+        assertTrue(selectors.contains("DesktopScroll"));
+        assertTrue(selectors.contains("DesktopScrollThumb"));
+        assertFalse(selectors.contains("DesktopScrollThumbDark"),
+                "The scrollbar UIIDs are fixed by the look and feel; a Dark twin is never "
+                        + "asked for, so its colour has to read on both pages.");
     }
 
     @Test
@@ -159,8 +225,8 @@ public class SettingsThemeTest {
                 "The Basic form should use a responsive two-column GridLayout.");
         assertTrue(source.contains("private Container configureToolbar()"),
                 "Native desktop chrome should use a stable top-bar container, not a second Toolbar instance.");
-        assertTrue(source.contains("section == Section.EXTENSIONS ? 100 : 72"),
-                "Extensions should use the full content width while forms retain a readable measure.");
+        assertTrue(source.contains("|| section == Section.EXTENSIONS || section == Section.BUILD_HINTS ? 100 : 72"),
+                "Extensions and Build Hints should use the full content width while forms retain a readable measure.");
     }
 
     @Test
