@@ -5337,10 +5337,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         return out;
     }
 
-    /// True when a display-relative point falls inside a cutout the skin
-    /// paints over the screen, so the pointer path should ignore it.
-    private boolean isPointerOnCutout(int x, int y) {
-        java.util.List<Rectangle> rects = portrait ? cutoutsPortrait : cutoutsLandscape;
+    /// True when a display-relative point falls inside one of the cutouts the
+    /// skin paints over the screen, so the pointer path should ignore it.
+    /// Static and given its list explicitly so a test can exercise it without
+    /// building a JavaSEPort: the constructor assigns the `instance`
+    /// singleton, and a throwaway port silently replaces the one the rest of
+    /// the suite is running against.
+    private static boolean isPointerOnCutout(java.util.List<Rectangle> rects, int x, int y) {
         if (rects == null) {
             return false;
         }
@@ -5350,6 +5353,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
         return false;
+    }
+
+    private boolean isPointerOnCutout(int x, int y) {
+        return isPointerOnCutout(portrait ? cutoutsPortrait : cutoutsLandscape, x, y);
     }
 
     @Override

@@ -104,34 +104,34 @@ public class JavaSEPortSkinCutoutTest {
         assertTrue(r.y + r.height <= displayW, "and stays inside the landscape display");
     }
 
+    private static boolean onCutout(List<Rectangle> rects, int x, int y) throws Exception {
+        Method m = JavaSEPort.class.getDeclaredMethod("isPointerOnCutout",
+                List.class, int.class, int.class);
+        m.setAccessible(true);
+        return (Boolean) m.invoke(null, rects, x, y);
+    }
+
     @Test
     public void aPointInsideACutoutIsRejectedAndOneBesideItIsNot() throws Exception {
-        JavaSEPort port = new JavaSEPort();
-        Method isOnCutout = JavaSEPort.class.getDeclaredMethod("isPointerOnCutout",
-                int.class, int.class);
-        isOnCutout.setAccessible(true);
+        // Deliberately does NOT build a JavaSEPort: the constructor assigns
+        // the static `instance` singleton, so a throwaway port replaces the
+        // one the rest of the suite runs against and unrelated tests start
+        // reading default state off it.
+        List<Rectangle> notch = parse("401,0,482,120");
 
-        java.lang.reflect.Field cutouts = JavaSEPort.class.getDeclaredField("cutoutsPortrait");
-        cutouts.setAccessible(true);
-        java.lang.reflect.Field portraitFlag = JavaSEPort.class.getDeclaredField("portrait");
-        portraitFlag.setAccessible(true);
-        portraitFlag.setBoolean(port, true);
-
-        assertFalse((Boolean) isOnCutout.invoke(port, 640, 20),
+        assertFalse(onCutout(null, 640, 20),
                 "with no cutouts declared nothing is rejected");
 
-        cutouts.set(port, parse("401,0,482,120"));
-
-        assertTrue((Boolean) isOnCutout.invoke(port, 640, 20),
+        assertTrue(onCutout(notch, 640, 20),
                 "the middle of the notch is not display");
-        assertTrue((Boolean) isOnCutout.invoke(port, 401, 0),
+        assertTrue(onCutout(notch, 401, 0),
                 "the top-left corner is inside");
-        assertFalse((Boolean) isOnCutout.invoke(port, 883, 20),
+        assertFalse(onCutout(notch, 883, 20),
                 "one pixel past the right edge is display again");
-        assertFalse((Boolean) isOnCutout.invoke(port, 640, 120),
+        assertFalse(onCutout(notch, 640, 120),
                 "the first row below the notch is display again -- that is where "
                         + "the status bar content actually renders");
-        assertFalse((Boolean) isOnCutout.invoke(port, 100, 20),
+        assertFalse(onCutout(notch, 100, 20),
                 "the screen beside the notch takes touches on the hardware, so it "
                         + "must keep taking them here");
     }
