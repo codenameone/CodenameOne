@@ -109,17 +109,49 @@ public final class CallSession {
     }
 
     /// Tells the system the outgoing call has begun connecting -- the far end
-    /// is being rung. Ignored for an incoming call.
+    /// is being rung. Ignored for an incoming call, and ignored once the call
+    /// has connected.
     public void reportStartedConnecting() {
         CallBridge b = CallRequests.bridge();
         if (b == null || direction != CallDirection.OUTGOING
                 || !Calls.owns(callId, this)) {
             return;
         }
-        if (!moveUnlessOver(CallState.DIALING)) {
+        // STILL DIALING, rather than "not over". This was
+        // moveUnlessOver(DIALING), which guards ENDED and nothing else, so
+        // reordered signalling -- reportConnected() followed by a
+        // reportStartedConnecting() that was already in flight -- moved an
+        // ACTIVE or HELD session back to DIALING. The platform half is worse
+        // than the Java half: AndroidCallBridge turns this into
+        // Connection.setDialing(), so the SYSTEM call UI went back to dialing
+        // for a call that was already up, and the user saw a connected call
+        // start ringing out again.
+        //
+        // The transition it was making could never be anything else. An
+        // outgoing session is constructed DIALING by Calls' report, and
+        // nothing else in core moves a session to DIALING, so
+        // moveUnlessOver(DIALING) was either a no-op or that regression --
+        // there was no case it existed to serve.
+        //
+        // The window between this answer and the bridge call is the same one
+        // every report here lives with, and is not what this closes: a
+        // connect landing in it is a report ordering the platform resolves,
+        // not a state this object can contradict.
+        if (!stillDialing()) {
             return;
         }
         b.reportOutgoingStartedConnecting(callId, System.currentTimeMillis());
+    }
+
+    /// Whether this call has not connected yet.
+    ///
+    /// Read under the monitor the state is written under, for the reason
+    /// isMuted() is: signalling reads this off the EDT while the ports
+    /// deliver a connect on it.
+    private boolean stillDialing() {
+        synchronized (this) {
+            return state == CallState.DIALING;
+        }
     }
 
     /// Moves to `next` unless the call is already over, as ONE step.

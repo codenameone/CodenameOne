@@ -1402,6 +1402,54 @@ public class LocalCallTest {
                 + " under a duplicate id what it has is another call");
     }
 
+    /// Records every startedConnecting the facade lets through, so a test can
+    /// assert on what reached the PLATFORM and not only on what the session
+    /// says -- the two halves of this defect are separate, and the platform
+    /// half is the one a user sees.
+    private static final class ConnectingWatcher extends LocalCallBridge {
+        private final List<String> startedConnecting = new ArrayList<String>();
+
+        @Override
+        public void reportOutgoingStartedConnecting(String callId,
+                long timestampMs) {
+            startedConnecting.add(callId);
+            super.reportOutgoingStartedConnecting(callId, timestampMs);
+        }
+    }
+
+    @Test
+    public void aLateStartedConnectingDoesNotUnconnectTheCall() {
+        // Signalling is asynchronous and an app forwards what it receives, so
+        // a "ringing" event that overtakes an "answered" one arrives as
+        // reportConnected() followed by reportStartedConnecting(). That used
+        // to move an ACTIVE session back to DIALING, and on Android it became
+        // Connection.setDialing() -- the system call UI showing a connected
+        // call ringing out again.
+        ConnectingWatcher watcher = new ConnectingWatcher();
+        CallRequests.resetForTest(watcher);
+        CallAwait.value(Calls.configure(
+                new CallConfiguration().displayName("Acme")));
+        String id = CallId.random();
+        CallSession call = CallAwait.value(Calls.reportOutgoing(id,
+                CallHandle.phone("+14155551212"), "Ada", false));
+        assertSame(CallState.DIALING, call.getState());
+
+        // While dialing it is exactly what the platform wants to hear.
+        call.reportStartedConnecting();
+        assertEquals(1, watcher.startedConnecting.size(),
+                "a connecting report before the call connects still counts");
+
+        call.reportConnected();
+        assertSame(CallState.ACTIVE, call.getState());
+
+        call.reportStartedConnecting();
+        assertSame(CallState.ACTIVE, call.getState(),
+                "a delayed connecting report must not un-connect the call");
+        assertEquals(1, watcher.startedConnecting.size(),
+                "and must not reach the platform, where Android turns it"
+                + " into Connection.setDialing() on a live call");
+    }
+
     @Test
     public void aSystemMuteThatCannotBeRefusedStillMoves() {
         // Telecom reports a mute it has already applied. A listener that
