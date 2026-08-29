@@ -72,6 +72,32 @@ class DisplayRecoveryTest {
                 "beforePretest must clear codenameOneRunning so its init is real");
     }
 
+    /// The window beforePretest cannot close on its own.
+    ///
+    /// That hook runs once per test. The teardown belongs to another thread and
+    /// lands whenever that thread is next scheduled, so it can arrive after the
+    /// check and before the dispatch -- which is why recovering only there took
+    /// ValidatorTest from twelve failures to one rather than to none. The
+    /// interceptor now repairs immediately before dispatching, and this asserts
+    /// that second call is the one that answers when the Display goes down after
+    /// the first.
+    @Test
+    void aDisplayLostAfterBeforePretestIsStillRecovered() throws Exception {
+        FormTestInterceptor interceptor = new FormTestInterceptor();
+        interceptor.beforePretest();
+        assertTrue(Display.isInitialized(), "the fixture starts from a live Display");
+
+        // Exactly the ordering that survived the first fix: the teardown lands
+        // after the per-test hook has already looked and been satisfied.
+        liveImplementation().deinitialize();
+        assertFalse(Display.isInitialized(), "and is taken down behind its back");
+
+        interceptor.ensureDisplayAlive();
+
+        assertTrue(Display.isInitialized(),
+                "the pre-dispatch repair has to answer when the per-test one already ran");
+    }
+
     /// The live implementation. Display.getImplementation() is package private to
     /// com.codename1.ui, and this field is the only handle on the object the
     /// departing thread would have called deinitialize() on.

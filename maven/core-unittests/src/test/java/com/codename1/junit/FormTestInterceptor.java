@@ -43,6 +43,19 @@ public class FormTestInterceptor extends EDTTestInterceptor {
                 return new TestCodenameOneImplementation();
             }
         });
+        ensureDisplayAlive();
+    }
+
+    /// Brings the Display back if the previous class's dispatch thread has taken
+    /// it down, and does nothing at all otherwise.
+    ///
+    /// Called from beforePretest AND from immediately before every dispatch, and
+    /// the second one is what makes it reliable. The teardown belongs to a
+    /// thread this one does not control, so checking once per test still leaves
+    /// the window between that check and the dispatch -- narrow enough that it
+    /// took twelve failures down to one rather than to none.
+    @Override
+    protected void ensureDisplayAlive() {
         if (!Display.isInitialized()) {
             // The two halves of isInitialized() come apart, and only one of them
             // is recoverable by the init() below. It answers

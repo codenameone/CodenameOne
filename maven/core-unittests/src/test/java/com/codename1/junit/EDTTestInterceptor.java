@@ -58,6 +58,18 @@ public class EDTTestInterceptor  implements InvocationInterceptor {
     }
 
     private void runOnMyThread(Invocation<Void> invocation) throws Throwable {
+        // Immediately before the dispatch, not once per test. The teardown that
+        // takes the Display down belongs to the PREVIOUS class's dispatch thread
+        // and runs whenever that thread is next scheduled, so a check anywhere
+        // earlier leaves a window between itself and the callSerially below.
+        // Recovering only in beforePretest took ValidatorTest from twelve
+        // failures to one; the survivor was a test whose window opened after
+        // that check.
+        //
+        // On the test thread, which is the only place it can work: this method
+        // is what puts work on the dispatch thread, so a repair scheduled there
+        // would queue behind the failure it exists to repair.
+        ensureDisplayAlive();
         AtomicReference<Throwable> thrown = new AtomicReference<>();
         final Object lock = new Object();
         final boolean[] completed = new boolean[1];
@@ -104,6 +116,10 @@ public class EDTTestInterceptor  implements InvocationInterceptor {
     }
 
     protected void beforePretest() {}
+
+    /// Hook for a subclass that can bring a torn-down Display back. The plain
+    /// EDT interceptor has nothing to restore, so this does nothing here.
+    protected void ensureDisplayAlive() {}
 
     protected void pretest(String testName) {
     }
