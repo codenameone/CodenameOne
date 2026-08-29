@@ -111,7 +111,7 @@ public class CodenameOneSettings extends Lifecycle {
     /// Every hint the current filter matches, in display order. The list builds
     /// rows from it one batch at a time as the reader scrolls.
     private final List<BuildHintMetadata> hintModel = new java.util.ArrayList<BuildHintMetadata>();
-    private InfiniteContainer hintList;
+    private HintList hintList;
     private Label hintCount;
     private String extensionFilter = "";
     private List<ExtensionDescriptor> extensionCatalog;
@@ -712,6 +712,28 @@ public class CodenameOneSettings extends Lifecycle {
             super(HINT_FETCH_BATCH);
         }
 
+        /// Shows the current result set from its first row.
+        ///
+        /// `refresh()` alone does not: `InfiniteContainer` overrides
+        /// `resetScroll()` with an empty body -- deliberately, so that pull to
+        /// refresh does not yank the list out from under the reader -- and that
+        /// is the method `removeAll()` calls. So the old offset survived into
+        /// the new result set, and searching from halfway down a scrolled
+        /// catalog left the scroll position past the end of a short result:
+        /// the header counted two matches and the list showed an empty page.
+        ///
+        /// This holds because every path that reloads the list begins with a
+        /// pointer press -- a click in the search box, a press on Add or on the
+        /// delete button -- and `Form.pointerPressed` cancels a scroll animation
+        /// still in flight before it does anything else. A fling that is still
+        /// gliding writes its own offset straight into the scroll field, past
+        /// any override, so nothing here could out-argue it.
+        void reload() {
+            refresh();
+            setScrollY(0);
+            repaint();
+        }
+
         @Override
         public Component[] fetchComponents(int index, int amount) {
             if (index < 0 || index >= hintModel.size()) {
@@ -754,7 +776,7 @@ public class CodenameOneSettings extends Lifecycle {
             // Back to the top with the first batch of the new result set. Before
             // the list is on the form this does nothing and is not needed: the
             // container fetches its first batch itself when it initializes.
-            hintList.refresh();
+            hintList.reload();
         }
     }
 
@@ -1014,7 +1036,16 @@ public class CodenameOneSettings extends Lifecycle {
         remove.setMaterialIcon(FontImage.MATERIAL_DELETE, 2.2f);
         remove.addActionListener(e -> {
             settings.removeBuildHint(meta.name());
-            refreshHintRow(row, meta);
+            if (buildHints.contains(meta.name())) {
+                refreshHintRow(row, meta);
+            } else {
+                // A hint the catalog has never heard of is in this list for one
+                // reason: the project declared it. Removing that declaration
+                // removes its only reason to be here, so rebuilding the row left
+                // a hint that exists nowhere offering an Add button, and left the
+                // header counting it. The result set has to be taken again.
+                renderBuildHintsList();
+            }
             animatePage();
         });
         return remove;

@@ -157,8 +157,33 @@ public class SettingsThemeTest {
                 "The rows must come from an InfiniteContainer: it scrolls, it handles rows "
                         + "of differing heights, and it builds them a batch at a time instead "
                         + "of turning the whole catalog into components.");
-        assertTrue(source.contains("hintList.refresh()"),
+        assertTrue(source.contains("hintList.reload()"),
                 "A new result set must reload the list rather than being appended to it.");
+    }
+
+    /// Two ways the list could show something that is not the result set.
+    ///
+    /// The scroll offset survives `InfiniteContainer.refresh()`, because that
+    /// class overrides `resetScroll()` with an empty body so pull to refresh
+    /// does not jump -- so a search run from halfway down the scrolled catalog
+    /// left the offset past the end of a short result and the list came up
+    /// blank under a header counting two matches.
+    ///
+    /// And a hint the catalog has never heard of is in the list only because
+    /// the project declares it, so rebuilding its row after the declaration was
+    /// removed left a hint that exists nowhere offering an Add button, with the
+    /// header still counting it.
+    @Test
+    public void theListCannotShowResultsThatAreNoLongerThere() throws Exception {
+        String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
+        assertTrue(source.contains("void reload() {"));
+        assertTrue(Pattern.compile("void reload\\(\\) \\{\\s*refresh\\(\\);\\s*setScrollY\\(0\\);",
+                        Pattern.DOTALL).matcher(source).find(),
+                "Reloading has to put the reader back at the first result; refresh() alone "
+                        + "leaves the offset of the result set that was replaced.");
+        assertTrue(source.contains("if (buildHints.contains(meta.name())) {"),
+                "Removing a hint the catalog does not know has to take the result set again -- "
+                        + "rebuilding its row in place leaves a row for a hint that no longer exists.");
     }
 
     /// The desktop scrollbar is drawn from UIIDs the look and feel names itself,
