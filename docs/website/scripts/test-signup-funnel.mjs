@@ -36,10 +36,24 @@ function page(name) {
   return fs.readFileSync(file, "utf8");
 }
 
+function escape(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Hugo minifies the generated HTML, and minification DROPS the quotes around an
+// attribute value that has no whitespace in it -- the pages ship
+// `href=https://cloud.codenameone.com/register`, not `href="..."`. A pattern
+// that insists on quotes therefore cannot match the very output it validates,
+// which is how a correct signup funnel failed this test.
+function attr(name, value) {
+  const v = escape(value);
+  return `${name}=(?:"${v}"|'${v}'|${v}(?=[\\s>]))`;
+}
+
 function assertSignupCta(html, event) {
   const link = new RegExp(
-    `<a[^>]+href=["']${registerUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'][^>]+data-cn1-conversion=["']${event}["']|` +
-    `<a[^>]+data-cn1-conversion=["']${event}["'][^>]+href=["']${registerUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`,
+    `<a[^>]+${attr("href", registerUrl)}[^>]+${attr("data-cn1-conversion", event)}|` +
+    `<a[^>]+${attr("data-cn1-conversion", event)}[^>]+${attr("href", registerUrl)}`,
     "i"
   );
   assert.match(html, link, `${event} must send directly to registration`);
@@ -55,9 +69,10 @@ assertSignupCta(pricing, "pricing-free-signup");
 assertSignupCta(compare, "compare-signup");
 assertSignupCta(compare, "compare-final-signup");
 
-assert.match(home, /<a[^>]+href=["']https:\/\/cloud\.codenameone\.com\/register["'][^>]*>[\s\S]*?Sign Up/i,
+assert.match(home,
+  new RegExp(`<a[^>]+${attr("href", registerUrl)}[^>]*>[\\s\\S]*?Sign Up`, "i"),
   "the global header must expose registration");
-assert.match(home, /href=["']\/initializr\/["']/i,
+assert.match(home, new RegExp(attr("href", "/initializr/"), "i"),
   "Initializr must remain available as an explicit project-generation tool");
 assert.doesNotMatch(home, /cn1-exp-004/i,
   "the retired download experiment must not enroll new homepage visitors");
