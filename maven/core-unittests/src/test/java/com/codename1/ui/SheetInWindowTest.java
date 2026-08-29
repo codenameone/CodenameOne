@@ -25,7 +25,9 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.UIManager;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -417,5 +419,51 @@ class SheetInWindowTest extends UITestBase {
         a.dispose();
         b.dispose();
         DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aSheetInAWindowGetsNoInsetForChromeTheWindowDoesNotHave() {
+        // StatusBar and TitleArea padding describe a phone's chrome. A desktop window
+        // has neither -- its title bar is outside the drawable -- so reading those
+        // styles pushed every window sheet down by an inset with nothing behind it.
+        implementation.setMultiWindowSupported(true);
+        UIManager uim = UIManager.getInstance();
+        uim.getComponentStyle("TitleArea").setPadding(Component.TOP, 20);
+        uim.getComponentStyle("StatusBar").setPadding(Component.TOP, 15);
+        try {
+            new Form("main", new BorderLayout()).show();
+            DisplayTest.flushEdt();
+
+            Window w = new Window("host", new BorderLayout());
+            w.setWindowSize(500, 400);
+            w.show();
+            DisplayTest.flushEdt();
+
+            Sheet south = new Sheet(null, "south");
+            south.setPosition(BorderLayout.SOUTH);
+            south.setTopLevelHost(w);
+            south.show(0);
+            DisplayTest.flushEdt();
+            assertEquals(0, south.getStyle().getMarginTop(),
+                    "a south sheet in a window must not be pushed down by phone chrome");
+            south.back(0);
+            DisplayTest.flushEdt();
+
+            Sheet east = new Sheet(null, "east");
+            east.setPosition(BorderLayout.EAST);
+            east.setTopLevelHost(w);
+            east.show(0);
+            DisplayTest.flushEdt();
+            assertEquals(0, east.getStyle().getPaddingTop(),
+                    "and neither must one that bleeds to the top edge");
+            east.back(0);
+            DisplayTest.flushEdt();
+
+            w.dispose();
+            DisplayTest.flushEdt();
+        } finally {
+            uim.getComponentStyle("TitleArea").setPadding(Component.TOP, 0);
+            uim.getComponentStyle("StatusBar").setPadding(Component.TOP, 0);
+        }
     }
 }

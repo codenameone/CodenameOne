@@ -923,10 +923,6 @@ public class Sheet extends Container {
             }
         }
 
-        Style statusBarStyle = uim.getComponentStyle("StatusBar");
-        Style titleAreaStyle = uim.getComponentStyle("TitleArea");
-
-        int topPadding = statusBarStyle.getPaddingTop() + statusBarStyle.getPaddingBottom() + titleAreaStyle.getPaddingTop();
         int positionInt = getPositionInt();
         // The host's safe area and height, not the display's. A window has no notch to
         // avoid and its own height is what the sheet has to fit, so measuring the main
@@ -939,6 +935,21 @@ public class Sheet extends Container {
                     hostSafe.getWidth(), hostSafe.getHeight());
         } else {
             Display.getInstance().getDisplaySafeArea(displaySafeArea);
+        }
+        // The top inset from the same place as the bottom one when the host is a
+        // window. StatusBar and TitleArea padding describe a phone's chrome -- a notch
+        // to clear and a status bar to sit under -- and a desktop window has neither:
+        // its title bar is outside the drawable and its safe area is the whole of it.
+        // Themes still give those styles a nonzero top padding, so reading them here
+        // pushed every window sheet down by an inset with nothing behind it.
+        int topPadding;
+        if (safeHost instanceof Window) {
+            topPadding = displaySafeArea.getY();
+        } else {
+            Style statusBarStyle = uim.getComponentStyle("StatusBar");
+            Style titleAreaStyle = uim.getComponentStyle("TitleArea");
+            topPadding = statusBarStyle.getPaddingTop() + statusBarStyle.getPaddingBottom()
+                    + titleAreaStyle.getPaddingTop();
         }
         // Use original bottom padding to prevent accumulation
         int bottomPadding = originalPadding[2];
