@@ -363,6 +363,13 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         popupDialog.setTransitionOutAnimator(CommonTransitions.createEmpty());
         popupDialog.setLayout(new BorderLayout());
         popupDialog.addComponent(BorderLayout.CENTER, l);
+        // Never a window of its own. A combo popup is placed by the margins computed
+        // against the surface it drops out of and dismissed by a press outside itself,
+        // and an operating system window has neither: the margins mean nothing in it,
+        // its slide transition never runs, and it cannot see the click meant to close
+        // it. Dialog exempts anchored popups already, but this one is positioned by
+        // hand rather than through showPopupDialog, so it has to say so itself.
+        popupDialog.setNativeWindowMode(false);
         return popupDialog;
     }
 

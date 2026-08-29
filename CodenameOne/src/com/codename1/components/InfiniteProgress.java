@@ -189,6 +189,14 @@ public class InfiniteProgress extends Component {
             f.setTintColor(tintColor);
         }
         Dialog d = new Dialog();
+        // Never a window of its own, whatever the application asked for globally. This
+        // one is shown modeless and does its blocking with the scrim the hosted path
+        // installs -- as a modeless operating system window it would install nothing,
+        // leave the surface behind it fully interactive, and let the user start the
+        // operation again while it span. Making it a modal window instead is not the
+        // answer either: the caller is handed this dialog and disposes it later, which
+        // a modal show would never let it reach.
+        d.setNativeWindowMode(false);
         d.putClientProperty("isInfiniteProgress", true);
         d.setTintColor(0x0);
         d.setDialogUIID("Container");

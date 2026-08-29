@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestWindowManager;
@@ -1127,5 +1128,38 @@ class NativeWindowDialogTest extends UITestBase {
         AbstractDialog theirs = new ThirdPartyDialog();
         assertNotNull(theirs);
         assertNull(theirs.showDialog());
+    }
+
+    @FormTest
+    void frameworkOverlaysStayLightweightWhenNativeModeIsOnGlobally() {
+        // Both are shown by the framework rather than asked for by the application, and
+        // both stop working as operating system windows: the spinner is modeless and
+        // does its blocking with a scrim a window would not install, and a combo popup
+        // is placed by margins against the surface it drops out of and dismissed by a
+        // press outside itself, neither of which a window has.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        boolean previous = Dialog.isDefaultNativeWindowMode();
+        Dialog.setDefaultNativeWindowMode(true);
+        try {
+            InfiniteProgress ip = new InfiniteProgress();
+            Dialog spinner = ip.showInfiniteBlocking();
+            DisplayTest.flushEdt();
+            assertFalse(spinner.isNativeWindowMode(),
+                    "the blocking spinner must not open a window of its own");
+            assertNull(spinner.getNativeWindow());
+            spinner.dispose();
+            DisplayTest.flushEdt();
+
+            ComboBox<String> combo = new ComboBox<String>("a", "b");
+            Dialog popup = combo.createPopupDialog(
+                    new com.codename1.ui.List<String>(combo.getModel()));
+            assertFalse(popup.isNativeWindowMode(),
+                    "and neither must a combo popup");
+        } finally {
+            Dialog.setDefaultNativeWindowMode(previous);
+        }
     }
 }
