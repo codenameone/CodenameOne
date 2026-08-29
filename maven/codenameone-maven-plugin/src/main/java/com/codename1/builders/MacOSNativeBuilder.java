@@ -1976,6 +1976,19 @@ public class MacOSNativeBuilder extends Executor {
         if (wantsPkg) {
             containers.add(buildPkg(hints, channel, bundle, base));
         }
+        // packaging=app deliberately adds nothing here. This builder is the
+        // LOCAL one, and locally the .app beside the project is the thing you
+        // double-click -- wrapping it in a zip would only make the developer
+        // unpack it again.
+        //
+        // The zip the Mac.packaging() javadoc promises belongs to the cloud,
+        // and the cloud runs a different program: BuildDaemon's MacOSBuilder,
+        // whose own packageChannel() ends with
+        // "if (out.isEmpty()) out.add(archiveBundle(...))" for exactly the
+        // reason given there -- a result is uploaded through a FileInputStream,
+        // so handing back a directory fails with "Is a directory" after an
+        // otherwise successful build. Both halves are already correct; they
+        // just live in different repositories.
         return containers;
     }
 
