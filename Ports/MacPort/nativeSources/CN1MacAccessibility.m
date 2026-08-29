@@ -287,6 +287,26 @@ void CN1MacAccessibilityUpdateTree(NSString *json, int changeType) {
         return;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
+        // The MAIN host view, deliberately, and this is a known gap rather than
+        // an oversight: VoiceOver cannot navigate the controls of a secondary
+        // desktop Window on this port.
+        //
+        // Routing the container to the querying window's view is the easy half
+        // and would make things worse on its own. The tree itself comes from
+        // AccessibilityManager.getCurrentSnapshot(), which builds it from
+        // Display.getCurrent() -- the main Form. Attaching that to a secondary
+        // window would publish the MAIN form's controls as the contents of a
+        // window that does not contain them, which is wrong data in the right
+        // place; today's behaviour publishes nothing there, which is at least
+        // honest.
+        //
+        // A correct fix cannot live in this port. AccessibilityManager's only
+        // entry point is getSnapshot(Form), and a secondary window is a
+        // TopLevelContainer -- an interface that offers asContainer() and
+        // getContentPane() and no Form at all. So there is no way to ask the
+        // framework for that window's tree until the manager accepts a
+        // TopLevelContainer, which changes accessibility for every port and
+        // belongs in its own change rather than inside a port.
         NSView *container = [CN1MacHost sharedHost].renderingView;
         if (container == nil || container.window == nil) {
             return;

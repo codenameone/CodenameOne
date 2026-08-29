@@ -311,7 +311,17 @@ void CN1MacHostSetDarkAppearance(BOOL dark) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAppearance *appearance = [NSAppearance appearanceNamed:
             dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
-        [CN1MacHost sharedHost].window.appearance = appearance;
+        // On NSApplication, not on the host window. The application-level
+        // appearance is inherited by every window that does not set its own --
+        // including the ones CN1AppKitWindows.m creates later, which is the
+        // point: setting it on the host alone left a secondary window's title
+        // bar and AppKit controls light while the main window was dark, and any
+        // window opened after this call missed the override entirely.
+        //
+        // Windows the framework has already created inherit it too, because
+        // none of them assigns an appearance of its own; if one ever does, it
+        // is that window's deliberate choice and this must not stamp over it.
+        NSApp.appearance = appearance;
     });
 }
 
