@@ -679,4 +679,46 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void disposingTheHostWindowLeavesNoLiveDialogBehindIt() {
+        // Exactly what the device harness does between sizes: open a window, put a
+        // dialog in it, dispose the window without disposing the dialog, open another.
+        // A dialog still holding listeners on a disposed window would accumulate.
+        Window first = openHost(500, 400);
+        Dialog d = new Dialog("stranded");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setDisposeWhenPointerOutOfBounds(true);
+        d.setTopLevelHost(first);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(first, d));
+
+        first.dispose();
+        DisplayTest.flushEdt();
+
+        // Opening another window and hosting a fresh dialog has to work.
+        Window second = new Window("second", new BorderLayout());
+        second.setWindowSize(900, 700);
+        second.show();
+        DisplayTest.flushEdt();
+
+        Dialog again = new Dialog("second dialog");
+        again.setLayout(new BorderLayout());
+        again.add(BorderLayout.CENTER, new Label("body"));
+        again.setDisposeWhenPointerOutOfBounds(true);
+        again.setTopLevelHost(second);
+        again.showModeless();
+        DisplayTest.flushEdt();
+
+        assertTrue(isUnder(second, again),
+                "a second window after a disposed one still hosts a dialog");
+        assertFalse(isUnder(second, d), "and the stranded one does not come with it");
+
+        again.dispose();
+        DisplayTest.flushEdt();
+        second.dispose();
+        DisplayTest.flushEdt();
+    }
 }
