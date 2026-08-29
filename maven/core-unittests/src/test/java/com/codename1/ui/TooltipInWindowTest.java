@@ -36,6 +36,34 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// so a tooltip on anything in one was scheduled against nothing and never appeared.
 class TooltipInWindowTest extends UITestBase {
 
+    /// The manager installed by the test in progress, so it can be taken back out.
+    private ProbeTooltipManager installed;
+
+    /// Installs a manager and remembers it.
+    ///
+    /// `TooltipManager.enableTooltips` writes a static with no counterpart to remove
+    /// it, so a manager installed here stays installed for the rest of the JVM: every
+    /// later test's forms get tooltip hooks, and a pending tooltip timer or an
+    /// InteractionDialog can outlive the test that created it. That is how an
+    /// unrelated class several hundred tests later fails with a dispatch timeout.
+    private ProbeTooltipManager install() {
+        installed = new ProbeTooltipManager();
+        TooltipManager.enableTooltips(installed);
+        return installed;
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void uninstallTooltips() throws Exception {
+        if (installed != null) {
+            installed.clearTooltip();
+            installed = null;
+        }
+        DisplayTest.flushEdt();
+        java.lang.reflect.Field f = TooltipManager.class.getDeclaredField("instance");
+        f.setAccessible(true);
+        f.set(null, null);
+    }
+
     /// Counts what the manager decided, without needing a real hover.
     private static final class ProbeTooltipManager extends TooltipManager {
         private int shown;
@@ -62,8 +90,7 @@ class TooltipInWindowTest extends UITestBase {
         w.show();
         DisplayTest.flushEdt();
 
-        ProbeTooltipManager mgr = new ProbeTooltipManager();
-        TooltipManager.enableTooltips(mgr);
+        ProbeTooltipManager mgr = install();
         try {
             mgr.showTooltip("a tip", b);
             DisplayTest.flushEdt();
@@ -96,8 +123,7 @@ class TooltipInWindowTest extends UITestBase {
         w.hide();
         DisplayTest.flushEdt();
 
-        ProbeTooltipManager mgr = new ProbeTooltipManager();
-        TooltipManager.enableTooltips(mgr);
+        ProbeTooltipManager mgr = install();
         mgr.showTooltip("a tip", b);
         DisplayTest.flushEdt();
 
@@ -113,8 +139,7 @@ class TooltipInWindowTest extends UITestBase {
         Form main = new Form("main", new BorderLayout());
         main.show();
         DisplayTest.flushEdt();
-        ProbeTooltipManager mgr = new ProbeTooltipManager();
-        TooltipManager.enableTooltips(mgr);
+        ProbeTooltipManager mgr = install();
 
         Button orphan = new Button("detached");
         orphan.setTooltip("a tip");

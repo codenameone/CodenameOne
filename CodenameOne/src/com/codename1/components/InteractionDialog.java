@@ -30,6 +30,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.Desktop;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.Window;
@@ -37,6 +38,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
@@ -335,7 +337,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// runs, so it cannot resolve its own host the way an attached component can. Left
     /// unset it uses the current `Form`, which is the historical behaviour and the
     /// right answer for an application with one window. Set it to put the dialog on a
-    /// `com.codename1.ui.Window` instead: without it the dialog is added to the main
+    /// `Window` instead: without it the dialog is added to the main
     /// form's layered pane, so it appears on the main window while the window that
     /// asked for it is merely dimmed -- and in an application with no form at all
     /// there is nothing to resolve and showing it fails.
@@ -353,6 +355,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// #### Returns
     ///
     /// true when this dialog asks for its own window
+    @Override
     public boolean isNativeWindowMode() {
         if (nativeWindowMode != null) {
             return nativeWindowMode.booleanValue();
@@ -367,6 +370,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// #### Parameters
     ///
     /// - `nativeWindowMode`: true to open this dialog in its own window
+    @Override
     public void setNativeWindowMode(boolean nativeWindowMode) {
         this.nativeWindowMode = Boolean.valueOf(nativeWindowMode);
     }
@@ -376,7 +380,8 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// #### Returns
     ///
     /// the window, or null when the dialog is not in one
-    public com.codename1.ui.Window getNativeWindow() {
+    @Override
+    public Window getNativeWindow() {
         return nativeWindow;
     }
 
@@ -386,7 +391,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// #### Parameters
     ///
     /// - `w`: the window about to be shown
-    protected void initNativeWindow(com.codename1.ui.Window w) {
+    protected void initNativeWindow(Window w) {
     }
 
     /// Whether this showing opens a real operating system window.
@@ -399,7 +404,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     ///
     /// true to open a window of its own
     private boolean usesNativeWindow() {
-        return com.codename1.ui.Desktop.isSupported() && !inPopupShow && isNativeWindowMode();
+        return Desktop.isSupported() && !inPopupShow && isNativeWindowMode();
     }
 
     /// True while an anchored popup is being shown.
@@ -412,13 +417,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// - `modal`: whether to park the caller until the dialog goes
     private void showInNativeWindow(boolean modal) {
         TopLevelContainer host = resolveHost();
-        com.codename1.ui.Window w = new com.codename1.ui.Window(
+        Window w = new Window(
                 getTitle() == null ? "" : getTitle(), new BorderLayout());
         nativeWindow = w;
         if (host != null) {
             w.setOwnerWindow(host);
         }
-        w.setCloseOperation(com.codename1.ui.Window.DO_NOTHING_ON_CLOSE);
+        w.setCloseOperation(Window.DO_NOTHING_ON_CLOSE);
         w.setResizable(false);
         w.setDecorated(true);
         w.getContentPane().setScrollableY(false);
@@ -445,7 +450,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
         startPendingTimeout();
         if (modal) {
-            w.setModalityType(com.codename1.ui.Window.MODALITY_WINDOW);
+            w.setModalityType(Window.MODALITY_WINDOW);
             w.showModal();
             finishNativeShowing();
         } else {
@@ -505,14 +510,15 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
         @Override
         public void actionPerformed(ActionEvent evt) {
-            if (evt instanceof com.codename1.ui.events.WindowEvent
-                    && ((com.codename1.ui.events.WindowEvent) evt).getType()
-                        == com.codename1.ui.events.WindowEvent.Type.Disposed) {
+            if (evt instanceof WindowEvent
+                    && ((WindowEvent) evt).getType()
+                        == WindowEvent.Type.Disposed) {
                 dlg.finishNativeShowing();
             }
         }
     }
 
+    @Override
     public void setTopLevelHost(TopLevelContainer host) {
         this.hostTopLevel = host;
         // An explicit choice replaces an inferred one outright, and there is no longer
@@ -526,6 +532,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// #### Returns
     ///
     /// the explicit host, or null when none was set
+    @Override
     public TopLevelContainer getTopLevelHost() {
         return hostTopLevel;
     }
@@ -554,7 +561,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     private Boolean nativeWindowMode;
 
     /// The window backing this dialog, non-null for exactly one native mode showing.
-    private com.codename1.ui.Window nativeWindow;
+    private Window nativeWindow;
 
     /// A timeout set before the dialog was shown, waiting for a host to bind to.
     private long pendingTimeout;

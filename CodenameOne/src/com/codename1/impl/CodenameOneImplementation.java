@@ -84,6 +84,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.Window;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Font;
 import com.codename1.ui.Form;
@@ -9347,7 +9348,7 @@ public abstract class CodenameOneImplementation {
             return null;
         }
         if (windowId > 0) {
-            com.codename1.ui.Window w = Desktop.getInstance().windowById(windowId);
+            Window w = Desktop.getInstance().windowById(windowId);
             // Visibility as well as modality, and for the same reason: an unconsumed
             // wheel listener can hide or minimize its own window before the gesture
             // starts, and a hidden window stays registered -- so the synthetic press,
@@ -12508,7 +12509,7 @@ public abstract class CodenameOneImplementation {
         if (windowId == 0) {
             return getAccessibilityTreeSnapshot();
         }
-        com.codename1.ui.Window w = com.codename1.ui.Desktop.getInstance().windowById(windowId);
+        Window w = Desktop.getInstance().windowById(windowId);
         return AccessibilityManager.getInstance().getSnapshot(w);
     }
 

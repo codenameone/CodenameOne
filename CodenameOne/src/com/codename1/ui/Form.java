@@ -1833,6 +1833,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// The layered pane if it's been created - or null.
+    @Override
     protected Container getLayeredPaneIfExists() {
         return layeredPane;
     }
@@ -1843,6 +1844,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// The layered pane if it's been created - or null.
+    @Override
     protected Container getFormLayeredPaneIfExists() {
         return formLayeredPane;
     }
@@ -4766,6 +4768,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// the tint color when a dialog or a menu is shown
+    @Override
     public int getTintColor() {
         return tintColor;
     }
@@ -4775,6 +4778,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `tintColor`: the tint color when a dialog or a menu is shown
+    @Override
     public void setTintColor(int tintColor) {
         this.tintColor = tintColor;
     }

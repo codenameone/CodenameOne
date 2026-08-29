@@ -1040,6 +1040,7 @@ public class Dialog extends Form implements AbstractDialog {
     /// #### Returns
     ///
     /// true when this dialog asks for its own window
+    @Override
     public boolean isNativeWindowMode() {
         if (nativeWindowMode != null) {
             return nativeWindowMode.booleanValue();
@@ -1056,6 +1057,7 @@ public class Dialog extends Form implements AbstractDialog {
     /// #### Parameters
     ///
     /// - `nativeWindowMode`: true to open this dialog in its own window
+    @Override
     public void setNativeWindowMode(boolean nativeWindowMode) {
         this.nativeWindowMode = Boolean.valueOf(nativeWindowMode);
     }
@@ -1065,6 +1067,7 @@ public class Dialog extends Form implements AbstractDialog {
     /// #### Returns
     ///
     /// the window, or null when the dialog is not in one
+    @Override
     public Window getNativeWindow() {
         return nativeWindow;
     }
@@ -1863,6 +1866,7 @@ public class Dialog extends Form implements AbstractDialog {
     /// #### Parameters
     ///
     /// - `host`: the top level to show on, or null to work it out
+    @Override
     public void setTopLevelHost(TopLevelContainer host) {
         this.hostTopLevel = host;
         // An explicit choice replaces an inferred one outright, and there is no longer
@@ -1876,6 +1880,7 @@ public class Dialog extends Form implements AbstractDialog {
     /// #### Returns
     ///
     /// the explicit host, or null when none was set
+    @Override
     public TopLevelContainer getTopLevelHost() {
         return hostTopLevel;
     }
