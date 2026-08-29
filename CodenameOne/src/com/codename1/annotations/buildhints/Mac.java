@@ -247,8 +247,12 @@ public @interface Mac {
     /// Party Mac Developer Installer` for the App Store, `Developer ID Installer`
     /// for direct distribution. This is a different certificate from
     /// `macos.signingIdentity.appStore`, which signs the application, so it has a
-    /// hint of its own rather than being derived from that one. Unset, the
-    /// package is built unsigned, which the App Store upload refuses.
+    /// hint of its own rather than being derived from that one. Required
+    /// whenever a package is produced, which includes the App Store default:
+    /// the build fails with an explanatory error rather than writing an
+    /// unsigned package, because App Store Connect refuses one and Gatekeeper
+    /// will not accept it as Developer ID distribution however well the
+    /// application inside it is signed.
     @Hint(name = "macos.signingIdentity.installer")
     String signingIdentityInstaller() default "";
 

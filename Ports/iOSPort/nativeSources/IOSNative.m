@@ -1115,6 +1115,16 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
         NSMutableArray* urls = [NSMutableArray array];
         for (NSString* u in [joined componentsSeparatedByString:@"\n"]) {
             if (u.length == 0) continue;
+            // A filename containing a newline splits into two entries here and
+            // there is no fix for that on this side: clipboardFileUris() joins
+            // the paths with \n in shared Java, the iOS branch below splits on
+            // the same character, and macOS permits a newline in a filename
+            // (only / and NUL are forbidden). Copying /tmp/a\nb publishes
+            // /tmp/a and a relative b. Pre-existing and shared -- the wire
+            // format is on master and predates this port -- so changing it
+            // means changing the bridge for both platforms rather than making
+            // macOS disagree with iOS about what the separator means.
+            //
             // ClipboardContent.MIME_FILE's contract explicitly permits a raw
             // local path, and URLWithString: turns one into a scheme-less
             // relative URL whose isFileURL is NO. The Finder then gets no
