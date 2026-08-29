@@ -276,9 +276,29 @@ def density_scale(plat: str, ppi: int, w: int = 0, h: int = 0) -> float:
     An iOS point is roughly 1/163 inch and Apple ships integral @2x/@3x
     panels, so round to the nearest integer -- 458 ppi is a 3x device
     even though 458/163 is 2.81 -- except on the downsampled panels
-    above, where the answer is not an integer at all. Android dp is
-    1/160 inch and reported densities are not bucketed cleanly, so keep
-    that one continuous.
+    above, where the answer is not an integer at all.
+
+    Android dp is 1/160 inch, and the ppi used here is the PHYSICAL panel
+    density, not the logical DisplayMetrics.densityDpi a device reports
+    (an OEM, sometimes user, choice: a 1080x2400 panel at 395ppi usually
+    reports 440). That is deliberate, not an oversight:
+
+      * GSMArena publishes no densityDpi and there is no exact derivation
+        from physical ppi. Snapping to a bucket would substitute a
+        different error, not remove one.
+      * The simulator has no densityDpi either. It reads the skin's own
+        ``ppi`` and sets ``pixelMilliRatio = ppi / 25.4`` (JavaSEPort),
+        which is what every other density-derived measurement in the same
+        skin uses, fonts included. One dp there is 0.15875mm, i.e.
+        exactly ``ppi / 160`` pixels -- so this conversion is the one that
+        keeps the safe area in step with the UI drawn next to it, and a
+        real device's densityDpi would pull the two apart.
+      * The Android insets are our own approximations (40 / 20) rather
+        than vendor-published numbers like Apple's 47 / 34, so there is no
+        precision here to lose.
+
+    Anyone who needs an exact value for one device can type it into the
+    designer's Info tab, which labels the field dp on Android.
     """
     if plat == "ios":
         pw = DOWNSAMPLED_IOS_PANELS.get((w, h))

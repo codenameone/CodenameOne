@@ -1671,28 +1671,43 @@ public class SkinDesigner extends Lifecycle {
      */
     private void applyCutouts(int[] data, int w, int h,
                               int bezelPx, int screenY, int sw, float scale) {
-        int cx = bezelPx + sw / 2;
         for (SkinModel.Cutout c : skin.cutouts) {
-            int cw = Math.round(c.w * scale);
-            int ch = Math.round(c.h * scale);
-            int ox = cx + Math.round(c.x * scale);
-            int x0 = ox - cw / 2;
+            int[] r = cutoutRectPx(c, scale);
+            int x0 = bezelPx + r[0];
+            int oy = screenY + r[1];
+            int cw = r[2];
+            int ch = r[3];
             if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
-                // Anchored to the screen's top edge, so c.y is ignored --
-                // square top corners flush with the bezel, rounded bottom
+                // Square top corners flush with the bezel, rounded bottom
                 // ones. fillRoundedRect rounds all four, so the top pair is
                 // filled back in as a plain rect.
                 int rad = Math.max(2, Math.round(8 * scale));
-                fillRoundedRect(data, w, h, x0, screenY, cw, ch, rad);
-                fillRect(data, w, h, x0, screenY, cw, Math.min(ch, rad));
+                fillRoundedRect(data, w, h, x0, oy, cw, ch, rad);
+                fillRect(data, w, h, x0, oy, cw, Math.min(ch, rad));
             } else if (SkinModel.CUTOUT_ISLAND.equals(c.type)) {
-                int oy = screenY + Math.round(c.y * scale);
                 fillRoundedRect(data, w, h, x0, oy, cw, ch, ch / 2);
             } else if (SkinModel.CUTOUT_HOLE.equals(c.type)) {
-                int oy = screenY + Math.round(c.y * scale);
-                fillCircle(data, w, h, ox, oy + ch / 2, cw / 2);
+                fillCircle(data, w, h, x0 + cw / 2, oy + ch / 2, cw / 2);
             }
         }
+    }
+
+    /**
+     * A cutout's bounding box in DISPLAY-relative pixels: {x, y, w, h}, with
+     * (0, 0) at the screen's top-left rather than the skin image's.
+     *
+     * <p>Shared by {@link #applyCutouts} and {@link #buildProperties} so the
+     * shape that gets painted and the rectangle written into the
+     * {@code cutouts} property are the same rectangle by construction. A
+     * notch is anchored to the screen's top edge, so its own offset does not
+     * apply.</p>
+     */
+    private int[] cutoutRectPx(SkinModel.Cutout c, float scale) {
+        int cw = Math.round(c.w * scale);
+        int ch = Math.round(c.h * scale);
+        int ox = device.resolutionW / 2 + Math.round(c.x * scale);
+        int y = SkinModel.CUTOUT_NOTCH.equals(c.type) ? 0 : Math.round(c.y * scale);
+        return new int[] { ox - cw / 2, y, cw, ch };
     }
 
     private void applyRoundRectAlphaMask(int[] data, int w, int h,
@@ -1836,6 +1851,29 @@ public class SkinDesigner extends Lifecycle {
         int safeTopPx = Math.max(
                 (int) Math.round(skin.safeTop * densityScale), cutoutBottomPx);
         int safeBottomPx = (int) Math.round(skin.safeBottom * densityScale);
+
+        // Painting the notch on the screen also puts it on the simulator's
+        // input surface: JavaSEPort's round-screen path accepts every
+        // coordinate inside the display rect, so without this a click on the
+        // opaque notch reaches whatever app content is hidden under it. The
+        // skin file had no way to say "these pixels are not display", and
+        // skin_map.png cannot stand in for one -- the shipped round skins all
+        // carry a map that marks only the screen, so hit-testing against it
+        // would also reject the screen's rounded CORNERS, which are real
+        // touch surface on the hardware. So declare the cutouts explicitly.
+        // A skin without this property behaves exactly as before.
+        StringBuilder cutoutRects = new StringBuilder();
+        for (SkinModel.Cutout c : skin.cutouts) {
+            int[] r = cutoutRectPx(c, vbToPx);
+            if (cutoutRects.length() > 0) {
+                cutoutRects.append(';');
+            }
+            cutoutRects.append(r[0]).append(',').append(r[1]).append(',')
+                    .append(r[2]).append(',').append(r[3]);
+        }
+        if (cutoutRects.length() > 0) {
+            p.put("cutouts", cutoutRects.toString());
+        }
 
         // Safe area is consumed by Container.snapToSafeAreaInternal, which
         // treats the rect's X/Y as inset margins from the *display* origin
