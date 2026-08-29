@@ -117,34 +117,13 @@ public class LocalVpnBridge implements VpnBridge {
             return;
         }
         String[] fields = TunnelWire.split(setupWire);
-        // The BLOCKS, read exactly as a port reads them. Without this the
-        // simulation accepted a setup the device refuses -- route("0/o") ran
-        // here and failed there -- which is the one divergence a simulation
-        // must not have, because the app meets it after it ships.
-        try {
-            String address = TunnelWire.address(fields);
-            if (address.length() > 0) {
-                TunnelWire.validate(address, "address");
-            }
-            for (String block : TunnelWire.routes(fields)) {
-                TunnelWire.validate(block, "route");
-            }
-            // EVERY field the platform is handed, not the two I happened to
-            // start with. Android passes each of these to
-            // VpnService.Builder.addDnsServer, which throws on a literal it
-            // cannot parse, so dnsServer("not-an-ip") started here and
-            // failed there. Search domains are names rather than addresses
-            // and the platform takes them as written, so there is nothing to
-            // check.
-            for (String dns : TunnelWire.dnsServers(fields)) {
-                TunnelWire.validateAddress(dns, "DNS server");
-            }
-        } catch (IllegalArgumentException malformed) {
-            Tunnels.deliverAck(requestId, false,
-                    VpnError.INVALID_CONFIGURATION.ordinal(),
-                    malformed.getMessage());
-            return;
-        }
+        // NOT validated here any more. The blocks were checked in this
+        // bridge, which made the simulation the only place that refused
+        // route("0/o") -- the divergence a simulation must not have works in
+        // both directions, and the two device ports were the ones getting it
+        // wrong. TunnelWire.validateSetup now runs in Tunnels.start(), above
+        // every bridge, so a malformed setup never reaches any of them.
+        //
         // NON-BLOCKING: this bridge delivers packets by pumping, which is
         // the iOS shape. Asking for the blocking one ran the host's loop to
         // its end inside start().

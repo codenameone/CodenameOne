@@ -137,11 +137,24 @@ jobs:
             # model the app never builds with, hid every leak this gate
             # exists to catch, and rejected the explicit release that fixes
             # one. The flag has to match the target or the check is theatre.
+            #
+            # arc-bridge-casts-disallowed-in-nonarc is promoted for the same
+            # reason: a __bridge cast is a NO-OP here, so an ownership
+            # transfer written that way silently leaks. It did --
+            # SecItemAdd's +1 persistent ref was "consumed" by a
+            # __bridge_transfer that does nothing without ARC -- and as a
+            # plain warning it scrolled past a green step.
+            #
+            # No comments inside the invocation below: a backslash-continued
+            # line joins to the next one, so a "#" among the arguments
+            # comments out every argument after it and the check keeps
+            # passing while testing less.
             xcrun --sdk iphoneos clang \
                 -fsyntax-only \
                 -arch arm64 \
                 -Werror=incompatible-pointer-types \
                 -Werror=objc-method-access \
+                -Werror=arc-bridge-casts-disallowed-in-nonarc \
                 -Wno-unused-parameter \
                 -Wno-deprecated-declarations \
                 -Wno-macro-redefined \

@@ -122,6 +122,20 @@ public final class Tunnels {
         if (b == null || !b.isCustomTunnelSupported()) {
             return failed(VpnError.NOT_SUPPORTED, null);
         }
+        // BEFORE a request exists, because a setup the platform cannot read
+        // is not a failure of the platform. Here rather than in each bridge:
+        // the check used to sit in LocalVpnBridge alone, so route("0/o") was
+        // refused in the simulator, threw out of Android's VpnService, and on
+        // iOS reached a separate extension process that read the unreadable
+        // prefix as zero and installed a DEFAULT route -- the app asked for
+        // one subnet and got all traffic.
+        String wire = TunnelWire.encodeSetup(setup);
+        try {
+            TunnelWire.validateSetup(wire);
+        } catch (IllegalArgumentException malformed) {
+            return failed(VpnError.INVALID_CONFIGURATION,
+                    malformed.getMessage());
+        }
         int id = VpnRequests.nextId();
         // Registered BEFORE the bridge is asked, and against THIS request.
         // On Android the service can be running and reading it back before
@@ -131,7 +145,7 @@ public final class Tunnels {
             PENDING.put(Integer.valueOf(id), tunnel);
         }
         EdtResult<Boolean> r = VpnRequests.openAck(id);
-        b.startCustomTunnel(id, TunnelWire.encodeSetup(setup));
+        b.startCustomTunnel(id, wire);
         return r;
     }
 

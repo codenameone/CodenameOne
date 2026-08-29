@@ -154,6 +154,36 @@ public final class TunnelWire {
         prefix(cidr, what);
     }
 
+    /// Refuses a whole encoded setup whose addresses are not addresses.
+    ///
+    /// Above every bridge rather than inside one. The check used to live in
+    /// `LocalVpnBridge`, which meant the simulation refused `route("0/o")`
+    /// and the two device ports did not: Android's `VpnService.Builder`
+    /// threw out of the service, and the generated iOS extension coerced the
+    /// unreadable prefix to zero and installed a DEFAULT route -- a setup
+    /// asking for one subnet quietly capturing all traffic. One caller,
+    /// [com.codename1.vpn.tunnel.Tunnels#start], so every port inherits the
+    /// same refusal without writing it again.
+    ///
+    /// The search domains are names rather than addresses and the platforms
+    /// take them as written, so there is nothing to check there.
+    ///
+    /// @param wire the encoded setup
+    /// @throws IllegalArgumentException naming the first unreadable field
+    public static void validateSetup(String wire) {
+        String[] fields = split(wire);
+        String address = address(fields);
+        if (address.length() > 0) {
+            validate(address, "address");
+        }
+        for (String block : routes(fields)) {
+            validate(block, "route");
+        }
+        for (String server : dnsServers(fields)) {
+            validateAddress(server, "DNS server");
+        }
+    }
+
     /// Refuses a bare address that is not one.
     ///
     /// A DNS server is an address with no prefix, so it cannot go through

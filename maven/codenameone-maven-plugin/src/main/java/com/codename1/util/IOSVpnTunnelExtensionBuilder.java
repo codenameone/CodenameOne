@@ -254,6 +254,33 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("    // moves; see the note on this class.\n");
         sb.append("    NEPacketTunnelNetworkSettings *settings =\n");
         sb.append("            cn1tnSettings(wire);\n");
+        sb.append("    if (settings == nil) {\n");
+        sb.append("        // The setup is unreadable. This process cannot\n");
+        sb.append("        // answer the application -- it is a separate\n");
+        sb.append("        // extension, and Tunnels.start() has long since\n");
+        sb.append("        // returned -- so failing the START is the whole of\n");
+        sb.append("        // what it can say, and it is the right thing to\n");
+        sb.append("        // say: a tunnel that comes up on settings nobody\n");
+        sb.append("        // asked for is worse than one that does not come\n");
+        sb.append("        // up. Tunnels.start() validates the same record\n");
+        sb.append("        // before it is saved, so in an ordinary start this\n");
+        sb.append("        // is unreachable; it is on-demand relaunches from a\n");
+        sb.append("        // configuration an OLDER version of the app saved\n");
+        sb.append("        // that arrive here unchecked.\n");
+        sb.append("        //\n");
+        sb.append("        // The code mirrors VpnError.INVALID_CONFIGURATION\n");
+        sb.append("        // so a system log reads the same as the API would,\n");
+        sb.append("        // but nothing consumes it: this NSError goes to\n");
+        sb.append("        // iOS, not to Java.\n");
+        sb.append("        completionHandler([NSError\n");
+        sb.append("                errorWithDomain:@\"com.codename1.vpn\"\n");
+        sb.append("                code:2\n");
+        sb.append("                userInfo:[NSDictionary\n");
+        sb.append("                        dictionaryWithObject:\n");
+        sb.append("                                @\"The tunnel setup is not readable\"\n");
+        sb.append("                        forKey:NSLocalizedDescriptionKey]]);\n");
+        sb.append("        return;\n");
+        sb.append("    }\n");
         sb.append("    [self setTunnelNetworkSettings:settings\n");
         sb.append("            completionHandler:^(NSError *error) {\n");
         sb.append("        if (error != nil) {\n");
@@ -400,15 +427,40 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "    }\n"
                 + "    return out;\n"
                 + "}\n\n"
+                + "/// A CIDR prefix length, or -1 when the text is not one.\n"
+                + "///\n"
+                + "/// STRICT, because intValue reads \"foo\" as zero and\n"
+                + "/// zero is meaningful here: /0 is the default route a\n"
+                + "/// full-tunnel VPN asks for. So route(\"10.0.0.0/foo\")\n"
+                + "/// did not fail, it installed a route over ALL traffic --\n"
+                + "/// the opposite of the one subnet it named. The caller\n"
+                + "/// can tell an unreadable prefix from a legitimate zero\n"
+                + "/// only if this refuses to guess.\n"
+                + "static int cn1tnBits(NSString *prefix, int max) {\n"
+                + "    NSUInteger n = [prefix length];\n"
+                + "    if (n == 0 || n > 3) {\n"
+                + "        return -1;\n"
+                + "    }\n"
+                + "    int v = 0;\n"
+                + "    for (NSUInteger i = 0; i < n; i++) {\n"
+                + "        unichar c = [prefix characterAtIndex:i];\n"
+                + "        if (c < '0' || c > '9') {\n"
+                + "            return -1;\n"
+                + "        }\n"
+                + "        v = v * 10 + (int)(c - '0');\n"
+                + "    }\n"
+                + "    return v > max ? -1 : v;\n"
+                + "}\n\n"
                 + "/// A dotted subnet mask for a CIDR prefix length.\n"
                 + "///\n"
                 + "/// ZERO is valid and is the one that matters: /0 is the\n"
                 + "/// default route a full-tunnel VPN asks for. Folding it\n"
                 + "/// into 32 gave 255.255.255.255, so the extension\n"
                 + "/// installed a host route, started successfully, and\n"
-                + "/// carried almost nothing.\n"
-                + "static NSString *cn1tnMask(NSString *prefix) {\n"
-                + "    int bits = [prefix intValue];\n"
+                + "/// carried almost nothing. Takes the PARSED length, so an\n"
+                + "/// unreadable prefix is refused by cn1tnBits before it\n"
+                + "/// can arrive here as a plausible number.\n"
+                + "static NSString *cn1tnMask(int bits) {\n"
                 + "    if (bits < 0 || bits > 32) {\n"
                 + "        bits = 32;\n"
                 + "    }\n"
@@ -443,13 +495,21 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "            // handed to NEIPv6Route, which rejects it.\n"
                 + "            continue;\n"
                 + "        }\n"
-                + "        NSNumber *bits = [NSNumber numberWithInt:\n"
-                + "                [parts count] > 1\n"
-                + "                        ? [[parts objectAtIndex:1] intValue]\n"
-                + "                        : 128];\n"
+                + "        int bits = [parts count] > 1\n"
+                + "                ? cn1tnBits([parts objectAtIndex:1], 128)\n"
+                + "                : 128;\n"
+                + "        if (bits < 0) {\n"
+                + "            // Skipped, exactly as a route of the wrong\n"
+                + "            // family is. Read as zero it became ::/0 --\n"
+                + "            // one unreadable entry silently turning a\n"
+                + "            // split tunnel into a full one.\n"
+                + "            continue;\n"
+                + "        }\n"
                 + "        [out addObject:[[[NEIPv6Route alloc]\n"
                 + "                initWithDestinationAddress:net\n"
-                + "                networkPrefixLength:bits] autorelease]];\n"
+                + "                networkPrefixLength:\n"
+                + "                        [NSNumber numberWithInt:bits]]\n"
+                + "                autorelease]];\n"
                 + "    }\n"
                 + "    // The filtered list, EMPTY if that is what it came\n"
                 + "    // to. Falling back to the default route here meant a\n"
@@ -487,9 +547,17 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "            // invalid rather than simply carrying no v4.\n"
                 + "            continue;\n"
                 + "        }\n"
-                + "        NSString *mask = [parts count] > 1\n"
-                + "                ? cn1tnMask([parts objectAtIndex:1])\n"
-                + "                : @\"255.255.255.255\";\n"
+                + "        int bits = [parts count] > 1\n"
+                + "                ? cn1tnBits([parts objectAtIndex:1], 32)\n"
+                + "                : 32;\n"
+                + "        if (bits < 0) {\n"
+                + "            // Skipped, exactly as a route of the wrong\n"
+                + "            // family is. Read as zero it became a mask of\n"
+                + "            // 0.0.0.0 -- one unreadable entry silently\n"
+                + "            // turning a split tunnel into a full one.\n"
+                + "            continue;\n"
+                + "        }\n"
+                + "        NSString *mask = cn1tnMask(bits);\n"
                 + "        [out addObject:[[[NEIPv4Route alloc]\n"
                 + "                initWithDestinationAddress:net\n"
                 + "                subnetMask:mask] autorelease]];\n"
@@ -521,26 +589,32 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "                [address componentsSeparatedByString:@\"/\"];\n"
                 + "        NSString *ip = [parts objectAtIndex:0];\n"
                 + "        BOOL v6 = [ip rangeOfString:@\":\"].location != NSNotFound;\n"
-                + "        NSString *mask = [parts count] > 1\n"
-                + "                ? cn1tnMask([parts objectAtIndex:1])\n"
-                + "                : @\"255.255.255.255\";\n"
-                + "        // The SUPPLIED prefix, parsed just above and then\n"
-                + "        // thrown away: the v6 branch always passed 128, so\n"
-                + "        // an interface asked for fd00::2/64 was installed\n"
-                + "        // as a host address. Directly connected peers in\n"
-                + "        // that subnet were then unreachable, and the\n"
-                + "        // configuration onStart reported did not describe\n"
-                + "        // what iOS had actually established.\n"
-                + "        int v6bits = [parts count] > 1\n"
-                + "                ? [[parts objectAtIndex:1] intValue] : 128;\n"
-                + "        if (v6bits < 0 || v6bits > 128) {\n"
-                + "            v6bits = 128;\n"
+                + "        // The SUPPLIED prefix, parsed once for both\n"
+                + "        // families. It used to be parsed twice and thrown\n"
+                + "        // away once: the v6 branch always passed 128, so an\n"
+                + "        // interface asked for fd00::2/64 was installed as a\n"
+                + "        // host address, directly connected peers in that\n"
+                + "        // subnet were unreachable, and the configuration\n"
+                + "        // onStart reported did not describe what iOS had\n"
+                + "        // established.\n"
+                + "        int bits = [parts count] > 1\n"
+                + "                ? cn1tnBits([parts objectAtIndex:1],\n"
+                + "                        v6 ? 128 : 32)\n"
+                + "                : (v6 ? 128 : 32);\n"
+                + "        if (bits < 0) {\n"
+                + "            // NIL, and the start fails with it. A route\n"
+                + "            // whose prefix is unreadable can be dropped;\n"
+                + "            // the interface address cannot, and coercing\n"
+                + "            // it to zero would have established the whole\n"
+                + "            // link on an address the app never asked for.\n"
+                + "            return nil;\n"
                 + "        }\n"
+                + "        NSString *mask = cn1tnMask(bits);\n"
                 + "        if (v6) {\n"
                 + "            NEIPv6Settings *v6s = [[[NEIPv6Settings alloc]\n"
                 + "                    initWithAddresses:[NSArray arrayWithObject:ip]\n"
                 + "                    networkPrefixLengths:[NSArray arrayWithObject:\n"
-                + "                            [NSNumber numberWithInt:v6bits]]]\n"
+                + "                            [NSNumber numberWithInt:bits]]]\n"
                 + "                    autorelease];\n"
                 + "            // The ROUTES too. Addresses establish the\n"
                 + "            // interface and route nothing, so a v6 setup\n"

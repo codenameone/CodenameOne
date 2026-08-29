@@ -366,7 +366,14 @@ static NSData *cn1vpStoreSecret(NSString *account, NSString *secret) {
     if (status != errSecSuccess) {
         return nil;
     }
-    return (__bridge_transfer NSData *)result;
+    // AUTORELEASED, not __bridge_transfer. This port compiles without ARC
+    // (CLANG_ENABLE_OBJC_ARC = NO), where the whole __bridge family is a
+    // no-op -- clang says so with -Warc-bridge-casts-disallowed-in-nonarc --
+    // so the +1 SecItemAdd hands back on kSecReturnPersistentRef was never
+    // consumed and every profile install leaked a persistent-ref CFData.
+    // The cast is only a type change here; the ownership transfer has to be
+    // written out.
+    return [(NSData *)result autorelease];
 }
 
 /// The generation the NEXT install writes its secrets under.
@@ -1299,12 +1306,22 @@ void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
     // have been restarted while its tunnel kept running, which is exactly
     // when a stop matters most.
     cn1vpLoadTunnelManager(^(NETunnelProviderManager *m, NSError *e) {
-        if (m != nil) {
-            [(NETunnelProviderSession *)m.connection stopVPNTunnel];
+        if (m == nil) {
+            // The LOAD failed, which is the only way the helper yields nil:
+            // with no error it hands back a manager either way, a saved one
+            // or a fresh one whose connection is already disconnected. So
+            // this branch is not "nothing was running" -- it is "iOS would
+            // not tell us what is running", and the tunnel may well still be
+            // up and routing. Answering YES here reported a stopped tunnel
+            // to Tunnels.stop() while traffic kept flowing through it.
+            cn1vpFail(rid, CN1_VPN_ERR_UNKNOWN, e);
+            return;
         }
-        // TRUE either way. Asking a tunnel that is not running to stop has
-        // got the caller what they asked for, and reporting a failure would
-        // have an app treat its own idle state as an error.
+        [(NETunnelProviderSession *)m.connection stopVPNTunnel];
+        // TRUE for the disconnected manager too. Asking a tunnel that is not
+        // running to stop has got the caller what they asked for, and
+        // reporting a failure would have an app treat its own idle state as
+        // an error.
         cn1vpTunnelAck(rid, YES, 0, nil);
     });
     });

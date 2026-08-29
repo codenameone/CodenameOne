@@ -257,4 +257,94 @@ public class TunnelsTest {
         assertEquals("start", good.events.get(0));
         VpnAwait.value(Tunnels.stop());
     }
+
+    /// A bridge that records whether it was asked, and refuses to do
+    /// anything else. Stands in for the two device ports, which cannot run
+    /// here.
+    private static final class Recording
+            implements com.codename1.vpn.spi.VpnBridge {
+        private int starts;
+
+        public boolean isVpnSupported() {
+            return true;
+        }
+
+        public boolean isCustomTunnelSupported() {
+            return true;
+        }
+
+        public int getVpnCapabilities() {
+            return CAPABILITY_CUSTOM_TUNNEL;
+        }
+
+        public int getVpnStatus() {
+            return 0;
+        }
+
+        public void installProfile(int requestId, String profileWire) {
+        }
+
+        public void removeProfile(int requestId) {
+        }
+
+        public void loadProfile(int requestId) {
+        }
+
+        public void startVpn(int requestId) {
+        }
+
+        public void stopVpn(int requestId) {
+        }
+
+        public void setStatusListening(boolean listening) {
+        }
+
+        public void startCustomTunnel(int requestId, String setupWire) {
+            starts++;
+        }
+
+        public void stopCustomTunnel(int requestId) {
+        }
+    }
+
+    @Test
+    public void aMalformedSetupNeverReachesAnyBridge() {
+        // The refusal used to live in LocalVpnBridge, so it was a property of
+        // the SIMULATION rather than of the API: the same setup handed to the
+        // Android bridge threw out of VpnService.Builder inside the service,
+        // and on iOS crossed into a separate extension process that read the
+        // unreadable prefix as zero and installed a DEFAULT route -- an app
+        // asking for one subnet silently capturing all traffic.
+        //
+        // Asserted against a bridge that is NOT the simulation, because a
+        // check that only the simulation performs is exactly the defect. The
+        // count is what makes it non-vacuous: refusing after asking the
+        // bridge would satisfy the error assertion and none of the point.
+        Recording device = new Recording();
+        VpnRequests.resetForTest(device);
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Tunnels.start(new Echo(), new TunnelSetup()
+                        .address("10.0.0.2/32")
+                        .route("10.0.0.0/foo")));
+        assertEquals(0, device.starts,
+                "the bridge must not be asked to start a setup it cannot"
+                + " read");
+        assertNull(Tunnels.getRegistered(),
+                "and nothing is left registered against it");
+
+        // A DNS server too -- Android hands each to addDnsServer, which
+        // throws on a literal it cannot parse.
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Tunnels.start(new Echo(), new TunnelSetup()
+                        .address("10.0.0.2/32")
+                        .dnsServer("not-an-ip")));
+        assertEquals(0, device.starts);
+
+        // And a setup this bridge can read does reach it, so the guard is
+        // not simply refusing everything.
+        Tunnels.start(new Echo(), new TunnelSetup()
+                .address("10.0.0.2/32").route("0.0.0.0/0"));
+        assertEquals(1, device.starts,
+                "a readable setup has to get through");
+    }
 }

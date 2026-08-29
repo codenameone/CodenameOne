@@ -49,6 +49,23 @@ class VpnTunnelExtensionTest {
         return new String(files.get(name), "UTF-8");
     }
 
+    /// The generated source with its comment lines removed.
+    ///
+    /// The checks below look for constructs that must not appear in the
+    /// generated code, and the comments explaining why they must not appear
+    /// name them -- so an assertion run over the raw text fails on the note
+    /// describing the bug it is guarding against.
+    private static String code(String src) {
+        StringBuilder sb = new StringBuilder();
+        String[] lines = src.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            if (!lines[i].trim().startsWith("//")) {
+                sb.append(lines[i]).append('\n');
+            }
+        }
+        return sb.toString();
+    }
+
     @Test
     void theVmIsStartedBeforeAnyJavaRuns() {
         String src = provider();
@@ -260,11 +277,20 @@ class VpnTunnelExtensionTest {
         // fd00::2/64 was parsed and then discarded for a hardcoded 128, so
         // the interface did not match the requested subnet and what onStart
         // reported was not what iOS installed.
+        //
+        // Asserted on the ARGUMENT rather than on the local's name: the
+        // first version of this checked for "v6bits", which broke the moment
+        // the two families started sharing one parse and said nothing about
+        // whether the value still reached the settings object.
         String src = provider();
-        assertTrue(src.contains("v6bits"),
-                "the parsed prefix has to reach NEIPv6Settings");
-        assertFalse(src.contains("numberWithInt:128]]]"),
-                "128 is the default, not the answer");
+        int v6 = src.indexOf("NEIPv6Settings *v6s = [[[NEIPv6Settings alloc]");
+        assertTrue(v6 >= 0, "the v6 settings have to be built");
+        String block = src.substring(v6, src.indexOf("autorelease];", v6));
+        assertTrue(block.contains("networkPrefixLengths:"),
+                "the prefix length is what this is about");
+        assertFalse(block.matches("(?s).*numberWithInt:\\s*\\d.*"),
+                "a literal there is the hardcoded 128 coming back;"
+                + " the parsed prefix has to reach NEIPv6Settings");
     }
 
     @Test
@@ -298,6 +324,77 @@ class VpnTunnelExtensionTest {
         // either fails codesigning or is dropped.
         assertTrue(ent.contains("<array>"),
                 "the key is array-valued");
+    }
+
+    @Test
+    void anUnreadablePrefixIsRefusedRatherThanReadAsZero() {
+        // NSString's intValue reads "foo" as 0, and 0 is meaningful here:
+        // /0 is the default route. So route("10.0.0.0/foo") did not fail --
+        // it installed a route over ALL traffic, which is the opposite of
+        // the single subnet it named, and the tunnel came up reporting
+        // success. The interface address had the same coercion.
+        //
+        // Asserted as the ABSENCE of the coercion primitive from the three
+        // places that read a prefix, rather than the presence of a
+        // particular guard: any parse that goes back through intValue has
+        // the defect back, whatever the code around it looks like.
+        //
+        // Scoped to prefixes rather than to the whole file, because the MTU
+        // legitimately coerces: there zero is not a meaningful value, so an
+        // unreadable one falls through to the system default, which is the
+        // recoverable answer TunnelWire.mtu picks on the Java side too.
+        String src = provider();
+        assertTrue(src.contains("static int cn1tnBits(NSString *prefix,"
+                + " int max)"),
+                "the strict parser is what tells -1 from a legitimate 0");
+
+        // Every one of the three places that reads a prefix uses it, and
+        // each does the only thing it can with a refusal: a route is
+        // dropped, the interface address is not droppable and fails the
+        // whole settings object.
+        for (String helper : new String[] {"cn1tnRoutes(NSString",
+                "cn1tnRoutes6(NSString"}) {
+            int at = src.indexOf(helper);
+            assertTrue(at >= 0, helper + " has to exist");
+            String body = code(
+                    src.substring(at, src.indexOf("return out;", at)));
+            assertTrue(body.contains("cn1tnBits("),
+                    helper + " has to parse its prefix strictly");
+            assertFalse(body.contains("intValue"),
+                    helper + " may not read a prefix with NSString's"
+                    + " lenient coercion");
+            assertTrue(body.contains("if (bits < 0) {"),
+                    helper + " has to act on a refusal, not ignore it");
+        }
+        int settings = src.indexOf(
+                "cn1tnSettings(\n        NSString *wire) {");
+        assertTrue(settings >= 0, "the settings builder has to exist");
+        // Ends at the DNS block: the MTU that follows it coerces on purpose.
+        String body = code(src.substring(settings,
+                src.indexOf("s.DNSSettings", settings)));
+        assertTrue(body.contains("cn1tnBits(") && body.contains("return nil;"),
+                "an interface address cannot be dropped, so an unreadable"
+                + " prefix has to fail the settings object");
+        assertFalse(body.contains("intValue"),
+                "and its prefix may not be read with the lenient coercion"
+                + " either");
+    }
+
+    @Test
+    void aFailedSettingsBuildFailsTheStartRatherThanTheLink() {
+        // The extension is a separate process and Tunnels.start() returned
+        // long ago, so failing the start is the whole of what it can say --
+        // and it is the right thing to say. Proceeding with nil settings
+        // would establish a link on a configuration nobody asked for.
+        String src = provider();
+        int nilCheck = src.indexOf("if (settings == nil) {");
+        int apply = src.indexOf("[self setTunnelNetworkSettings:settings");
+        assertTrue(nilCheck >= 0, "the nil settings case has to be handled");
+        assertTrue(apply > nilCheck,
+                "and handled BEFORE the settings are applied");
+        assertTrue(src.substring(nilCheck, apply).contains(
+                "completionHandler([NSError"),
+                "the start has to fail with an error, not silently return");
     }
 
     @Test
