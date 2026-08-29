@@ -73,6 +73,12 @@ public class WindowDialogTest extends WindowHostTest {
                 d.setLayout(new BorderLayout());
                 d.add(BorderLayout.CENTER, new Label("Delete the document?"));
                 d.setTopLevelHost(top);
+                // Gets the dialog a backdrop without parking anything: the scrim is
+                // installed for either modality or outside-press dismissal, so asking
+                // for the second one renders the tint that a modal dialog would show.
+                // Without it the golden is a dialog floating over undimmed content and
+                // never exercises the scrim at all.
+                d.setDisposeWhenPointerOutOfBounds(true);
                 // Modeless: a modal dialog parks the caller, and the harness is the
                 // caller. The rendering is identical either way.
                 d.showModeless();
