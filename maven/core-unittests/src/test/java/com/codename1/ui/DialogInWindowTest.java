@@ -1378,4 +1378,47 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aListenerSharedWithTheWindowSurvivesTheDialogClosing() {
+        // EventDispatcher ignores a listener it already holds, so handing over one the
+        // window already had added nothing -- and taking it back on the way out removed
+        // the window's own registration, silently killing a listener the application
+        // never attached to the dialog.
+        Window w = openHost(600, 500);
+        final int[] presses = new int[1];
+        ActionListener shared = new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                presses[0]++;
+            }
+        };
+        w.addPointerPressedListener(shared);
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(1, presses[0], "the window's own listener works");
+
+        Dialog d = new Dialog("shares a handler");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.addPointerPressedListener(shared);
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(2, presses[0], "and still fires exactly once while the dialog is up");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(3, presses[0],
+                "the window's listener must outlive the dialog that shared it");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

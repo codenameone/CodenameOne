@@ -1004,4 +1004,34 @@ class NativeWindowDialogTest extends UITestBase {
         DisplayTest.flushEdt();
         assertTrue(second.isWindowDisposed());
     }
+
+    @FormTest
+    void showingANativeDialogAgainClosesTheFirstWindow() {
+        // The same defect InteractionDialog had: a modeless dialog shown again before
+        // it is disposed left the first window open and empty, with its own bridges
+        // pointing at the second showing.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Dialog d = newDialog("shown twice");
+        d.setNativeWindowMode(true);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        Window first = d.getNativeWindow();
+        assertNotNull(first);
+
+        d.showModeless();
+        DisplayTest.flushEdt();
+        Window second = d.getNativeWindow();
+        assertNotNull(second);
+        assertNotSame(first, second, "the second showing gets its own window");
+        assertTrue(first.isWindowDisposed(),
+                "and the first must not be left open and empty");
+        assertNotNull(d.getParent(), "the dialog is in the second window");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        assertTrue(second.isWindowDisposed());
+    }
 }

@@ -2091,6 +2091,19 @@ public class Dialog extends Form implements AbstractDialog {
     /// - `modal`: whether to wait here until the dialog is disposed
     private void showInNativeWindow(boolean modal) {
         Display.getInstance().flushEdt();
+        // A modeless dialog can be shown again before it is disposed, exactly as
+        // InteractionDialog can. Overwriting the field left the first window on screen
+        // and empty, with its own close and dispose bridges still pointing at this
+        // dialog -- whose window was now the second one, so closing the abandoned
+        // window tore down the showing the user was actually looking at.
+        Window previous = nativeWindow;
+        if (previous != null) {
+            finishNativeShowing();
+            if (!previous.isWindowDisposed()) {
+                previous.dispose();
+            }
+            setDisposed(false);
+        }
         TopLevelContainer host = resolveHost();
         Window w = new Window(getTitle() == null ? "" : getTitle(), new BorderLayout());
         nativeWindow = w;

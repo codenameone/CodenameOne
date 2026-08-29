@@ -2693,10 +2693,29 @@ public class Form extends Container implements TopLevelContainer {
 
     /// The host an embedded form gave its pointer listeners to, or null.
     private TopLevelContainer transferredListenerHost;
-    private ArrayList<ActionListener> transferredPointerPressed;
-    private ArrayList<ActionListener> transferredPointerDragged;
-    private ArrayList<ActionListener> transferredPointerReleased;
-    private ArrayList<ActionListener> transferredLongPress;
+    private ArrayList<TransferredListener> transferredPointerPressed;
+    private ArrayList<TransferredListener> transferredPointerDragged;
+    private ArrayList<TransferredListener> transferredPointerReleased;
+    private ArrayList<TransferredListener> transferredLongPress;
+
+    /// One listener this form handed to a host, and whether handing it over is what
+    /// put it there.
+    ///
+    /// EventDispatcher.addListener ignores a listener it already holds, so when the
+    /// application registered the same instance on both this form and the host, the
+    /// transfer added nothing -- and taking it off again on the way out would have
+    /// removed the host's own registration, silently stopping a listener the
+    /// application never attached to this form at all. The same collision happens
+    /// between two dialogs sharing one handler.
+    private static final class TransferredListener {
+        private final ActionListener listener;
+        private final boolean added;
+
+        TransferredListener(ActionListener listener, boolean added) {
+            this.listener = listener;
+            this.added = added;
+        }
+    }
 
     /// Moves a dispatcher's listeners onto the host and returns what was moved.
     ///
@@ -2711,17 +2730,55 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// the listeners handed over, or null when there were none
-    private ArrayList<ActionListener> transferListeners(EventDispatcher dispatcher,
+    private ArrayList<TransferredListener> transferListeners(EventDispatcher dispatcher,
             TopLevelContainer host, int kind) {
         if (dispatcher == null) {
             return null;
         }
-        ArrayList<ActionListener> moved = new ArrayList<ActionListener>();
+        ArrayList<TransferredListener> moved = new ArrayList<TransferredListener>();
         for (ActionListener l : (Collection<ActionListener>) dispatcher.getListenerCollection()) {
-            addTransferred(host, kind, l);
-            moved.add(l);
+            boolean already = hostHasListener(host, kind, l);
+            addTransferred(host, kind, l, !already);
+            moved.add(new TransferredListener(l, !already));
         }
         return moved.isEmpty() ? null : moved;
+    }
+
+    /// Whether the host already holds this listener for this event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the top level being handed the listener
+    ///
+    /// - `kind`: which of the four pointer listener kinds this is
+    ///
+    /// - `l`: the listener
+    ///
+    /// #### Returns
+    ///
+    /// true if the host would ignore an add of this listener
+    private static boolean hostHasListener(TopLevelContainer host, int kind, ActionListener l) {
+        Container c = host.asContainer();
+        EventDispatcher d;
+        switch (kind) {
+            case POINTER_PRESSED:
+                d = c.pointerPressedListeners;
+                break;
+            case POINTER_DRAGGED:
+                d = c.pointerDraggedListeners;
+                break;
+            case POINTER_RELEASED:
+                d = c.pointerReleasedListeners;
+                break;
+            default:
+                d = c.longPressListeners;
+                break;
+        }
+        if (d == null) {
+            return false;
+        }
+        Collection existing = d.getListenerCollection();
+        return existing != null && existing.contains(l);
     }
 
     /// Maps this class's listener kind onto the one the window's exemption registry
@@ -2747,7 +2804,8 @@ public class Form extends Container implements TopLevelContainer {
         }
     }
 
-    private void addTransferred(TopLevelContainer host, int kind, ActionListener l) {
+    private void addTransferred(TopLevelContainer host, int kind, ActionListener l,
+            boolean add) {
         // Marked as this form's rather than the host's, so that a hosted overlay
         // claiming the pointer suppresses the host's own listeners without also
         // suppressing the ones the application registered on the overlay itself.
@@ -2755,6 +2813,14 @@ public class Form extends Container implements TopLevelContainer {
         // release listeners and a stacked dialog cannot run the ones below it.
         if (host instanceof Window) {
             ((Window) host).addPointerScopeExempt(pointerScopeKind(kind), this, l);
+        }
+        if (!add) {
+            // Already on the host, so the add below would do nothing anyway -- and
+            // pairing it with a remove on the way out would take the host's own
+            // registration with it. The exemption above still goes in: the listener is
+            // on this form too, so it has to keep firing while this form owns the
+            // pointer.
+            return;
         }
         switch (kind) {
             case POINTER_PRESSED:
@@ -2772,9 +2838,13 @@ public class Form extends Container implements TopLevelContainer {
         }
     }
 
-    private void removeTransferred(TopLevelContainer host, int kind, ActionListener l) {
+    private void removeTransferred(TopLevelContainer host, int kind, ActionListener l,
+            boolean remove) {
         if (host instanceof Window) {
             ((Window) host).removePointerScopeExempt(pointerScopeKind(kind), l);
+        }
+        if (!remove) {
+            return;
         }
         switch (kind) {
             case POINTER_PRESSED:
@@ -2810,13 +2880,15 @@ public class Form extends Container implements TopLevelContainer {
         transferredLongPress = null;
     }
 
-    private void reclaim(TopLevelContainer host, ArrayList<ActionListener> moved, int kind) {
+    private void reclaim(TopLevelContainer host, ArrayList<TransferredListener> moved,
+            int kind) {
         if (moved == null) {
             return;
         }
         for (int iter = 0; iter < moved.size(); iter++) { // NOPMD ForLoopCanBeForeach
-            ActionListener l = moved.get(iter);
-            removeTransferred(host, kind, l);
+            TransferredListener entry = moved.get(iter);
+            ActionListener l = entry.listener;
+            removeTransferred(host, kind, l, entry.added);
             // Back into this form's own dispatcher, which was cleared when they were
             // handed over. Only taking them off the host would lose them outright, so a
             // dialog shown a second time would have none of the listeners it was built
@@ -2922,24 +2994,36 @@ public class Form extends Container implements TopLevelContainer {
         if (host == null) {
             return false;
         }
-        ArrayList<ActionListener> tracked = trackedFor(kind);
+        ArrayList<TransferredListener> tracked = trackedFor(kind);
         if (adding) {
-            addTransferred(host, kind, l);
+            // Same ownership question as the bulk transfer: if the host already holds
+            // this listener, adding it here does nothing and removing it later would
+            // take away a registration this form never made.
+            boolean added = !hostHasListener(host, kind, l);
+            addTransferred(host, kind, l, added);
             if (tracked == null) {
-                tracked = new ArrayList<ActionListener>();
+                tracked = new ArrayList<TransferredListener>();
                 setTrackedFor(kind, tracked);
             }
-            tracked.add(l);
+            tracked.add(new TransferredListener(l, added));
         } else {
-            removeTransferred(host, kind, l);
+            boolean remove = true;
             if (tracked != null) {
-                tracked.remove(l);
+                for (int iter = 0; iter < tracked.size(); iter++) {
+                    TransferredListener entry = tracked.get(iter);
+                    if (entry.listener == l) { //NOPMD CompareObjectsWithEquals
+                        remove = entry.added;
+                        tracked.remove(iter);
+                        break;
+                    }
+                }
             }
+            removeTransferred(host, kind, l, remove);
         }
         return true;
     }
 
-    private ArrayList<ActionListener> trackedFor(int kind) {
+    private ArrayList<TransferredListener> trackedFor(int kind) {
         switch (kind) {
             case POINTER_PRESSED:
                 return transferredPointerPressed;
@@ -2952,7 +3036,7 @@ public class Form extends Container implements TopLevelContainer {
         }
     }
 
-    private void setTrackedFor(int kind, ArrayList<ActionListener> v) {
+    private void setTrackedFor(int kind, ArrayList<TransferredListener> v) {
         switch (kind) {
             case POINTER_PRESSED:
                 transferredPointerPressed = v;
