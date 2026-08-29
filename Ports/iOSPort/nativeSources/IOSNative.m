@@ -1176,13 +1176,27 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardImage___R_byte_1ARRAY(C
     NSPasteboard* pb = [NSPasteboard generalPasteboard];
     NSData* data = [pb dataForType:NSPasteboardTypePNG];
     if (data == nil) {
-        NSData* tiff = [pb dataForType:NSPasteboardTypeTIFF];
-        if (tiff != nil) {
-            // A Mac application that copies an image usually offers TIFF rather
-            // than PNG, so the fallback is what actually fires most of the time
-            // -- and the Java side is specified in PNG.
-            NSBitmapImageRep* rep = [NSBitmapImageRep imageRepWithData:tiff];
+        // Every image type the pasteboard might carry, transcoded to the PNG
+        // the Java side is specified in.
+        //
+        // TIFF first because a Mac application that copies an image usually
+        // offers it, so this is the branch that actually fires most of the
+        // time. JPEG and GIF matter because an external owner is under no
+        // obligation to publish anything else: this port's own writer adds a
+        // PNG rendition beside its JPEG or GIF bytes, but another application
+        // will not, and asking only for PNG and TIFF then reported an empty
+        // clipboard for an image that was plainly on it.
+        NSArray *fallbacks = @[ NSPasteboardTypeTIFF, @"public.jpeg", @"com.compuserve.gif" ];
+        for (NSString *type in fallbacks) {
+            NSData* raw = [pb dataForType:type];
+            if (raw == nil) {
+                continue;
+            }
+            NSBitmapImageRep* rep = [NSBitmapImageRep imageRepWithData:raw];
             data = [rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+            if (data != nil) {
+                break;
+            }
         }
     }
     JAVA_OBJECT result = (data == nil || data.length == 0) ? JAVA_NULL : nsDataToByteArr(data);

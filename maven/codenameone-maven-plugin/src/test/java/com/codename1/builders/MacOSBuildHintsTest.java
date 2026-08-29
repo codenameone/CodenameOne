@@ -609,4 +609,45 @@ public class MacOSBuildHintsTest {
                 parse(raw("macos.notarize.password", "modern",
                         "macNative.notarize.password", "legacy"), "p").getNotarizePassword());
     }
+
+    /// An explicit opt-out has to clear the PRIVACY STRING, not just the
+    /// entitlement.
+    ///
+    /// macos.entitlements.device.microphone=false is the documented escape for
+    /// an application whose camera sessions are all silent. The effective
+    /// capabilities were seeded from the scan and then OR-ed with the resolved
+    /// values, which made the OR one-way: the resolver answered false, the
+    /// entitlement was correctly omitted, and the Info.plist still declared
+    /// NSMicrophoneUsageDescription -- the application declaring a device it
+    /// had just been told not to use.
+    @Test
+    public void anExplicitOptOutClearsTheDeclaredCapability() {
+        MacOSBuildHints hints = parse(raw(
+                "macos.entitlements.device.microphone", "false"), "com.example.app");
+        MacOSXcodeProject.MacOSCapabilities scanned = new MacOSXcodeProject.MacOSCapabilities();
+        scanned.usesMicrophone = true;
+        scanned.usesCamera = true;
+
+        MacOSXcodeProject.MacOSCapabilities out =
+                MacOSNativeBuilder.effectiveCapabilities(hints, scanned);
+        assertFalse("an explicit false must clear the declaration", out.usesMicrophone);
+        // And only the one that was opted out: the camera is untouched.
+        assertTrue("the camera was not opted out", out.usesCamera);
+    }
+
+    /// With nothing opted out the scan still stands, so the fix cannot have
+    /// quietly turned every capability off.
+    @Test
+    public void anUnhintedBuildKeepsWhatTheScanFound() {
+        MacOSBuildHints hints = parse(raw(), "com.example.app");
+        MacOSXcodeProject.MacOSCapabilities scanned = new MacOSXcodeProject.MacOSCapabilities();
+        scanned.usesMicrophone = true;
+        scanned.usesLocation = true;
+
+        MacOSXcodeProject.MacOSCapabilities out =
+                MacOSNativeBuilder.effectiveCapabilities(hints, scanned);
+        assertTrue(out.usesMicrophone);
+        assertTrue(out.usesLocation);
+        assertFalse(out.usesBluetooth);
+    }
 }

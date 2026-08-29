@@ -1084,15 +1084,32 @@ public class MacOSNativeBuilder extends Executor {
      * <p>Across every channel, since the plist is one file and a capability
      * enabled for either channel ships in it.</p>
      */
-    private MacOSXcodeProject.MacOSCapabilities effectiveCapabilities(MacOSBuildHints hints,
+    static MacOSXcodeProject.MacOSCapabilities effectiveCapabilities(MacOSBuildHints hints,
             MacOSXcodeProject.MacOSCapabilities scanned) {
         MacOSXcodeProject.MacOSCapabilities out = new MacOSXcodeProject.MacOSCapabilities();
-        out.usesCamera = scanned.usesCamera;
-        out.usesMicrophone = scanned.usesMicrophone;
-        out.usesBluetooth = scanned.usesBluetooth;
-        out.usesLocation = scanned.usesLocation;
-        out.usesServerSockets = scanned.usesServerSockets;
-        for (String channel : hints.getChannels()) {
+        List<String> channels = hints.getChannels();
+        if (channels.isEmpty()) {
+            // Nothing to resolve against, so the scan stands. Not reachable from
+            // a normal build -- a channel is always selected -- but seeding the
+            // fields from an empty loop would silently answer "no capabilities".
+            out.usesCamera = scanned.usesCamera;
+            out.usesMicrophone = scanned.usesMicrophone;
+            out.usesBluetooth = scanned.usesBluetooth;
+            out.usesLocation = scanned.usesLocation;
+            out.usesServerSockets = scanned.usesServerSockets;
+            return out;
+        }
+        // The OR is over the RESOLVED value for each channel, not over the scan
+        // plus the resolutions. Seeding these from `scanned` made the OR
+        // one-way: an explicit macos.entitlements.device.microphone=false
+        // returned false from the resolver and could not clear a field that was
+        // already true, so the entitlement was correctly omitted while the
+        // Info.plist still carried NSMicrophoneUsageDescription -- an
+        // application declaring a device it had just been told not to use.
+        //
+        // Still an OR across channels, because there is one Info.plist for all
+        // of them: a capability any channel keeps has to be declared.
+        for (String channel : channels) {
             MacOSBuildHints.EntitlementOverrides o = hints.entitlementsFor(channel);
             out.usesCamera |= o.camera(scanned.usesCamera);
             out.usesMicrophone |= o.microphone(scanned.usesMicrophone);
