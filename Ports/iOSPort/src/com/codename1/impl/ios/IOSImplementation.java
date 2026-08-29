@@ -2833,8 +2833,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// Reads a bundled resource by name, the way the rest of this port does.
+    ///
+    /// Class.getResourceAsStream() is a CLASSLOADER lookup, and a
+    /// ParparVM-translated application has no classpath to look in -- the file
+    /// lives in the app bundle and is reached through
+    /// nativeInstance.getResourceSize / NSFileInputStream. So the classloader
+    /// spelling answered null for a resource that was sitting in the bundle
+    /// the whole time, and installNativeTheme()'s modern branch read that null
+    /// as "the theme was never built" and fell back to iOS 7 -- silently, on
+    /// every target, which is why ios.themeMode=modern appeared to do nothing.
     private InputStream getResourceAsStream(String name) {
-        return IOSImplementation.class.getResourceAsStream(name);
+        return getResourceAsStream(IOSImplementation.class, name);
     }
 
     private long getNSData(InputStream i) {
