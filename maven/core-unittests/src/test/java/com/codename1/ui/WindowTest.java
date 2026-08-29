@@ -5603,4 +5603,43 @@ class WindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aContentSizeSurvivesAPeerWhoseGeometryIsNotRealYet() {
+        // Mac Catalyst grants the window scene asynchronously and, until it arrives,
+        // answers both the frame and the drawable with the size that was asked for. The
+        // chrome therefore measures zero on a decorated window, and treating the mere
+        // existence of a peer as enough left the drawable clipped by the title bar once
+        // the scene did connect.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+        wm.setChromeMeasurable(false);
+
+        Window w = new Window("late geometry", new BorderLayout());
+        w.setDecorated(true);
+        w.setWindowContentSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(400, peer.getWidth(),
+                "nothing measurable yet, so the frame is what was asked for");
+
+        // The scene connects and the platform reports geometry worth measuring.
+        wm.setChromeMeasurable(true);
+        Desktop.getInstance().windowSizeChanged(w.getWindowId(),
+                wm.getWidth(peer), wm.getHeight(peer));
+        // The correction is queued rather than applied inside the size callback, so it
+        // takes another turn of the event thread.
+        for (int iter = 0; iter < 20 && wm.getWidth(peer) != 400; iter++) {
+            DisplayTest.flushEdt();
+        }
+
+        assertEquals(400, wm.getWidth(peer),
+                "and the content size is applied once the chrome can be measured");
+        assertEquals(300, wm.getHeight(peer));
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

@@ -1841,4 +1841,55 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void oneEnterDoesNotDismissTwoStackedDialogs() {
+        // The focused control in the top dialog is free to close it, which releases the
+        // key scope. Reading the scope after that found the dialog underneath newly
+        // exposed and ran its default command for the same release.
+        Window w = openHost(600, 500);
+        final int[] lowerDefault = new int[1];
+
+        Dialog low = new Dialog("lower");
+        low.setLayout(new BorderLayout());
+        low.add(BorderLayout.CENTER, new Label("lower"));
+        low.setDefaultCommand(new Command("lower default") {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                lowerDefault[0]++;
+            }
+        });
+        low.setTopLevelHost(w);
+        low.showModeless();
+        DisplayTest.flushEdt();
+
+        final Dialog high = new Dialog("upper");
+        high.setLayout(new BorderLayout());
+        Button ok = new Button("OK");
+        ok.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                high.dispose();
+            }
+        });
+        high.add(BorderLayout.CENTER, ok);
+        high.setTopLevelHost(w);
+        high.showModeless();
+        DisplayTest.flushEdt();
+        w.setFocused(ok);
+        DisplayTest.flushEdt();
+
+        int enter = Display.getInstance().getKeyCode(Display.GAME_FIRE);
+        w.keyPressed(enter);
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+
+        assertTrue(high.isDisposed(), "the top dialog closes on its own OK button");
+        assertEquals(0, lowerDefault[0],
+                "and the one it uncovers must not act on the same key release");
+
+        low.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

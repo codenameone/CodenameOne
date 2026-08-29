@@ -487,13 +487,19 @@ public class TestWindowManager extends WindowManager {
     @Override
     public int getWidth(Object peer) {
         FakeWindow w = win(peer);
-        return w == null ? 0 : Math.max(0, w.width - chromeWidth);
+        if (w == null) {
+            return 0;
+        }
+        return chromeMeasurable ? Math.max(0, w.width - chromeWidth) : w.width;
     }
 
     @Override
     public int getHeight(Object peer) {
         FakeWindow w = win(peer);
-        return w == null ? 0 : Math.max(0, w.height - chromeHeight);
+        if (w == null) {
+            return 0;
+        }
+        return chromeMeasurable ? Math.max(0, w.height - chromeHeight) : w.height;
     }
 
     /// How much of a window's frame is chrome rather than drawable area.
@@ -515,6 +521,24 @@ public class TestWindowManager extends WindowManager {
 
     private int chromeWidth;
     private int chromeHeight;
+
+    /// Whether the chrome is measurable yet.
+    ///
+    /// Mac Catalyst grants a window scene asynchronously and, until it arrives,
+    /// answers both the frame and the drawable with the size that was asked for -- so
+    /// the chrome measures zero even though the window is decorated. Setting this false
+    /// reproduces that window.
+    private boolean chromeMeasurable = true;
+
+    /// Whether this manager reports chrome yet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `measurable`: false to answer as a platform whose window scene has not
+    ///   connected, which reports the frame size as the drawable
+    public void setChromeMeasurable(boolean measurable) {
+        this.chromeMeasurable = measurable;
+    }
 
     @Override
     public void setResizable(Object peer, boolean resizable) {

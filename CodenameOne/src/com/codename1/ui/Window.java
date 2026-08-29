@@ -1503,8 +1503,7 @@ public class Window extends Container implements TopLevelContainer {
             setWindowSize(width, height);
             return;
         }
-        pendingContentWidth = -1;
-        pendingContentHeight = -1;
+
         // Both numbers come from the port, which is the only thing that knows how much
         // of a frame is chrome. Asking the component for its width instead compares two
         // different moments: a window's component size is whatever the last size-changed
@@ -1515,7 +1514,68 @@ public class Window extends Container implements TopLevelContainer {
         int chromeW = Math.max(0, frame[2] - wm.getWidth(nativePeer));
         int chromeH = Math.max(0, frame[3] - wm.getHeight(nativePeer));
         setWindowSize(width + chromeW, height + chromeH);
+        if (isDecorated() && chromeW == 0 && chromeH == 0) {
+            // A peer exists but its geometry is not real yet. Mac Catalyst grants the
+            // window scene asynchronously and, until it arrives, answers both the frame
+            // and the drawable with the size that was asked for -- so the chrome
+            // measures zero and a decorated window would be left with its title bar
+            // eating the content. The request is kept and applied again from the first
+            // genuine size change.
+            pendingContentWidth = width;
+            pendingContentHeight = height;
+        } else {
+            pendingContentWidth = -1;
+            pendingContentHeight = -1;
+        }
     }
+
+    /// Applies a content size that could not be measured when it was asked for.
+    ///
+    /// Called from the size-changed callback, which is the first moment a platform
+    /// that grants its window asynchronously reports geometry worth measuring.
+    private void reapplyPendingContentSize() {
+        if (pendingContentWidth < 0 || pendingContentHeight < 0 || nativePeer == null
+                || reapplyingContentSize) {
+            return;
+        }
+        // Off the size callback rather than inside it. Correcting the size resizes the
+        // window, which reports another size change, and doing that while the port is
+        // still delivering the first one re-enters this path with half-applied
+        // geometry.
+        reapplyingContentSize = true;
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                reapplyingContentSize = false;
+                if (pendingContentWidth < 0 || pendingContentHeight < 0
+                        || nativePeer == null) {
+                    return;
+                }
+                WindowManager wm = manager();
+                int[] frame = wm.getBounds(nativePeer, new int[4]);
+                int chromeW = Math.max(0, frame[2] - wm.getWidth(nativePeer));
+                int chromeH = Math.max(0, frame[3] - wm.getHeight(nativePeer));
+                if (isDecorated() && chromeW == 0 && chromeH == 0) {
+                    // The geometry is still the size that was asked for rather than
+                    // anything measured, so the request stays pending. Waiting is the
+                    // whole point: treating this as "already correct" is what cleared
+                    // the request before the scene had ever reported a real frame.
+                    return;
+                }
+                if (wm.getWidth(nativePeer) == pendingContentWidth
+                        && wm.getHeight(nativePeer) == pendingContentHeight) {
+                    // Measurable, and already the size that was asked for.
+                    pendingContentWidth = -1;
+                    pendingContentHeight = -1;
+                    return;
+                }
+                setWindowContentSize(pendingContentWidth, pendingContentHeight);
+            }
+        });
+    }
+
+    /// True while a deferred content-size correction is queued.
+    private boolean reapplyingContentSize;
 
     /// A content size asked for before the peer existed, or -1.
     private int pendingContentWidth = -1;
@@ -2888,6 +2948,7 @@ public class Window extends Container implements TopLevelContainer {
         int oldWidth = getWidth();
         int oldHeight = getHeight();
         setSize(new Dimension(w, h));
+        reapplyPendingContentSize();
         setShouldCalcPreferredSize(true);
         if (windowLayeredPane != null) {
             windowLayeredPane.setWidth(w);
@@ -4071,12 +4132,18 @@ public class Window extends Container implements TopLevelContainer {
         // at all: fireKeyEvent is how a hosted dialog receives the back key, so
         // returning early here made a dialog with nothing focusable swallow its own
         // way out.
+        // Read before the focused component is given the key, because it is free to
+        // close the overlay that owns the keyboard -- an OK button on the top dialog
+        // does exactly that. Reading afterwards found the dialog underneath newly
+        // exposed and ran its default command for the same release, so one Enter
+        // dismissed two dialogs.
+        Container scopeAtRelease = keyInputScope;
         if (focusWithinKeyScope() && focused != null
                 && focused.getTopLevelContainer() == this //NOPMD CompareObjectsWithEquals
                 && focused.isEnabled()) {
             focused.keyReleased(keyCode);
         }
-        dispatchDefaultCommand(keyCode);
+        dispatchDefaultCommand(keyCode, scopeAtRelease);
         fireKeyEvent(keyCode);
     }
 
@@ -4092,12 +4159,16 @@ public class Window extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `keyCode`: the key that was released
-    private void dispatchDefaultCommand(int keyCode) {
+    ///
+    /// - `scope`: the overlay that owned the keyboard when the key arrived
+    private void dispatchDefaultCommand(int keyCode, Container scope) {
         if (Display.getInstance().getGameAction(keyCode) != Display.GAME_FIRE) {
             return;
         }
-        Container scope = keyInputScope;
-        if (!(scope instanceof Dialog)) {
+        // Still the owner, and still the one that owned it when the key arrived. A
+        // dialog that has already gone does not get a second bite, and the one it
+        // uncovered does not inherit this release.
+        if (!(scope instanceof Dialog) || scope != keyInputScope) { //NOPMD CompareObjectsWithEquals
             return;
         }
         Dialog dlg = (Dialog) scope;
