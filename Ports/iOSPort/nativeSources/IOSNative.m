@@ -7355,6 +7355,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(CN1_THREAD_S
 #endif
 }
 
+#if TARGET_OS_OSX
+/// The screen the view is actually on, falling back to the main one.
+///
+/// [NSScreen mainScreen] is the screen with the KEY window, not the screen
+/// showing this view. A player inside a secondary window on a second monitor,
+/// full-screened while some other window held focus, jumped to the focused
+/// window's monitor instead of growing where it already was.
+static NSScreen *cn1MacScreenFor(NSView *v) {
+    NSScreen *s = v.window.screen;
+    return s != nil ? s : [NSScreen mainScreen];
+}
+#endif
+
 void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN fullscreen) {
 #if TARGET_OS_OSX
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -7365,7 +7378,7 @@ void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(CN1_THRE
             // player that goes full screen, which is what the caller asked for
             // and what leaves the rest of the application where it was.
             if (fullscreen && !v.isInFullScreenMode) {
-                [v enterFullScreenMode:[NSScreen mainScreen] withOptions:nil];
+                [v enterFullScreenMode:cn1MacScreenFor(v) withOptions:nil];
             } else if (!fullscreen && v.isInFullScreenMode) {
                 [v exitFullScreenModeWithOptions:nil];
             }
@@ -7467,7 +7480,7 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
             // There is no modal presentation to make here. A Mac shows a video
             // "as the player" by going full screen, which is the closest thing
             // to what presentViewController: does on iOS.
-            [v enterFullScreenMode:[NSScreen mainScreen] withOptions:nil];
+            [v enterFullScreenMode:cn1MacScreenFor(v) withOptions:nil];
         }
         POOL_END();
     });

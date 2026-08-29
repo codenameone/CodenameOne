@@ -1744,9 +1744,22 @@ public class MacOSNativeBuilder extends Executor {
             // no entitlement and was denied at first use.
             if (applicationUsesCameraBackedVision(scanning, cls)) {
                 caps.usesCamera = true;
-                // The scanner session takes the microphone with it for the same
-                // reason a plain Camera.open() does: captureAudio defaults on.
-                caps.usesMicrophone = true;
+                // The camera only. These two do NOT take the microphone:
+                // VisionCameraView.start() opens its session with
+                // captureAudio(false) and CodeScanner delegates to that view,
+                // so a scanner application was being given
+                // NSMicrophoneUsageDescription and the audio-input entitlement
+                // for a device it never opens -- a privacy declaration it then
+                // has to justify at review.
+                //
+                // This is not the over-reporting rule below being contradicted.
+                // That one refuses to read the APPLICATION's own
+                // captureAudio(false), because an application that silences one
+                // session can still leave another on the default and would be
+                // terminated on the second. Here the setting is made by
+                // framework code the application cannot vary: every session
+                // these classes open is silent, so there is no second session
+                // to be wrong about.
             }
             // MapComponent by name rather than the whole maps package. Only that
             // class reads the LocationManager; LatLng, Coord, WebMercator and the

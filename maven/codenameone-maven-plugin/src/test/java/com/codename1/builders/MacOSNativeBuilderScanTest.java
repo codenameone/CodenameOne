@@ -517,4 +517,23 @@ public class MacOSNativeBuilderScanTest {
         assertFalse(MacOSNativeBuilder.usesNotifications(
                 "com/codename1/ui/Display", "setProperty"));
     }
+
+    /// A vision application gets the camera and NOT the microphone.
+    ///
+    /// VisionCameraView.start() opens its session with captureAudio(false) and
+    /// CodeScanner delegates to that view, so every session these classes open
+    /// is silent. Declaring the microphone anyway is a privacy string and an
+    /// audio-input entitlement the application has to justify at review for a
+    /// device it never opens.
+    @Test
+    public void aVisionApplicationIsNotAMicrophoneUser() {
+        assertTrue("a scanner application still needs the camera",
+                MacOSNativeBuilder.applicationUsesCameraBackedVision(
+                        "com/example/MyApp", "com/codename1/ai/vision/CodeScanner"));
+        // The microphone predicate is about the low level Camera entry points,
+        // and naming a vision class is not one of them.
+        assertFalse("naming a vision class must not take the microphone",
+                MacOSNativeBuilder.applicationOpensCameraMicrophone(
+                        "com/example/MyApp", "com/codename1/ai/vision/CodeScanner", "start"));
+    }
 }
