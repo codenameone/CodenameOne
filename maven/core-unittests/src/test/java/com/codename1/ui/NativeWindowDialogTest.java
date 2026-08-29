@@ -1034,4 +1034,52 @@ class NativeWindowDialogTest extends UITestBase {
         DisplayTest.flushEdt();
         assertTrue(second.isWindowDisposed());
     }
+
+    @FormTest
+    void aNativeDialogKeepsItsShortcutsAndDefaultCommand() {
+        // A window never reads a nested form's key listeners, and its default-command
+        // dispatch only runs for whatever holds the key scope -- neither of which the
+        // native path set up, so a dialog in a window of its own had neither.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        final int[] shortcut = new int[1];
+        final int[] defaultCmd = new int[1];
+
+        Dialog d = newDialog("keyboard");
+        d.setNativeWindowMode(true);
+        d.addKeyListener('k', new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                shortcut[0]++;
+            }
+        });
+        d.setDefaultCommand(new Command("OK") {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                defaultCmd[0]++;
+            }
+        });
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        Window w = d.getNativeWindow();
+        assertNotNull(w);
+
+        w.keyPressed('k');
+        w.keyReleased('k');
+        DisplayTest.flushEdt();
+        assertEquals(1, shortcut[0], "a shortcut on a native dialog has to fire");
+
+        int enter = Display.getInstance().getKeyCode(Display.GAME_FIRE);
+        w.keyPressed(enter);
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+        assertEquals(1, defaultCmd[0], "and so does its default command");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        assertTrue(w.isKeyInputScopeEmpty(),
+                "and the window gets its keyboard back afterwards");
+    }
 }

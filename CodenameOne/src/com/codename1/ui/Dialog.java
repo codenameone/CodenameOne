@@ -2125,6 +2125,12 @@ public class Dialog extends Form implements AbstractDialog {
         w.addWindowListener(new NativeDisposeBridge(this));
         initNativeWindow(w);
         hideOwnTitleIfDecorated(w);
+        // The keyboard, on the same terms as a hosted dialog. A window never reads a
+        // nested form's key listeners, and its default-command dispatch only runs for
+        // whatever holds the key scope -- so without these two a dialog in a window of
+        // its own had neither its shortcuts nor its default action.
+        w.pushKeyInputScope(this);
+        publishKeyListeners(w);
         if (modal) {
             // MODALITY_WINDOW, not APPLICATION. Desktop.blocks() already blocks the main
             // surface when the owner is a Form, and exempts a dialog opened from another
@@ -2240,6 +2246,20 @@ public class Dialog extends Form implements AbstractDialog {
         getTitleComponent().setVisible(false);
     }
 
+    /// The window this dialog is currently inside, whichever way it got there.
+    ///
+    /// A dialog reaches a window two ways -- into its layered pane, or as the content
+    /// of a window of its own -- and the keyboard has to work the same in both. Keeping
+    /// the two apart is what left a native-window dialog with no key listeners and no
+    /// default command.
+    ///
+    /// #### Returns
+    ///
+    /// the window, or null when this dialog is not in one
+    private Window hostWindow() {
+        return layerHost != null ? layerHost : nativeWindow;
+    }
+
     /// Registers this dialog's key listeners on its host window.
     ///
     /// #### Parameters
@@ -2301,22 +2321,24 @@ public class Dialog extends Form implements AbstractDialog {
     void keyListenerAdded(int keyCode, ActionListener listener) {
         // Added after the dialog was shown -- from onShow, say -- so it has to reach
         // the host the same way the ones present at show time did.
-        if (layerHost != null) {
-            publishKeyListener(layerHost, keyCode, listener);
+        Window host = hostWindow();
+        if (host != null) {
+            publishKeyListener(host, keyCode, listener);
         }
     }
 
     /// {@inheritDoc}
     @Override
     void keyListenerRemoved(int keyCode, ActionListener listener) {
-        if (layerHost == null || hostedKeyListeners == null) {
+        Window host = hostWindow();
+        if (host == null || hostedKeyListeners == null) {
             return;
         }
         for (int iter = 0; iter < hostedKeyListeners.size(); iter++) {
             HostedKeyListener wrapper = hostedKeyListeners.get(iter);
             if (wrapper.keyCode == keyCode
                     && wrapper.delegate == listener) { //NOPMD CompareObjectsWithEquals
-                layerHost.removeKeyListener(keyCode, wrapper);
+                host.removeKeyListener(keyCode, wrapper);
                 hostedKeyListeners.remove(iter);
                 return;
             }
@@ -2342,7 +2364,7 @@ public class Dialog extends Form implements AbstractDialog {
 
         @Override
         public void actionPerformed(ActionEvent evt) {
-            Window host = dlg.layerHost;
+            Window host = dlg.hostWindow();
             if (host == null) {
                 return;
             }
@@ -2441,6 +2463,9 @@ public class Dialog extends Form implements AbstractDialog {
         if (nativeWindow == null) {
             return;
         }
+        Window closing = nativeWindow;
+        unpublishKeyListeners(closing);
+        closing.removeKeyInputScope(this);
         nativeWindow = null;
         // The window can die without the dialog having asked -- an owner disposing its
         // children, the desktop shutting down, someone calling dispose() on what
