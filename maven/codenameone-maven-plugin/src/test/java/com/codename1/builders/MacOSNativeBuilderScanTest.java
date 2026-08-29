@@ -440,4 +440,32 @@ public class MacOSNativeBuilderScanTest {
         assertFalse(MacOSNativeBuilder.requestsNativeReview(null, "requestNativeInAppReview"));
         assertFalse(MacOSNativeBuilder.requestsNativeReview("com/codename1/ui/CN", null));
     }
+
+    /// Camera.requestPermissions is camera use, not only microphone use.
+    ///
+    /// It is the one call the documentation tells an application to make BEFORE
+    /// touching a camera, and it was the one call that did not earn it
+    /// NSCameraUsageDescription. MacCameraImpl answers it by asking AVFoundation
+    /// for video authorization, and asking without that key in the bundle does
+    /// not fail the request -- macOS terminates the process.
+    @Test
+    public void requestingCameraPermissionCountsAsUsingTheCamera() {
+        assertTrue(MacOSNativeBuilder.applicationOpensCameraSession(
+                "com/example/MyApp", "com/codename1/camera/Camera", "requestPermissions"));
+        // And still counts for the microphone, because the probe session it
+        // opens carries CameraSessionOptions' default captureAudio.
+        assertTrue(MacOSNativeBuilder.applicationOpensCameraMicrophone(
+                "com/example/MyApp", "com/codename1/camera/Camera", "requestPermissions"));
+    }
+
+    /// The framework's own callers are still excluded, which is the whole point
+    /// of taking the caller: com.codename1.ai.vision calls these entry points in
+    /// every build, so counting them would put a camera privacy string in every
+    /// macOS application ever produced.
+    @Test
+    public void theFrameworksOwnPermissionRequestStillDoesNotCount() {
+        assertFalse(MacOSNativeBuilder.applicationOpensCameraSession(
+                "com/codename1/ai/vision/CodeScanner",
+                "com/codename1/camera/Camera", "requestPermissions"));
+    }
 }

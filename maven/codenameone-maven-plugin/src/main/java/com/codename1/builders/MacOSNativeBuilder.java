@@ -1515,7 +1515,15 @@ public class MacOSNativeBuilder extends Executor {
         return "com/codename1/camera/Camera".equals(cls)
                 && (method.indexOf("open") > -1
                     || method.indexOf("getCameras") > -1
-                    || method.indexOf("getDefault") > -1);
+                    || method.indexOf("getDefault") > -1
+                    // requestPermissions counts as camera use, not only as
+                    // microphone use. MacCameraImpl answers it by asking
+                    // AVFoundation for video authorization, and asking for that
+                    // without NSCameraUsageDescription in the bundle does not
+                    // fail the request -- macOS terminates the process. So the
+                    // one documented call an application makes BEFORE touching
+                    // a camera was the one call that did not earn it the key.
+                    || method.indexOf("requestPermissions") > -1);
     }
 
     /// The framework's own classes that invoke the low level camera entry
@@ -1598,10 +1606,10 @@ public class MacOSNativeBuilder extends Executor {
     /// macos.entitlements.device.microphone=false turns it off for an
     /// application that knows every one of its sessions is silent.
     static boolean applicationOpensCameraMicrophone(String caller, String cls, String method) {
-        return applicationOpensCameraSession(caller, cls, method)
-                || (!isFrameworkCameraCaller(caller)
-                    && "com/codename1/camera/Camera".equals(cls)
-                    && method.indexOf("requestPermissions") > -1);
+        // requestPermissions is part of applicationOpensCameraSession now, so
+        // this is simply that test: the probe session it opens carries
+        // CameraSessionOptions' default captureAudio, which is true.
+        return applicationOpensCameraSession(caller, cls, method);
     }
 
     /// Whether an APPLICATION class opens a camera through the low level
