@@ -433,6 +433,16 @@ public class Sheet extends Container {
     }
 
     private void startTrackingBounds() {
+        // Only for a sheet on the main surface. The one reader of this list is the
+        // native peer hit test, which resolves against Display.getCurrent() and knows
+        // nothing of any other top level, so a rectangle from a secondary window would
+        // be compared against main-surface coordinates it has no relation to -- a peer
+        // there would stop receiving input because an unrelated window happens to hold
+        // a sheet over the same numbers. There is no true positive to lose: peers in a
+        // secondary window are never tested against this list at all.
+        if (!(shownHost instanceof Form)) {
+            return;
+        }
         trackSheetBounds = true;
         sheetEntry = sheetBounds;
         addSheetEntry(sheetEntry);

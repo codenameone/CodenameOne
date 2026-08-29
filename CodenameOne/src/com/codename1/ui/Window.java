@@ -3110,6 +3110,16 @@ public class Window extends Container implements TopLevelContainer {
                 new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y))) {
             return;
         }
+        if (gestureCancelled) {
+            // A listener put an overlay up without consuming the press -- showing a
+            // dialog from a press is routine, and a blocking progress dialog goes up
+            // while the finger is still down. pushPointerInputScope ended the gesture
+            // for exactly that reason, and carrying on to hit testing would undo it:
+            // the walk below resolves the overlay that was not there when the finger
+            // went down and makes it the release target, so the lift activates or
+            // dismisses UI this press never touched.
+            return;
+        }
         // A press dismisses any tooltip so it cannot linger over a drag image or be
         // stranded when the gesture rebuilds the UI, as on a Form.
         if (TooltipManager.getInstance() != null) {

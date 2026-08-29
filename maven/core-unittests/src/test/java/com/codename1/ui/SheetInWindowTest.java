@@ -65,6 +65,53 @@ class SheetInWindowTest extends UITestBase {
     }
 
     @FormTest
+    void aSheetOnAWindowIsNotTrackedForTheMainSurfaceHitTest() {
+        // The bounds list exists for one reader: the iOS native peer hit test, which
+        // resolves against Display.getCurrent() and has no notion of any other top
+        // level. A window-local rectangle offered to it is compared against
+        // main-surface coordinates it has nothing to do with, so a peer there stops
+        // receiving input because an unrelated window happens to hold a sheet over the
+        // same numbers.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        w.show();
+        DisplayTest.flushEdt();
+
+        Sheet onWindow = new Sheet(null, "options");
+        onWindow.setTopLevelHost(w);
+        onWindow.show(0);
+        settle(w);
+        assertTrue(onWindow.getWidth() > 0 && onWindow.getHeight() > 0,
+                "the sheet is laid out, so it has bounds that could be offered");
+        int x = onWindow.getAbsoluteX() + onWindow.getWidth() / 2;
+        int y = onWindow.getAbsoluteY() + onWindow.getHeight() / 2;
+        assertFalse(Sheet.isSheetVisibleAt(x, y),
+                "a sheet in a secondary window must not answer for the main surface");
+
+        onWindow.back(0);
+        settle(w);
+        w.dispose();
+        DisplayTest.flushEdt();
+
+        // The same query still works for the surface it was written for, so this is a
+        // scoping fix and not a switch that turns the feature off.
+        Sheet onForm = new Sheet(null, "options");
+        onForm.show(0);
+        settle(main);
+        int fx = onForm.getAbsoluteX() + onForm.getWidth() / 2;
+        int fy = onForm.getAbsoluteY() + onForm.getHeight() / 2;
+        assertTrue(Sheet.isSheetVisibleAt(fx, fy),
+                "a sheet on the main form still covers the peers underneath it");
+        onForm.back(0);
+        settle(main);
+    }
+
+    @FormTest
     void aSheetShownOnAWindowAttachesToThatWindow() {
         implementation.setMultiWindowSupported(true);
         Form main = new Form("main", new BorderLayout());

@@ -829,24 +829,24 @@ class DialogInWindowTest extends UITestBase {
 
         d.showModeless();
         DisplayTest.flushEdt();
-        w.pointerPressed(5, 5);
-        w.pointerReleased(5, 5);
+        w.pointerPressed(2, 2);
+        w.pointerReleased(2, 2);
         DisplayTest.flushEdt();
         int afterFirst = presses[0];
         assertTrue(afterFirst > 0, "the listener fires while the dialog is up");
 
         d.dispose();
         DisplayTest.flushEdt();
-        w.pointerPressed(5, 5);
-        w.pointerReleased(5, 5);
+        w.pointerPressed(2, 2);
+        w.pointerReleased(2, 2);
         DisplayTest.flushEdt();
         assertEquals(afterFirst, presses[0],
                 "and stops firing once the dialog has gone");
 
         d.showModeless();
         DisplayTest.flushEdt();
-        w.pointerPressed(5, 5);
-        w.pointerReleased(5, 5);
+        w.pointerPressed(2, 2);
+        w.pointerReleased(2, 2);
         DisplayTest.flushEdt();
         assertTrue(presses[0] > afterFirst,
                 "a dialog shown again still has the listeners it was built with");
@@ -1079,15 +1079,15 @@ class DialogInWindowTest extends UITestBase {
             }
         };
         d.addPointerPressedListener(late);
-        w.pointerPressed(5, 5);
-        w.pointerReleased(5, 5);
+        w.pointerPressed(2, 2);
+        w.pointerReleased(2, 2);
         DisplayTest.flushEdt();
         assertTrue(presses[0] > 0, "a listener added while hosted has to fire");
 
         int before = presses[0];
         d.removePointerPressedListener(late);
-        w.pointerPressed(5, 5);
-        w.pointerReleased(5, 5);
+        w.pointerPressed(2, 2);
+        w.pointerReleased(2, 2);
         DisplayTest.flushEdt();
         assertEquals(before, presses[0], "and removing it has to stop it");
 
@@ -2184,6 +2184,68 @@ class DialogInWindowTest extends UITestBase {
 
         low.dispose();
         DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aPressListenerThatShowsADialogDoesNotHandItTheRelease() {
+        // Showing a dialog from a press is routine, and a blocking progress dialog goes
+        // up while the finger is still down. The overlay ends the gesture as it takes
+        // the pointer, but the press was still being dispatched: carrying on to hit
+        // testing afterwards resolves the scrim that was not there when the finger went
+        // down and makes it the release target, so the lift dismisses a dialog this
+        // press never touched.
+        final Window w = openHost(600, 500);
+        final Dialog[] shown = new Dialog[1];
+        final boolean[] once = new boolean[1];
+        w.addPointerPressedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                if (once[0]) {
+                    return;
+                }
+                once[0] = true;
+                Dialog over = new Dialog("over");
+                over.setLayout(new BorderLayout());
+                over.add(BorderLayout.CENTER, new Label("over"));
+                over.setDisposeWhenPointerOutOfBounds(true);
+                over.setTopLevelHost(w);
+                shown[0] = over;
+                // Deliberately not consumed: a listener that puts UI up has no reason
+                // to claim the event, and that is the case this guards.
+                // Inset and modeless, so the card cannot cover the corner pressed
+                // below and that press lands on the backdrop.
+                over.show(80, 80, 80, 80, true, false);
+            }
+        });
+        DisplayTest.flushEdt();
+
+        // A corner, so it is outside the dialog card both when the finger goes down and
+        // when it comes up -- which is exactly what arms dispose-out-of-bounds.
+        w.pointerPressed(2, 2);
+        DisplayTest.flushEdt();
+        assertNotNull(shown[0], "the listener showed a dialog");
+        assertFalse(shown[0].isDisposed(), "which is up before the finger lifts");
+        // The Dialog container spans the window; the card is the title and content
+        // inside it, which is what dispose-out-of-bounds measures against.
+        assertFalse(shown[0].getContentPane().containsOrOwns(2, 2)
+                        || shown[0].getTitleComponent().containsOrOwns(2, 2)
+                        || shown[0].getMenuBar().containsOrOwns(2, 2),
+                "sanity: the corner pressed is on the backdrop, not on the card");
+
+        w.pointerReleased(2, 2);
+        DisplayTest.flushEdt();
+        assertFalse(shown[0].isDisposed(),
+                "the lift must not dismiss a dialog the press never touched");
+
+        // A whole gesture of its own still dismisses it, so this is a scoping fix and
+        // not a switch that turns dispose-out-of-bounds off.
+        w.pointerPressed(2, 2);
+        DisplayTest.flushEdt();
+        w.pointerReleased(2, 2);
+        DisplayTest.flushEdt();
+        assertTrue(shown[0].isDisposed(), "a press and release of its own still works");
+
         w.dispose();
         DisplayTest.flushEdt();
     }
