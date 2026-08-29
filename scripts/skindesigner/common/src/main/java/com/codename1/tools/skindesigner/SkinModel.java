@@ -40,6 +40,14 @@ public final class SkinModel {
     public int bezel = 40;
     public boolean homeIndicator = true;
     public List<Cutout> cutouts = new ArrayList<>();
+    /**
+     * Safe-area insets in DENSITY-INDEPENDENT units -- iOS points, Android
+     * dp -- prefilled from the device catalog, which stores the values
+     * Apple and Google publish (47/34 for a notch, 59/34 for an island).
+     * Everything else on this model (cornerR, bezel, cutout geometry) is
+     * in the 320-wide preview viewbox instead, so the two never share a
+     * scale factor; see buildProperties in SkinDesigner.
+     */
     public int safeTop = 40;
     public int safeBottom = 0;
 

@@ -46,6 +46,20 @@ public final class DeviceDatabase {
         public final boolean hasHomeIndicator;
         public final int safeTop;
         public final int safeBottom;
+        /**
+         * Physical pixels per density-independent unit -- iOS points,
+         * Android dp. {@link #safeTop} and {@link #safeBottom} are stored
+         * in those units (Apple and Google both document their insets that
+         * way), so anything that needs them in pixels multiplies by this.
+         *
+         * <p>Written by {@code build_devices_json.py::density_scale}. Do
+         * NOT substitute {@code resolutionW / DevicePreview.VB_W}: that
+         * ratio is the designer's drawing viewbox and is only accidentally
+         * equal to the scale on a 320pt-wide phone. On an iPhone 13 Pro Max
+         * (428pt wide) it is 34% too large, and on an iPad Pro 12.9 it is
+         * more than triple.</p>
+         */
+        public final double densityScale;
         public final int safeLeft;
         public final int safeRight;
         public final String systemFont;
@@ -61,6 +75,7 @@ public final class DeviceDatabase {
                String platformName,
                boolean hasNotch, boolean hasIsland, boolean hasHole, boolean hasHomeIndicator,
                int safeTop, int safeBottom, int safeLeft, int safeRight,
+               double densityScale,
                String systemFont, String proportionalFont, String monoFont,
                int fontSmall, int fontMedium, int fontLarge,
                boolean tablet) {
@@ -81,6 +96,7 @@ public final class DeviceDatabase {
             this.hasHomeIndicator = hasHomeIndicator;
             this.safeTop = safeTop;
             this.safeBottom = safeBottom;
+            this.densityScale = densityScale;
             this.safeLeft = safeLeft;
             this.safeRight = safeRight;
             this.systemFont = systemFont;
@@ -196,6 +212,15 @@ public final class DeviceDatabase {
             boolean hasHome = bool(m, "hasHome", false);
             int safeTop = num(m, "safeTop", 0);
             int safeBottom = num(m, "safeBottom", 0);
+            // Catalogs written before devices.json version 3 carry no
+            // "scale", so mirror density_scale() rather than fall back to
+            // something that would silently produce wrong safe areas.
+            double scale = numDouble(m, "scale", 0);
+            if (scale <= 0) {
+                scale = "ios".equals(platform)
+                        ? Math.max(1, Math.round(ppi / 163.0))
+                        : ppi / 160.0;
+            }
 
             Map<String, Object> fonts = m.get("fonts") instanceof Map
                     ? (Map<String, Object>) m.get("fonts")
@@ -211,7 +236,7 @@ public final class DeviceDatabase {
             if (w <= 0 || h <= 0 || ppi <= 0) return null;
             return new Device(id, brand, os, year, form, name, w, h, inches, ppi, platform,
                     hasNotch, hasIsland, hasHole, hasHome,
-                    safeTop, safeBottom, 0, 0,
+                    safeTop, safeBottom, 0, 0, scale,
                     sysFont, propFont, monoFont, sm, md, lg, tablet);
         } catch (Exception err) {
             Log.e(err);

@@ -239,6 +239,26 @@ def is_foldable(model: str, display_type: str) -> bool:
     ))
 
 
+def density_scale(plat: str, ppi: int) -> float:
+    """Physical pixels covered by one density-independent unit.
+
+    ``safeTop``/``safeBottom`` below are authored in density-independent
+    units -- iOS points, Android dp -- because that is how Apple and
+    Google document them. The skin designer has to turn them into the
+    pixel insets a ``.skin`` file carries, and the factor is this, NOT
+    ``w / 320``: the 320-wide figure is the designer's drawing viewbox
+    and has nothing to do with the device's density.
+
+    An iOS point is 1/163 inch and Apple only ships integral @2x/@3x
+    panels, so round to the nearest integer -- 458 ppi is a 3x device
+    even though 458/163 is 2.81. Android dp is 1/160 inch and reported
+    densities are not bucketed cleanly, so keep that one continuous.
+    """
+    if plat == "ios":
+        return float(max(1, round(ppi / 163.0)))
+    return round(ppi / 160.0, 3)
+
+
 def normalise(brand: str, model: str, specs: dict) -> Optional[dict]:
     title = specs.get("title", brand + " " + model)
     name = title.replace(brand + " ", "", 1) if title.startswith(brand + " ") else (model or title)
@@ -294,6 +314,9 @@ def normalise(brand: str, model: str, specs: dict) -> Optional[dict]:
     rec["hasHome"] = (plat == "ios" and (rec["hasNotch"] or rec["hasIsland"])) or (
         plat == "ios" and tablet and year >= 2018
     )
+    rec["scale"] = density_scale(plat, ppi)
+    # safeTop/safeBottom are density-independent units (iOS points,
+    # Android dp), scaled to pixels by rec["scale"] -- see density_scale.
     if rec["hasIsland"]:
         rec["safeTop"], rec["safeBottom"] = 59, 34
     elif rec["hasNotch"]:
@@ -434,7 +457,7 @@ def main() -> int:
         return 0
 
     payload = {
-        "version": 2,
+        "version": 3,
         "generator": "build_devices_json.py",
         "source": BASE,
         "count": len(merged),

@@ -5038,6 +5038,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             landscapeSkinHotspots = new HashMap<Point, Integer>();
             landscapeScreenCoordinates = new Rectangle();
             boolean roundScreen = props.getProperty("roundScreen", "false").equalsIgnoreCase("true");
+            // Every field below describes THIS skin. Clear them up front:
+            // they used to be assigned only on the branches that had a value
+            // for them, so loading a legacy skin after a skin designer one
+            // left the previous device's safe area in force and kept
+            // painting the skin over the UI (see the roundedSkin branch in
+            // paintComponent).
+            roundedSkin = false;
+            safeAreaPortrait = null;
+            safeAreaLandscape = null;
             boolean hasSafeAreaProps =
                     props.getProperty("safePortraitX") != null ||
                     props.getProperty("safePortraitY") != null ||

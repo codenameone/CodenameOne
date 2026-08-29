@@ -106,27 +106,29 @@ to expand its width / height / offset fields; the X button on the
 right removes it. The three add buttons at the bottom seed a sensible
 default of each type:
 
-* *Notch* (180 × 30 viewbox px) — physical hardware cutout. Notches
-  are drawn in the device frame *above* the screen rect, with the
-  bottom edge touching the screen top. Mirrors iPhone X / 11 / 12 /
-  13 hardware.
+* *Notch* (180 × 30 viewbox px) — the iPhone X / 11 / 12 / 13
+  hardware cutout. Drawn as an opaque shape hanging from the top edge
+  *inside* the screen rect, square at the top and rounded at the
+  bottom, because that's where it sits on the hardware: an iPhone 13
+  Pro Max reports 1284 × 2778 pixels and the notch eats into the top
+  of that rectangle.
 * *Island* (120 × 35) — Dynamic Island. Software-reserved space
-  rendered as an opaque pill *inside* the screen rect, floating on
-  top of the iOS status bar.
+  rendered as an opaque pill inside the screen rect, floating on top
+  of the iOS status bar.
 * *Hole* (28 × 28) — Android punch-hole camera. Rendered like the
   island: opaque circle inside the screen rect.
 
 Offsets are relative to the top-center of the screen, in viewbox
 pixels. For islands and holes, `Offset Y` is the gap between the
 cutout's top edge and the screen top. For notches, `Offset Y` is
-ignored (the notch is anchored to the frame).
+ignored, because a notch is anchored to the screen's top edge.
 
 WARNING: When the wizard generates the `.skin` file, it
-automatically extends `safePortraitTop` to cover any in-screen
-cutouts (islands, holes), so app content lands below the floating
-shape. You don't need to manually adjust safe area for the cutout
-itself; only adjust it if you need extra padding above your title
-bar.
+automatically pushes `safePortraitY` down to the lowest cutout edge
+whenever that sits below the platform's own status-bar inset, so app
+content lands below the shape instead of underneath it. You don't
+need to adjust the safe area for a cutout yourself; only adjust it
+if you want extra padding above your title bar.
 
 ==== Info tab
 
@@ -142,9 +144,14 @@ written into `skin.properties`:
 * *PPI / Pixels per millimeter* — the simulator uses
   `pixelMilliRatio = ppi / 25.4` to derive font sizes when none are
   specified in the skin.
-* *Safe area Top / Bottom* — the user-editable safe-area insets in
-  viewbox pixels. The wizard converts these to display-relative
-  pixels at save time.
+* *Safe area Top / Bottom* — the user-editable safe-area insets,
+  in the density-independent units the platform vendors publish:
+  points on iOS, dp on Android. A notched iPhone reserves 47pt at
+  the top and 34pt at the bottom, a Dynamic Island iPhone 59pt and
+  34pt, and an iPad 24pt on both edges. The wizard multiplies them
+  by the device's density scale to get the display-relative pixel
+  insets it writes into `skin.properties`, so the same 47 is
+  correct on every notched iPhone regardless of resolution.
 
 === Stage 4 — finish and download
 
@@ -153,8 +160,9 @@ image::img/skin-designer/skin-designer-stage-4-done.png[Done page showing the gr
 Clicking *Finish* in the editor's footer:
 
 . Renders the portrait skin image (`skin.png`) at the device's
-  actual resolution + bezel, with rounded corners, transparent
-  screen, opaque cutouts, and a home indicator if enabled.
+  actual resolution plus the bezel on all four sides, with rounded
+  corners, a transparent screen, opaque cutouts painted on that
+  screen, and a home indicator if enabled.
 . Synthesises the landscape skin (`skin_l.png`) by 90° rotation.
 . Writes `skin_map.png` / `skin_map_l.png` overlays that mark the
   screen rectangle for the simulator's screen-position detection.
