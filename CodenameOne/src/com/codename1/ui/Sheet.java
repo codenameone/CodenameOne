@@ -963,8 +963,6 @@ public class Sheet extends Container {
                     + "no form is current");
         }
         shownHost = f;
-        // Consumed by this showing; it must not decide where the sheet goes next time.
-        restoreOnHost = null;
         if (f.getAnimationManager().isAnimating()) {
             f.getAnimationManager().flushAnimation(new Runnable() {
                 @Override
@@ -974,6 +972,11 @@ public class Sheet extends Container {
             });
             return;
         }
+        // Consumed here rather than above, because the animating branch returns and
+        // queues this method again: clearing it earlier meant the retry resolved a host
+        // of its own and could restore the parent onto a different window than the
+        // child it came from, which is the split this field exists to prevent.
+        restoreOnHost = null;
         if (getParent() != null) {
             remove();
         }

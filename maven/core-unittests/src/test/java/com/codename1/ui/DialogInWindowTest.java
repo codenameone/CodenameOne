@@ -973,4 +973,115 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aHostedDialogWithNothingFocusableStillTakesTheKeyboard() {
+        // The scrim swallows presses but keys go to whatever the window last focused.
+        // A dialog with no focusable child of its own -- which is exactly what
+        // InfiniteProgress builds -- left the control behind it fully operable.
+        Window w = openHost(600, 500);
+        final int[] pressesBehind = new int[1];
+        Button behind = new Button("behind") {
+            @Override
+            public void keyPressed(int keyCode) {
+                pressesBehind[0]++;
+                super.keyPressed(keyCode);
+            }
+        };
+        w.add(BorderLayout.CENTER, behind);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+        w.setFocused(behind);
+        DisplayTest.flushEdt();
+
+        Dialog d = new Dialog("no focusables");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("please wait"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        w.keyPressed('a');
+        w.keyReleased('a');
+        DisplayTest.flushEdt();
+        assertEquals(0, pressesBehind[0],
+                "a key must not reach a control behind a dialog that covers it");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.keyPressed('a');
+        DisplayTest.flushEdt();
+        assertTrue(pressesBehind[0] > 0,
+                "and the control is reachable again once the dialog has gone");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aModelessHostedDialogStillDimsWhatIsBehindIt() {
+        // Form.showModal tints the previous surface whether or not the dialog blocks,
+        // so a modeless Dialog has always dimmed. Gating the scrim on modality dropped
+        // that, and with it the tint InfiniteProgress configures before showing.
+        Window w = openHost(600, 500);
+        Dialog d = new Dialog("modeless");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setDisposeWhenPointerOutOfBounds(false);
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        // The Dialog class layer inside the window's overlay, not the overlay itself:
+        // the overlay's children are the per-class layers.
+        Container layer = w.getFormLayeredPane(Dialog.class, true);
+        assertNotNull(layer);
+        assertEquals(2, layer.getComponentCount(),
+                "a backdrop and the dialog, not the dialog on its own");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aPointerListenerAddedWhileHostedStillFires() {
+        // Initialization hands over the listeners that existed at that instant and
+        // clears the dialog's dispatchers. One added afterwards -- from onShow, say --
+        // would sit in a dispatcher the window never consults.
+        Window w = openHost(600, 500);
+        final int[] presses = new int[1];
+        Dialog d = new Dialog("late listener");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        com.codename1.ui.events.ActionListener late =
+                new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                presses[0]++;
+            }
+        };
+        d.addPointerPressedListener(late);
+        w.pointerPressed(5, 5);
+        w.pointerReleased(5, 5);
+        DisplayTest.flushEdt();
+        assertTrue(presses[0] > 0, "a listener added while hosted has to fire");
+
+        int before = presses[0];
+        d.removePointerPressedListener(late);
+        w.pointerPressed(5, 5);
+        w.pointerReleased(5, 5);
+        DisplayTest.flushEdt();
+        assertEquals(before, presses[0], "and removing it has to stop it");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

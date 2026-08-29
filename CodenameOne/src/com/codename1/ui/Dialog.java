@@ -261,6 +261,12 @@ public class Dialog extends Form implements AbstractDialog {
     /// Whether the hosted showing in progress has a caller parked on it.
     private boolean hostedModal;
 
+    /// What owned the host's keyboard before this dialog took it.
+    private Container previousKeyScope;
+
+    /// The host's focus owner before this dialog took the keyboard.
+    private Component previousFocus;
+
     /// The host's shape when the dialog was shown, so a resize can tell an orientation
     /// flip from an ordinary resize. True when it was taller than it was wide.
     private boolean hostWasPortrait;
@@ -2404,14 +2410,18 @@ public class Dialog extends Form implements AbstractDialog {
         savedBgPainterValid = true;
         getStyle().setBgPainter(NO_OP_PAINTER);
 
-        if (modal || disposeWhenPointerOutOfBounds) {
-            // The host's tint, not the dialog's. The historical path dims the previous
-            // form and paints that form's tintColor, which is why ComboBox and the
-            // floating action button submenu set the host's tint to zero to opt out of
-            // dimming. Reading the dialog's own would ignore that and dim anyway.
-            scrim = new DialogScrim(this, host.getTintColor(), backdrop);
-            layer.addComponent(scrim);
-        }
+        // Always, for any Dialog. Form.showModal tints the previous surface whether or
+        // not the dialog blocks -- a modeless Dialog still replaces what was there --
+        // so gating this on modality dropped the dimming a modeless one has always had,
+        // and with it the tint InfiniteProgress.showInfiniteBlocking configures before
+        // showing itself modelessly. InteractionDialog is the thing that overlays
+        // without a backdrop, and it does not come through here.
+        //
+        // The host's tint, not the dialog's: the historical path dims the previous form
+        // and paints that form's tintColor, which is why ComboBox and the floating
+        // action button submenu set the host's tint to zero to opt out of dimming.
+        scrim = new DialogScrim(this, host.getTintColor(), backdrop);
+        layer.addComponent(scrim);
 
         applyDialogMargins(top, bottom, left, right, includeTitle);
         if (getTransitionOutAnimator() == null && getTransitionInAnimator() == null) {
@@ -2430,6 +2440,12 @@ public class Dialog extends Form implements AbstractDialog {
         // alive through layerHost.
         hostWindowListener = new HostWindowListener(this);
         host.addWindowListener(hostWindowListener);
+        // Keys follow the dialog, not the window's previous focus owner. Saved rather
+        // than cleared so a dialog over a dialog gives the keyboard back to the one
+        // underneath rather than to the window.
+        previousKeyScope = host.getKeyInputScope();
+        previousFocus = host.getFocused();
+        host.setKeyInputScope(this);
         focusFirstFocusable(host);
 
         onShow();
@@ -2654,6 +2670,17 @@ public class Dialog extends Form implements AbstractDialog {
                 host.removeWindowListener(hostWindowListener);
                 hostWindowListener = null;
             }
+            Container restoredScope = previousKeyScope;
+            previousKeyScope = null;
+            host.setKeyInputScope(restoredScope);
+            // Focus goes back to what this dialog covered, but only when nothing else
+            // is still holding the keyboard: with a dialog stacked under this one that
+            // dialog owns it, and handing focus to what is behind both would let keys
+            // reach a control it is still covering.
+            if (previousFocus != null && restoredScope == null) {
+                host.setFocused(previousFocus);
+            }
+            previousFocus = null;
         }
         if (scrim != null) {
             scrim.remove();

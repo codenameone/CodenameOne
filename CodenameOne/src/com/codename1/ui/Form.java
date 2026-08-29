@@ -2791,6 +2791,150 @@ public class Form extends Container implements TopLevelContainer {
         }
     }
 
+    /// {@inheritDoc}
+    ///
+    /// While this form's listeners live on a host -- which is the case for the whole
+    /// time it is embedded, or hosted in a window -- additions and removals have to go
+    /// there too. The host's pointer dispatch is what drives the hierarchy, so a
+    /// listener added later (from `onShow()`, say) would sit in a dispatcher nothing
+    /// consults, and removing a transferred one would leave it firing on the host.
+    @Override
+    public void addPointerPressedListener(ActionListener l) {
+        if (routeToHost(POINTER_PRESSED, l, true)) {
+            return;
+        }
+        super.addPointerPressedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void removePointerPressedListener(ActionListener l) {
+        if (routeToHost(POINTER_PRESSED, l, false)) {
+            return;
+        }
+        super.removePointerPressedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void addPointerDraggedListener(ActionListener l) {
+        if (routeToHost(POINTER_DRAGGED, l, true)) {
+            return;
+        }
+        super.addPointerDraggedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void removePointerDraggedListener(ActionListener l) {
+        if (routeToHost(POINTER_DRAGGED, l, false)) {
+            return;
+        }
+        super.removePointerDraggedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void addPointerReleasedListener(ActionListener l) {
+        if (routeToHost(POINTER_RELEASED, l, true)) {
+            return;
+        }
+        super.addPointerReleasedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void removePointerReleasedListener(ActionListener l) {
+        if (routeToHost(POINTER_RELEASED, l, false)) {
+            return;
+        }
+        super.removePointerReleasedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void addLongPressListener(ActionListener l) {
+        if (routeToHost(LONG_PRESS, l, true)) {
+            return;
+        }
+        super.addLongPressListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void removeLongPressListener(ActionListener l) {
+        if (routeToHost(LONG_PRESS, l, false)) {
+            return;
+        }
+        super.removeLongPressListener(l);
+    }
+
+    /// Sends a listener change to the host this form transferred its listeners to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kind`: which of the four pointer listener kinds this is
+    ///
+    /// - `l`: the listener
+    ///
+    /// - `adding`: true to add, false to remove
+    ///
+    /// #### Returns
+    ///
+    /// true when the host took it, false when this form is not embedded and should
+    /// keep the listener itself
+    private boolean routeToHost(int kind, ActionListener l, boolean adding) {
+        TopLevelContainer host = transferredListenerHost;
+        if (host == null) {
+            return false;
+        }
+        ArrayList<ActionListener> tracked = trackedFor(kind);
+        if (adding) {
+            addTransferred(host, kind, l);
+            if (tracked == null) {
+                tracked = new ArrayList<ActionListener>();
+                setTrackedFor(kind, tracked);
+            }
+            tracked.add(l);
+        } else {
+            removeTransferred(host, kind, l);
+            if (tracked != null) {
+                tracked.remove(l);
+            }
+        }
+        return true;
+    }
+
+    private ArrayList<ActionListener> trackedFor(int kind) {
+        switch (kind) {
+            case POINTER_PRESSED:
+                return transferredPointerPressed;
+            case POINTER_DRAGGED:
+                return transferredPointerDragged;
+            case POINTER_RELEASED:
+                return transferredPointerReleased;
+            default:
+                return transferredLongPress;
+        }
+    }
+
+    private void setTrackedFor(int kind, ArrayList<ActionListener> v) {
+        switch (kind) {
+            case POINTER_PRESSED:
+                transferredPointerPressed = v;
+                break;
+            case POINTER_DRAGGED:
+                transferredPointerDragged = v;
+                break;
+            case POINTER_RELEASED:
+                transferredPointerReleased = v;
+                break;
+            default:
+                transferredLongPress = v;
+                break;
+        }
+    }
+
     private void addOwn(int kind, ActionListener l) {
         switch (kind) {
             case POINTER_PRESSED:

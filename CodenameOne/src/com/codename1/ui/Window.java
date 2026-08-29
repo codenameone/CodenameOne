@@ -3552,11 +3552,70 @@ public class Window extends Container implements TopLevelContainer {
 
     private void initFocused() {
         if (focused == null) {
-            Component first = getActualPane().findFirstFocusable();
+            // The blocking overlay first when there is one, then the content. Unlike
+            // Form.initFocused this used to search the content pane only, so a window
+            // with a modal dialog over it would hand focus straight back to a control
+            // underneath the dialog.
+            Component first = keyInputScope != null
+                    ? keyInputScope.findFirstFocusable() : null;
+            if (first == null && keyInputScope == null) {
+                first = getActualPane().findFirstFocusable();
+            }
             if (first != null) {
                 setFocused(first);
             }
         }
+    }
+
+    /// The container that owns the keyboard while it is set, or null when the whole
+    /// window does.
+    ///
+    /// A hosted modal dialog covers the window and swallows presses through its scrim,
+    /// but keys are dispatched to whatever the window last focused -- which is a
+    /// control underneath it. A dialog with nothing focusable of its own, which is
+    /// exactly what InfiniteProgress builds, therefore left the button or text field
+    /// behind it fully operable from the keyboard.
+    private Container keyInputScope;
+
+    /// The container currently owning the keyboard, or null.
+    Container getKeyInputScope() {
+        return keyInputScope;
+    }
+
+    /// Confines the keyboard to a container, or releases it with null. Nested overlays
+    /// save and restore what was in force rather than clearing it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scope`: the container that owns keys, or null for the whole window
+    void setKeyInputScope(Container scope) {
+        this.keyInputScope = scope;
+        if (scope != null && (focused == null || !scope.contains(focused))) {
+            focused = null;
+            initFocused();
+        }
+    }
+
+    /// Whether a key may be dispatched at all.
+    ///
+    /// #### Returns
+    ///
+    /// false when a blocking overlay is up and nothing in it can take the key, in
+    /// which case the key is dropped rather than reaching what is behind it
+    private boolean focusWithinKeyScope() {
+        if (keyInputScope == null) {
+            return true;
+        }
+        if (focused != null && keyInputScope.contains(focused)) {
+            return true;
+        }
+        Component first = keyInputScope.findFirstFocusable();
+        if (first != null) {
+            setFocused(first);
+            return true;
+        }
+        focused = null;
+        return false;
     }
 
     /// {@inheritDoc}
@@ -3684,6 +3743,9 @@ public class Window extends Container implements TopLevelContainer {
     /// window does not have: commands reach the desktop menu instead.
     @Override
     public void keyPressed(int keyCode) {
+        if (!focusWithinKeyScope()) {
+            return;
+        }
         int game = Display.getInstance().getGameAction(keyCode);
         if (focused != null) {
             if (focused.isEnabled()) {
@@ -3709,7 +3771,12 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void keyReleased(int keyCode) {
-        if (focused != null && focused.getTopLevelContainer() == this //NOPMD CompareObjectsWithEquals
+        // The scope gates who the key is delivered to, not whether the window hears it
+        // at all: fireKeyEvent is how a hosted dialog receives the back key, so
+        // returning early here made a dialog with nothing focusable swallow its own
+        // way out.
+        if (focusWithinKeyScope() && focused != null
+                && focused.getTopLevelContainer() == this //NOPMD CompareObjectsWithEquals
                 && focused.isEnabled()) {
             focused.keyReleased(keyCode);
         }

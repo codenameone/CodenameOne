@@ -413,7 +413,13 @@ public interface TopLevelContainer {
     /// true when this top level is showing
     boolean isTopLevelShowing();
 
-        Rectangle getSafeArea();
+    /// Returns the region of this top level that is guaranteed not to be obscured
+    /// by system chrome such as a notch or a rounded corner.
+    ///
+    /// #### Returns
+    ///
+    /// the safe area rectangle
+    Rectangle getSafeArea();
 
     /// Returns the height hidden behind the virtual keyboard, which is zero on a
     /// platform without one.
