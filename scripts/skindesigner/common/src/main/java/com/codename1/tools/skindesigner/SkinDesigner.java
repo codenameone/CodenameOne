@@ -1687,7 +1687,12 @@ public class SkinDesigner extends Lifecycle {
             } else if (SkinModel.CUTOUT_ISLAND.equals(c.type)) {
                 fillRoundedRect(data, w, h, x0, oy, cw, ch, ch / 2);
             } else if (SkinModel.CUTOUT_HOLE.equals(c.type)) {
-                fillCircle(data, w, h, x0 + cw / 2, oy + ch / 2, cw / 2);
+                // An ellipse filling the box, which is what DevicePreview
+                // draws (g.fillArc with the cutout's w and h). A circle of
+                // diameter cw ignored c.h, so a hole taller or wider than it
+                // is square painted opaque pixels outside its own rectangle
+                // -- and that rectangle is what the simulator hit-tests.
+                fillEllipse(data, w, h, x0, oy, cw, ch);
             }
         }
     }
@@ -1747,6 +1752,26 @@ public class SkinDesigner extends Lifecycle {
         }
     }
 
+    private void fillEllipse(int[] data, int w, int h, int x, int y, int rw, int rh) {
+        if (rw <= 0 || rh <= 0) return;
+        float ax = rw / 2f;
+        float by = rh / 2f;
+        float cx = x + ax - 0.5f;
+        float cy = y + by - 0.5f;
+        int x2 = Math.min(w, x + rw);
+        int y2 = Math.min(h, y + rh);
+        for (int yy = Math.max(0, y); yy < y2; yy++) {
+            for (int xx = Math.max(0, x); xx < x2; xx++) {
+                float dx = (xx - cx) / ax;
+                float dy = (yy - cy) / by;
+                if (dx * dx + dy * dy <= 1f) {
+                    data[yy * w + xx] = 0xff000000;
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("unused")
     private void fillCircle(int[] data, int w, int h, int cx, int cy, int r) {
         int r2 = r * r;
         for (int yy = Math.max(0, cy - r); yy < Math.min(h, cy + r + 1); yy++) {
@@ -1839,10 +1864,13 @@ public class SkinDesigner extends Lifecycle {
         float vbToPx = (float) device.resolutionW / DevicePreview.VB_W;
         int cutoutBottomPx = 0;
         for (SkinModel.Cutout c : skin.cutouts) {
-            // A notch is anchored to the screen's top edge, so its own
-            // offset does not apply -- it reaches exactly its height down.
-            int extentVB = SkinModel.CUTOUT_NOTCH.equals(c.type) ? c.h : c.y + c.h;
-            int extentPx = Math.round(extentVB * vbToPx);
+            // Measured off the rectangle that actually gets painted and
+            // declared, not recomputed from viewbox units: round(y) +
+            // round(h) and round(y + h) differ by a pixel often enough, and
+            // the difference would leave a cutout edge one pixel below the
+            // reserved band.
+            int[] r = cutoutRectPx(c, vbToPx);
+            int extentPx = r[1] + r[3];
             if (extentPx > cutoutBottomPx) {
                 cutoutBottomPx = extentPx;
             }
@@ -1862,6 +1890,16 @@ public class SkinDesigner extends Lifecycle {
         // would also reject the screen's rounded CORNERS, which are real
         // touch surface on the hardware. So declare the cutouts explicitly.
         // A skin without this property behaves exactly as before.
+        // Rectangles, not shapes. The simulator rejects the whole box, so a
+        // visible corner of the box outside a pill or ellipse is rejected
+        // with it. That costs nothing: safeTopPx above is floored at the
+        // lowest cutout edge, so every rectangle here lies inside the
+        // reserved band, where app content does not render. Carrying the
+        // shape instead would mean a second copy of the rasteriser's
+        // geometry inside JavaSEPort, free to drift from the one that paints
+        // the pixels -- which is what cutoutRectPx exists to prevent. What
+        // does matter is that the painted shape never escapes its rectangle,
+        // and each branch above stays inside the box it is given.
         StringBuilder cutoutRects = new StringBuilder();
         for (SkinModel.Cutout c : skin.cutouts) {
             int[] r = cutoutRectPx(c, vbToPx);
