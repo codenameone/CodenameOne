@@ -1770,6 +1770,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-08-29T15:01:12+00:00"
+      },
+      "devto": {
+        "id": 4523495,
+        "url": "https://dev.to/codenameone/watch-apps-one-codebase-two-real-applications-215f",
+        "syndicated_at": "2026-08-29T17:06:29+00:00"
       }
     }
   }
