@@ -5574,4 +5574,33 @@ class WindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aContentSizeAskedForBeforeShowingIsStillAContentSize() {
+        // Before there is a peer there is no chrome to measure, and the request used to
+        // be applied as an ordinary frame size -- so the drawable came out short by the
+        // title bar, which is the opposite of what the method promises. Only a caller
+        // who knew to ask again after showing got what it asked for.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+
+        Window w = new Window("sized early", new BorderLayout());
+        w.setDecorated(true);
+        w.setWindowContentSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+
+        // The drawable, which is what was asked for. Asserting the difference between
+        // the frame and the drawable instead would only restate the fake manager's own
+        // insets and pass whatever the window did with the request.
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(400, wm.getWidth(peer),
+                "the drawable has to be the size the caller asked for");
+        assertEquals(300, wm.getHeight(peer));
+        assertEquals(420, peer.getWidth(), "with the chrome added on top of it");
+        assertEquals(350, peer.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

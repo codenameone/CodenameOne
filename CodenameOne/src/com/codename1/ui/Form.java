@@ -3037,6 +3037,17 @@ public class Form extends Container implements TopLevelContainer {
         }
         ArrayList<TransferredListener> tracked = trackedFor(kind);
         if (adding) {
+            // Registered twice is registered once, as it is on any dispatcher. The
+            // host's own collection ignores the duplicate, but the exemption list is
+            // walked directly while an overlay owns the pointer, so a second entry
+            // meant one press called the listener twice.
+            if (tracked != null) {
+                for (TransferredListener existing : tracked) {
+                    if (existing.listener == l) { //NOPMD CompareObjectsWithEquals
+                        return true;
+                    }
+                }
+            }
             // Same ownership question as the bulk transfer: if the host already holds
             // this listener, adding it here does nothing and removing it later would
             // take away a registration this form never made.

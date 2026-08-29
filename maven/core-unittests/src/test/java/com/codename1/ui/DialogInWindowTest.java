@@ -1803,4 +1803,42 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void addingTheSamePointerListenerTwiceWhileHostedStillCallsItOnce() {
+        // Registered twice is registered once, as it is on any dispatcher. The host's
+        // own collection ignores the duplicate, but the exemption list is walked
+        // directly while an overlay owns the pointer, so a second entry meant one press
+        // called the listener twice.
+        Window w = openHost(600, 500);
+        final int[] hits = new int[1];
+        ActionListener l = new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                hits[0]++;
+            }
+        };
+
+        Dialog d = new Dialog("double registered");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        d.addPointerPressedListener(l);
+        d.addPointerPressedListener(l);
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(1, hits[0], "one registration means one call");
+
+        d.removePointerPressedListener(l);
+        w.pointerPressed(10, 10);
+        DisplayTest.flushEdt();
+        assertEquals(1, hits[0], "and removing it stops it completely");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

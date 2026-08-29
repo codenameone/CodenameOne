@@ -1493,11 +1493,18 @@ public class Window extends Container implements TopLevelContainer {
             return;
         }
         if (nativePeer == null) {
-            // Nothing to measure against yet, so this is an ordinary size. show()
-            // applies it, and a caller that needs the exact fit can ask again after.
+            // There is nothing to measure the chrome against yet, so the request is
+            // held and applied again once the peer exists. Treating it as an ordinary
+            // frame size here was the whole defect: the drawable came out short by the
+            // title bar, which is the opposite of what this method promises, and only a
+            // caller who knew to ask a second time after showing got what it asked for.
+            pendingContentWidth = width;
+            pendingContentHeight = height;
             setWindowSize(width, height);
             return;
         }
+        pendingContentWidth = -1;
+        pendingContentHeight = -1;
         // Both numbers come from the port, which is the only thing that knows how much
         // of a frame is chrome. Asking the component for its width instead compares two
         // different moments: a window's component size is whatever the last size-changed
@@ -1509,6 +1516,12 @@ public class Window extends Container implements TopLevelContainer {
         int chromeH = Math.max(0, frame[3] - wm.getHeight(nativePeer));
         setWindowSize(width + chromeW, height + chromeH);
     }
+
+    /// A content size asked for before the peer existed, or -1.
+    private int pendingContentWidth = -1;
+
+    /// The height half of `#pendingContentWidth`.
+    private int pendingContentHeight = -1;
 
     /// Moves and resizes this window.
     ///
@@ -2068,6 +2081,10 @@ public class Window extends Container implements TopLevelContainer {
             if (minimumWindowSize != null) {
                 wm.setMinimumSize(nativePeer, minimumWindowSize.getWidth(),
                         minimumWindowSize.getHeight());
+            }
+            if (pendingContentWidth >= 0 && pendingContentHeight >= 0) {
+                // Asked for before there was a peer to measure the chrome against.
+                setWindowContentSize(pendingContentWidth, pendingContentHeight);
             }
         }
         Desktop.getInstance().registerWindow(this);
