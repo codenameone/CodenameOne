@@ -2249,4 +2249,65 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+    @FormTest
+    void aDialogOpenedByAKeyReleaseDoesNotAlsoHandleThatKey() {
+        // Nothing holds the keyboard when the key arrives, so the release belongs to the
+        // window itself. A focused control opening a dialog from it is ordinary -- and
+        // the dialog publishes its shortcuts onto this same window as it goes up. The
+        // listeners are dispatched from two snapshots, so one taken after the dialog
+        // appeared contains it, and the key that opened the dialog then ran its Enter
+        // shortcut: the dialog shut again before it was ever seen.
+        final Window w = openHost(600, 500);
+        final int[] closedByShortcut = new int[1];
+        final Dialog[] opened = new Dialog[1];
+        int enter = Display.getInstance().getKeyCode(Display.GAME_FIRE);
+        final int enterCode = enter;
+
+        Button opener = new Button("open") {
+            @Override
+            public void keyReleased(int keyCode) {
+                super.keyReleased(keyCode);
+                if (opened[0] != null) {
+                    return;
+                }
+                final Dialog d = new Dialog("opened");
+                d.setLayout(new BorderLayout());
+                d.add(BorderLayout.CENTER, new Label("body"));
+                d.addKeyListener(enterCode, new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        closedByShortcut[0]++;
+                        d.dispose();
+                    }
+                });
+                d.setTopLevelHost(w);
+                opened[0] = d;
+                d.showModeless();
+            }
+        };
+        w.add(BorderLayout.CENTER, opener);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+        w.setFocused(opener);
+        DisplayTest.flushEdt();
+
+        w.keyPressed(enter);
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+
+        assertNotNull(opened[0], "the release opened a dialog");
+        assertEquals(0, closedByShortcut[0],
+                "the key that opened it must not also run its shortcut");
+        assertFalse(opened[0].isDisposed(), "so the dialog is still up");
+
+        // Its own keystroke still reaches it, so this scopes the dispatch rather than
+        // silencing the dialog.
+        w.keyPressed(enter);
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+        assertEquals(1, closedByShortcut[0], "a keystroke of its own still works");
+        assertTrue(opened[0].isDisposed());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

@@ -4254,12 +4254,14 @@ public class Window extends Container implements TopLevelContainer {
         // closed itself -- so the one it uncovered would answer a release whose press
         // it never saw.
         keyDispatchScope = scopeAtRelease;
+        keyDispatchActive = true;
         try {
             fireKeyEvent(keyCode);
             // Both maps, which is what Form.keyReleased does. Dispatching only the raw
             // code left every game key shortcut on a hosted dialog silently dead.
             fireGameKeyEvent(keyCode);
         } finally {
+            keyDispatchActive = false;
             keyDispatchScope = null;
         }
     }
@@ -4328,6 +4330,10 @@ public class Window extends Container implements TopLevelContainer {
     /// null scope, which is a real answer meaning the window itself owned the key.
     private boolean keyPressScopeValid;
 
+    /// Whether a key is being dispatched right now. Distinct from a null scope, which
+    /// is a real answer meaning the window itself owned the key rather than any overlay.
+    private boolean keyDispatchActive;
+
     /// The overlay that owned the keyboard when the release being dispatched arrived,
     /// or null outside a dispatch.
     private Container keyDispatchScope;
@@ -4343,8 +4349,19 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// true if the listener should run
     boolean isKeyDispatchOwner(Container owner) {
-        Container scope = keyDispatchScope != null ? keyDispatchScope : keyInputScope;
-        return scope == null || scope == owner; //NOPMD CompareObjectsWithEquals
+        if (keyDispatchActive) {
+            // Null is a real answer while a key is being dispatched: the window itself
+            // owned it, so no hosted dialog did, and none may claim it now. Falling
+            // back to the live scope here let a dialog opened by an earlier handler in
+            // this same release answer for it -- the listeners are dispatched from two
+            // separate snapshots, so one taken after the dialog went up contains it --
+            // and an Enter that opened a dialog whose Enter listener closes it shut the
+            // dialog again before it was ever seen.
+            return keyDispatchScope == owner; //NOPMD CompareObjectsWithEquals
+        }
+        // Outside a dispatch there is no key to attribute, so the question is only
+        // whether anything currently holds the keyboard away from this owner.
+        return keyInputScope == null || keyInputScope == owner; //NOPMD CompareObjectsWithEquals
     }
 
     /// Game key listeners, by game action.
