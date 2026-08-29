@@ -161,6 +161,36 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             return TEST_TIMEOUT_MS_NATIVE * 2;
         }
         if (!"HTML5".equals(Display.getInstance().getPlatformName())
+                && testClass instanceof GoogleWebMapScreenshotTest) {
+            // The same poll-cap-inside-the-budget inversion the VectorMap
+            // branch above exists to fix, in a test nobody applied it to.
+            // waitForMapReady polls for 24s and only THEN reports
+            // "SKIPPED reason=map-tiles-never-loaded" -- the outcome the test
+            // was written to produce, because an unreachable Google Maps API
+            // says nothing about the port and a red there is one the suite
+            // cannot act on. Against the 30s default that skip had 5s to
+            // happen in, once form setup, the web view, the 1s settle and the
+            // capture were paid for. The runner declared the timeout first,
+            // so the graceful answer was unreachable and an unreachable
+            // network was indistinguishable from a broken renderer.
+            //
+            // Observed in run 33231956992 on the Metal leg: the first attempt
+            // exhausted its budget and went silent as designed, the retry ran
+            // 34.6s without ever reaching its own 24s cap, and the test failed
+            // at stage=retry-created having never reported anything.
+            //
+            // Derived from the cap rather than restated, exactly as the
+            // VectorMap branch is, so the ordering cannot drift when either
+            // side is tuned. The cost is paid only when the map never loads:
+            // the first attempt's deliberate hand-off to the silent-timeout
+            // retry now waits out this budget instead of the default, so a
+            // tiles-never-load run takes about a minute longer and ends in
+            // a SKIP that names the reason rather than a failure that does
+            // not.
+            return GoogleWebMapScreenshotTest.MAX_WAIT_MS
+                    + TEST_TIMEOUT_MS_NATIVE;
+        }
+        if (!"HTML5".equals(Display.getInstance().getPlatformName())
                 && (testClass instanceof VideoIODecodedFramesScreenshotTest
                         || testClass instanceof VideoIORoundTripTest)) {
             // The two tests that drive a real native video encode and decode,

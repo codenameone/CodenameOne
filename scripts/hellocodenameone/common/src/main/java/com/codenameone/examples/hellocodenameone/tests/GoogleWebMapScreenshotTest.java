@@ -57,6 +57,13 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
     /// two-12s-attempt split fared worse: neither window fit a cold load).
     private static final int WAIT_ATTEMPTS = 48;
 
+    /// How long waitForMapReady polls before it gives up, exposed so
+    /// Cn1ssDeviceRunner can size this test's budget from it rather than
+    /// restate it. Derived rather than written twice, so the two cannot
+    /// drift apart when either side is tuned -- which is exactly how the
+    /// skip below became unreachable.
+    static final int MAX_WAIT_MS = WAIT_ATTEMPTS * 500;
+
     /// Set when the first attempt exhausted its budget and the test went silent
     /// to hand control to the runner's silent-timeout retry (which re-runs the
     /// whole test on the SAME instance with a fresh 30s budget and a warm
@@ -193,7 +200,7 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
                 // WebKit (the cold-process page load is what ate the first budget).
                 retriedOnce = true;
                 System.out.println("CN1SS:WARN:test=GoogleWebMap tiles not loaded after "
-                        + (WAIT_ATTEMPTS * 500)
+                        + MAX_WAIT_MS
                         + "ms; going silent to hand off to the runner's timeout retry");
                 try {
                     currentMap.dispose();
