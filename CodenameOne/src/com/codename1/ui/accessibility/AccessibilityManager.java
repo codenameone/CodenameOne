@@ -127,6 +127,15 @@ public final class AccessibilityManager {
         return dirtyRoots.size();
     }
 
+    /// How many roots currently have a cached tree.
+    ///
+    /// #### Returns
+    ///
+    /// the size of the snapshot cache
+    public synchronized int cachedRootCount() {
+        return snapshotsByRoot.size();
+    }
+
     /// Marks a root's tree stale.
     ///
     /// #### Parameters
@@ -416,6 +425,12 @@ public final class AccessibilityManager {
                 return;
             }
             snapshotsByRoot.remove(evictable);
+            // And out of the dirty set with it. Dirtiness is only ever recorded for a
+            // root that has a cached tree, so an entry left behind here describes a
+            // tree that no longer exists -- and because a form never releases its root
+            // explicitly, that entry would hold the form and its whole hierarchy for
+            // good.
+            dirtyRoots.remove(evictable);
         }
     }
 

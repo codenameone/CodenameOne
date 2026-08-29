@@ -528,4 +528,44 @@ class AccessibilityWindowTest extends UITestBase {
                 "a form with no cached tree must not be recorded as stale, "
                         + "and so must not be held by the manager");
     }
+
+    @FormTest
+    void aDirtyFormEvictedFromTheCacheIsNotHeldByTheDirtySet() {
+        // Dirtiness is only recorded for a root that has a cached tree, so an entry
+        // left behind by eviction describes a tree that no longer exists -- and a form
+        // never releases its root explicitly, so that entry held the form and its whole
+        // hierarchy for good.
+        AccessibilityManager mgr = AccessibilityManager.getInstance();
+        int before = mgr.dirtyRootCount();
+
+        Form doomed = new Form("doomed", new BorderLayout());
+        Button b = new Button("in the doomed form");
+        doomed.add(BorderLayout.CENTER, b);
+        doomed.show();
+        DisplayTest.flushEdt();
+        // Cached, then made stale while it still has a tree.
+        assertTrue(mentions(mgr.getSnapshot(doomed), "in the doomed form"));
+        b.setText("renamed");
+        DisplayTest.flushEdt();
+
+        // Enough other surfaces, each cached, to push it out of the cache. It is no
+        // longer the current form, so it is the one eviction is allowed to take.
+        for (int iter = 0; iter < 12; iter++) {
+            Form f = new Form("filler " + iter, new BorderLayout());
+            f.add(BorderLayout.CENTER, new Button("filler " + iter));
+            f.show();
+            DisplayTest.flushEdt();
+            mgr.getSnapshot(f);
+        }
+
+        // The invariant, rather than an exact count: dirtiness is only ever recorded
+        // for a root that has a cached tree, so the dirty set can never be larger than
+        // the cache. Eviction is the only thing that can break that, and it did --
+        // the set kept one entry per form shown rather than at most one per cached
+        // tree.
+        assertTrue(mgr.dirtyRootCount() <= mgr.cachedRootCount(),
+                "the dirty set must not outgrow the cache it describes: "
+                        + mgr.dirtyRootCount() + " dirty vs " + mgr.cachedRootCount()
+                        + " cached");
+    }
 }
