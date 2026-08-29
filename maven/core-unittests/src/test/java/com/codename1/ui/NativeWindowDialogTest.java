@@ -28,6 +28,7 @@ import com.codename1.testing.TestWindowManager;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.animations.Transition;
 import com.codename1.ui.plaf.UIManager;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -1081,5 +1082,50 @@ class NativeWindowDialogTest extends UITestBase {
         DisplayTest.flushEdt();
         assertTrue(w.isKeyInputScopeEmpty(),
                 "and the window gets its keyboard back afterwards");
+    }
+
+    /// An application's own AbstractDialog, written against the interface as it was
+    /// published. It must keep compiling: the core is built at Java 5, which has no
+    /// default methods, so anything added to that interface breaks every existing
+    /// implementation at build time and throws AbstractMethodError at runtime for one
+    /// already compiled.
+    private static final class ThirdPartyDialog implements AbstractDialog {
+        public void addComponent(Object constraints, Component cmp) {
+        }
+
+        public void setScrollable(boolean scrollable) {
+        }
+
+        public void setDialogType(int dialogType) {
+        }
+
+        public void setTransitions(Transition transition) {
+        }
+
+        public void configureCommands(Command[] cmds, boolean commandsAsButtons) {
+        }
+
+        public void setDefaultCommand(Command defaultCommand) {
+        }
+
+        public void setTimeout(long timeout) {
+        }
+
+        public void dispose() {
+        }
+
+        public Command showDialog() {
+            return null;
+        }
+    }
+
+    @FormTest
+    void anApplicationsOwnAbstractDialogStillCompiles() {
+        // The assertion is that this file compiles at all -- the class above implements
+        // nothing but the members the interface published, and a new abstract member
+        // would stop it.
+        AbstractDialog theirs = new ThirdPartyDialog();
+        assertNotNull(theirs);
+        assertNull(theirs.showDialog());
     }
 }

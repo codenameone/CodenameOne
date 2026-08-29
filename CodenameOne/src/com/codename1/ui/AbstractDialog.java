@@ -44,25 +44,13 @@ public interface AbstractDialog {
     void dispose();
     /// Shows the dialog and returns the selected command if applicable.
     Command showDialog();
-    /// Sets the top level this dialog appears on, which may be a
-    /// `com.codename1.ui.Window` rather than the current `Form`.
-    ///
-    /// A dialog is not attached to anything at the moment it is shown, so it cannot
-    /// work its own surface out the way an attached component can. Both implementations
-    /// fall back to the focused window, then the current form, when this is left unset.
-    void setTopLevelHost(TopLevelContainer host);
-    /// The top level set with `#setTopLevelHost(TopLevelContainer)`, or null.
-    TopLevelContainer getTopLevelHost();
-    /// Whether this dialog is backed by a real operating system window rather than
-    /// being drawn inside the application's own surface.
-    ///
-    /// Only desktop platforms have a windowing system. Everywhere else the request is
-    /// silently ignored and the dialog shows the ordinary way, so shared code does not
-    /// have to guard it.
-    boolean isNativeWindowMode();
-    /// Sets whether this dialog opens in a window of its own. Takes effect the next
-    /// time it is shown.
-    void setNativeWindowMode(boolean nativeWindowMode);
-    /// The window backing this dialog while it is showing, or null.
-    Window getNativeWindow();
+    // Deliberately no window-targeting members here. setTopLevelHost, the native
+    // window mode and getNativeWindow are public on Dialog and on InteractionDialog,
+    // and nothing needs them through this interface. Declaring them here would be a
+    // breaking change to a published interface: the core is compiled at Java 5, which
+    // has no default methods, so every existing implementation would stop compiling
+    // and already-compiled ones would throw AbstractMethodError the first time new
+    // code called one. If the polymorphism is ever wanted, a separate capability
+    // interface that Dialog and InteractionDialog also implement costs nobody their
+    // build.
 }
