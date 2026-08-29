@@ -84,6 +84,7 @@ public class MacOSBuildHints {
     private String appCategory = DEFAULT_APP_CATEGORY;
     private String copyright;
     private String signingStyle;
+    private boolean signingConfigured;
     private String signingIdentityAppStore;
     private String signingIdentityDeveloperID;
     private String fixedWindowSize;
@@ -227,6 +228,21 @@ public class MacOSBuildHints {
                 DEFAULT_IDENTITY_APP_STORE);
         signingIdentityDeveloperID = hint(src, "signingIdentity.developerID",
                 DEFAULT_IDENTITY_DEVELOPER_ID);
+        // Whether the DEVELOPER configured signing, as opposed to the defaults
+        // this class supplies for an actual build.
+        //
+        // getSigningIdentityFor() answers "Developer ID Application" when
+        // nothing is set, which is the right certificate to look for on a build
+        // machine and the wrong thing to write into an exported Xcode project:
+        // it would tell a developer's project to sign manually with a
+        // certificate they may not have, where the template's ad-hoc "-" builds
+        // and runs. Re-resolved with a null default so this reports presence
+        // rather than the value.
+        signingConfigured = hint(src, "signingIdentity", null) != null
+                || hint(src, "signingIdentity.appStore", null) != null
+                || hint(src, "signingIdentity.developerID", null) != null
+                || hint(src, "signing.style", null) != null
+                || (teamId != null && teamId.trim().length() > 0);
         // Screenshot CI is the only consumer: a window whose size the app cannot
         // change is what makes a strict pixel comparison meaningful.
         fixedWindowSize = hint(src, "fixedWindowSize", null);
@@ -347,6 +363,12 @@ public class MacOSBuildHints {
 
     public String getCopyright() {
         return copyright;
+    }
+
+    /// Whether the developer configured signing at all, rather than taking the
+    /// defaults this class supplies for a build it performs itself.
+    public boolean isSigningConfigured() {
+        return signingConfigured;
     }
 
     public String getSigningStyle() {

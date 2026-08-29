@@ -696,6 +696,7 @@ public class MacOSNativeBuilder extends Executor {
         applySettingToProject(distDir, appName, "ARCHS", hints.getArch());
         applySettingToProject(distDir, appName, "ENABLE_HARDENED_RUNTIME",
                 hints.isHardenedRuntime() ? "YES" : "NO");
+        applySigningToProject(distDir, appName, hints);
 
         resultDir = new File(tmpFile, "result");
         resultDir.mkdirs();
@@ -1280,6 +1281,66 @@ public class MacOSNativeBuilder extends Executor {
             }
         }
         return bare ? value : "\"" + value + "\"";
+    }
+
+    /// Writes the signing configuration into the generated project.
+    ///
+    /// The whole set buildChannel() passes, not the two that were reported:
+    /// DEVELOPMENT_TEAM, CODE_SIGN_STYLE, CODE_SIGN_IDENTITY and
+    /// PROVISIONING_PROFILE_SPECIFIER. mac-source returns before buildChannel
+    /// runs, and the template configures none of them, so an exported project
+    /// fell back to ad-hoc signing and could not archive with the certificate
+    /// the hints named -- the developer had to reconfigure by hand what they
+    /// had already declared.
+    ///
+    /// SYMROOT, OBJROOT and ONLY_ACTIVE_ARCH are deliberately NOT written.
+    /// Those describe one invocation of xcodebuild rather than the project, and
+    /// baking a build directory into an exported project is worse than leaving
+    /// it out. CODE_SIGNING_ALLOWED=NO likewise: that is how this builder runs
+    /// an unsigned local build, not something a developer opening the project
+    /// asked for.
+    ///
+    /// The first channel, the same one attachEntitlementsToProject writes: a
+    /// project carries one signing configuration, and with distribution=both
+    /// the second channel is a build this builder performs rather than
+    /// something the exported project can express.
+    private void applySigningToProject(File distDir, String appName, MacOSBuildHints hints) {
+        java.util.List<String> channels = hints.getChannels();
+        if (channels.isEmpty()) {
+            return;
+        }
+        if (!hints.isSigningConfigured()) {
+            // Nothing configured, so the project keeps the template's ad-hoc
+            // identity. Writing the build-machine defaults here would tell a
+            // developer's project to sign manually with a certificate they may
+            // not have, where "-" builds and runs.
+            return;
+        }
+        String channel = channels.get(0);
+        applySettingToProject(distDir, appName, "DEVELOPMENT_TEAM", hints.getTeamId());
+        if (hints.usesAutomaticSigning()) {
+            // No identity under automatic signing, for the reason buildChannel
+            // gives: Xcode resolves the certificate from the team and profile,
+            // and naming one here while it picks another is how a build ends up
+            // signed by a certificate nobody chose.
+            applySettingToProject(distDir, appName, "CODE_SIGN_STYLE", "Automatic");
+            return;
+        }
+        String identity = hints.getSigningIdentityFor(channel);
+        if (identity == null || identity.trim().length() == 0) {
+            // Nothing configured, so the project keeps the template's ad-hoc
+            // default rather than being told to sign manually with no identity,
+            // which fails in Xcode rather than in a way anyone can act on.
+            return;
+        }
+        applySettingToProject(distDir, appName, "CODE_SIGN_STYLE", "Manual");
+        // The CONDITIONAL key, which is how the template spells it:
+        // "CODE_SIGN_IDENTITY[sdk=macosx*]". Writing a plain CODE_SIGN_IDENTITY
+        // beside it would lose -- Xcode prefers the sdk-qualified value for a
+        // macOS build, so the identity would be set and ignored.
+        applySettingToProject(distDir, appName, "\"CODE_SIGN_IDENTITY[sdk=macosx*]\"", identity);
+        applySettingToProject(distDir, appName, "PROVISIONING_PROFILE_SPECIFIER",
+                hints.getProvisioningProfileFor(channel));
     }
 
     /// Writes a resolved hint into the generated project's build settings.
