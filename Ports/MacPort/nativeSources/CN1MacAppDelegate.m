@@ -431,8 +431,18 @@ static void cn1MacDeliverURL(NSString *url) {
     // what the UIKit delegate calls; setting the property alone leaves every app
     // implementing URLCallback.shouldApplicationHandleURL with no notification
     // that a deep link arrived at all.
-    com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(
-        threadStateData, str, JAVA_NULL);
+    // Through the macOS shim, which hands the delivery to the EDT before any
+    // application code runs. Calling the shared method straight from here ran
+    // the app's URLCallback on AppKit's main thread, and a callback that
+    // touched BrowserComponent.setURL() deadlocked against the main queue it
+    // was already on.
+    // Declared locally, the way METALView.m declares macHoverCursor: the
+    // generated com_codename1_impl_mac_MacImplementation.h is not imported here
+    // and pulling it in for one symbol would drag the whole class in with it.
+    extern JAVA_VOID com_codename1_impl_mac_MacImplementation_macDeliverUrl___java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1);
+    com_codename1_impl_mac_MacImplementation_macDeliverUrl___java_lang_String(
+        threadStateData, str);
 }
 
 /// Called from initVM once IOSImplementation exists and its lifecycle callback

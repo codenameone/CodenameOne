@@ -5427,6 +5427,73 @@ public class IOSImplementation extends CodenameOneImplementation {
         return -1;
     }
 
+    /// The macOS entry points for the two picker results, which deliver the
+    /// application's listener ON THE EDT.
+    ///
+    /// Both natives run on AppKit's main queue. The shared methods below fire
+    /// the application's ActionListener synchronously, so the listener ran on
+    /// that queue rather than the EDT: ordinary UI work raced the framework,
+    /// and a listener calling BrowserComponent.setURL() reached the browser
+    /// native's dispatch_sync back onto the main queue it was already occupying
+    /// and deadlocked.
+    ///
+    /// dropEvents is cleared HERE, immediately, and only the listener is
+    /// marshalled. That flag suppresses input while a modal picker is up, and
+    /// deferring it to the EDT would leave events dropped for a turn after the
+    /// picker closed.
+    ///
+    /// New methods rather than a change to the shared ones, so the iOS document
+    /// picker and the Mac share callback keep the behaviour they have. Note
+    /// that means iOS still fires these listeners off the EDT and can still
+    /// deadlock the same way -- that is pre-existing, framework-wide, and wants
+    /// fixing inside fileChooserResult/capturePictureResult where every caller
+    /// benefits.
+    public static void macFileChooserResult(final String r) {
+        dropEvents = false;
+        if (deliverPickerResultOnEdt(new Runnable() {
+            @Override
+            public void run() {
+                fileChooserResult(r);
+            }
+        })) {
+            return;
+        }
+        fileChooserResult(r);
+    }
+
+    /// @see #macFileChooserResult(String)
+    public static void macCapturePictureResult(final String r) {
+        dropEvents = false;
+        if (deliverPickerResultOnEdt(new Runnable() {
+            @Override
+            public void run() {
+                capturePictureResult(r);
+            }
+        })) {
+            return;
+        }
+        capturePictureResult(r);
+    }
+
+    /// Queues the delivery on the EDT, answering whether it took it.
+    ///
+    /// callSerially, never callSeriallyAndWait: this runs on the thread AppKit
+    /// needs to keep servicing, and waiting for the EDT from it is the deadlock
+    /// these entry points exist to avoid. False when there is no EDT to queue
+    /// on -- Display not yet initialised, or we are already on it -- and the
+    /// caller then delivers inline exactly as before.
+    private static boolean deliverPickerResultOnEdt(Runnable delivery) {
+        if (!Display.isInitialized()) {
+            return false;
+        }
+        Display d = Display.getInstance();
+        if (d == null || d.isEdt()) {
+            return false;
+        }
+        d.callSerially(delivery);
+        return true;
+    }
+
     public static void capturePictureResult(String r) {
         dropEvents = false;
         if(captureCallback != null) {

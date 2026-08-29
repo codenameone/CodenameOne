@@ -8440,17 +8440,21 @@ void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THR
         // UIKit main thread delegate, and the EDT is a separate thread on both
         // platforms. The share callback in CN1MacShare.m does the same.
         //
-        // Worth knowing rather than assuming: an application listener that
-        // dispatch_syncs to the main queue from here deadlocks on itself. That
-        // is a real hazard and it is a FRAMEWORK-wide one -- the fix is inside
-        // IOSImplementation.fileChooserResult/capturePictureResult, which would
-        // have to marshal the listener while keeping the dropEvents flag
-        // immediate, and it changes iOS behaviour too. Marshalling only these
-        // two macOS call sites would leave the iOS twin and the mac share
-        // callback exactly as they are and put this port out of step with both,
-        // which is how most of the defects on this branch were made.
+        // An application listener that dispatch_syncs to the main queue from
+        // here deadlocks on itself, and setURL() does exactly that through the
+        // shared browser native -- so these two call sites go through
+        // macFileChooserResult / macCapturePictureResult, which clear
+        // dropEvents immediately and hand the listener to the EDT.
+        //
+        // This used to argue the opposite: that marshalling macOS alone would
+        // put the port out of step with the iOS twin and the mac share
+        // callback. Consistency is worth something, but not a deadlock, and
+        // running an application listener on the EDT is the framework's
+        // contract rather than a local preference. The iOS twin still fires off
+        // the EDT and can still deadlock the same way; that is pre-existing and
+        // wants fixing where every caller benefits.
         struct ThreadLocalData* threadStateData = getThreadLocalData();
-        com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(
+        com_codename1_impl_ios_IOSImplementation_macFileChooserResult___java_lang_String(
             threadStateData,
             // path, not absoluteString. fileChooserResult prefixes "file:" and
             // unfile() strips it again WITHOUT percent decoding, so an encoded
@@ -8687,7 +8691,7 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
         }
         // Same thread contract as the file chooser above; see the note there.
         struct ThreadLocalData* threadStateData = getThreadLocalData();
-        com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(
+        com_codename1_impl_ios_IOSImplementation_macCapturePictureResult___java_lang_String(
             threadStateData,
             result == nil ? JAVA_NULL : fromNSString(threadStateData, result));
         POOL_END();

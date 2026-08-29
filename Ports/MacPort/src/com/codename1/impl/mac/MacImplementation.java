@@ -463,6 +463,44 @@ public class MacImplementation extends IOSImplementation {
     /// Display.getCurrent(), for the reason the JavaSE port gives at the same
     /// point: a secondary window's components are the ones under this pointer,
     /// and reading the current form would answer about the wrong hierarchy.
+    /// Delivers a deep link to the application ON THE EDT.
+    ///
+    /// Called from AppKit's main thread, both for a URL opened while running and
+    /// for one replayed out of the cold-launch queue. The shared
+    /// IOSImplementation.shouldApplicationHandleURL runs the application's
+    /// URLCallback synchronously and then sets the AppArg property, which routes
+    /// a URL-shaped value into Navigation.dispatchExternalUrl; off the EDT that
+    /// uses callSeriallyAndWait. So calling it directly from here ran
+    /// application UI code on the wrong thread, and a callback that touched
+    /// BrowserComponent.setURL() reached the shared browser native's
+    /// dispatch_sync back onto the main queue it was already occupying, which
+    /// deadlocks outright.
+    ///
+    /// callSerially rather than callSeriallyAndWait, deliberately: this runs on
+    /// the thread AppKit needs to keep servicing, and waiting for the EDT from
+    /// it is the deadlock this exists to avoid.
+    ///
+    /// A macOS shim rather than a change to the shared method, so the iOS
+    /// delegate keeps the behaviour it has today.
+    public static void macDeliverUrl(final String url) {
+        if (url == null) {
+            return;
+        }
+        if (com.codename1.ui.Display.isInitialized()
+                && !com.codename1.ui.Display.getInstance().isEdt()) {
+            com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    IOSImplementation.shouldApplicationHandleURL(url, null);
+                }
+            });
+            return;
+        }
+        // Already on the EDT, or Display is not up yet and callSerially has
+        // nowhere to queue: deliver inline, which is what the caller did before.
+        IOSImplementation.shouldApplicationHandleURL(url, null);
+    }
+
     public static void macHoverCursor(final int windowId, final int x, final int y) {
         com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
             @Override
