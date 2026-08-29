@@ -1609,7 +1609,21 @@ public class Window extends Container implements TopLevelContainer {
     /// True while `#setWindowContentSize(int, int)` is setting the frame itself.
     private boolean applyingContentSize;
 
-    public void setWindowBounds(Rectangle r) {
+    public void setWindowBounds(final Rectangle r) {
+        // Marshalled here rather than only in the private form below, so that the
+        // supersession keeps its place in the queue. A background caller that asks for
+        // a content size and then for bounds queues the first and ran the second's
+        // supersession immediately -- clearing a request that had not been installed
+        // yet, and leaving the one that arrived afterwards to win.
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    setWindowBounds(r);
+                }
+            });
+            return;
+        }
         // Here rather than in the shared private form below, which is also how a move
         // is carried out: setWindowLocation and the centering helpers pass the size
         // they already have, and a location is not a change of mind about the size.
@@ -1660,11 +1674,6 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// - `height`: the new height
     public void setWindowSize(final int width, final int height) {
-        // A frame size the application asked for supersedes a content size it asked for
-        // earlier: the two express different intents for the same window and the last
-        // caller wins. Without this, show() applied the older content request over the
-        // size the caller had settled on afterwards.
-        supersedePendingContentSize();
         // As setWindowBounds: the no-peer branch below writes the pending size, which
         // the event dispatch thread reads when the window is shown.
         if (!Display.getInstance().isEdt()) {
@@ -1676,6 +1685,12 @@ public class Window extends Container implements TopLevelContainer {
             });
             return;
         }
+        // A frame size the application asked for supersedes a content size it asked for
+        // earlier: the two express different intents for the same window and the last
+        // caller wins. After the marshalling above, so a background caller's two
+        // requests are applied in the order it made them rather than one of them
+        // jumping the queue.
+        supersedePendingContentSize();
         if (nativePeer == null) {
             // Only the size. Routing through setWindowBounds before the window exists
             // would hand the port the placeholder (0,0) as though the application had

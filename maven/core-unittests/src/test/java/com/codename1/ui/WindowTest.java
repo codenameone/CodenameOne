@@ -5712,4 +5712,40 @@ class WindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aBackgroundCallersGeometryRequestsApplyInTheOrderItMadeThem() throws Exception {
+        // The supersession used to run on the calling thread while the request it was
+        // meant to supersede was still queued -- so it cleared nothing, and the older
+        // content size won over the bounds asked for after it.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+
+        final Window w = new Window("ordered", new BorderLayout());
+        w.setDecorated(true);
+
+        Thread caller = new Thread(new Runnable() {
+            public void run() {
+                w.setWindowContentSize(400, 300);
+                w.setWindowBounds(new Rectangle(10, 10, 800, 600));
+            }
+        }, "cn1-test-geometry-caller");
+        caller.start();
+        caller.join(5000);
+        for (int iter = 0; iter < 50; iter++) {
+            DisplayTest.flushEdt();
+        }
+
+        w.show();
+        DisplayTest.flushEdt();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(800, peer.getWidth(),
+                "the bounds asked for second must win, as they would on the "
+                        + "event dispatch thread");
+        assertEquals(600, peer.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

@@ -12516,6 +12516,13 @@ public abstract class CodenameOneImplementation {
                     .getSnapshot(Display.getInstance().getCurrent());
         }
         Window w = Desktop.getInstance().windowById(windowId);
+        if (w == null) {
+            // The window this surface described has been disposed, and the bridge
+            // asking outlived it. Nothing, rather than the last tree built anywhere --
+            // which belongs to some other window, and would have this dead surface
+            // reading out its labels and handing back its node ids.
+            return AccessibilityManager.getInstance().emptySnapshot();
+        }
         return AccessibilityManager.getInstance().getSnapshot(w);
     }
 

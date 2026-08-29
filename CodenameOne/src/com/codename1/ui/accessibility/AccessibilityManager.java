@@ -127,6 +127,24 @@ public final class AccessibilityManager {
         return dirtyRoots.size();
     }
 
+    /// A tree describing nothing.
+    ///
+    /// For a surface that no longer exists. A port can outlive a window -- an
+    /// accessibility bridge is held by the platform and asked for its tree after the
+    /// window it describes has been disposed -- and the alternatives are both wrong:
+    /// the last tree built anywhere belongs to some other window, and rebuilding is
+    /// impossible with nothing to walk.
+    ///
+    /// #### Returns
+    ///
+    /// an empty snapshot, never null
+    public synchronized AccessibilityTreeSnapshot emptySnapshot() {
+        generation++;
+        return new AccessibilityTreeSnapshot(generation,
+                Collections.<Long>emptyList(),
+                Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
+    }
+
     /// How many roots currently have a cached tree.
     ///
     /// #### Returns

@@ -568,4 +568,51 @@ class AccessibilityWindowTest extends UITestBase {
                         + mgr.dirtyRootCount() + " dirty vs " + mgr.cachedRootCount()
                         + " cached");
     }
+
+    @FormTest
+    void aDisposedWindowsSurfaceDescribesNothing() throws Exception {
+        // A platform accessibility bridge outlives the window it describes and keeps
+        // asking. Answering with the last tree built anywhere hands that dead surface
+        // another window's labels and node ids, which is the isolation this work exists
+        // to provide.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.add(BorderLayout.CENTER, new Button("on the main form"));
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("going", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.add(BorderLayout.CENTER, new Button("in the window"));
+        w.show();
+        DisplayTest.flushEdt();
+        int id = w.getWindowId();
+        assertTrue(mentions(AccessibilityManager.getInstance().getSnapshot(w),
+                "in the window"));
+
+        w.dispose();
+        DisplayTest.flushEdt();
+
+        // Another surface is described after it goes, so the last tree built anywhere
+        // is somebody else's. Without this the disposal itself has already emptied the
+        // shared snapshot and the test would pass whatever the lookup returned.
+        assertTrue(mentions(AccessibilityManager.getInstance().getSnapshot(main),
+                "on the main form"));
+
+        final int disposedId = id;
+        final AccessibilityTreeSnapshot[] offEdt = new AccessibilityTreeSnapshot[1];
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                offEdt[0] = implementation.getAccessibilityTreeSnapshot(disposedId);
+            }
+        });
+        t.start();
+        t.join(5000);
+
+        assertNotNull(offEdt[0]);
+        assertTrue(offEdt[0].getRootIds().isEmpty(),
+                "a surface whose window is gone describes nothing");
+        assertFalse(mentions(offEdt[0], "on the main form"),
+                "and certainly not whatever window is still open");
+    }
 }
