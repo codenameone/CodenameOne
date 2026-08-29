@@ -160,6 +160,39 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // native initialization a bounded minute.
             return TEST_TIMEOUT_MS_NATIVE * 2;
         }
+        if (!"HTML5".equals(Display.getInstance().getPlatformName())
+                && (testClass instanceof VideoIODecodedFramesScreenshotTest
+                        || testClass instanceof VideoIORoundTripTest)) {
+            // The two tests that drive a real native video encode and decode,
+            // and the only two with a multi-second cost of their own before
+            // anything can go wrong: 7-8s and ~6s respectively on a healthy
+            // simulator, against a 30s default that every other test enters
+            // with essentially empty.
+            //
+            // That headroom is what absorbs this simulator's stalls, and the
+            // stalls are neither rare nor small. In run 33210835375
+            // FillRoundRect -- one rounded rectangle, normally under 0.1s --
+            // sat 26.3s between "awaiting" and its PNG with no log line in
+            // between, and GaussianBlur sat 24.3s. Both passed, because a 25s
+            // stall still fits inside a budget nothing else was using.
+            //
+            // These two have no such slack, and no second chance either:
+            // isRetrySafe() is false for both (their work outlives runTest(),
+            // so resetForRetry() would let a late done() complete the retry),
+            // which is exactly the retry that recovers every other stalled
+            // test. So a stall that costs FillRoundRect nothing fails them.
+            // Both have: on master at 73aa2663e both timed out at 30s
+            // "waiting for DONE stage=created", and on 35bdb4b54a
+            // VideoIODecodedFrames did -- its EDT frame-render phase taking
+            // 22.3s and its worker encode/decode plus capture a further 49.7s,
+            // for a screenshot that then matched its reference. Two serial
+            // phases means paying the stall window twice.
+            //
+            // Three times the default covers the work plus a stall window per
+            // phase. The suite caps are 2100s absolute and 720s idle, so
+            // neither is threatened by a 90s test.
+            return TEST_TIMEOUT_MS_NATIVE * 3;
+        }
         return "HTML5".equals(Display.getInstance().getPlatformName())
                 ? TEST_TIMEOUT_MS_HTML5
                 : TEST_TIMEOUT_MS_NATIVE;
