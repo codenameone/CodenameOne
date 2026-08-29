@@ -123,6 +123,11 @@ pixels. For islands and holes, `Offset Y` is the gap between the
 cutout's top edge and the screen top. For notches, `Offset Y` is
 ignored, because a notch is anchored to the screen's top edge.
 
+The wizard also writes each cutout's rectangle into the `cutouts`
+property. The simulator drops pointer events that land inside one, so a
+click on an opaque notch or island can't reach app content hidden
+underneath it, the way the hardware cutout can't be touched at all.
+
 WARNING: When the wizard generates the `.skin` file, it
 automatically pushes `safePortraitY` down to the lowest cutout edge
 whenever that sits below the platform's own status-bar inset, so app
@@ -170,7 +175,7 @@ Clicking *Finish* in the editor's footer:
   `android_holo_light.res`, or `winTheme.res`) inside the skin zip.
 . Writes `skin.properties` with `roundScreen=true`,
   `displayX/Y/Width/Height`, `safePortrait*` / `safeLandscape*`,
-  the platform name, override names, fonts, and PPI.
+  `cutouts`, the platform name, override names, fonts, and PPI.
 
 Clicking *Download skin* on the done page hands the file to the
 browser's download dialog. The button is the only reliable trigger

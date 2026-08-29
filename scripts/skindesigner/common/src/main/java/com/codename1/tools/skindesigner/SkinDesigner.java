@@ -174,6 +174,11 @@ public class SkinDesigner extends Lifecycle {
         device = DeviceDatabase.findById(id);
         source = Preferences.get(PREF_SOURCE, null);
         skin.load();
+        if (skin.migrateSafeAreaUnits(device)) {
+            // Write the migrated state straight back, so the conversion
+            // happens once rather than on every reload.
+            skin.save();
+        }
         if (device != null && skin.name == null) {
             skin.resetForDevice(device);
         }
