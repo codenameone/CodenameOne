@@ -1948,4 +1948,124 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void oneEnterDoesNotRunTheUncoveredDialogsShortcut() {
+        // The wrappers check who owns the keyboard as they run, and by the time they do
+        // the top dialog may have closed itself -- so the dialog it uncovered answered a
+        // release whose press it never saw.
+        Window w = openHost(600, 500);
+        final int[] lowerShortcut = new int[1];
+        final int[] lowerGame = new int[1];
+
+        Dialog low = new Dialog("lower");
+        low.setLayout(new BorderLayout());
+        low.add(BorderLayout.CENTER, new Label("lower"));
+        int enter = Display.getInstance().getKeyCode(Display.GAME_FIRE);
+        low.addKeyListener(enter, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                lowerShortcut[0]++;
+            }
+        });
+        low.addGameKeyListener(Display.GAME_FIRE, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                lowerGame[0]++;
+            }
+        });
+        low.setTopLevelHost(w);
+        low.showModeless();
+        DisplayTest.flushEdt();
+
+        final Dialog high = new Dialog("upper");
+        high.setLayout(new BorderLayout());
+        Button ok = new Button("OK");
+        ok.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                high.dispose();
+            }
+        });
+        high.add(BorderLayout.CENTER, ok);
+        high.setTopLevelHost(w);
+        high.showModeless();
+        DisplayTest.flushEdt();
+        w.setFocused(ok);
+        DisplayTest.flushEdt();
+
+        w.keyPressed(enter);
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+
+        assertTrue(high.isDisposed());
+        assertEquals(0, lowerShortcut[0],
+                "the uncovered dialog's raw shortcut must not run");
+        assertEquals(0, lowerGame[0], "nor its game key one");
+
+        // It works normally once it is the one being used.
+        w.keyPressed(enter);
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+        assertEquals(1, lowerShortcut[0], "and works when the key is really for it");
+
+        low.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aCancelledGestureDoesNotDeliverItsReleaseToTheNewDialog() {
+        // The press was taken away by the dialog, so the rest of that gesture is not
+        // addressed to it: neither the long press that was still pending nor the
+        // eventual physical release.
+        Window w = openHost(600, 500);
+        final int[] dialogReleases = new int[1];
+        final int[] dialogLongPresses = new int[1];
+
+        Button behind = new Button("behind");
+        w.add(BorderLayout.CENTER, behind);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+
+        int x = behind.getAbsoluteX() + 2;
+        int y = behind.getAbsoluteY() + 2;
+        w.pointerPressed(x, y);
+        DisplayTest.flushEdt();
+
+        Dialog d = new Dialog("interrupting");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.addPointerReleasedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                dialogReleases[0]++;
+            }
+        });
+        d.addLongPressListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                dialogLongPresses[0]++;
+            }
+        });
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        // The gesture that was already under way finishes.
+        w.longPointerPress(x, y);
+        w.pointerReleased(x, y);
+        DisplayTest.flushEdt();
+        assertEquals(0, dialogLongPresses[0],
+                "a long press the dialog was never pressed on must not reach it");
+        assertEquals(0, dialogReleases[0],
+                "and neither must the release of that gesture");
+
+        // A gesture that starts on the dialog reaches it normally.
+        w.pointerPressed(x, y);
+        w.pointerReleased(x, y);
+        DisplayTest.flushEdt();
+        assertEquals(1, dialogReleases[0], "a new gesture does reach it");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

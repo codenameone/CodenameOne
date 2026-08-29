@@ -1584,6 +1584,9 @@ public class Window extends Container implements TopLevelContainer {
         });
     }
 
+    /// True once an overlay took the pointer away mid-gesture, until a new press.
+    private boolean gestureCancelled;
+
     /// True while a deferred content-size correction is queued.
     private boolean reapplyingContentSize;
 
@@ -3088,6 +3091,8 @@ public class Window extends Container implements TopLevelContainer {
         initialPressX = x;
         initialPressY = y;
         currentPointerPress = new Object();
+        // A real press starts a real gesture again.
+        gestureCancelled = false;
         dragged = null;
         if (firePointerEvent(POINTER_SCOPE_PRESSED, pointerPressedListeners,
                 new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y))) {
@@ -3343,6 +3348,11 @@ public class Window extends Container implements TopLevelContainer {
     /// neither the component nor its context menu.
     @Override
     public void longPointerPress(int x, int y) {
+        if (gestureCancelled) {
+            // The press this would have completed was taken away by an overlay, so
+            // there is nothing here to hold down.
+            return;
+        }
         // Listeners registered on the window itself run first and can consume the
         // gesture, the same order Form uses. Forwarding to the child without this
         // silently dropped every addLongPressListener attached to the window.
@@ -3828,6 +3838,12 @@ public class Window extends Container implements TopLevelContainer {
         // hold two -- which takes autoRelease out of its single-component branch, so
         // dragging off the newly pressed component no longer cancels it.
         clearComponentsAwaitingRelease();
+        // The routed press too, or the eventual physical release is delivered to the
+        // container that took a press the overlay has since taken over -- and the long
+        // press that is still pending would arrive at the overlay having never been
+        // pressed on it.
+        pointerPressTarget = null;
+        gestureCancelled = true;
         pressedCmp = null;
         dragged = null;
         currentPointerPress = null;
@@ -3933,6 +3949,11 @@ public class Window extends Container implements TopLevelContainer {
                 dispatcher.fireActionEvent(e);
             }
             return e.isConsumed();
+        }
+        if (gestureCancelled) {
+            // The overlay that owns the pointer never saw this gesture begin, so the
+            // rest of it is not addressed to it.
+            return false;
         }
         if (pointerScopeExempt != null && dispatcher != null && dispatcher.hasListeners()) {
             // Only this event's listeners, and only the topmost overlay's: the list
@@ -4177,10 +4198,19 @@ public class Window extends Container implements TopLevelContainer {
             focused.keyReleased(keyCode);
         }
         dispatchDefaultCommand(keyCode, scopeAtRelease);
-        fireKeyEvent(keyCode);
-        // Both maps, which is what Form.keyReleased does. Dispatching only the raw code
-        // left every game key shortcut on a hosted dialog silently dead.
-        fireGameKeyEvent(keyCode);
+        // Against the scope that took the press, for the same reason. The wrappers
+        // check who owns the keyboard as they run, and by now the top dialog may have
+        // closed itself -- so the one it uncovered would answer a release whose press
+        // it never saw.
+        keyDispatchScope = scopeAtRelease;
+        try {
+            fireKeyEvent(keyCode);
+            // Both maps, which is what Form.keyReleased does. Dispatching only the raw
+            // code left every game key shortcut on a hosted dialog silently dead.
+            fireGameKeyEvent(keyCode);
+        } finally {
+            keyDispatchScope = null;
+        }
     }
 
     /// Runs the default command of the overlay holding the keyboard, if a fire key was
@@ -4235,6 +4265,25 @@ public class Window extends Container implements TopLevelContainer {
             keyPressed(keyCode);
             keyReleased(keyCode);
         }
+    }
+
+    /// The overlay that owned the keyboard when the release being dispatched arrived,
+    /// or null outside a dispatch.
+    private Container keyDispatchScope;
+
+    /// Whether the overlay a published key listener belongs to is the one this dispatch
+    /// is for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `owner`: the overlay that published the listener
+    ///
+    /// #### Returns
+    ///
+    /// true if the listener should run
+    boolean isKeyDispatchOwner(Container owner) {
+        Container scope = keyDispatchScope != null ? keyDispatchScope : keyInputScope;
+        return scope == null || scope == owner; //NOPMD CompareObjectsWithEquals
     }
 
     /// Game key listeners, by game action.

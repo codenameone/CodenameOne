@@ -118,6 +118,15 @@ public final class AccessibilityManager {
         }
     }
 
+    /// How many roots are currently recorded as stale.
+    ///
+    /// #### Returns
+    ///
+    /// the size of the dirty set
+    public synchronized int dirtyRootCount() {
+        return dirtyRoots.size();
+    }
+
     /// Marks a root's tree stale.
     ///
     /// #### Parameters
@@ -132,7 +141,13 @@ public final class AccessibilityManager {
             }
             return;
         }
-        if (!dirtyRoots.contains(root)) {
+        // Only a root that actually has a cached tree. Marking one that has none
+        // achieves nothing -- a cache miss rebuilds it anyway -- and this list is held
+        // by a singleton, so recording every form the application has ever shown, which
+        // is what Display.setCurrent invalidating each new one amounts to, pinned every
+        // one of them and its whole component hierarchy for the life of the process.
+        // Only a disposed window ever releases a root explicitly.
+        if (snapshotsByRoot.containsKey(root) && !dirtyRoots.contains(root)) {
             dirtyRoots.add(root);
         }
     }

@@ -2428,8 +2428,7 @@ public class Dialog extends Form implements AbstractDialog {
             if (host == null) {
                 return;
             }
-            Container owner = host.getKeyInputScope();
-            if (owner != null && owner != dlg) { //NOPMD CompareObjectsWithEquals
+            if (!host.isKeyDispatchOwner(dlg)) {
                 return;
             }
             delegate.actionPerformed(evt);

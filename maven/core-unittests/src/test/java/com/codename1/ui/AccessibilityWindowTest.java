@@ -30,6 +30,7 @@ import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
 import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import com.codename1.ui.layouts.BorderLayout;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -504,5 +505,27 @@ class AccessibilityWindowTest extends UITestBase {
 
         w.dispose();
         DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void navigatingThroughFormsDoesNotPinThemForever() {
+        // Display.setCurrent invalidates every newly shown form, and the dirty list is
+        // held by a singleton. Recording a root that has no cached tree pinned every
+        // form the application had ever shown, with its whole hierarchy, for the life
+        // of the process -- only a disposed window ever releases a root explicitly.
+        // The growth, not the absolute count: the manager is a singleton and earlier
+        // tests in this class have left cached roots behind.
+        AccessibilityManager mgr = AccessibilityManager.getInstance();
+        int before = mgr.dirtyRootCount();
+        for (int iter = 0; iter < 30; iter++) {
+            Form f = new Form("form " + iter, new BorderLayout());
+            f.add(BorderLayout.CENTER, new Button("button " + iter));
+            f.show();
+            DisplayTest.flushEdt();
+        }
+
+        assertEquals(before, mgr.dirtyRootCount(),
+                "a form with no cached tree must not be recorded as stale, "
+                        + "and so must not be held by the manager");
     }
 }
