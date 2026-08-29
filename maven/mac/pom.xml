@@ -94,6 +94,19 @@
                             </sources>
                         </configuration>
                     </execution>
+                    <!-- Declared before the assembly and the build-bundle antrun
+                         that actually create this jar, which looks like it must
+                         fail and does not: attach-artifact only RECORDS the file
+                         against the project, and the file itself is not read
+                         until install/deploy, long after every package-phase
+                         execution has run. Verified with `mvn clean install -pl
+                         mac` on an empty target: the zip is built after this
+                         goal logs, and the bundle installs intact.
+
+                         maven/ios/pom.xml happens to declare the same three
+                         plugins in the other order. That is a difference in
+                         spelling, not in behaviour; do not "fix" this one by
+                         reordering on the assumption it was broken. -->
                     <execution>
                         <id>attach-artifacts</id>
                         <phase>package</phase>
