@@ -967,14 +967,54 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     }
     struct clazz* cls = (*srcArr).__codenameOneParentClsReference;
     int byteSize = byteSizeForArray(cls);
-    // SATB deletion barrier: an object arraycopy overwrites dst[dstOffset..+length)
-    // with a bulk memmove that bypasses the per-element setter, so preserve those
-    // overwritten references for the current mark cycle. No-op (one flag load) off-GC.
-    if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType) {
-        JAVA_ARRAY_OBJECT* dstData = (JAVA_ARRAY_OBJECT*)(*dstArr).data;
-        for(int i = 0 ; i < length ; i++) {
-            JAVA_OBJECT o = dstData[dstOffset + i];
-            if(o != JAVA_NULL && !CN1_IS_TAGGED(o)) cn1SatbEnqueue(o);
+    // SATB barrier, BOTH halves: an object arraycopy replaces dst[dstOffset..+length)
+    // with a bulk memmove that bypasses the per-element setter, so neither half fires on
+    // its own. No-op (one flag load) off-GC.
+    //
+    // The DELETION half preserves the references being overwritten, for the usual
+    // snapshot reason.
+    //
+    // The INSERTION half preserves the references being written IN, and it was missing.
+    // That half exists (see CN1_WRITE_BARRIER in cn1_globals.h) specifically to keep an
+    // object alive when "the container it is stored into is a fresh grace object not yet
+    // reachable" -- so copying into a freshly allocated Object[] during a mark, and then
+    // dropping the source, left the copied-in objects unmarked. The BiBOP grace pass
+    // covers most of that window by walking fresh slots, but not a destination allocated
+    // after the walk has passed its page, and not the belt/fixpoint phases that run after
+    // it. The result is a live object swept with a surviving reference to it -- the
+    // container->content class of crash the insertion half was added for.
+    //
+    // Both reads happen BEFORE the memmove, which is also what makes this correct for the
+    // overlapping src/dst that arraycopy is contractually required to support.
+    // ONE registration around BOTH halves. Bracketing each range separately would let the
+    // in-flight count fall to zero between them, and the collector can clear gcSatbActive,
+    // see zero and finish its final drain in that gap -- after which the insertion half
+    // logs nothing while the memmove below publishes those references regardless. See
+    // cn1SatbBulkBegin.
+    // NO FLAG PRECHECK. Sampling gcSatbActive out here is unsafe at BOTH ends of a mark:
+    // termination clears and re-raises it during the trial-clear protocol, and startup arms
+    // it without waiting for a copy that already looked. Either way the copy skips the
+    // barrier and then publishes into a live mark. Registering first and reading the flags
+    // while registered is the whole point of the protocol, and it is what lets
+    // codenameOneGCMark and mark termination both wait for an in-flight copy.
+    //
+    // The cost lands only on OBJECT arrays: cls->primitiveType is a load and a branch, and
+    // it rejects the byte[]/char[] copies that dominate arraycopy traffic before any atomic
+    // is executed.
+    // The bracket spans the memmove below, not just the logging: the registration is what
+    // mark startup and mark termination wait on, so releasing it before the copy would let
+    // a scan interleave with the publication. See cn1SatbBulkBegin.
+    JAVA_BOOLEAN cn1__satbReg = JAVA_FALSE;
+    if(!cls->primitiveType) {
+        cn1__satbReg = JAVA_TRUE;
+        if(cn1SatbBulkBegin()) {
+            // One acquisition of the SATB mutex per 256 references rather than per
+            // reference; this used to be two locked enqueues per element. See
+            // cn1SatbEnqueueRangeLocked.
+            cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)(*dstArr).data) + dstOffset, length);
+#ifndef CN1_NO_BULK_INSERTION_BARRIER
+            cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)(*srcArr).data) + srcOffset, length);
+#endif
         }
     }
     /* java.lang.System.arraycopy is contractually overlap-safe (the spec defines
@@ -985,6 +1025,9 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
      * heap corruption on the arm64 clean target). memmove is the correct,
      * overlap-safe primitive. */
     memmove( (*dstArr).data + (dstOffset * byteSize), (*srcArr).data  + (srcOffset * byteSize), length * byteSize);
+    if(cn1__satbReg) {
+        cn1SatbBulkEnd();
+    }
 }
 
 JAVA_LONG java_lang_System_currentTimeMillis___R_long(CODENAME_ONE_THREAD_STATE) {
@@ -1704,6 +1747,11 @@ struct ThreadLocalData* getThreadLocalData() {
         i->threadBlockedByGC = JAVA_FALSE;
         i->threadActive = JAVA_FALSE;
         i->threadKilled = JAVA_FALSE;
+#ifdef CN1_GC_CONFORM
+        // Malloc'd, so this starts as garbage. See gcThreadStartMs in cn1_globals.h.
+        { extern void cn1StallRegisterThread(struct ThreadLocalData* t);
+          cn1StallRegisterThread(i); }
+#endif
         i->interrupted = JAVA_FALSE;
         
         i->currentThreadObject = 0;
@@ -1735,7 +1783,6 @@ struct ThreadLocalData* getThreadLocalData() {
         // ThreadLocalData is malloc'd (not zeroed); 0 means "frameless native-stack
         // limit not yet computed" -- it is filled in lazily on first frameless entry.
         i->nativeStackLimit = 0;
-
         i->pendingHeapAllocations = malloc(PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
         memset(i->pendingHeapAllocations, 0, PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
         i->heapAllocationSize = 0;
@@ -2358,6 +2405,14 @@ void markDeadThread(struct ThreadLocalData *d)
             d->threadActive = JAVA_FALSE;
             found = iter;
             nThreadsToKill++;
+#ifdef CN1_GC_CONFORM
+            // Bank this thread's lifetime before its TLD leaves allThreads, so the duty
+            // denominator keeps it. Mirrors cn1StallMutatorNs on the numerator side: both
+            // have to survive the thread that earned them, and both count only lightweight
+            // non-collector threads so the two describe one population.
+            { extern void cn1StallRetireThread(struct ThreadLocalData* t);
+              cn1StallRetireThread(d); }
+#endif
             collectThreadResources(d);
             break;
         }
