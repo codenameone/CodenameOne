@@ -117,9 +117,10 @@ with `NOT_SUPPORTED` rather than pretending.
 
 The addresses in a `TunnelSetup` are read before the platform is asked. An
 address, a route or a DNS server that isn't an IP literal fails the start
-with `INVALID_CONFIGURATION`, and the message names the field. That check
-runs in `Tunnels.start` on every platform, so a setup the simulator accepts
-is a setup a device accepts.
+with `INVALID_CONFIGURATION`, and the message names the field. A setup with
+no `address` at all fails the same way, because a link with no address isn't
+one a platform can establish. That check runs in `Tunnels.start` on every
+platform, so a setup the simulator accepts is a setup a device accepts.
 
 On Android the tunnel runs inside a `VpnService` in your app's own process.
 The instance you passed to `Tunnels.start` is the instance that runs, and

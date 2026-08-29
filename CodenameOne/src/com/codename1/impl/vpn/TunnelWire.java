@@ -173,9 +173,19 @@ public final class TunnelWire {
     public static void validateSetup(String wire) {
         String[] fields = split(wire);
         String address = address(fields);
-        if (address.length() > 0) {
-            validate(address, "address");
+        // REQUIRED, not merely readable when present. An empty one was
+        // accepted here and the simulation started a tunnel on it, while
+        // Android skips Builder.addAddress and hands establish() an
+        // interface with no addresses -- which its own documentation for
+        // addAddress rules out, saying at least one address must be set
+        // before establish(). So new TunnelSetup().route("0.0.0.0/0") was a
+        // setup the simulator approved and a device could not bring up,
+        // which is the divergence this whole validation exists to remove.
+        if (address.length() == 0) {
+            throw new IllegalArgumentException("A tunnel needs an address:"
+                    + " the platform cannot establish a link that has none");
         }
+        validate(address, "address");
         for (String block : routes(fields)) {
             validate(block, "route");
         }

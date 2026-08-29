@@ -51,9 +51,14 @@ public final class TunnelSetup {
 
     /// The address this device takes on the tunnel, in CIDR form.
     ///
+    /// REQUIRED. A setup without one fails the start with
+    /// `INVALID_CONFIGURATION`, because a link with no address is not one a
+    /// platform can establish -- Android's `VpnService.Builder` documents
+    /// that at least one address must be set before `establish()`.
+    ///
     /// The prefix may be left off -- `/32` for IPv4, `/128` for IPv6 -- but
-    /// one that is written and unreadable FAILS the start with
-    /// `INVALID_CONFIGURATION`; see [#route].
+    /// one that is written and unreadable FAILS the start the same way; see
+    /// [#route].
     public TunnelSetup address(String cidr) {
         this.address = cidr == null ? "" : cidr;
         return this;

@@ -308,6 +308,33 @@ public class TunnelsTest {
     }
 
     @Test
+    public void aTunnelWithNoAddressIsRefusedRatherThanSimulated() {
+        // route("0.0.0.0/0") and nothing else used to start here: the empty
+        // address was read as "none given" and skipped. Android skips
+        // Builder.addAddress for it and hands establish() an interface with
+        // no addresses, which its addAddress documentation rules out -- at
+        // least one address must be set before establish(). So this was a
+        // setup the simulator approved and a device could not bring up,
+        // which is the one divergence this validation exists to remove.
+        Recording device = new Recording();
+        VpnRequests.resetForTest(device);
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Tunnels.start(new Echo(), new TunnelSetup()
+                        .route("0.0.0.0/0")));
+        assertEquals(0, device.starts,
+                "and it must not reach the bridge on the way to failing");
+
+        // The SIMULATION too, which is where the divergence showed: it is
+        // the same call, so it cannot answer differently.
+        VpnRequests.resetForTest(bridge);
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Tunnels.start(new Echo(), new TunnelSetup()
+                        .route("0.0.0.0/0")));
+        assertNull(Tunnels.getRegistered(),
+                "a refused start leaves nothing registered");
+    }
+
+    @Test
     public void aMalformedSetupNeverReachesAnyBridge() {
         // The refusal used to live in LocalVpnBridge, so it was a property of
         // the SIMULATION rather than of the API: the same setup handed to the
