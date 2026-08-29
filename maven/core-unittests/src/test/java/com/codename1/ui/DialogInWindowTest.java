@@ -1892,4 +1892,60 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aHostedDialogsGameKeyShortcutsFireToo() {
+        // A form dispatches both the raw code and the game action; a window that was
+        // given only the raw map left every game key shortcut on a hosted dialog dead.
+        Window w = openHost(600, 500);
+        final int[] gameHits = new int[1];
+        ActionListener onFire = new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                gameHits[0]++;
+            }
+        };
+
+        Dialog d = new Dialog("game keys");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.addGameKeyListener(Display.GAME_FIRE, onFire);
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        int enter = Display.getInstance().getKeyCode(Display.GAME_FIRE);
+        w.keyPressed(enter);
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+        assertEquals(1, gameHits[0], "a game key shortcut has to fire");
+
+        // Added after showing, the way onShow would.
+        final int[] later = new int[1];
+        d.addGameKeyListener(Display.GAME_LEFT, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                later[0]++;
+            }
+        });
+        int left = Display.getInstance().getKeyCode(Display.GAME_LEFT);
+        w.keyPressed(left);
+        w.keyReleased(left);
+        DisplayTest.flushEdt();
+        assertEquals(1, later[0], "and so does one registered after the show");
+
+        d.removeGameKeyListener(Display.GAME_FIRE, onFire);
+        w.keyPressed(enter);
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+        assertEquals(1, gameHits[0], "removing it stops it");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.keyPressed(left);
+        w.keyReleased(left);
+        DisplayTest.flushEdt();
+        assertEquals(1, later[0], "and disposal takes the rest away");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

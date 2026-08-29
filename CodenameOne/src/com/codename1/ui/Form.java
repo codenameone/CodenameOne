@@ -1360,6 +1360,7 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
         removeKeyListener(keyCode, listener, gameKeyListeners);
+        gameKeyListenerRemoved(keyCode, listener);
     }
 
     private boolean addKeyListener(int keyCode, ActionListener listener, HashMap<Integer, ArrayList<ActionListener>> keyListeners) {
@@ -1408,7 +1409,41 @@ public class Form extends Container implements TopLevelContainer {
         if (gameKeyListeners == null) {
             gameKeyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
         }
-        addKeyListener(keyCode, listener, gameKeyListeners);
+        if (addKeyListener(keyCode, listener, gameKeyListeners)) {
+            gameKeyListenerAdded(keyCode, listener);
+        }
+    }
+
+    /// A game key listener was registered on this form. Inert here; a `Dialog` in a
+    /// window overrides it, for the same reason as `#keyListenerAdded(int,
+    /// ActionListener)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the game action it was registered for
+    ///
+    /// - `listener`: the listener
+    void gameKeyListenerAdded(int keyCode, ActionListener listener) {
+    }
+
+    /// A game key listener was removed from this form. Inert here, overridden by
+    /// `Dialog`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the game action it was registered for
+    ///
+    /// - `listener`: the listener
+    void gameKeyListenerRemoved(int keyCode, ActionListener listener) {
+    }
+
+    /// Every game key listener registered on this form, by game action, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the live map, not a copy
+    HashMap<Integer, ArrayList<ActionListener>> gameKeyListenerMap() {
+        return gameKeyListeners;
     }
 
     /// Returns the number of buttons on the menu bar for use with getSoftButton()

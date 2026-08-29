@@ -2266,7 +2266,24 @@ public class Dialog extends Form implements AbstractDialog {
     ///
     /// - `host`: the window to publish onto
     private void publishKeyListeners(Window host) {
-        HashMap<Integer, ArrayList<ActionListener>> own = keyListenerMap();
+        publishKeyMap(host, keyListenerMap(), false);
+        // Both maps. A form dispatches the raw code and the game action; a window that
+        // was given only the first left every game key shortcut on a hosted dialog
+        // silently dead.
+        publishKeyMap(host, gameKeyListenerMap(), true);
+    }
+
+    /// Registers one of this dialog's key maps on its host window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the window to publish onto
+    ///
+    /// - `own`: the map, may be null
+    ///
+    /// - `game`: true when these are game key listeners
+    private void publishKeyMap(Window host,
+            HashMap<Integer, ArrayList<ActionListener>> own, boolean game) {
         if (own == null) {
             return;
         }
@@ -2274,7 +2291,7 @@ public class Dialog extends Form implements AbstractDialog {
             int code = e.getKey().intValue();
             ArrayList<ActionListener> listeners = e.getValue();
             for (ActionListener l : listeners) {
-                publishKeyListener(host, code, l);
+                publishKeyListener(host, code, l, game);
             }
         }
     }
@@ -2289,13 +2306,18 @@ public class Dialog extends Form implements AbstractDialog {
     /// - `keyCode`: the code
     ///
     /// - `listener`: the listener
-    private void publishKeyListener(Window host, int keyCode, ActionListener listener) {
+    private void publishKeyListener(Window host, int keyCode, ActionListener listener,
+            boolean game) {
         if (hostedKeyListeners == null) {
             hostedKeyListeners = new ArrayList<HostedKeyListener>();
         }
-        HostedKeyListener wrapper = new HostedKeyListener(this, keyCode, listener);
+        HostedKeyListener wrapper = new HostedKeyListener(this, keyCode, listener, game);
         hostedKeyListeners.add(wrapper);
-        host.addKeyListener(keyCode, wrapper);
+        if (game) {
+            host.addGameKeyListener(keyCode, wrapper);
+        } else {
+            host.addKeyListener(keyCode, wrapper);
+        }
     }
 
     /// Takes this dialog's key listeners back off its host.
@@ -2308,7 +2330,11 @@ public class Dialog extends Form implements AbstractDialog {
             return;
         }
         for (HostedKeyListener wrapper : hostedKeyListeners) {
-            host.removeKeyListener(wrapper.keyCode, wrapper);
+            if (wrapper.game) {
+                host.removeGameKeyListener(wrapper.keyCode, wrapper);
+            } else {
+                host.removeKeyListener(wrapper.keyCode, wrapper);
+            }
         }
         hostedKeyListeners = null;
     }
@@ -2323,22 +2349,54 @@ public class Dialog extends Form implements AbstractDialog {
         // the host the same way the ones present at show time did.
         Window host = hostWindow();
         if (host != null) {
-            publishKeyListener(host, keyCode, listener);
+            publishKeyListener(host, keyCode, listener, false);
         }
     }
 
     /// {@inheritDoc}
     @Override
+    void gameKeyListenerAdded(int keyCode, ActionListener listener) {
+        Window host = hostWindow();
+        if (host != null) {
+            publishKeyListener(host, keyCode, listener, true);
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    void gameKeyListenerRemoved(int keyCode, ActionListener listener) {
+        unpublishKeyListener(keyCode, listener, true);
+    }
+
+    /// {@inheritDoc}
+    @Override
     void keyListenerRemoved(int keyCode, ActionListener listener) {
+        unpublishKeyListener(keyCode, listener, false);
+    }
+
+    /// Takes one published wrapper back off the host.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the code it was registered for
+    ///
+    /// - `listener`: the listener it wraps
+    ///
+    /// - `game`: true when it is a game key listener
+    private void unpublishKeyListener(int keyCode, ActionListener listener, boolean game) {
         Window host = hostWindow();
         if (host == null || hostedKeyListeners == null) {
             return;
         }
         for (int iter = 0; iter < hostedKeyListeners.size(); iter++) {
             HostedKeyListener wrapper = hostedKeyListeners.get(iter);
-            if (wrapper.keyCode == keyCode
+            if (wrapper.keyCode == keyCode && wrapper.game == game
                     && wrapper.delegate == listener) { //NOPMD CompareObjectsWithEquals
-                host.removeKeyListener(keyCode, wrapper);
+                if (game) {
+                    host.removeGameKeyListener(keyCode, wrapper);
+                } else {
+                    host.removeKeyListener(keyCode, wrapper);
+                }
                 hostedKeyListeners.remove(iter);
                 return;
             }
@@ -2355,11 +2413,13 @@ public class Dialog extends Form implements AbstractDialog {
         private final Dialog dlg;
         private final int keyCode;
         private final ActionListener delegate;
+        private final boolean game;
 
-        HostedKeyListener(Dialog dlg, int keyCode, ActionListener delegate) {
+        HostedKeyListener(Dialog dlg, int keyCode, ActionListener delegate, boolean game) {
             this.dlg = dlg;
             this.keyCode = keyCode;
             this.delegate = delegate;
+            this.game = game;
         }
 
         @Override

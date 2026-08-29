@@ -1500,7 +1500,12 @@ public class Window extends Container implements TopLevelContainer {
             // caller who knew to ask a second time after showing got what it asked for.
             pendingContentWidth = width;
             pendingContentHeight = height;
-            setWindowSize(width, height);
+            applyingContentSize = true;
+            try {
+                setWindowSize(width, height);
+            } finally {
+                applyingContentSize = false;
+            }
             return;
         }
 
@@ -1513,7 +1518,12 @@ public class Window extends Container implements TopLevelContainer {
         int[] frame = wm.getBounds(nativePeer, new int[4]);
         int chromeW = Math.max(0, frame[2] - wm.getWidth(nativePeer));
         int chromeH = Math.max(0, frame[3] - wm.getHeight(nativePeer));
-        setWindowSize(width + chromeW, height + chromeH);
+        applyingContentSize = true;
+        try {
+            setWindowSize(width + chromeW, height + chromeH);
+        } finally {
+            applyingContentSize = false;
+        }
         if (isDecorated() && chromeW == 0 && chromeH == 0) {
             // A peer exists but its geometry is not real yet. Mac Catalyst grants the
             // window scene asynchronously and, until it arrives, answers both the frame
@@ -1588,11 +1598,29 @@ public class Window extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `r`: the new bounds in desktop coordinates
+    /// Drops a content-size request that a later frame-size call has superseded.
+    ///
+    /// The two express different intents for the same window, and the last caller wins.
+    /// Leaving the earlier content request pending meant show() applied it over a size
+    /// the caller had asked for afterwards.
+    private void supersedePendingContentSize() {
+        if (applyingContentSize) {
+            // This window's own correction, not a caller changing its mind.
+            return;
+        }
+        pendingContentWidth = -1;
+        pendingContentHeight = -1;
+    }
+
+    /// True while `#setWindowContentSize(int, int)` is setting the frame itself.
+    private boolean applyingContentSize;
+
     public void setWindowBounds(Rectangle r) {
         setWindowBounds(r.getX(), r.getY(), r.getWidth(), r.getHeight());
     }
 
     private void setWindowBounds(final int x, final int y, final int w, final int h) {
+        supersedePendingContentSize();
         // Marshalled exactly as show(), hide() and dispose() are, and as the developer
         // guide promises for moving a window. Without it a background caller mutated
         // the pending geometry and the cached monitor while the event dispatch thread
@@ -1632,6 +1660,11 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// - `height`: the new height
     public void setWindowSize(final int width, final int height) {
+        // A frame size the application asked for supersedes a content size it asked for
+        // earlier: the two express different intents for the same window and the last
+        // caller wins. Without this, show() applied the older content request over the
+        // size the caller had settled on afterwards.
+        supersedePendingContentSize();
         // As setWindowBounds: the no-peer branch below writes the pending size, which
         // the event dispatch thread reads when the window is shown.
         if (!Display.getInstance().isEdt()) {
@@ -4145,6 +4178,9 @@ public class Window extends Container implements TopLevelContainer {
         }
         dispatchDefaultCommand(keyCode, scopeAtRelease);
         fireKeyEvent(keyCode);
+        // Both maps, which is what Form.keyReleased does. Dispatching only the raw code
+        // left every game key shortcut on a hosted dialog silently dead.
+        fireGameKeyEvent(keyCode);
     }
 
     /// Runs the default command of the overlay holding the keyboard, if a fire key was
@@ -4198,6 +4234,70 @@ public class Window extends Container implements TopLevelContainer {
                     || game == Display.GAME_LEFT || game == Display.GAME_RIGHT)) {
             keyPressed(keyCode);
             keyReleased(keyCode);
+        }
+    }
+
+    /// Game key listeners, by game action.
+    ///
+    /// Package private rather than public API: a window has never offered game key
+    /// listeners of its own and this does not add them. It exists so that a dialog
+    /// hosted here keeps the game key shortcuts it was built with, which a form gives
+    /// it and a window would otherwise silently drop.
+    private HashMap<Integer, ArrayList<ActionListener>> gameKeyListeners;
+
+    /// Registers a game key listener on this window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the game action
+    ///
+    /// - `listener`: the listener
+    void addGameKeyListener(int keyCode, ActionListener listener) {
+        if (gameKeyListeners == null) {
+            gameKeyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
+        }
+        Integer code = Integer.valueOf(keyCode);
+        ArrayList<ActionListener> l = gameKeyListeners.get(code);
+        if (l == null) {
+            l = new ArrayList<ActionListener>();
+            gameKeyListeners.put(code, l);
+        }
+        if (!l.contains(listener)) {
+            l.add(listener);
+        }
+    }
+
+    /// Removes a game key listener from this window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the game action
+    ///
+    /// - `listener`: the listener
+    void removeGameKeyListener(int keyCode, ActionListener listener) {
+        if (gameKeyListeners == null) {
+            return;
+        }
+        ArrayList<ActionListener> l = gameKeyListeners.get(Integer.valueOf(keyCode));
+        if (l != null) {
+            l.remove(listener);
+        }
+    }
+
+    private void fireGameKeyEvent(int keyCode) {
+        if (gameKeyListeners == null) {
+            return;
+        }
+        ArrayList<ActionListener> listeners = gameKeyListeners.get(
+                Integer.valueOf(Display.getInstance().getGameAction(keyCode)));
+        if (listeners == null) {
+            return;
+        }
+        ActionEvent evt = new ActionEvent(this, keyCode);
+        // Over a copy, for the same reason the raw key dispatch below uses one.
+        ActionListener[] snapshot = listeners.toArray(new ActionListener[listeners.size()]);
+        for (int iter = 0; iter < snapshot.length; iter++) { // NOPMD ForLoopCanBeForeach
+            snapshot[iter].actionPerformed(evt);
         }
     }
 

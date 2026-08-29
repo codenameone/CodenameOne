@@ -5642,4 +5642,28 @@ class WindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aLaterFrameSizeSupersedesAnEarlierContentSize() {
+        // The two express different intents for the same window and the last caller
+        // wins. Leaving the earlier content request pending meant show() applied it
+        // over the size the caller had settled on afterwards.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+
+        Window w = new Window("changed its mind", new BorderLayout());
+        w.setDecorated(true);
+        w.setWindowContentSize(400, 300);
+        w.setWindowSize(800, 600);
+        w.show();
+        DisplayTest.flushEdt();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(800, peer.getWidth(),
+                "the frame size asked for last is the one that applies");
+        assertEquals(600, peer.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }
