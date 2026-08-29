@@ -215,12 +215,22 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         // line in the log on every port -- macOS renders every *_dark frame
         // light and four rounds of reading the framework did not say why.
         Style themeProbe = UIManager.getInstance().getComponentStyle("Form");
-        System.out.println("CN1SS:INFO:test=" + baseName() + " appearance=" + suffix
+        Style darkProbe = UIManager.getInstance().getComponentStyle("$DarkForm");
+        // logDiag, not System.out.println: a bare stdout line does not survive
+        // to the captured log on every port, which is the whole reason logDiag
+        // exists -- and a diagnostic that cannot be read is worse than none,
+        // because its silence gets mistaken for the condition not occurring.
+        //
+        // Both probes are null-guarded. getComponentStyle() answers null when
+        // the theme carries no such UIID, and "$DarkForm" is absent on exactly
+        // the port this line is here to diagnose, so dereferencing it blind
+        // would throw inside the capture phase it is meant to report on.
+        logDiag("CN1SS:INFO:test=" + baseName() + " appearance=" + suffix
                 + " isDarkMode=" + Display.getInstance().isDarkMode()
                 + " FormBg=" + Integer.toHexString(
                         themeProbe == null ? 0 : themeProbe.getBgColor())
-                + " darkStyleForForm=" + UIManager.getInstance()
-                        .getComponentStyle("$DarkForm").getBgColor());
+                + " darkStyleForForm=" + (darkProbe == null
+                        ? "absent" : Integer.toHexString(darkProbe.getBgColor())));
 
         annotations.clear();
 

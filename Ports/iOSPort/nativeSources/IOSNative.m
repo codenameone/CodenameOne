@@ -1048,6 +1048,32 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_Str
 extern NSData* arrayToData(JAVA_OBJECT arr);
 extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 
+#if TARGET_OS_OSX
+/// The pasteboard type the bytes actually are, by magic number, or nil when
+/// they are none of the three the Java side can hand us.
+///
+/// IOSImplementation.clipboardImageBytes() takes ClipboardContent's MIME_PNG
+/// representation if it has one, else MIME_JPEG, else MIME_GIF -- so the bytes
+/// arriving here are frequently not PNG, and declaring them PNG makes every
+/// other application decode JPEG or GIF data as PNG.
+static NSString* cn1MacPasteboardImageType(NSData* data) {
+    if (data.length < 4) {
+        return nil;
+    }
+    const unsigned char* b = (const unsigned char*)data.bytes;
+    if (b[0] == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
+        return NSPasteboardTypePNG;
+    }
+    if (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) {
+        return @"public.jpeg";
+    }
+    if (b[0] == 'G' && b[1] == 'I' && b[2] == 'F' && b[3] == '8') {
+        return @"com.compuserve.gif";
+    }
+    return nil;
+}
+#endif
+
 void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT plain, JAVA_OBJECT html, JAVA_OBJECT rtf, JAVA_OBJECT markdown, JAVA_OBJECT asciidoc, JAVA_OBJECT image, JAVA_OBJECT fileUris) {
 #if TARGET_OS_OSX
     POOL_BEGIN();
@@ -1066,7 +1092,22 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
     if (image != JAVA_NULL) {
         NSData* imgData = arrayToData(image);
         if (imgData != nil && imgData.length > 0) {
-            [pb setData:imgData forType:NSPasteboardTypePNG];
+            NSString* trueType = cn1MacPasteboardImageType(imgData);
+            if (trueType != nil) {
+                [pb setData:imgData forType:trueType];
+            }
+            if (trueType == nil || ![trueType isEqualToString:NSPasteboardTypePNG]) {
+                // getClipboardImage() is specified to hand Java PNG back, so
+                // publish a real PNG rendition beside the original rather than
+                // relabelling non-PNG bytes as PNG. If the bytes decode as
+                // nothing, publishing nothing is better than publishing them
+                // under a type they are not.
+                NSBitmapImageRep* rep = [NSBitmapImageRep imageRepWithData:imgData];
+                NSData* png = [rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+                if (png != nil) {
+                    [pb setData:png forType:NSPasteboardTypePNG];
+                }
+            }
         }
     }
     if (fileUris != JAVA_NULL) {
@@ -1074,7 +1115,20 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
         NSMutableArray* urls = [NSMutableArray array];
         for (NSString* u in [joined componentsSeparatedByString:@"\n"]) {
             if (u.length == 0) continue;
-            NSURL* url = [NSURL URLWithString:u];
+            // ClipboardContent.MIME_FILE's contract explicitly permits a raw
+            // local path, and URLWithString: turns one into a scheme-less
+            // relative URL whose isFileURL is NO. The Finder then gets no
+            // usable file reference, and getClipboardFileUris() -- which asks
+            // for file URLs only -- cannot read back what this just wrote.
+            NSURL* url;
+            if ([u hasPrefix:@"/"] || [u hasPrefix:@"~"]) {
+                url = [NSURL fileURLWithPath:[u stringByExpandingTildeInPath]];
+            } else {
+                url = [NSURL URLWithString:u];
+                if (url != nil && url.scheme == nil) {
+                    url = [NSURL fileURLWithPath:u];
+                }
+            }
             if (url != nil) [urls addObject:url];
         }
         // Written as objects rather than as a type, which is what makes the

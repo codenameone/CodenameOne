@@ -57,6 +57,32 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 + (NSString *)enumerateCameras {
     NSMutableArray *parts = [NSMutableArray array];
     NSArray<AVCaptureDevice *> *devs;
+#if TARGET_OS_OSX
+    // Plenty of Macs have no built-in wide-angle camera at all: the only
+    // device is an external USB camera or an iPhone acting as a Continuity
+    // Camera. hasCameraSupport answers from defaultDeviceWithMediaType, which
+    // DOES see those, so enumerating the built-in type alone reports support
+    // while Camera.getCameras() comes back empty and Camera.getDefault()
+    // returns null.
+    NSMutableArray<AVCaptureDeviceType> *macTypes =
+        [NSMutableArray arrayWithObject:AVCaptureDeviceTypeBuiltInWideAngleCamera];
+    if (@available(macOS 14.0, *)) {
+        [macTypes addObject:AVCaptureDeviceTypeExternal];
+        [macTypes addObject:AVCaptureDeviceTypeContinuityCamera];
+    } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        // Superseded by AVCaptureDeviceTypeExternal above; still the only
+        // spelling that exists before macOS 14.
+        [macTypes addObject:AVCaptureDeviceTypeExternalUnknown];
+#pragma clang diagnostic pop
+    }
+    AVCaptureDeviceDiscoverySession *macSess =
+        [AVCaptureDeviceDiscoverySession discoverySessionWithDeviceTypes:macTypes
+                                                             mediaType:AVMediaTypeVideo
+                                                              position:AVCaptureDevicePositionUnspecified];
+    devs = macSess.devices;
+#else
     if (@available(iOS 10.0, *)) {
         AVCaptureDeviceDiscoverySession *sess =
             [AVCaptureDeviceDiscoverySession discoverySessionWithDeviceTypes:
@@ -67,6 +93,7 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
     } else {
         devs = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
     }
+#endif
     for (AVCaptureDevice *d in devs) {
         NSString *facing = (d.position == AVCaptureDevicePositionFront) ? @"front"
                          : (d.position == AVCaptureDevicePositionBack)  ? @"back"
