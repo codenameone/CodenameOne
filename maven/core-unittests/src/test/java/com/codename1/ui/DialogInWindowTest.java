@@ -1084,4 +1084,61 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void anOlderDialogClosingDoesNotTakeTheKeyboardFromANewerOne() {
+        // Hosted dialogs do not necessarily close in the order they opened: a timed one
+        // can expire while a newer one is up. With each remembering what was in force
+        // when it arrived, the older one put its own answer back over the newer one's
+        // and the newer one later restored a scope pointing at a detached hierarchy.
+        Window w = openHost(600, 500);
+        final int[] pressesBehind = new int[1];
+        Button behind = new Button("behind") {
+            @Override
+            public void keyPressed(int keyCode) {
+                pressesBehind[0]++;
+                super.keyPressed(keyCode);
+            }
+        };
+        w.add(BorderLayout.CENTER, behind);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+        w.setFocused(behind);
+        DisplayTest.flushEdt();
+
+        Dialog older = new Dialog("older");
+        older.setLayout(new BorderLayout());
+        older.add(BorderLayout.CENTER, new Label("older"));
+        older.setTopLevelHost(w);
+        older.showModeless();
+        DisplayTest.flushEdt();
+
+        Dialog newer = new Dialog("newer");
+        newer.setLayout(new BorderLayout());
+        newer.add(BorderLayout.CENTER, new Label("newer"));
+        newer.setTopLevelHost(w);
+        newer.showModeless();
+        DisplayTest.flushEdt();
+
+        // The older one expires underneath the newer one.
+        older.dispose();
+        DisplayTest.flushEdt();
+        assertFalse(w.isKeyInputScopeEmpty(),
+                "the newer dialog still owns the keyboard");
+        w.keyPressed('a');
+        w.keyReleased('a');
+        DisplayTest.flushEdt();
+        assertEquals(0, pressesBehind[0],
+                "and a key must not reach the control the newer dialog covers");
+
+        newer.dispose();
+        DisplayTest.flushEdt();
+        assertTrue(w.isKeyInputScopeEmpty(), "the keyboard is free once both have gone");
+        w.keyPressed('a');
+        DisplayTest.flushEdt();
+        assertTrue(pressesBehind[0] > 0, "and the control is reachable again");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

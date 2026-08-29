@@ -127,4 +127,36 @@ class ToastBarInWindowTest extends UITestBase {
         assertSame(ToastBar.getInstance(), ToastBar.getInstance(null),
                 "callers with nothing to resolve still get the singleton");
     }
+
+    @FormTest
+    void theSingletonStaysOnTheFormEvenWhileAWindowIsFocused() {
+        // Two instances sharing one window's cached component, with two status lists,
+        // would fight: one expiring a toast the other still thinks it is showing.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        w.show();
+        DisplayTest.flushEdt();
+        com.codename1.ui.Desktop.getInstance().windowFocusChanged(w.getWindowId(), true);
+        DisplayTest.flushEdt();
+
+        ToastBar singleton = ToastBar.getInstance();
+        ToastBar forWindow = ToastBar.getInstance(w);
+        assertNotSame(singleton, forWindow);
+
+        // The singleton is form-only by contract, so a legacy caller reaching for it
+        // while a window has focus still targets the main form and cannot collide with
+        // the window's own instance.
+        ToastBar.Status s = singleton.createStatus();
+        s.setMessage("legacy");
+        assertNull(w.getClientProperty("ToastBarComponent"),
+                "the singleton must not build itself onto the focused window");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

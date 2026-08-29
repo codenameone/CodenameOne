@@ -195,10 +195,28 @@ public final class AccessibilityManager {
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     private synchronized AccessibilityTreeSnapshot getSnapshotForRoot(Container form) {
         // Walking a live lightweight component hierarchy off the Codename One
-        // EDT is unsafe. Native bridges on other threads receive the last
-        // immutable snapshot; active bridges arrange eager refreshes on the EDT.
+        // EDT is unsafe. Native bridges on other threads receive an immutable
+        // snapshot; active bridges arrange eager refreshes on the EDT.
         if (!Display.getInstance().isEdt()) {
-            return snapshot;
+            // The one cached for the surface actually being asked about. An
+            // invalidation rebuilds a single root and then notifies every window
+            // bridge, so the most recently built tree usually belongs to a different
+            // window -- handing that back would have a screen reader on one window
+            // announce, and act on, another window's contents. An empty tree when
+            // nothing has been built for this root yet, because "nothing known here"
+            // is recoverable on the next refresh and describing the wrong window
+            // is not.
+            if (form == null) {
+                return snapshot;
+            }
+            AccessibilityTreeSnapshot cached = snapshotsByRoot.get(form);
+            if (cached != null) {
+                return cached;
+            }
+            return form == snapshotRoot ? snapshot //NOPMD CompareObjectsWithEquals
+                    : new AccessibilityTreeSnapshot(generation,
+                            Collections.<Long>emptyList(),
+                            Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
         }
         if (!dirty) {
             if (form == snapshotRoot) {
@@ -243,6 +261,20 @@ public final class AccessibilityManager {
         return snapshot;
     }
 
+    private AccessibilityNodeSnapshot findNode(long nodeId) {
+        AccessibilityNodeSnapshot node = snapshot.getNode(nodeId);
+        if (node != null) {
+            return node;
+        }
+        for (AccessibilityTreeSnapshot cached : snapshotsByRoot.values()) {
+            node = cached.getNode(nodeId);
+            if (node != null) {
+                return node;
+            }
+        }
+        return null;
+    }
+
     public synchronized int getPendingChanges() {
         return pendingChanges;
     }
@@ -251,7 +283,12 @@ public final class AccessibilityManager {
         final AccessibilityNodeSnapshot node;
         final AccessibilityAction action;
         synchronized (this) {
-            node = snapshot.getNode(nodeId);
+            // Across every cached surface, not just the last one built. Off-EDT
+            // readers are now handed their own window's tree, so the node they act on
+            // routinely comes from a snapshot other than the current one -- resolving
+            // only against that one would leave every button on a secondary window
+            // inert.
+            node = findNode(nodeId);
             action = node == null ? null : node.getAction(actionId);
         }
         if (node == null || action == null || !action.isEnabled()) {

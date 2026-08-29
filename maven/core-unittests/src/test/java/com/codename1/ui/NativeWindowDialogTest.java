@@ -25,6 +25,8 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestWindowManager;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.UIManager;
 
@@ -779,6 +781,68 @@ class NativeWindowDialogTest extends UITestBase {
         id.dispose();
         DisplayTest.flushEdt();
         host.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aNativeDialogIsResizedForContentItsShowListenerAdds() {
+        // A show listener is the ordinary place to fill a dialog in, and a decorated
+        // non-resizable window will not grow itself afterwards. Sizing only before the
+        // callbacks left whatever they added compressed into the empty box's size, with
+        // no way for the user to drag it bigger.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Dialog empty = newDialog("empty");
+        empty.setNativeWindowMode(true);
+        empty.showModeless();
+        DisplayTest.flushEdt();
+        TestWindowManager wm = (TestWindowManager) implementation.getWindowManager();
+        int emptyHeight = wm.getLastWindow().getHeight();
+        empty.dispose();
+        DisplayTest.flushEdt();
+
+        final Dialog d = newDialog("filled late");
+        d.setNativeWindowMode(true);
+        d.setLayout(com.codename1.ui.layouts.BoxLayout.y());
+        d.addShowListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                for (int i = 0; i < 8; i++) {
+                    d.add(new Label("added by the show listener " + i));
+                }
+            }
+        });
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        assertTrue(wm.getLastWindow().getHeight() > emptyHeight,
+                "the window has to account for what the show listener added");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aNativeDialogDisposedByItsShowListenerIsNotResizedAfterwards() {
+        // The re-size above must not run against a window that the callbacks tore down.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        final Dialog d = newDialog("self disposing");
+        d.setNativeWindowMode(true);
+        d.addShowListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                d.dispose();
+            }
+        });
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        assertTrue(d.isDisposed());
+        assertNull(d.getNativeWindow());
+
         DisplayTest.flushEdt();
     }
 }

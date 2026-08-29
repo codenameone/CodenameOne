@@ -164,6 +164,11 @@ public final class ToastBar {
     }
 
     /// Gets reference to the singleton StatusBar instance
+    ///
+    /// The singleton shows on whichever `com.codename1.ui.Form` is current, including
+    /// while a desktop window has the focus. To toast on a window use
+    /// `#getInstance(com.codename1.ui.TopLevelContainer)`, which is what the static
+    /// helpers on this class do.
     public static ToastBar getInstance() {
         return ToastBarHolder.INSTANCE;
     }
@@ -210,7 +215,17 @@ public final class ToastBar {
     ///
     /// the host, or null when there is none
     private TopLevelContainer resolveHost() {
-        return host != null ? host : CN.getCurrentTopLevel();
+        if (host != null) {
+            return host;
+        }
+        // The current form, not the top level the user is in. The singleton is
+        // form-only by contract, and it has to stay that way: a window already has its
+        // own instance from getInstance(TopLevelContainer), and letting the singleton
+        // resolve to that window as well would give two instances with two status
+        // lists the same cached component to fight over -- one expiring a toast the
+        // other still thinks it is showing. Callers that want the surface the user is
+        // in ask for it, which is what the static helpers below do.
+        return Display.getInstance().getCurrent();
     }
 
     /// Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds

@@ -117,4 +117,48 @@ class AccessibilityWindowTest extends UITestBase {
         // throw on the way out.
         assertNotNull(AccessibilityInspector.currentSnapshot());
     }
+
+    @FormTest
+    void anOffEdtReaderGetsTheTreeOfTheSurfaceItAsksAbout() throws Exception {
+        // Swing's accessibility callbacks run on the AWT thread, not the Codename One
+        // EDT, and every window bridge is notified whenever any one root is rebuilt.
+        // Returning the last tree built would have a reader on one window announce
+        // another window's contents.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.add(BorderLayout.CENTER, new Button("on the main form"));
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("second", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.add(BorderLayout.CENTER, new Button("in the window"));
+        w.show();
+        DisplayTest.flushEdt();
+
+        AccessibilityManager mgr = AccessibilityManager.getInstance();
+        // Both built on the EDT, the window last, so the global snapshot is its tree.
+        assertTrue(mentions(mgr.getSnapshot(main), "on the main form"));
+        assertTrue(mentions(mgr.getSnapshot(w), "in the window"));
+
+        final AccessibilityTreeSnapshot[] offEdt = new AccessibilityTreeSnapshot[2];
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                offEdt[0] = AccessibilityManager.getInstance().getSnapshot(main);
+                offEdt[1] = AccessibilityManager.getInstance().getSnapshot(w);
+            }
+        });
+        t.start();
+        t.join(5000);
+
+        assertNotNull(offEdt[0]);
+        assertTrue(mentions(offEdt[0], "on the main form"),
+                "a reader on the main form must get the main form's tree");
+        assertFalse(mentions(offEdt[0], "in the window"),
+                "and must not be told about the window that was built more recently");
+        assertTrue(mentions(offEdt[1], "in the window"));
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

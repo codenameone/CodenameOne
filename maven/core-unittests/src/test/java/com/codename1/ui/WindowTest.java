@@ -5456,4 +5456,76 @@ class WindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aWindowWithNoOverlayDispatchesKeysExactlyAsBefore() {
+        // The compatibility half of the key input scope: with nothing claiming the
+        // keyboard a window has to behave as it always did, or every window without a
+        // dialog on it changes.
+        implementation.setMultiWindowSupported(true);
+        final int[] pressed = new int[1];
+        final int[] released = new int[1];
+        Window w = new Window("keys", new BorderLayout());
+        w.setWindowSize(400, 300);
+        Button b = new Button("target") {
+            @Override
+            public void keyPressed(int keyCode) {
+                pressed[0]++;
+                super.keyPressed(keyCode);
+            }
+
+            @Override
+            public void keyReleased(int keyCode) {
+                released[0]++;
+                super.keyReleased(keyCode);
+            }
+        };
+        w.add(BorderLayout.CENTER, b);
+        w.show();
+        DisplayTest.flushEdt();
+        w.setFocused(b);
+        DisplayTest.flushEdt();
+
+        assertNull(w.getKeyInputScope(), "nothing claims the keyboard by default");
+        w.keyPressed('x');
+        w.keyReleased('x');
+        DisplayTest.flushEdt();
+        assertEquals(1, pressed[0], "the focused component still gets its keys");
+        assertEquals(1, released[0]);
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aKeyInputScopeHandsTheKeyboardBackWhenItIsCleared() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("scoped", new BorderLayout());
+        w.setWindowSize(400, 300);
+        Button outside = new Button("outside");
+        w.add(BorderLayout.CENTER, outside);
+        w.show();
+        DisplayTest.flushEdt();
+        w.setFocused(outside);
+        DisplayTest.flushEdt();
+
+        Container scope = new Container(new BorderLayout());
+        Button inside = new Button("inside");
+        scope.add(BorderLayout.CENTER, inside);
+        w.getFormLayeredPane(WindowTest.class, true).addComponent(scope);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+
+        w.pushKeyInputScope(scope);
+        DisplayTest.flushEdt();
+        assertSame(inside, w.getFocused(),
+                "the scope takes focus off whatever was outside it");
+
+        w.removeKeyInputScope(scope);
+        DisplayTest.flushEdt();
+        assertNull(w.getKeyInputScope());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

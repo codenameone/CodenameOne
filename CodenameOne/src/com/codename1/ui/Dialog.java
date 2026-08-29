@@ -261,11 +261,7 @@ public class Dialog extends Form implements AbstractDialog {
     /// Whether the hosted showing in progress has a caller parked on it.
     private boolean hostedModal;
 
-    /// What owned the host's keyboard before this dialog took it.
-    private Container previousKeyScope;
-
     /// The host's focus owner before this dialog took the keyboard.
-    private Component previousFocus;
 
     /// The host's shape when the dialog was shown, so a resize can tell an orientation
     /// flip from an ordinary resize. True when it was taller than it was wide.
@@ -2119,6 +2115,14 @@ public class Dialog extends Form implements AbstractDialog {
         // released. Before the wait below, so a listener that disposes is honoured.
         onShow();
         onShowCompletedImpl();
+        // Sized once more, because those callbacks are where content is commonly added
+        // or revealed and the window does not resize itself. Sizing only beforehand
+        // left anything they added compressed or clipped in a window that cannot be
+        // resized. Sizing only afterwards would show the window at its pending size
+        // first, so it is done twice: once so it appears right, once so it stays right.
+        if (!isDisposed() && !w.isWindowDisposed()) {
+            sizeAndPlaceNativeWindow(w, host);
+        }
         if (modal) {
             // Idempotent for a window already on screen: it takes the modal blocker and
             // parks the caller without showing anything a second time.
@@ -2443,9 +2447,7 @@ public class Dialog extends Form implements AbstractDialog {
         // Keys follow the dialog, not the window's previous focus owner. Saved rather
         // than cleared so a dialog over a dialog gives the keyboard back to the one
         // underneath rather than to the window.
-        previousKeyScope = host.getKeyInputScope();
-        previousFocus = host.getFocused();
-        host.setKeyInputScope(this);
+        host.pushKeyInputScope(this);
         focusFirstFocusable(host);
 
         onShow();
@@ -2670,17 +2672,10 @@ public class Dialog extends Form implements AbstractDialog {
                 host.removeWindowListener(hostWindowListener);
                 hostWindowListener = null;
             }
-            Container restoredScope = previousKeyScope;
-            previousKeyScope = null;
-            host.setKeyInputScope(restoredScope);
-            // Focus goes back to what this dialog covered, but only when nothing else
-            // is still holding the keyboard: with a dialog stacked under this one that
-            // dialog owns it, and handing focus to what is behind both would let keys
-            // reach a control it is still covering.
-            if (previousFocus != null && restoredScope == null) {
-                host.setFocused(previousFocus);
-            }
-            previousFocus = null;
+            // Releasing the claim is all that is needed: the window restores focus
+            // itself once the last claimant has gone, which is the only point at which
+            // handing focus back cannot hand it to something still covered.
+            host.removeKeyInputScope(this);
         }
         if (scrim != null) {
             scrim.remove();

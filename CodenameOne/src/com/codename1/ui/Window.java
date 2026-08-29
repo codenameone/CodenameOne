@@ -3577,18 +3577,83 @@ public class Window extends Container implements TopLevelContainer {
     /// behind it fully operable from the keyboard.
     private Container keyInputScope;
 
+    /// Every container currently claiming the keyboard, innermost last.
+    ///
+    /// A stack rather than a saved value per claimant, because overlays do not
+    /// necessarily close in the order they opened: a timed dialog can expire while a
+    /// newer one is still up. With each claimant remembering "what was in force when I
+    /// arrived", that older dialog would put its own answer back over the newer one's,
+    /// and the newer one would later restore a scope pointing at a hierarchy that had
+    /// already been detached -- leaving keys going into dead components. Removing an
+    /// entry from anywhere in a stack has none of those problems.
+    private ArrayList<Container> keyInputScopes;
+
+    /// What had focus before the first of those claimants arrived, so it can be given
+    /// focus back once the last of them leaves. Held here rather than by each claimant
+    /// for the same reason as the stack itself: a claimant records whatever the one
+    /// below it had focused, which by the time it leaves is usually a component that
+    /// has already been detached.
+    private Component preKeyInputScopeFocus;
+
     /// The container currently owning the keyboard, or null.
     Container getKeyInputScope() {
         return keyInputScope;
     }
 
-    /// Confines the keyboard to a container, or releases it with null. Nested overlays
-    /// save and restore what was in force rather than clearing it.
+    /// Claims the keyboard for a container.
     ///
     /// #### Parameters
     ///
-    /// - `scope`: the container that owns keys, or null for the whole window
-    void setKeyInputScope(Container scope) {
+    /// - `scope`: the container that owns keys until it releases them
+    void pushKeyInputScope(Container scope) {
+        if (scope == null) {
+            return;
+        }
+        if (keyInputScopes == null) {
+            keyInputScopes = new ArrayList<Container>();
+            preKeyInputScopeFocus = getFocused();
+        }
+        keyInputScopes.add(scope);
+        applyKeyInputScope();
+    }
+
+    /// Releases a claim, wherever it sits in the stack.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scope`: the container releasing the keyboard
+    void removeKeyInputScope(Container scope) {
+        if (keyInputScopes == null || scope == null) {
+            return;
+        }
+        keyInputScopes.remove(scope);
+        Component restoreFocusTo = null;
+        if (keyInputScopes.isEmpty()) {
+            keyInputScopes = null;
+            restoreFocusTo = preKeyInputScopeFocus;
+            preKeyInputScopeFocus = null;
+        }
+        applyKeyInputScope();
+        // Only once nothing is left holding the keyboard, and only if what held focus
+        // then is still part of this window -- a claimant can take its own content away
+        // with it, and focusing a detached component silently eats every later key.
+        if (restoreFocusTo != null && contains(restoreFocusTo)) {
+            setFocused(restoreFocusTo);
+        }
+    }
+
+    /// Whether anything at all currently claims the keyboard.
+    ///
+    /// #### Returns
+    ///
+    /// true when no overlay owns keys
+    boolean isKeyInputScopeEmpty() {
+        return keyInputScopes == null;
+    }
+
+    private void applyKeyInputScope() {
+        Container scope = keyInputScopes == null ? null
+                : keyInputScopes.get(keyInputScopes.size() - 1);
         this.keyInputScope = scope;
         if (scope != null && (focused == null || !scope.contains(focused))) {
             focused = null;
