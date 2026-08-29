@@ -251,8 +251,8 @@ public @interface Mac {
     /// whenever a package is produced, which includes the App Store default:
     /// the build fails with an explanatory error rather than writing an
     /// unsigned package, because App Store Connect refuses one and Gatekeeper
-    /// will not accept it as Developer ID distribution however well the
-    /// application inside it is signed.
+    /// won't accept it as Developer ID distribution however well the enclosed
+    /// application is signed.
     @Hint(name = "macos.signingIdentity.installer")
     String signingIdentityInstaller() default "";
 
