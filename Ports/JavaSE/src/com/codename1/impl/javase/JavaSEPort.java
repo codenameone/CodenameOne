@@ -3118,7 +3118,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                 // so a bridge that always described surface zero handed a screen reader
                 // on a secondary window the main window's tree.
                 cn1Accessibility = new JavaSEAccessibility(this, JavaSEPort.this, windowId);
-                AccessibilityManager.getInstance().invalidateAll();
+                // This canvas's own surface, named rather than left to be inferred.
+                // invalidateAll() has no root to work from, so the eager refresh built
+                // whichever surface had focus -- and a reader attaching to a window
+                // that did not have focus was left with nothing to read until that
+                // window happened to change.
+                com.codename1.ui.TopLevelContainer requesting = canvasTopLevel();
+                if (requesting == null) {
+                    AccessibilityManager.getInstance().invalidateAll();
+                } else {
+                    AccessibilityManager.getInstance().invalidate(
+                            requesting.asContainer(), AccessibilityManager.CHANGE_ALL);
+                }
             }
             return cn1Accessibility.getContext();
         }

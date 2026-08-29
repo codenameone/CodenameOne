@@ -12507,7 +12507,13 @@ public abstract class CodenameOneImplementation {
     /// the snapshot, never null
     public AccessibilityTreeSnapshot getAccessibilityTreeSnapshot(int windowId) {
         if (windowId == 0) {
-            return getAccessibilityTreeSnapshot();
+            // The main form by name, not "the current surface". Surface zero is the
+            // main canvas by contract, and the current-surface accessor answers with
+            // the focused top level on the event dispatch thread and with the last
+            // tree built anywhere off it -- either of which hands the main canvas a
+            // secondary window's labels and actions.
+            return AccessibilityManager.getInstance()
+                    .getSnapshot(Display.getInstance().getCurrent());
         }
         Window w = Desktop.getInstance().windowById(windowId);
         return AccessibilityManager.getInstance().getSnapshot(w);

@@ -114,9 +114,14 @@ public final class AccessibilityManager {
         // The root the changed component actually lives on, not whatever form happens
         // to be current: a change inside a window used to schedule a rebuild of the
         // main form's tree instead, so the window's own tree stayed stale.
-        TopLevelContainer changedTop = component != null
-                ? component.getTopLevelContainer() : null;
-        if (changedTop == null) {
+        // A null component is invalidateAll(): every surface is stale, not the focused
+        // one. Substituting the current top level here turned an all-root invalidation
+        // into a single-root refresh of whichever window happened to have focus, and
+        // the rebuild then cleared the global dirty flag -- so a window that asked for
+        // accessibility while unfocused was left with nothing until it next changed.
+        final boolean allRoots = component == null;
+        TopLevelContainer changedTop = allRoots ? null : component.getTopLevelContainer();
+        if (changedTop == null && !allRoots) {
             changedTop = CN.getCurrentTopLevel();
         }
         final Container refreshRoot = changedTop == null ? null : changedTop.asContainer();
@@ -141,12 +146,25 @@ public final class AccessibilityManager {
             // leave it stale, which is the defect this queue exists to fix. The
             // snapshot cache is capped because it holds whole trees; this holds
             // references to containers that are alive anyway.
-            if (refreshRoot == null) {
-                // A mutation with no surface at all. Recorded separately from the
-                // queue, because an empty queue can also mean every root that was in
-                // it has since been disposed -- and clearing every cached surface is
-                // right for the first and destroys every other window's tree for the
-                // second.
+            if (allRoots) {
+                // Every surface known to be alive, so the refresh rebuilds all of them
+                // rather than picking one.
+                for (Container root : snapshotsByRoot.keySet()) {
+                    if (!pendingRoots.contains(root)) {
+                        pendingRoots.add(root);
+                    }
+                }
+                TopLevelContainer current = CN.getCurrentTopLevel();
+                Container currentRoot = current == null ? null : current.asContainer();
+                if (currentRoot != null && !pendingRoots.contains(currentRoot)) {
+                    pendingRoots.add(currentRoot);
+                }
+            } else if (refreshRoot == null) {
+                // A mutation whose component belongs to no surface at all. Recorded
+                // separately from the queue, because an empty queue can also mean every
+                // root that was in it has since been disposed -- and clearing every
+                // cached surface is right for the first and destroys every other
+                // window's tree for the second.
                 pendingRootlessRefresh = true;
             } else if (!pendingRoots.contains(refreshRoot)) {
                 pendingRoots.add(refreshRoot);

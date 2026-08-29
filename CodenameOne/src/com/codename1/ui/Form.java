@@ -1292,6 +1292,38 @@ public class Form extends Container implements TopLevelContainer {
             keyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
         }
         addKeyListener(keyCode, listener, keyListeners);
+        keyListenerAdded(keyCode, listener);
+    }
+
+    /// A key listener was registered on this form. Inert here; a `Dialog` hosted in a
+    /// window overrides it, because the window dispatches keys through its own map and
+    /// would never consult this one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the code it was registered for
+    ///
+    /// - `listener`: the listener
+    void keyListenerAdded(int keyCode, ActionListener listener) {
+    }
+
+    /// A key listener was removed from this form. Inert here, overridden by `Dialog`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the code it was registered for
+    ///
+    /// - `listener`: the listener
+    void keyListenerRemoved(int keyCode, ActionListener listener) {
+    }
+
+    /// Every key listener registered on this form, by key code, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the live map, not a copy
+    HashMap<Integer, ArrayList<ActionListener>> keyListenerMap() {
+        return keyListeners;
     }
 
     /// Removes a key listener from the given keycode
@@ -1307,6 +1339,7 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
         removeKeyListener(keyCode, listener, keyListeners);
+        keyListenerRemoved(keyCode, listener);
     }
 
     /// Removes a game key listener from the given game keycode

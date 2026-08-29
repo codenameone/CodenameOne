@@ -40,6 +40,8 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 
 /// A dialog is a form that occupies a part of the screen and appears as a modal
@@ -2238,6 +2240,120 @@ public class Dialog extends Form implements AbstractDialog {
         getTitleComponent().setVisible(false);
     }
 
+    /// Registers this dialog's key listeners on its host window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the window to publish onto
+    private void publishKeyListeners(Window host) {
+        HashMap<Integer, ArrayList<ActionListener>> own = keyListenerMap();
+        if (own == null) {
+            return;
+        }
+        for (Map.Entry<Integer, ArrayList<ActionListener>> e : own.entrySet()) {
+            int code = e.getKey().intValue();
+            ArrayList<ActionListener> listeners = e.getValue();
+            for (ActionListener l : listeners) {
+                publishKeyListener(host, code, l);
+            }
+        }
+    }
+
+    /// Registers one of this dialog's key listeners on its host, wrapped so it only
+    /// fires while this dialog owns the keyboard.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the window to publish onto
+    ///
+    /// - `keyCode`: the code
+    ///
+    /// - `listener`: the listener
+    private void publishKeyListener(Window host, int keyCode, ActionListener listener) {
+        if (hostedKeyListeners == null) {
+            hostedKeyListeners = new ArrayList<HostedKeyListener>();
+        }
+        HostedKeyListener wrapper = new HostedKeyListener(this, keyCode, listener);
+        hostedKeyListeners.add(wrapper);
+        host.addKeyListener(keyCode, wrapper);
+    }
+
+    /// Takes this dialog's key listeners back off its host.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the window they were published onto
+    private void unpublishKeyListeners(Window host) {
+        if (hostedKeyListeners == null) {
+            return;
+        }
+        for (HostedKeyListener wrapper : hostedKeyListeners) {
+            host.removeKeyListener(wrapper.keyCode, wrapper);
+        }
+        hostedKeyListeners = null;
+    }
+
+    /// The wrappers this dialog put on its host, so they can be taken off again.
+    private ArrayList<HostedKeyListener> hostedKeyListeners;
+
+    /// {@inheritDoc}
+    @Override
+    void keyListenerAdded(int keyCode, ActionListener listener) {
+        // Added after the dialog was shown -- from onShow, say -- so it has to reach
+        // the host the same way the ones present at show time did.
+        if (layerHost != null) {
+            publishKeyListener(layerHost, keyCode, listener);
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    void keyListenerRemoved(int keyCode, ActionListener listener) {
+        if (layerHost == null || hostedKeyListeners == null) {
+            return;
+        }
+        for (int iter = 0; iter < hostedKeyListeners.size(); iter++) {
+            HostedKeyListener wrapper = hostedKeyListeners.get(iter);
+            if (wrapper.keyCode == keyCode
+                    && wrapper.delegate == listener) { //NOPMD CompareObjectsWithEquals
+                layerHost.removeKeyListener(keyCode, wrapper);
+                hostedKeyListeners.remove(iter);
+                return;
+            }
+        }
+    }
+
+    /// One of a hosted dialog's key listeners, as the host window sees it.
+    ///
+    /// The wrapper exists for the scoping: every hosted dialog publishes onto the same
+    /// window, so without it a dialog covered by another one would still be running its
+    /// shortcuts. It fires only while the dialog it belongs to is the one holding the
+    /// keyboard.
+    private static final class HostedKeyListener implements ActionListener {
+        private final Dialog dlg;
+        private final int keyCode;
+        private final ActionListener delegate;
+
+        HostedKeyListener(Dialog dlg, int keyCode, ActionListener delegate) {
+            this.dlg = dlg;
+            this.keyCode = keyCode;
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            Window host = dlg.layerHost;
+            if (host == null) {
+                return;
+            }
+            Container owner = host.getKeyInputScope();
+            if (owner != null && owner != dlg) { //NOPMD CompareObjectsWithEquals
+                return;
+            }
+            delegate.actionPerformed(evt);
+        }
+    }
+
     /// Puts the dialog's own title back.
     private void restoreOwnTitle() {
         if (!nativeTitleHidden) {
@@ -2481,6 +2597,11 @@ public class Dialog extends Form implements AbstractDialog {
         host.addSizeChangedListener(hostSizeListener);
         hostBackListener = new HostBackListener(this);
         host.addKeyListener(MenuBar.backSK, hostBackListener);
+        // And this dialog's own key listeners with it. A window dispatches keys through
+        // its own map and never looks at a nested form's, so an application's shortcuts
+        // stopped working the moment the dialog was hosted rather than shown the
+        // historical way.
+        publishKeyListeners(host);
         // A window closed through its own title bar disposes by default, and takes the
         // layered pane and everything in it with it. Without this a modal caller waits
         // on a dialog whose surface is gone, and a modeless one keeps the dead window
@@ -2725,6 +2846,7 @@ public class Dialog extends Form implements AbstractDialog {
             // Releasing the claim is all that is needed: the window restores focus
             // itself once the last claimant has gone, which is the only point at which
             // handing focus back cannot hand it to something still covered.
+            unpublishKeyListeners(host);
             host.removeKeyInputScope(this);
             host.removePointerInputScope(this);
         }

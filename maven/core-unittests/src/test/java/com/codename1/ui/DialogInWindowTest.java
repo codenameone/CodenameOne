@@ -497,7 +497,12 @@ class DialogInWindowTest extends UITestBase {
         }, "cn1-test-modal-dialog");
         caller.start();
         try {
-            for (int i = 0; i < 400 && d.getParent() == null; i++) {
+            // The claim, not the parent: the dialog is added to the layer several
+            // steps before the show finishes claiming input, so waiting on the parent
+            // alone can catch it half installed -- with the scrim not yet laid out and
+            // presses still reaching what is behind.
+            for (int i = 0; i < 400
+                    && (d.getParent() == null || w.isPointerInputScopeEmpty()); i++) {
                 DisplayTest.flushEdt();
                 Thread.sleep(5);
             }
@@ -893,7 +898,12 @@ class DialogInWindowTest extends UITestBase {
         }, "cn1-test-hidden-host");
         caller.start();
         try {
-            for (int i = 0; i < 400 && d.getParent() == null; i++) {
+            // The claim, not the parent: the dialog is added to the layer several
+            // steps before the show finishes claiming input, so waiting on the parent
+            // alone can catch it half installed -- with the scrim not yet laid out and
+            // presses still reaching what is behind.
+            for (int i = 0; i < 400
+                    && (d.getParent() == null || w.isPointerInputScopeEmpty()); i++) {
                 DisplayTest.flushEdt();
                 Thread.sleep(5);
             }
@@ -1499,6 +1509,113 @@ class DialogInWindowTest extends UITestBase {
         assertEquals(1, presses[0],
                 "the window's own listener must still be there");
 
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aHostedDialogsOwnKeyListenersStillFire() {
+        // A window dispatches keys through its own map and never looks at a nested
+        // form's, so an application's shortcuts stopped working the moment the dialog
+        // was hosted rather than shown the historical way.
+        Window w = openHost(600, 500);
+        final int[] shortcut = new int[1];
+        final int[] addedLater = new int[1];
+
+        Dialog d = new Dialog("shortcuts");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.addKeyListener('s', new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                shortcut[0]++;
+            }
+        });
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        w.keyPressed('s');
+        w.keyReleased('s');
+        DisplayTest.flushEdt();
+        assertEquals(1, shortcut[0], "a shortcut registered before showing fires");
+
+        // And one registered afterwards, which is what onShow would do.
+        d.addKeyListener('t', new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                addedLater[0]++;
+            }
+        });
+        w.keyPressed('t');
+        w.keyReleased('t');
+        DisplayTest.flushEdt();
+        assertEquals(1, addedLater[0], "and so does one registered after");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.keyPressed('s');
+        w.keyReleased('s');
+        DisplayTest.flushEdt();
+        assertEquals(1, shortcut[0],
+                "but not once the dialog has gone");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void onlyTheTopmostDialogsShortcutsFire() {
+        // Every hosted dialog publishes onto the same window, so without scoping a
+        // dialog covered by another would still be running its shortcuts.
+        Window w = openHost(600, 500);
+        final int[] lower = new int[1];
+        final int[] upper = new int[1];
+
+        Dialog low = new Dialog("lower");
+        low.setLayout(new BorderLayout());
+        low.add(BorderLayout.CENTER, new Label("lower"));
+        low.addKeyListener('x', new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                lower[0]++;
+            }
+        });
+        low.setTopLevelHost(w);
+        low.showModeless();
+        DisplayTest.flushEdt();
+
+        w.keyPressed('x');
+        w.keyReleased('x');
+        DisplayTest.flushEdt();
+        assertEquals(1, lower[0]);
+
+        Dialog high = new Dialog("upper");
+        high.setLayout(new BorderLayout());
+        high.add(BorderLayout.CENTER, new Label("upper"));
+        high.addKeyListener('y', new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                upper[0]++;
+            }
+        });
+        high.setTopLevelHost(w);
+        high.showModeless();
+        DisplayTest.flushEdt();
+
+        w.keyPressed('x');
+        w.keyReleased('x');
+        w.keyPressed('y');
+        w.keyReleased('y');
+        DisplayTest.flushEdt();
+        assertEquals(1, lower[0], "the covered dialog's shortcut must not fire");
+        assertEquals(1, upper[0], "the one on top must");
+
+        high.dispose();
+        DisplayTest.flushEdt();
+        w.keyPressed('x');
+        w.keyReleased('x');
+        DisplayTest.flushEdt();
+        assertEquals(2, lower[0], "and works again once uncovered");
+
+        low.dispose();
+        DisplayTest.flushEdt();
         w.dispose();
         DisplayTest.flushEdt();
     }

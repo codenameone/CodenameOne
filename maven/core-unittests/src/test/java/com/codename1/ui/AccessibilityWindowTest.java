@@ -373,4 +373,101 @@ class AccessibilityWindowTest extends UITestBase {
             implementation.setAccessibilityTreeSupported(false);
         }
     }
+
+    @FormTest
+    void surfaceZeroDescribesTheMainFormWhateverHasFocus() {
+        // Surface zero is the main canvas by contract. Resolving it through "the
+        // current surface" answered with the focused top level on the event dispatch
+        // thread and with the last tree built anywhere off it, either of which hands
+        // the main canvas a secondary window's labels and actions.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.add(BorderLayout.CENTER, new Button("on the main form"));
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("second", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.add(BorderLayout.CENTER, new Button("in the window"));
+        w.show();
+        DisplayTest.flushEdt();
+        Desktop.getInstance().windowFocusChanged(w.getWindowId(), true);
+        DisplayTest.flushEdt();
+        // Built last, and focused, so both readings of "current" point at the window.
+        AccessibilityManager.getInstance().getSnapshot(w);
+
+        AccessibilityTreeSnapshot zero = implementation.getAccessibilityTreeSnapshot(0);
+        assertNotNull(zero);
+        assertTrue(mentions(zero, "on the main form"),
+                "surface zero is the main form");
+        assertFalse(mentions(zero, "in the window"),
+                "and never the window that happens to be focused");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void invalidatingEverythingRebuildsEverySurfaceNotJustTheFocusedOne() {
+        // invalidateAll() has no root, and substituting the focused one turned it into
+        // a single-root refresh -- which then cleared the global dirty flag, so every
+        // other surface stayed stale.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        try {
+            Form main = new Form("main", new BorderLayout());
+            Button mainButton = new Button("on the main form");
+            main.add(BorderLayout.CENTER, mainButton);
+            main.show();
+            DisplayTest.flushEdt();
+
+            final Window w = new Window("second", new BorderLayout());
+            w.setWindowSize(400, 300);
+            Button windowButton = new Button("in the window");
+            w.add(BorderLayout.CENTER, windowButton);
+            w.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            mgr.getSnapshot(main);
+            mgr.getSnapshot(w);
+            DisplayTest.flushEdt();
+
+            // Mutated with eager projection off, so nothing queues these roots by
+            // itself -- otherwise setText would queue the window and the test would
+            // pass however invalidateAll behaved.
+            implementation.setAccessibilityTreeSupported(false);
+            Desktop.getInstance().windowFocusChanged(w.getWindowId(), false);
+            DisplayTest.flushEdt();
+            mainButton.setText("renamed on the main form");
+            windowButton.setText("renamed in the window");
+            DisplayTest.flushEdt();
+
+            // Now everything is declared stale at once, with the main form focused.
+            implementation.setAccessibilityTreeSupported(true);
+            mgr.invalidateAll();
+            DisplayTest.flushEdt();
+
+            final AccessibilityTreeSnapshot[] offEdt = new AccessibilityTreeSnapshot[1];
+            Thread t = new Thread(new Runnable() {
+                public void run() {
+                    offEdt[0] = AccessibilityManager.getInstance().getSnapshot(w);
+                }
+            });
+            t.start();
+            t.join(5000);
+
+            assertNotNull(offEdt[0]);
+            assertTrue(mentions(offEdt[0], "renamed in the window"),
+                    "an unfocused surface has to be rebuilt by an all-root invalidation");
+
+            w.dispose();
+            DisplayTest.flushEdt();
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(err);
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+        }
+    }
 }
