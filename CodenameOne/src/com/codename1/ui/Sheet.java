@@ -373,8 +373,15 @@ public class Sheet extends Container {
     /// The top level the application named, or null to work it out.
     private TopLevelContainer hostTopLevel;
 
-    /// The surface a child sheet asked this one to be restored on, good for one show.
-    private TopLevelContainer restoreOnHost;
+    /// The surface the next `#show(int)` must use, good for exactly one show.
+    ///
+    /// Two things set it, for the same reason: a show must not resolve a surface of its
+    /// own when one has already been decided. A child sheet's `back()` names the
+    /// surface its parent belongs on, or the stack unwinds onto two windows; and a show
+    /// deferred behind an animation names the surface it resolved, or focus moving to
+    /// another window before the retry runs would attach the sheet to that one while
+    /// `shownHost` still recorded the first.
+    private TopLevelContainer pinnedShowHost;
     private final Rectangle sheetBounds = new Rectangle();
     private boolean trackSheetBounds;
     private Rectangle sheetEntry;
@@ -510,10 +517,8 @@ public class Sheet extends Container {
     ///
     /// the host top level, or null when there is none
     private TopLevelContainer resolveHost() {
-        if (restoreOnHost != null) {
-            // A parent being restored by its child's back(): it belongs on the surface
-            // the child was on, or the stack unwinds onto two different windows.
-            return restoreOnHost;
+        if (pinnedShowHost != null) {
+            return pinnedShowHost;
         }
         if (hostTopLevel != null) {
             return hostTopLevel;
@@ -964,6 +969,11 @@ public class Sheet extends Container {
         }
         shownHost = f;
         if (f.getAnimationManager().isAnimating()) {
+            // Pinned across the wait. The retry calls this method again, which would
+            // otherwise resolve a surface of its own -- and the focused window can
+            // change while the animation drains, so it would attach the sheet to a
+            // different window than the one shownHost was just set to.
+            pinnedShowHost = f;
             f.getAnimationManager().flushAnimation(new Runnable() {
                 @Override
                 public void run() {
@@ -974,9 +984,8 @@ public class Sheet extends Container {
         }
         // Consumed here rather than above, because the animating branch returns and
         // queues this method again: clearing it earlier meant the retry resolved a host
-        // of its own and could restore the parent onto a different window than the
-        // child it came from, which is the split this field exists to prevent.
-        restoreOnHost = null;
+        // of its own, which is the split this field exists to prevent.
+        pinnedShowHost = null;
         if (getParent() != null) {
             remove();
         }
@@ -1372,7 +1381,7 @@ public class Sheet extends Container {
             // it the parent's permanent configuration -- overwriting a host the
             // application chose, and pinning the sheet to a window that may be long
             // gone the next time it is shown on its own.
-            this.parentSheet.restoreOnHost = shownHost;
+            this.parentSheet.pinnedShowHost = shownHost;
             this.parentSheet.show(duration);
         } else {
             hide(duration);

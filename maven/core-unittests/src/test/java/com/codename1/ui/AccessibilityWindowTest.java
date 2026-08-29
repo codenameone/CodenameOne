@@ -261,4 +261,59 @@ class AccessibilityWindowTest extends UITestBase {
             implementation.setAccessibilityTreeSupported(false);
         }
     }
+
+    @FormTest
+    void aLiveWindowKeepsItsTreeEvenPastTheCacheLimit() {
+        // The cache is capped because a root is only released explicitly when a window
+        // is disposed, so forms would accumulate. Evicting by age alone dropped live
+        // windows once there were more of them than the cap, and an off-EDT reader on
+        // an evicted window gets an empty tree -- a screen reader losing everything.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        AccessibilityManager mgr = AccessibilityManager.getInstance();
+        final Window first = new Window("first", new BorderLayout());
+        first.setWindowSize(300, 200);
+        first.add(BorderLayout.CENTER, new Button("in the first window"));
+        first.show();
+        DisplayTest.flushEdt();
+        assertTrue(mentions(mgr.getSnapshot(first), "in the first window"));
+
+        // Comfortably more surfaces than the cache holds.
+        Window[] others = new Window[12];
+        for (int iter = 0; iter < others.length; iter++) {
+            Window w = new Window("w" + iter, new BorderLayout());
+            w.setWindowSize(300, 200);
+            w.add(BorderLayout.CENTER, new Button("in window " + iter));
+            w.show();
+            others[iter] = w;
+            DisplayTest.flushEdt();
+            mgr.getSnapshot(w);
+        }
+
+        final AccessibilityTreeSnapshot[] offEdt = new AccessibilityTreeSnapshot[1];
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                offEdt[0] = AccessibilityManager.getInstance().getSnapshot(first);
+            }
+        });
+        t.start();
+        try {
+            t.join(5000);
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(err);
+        }
+
+        assertNotNull(offEdt[0]);
+        assertTrue(mentions(offEdt[0], "in the first window"),
+                "a window the user can still see must keep its tree");
+
+        first.dispose();
+        for (int iter = 0; iter < others.length; iter++) {
+            others[iter].dispose();
+        }
+        DisplayTest.flushEdt();
+    }
 }

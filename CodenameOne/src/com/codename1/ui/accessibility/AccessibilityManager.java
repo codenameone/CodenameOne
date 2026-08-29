@@ -298,12 +298,38 @@ public final class AccessibilityManager {
         snapshot = updatedSnapshot;
         snapshotRoot = form;
         snapshotsByRoot.put(form, updatedSnapshot);
-        while (snapshotsByRoot.size() > MAX_CACHED_ROOTS) {
-            snapshotsByRoot.remove(snapshotsByRoot.keySet().iterator().next());
-        }
+        evictStaleRoots();
         dirty = false;
         pendingChanges = 0;
         return snapshot;
+    }
+
+    /// Trims the cache without ever dropping a surface the user can still see.
+    ///
+    /// The cap is here because a root is only released explicitly when a window is
+    /// disposed -- an application walking through fifty forms would otherwise keep a
+    /// frozen tree for every one of them. But evicting by age alone dropped live
+    /// windows once there were more of them than the cap, and an off-EDT reader on an
+    /// evicted window is handed an empty tree, which is a screen reader losing the
+    /// whole hierarchy. So age decides only among the surfaces that are no longer
+    /// showing; when every entry is still showing the cache is allowed to exceed the
+    /// cap, which is bounded anyway by how many surfaces can exist at once.
+    private void evictStaleRoots() {
+        while (snapshotsByRoot.size() > MAX_CACHED_ROOTS) {
+            Container evictable = null;
+            for (Container root : snapshotsByRoot.keySet()) {
+                boolean showing = root instanceof TopLevelContainer
+                        && ((TopLevelContainer) root).isTopLevelShowing();
+                if (!showing) {
+                    evictable = root;
+                    break;
+                }
+            }
+            if (evictable == null) {
+                return;
+            }
+            snapshotsByRoot.remove(evictable);
+        }
     }
 
     private AccessibilityNodeSnapshot findNode(long nodeId) {

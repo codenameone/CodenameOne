@@ -364,4 +364,58 @@ class SheetInWindowTest extends UITestBase {
         parent.back(0);
         settle(main);
     }
+
+    @FormTest
+    void aShowDeferredBehindAnAnimationStaysOnTheSurfaceItResolved() {
+        // A show that lands while the host is animating queues itself and runs again
+        // later. The retry used to resolve a surface of its own, so focus moving to
+        // another window while the animation drained attached the sheet to that one
+        // even though the show had already settled on the first.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window a = new Window("a", new BorderLayout());
+        a.setWindowSize(500, 400);
+        a.show();
+        DisplayTest.flushEdt();
+        Window b = new Window("b", new BorderLayout());
+        b.setWindowSize(500, 400);
+        b.show();
+        DisplayTest.flushEdt();
+
+        Desktop.getInstance().windowFocusChanged(a.getWindowId(), true);
+        DisplayTest.flushEdt();
+
+        // The host has to be mid-animation when show() is called, or the deferred
+        // branch is never reached and this test would pass whatever the retry did.
+        a.add(BorderLayout.NORTH, new Label("something to animate"));
+        a.animateLayout(1);
+
+        // No explicit host: an ordinary show resolves the focused window, which is
+        // exactly the case that can change under it while the show waits.
+        Sheet sheet = new Sheet(null, "deferred");
+        sheet.show(0);
+        assertNull(sheet.getParent(),
+                "the show has to have been deferred for this test to mean anything");
+
+        // Focus moves to the other window while the show is still queued.
+        Desktop.getInstance().windowFocusChanged(b.getWindowId(), true);
+        // Ticked by hand: core-unittests has no rasterizer, so nothing ever drives an
+        // animation to completion on its own and the queued show would never run.
+        for (int iter = 0; iter < 200 && sheet.getParent() == null; iter++) {
+            a.getAnimationManager().updateAnimations();
+            DisplayTest.flushEdt();
+        }
+
+        assertNotNull(sheet.getParent(), "the sheet is attached");
+        assertTrue(isUnder(a, sheet), "and it is on the surface the show resolved");
+        assertFalse(isUnder(b, sheet), "not on whichever window took focus later");
+
+        sheet.back(0);
+        DisplayTest.flushEdt();
+        a.dispose();
+        b.dispose();
+        DisplayTest.flushEdt();
+    }
 }
