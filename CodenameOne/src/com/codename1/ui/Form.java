@@ -2672,9 +2672,9 @@ public class Form extends Container implements TopLevelContainer {
             // The top level, not the form. getComponentForm() is null by design inside
             // a Window, so an embedded form there was never deregistered -- the mirror
             // of the registration below, which never happened either.
-            Container host = TopLevelSupport.rootOf(getParent());
+            TopLevelContainer host = TopLevelSupport.of(getParent());
             if (host != null) {
-                host.deregisterAnimatedInternal(this);
+                host.deregisterAnimated(this);
             }
         }
         super.deinitializeImpl();
@@ -2707,30 +2707,30 @@ public class Form extends Container implements TopLevelContainer {
             // was never ticked, and every animateLayout() on it or its children either
             // did nothing or waited forever. The listeners below were dropped the same
             // way, and they are Container level calls, so the top level takes them.
-            Container f = TopLevelSupport.rootOf(getParent());
+            TopLevelContainer f = TopLevelSupport.of(getParent());
             if (f != null) {
-                f.registerAnimatedInternal(this);
+                f.registerAnimated(this);
                 if (pointerPressedListeners != null) {
                     for (ActionListener l : (Collection<ActionListener>) pointerPressedListeners.getListenerCollection()) {
-                        f.addPointerPressedListener(l);
+                        f.asContainer().addPointerPressedListener(l);
                     }
                     pointerPressedListeners = null;
                 }
                 if (pointerDraggedListeners != null) {
                     for (ActionListener l : (Collection<ActionListener>) pointerDraggedListeners.getListenerCollection()) {
-                        f.addPointerDraggedListener(l);
+                        f.asContainer().addPointerDraggedListener(l);
                     }
                     pointerDraggedListeners = null;
                 }
                 if (pointerReleasedListeners != null) {
                     for (ActionListener l : (Collection<ActionListener>) pointerReleasedListeners.getListenerCollection()) {
-                        f.addPointerReleasedListener(l);
+                        f.asContainer().addPointerReleasedListener(l);
                     }
                     pointerReleasedListeners = null;
                 }
                 if (longPressListeners != null) {
                     for (ActionListener l : (Collection<ActionListener>) longPressListeners.getListenerCollection()) {
-                        f.addLongPressListener(l);
+                        f.asContainer().addLongPressListener(l);
                     }
                     longPressListeners = null;
                 }

@@ -215,4 +215,106 @@ class SheetInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void nestedSheetsShowAndUnwindOnAForm() {
+        // What SheetScreenshotTest does on a device, and what none of the tests above
+        // covered: a sheet, then a child sheet on top of it, then back to the parent.
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        Sheet parent = new Sheet(null, "Options");
+        parent.getContentPane().add(new Label("parent content"));
+        parent.show(0);
+        settle(main);
+        assertSame(parent, Sheet.getCurrentSheet(main));
+
+        Sheet child = new Sheet(parent, "Details");
+        child.getContentPane().add(new Label("child content"));
+        child.show(0);
+        settle(main);
+        assertSame(child, Sheet.getCurrentSheet(main),
+                "the child is the current sheet while it is up");
+        assertSame(parent, child.getParentSheet());
+
+        child.back(0);
+        settle(main);
+        assertSame(parent, Sheet.getCurrentSheet(main),
+                "going back from a child sheet re-shows its parent");
+
+        parent.back(0);
+        settle(main);
+        assertNull(Sheet.getCurrentSheet(main), "and back from the parent closes it");
+    }
+
+    @FormTest
+    void nestedSheetsShowAndUnwindOnAWindow() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(600, 500);
+        w.show();
+        DisplayTest.flushEdt();
+
+        Sheet parent = new Sheet(null, "Options");
+        parent.getContentPane().add(new Label("parent content"));
+        parent.setTopLevelHost(w);
+        parent.show(0);
+        settle(w);
+
+        Sheet child = new Sheet(parent, "Details");
+        child.getContentPane().add(new Label("child content"));
+        child.setTopLevelHost(w);
+        child.show(0);
+        settle(w);
+        assertSame(child, Sheet.getCurrentSheet(w));
+
+        child.back(0);
+        settle(w);
+        assertSame(parent, Sheet.getCurrentSheet(w));
+
+        parent.back(0);
+        settle(w);
+        assertNull(Sheet.getCurrentSheet(w));
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aSheetOnAFormWorksOnAPortThatHasAWindowSystemButNoOpenWindow() {
+        // The state every desktop port is in for most of its life, and the one the
+        // unit tests above never reproduce: a window manager exists, so the host
+        // resolution consults Desktop, but nothing is open and the answer has to fall
+        // through to the current form.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+        assertNull(Desktop.getInstance().getFocusedWindow(),
+                "precondition: a window system with nothing open");
+        assertSame(main, CN.getCurrentTopLevel());
+
+        Sheet parent = new Sheet(null, "Options");
+        parent.getContentPane().add(new Label("parent content"));
+        parent.show(0);
+        settle(main);
+        assertSame(parent, Sheet.getCurrentSheet(main));
+
+        Sheet child = new Sheet(parent, "Details");
+        child.getContentPane().add(new Label("child content"));
+        child.show(0);
+        settle(main);
+        assertSame(child, Sheet.getCurrentSheet(main));
+
+        child.back(0);
+        settle(main);
+        assertSame(parent, Sheet.getCurrentSheet(main));
+
+        parent.back(0);
+        settle(main);
+        assertNull(Sheet.getCurrentSheet(main));
+    }
 }
