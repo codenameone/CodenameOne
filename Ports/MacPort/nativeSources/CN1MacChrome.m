@@ -307,23 +307,45 @@ void CN1MacHostSetWindowUndecorated(BOOL undecorated) {
     });
 }
 
+/// The appearance the framework last forced, or nil while it follows macOS.
+///
+/// Held so a window created later can adopt it: the framework sets this once
+/// when the theme resolves, and a secondary Window opened afterwards would
+/// otherwise keep the system appearance and show a light title bar over a dark
+/// application.
+static NSAppearance *cn1MacForcedAppearance = nil;
+
+/// Applies the forced appearance to one window, if there is one to apply.
+void CN1MacApplyForcedAppearance(NSWindow *w) {
+    if (w != nil && cn1MacForcedAppearance != nil) {
+        w.appearance = cn1MacForcedAppearance;
+    }
+}
+
 void CN1MacHostSetDarkAppearance(BOOL dark) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSAppearance *appearance = [NSAppearance appearanceNamed:
             dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
-        // On NSApplication, not on the host window. The application-level
-        // appearance is inherited by every window that does not set its own --
-        // including the ones CN1AppKitWindows.m creates later, which is the
-        // point: setting it on the host alone left a secondary window's title
-        // bar and AppKit controls light while the main window was dark, and any
-        // window opened after this call missed the override entirely.
+#ifndef CN1_USE_ARC
+        [appearance retain];
+        [cn1MacForcedAppearance release];
+#endif
+        cn1MacForcedAppearance = appearance;
+        // Per window, NOT on NSApplication. Setting NSApp.appearance reaches
+        // far more than the title bars this exists to fix: it repainted the
+        // window background and CN1's own surfaces too, turning every normally
+        // light screenshot dark once any test forced dark once. Twenty three
+        // frames changed, from 0.92 mean luma to 0.16.
         //
-        // Windows the framework has already created inherit it too, because
-        // none of them assigns an appearance of its own; if one ever does, it
-        // is that window's deliberate choice and this must not stamp over it.
-        NSApp.appearance = appearance;
+        // Every window that exists now, and CN1MacApplyForcedAppearance covers
+        // the ones created later.
+        [CN1MacHost sharedHost].window.appearance = appearance;
+        for (NSWindow *w in [NSApp windows]) {
+            w.appearance = appearance;
+        }
     });
 }
+
 
 /// Whether VoiceOver is running, read from its own preference domain. macOS has
 /// no equivalent of UIAccessibilityIsVoiceOverRunning and publishes no

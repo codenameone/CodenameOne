@@ -446,6 +446,10 @@ static NSWindow *cn1MakeWindow(NSRect contentRect, BOOL decorated, BOOL resizabl
     if (!decorated) {
         w.movableByWindowBackground = YES;
     }
+    // A window created after the theme resolved has to adopt the forced
+    // appearance too, or its title bar stays light under a dark application.
+    extern void CN1MacApplyForcedAppearance(NSWindow *w);
+    CN1MacApplyForcedAppearance(w);
     return w;
 }
 
