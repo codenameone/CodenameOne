@@ -6576,6 +6576,21 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___lo
 }
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+#if TARGET_OS_OSX
+/// Runs an AppKit block on the main thread and waits for it.
+///
+/// The guard is not decoration: dispatch_sync to the main queue FROM the main
+/// thread deadlocks outright, and a native here can be reached from a callback
+/// that already runs there.
+static void cn1RunOnMainSync(void (^block)(void)) {
+    if ([NSThread isMainThread]) {
+        block();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
+}
+#endif
+
 void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJECT content){
 #if TARGET_OS_OSX
     // AppKit has no in-process mail composer, so the message goes to the user's
@@ -6703,15 +6718,29 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
     NSString *nSubject = subject != JAVA_NULL
         ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG subject) : @"";
     BOOL hasAttachments = items.count > 1;
-    NSSharingService *mail =
-        [NSSharingService sharingServiceNamed:NSSharingServiceNameComposeEmail];
-    if (mail != nil && [mail canPerformWithItems:items]) {
-        mail.recipients = toList;
-        mail.subject = nSubject;
-        dispatch_async(dispatch_get_main_queue(), ^{
+    // The whole sharing service, not just the presentation. NSSharingService is
+    // AppKit: sharingServiceNamed:, canPerformWithItems: and the recipients /
+    // subject mutations are all main-thread work, and this native runs on the
+    // EDT. Dispatching only performWithItems: left the lookup, the capability
+    // check and the configuration off the main thread, which is the part that
+    // trips main-thread assertions before the queued block is ever reached.
+    //
+    // Synchronously, and the Java marshalling stays out here: items, toList and
+    // nSubject are already plain Foundation objects by this point, while the
+    // fallback below needs the JAVA_OBJECT arguments and a thread state, so it
+    // must run on the calling thread. Waiting is what lets it.
+    __block BOOL composed = NO;
+    cn1RunOnMainSync(^{
+        NSSharingService *mail =
+            [NSSharingService sharingServiceNamed:NSSharingServiceNameComposeEmail];
+        if (mail != nil && [mail canPerformWithItems:items]) {
+            mail.recipients = toList;
+            mail.subject = nSubject;
             [mail performWithItems:items];
-        });
-    } else {
+            composed = YES;
+        }
+    });
+    if (!composed) {
         // No mail service configured. A mailto still opens whatever handles it,
         // which is better than nothing -- but it cannot carry a file, so say so
         // rather than let the attachments disappear without a trace.

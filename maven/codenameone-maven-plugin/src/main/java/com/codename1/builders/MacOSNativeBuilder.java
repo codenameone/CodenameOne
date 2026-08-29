@@ -1508,6 +1508,23 @@ public class MacOSNativeBuilder extends Executor {
     /// name. Opening one is what needs the native compiled in; asking whether a
     /// camera exists is not, and `Camera.isSupported()` is deliberately absent
     /// so that a hasCamera() check does not compile in a bridge nothing uses.
+    /// The whole com.codename1.camera.Camera surface, classified once rather
+    /// than one entry point per review round:
+    ///
+    /// <ul>
+    /// <li>{@code open} -- starts an AVCaptureSession. Needs the key.</li>
+    /// <li>{@code getCameras} / {@code getDefault} -- run a discovery session.
+    ///     They neither prompt nor terminate without the key, but an
+    ///     application enumerating cameras is an application about to open one,
+    ///     so they count.</li>
+    /// <li>{@code requestPermissions} -- calls requestAccessForMediaType, which
+    ///     PROMPTS. Without the key macOS terminates the process rather than
+    ///     failing the call, so this is the one that must not be missed.</li>
+    /// <li>{@code isSupported} -- deliberately absent. It only asks whether a
+    ///     backend object exists and touches no AVFoundation authorization at
+    ///     all, so counting it would put a camera privacy string in every
+    ///     application that merely checks.</li>
+    /// </ul>
     static boolean opensCameraSession(String cls, String method) {
         if (cls == null || method == null) {
             return false;
