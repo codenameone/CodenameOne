@@ -62,16 +62,54 @@ public class MacCameraImpl extends IOSCameraImpl {
                 }
             }
             if (video == NOT_DETERMINED) {
-                // Nobody has been asked yet, and this method has to return a
-                // value now. Trigger the real prompt so the next call has a
-                // genuine answer, and report no failure: an undetermined
-                // permission is not a refusal, and the session open that follows
-                // resolves it for real.
+                // Nobody has been asked yet, so ask and WAIT for the answer.
+                // Firing the prompt and returning normally would report the
+                // permission as granted before the user had touched the dialog,
+                // and a later denial would arrive after the application had
+                // already been told it could open a session.
                 //
-                // Answering the undetermined case properly needs an asynchronous
-                // permission SPI on CameraImpl, which every port would have to
-                // implement -- not something to introduce from one port.
-                IOSImplementation.requestCameraAccess(o.isCaptureAudio(), null);
+                // invokeAndBlock is what makes waiting legal here: the result
+                // is delivered on the EDT, so blocking the EDT outright would
+                // deadlock against the very callback being waited for. This is
+                // the pattern createAudioRecorder() already uses in
+                // IOSImplementation for the same reason.
+                final boolean[] answered = new boolean[1];
+                final boolean[] granted = new boolean[1];
+                final Object lock = new Object();
+                IOSImplementation.requestCameraAccess(o.isCaptureAudio(),
+                        new com.codename1.util.SuccessCallback<Boolean>() {
+                    @Override
+                    public void onSucess(Boolean value) {
+                        synchronized (lock) {
+                            granted[0] = value != null && value.booleanValue();
+                            answered[0] = true;
+                            lock.notifyAll();
+                        }
+                    }
+                });
+                if (com.codename1.ui.Display.getInstance().isEdt()) {
+                    com.codename1.ui.Display.getInstance().invokeAndBlock(new Runnable() {
+                        @Override
+                        public void run() {
+                            synchronized (lock) {
+                                while (!answered[0]) {
+                                    com.codename1.io.Util.wait(lock);
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    // Off the EDT there is no dispatch thread to free, so an
+                    // ordinary wait is both sufficient and correct.
+                    synchronized (lock) {
+                        while (!answered[0]) {
+                            com.codename1.io.Util.wait(lock);
+                        }
+                    }
+                }
+                if (!granted[0]) {
+                    throw new IOException("camera access was denied for this application");
+                }
             }
             return;
         }
