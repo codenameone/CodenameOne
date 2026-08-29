@@ -1610,11 +1610,17 @@ public class Window extends Container implements TopLevelContainer {
     private boolean applyingContentSize;
 
     public void setWindowBounds(Rectangle r) {
+        // Here rather than in the shared private form below, which is also how a move
+        // is carried out: setWindowLocation and the centering helpers pass the size
+        // they already have, and a location is not a change of mind about the size.
+        // Superseding there cancelled the pending correction for anything that moved
+        // after asking for a content size -- including the centring a native dialog
+        // does immediately afterwards, which defeated the deferred sizing entirely.
+        supersedePendingContentSize();
         setWindowBounds(r.getX(), r.getY(), r.getWidth(), r.getHeight());
     }
 
     private void setWindowBounds(final int x, final int y, final int w, final int h) {
-        supersedePendingContentSize();
         // Marshalled exactly as show(), hide() and dispose() are, and as the developer
         // guide promises for moving a window. Without it a background caller mutated
         // the pending geometry and the cached monitor while the event dispatch thread

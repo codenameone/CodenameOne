@@ -5665,4 +5665,51 @@ class WindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void movingAWindowDoesNotCancelAPendingContentSize() {
+        // A move passes the size it already has, so it is not a change of mind about
+        // the size. Superseding on it cancelled the correction for anything that moved
+        // after asking for a content size -- including the centring a native dialog
+        // does immediately afterwards.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+
+        Window w = new Window("moved", new BorderLayout());
+        w.setDecorated(true);
+        w.setWindowContentSize(400, 300);
+        w.setWindowLocation(120, 90);
+        w.show();
+        DisplayTest.flushEdt();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(400, wm.getWidth(peer),
+                "a move must not cancel the content size asked for before it");
+        assertEquals(300, wm.getHeight(peer));
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void anExplicitBoundsChangeStillSupersedesAContentSize() {
+        // The other half: setWindowBounds does name a frame size, so it wins.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+
+        Window w = new Window("rebounded", new BorderLayout());
+        w.setDecorated(true);
+        w.setWindowContentSize(400, 300);
+        w.setWindowBounds(new Rectangle(10, 10, 800, 600));
+        w.show();
+        DisplayTest.flushEdt();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(800, peer.getWidth(),
+                "the frame the caller named last is the one that applies");
+        assertEquals(600, peer.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }
