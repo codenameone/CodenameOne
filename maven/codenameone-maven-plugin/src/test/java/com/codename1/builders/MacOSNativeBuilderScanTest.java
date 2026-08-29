@@ -468,4 +468,53 @@ public class MacOSNativeBuilderScanTest {
                 "com/codename1/ai/vision/CodeScanner",
                 "com/codename1/camera/Camera", "requestPermissions"));
     }
+
+    /// Util's crypto delegates count, and all nine of them.
+    ///
+    /// They reach the same natives com.codename1.security does, and the package
+    /// test cannot see them. secureRandomBytes is the one that matters most:
+    /// its disabled native returns void and leaves the caller's buffer alone,
+    /// so an application asking for random bytes with the suite compiled out
+    /// gets the zeros it passed in and no error at all.
+    @Test
+    public void theUtilCryptoDelegatesCount() {
+        String[] crypto = {
+            "secureRandomBytes", "aesEncrypt", "aesDecrypt", "rsaEncrypt", "rsaDecrypt",
+            "cryptoSign", "cryptoVerify", "generateRsaKeyPair", "generateSymmetricKey"
+        };
+        for (String m : crypto) {
+            assertTrue("Util." + m + " reaches the crypto natives and must enable them",
+                    MacOSNativeBuilder.usesUtilCrypto("com/codename1/io/Util", m));
+        }
+    }
+
+    /// Util is a big class of unrelated helpers, so the match is by exact name:
+    /// copying a stream or reading a UTF string must not drag CommonCrypto into
+    /// an application that never asked for it.
+    @Test
+    public void theRestOfUtilDoesNotCount() {
+        for (String m : new String[] {"copy", "readToString", "cleanup", "encodeUrl", "sleep"}) {
+            assertFalse("Util." + m + " is not crypto",
+                    MacOSNativeBuilder.usesUtilCrypto("com/codename1/io/Util", m));
+        }
+        assertFalse(MacOSNativeBuilder.usesUtilCrypto("com/example/MyUtil", "secureRandomBytes"));
+        assertFalse(MacOSNativeBuilder.usesUtilCrypto(null, "secureRandomBytes"));
+        assertFalse(MacOSNativeBuilder.usesUtilCrypto("com/codename1/io/Util", null));
+    }
+
+    /// Cancelling a notification is using notifications.
+    ///
+    /// An update whose only notification code withdraws one scheduled by an
+    /// earlier version names nothing in com.codename1.notifications, and with
+    /// the define off the cancel compiles away and the notification still
+    /// fires.
+    @Test
+    public void cancellingALocalNotificationCounts() {
+        assertTrue(MacOSNativeBuilder.usesNotifications(
+                "com/codename1/ui/Display", "cancelLocalNotification"));
+        assertTrue(MacOSNativeBuilder.usesNotifications(
+                "com/codename1/ui/Display", "requestNotificationPermission"));
+        assertFalse(MacOSNativeBuilder.usesNotifications(
+                "com/codename1/ui/Display", "setProperty"));
+    }
 }

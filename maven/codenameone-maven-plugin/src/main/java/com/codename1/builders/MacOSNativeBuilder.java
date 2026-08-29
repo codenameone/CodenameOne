@@ -1371,6 +1371,9 @@ public class MacOSNativeBuilder extends Executor {
             if (requestsNativeReview(cls, method)) {
                 usesAppReview[0] = true;
             }
+            if (usesUtilCrypto(cls, method)) {
+                usesCrypto[0] = true;
+            }
             if (reachesBluetoothViaDisplay(cls, method)) {
                 // Display.getBluetooth() names com.codename1.bluetooth only in
                 // its return type, which this scan does not read. An application
@@ -1401,6 +1404,37 @@ public class MacOSNativeBuilder extends Executor {
                 && method.equals("requestNativeInAppReview");
     }
 
+    /// Whether an invoked method is one of com.codename1.io.Util's crypto
+    /// delegates, which reach the same natives com.codename1.security does.
+    ///
+    /// The package test alone misses them, and the consequence is not a
+    /// disabled feature. Every other stub answers CN1_CRYPTO_E_UNSUPPORTED,
+    /// which surfaces as an exception; secureRandomBytes returns void and its
+    /// stub simply leaves the caller's buffer alone, so an application that
+    /// asks for random bytes with the crypto suite compiled out receives the
+    /// zero-filled array it passed in and has no way to tell. Predictable
+    /// "random" data is worse than an error.
+    ///
+    /// The whole surface at once rather than the one method that was reported:
+    /// these nine are Util's complete set of crypto delegates.
+    static boolean usesUtilCrypto(String cls, String method) {
+        if (cls == null || method == null) {
+            return false;
+        }
+        if (!cls.equals("com/codename1/io/Util")) {
+            return false;
+        }
+        return method.equals("secureRandomBytes")
+                || method.equals("aesEncrypt")
+                || method.equals("aesDecrypt")
+                || method.equals("rsaEncrypt")
+                || method.equals("rsaDecrypt")
+                || method.equals("cryptoSign")
+                || method.equals("cryptoVerify")
+                || method.equals("generateRsaKeyPair")
+                || method.equals("generateSymmetricKey");
+    }
+
     /**
      * Whether an invoked method means the application uses notifications.
      *
@@ -1415,8 +1449,15 @@ public class MacOSNativeBuilder extends Executor {
         if (cls == null || method == null) {
             return false;
         }
+        // cancelLocalNotification as well as the permission request. An update
+        // whose only notification code REMOVES one scheduled by an earlier
+        // version names nothing in com.codename1.notifications, so without this
+        // CN1_INCLUDE_NOTIFICATIONS2 stays off, cn1CancelScheduledLocalNotificationById
+        // compiles away, and the notification the application asked to withdraw
+        // still fires.
         return cls.equals("com/codename1/ui/Display")
-                && method.indexOf("requestNotificationPermission") > -1;
+                && (method.indexOf("requestNotificationPermission") > -1
+                    || method.indexOf("cancelLocalNotification") > -1);
     }
 
     /**
