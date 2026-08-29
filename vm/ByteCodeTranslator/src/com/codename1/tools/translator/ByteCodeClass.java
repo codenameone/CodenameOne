@@ -1206,7 +1206,24 @@ public class ByteCodeClass {
                     // the concurrent GC's stop-the-world pause (so the GC never scans its
                     // nursery while a minor collection runs). Lightweight threads are the
                     // ones the GC pauses; mark the main thread lightweight too.
-                    b.append("#ifdef CN1_NURSERY\n    getThreadLocalData()->lightweightThread = JAVA_TRUE;\n#endif\n");
+                    // NOT on the macOS target, where this thread goes on to
+                    // become AppKit's event loop rather than the thread that
+                    // runs Java. "Lightweight" is a promise to the collector
+                    // that the thread parks: cn1_globals.m waits for
+                    // threadActive to drop and then migrates
+                    // pendingHeapAllocations WITHOUT taking threadHeapMutex,
+                    // which is the mutex it does take for a native thread. The
+                    // unlocked append in cn1AddPending is safe only under that
+                    // pause -- its own comment says so -- so a thread that
+                    // never parks and still claims to be lightweight lets a
+                    // grow inside cn1AddPending free the array while the
+                    // collector is reading it. The event loop reaches Java only
+                    // through AppKit callbacks and brackets nothing, so it must
+                    // stay native; the flag is set below on the dispatched
+                    // thread that actually runs the application.
+                    if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_MACOS) {
+                        b.append("#ifdef CN1_NURSERY\n    getThreadLocalData()->lightweightThread = JAVA_TRUE;\n#endif\n");
+                    }
                     // On the native macOS target the application's main method
                     // runs on a background thread and AppKit owns the main one.
                     // That is not a preference: the main thread has to be free to
