@@ -1683,7 +1683,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
         textLayerEnabled = !"0".equals(getParameterByName("cn1TextLayer"));
         semanticOverlayEnabled = !"0".equals(getParameterByName("cn1Semantics"));
         if (textLayerEnabled) {
-            textLayer = new JavaScriptTextLayer(document, textLayerContainer);
+            // The sink reads ``graphics`` at record time rather than capturing it: the display
+            // graphics is built further down this method, after the layer exists.
+            textLayer = new JavaScriptTextLayer(document, textLayerContainer,
+                    new JavaScriptTextLayer.MutationSink() {
+                        @Override
+                        public void record(int kind, Object target, Object child, String value) {
+                            if (graphics != null) {
+                                graphics.recordTextLayerOp(kind, target, child, value);
+                            }
+                        }
+                    });
         }
         if (textLayerEnabled) {
             // Paint locking caches a component's pixels in an image and serves that image
@@ -3516,11 +3526,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             if (!textLayer.isSuspended() && Display.getInstance().isInTransition()) {
                 textLayer.setSuspended(true);
             }
-            // Releases runs whose component has been removed, hidden, or whose form is no
-            // longer displayed; none of those ever paints again, so nothing else would clean
-            // them up.
+            // syncToForm is NOT called here. By this point the frame's ops have already been
+            // snapshotted, so a release recorded now would ship with the NEXT frame -- the
+            // removed component's text would stay on screen over the pixels that replaced it
+            // for one frame, which is what a rebuilt navigation showed as a doubled label. It
+            // runs in flushGraphics instead, while the buffer this frame ships is still open.
             Form displayed = Display.getInstance().getCurrent();
-            textLayer.syncToForm(displayed);
             if (textLayer.consumeReattachFlag() && displayed != null) {
                 // A run came back after being detached, so it holds a fresh stacking index
                 // while everything that did not repaint still holds an older one. One full
@@ -6773,6 +6784,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
         displayFlushes++;
+        if (textLayer != null) {
+            // Releases runs whose component has been removed, hidden, or whose form is no longer
+            // displayed; none of those ever paints again, so nothing else would clean them up.
+            //
+            // Here rather than in the drain because of when the buffer closes. The components of
+            // this frame have finished painting and their ops are still in ``upcoming``, so a
+            // detach recorded now travels with the very pixels that replace the text -- the host
+            // applies both in one task and the frame is never seen half-updated.
+            textLayer.syncToForm(Display.getInstance().getCurrent());
+        }
         JavaScriptRenderQueueCoordinator.waitUntilFlushable(new JavaScriptRenderQueueCoordinator.FlushBarrier() {
             @Override
             public boolean isGraphicsLocked() {

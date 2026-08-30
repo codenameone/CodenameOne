@@ -22,10 +22,10 @@
  */
 package com.codename1.impl.html5;
 
-import com.codename1.html5.js.dom.CSSStyleDeclaration;
 import com.codename1.html5.js.dom.HTMLDocument;
 import com.codename1.html5.js.dom.HTMLElement;
 import com.codename1.impl.html5.HTML5Implementation.NativeFont;
+import com.codename1.impl.html5.graphics.SurfaceCommandRecorder;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -75,11 +75,6 @@ public final class JavaScriptTextLayer {
     private static final class Run {
         private final HTMLElement clip;
         private final HTMLElement text;
-        // Held rather than re-fetched. getStyle() is a property read, which crosses to the main
-        // thread and parks the worker until it answers; doing that twice per run per frame was
-        // enough to wedge the VM on a screen that repaints continuously.
-        private final CSSStyleDeclaration clipStyle;
-        private final CSSStyleDeclaration textStyle;
         private String clipCss;
         private String textCss;
         private String content;
@@ -108,8 +103,6 @@ public final class JavaScriptTextLayer {
         Run(HTMLElement clip, HTMLElement text) {
             this.clip = clip;
             this.text = text;
-            this.clipStyle = clip.getStyle();
-            this.textStyle = text.getStyle();
         }
     }
 
@@ -140,8 +133,30 @@ public final class JavaScriptTextLayer {
         private int clipH;
     }
 
+    /**
+     * Where a DOM mutation is recorded.
+     *
+     * <p>Every write this class makes goes here rather than to the element, so it is carried in
+     * the frame's command stream and applied by the host in the same task that replays that
+     * frame's canvas commands. Writing to the element directly applies it an animation frame
+     * early -- before the pixels it belongs with exist -- which is seen as text that blanks out
+     * or is drawn twice. See {@code TextLayerOp}.</p>
+     */
+    public interface MutationSink {
+        /**
+         * Records one mutation into the current frame.
+         *
+         * @param kind one of the {@code SurfaceCommandRecorder.OP_TEXT_*} opcodes
+         * @param target the element the mutation applies to
+         * @param child the element being attached or detached, null for the other kinds
+         * @param value the CSS declaration or text content, null for the other kinds
+         */
+        void record(int kind, Object target, Object child, String value);
+    }
+
     private final HTMLDocument document;
     private final HTMLElement container;
+    private final MutationSink sink;
     private final Map<Component, ComponentRuns> byComponent = new HashMap<Component, ComponentRuns>();
     private final List<Frame> stack = new ArrayList<Frame>();
     private int depth;
@@ -172,9 +187,10 @@ public final class JavaScriptTextLayer {
      * @param document the host document used to create elements
      * @param container the layer root, already attached to the document
      */
-    public JavaScriptTextLayer(HTMLDocument document, HTMLElement container) {
+    public JavaScriptTextLayer(HTMLDocument document, HTMLElement container, MutationSink sink) {
         this.document = document;
         this.container = container;
+        this.sink = sink;
     }
 
     /**
@@ -190,7 +206,8 @@ public final class JavaScriptTextLayer {
             return;
         }
         suspended = value;
-        container.getStyle().setProperty("display", value ? "none" : "block");
+        sink.record(SurfaceCommandRecorder.OP_TEXT_DISPLAY, container, null,
+                value ? "none" : "block");
     }
 
     /**
@@ -446,7 +463,7 @@ public final class JavaScriptTextLayer {
         }
         String clipDeclaration = clipCss.toString();
         if (!clipDeclaration.equals(run.clipCss)) {
-            run.clipStyle.setCssText(clipDeclaration);
+            sink.record(SurfaceCommandRecorder.OP_TEXT_CLIP_CSS, run.clip, null, clipDeclaration);
             run.clipCss = clipDeclaration;
         }
 
@@ -470,12 +487,12 @@ public final class JavaScriptTextLayer {
         // anything at all across the bridge.
         String textDeclaration = textCss.toString();
         if (!textDeclaration.equals(run.textCss)) {
-            run.textStyle.setCssText(textDeclaration);
+            sink.record(SurfaceCommandRecorder.OP_TEXT_RUN_CSS, run.text, null, textDeclaration);
             run.textCss = textDeclaration;
         }
 
         if (!str.equals(run.content)) {
-            run.text.setTextContent(str);
+            sink.record(SurfaceCommandRecorder.OP_TEXT_CONTENT, run.text, null, str);
             run.content = str;
             if (regionNarrowed) {
                 // The canvas would have changed only the part of this line the repaint reached;
@@ -502,7 +519,7 @@ public final class JavaScriptTextLayer {
         run.coverW = Math.max(0, coverRight - coverLeft);
         run.coverH = Math.max(0, coverBottom - coverTop);
         if (!run.attached) {
-            container.appendChild(run.clip);
+            sink.record(SurfaceCommandRecorder.OP_TEXT_ATTACH, container, run.clip, null);
             run.attached = true;
             if (run.everAttached) {
                 // Previously attached, so other runs are still carrying stacking indices from
@@ -679,7 +696,7 @@ public final class JavaScriptTextLayer {
      * Detaches every run and drops the pool.
      */
     public void clear() {
-        container.setInnerHTML("");
+        sink.record(SurfaceCommandRecorder.OP_TEXT_CLEAR, container, null, null);
         byComponent.clear();
         canvasOnly.clear();
         stack.clear();
@@ -761,6 +778,10 @@ public final class JavaScriptTextLayer {
         while (runs.runs.size() <= index) {
             HTMLElement clip = document.createElement("div");
             HTMLElement text = document.createElement("span");
+            // Building the pair is not a frame mutation: neither element is in the document
+            // yet, so nothing can be seen half-built and there is nothing to keep in step with
+            // the canvas. It stays an immediate write, which is also what guarantees the pair
+            // exists by the time the recorded OP_TEXT_ATTACH for it is replayed.
             clip.appendChild(text);
             runs.runs.add(new Run(clip, text));
         }
@@ -806,7 +827,7 @@ public final class JavaScriptTextLayer {
                     || run.coverY + run.coverH <= y || y + h <= run.coverY) {
                 continue;
             }
-            container.removeChild(run.clip);
+            sink.record(SurfaceCommandRecorder.OP_TEXT_DETACH, container, run.clip, null);
             run.attached = false;
         }
     }
@@ -815,7 +836,7 @@ public final class JavaScriptTextLayer {
         for (int i = from; i < runs.runs.size(); i++) {
             Run run = runs.runs.get(i);
             if (run.attached) {
-                container.removeChild(run.clip);
+                sink.record(SurfaceCommandRecorder.OP_TEXT_DETACH, container, run.clip, null);
                 run.attached = false;
             }
         }

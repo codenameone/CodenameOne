@@ -132,6 +132,25 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     /**
+     * Queue a text-layer DOM mutation into this frame's command buffer.
+     *
+     * <p>Deliberately not routed through {@link #addOp}: that culls draws under an empty clip,
+     * and a mutation is not a draw. The release of a run whose component has just been clipped
+     * away is issued under exactly that empty clip, and dropping it would leave the run on
+     * screen with no pixels beneath it.</p>
+     *
+     * @param kind one of the {@code SurfaceCommandRecorder.OP_TEXT_*} opcodes
+     * @param target the element the mutation applies to
+     * @param child the element being attached or detached, null for the other kinds
+     * @param value the CSS declaration or text content, null for the other kinds
+     */
+    void recordTextLayerOp(int kind, Object target, Object child, String value) {
+        synchronized (upcoming) {
+            upcoming.add(new com.codename1.impl.html5.graphics.TextLayerOp(kind, target, child, value));
+        }
+    }
+
+    /**
      * Image draws report the rectangle they land in.
      *
      * <p>Review asked for the source alpha to be taken into account, so that an image which is
