@@ -248,6 +248,10 @@ final class MacCameraCapture {
                     // capture had reported success.
                     shutter.setEnabled(false);
                     stopPending[0] = true;
+                    // The best guess at what was left on disk if finalization
+                    // fails, since no final path will then be reported. It is
+                    // what discard() falls back to for the same reason.
+                    final String requestedPath = recording[0].getRequestedPath();
                     recording[0].stopAndAwait().ready(new SuccessCallback<String>() {
                         @Override
                         public void onSucess(String path) {
@@ -272,7 +276,18 @@ final class MacCameraCapture {
                     }).except(new SuccessCallback<Throwable>() {
                         @Override
                         public void onSucess(Throwable err) {
+                            // Finalization failed, so no path will ever be
+                            // reported and the capture answers null. Whatever
+                            // the recorder had written is therefore a file
+                            // nobody will be told about -- the same position
+                            // discard() takes on its own error path, and it
+                            // holds however this stop was reached, cancelled or
+                            // not. Without this the one route that skips
+                            // discard() -- cancelling while a stop is already
+                            // finalizing -- was also the one route that leaked
+                            // the partial file.
                             Log.e(err);
+                            deleteQuietly(requestedPath);
                             finish(finished, session, previous, response, null);
                         }
                     });
