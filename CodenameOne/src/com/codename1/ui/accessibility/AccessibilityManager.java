@@ -301,10 +301,10 @@ public final class AccessibilityManager {
                 // across the re-post, because it is still scheduled -- clearing it
                 // first would let a third invalidation queue a second pass for the
                 // same work.
-                again = !pendingRoots.isEmpty() || pendingRootlessRefresh;
-                if (!again) {
-                    refreshScheduled = false;
-                }
+                // PROBE ONLY -- restores the pre-re-post behaviour to test whether the
+                // chained pass is what stalls the JavaScript suite. Not for merge.
+                again = false;
+                refreshScheduled = false;
             }
             // Named per surface. A port that pushes the tree into a native view needs
             // to know which one it just described: told only that something changed, it
