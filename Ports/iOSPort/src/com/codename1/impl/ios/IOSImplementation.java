@@ -5528,19 +5528,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// @see #macFileChooserResult(String)
     public static void macCapturePictureResult(final String r) {
         dropEvents = false;
-        final EventDispatcher target = macDequeue(macCaptureQueue);
+        final MacCaptureRequest request = macDequeueCapture();
+        final EventDispatcher target = request == null ? null : request.dispatcher;
+        final boolean multiple = request != null && request.selectMultiple;
         if (target != null && target == captureCallback) {
             captureCallback = null;
         }
         if (deliverPickerResultOnEdt(new Runnable() {
             @Override
             public void run() {
-                capturePictureResult(r, target);
+                capturePictureResult(r, target, multiple);
             }
         })) {
             return;
         }
-        capturePictureResult(r, target);
+        capturePictureResult(r, target, multiple);
     }
 
     /// Queues the delivery on the EDT, answering whether it took it.
@@ -5563,18 +5565,23 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public static void capturePictureResult(String r) {
-        capturePictureResult(r, captureCallback);
+        capturePictureResult(r, captureCallback, gallerySelectMultiple);
         captureCallback = null;
     }
 
-    /// Delivers to ONE dispatcher rather than to whichever is current. The
-    /// single-slot caller above keeps the old behaviour for iOS; the macOS
-    /// entry point passes the dispatcher of the request this result answers.
-    private static void capturePictureResult(String r, EventDispatcher captureCallback) {
+    /// Delivers to ONE dispatcher, in the shape THAT request asked for.
+    ///
+    /// The single-slot caller above keeps the old behaviour for iOS; the macOS
+    /// entry point passes the dispatcher and the multiplicity recorded when the
+    /// request was made. Both have to travel together: reading the process-wide
+    /// gallerySelectMultiple here would hand the first listener the second
+    /// request's shape.
+    private static void capturePictureResult(String r, EventDispatcher captureCallback,
+            boolean selectMultiple) {
         dropEvents = false;
         if(captureCallback != null) {
             if(r != null) {
-                if (gallerySelectMultiple) {
+                if (selectMultiple) {
                     String[] paths = Util.split(r, "\n");
                     int len = paths.length;
                     for (int i=0; i<len; i++) {
@@ -5681,8 +5688,48 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// benefits, not smuggled in here.
     private static final java.util.ArrayList<EventDispatcher> macFileChooserQueue =
             new java.util.ArrayList<EventDispatcher>();
-    private static final java.util.ArrayList<EventDispatcher> macCaptureQueue =
-            new java.util.ArrayList<EventDispatcher>();
+
+    /// One outstanding capture request: who asked, and what SHAPE of answer it
+    /// asked for.
+    ///
+    /// gallerySelectMultiple is process-wide and read when the result arrives,
+    /// so binding only the dispatcher was half a fix: open a single-select and
+    /// a multi-select gallery before the first panel returns and the first
+    /// listener is handed the second request's shape -- a String[] where it
+    /// expects a String, or several paths collapsed into one newline-separated
+    /// one. The shape belongs to the request, like the dispatcher.
+    private static final class MacCaptureRequest {
+        final EventDispatcher dispatcher;
+        final boolean selectMultiple;
+
+        MacCaptureRequest(EventDispatcher dispatcher, boolean selectMultiple) {
+            this.dispatcher = dispatcher;
+            this.selectMultiple = selectMultiple;
+        }
+    }
+
+    private static final java.util.ArrayList<MacCaptureRequest> macCaptureQueue =
+            new java.util.ArrayList<MacCaptureRequest>();
+
+    /// Remembers a capture request, dispatcher and answer shape together.
+    private static void macEnqueueCapture(EventDispatcher dispatcher) {
+        if (!isMacPlatformStatic() || dispatcher == null) {
+            return;
+        }
+        synchronized (macCaptureQueue) {
+            macCaptureQueue.add(new MacCaptureRequest(dispatcher, gallerySelectMultiple));
+        }
+    }
+
+    /// The oldest unanswered capture request, or null when there is none.
+    private static MacCaptureRequest macDequeueCapture() {
+        synchronized (macCaptureQueue) {
+            if (macCaptureQueue.isEmpty()) {
+                return null;
+            }
+            return macCaptureQueue.remove(0);
+        }
+    }
 
     /// Remembers a chooser request's dispatcher so its own result can find it.
     private static void macEnqueue(java.util.ArrayList<EventDispatcher> queue,
@@ -5719,7 +5766,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        macEnqueue(macCaptureQueue, captureCallback);
+        macEnqueueCapture(captureCallback);
         nativeInstance.captureCamera(false, 0, 0);
         dropEvents = true;
     }
@@ -6051,7 +6098,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        macEnqueue(macCaptureQueue, captureCallback);
+        macEnqueueCapture(captureCallback);
         nativeInstance.captureCamera(true, getUIPickerControllerQualityType(cnst), cnst != null ? cnst.getPreferredMaxLength() : 0);
         dropEvents = true;
     }
@@ -6130,7 +6177,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
-        macEnqueue(macCaptureQueue, captureCallback);
+        macEnqueueCapture(captureCallback);
         nativeInstance.openGallery(type);
     }
 
