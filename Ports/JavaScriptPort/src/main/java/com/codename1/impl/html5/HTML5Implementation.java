@@ -4605,9 +4605,42 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public int convertToPixels(int dipCount, boolean horizontal) {
         if (ppi == 0) {
-            ppi = JavaScriptDisplayMetrics.pixelsPerMillimeter(getDeviceDensity());
+            ppi = millimetreScale();
         }
         return (int) Math.round(((float) dipCount) * ppi);
+    }
+
+    /**
+     * Device pixels per millimetre, taken from the display's actual pixel ratio.
+     *
+     * <p>Deliberately not {@code pixelsPerMillimeter(getDeviceDensity())}. That table sorts a
+     * display into one of nine Android-shaped buckets and reads a nominal dpi out of it, which
+     * only lands on Codename One's own baseline of 160dpi-per-CSS-pixel at ratios 1 and 2.
+     * Everywhere else it misses, and by a lot: ratio 3 falls in the HD bucket and is rendered
+     * 12.5% too large, ratio 2.5 lands in the same bucket and is 35% too large, and ratio 1.5 --
+     * ordinary on Android and on Windows at 150% scaling -- falls back to MEDIUM and is a third
+     * too small. A millimetre is a physical length, so it should cover the same amount of screen
+     * whatever the ratio; instead it stepped between displays.</p>
+     *
+     * <p>A browser does not need to guess at any of this. It reports the ratio exactly, so the
+     * baseline scaled by it is the answer, and a millimetre is then the same size at every ratio.
+     * {@link #getDeviceDensity()} keeps its buckets: that one picks which resolution of an image
+     * to load, which is a genuine choice between a handful of assets.</p>
+     *
+     * <p>An explicit {@code ?density=} override is honoured as given -- someone forcing a density
+     * is asking for that density, not for a correction to it.</p>
+     */
+    private double millimetreScale() {
+        int override = getDensityOverride();
+        if (override > 0) {
+            return JavaScriptDisplayMetrics.pixelsPerMillimeter(override);
+        }
+        double ratio = getDevicePixelRatio();
+        if (ratio <= 0) {
+            ratio = 1;
+        }
+        return ratio * JavaScriptDisplayMetrics.pixelsPerMillimeter(
+                JavaScriptDisplayMetrics.DENSITY_MEDIUM);
     }
     
     @JSBody(params={}, script="var ua = navigator.userAgent.toLowerCase(); \n" +
