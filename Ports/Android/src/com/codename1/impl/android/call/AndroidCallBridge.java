@@ -994,9 +994,26 @@ public class AndroidCallBridge implements CallBridge {
         // bridge first obtained from that service could never prompt again,
         // even once the app was in the foreground.
         Activity a = currentActivity();
-        if (a == null || !isDirectorySupported()) {
+        // Split, because the two halves are different answers and only one of
+        // them is a failure. requestScreeningRole documents "Resolves false
+        // where the role was refused or does not exist", and below API 29 the
+        // role DOES NOT EXIST -- there is nothing to ask for and nothing that
+        // could change, so an error told an app to retry what can never
+        // succeed. The same reading is why iOS answers false rather than
+        // NOT_SUPPORTED. Folding both into one refusal made the older-Android
+        // answer disagree with the documented contract that the simulation
+        // and the newer-Android path both keep.
+        if (!isDirectorySupported()) {
+            Calls.deliverAckValue(requestId, false);
+            return;
+        }
+        // No foreground activity is the other half, and it IS a failure: the
+        // role exists and could be granted, this process simply cannot raise
+        // the dialog right now. Saying false there would tell an app the user
+        // declined when nobody was asked.
+        if (a == null) {
             Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
-                    "Call screening needs Android 10 or newer and a foreground"
+                    "Requesting the call screening role needs a foreground"
                     + " activity");
             return;
         }

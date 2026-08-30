@@ -158,6 +158,51 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void aReadArmedByAnEarlierStartCannotFeedTheNextTunnel() {
+        // The extension process outlives a tunnel -- NE stops and starts this
+        // provider without tearing the process down -- so a read armed by one
+        // start can complete after it. The handler delivered whatever it got
+        // and re-armed itself unconditionally, guarded only by a null buffer
+        // meaning "no tunnel running", which stops nothing once a NEW tunnel
+        // is running. A stop followed by a start therefore fed packets
+        // captured on the old link into the new tunnel, and left two readers
+        // competing for one flow for the rest of the process.
+        String src = code(provider());
+        assertTrue(src.contains("cn1ReadPacketsForGeneration:"),
+                "the read has to carry the start it belongs to");
+        assertFalse(src.contains("[self cn1ReadPackets]"),
+                "and the ungeneration-ed entry point must be gone, not merely"
+                + " unused -- it is the one a later edit would reach for");
+
+        int handler = src.indexOf("readPacketsWithCompletionHandler:");
+        assertTrue(handler >= 0, "the read handler has to exist");
+        String body = src.substring(handler);
+        int guard = body.indexOf(
+                "if (generation != atomic_load(&cn1tnReadGeneration))");
+        int deliver = body.indexOf("ExtensionTunnelHost_received___int");
+        int rearm = body.indexOf("cn1ReadPacketsForGeneration:generation");
+        assertTrue(guard >= 0, "the handler has to check its generation");
+        assertTrue(guard < deliver,
+                "before delivering, or a stale batch reaches the new tunnel");
+        assertTrue(guard < rearm,
+                "and before re-arming, or the stale reader lives for ever");
+
+        // Bumped on BOTH sides. Only on start, a read outstanding across a
+        // long stop would still be live when the next start bumped it -- but
+        // nothing would have stopped it in between, and it would deliver into
+        // whatever the process did next.
+        int start = src.indexOf("startTunnelWithOptions");
+        int stop = src.indexOf("stopTunnelWithReason");
+        assertTrue(start >= 0 && stop > start);
+        assertTrue(src.substring(start, stop)
+                        .contains("atomic_fetch_add(&cn1tnReadGeneration, 1)"),
+                "a start claims its own generation");
+        assertTrue(src.substring(stop)
+                        .contains("atomic_fetch_add(&cn1tnReadGeneration, 1)"),
+                "and a stop invalidates the one it is ending");
+    }
+
+    @Test
     void anEmptyRouteListNeverBecomesTheDefaultRoute() {
         // Two ways a list ends up empty, and now one answer. A setup listing
         // only v4 routes on a v6 interface asked for no v6 traffic; a setup

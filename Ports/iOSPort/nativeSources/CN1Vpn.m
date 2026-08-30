@@ -1147,6 +1147,115 @@ static void cn1vpStopWatchingTunnel(void) {
 
 @end
 
+/// How long a stop waits for the connection to actually leave.
+///
+/// A bound rather than a guess at the right answer: the point is that the
+/// request is answered, and this SPI calls an operation that never answers
+/// worse than one that fails.
+#define CN1_VPN_STOP_TIMEOUT_SECONDS 10
+
+/// Watches a STOP until the connection has really gone.
+///
+/// stopVPNTunnel only begins the disconnect. Acknowledging the request on the
+/// next line said "down" while the tunnel was still routing, so an app could
+/// free its resources, or start a replacement, against a link that was still
+/// carrying packets and an extension that had not yet been told to stop.
+///
+/// The file already made this argument in the other direction two branches
+/// down, where a manager that could not be loaded refuses to answer YES
+/// precisely because the tunnel may still be up. Both halves now agree.
+@interface CN1VpnTunnelStopWatcher : NSObject
+@property (nonatomic, assign) int requestId;
+@property (nonatomic, assign) BOOL answered;
+- (void)statusChanged:(NSNotification *)note;
+@end
+
+static CN1VpnTunnelStopWatcher *cn1vpTunnelStopWatcher = nil;
+
+/// Which stop is current, so a timeout cannot answer a later one.
+///
+/// MAIN QUEUE ONLY, for the reason cn1vpTunnelGeneration gives.
+static int cn1vpStopGeneration = 0;
+
+/// Answers the stop being watched, once, and stops watching.
+static void cn1vpFinishStop(BOOL ok, int error, NSString *message) {
+    if (cn1vpTunnelStopWatcher == nil) {
+        return;
+    }
+    CN1VpnTunnelStopWatcher *watcher = cn1vpTunnelStopWatcher;
+    cn1vpTunnelStopWatcher = nil;
+    [[NSNotificationCenter defaultCenter] removeObserver:watcher];
+    if (!watcher.answered) {
+        watcher.answered = YES;
+        cn1vpTunnelAck(watcher.requestId, ok, error, message);
+    }
+    [watcher release];
+}
+
+@implementation CN1VpnTunnelStopWatcher
+
+- (void)statusChanged:(NSNotification *)note {
+    if (self.answered) {
+        return;
+    }
+    NEVPNStatus status = ((NEVPNConnection *)note.object).status;
+    // Disconnected is the answer; Invalid is one too, and means the
+    // configuration went away underneath -- there is no tunnel either way,
+    // which is what the caller asked for. Disconnecting is passed over: it is
+    // the state this is waiting through, and it is exactly the state the old
+    // code answered from.
+    if (status == NEVPNStatusDisconnected || status == NEVPNStatusInvalid) {
+        cn1vpFinishStop(YES, 0, nil);
+    }
+}
+
+@end
+
+/// Asks a session to stop and answers `rid` once it has.
+///
+/// Called on the main queue only, like everything else that touches the
+/// watcher and the generations.
+static void cn1vpStopAndWatch(int rid, NETunnelProviderSession *session) {
+    // A previous stop still waiting is superseded rather than abandoned: it
+    // carries the only completion path its request has.
+    cn1vpFinishStop(NO, CN1_VPN_ERR_UNKNOWN,
+            @"The tunnel stop was superseded by another stop");
+    int generation = ++cn1vpStopGeneration;
+    CN1VpnTunnelStopWatcher *watcher =
+            [[CN1VpnTunnelStopWatcher alloc] init];
+    watcher.requestId = rid;
+    cn1vpTunnelStopWatcher = watcher;
+    // OBSERVED BEFORE the stop is asked for. Armed afterwards, a disconnect
+    // that completed immediately would post its notification to nobody and
+    // the request would wait out the timeout for something that had already
+    // happened.
+    [[NSNotificationCenter defaultCenter]
+            addObserver:watcher
+            selector:@selector(statusChanged:)
+            name:NEVPNStatusDidChangeNotification
+            object:session];
+    [session stopVPNTunnel];
+    // Checked once immediately, for the connection that is already down --
+    // a manager with no saved configuration reads Invalid, and asking a
+    // tunnel that is not running to stop has got the caller what they asked
+    // for. Without this the ordinary "stop something already stopped" case
+    // would post no further notification and answer only on the timeout.
+    [watcher statusChanged:
+            [NSNotification notificationWithName:NEVPNStatusDidChangeNotification
+                    object:session]];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                    (int64_t)CN1_VPN_STOP_TIMEOUT_SECONDS * NSEC_PER_SEC),
+            dispatch_get_main_queue(), ^{
+        // Only if THIS stop is still the current one. A later stop has its
+        // own watcher and its own deadline, and answering here would settle
+        // a request that is still legitimately waiting.
+        if (generation == cn1vpStopGeneration) {
+            cn1vpFinishStop(NO, CN1_VPN_ERR_TIMEOUT,
+                    @"The tunnel did not disconnect");
+        }
+    });
+}
+
 /// Loads or creates the manager for this app's packet tunnel.
 ///
 /// NETunnelProviderManager is per app, and loading is asynchronous, so this
@@ -1298,8 +1407,13 @@ void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
     cn1vpTunnelGeneration++;
     cn1vpStopWatchingTunnel();
     if (cn1vpTunnelManager != nil) {
-        [(NETunnelProviderSession *)cn1vpTunnelManager.connection stopVPNTunnel];
-        cn1vpTunnelAck(rid, YES, 0, nil);
+        // WATCHED, not fired and forgotten. stopVPNTunnel begins an
+        // asynchronous disconnect; answering on the next line told
+        // Tunnels.stop() the tunnel was down while it was still routing, and
+        // an app that then released its resources or started a replacement
+        // was racing a link that had not gone anywhere yet.
+        cn1vpStopAndWatch(rid,
+                (NETunnelProviderSession *)cn1vpTunnelManager.connection);
         return;
     }
     // No manager in this process. Loaded rather than refused: the app may
@@ -1317,12 +1431,12 @@ void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
             cn1vpFail(rid, CN1_VPN_ERR_UNKNOWN, e);
             return;
         }
-        [(NETunnelProviderSession *)m.connection stopVPNTunnel];
-        // TRUE for the disconnected manager too. Asking a tunnel that is not
-        // running to stop has got the caller what they asked for, and
-        // reporting a failure would have an app treat its own idle state as
-        // an error.
-        cn1vpTunnelAck(rid, YES, 0, nil);
+        // The same wait as the branch above, and for the same reason. The
+        // disconnected manager still answers immediately: its connection
+        // reads Disconnected or Invalid, the watcher's opening probe sees
+        // that, and asking a tunnel that is not running to stop has got the
+        // caller what they asked for.
+        cn1vpStopAndWatch(rid, (NETunnelProviderSession *)m.connection);
     });
     });
 }

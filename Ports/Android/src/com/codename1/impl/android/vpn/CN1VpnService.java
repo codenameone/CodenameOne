@@ -126,6 +126,31 @@ public class CN1VpnService extends VpnService {
                 : intent.getIntExtra(EXTRA_REQUEST, -1);
         String wire = intent == null ? null
                 : intent.getStringExtra(EXTRA_SETUP);
+        // PROMOTED FIRST, before any branch below can return. The bridge
+        // launches this with startForegroundService on Oreo and newer, which
+        // is a promise to call startForeground within a few seconds; break it
+        // and the platform crashes the process rather than merely declining.
+        //
+        // That promise cannot be kept from where the promotion used to live.
+        // It ran after establish() had returned and the tunnel was published,
+        // on the Opener thread, behind a DNS lookup for the gateway name --
+        // on the slow network a VPN is typically being started on, which is
+        // exactly when it would arrive late.
+        //
+        // The old placement was deliberate and its reason is worth answering
+        // rather than deleting: promoting after publication meant a start
+        // superseded by a stop left no notification for a tunnel it never
+        // installed. It still does not for long -- a superseded start bails
+        // and stops the service, which takes the notification with it -- so
+        // the cost is a notification visible for as long as the failed start
+        // takes, and the thing bought is a process that does not crash and a
+        // background reconnect that works.
+        //
+        // Every path from here promotes, including the two that turn straight
+        // around and stop: a service launched this way must promote even to
+        // die tidily.
+        promote(wire == null ? "" : TunnelWire.sessionName(
+                TunnelWire.split(wire)));
         if (wire == null) {
             // Android restarted the service on its own -- the only way here
             // with no intent -- and the setup it was started with is not
@@ -767,12 +792,12 @@ public class CN1VpnService extends VpnService {
             }
             if (published) {
                 // FOREGROUND once the tunnel is really this service's.
-                // Android 8 shuts down an ordinary started service that
-                // keeps running, so a tunnel brought up without this was
-                // acknowledged, established, and then killed a little later
-                // with nothing in the app to say why. After the publication
-                // rather than before it, so a superseded start does not
-                // leave a notification for a tunnel it never installed.
+                // Promoted again, and only to refresh the notification now
+                // that the link is up: onStartCommand already promoted this
+                // service before any of this ran, because
+                // startForegroundService demands it within seconds. Calling
+                // startForeground twice updates the notification rather than
+                // adding one.
                 promote(TunnelWire.sessionName(fields));
                 // ANSWERED before the loop is started, and deliberately: the
                 // link is established by now -- establish() returned a

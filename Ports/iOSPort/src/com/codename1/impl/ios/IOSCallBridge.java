@@ -222,13 +222,25 @@ class IOSCallBridge implements CallBridge {
 
     @Override
     public void requestScreeningRole(int requestId) {
-        // iOS has no equivalent to ask for. Caller identification is enabled
-        // by the user in Settings, and an app cannot prompt for it -- so the
-        // honest answer is that the request did not apply, and
-        // DirectoryStatus.isEnabled() is what an app reads instead.
-        com.codename1.call.session.Calls.deliverAck(requestId, false,
-                com.codename1.call.CallError.NOT_SUPPORTED.ordinal(),
-                "On iOS the user enables call directories in Settings; an app"
-                + " cannot request the role");
+        // FALSE, not a failure. iOS has no screening role to ask for --
+        // caller identification is enabled by the user in Settings and an app
+        // cannot prompt for it -- and CallDirectory.requestScreeningRole
+        // documents exactly that case: "Resolves false where the role was
+        // refused or does not exist."
+        //
+        // This used to answer NOT_SUPPORTED, which deliverAck turns into a
+        // CallException. So an app written to the documented contract --
+        // handling denial in its success callback, as the simulation and
+        // Android both let it -- got an exception on iOS and nowhere else,
+        // and the one platform where the answer is always "no" was the one
+        // that could not say "no".
+        //
+        // "Cannot be granted" and "cannot be asked" are different answers and
+        // only the second is a failure. There is nothing transient here: this
+        // is not a request that might succeed later, so reporting it as an
+        // error tells the app to retry something that can never change.
+        // DirectoryStatus.isEnabled() remains what an app reads to find out
+        // whether the user turned it on.
+        com.codename1.call.session.Calls.deliverAckValue(requestId, false);
     }
 }

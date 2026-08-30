@@ -1287,15 +1287,42 @@ public class AndroidVpnBridge implements VpnBridge {
             // generation between them and its intent still reach the service
             // first, which is the ordering this is about.
             //
-            // startService, not startForegroundService: a VpnService is
-            // exempt from the background start restriction precisely because
-            // the user has just consented to it, and asking for a foreground
-            // service would demand a notification the tunnel does not need.
+            // startForegroundService on Oreo and newer. This said
+            // startService, justified as "a VpnService is exempt from the
+            // background start restriction precisely because the user has
+            // just consented to it, and asking for a foreground service would
+            // demand a notification the tunnel does not need". Both halves
+            // were wrong.
+            //
+            // The second half is refuted by this port's own code:
+            // CN1VpnService.promote() builds a notification and calls
+            // startForeground, because Android 8 shuts down an ordinary
+            // started service. The notification is not a cost of asking for a
+            // foreground service; it is already being paid.
+            //
+            // The first half rests on consent granted JUST NOW. A start where
+            // the user has already authorised the app skips the dialog
+            // entirely -- a reconnect, a retry after a network change, an app
+            // resuming work in the background -- and then this is an ordinary
+            // background startService subject to the Android 8 limits. It
+            // throws, the catch below reports UNKNOWN, and a reconnect fails
+            // for an app that still holds VPN authorisation. Rather than rest
+            // on an exemption whose scope is not something this code can
+            // establish, ask for what the service actually becomes.
+            //
+            // startForegroundService is a PROMISE to promote within a few
+            // seconds, and the service now keeps it at the top of
+            // onStartCommand rather than after establish() -- see the note
+            // there, which is the other half of this fix and not optional.
             boolean sent;
             synchronized (this) {
                 sent = generation == tunnelGeneration;
                 if (sent) {
-                    context.startService(i);
+                    if (Build.VERSION.SDK_INT >= 26) {
+                        context.startForegroundService(i);
+                    } else {
+                        context.startService(i);
+                    }
                 }
             }
             if (!sent) {
@@ -1319,6 +1346,15 @@ public class AndroidVpnBridge implements VpnBridge {
             Intent i = new Intent(context, CN1VpnService.class);
             i.setAction(CN1VpnService.ACTION_STOP);
             i.putExtra(CN1VpnService.EXTRA_REQUEST, requestId);
+            // Still startService, unlike the start above, and for a reason
+            // rather than by omission. Either the tunnel is running -- in
+            // which case this app owns a foreground service and the Android 8
+            // background limits do not apply to it -- or it is not, in which
+            // case the throw is caught below and answered as the success it
+            // is. Asking for a foreground service here would instead promise
+            // a promotion that ACTION_STOP has no intention of making, since
+            // its whole job is to stop.
+            //
             // The bump BEFORE the service is told, and in the same critical
             // section, so a start cannot read the old generation here and
             // still send its intent after this one. See tunnelGeneration and
