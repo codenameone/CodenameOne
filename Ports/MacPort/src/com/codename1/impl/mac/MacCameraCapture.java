@@ -140,7 +140,7 @@ final class MacCameraCapture {
         capture.add(BorderLayout.CENTER, session.createView());
 
         final Button shutter = new Button(video ? "Record" : "Capture");
-        Button cancel = new Button("Cancel");
+        final Button cancel = new Button("Cancel");
         Container buttons = new Container(new FlowLayout(com.codename1.ui.Component.CENTER));
         buttons.add(cancel);
         buttons.add(shutter);
@@ -159,11 +159,35 @@ final class MacCameraCapture {
         // callback said "cancelled", so nothing downstream knew to clean it up.
         final VideoRecording[] recording = {null};
 
+        // Whether Stop has already begun finalizing, and whether Cancel was
+        // pressed while it was. They exist because VideoRecording.stopAndAwait()
+        // is only an await the FIRST time: a recording already marked stopped
+        // completes the resource immediately with the requested path rather
+        // than waiting for anything. So once Stop has started finalization,
+        // Cancel calling discard() would not await at all -- it would delete a
+        // file the recorder is still writing and then close the session, which
+        // removes movieOutput and releases the camera while the native
+        // didFinishRecordingToOutputFileAtURL: callback is still pending. That
+        // is exactly the failure the Cancel path below was written to avoid,
+        // reached by the one route where the await it relies on is a no-op.
+        final boolean[] stopPending = {false};
+        final boolean[] cancelRequested = {false};
+
         cancel.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
                 if (recording[0] == null) {
                     finish(finished, session, previous, response, null);
+                    return;
+                }
+                if (stopPending[0]) {
+                    // Finalization is already in flight and owns the only
+                    // resource that will ever report the final path. Record the
+                    // intent and let that callback do the discarding, rather
+                    // than starting a second stop that resolves instantly and
+                    // tears the session down underneath the first one.
+                    cancelRequested[0] = true;
+                    cancel.setEnabled(false);
                     return;
                 }
                 // The session stays open until the recorder has finished with
@@ -223,9 +247,18 @@ final class MacCameraCapture {
                     // application was left holding a path to nothing, and the
                     // capture had reported success.
                     shutter.setEnabled(false);
+                    stopPending[0] = true;
                     recording[0].stopAndAwait().ready(new SuccessCallback<String>() {
                         @Override
                         public void onSucess(String path) {
+                            if (cancelRequested[0]) {
+                                // Cancelled while this stop was finalizing. The
+                                // file is finished now, so it can be removed --
+                                // and only now is it safe to close the session.
+                                deleteQuietly(path);
+                                finish(finished, session, previous, response, null);
+                                return;
+                            }
                             if (finished[0]) {
                                 // Cancelled while this stop was still pending.
                                 // finish() would ignore the result, and the file
