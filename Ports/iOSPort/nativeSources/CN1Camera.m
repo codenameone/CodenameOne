@@ -197,6 +197,15 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 - (CN1View *)createPreviewView {
     if (self.previewView) return self.previewView;
     CN1View *v = [[CN1View alloc] initWithFrame:CGRectMake(0, 0, 320, 480)];
+#ifndef CN1_USE_ARC
+    // Autoreleased so the previewView property below is the only owner. The
+    // alloc's +1 was never balanced here either: this method does not begin
+    // with alloc, new, copy or mutableCopy, so its caller is entitled to treat
+    // the result as +0 -- and cn1CameraCreatePreviewView does, retaining it for
+    // the Java peer. Found while fixing the camera handle above; same leak,
+    // same file, one view per session.
+    [v autorelease];
+#endif
 #if TARGET_OS_OSX
     // NSView has no backgroundColor; the colour belongs to its layer, and the
     // view has to be told to have one. Black because the preview layer below
@@ -563,9 +572,21 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraOpen___java_lang_String_int_
     CN1Camera *cam = [[CN1Camera alloc] init];
     BOOL ok = [cam openWithCameraId:idStr previewW:previewW previewH:previewH
                        captureAudio:captureAudio];
-    if (!ok) return 0;
+    if (!ok) {
+        // The allocation was leaked outright on this path: nothing else ever
+        // sees this camera, so nothing else can release it.
 #ifndef CN1_USE_ARC
-    return (JAVA_LONG)[cam retain];
+        [cam release];
+#endif
+        return 0;
+    }
+#ifndef CN1_USE_ARC
+    // The alloc's +1 IS the reference handed to Java, transferred rather than
+    // added to. Retaining again made it +2 against the single release
+    // cn1CameraClose does, so every camera session opened kept its
+    // AVCaptureSession and its inputs alive for the life of the process --
+    // a capture at a time, never given back.
+    return (JAVA_LONG)cam;
 #else
     return (JAVA_LONG)(__bridge_retained void *)cam;
 #endif
