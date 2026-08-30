@@ -692,11 +692,17 @@ PushKit
 Telecom
 VoIP
 DTMF
+# Android names the lock screen the keyguard, and the class that shows a
+# ringing screen over it is KeyguardManager.
+keyguard
 
 # VPN (VPN.asciidoc) terminology.
 IKEv2
 IPsec
 
-# Call management (Call-Management.asciidoc) terminology. Android names the
-# lock screen the keyguard, and the class that shows over it is KeyguardManager.
-keyguard
+# -----------------------------------------------------------------------------
+# Skin designer (Skin-Designer.asciidoc) units.
+# -----------------------------------------------------------------------------
+# Android's density-independent pixel, the unit its safe-area insets are
+# published in. Spelled the way Google spells it, alongside the iOS "pt".
+dp
