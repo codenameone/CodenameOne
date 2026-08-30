@@ -1865,9 +1865,19 @@ public class MacOSNativeBuilder extends Executor {
         // open() does: CameraSessionOptions.captureAudio starts true and
         // CN1Camera adds an AVMediaTypeAudio input whenever it is set, and the
         // application's own captureAudio(false) is deliberately not read here
-        // (see the note below). requestPermissions is handled separately, by
-        // its argument.
-        if (method.indexOf("getCameras") > -1 || method.indexOf("getDefault") > -1) {
+        // (see the note below).
+        //
+        // requestPermissions is excluded HERE and decided only by
+        // requestsMicrophonePermission, which reads the argument. Executor
+        // invokes usesClassMethod AND usesClassMethodWithBooleanArgument for
+        // the same call, and the boolean-aware hook can only SET the flag --
+        // nothing clears it. So leaving requestPermissions matching in this
+        // predicate meant the generic hook granted the microphone before the
+        // argument was ever looked at, and requestPermissions(false, cb) still
+        // shipped NSMicrophoneUsageDescription. The two hooks run alongside
+        // each other, not instead of each other.
+        if (method.indexOf("getCameras") > -1 || method.indexOf("getDefault") > -1
+                || method.indexOf("requestPermissions") > -1) {
             return false;
         }
         return true;

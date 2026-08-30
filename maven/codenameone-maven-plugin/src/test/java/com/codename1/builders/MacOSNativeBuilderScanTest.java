@@ -195,10 +195,18 @@ public class MacOSNativeBuilderScanTest {
         assertTrue("opening a session opens the default audio input",
                 MacOSNativeBuilder.applicationOpensCameraMicrophone(
                         "com/example/MyForm", "com/codename1/camera/Camera", "open"));
-        assertTrue("requestPermissions opens a probe session with the same options",
+        // requestPermissions is NOT decided here any more -- it is decided by
+        // its argument, in requestsMicrophonePermission. Both hooks fire for the
+        // same call and the argument-aware one can only SET the flag, so a
+        // match here would grant the microphone before the argument was read.
+        assertFalse("requestPermissions is decided by its argument",
                 MacOSNativeBuilder.applicationOpensCameraMicrophone(
                         "com/example/MyForm",
                         "com/codename1/camera/Camera", "requestPermissions"));
+        assertTrue("asking for audio still declares the microphone",
+                MacOSNativeBuilder.requestsMicrophonePermission(
+                        "com/example/MyForm", "com/codename1/camera/Camera",
+                        "requestPermissions", Boolean.TRUE));
 
         assertFalse("the framework's own callers are in every build",
                 MacOSNativeBuilder.applicationOpensCameraMicrophone(
@@ -453,10 +461,14 @@ public class MacOSNativeBuilderScanTest {
     public void requestingCameraPermissionCountsAsUsingTheCamera() {
         assertTrue(MacOSNativeBuilder.applicationOpensCameraSession(
                 "com/example/MyApp", "com/codename1/camera/Camera", "requestPermissions"));
-        // And still counts for the microphone, because the probe session it
-        // opens carries CameraSessionOptions' default captureAudio.
-        assertTrue(MacOSNativeBuilder.applicationOpensCameraMicrophone(
-                "com/example/MyApp", "com/codename1/camera/Camera", "requestPermissions"));
+        // The microphone follows the argument rather than the call, so an
+        // unresolved value still declares it and an explicit false does not.
+        assertTrue(MacOSNativeBuilder.requestsMicrophonePermission(
+                "com/example/MyApp", "com/codename1/camera/Camera",
+                "requestPermissions", null));
+        assertFalse(MacOSNativeBuilder.requestsMicrophonePermission(
+                "com/example/MyApp", "com/codename1/camera/Camera",
+                "requestPermissions", Boolean.FALSE));
     }
 
     /// The framework's own callers are still excluded, which is the whole point
@@ -615,6 +627,13 @@ public class MacOSNativeBuilderScanTest {
         assertFalse(MacOSNativeBuilder.applicationOpensCameraMicrophone(app, cam, "getDefault"));
         // open() still does: CameraSessionOptions.captureAudio starts true.
         assertTrue(MacOSNativeBuilder.applicationOpensCameraMicrophone(app, cam, "open"));
+        // requestPermissions must NOT match here. Executor calls this hook and
+        // the boolean-aware one for the same call, and the latter can only set
+        // the flag -- so matching here granted the microphone before the
+        // argument was read, and requestPermissions(false, cb) still declared
+        // it.
+        assertFalse("requestPermissions is decided by its argument alone",
+                MacOSNativeBuilder.applicationOpensCameraMicrophone(app, cam, "requestPermissions"));
         // And they are still CAMERA users, which is a separate question.
         assertTrue(MacOSNativeBuilder.applicationOpensCameraSession(app, cam, "getCameras"));
     }
