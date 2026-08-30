@@ -111,4 +111,29 @@ class RingingScreenBindsEveryIntentTest {
         assertTrue(assign >= 0 && assign < draw,
                 "the id is set before the draw that reads it back");
     }
+
+    @Test
+    @EnabledIf("portPresent")
+    void theInstanceIsRegisteredBeforeAnythingCanDismissIt() throws Exception {
+        // A call ending between bindTo confirming it and onStart running used
+        // to find `current` still null, so dismissFor had nothing to finish
+        // and the dismissal was lost -- then onStart published the instance
+        // for a call that no longer existed, leaving a full-screen window
+        // over the keyguard with nothing behind it to close it.
+        String create = body(source(), "protected void onCreate(");
+        int register = create.indexOf("current = this");
+        int bind = create.indexOf("bindTo(");
+        assertTrue(register >= 0,
+                "onCreate has to publish the instance");
+        assertTrue(register < bind,
+                "before the bind, so a dismissal arriving mid-bind finds it");
+
+        // And the publish rechecks, because onCreate's answer was true when
+        // it ran and the call can end during the draw.
+        String start = body(source(), "protected void onStart(");
+        assertTrue(start.contains("CN1ConnectionService.find(callId)")
+                        && start.contains("finish()"),
+                "onStart has to refuse a call that ended while this screen"
+                + " was being built");
+    }
 }

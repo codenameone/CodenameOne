@@ -70,6 +70,19 @@ public class CN1IncomingCallActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        // REGISTERED FIRST, before anything can decide this screen is worth
+        // keeping. Registration used to happen in onStart, which left a
+        // window: a call ending between bindTo confirming it and onStart
+        // running found current still null, so dismissFor had nothing to
+        // finish and the dismissal was simply lost -- and onStart then
+        // published this instance for a call that no longer existed, leaving
+        // a full-screen window over the keyguard with nothing behind it.
+        //
+        // Registering before the bind rather than after it closes the same
+        // window on the other side: a dismissal that arrives mid-bind finds
+        // the instance, and if it arrives before callId is set the bind's own
+        // liveness check finishes the screen a moment later.
+        current = this;
         showOverKeyguard();
         bindTo(getIntent());
     }
@@ -274,6 +287,14 @@ public class CN1IncomingCallActivity extends Activity {
     protected void onStart() {
         super.onStart();
         current = this;
+        // RECHECKED on the way to the screen. onCreate's check was true when
+        // it ran, and "was live a moment ago" is not the question this
+        // window's existence depends on -- the call can end during the draw,
+        // and a stale ringing screen over the keyguard is exactly what a lost
+        // dismissal looks like.
+        if (callId == null || CN1ConnectionService.find(callId) == null) {
+            finish();
+        }
     }
 
     @Override
