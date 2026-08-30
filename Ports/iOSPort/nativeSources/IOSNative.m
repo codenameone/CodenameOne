@@ -5256,7 +5256,7 @@ static BOOL cn1_shouldFollowTargetBlank(id webView) {
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
 #ifndef NO_UIWEBVIEW
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         com_codename1_impl_ios_IOSNative_createBrowserComponent = [[UIWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200)];
         com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor clearColor];
         com_codename1_impl_ios_IOSNative_createBrowserComponent.opaque = NO;
@@ -5286,7 +5286,7 @@ WKWebView* com_codename1_impl_ios_IOSNative_createWKBrowserComponent = nil;
 #endif
 JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_Object_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
 #if TARGET_OS_OSX
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
         // allowsInlineMediaPlayback has no macOS counterpart: a Mac has no
@@ -5335,7 +5335,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
 #else
 #ifdef supportsWKWebKit
     if (@available(iOS 8, *)) {
-        dispatch_sync(dispatch_get_main_queue(), ^{
+        cn1RunSyncOnMainQueue(^{
             POOL_BEGIN();
             WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
             config.allowsInlineMediaPlayback = YES;
@@ -5398,7 +5398,7 @@ BOOL isWKWebView(JAVA_LONG peer) {
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT html, JAVA_OBJECT baseUrl) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5430,7 +5430,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_Strin
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserFollowTargetBlank___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN follow) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5455,7 +5455,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserFollowTargetBlank___long_boolean
 // kept light (or dark) regardless of the user's system appearance.
 void com_codename1_impl_ios_IOSNative_setBrowserInterfaceStyle___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT style) {
 #if TARGET_OS_OSX
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         CN1View* w = (BRIDGE_CAST CN1View*)((void *)(uintptr_t)peer);
         // AppKit expresses this as an appearance on the view rather than as an
@@ -5472,7 +5472,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserInterfaceStyle___long_int(CN1_TH
     });
 #else
 #if !TARGET_OS_WATCH
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (@available(iOS 13.0, *)) {
             CN1View* w = (BRIDGE_CAST CN1View*)((void *)peer);
@@ -5523,7 +5523,7 @@ void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_bo
     (void)peer;
     (void)enabled;
 #else
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5546,8 +5546,22 @@ void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_bo
 #endif
 }
 
+/// Every BrowserComponent native runs through cn1RunSyncOnMainQueue rather
+/// than dispatch_sync, because a browser listener is called ON the main queue.
+///
+/// WebKit invokes onLoad, onStart and the navigation policy decision
+/// synchronously on the main queue, and those listeners are documented to be
+/// able to drive the component -- redirecting after a load is the obvious case.
+/// A raw dispatch_sync to the main queue from there is a deadlock against the
+/// queue already running it, and the application hangs with no output.
+///
+/// cn1RunSyncOnMainQueue runs the block inline when it is already on the main
+/// queue and dispatches otherwise, so the synchronous policy decision keeps its
+/// timing. Applied to the whole BrowserComponent surface rather than the one
+/// entry point that was reported: a listener can call any of them, and setURL
+/// is simply the one people reach for first.
 void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT url) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5598,7 +5612,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT url, JAVA_OBJECT keys, JAVA_OBJECT values) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5643,7 +5657,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java
 }
 
 void com_codename1_impl_ios_IOSNative_browserBack___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5661,7 +5675,7 @@ void com_codename1_impl_ios_IOSNative_browserBack___long(CN1_THREAD_STATE_MULTI_
 }
 
 void com_codename1_impl_ios_IOSNative_browserStop___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5791,7 +5805,7 @@ void com_codename1_impl_ios_IOSNative_browserExecuteAndReturnStringCallback___lo
 }
 
 void com_codename1_impl_ios_IOSNative_browserForward___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5810,7 +5824,7 @@ void com_codename1_impl_ios_IOSNative_browserForward___long(CN1_THREAD_STATE_MUL
 
 JAVA_BOOLEAN booleanResponse = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5829,7 +5843,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(CN1_THREAD_S
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasForward___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5848,7 +5862,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasForward___long(CN1_THREA
 }
 
 void com_codename1_impl_ios_IOSNative_browserReload___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5867,7 +5881,7 @@ void com_codename1_impl_ios_IOSNative_browserReload___long(CN1_THREAD_STATE_MULT
 
 JAVA_OBJECT returnString;
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -5887,7 +5901,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(CN1_THREAD_S
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -12739,7 +12753,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_browserExecuteAndReturnString___lon
             return out;
         } else {
             __block JAVA_OBJECT out;
-            dispatch_sync(dispatch_get_main_queue(), ^{
+            cn1RunSyncOnMainQueue(^{
                 POOL_BEGIN();
                 UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
                 out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
