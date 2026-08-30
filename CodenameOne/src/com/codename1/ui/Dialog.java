@@ -2783,10 +2783,16 @@ public class Dialog extends Form implements AbstractDialog {
             // every other window interactive, but this call is process wide -- on iOS it
             // reaches the global stopTextEditing -- so closing a dialog in one window
             // dismissed the keyboard of a field being typed into in another.
+            // Against the surface this dialog was actually shown on, held from above,
+            // not one resolved now: the teardown clears layerHost before this runs, so
+            // resolveHost() answers with whatever has the focus by then. For a dialog
+            // that timed out while the user had moved to another window, that is the
+            // window they moved to -- which made the test pass and stopped the editing
+            // this exists to leave alone.
             Component editing = Display.impl.getEditingText();
             TopLevelContainer editingHost =
                     editing == null ? null : editing.getTopLevelContainer();
-            if (editing == null || editingHost == null || editingHost == resolveHost()) { //NOPMD CompareObjectsWithEquals
+            if (editing == null || editingHost == null || editingHost == host) { //NOPMD CompareObjectsWithEquals
                 Display.getInstance().setShowVirtualKeyboard(false);
             }
         }

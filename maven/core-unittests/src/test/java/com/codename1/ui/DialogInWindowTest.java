@@ -3024,4 +3024,105 @@ class DialogInWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    @FormTest
+    void aDialogTimingOutElsewhereLeavesTheOtherWindowsKeyboardAlone() throws Exception {
+        // The teardown clears the host before the keyboard check runs, so resolving it
+        // again answered with whatever had the focus by then -- for a dialog that timed
+        // out while the user had moved to another window, that is the window they moved
+        // to, which made the test pass and stopped the editing it exists to leave alone.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        final Window shownOn = new Window("dialog host", new BorderLayout());
+        shownOn.setWindowSize(400, 300);
+        shownOn.show();
+        DisplayTest.flushEdt();
+
+        final Window typingIn = new Window("typing here", new BorderLayout());
+        typingIn.setWindowSize(400, 300);
+        TextField field = new TextField();
+        typingIn.add(BorderLayout.CENTER, field);
+        typingIn.show();
+        DisplayTest.flushEdt();
+
+        // The keyboard is only actually asked to hide on a touch device with one
+        // registered, so without both this assertion could never see anything.
+        implementation.setTouchDevice(true);
+        final int[] hidden = new int[1];
+        Display.getInstance().setDefaultVirtualKeyboard(new com.codename1.impl.VirtualKeyboardInterface() {
+            @Override
+            public String getVirtualKeyboardName() {
+                return "recording";
+            }
+
+            @Override
+            public void setInputType(int inputType) {
+            }
+
+            @Override
+            public void showKeyboard(boolean show) {
+                if (!show) {
+                    hidden[0]++;
+                }
+            }
+
+            @Override
+            public boolean isVirtualKeyboardShowing() {
+                return false;
+            }
+        });
+
+        final Dialog d = new Dialog("please wait");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("working"));
+        // Hosted implicitly, from the focused window, which is what makes resolving the
+        // host again after teardown answer with a different surface. A dialog told its
+        // host outright keeps that answer and never had the problem.
+        Desktop.getInstance().windowFocusChanged(shownOn.getWindowId(), true);
+        DisplayTest.flushEdt();
+
+        Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                d.showDialog();
+            }
+        }, "cn1-test-hosted-modal");
+        caller.start();
+        try {
+            for (int i = 0; i < 400 && d.getParent() == null; i++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            assertNotNull(d.getParent(), "precondition: the dialog is up on its host");
+
+            // The user moves to the other window and starts typing there.
+            Desktop.getInstance().windowFocusChanged(typingIn.getWindowId(), true);
+            implementation.setFocusedEditingText(field);
+            DisplayTest.flushEdt();
+            assertSame(field, Display.impl.getEditingText(),
+                    "precondition: the other window is the one being typed into");
+            hidden[0] = 0;
+
+            d.dispose();
+            for (int i = 0; i < 400 && caller.isAlive(); i++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            caller.join(2000);
+
+            assertEquals(0, hidden[0],
+                    "a dialog closing on one window must not hide another window's keyboard");
+        } finally {
+            Display.getInstance().setDefaultVirtualKeyboard(null);
+            implementation.setTouchDevice(false);
+            implementation.setFocusedEditingText(null);
+            d.dispose();
+            DisplayTest.flushEdt();
+            caller.join(2000);
+            typingIn.dispose();
+            shownOn.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }
