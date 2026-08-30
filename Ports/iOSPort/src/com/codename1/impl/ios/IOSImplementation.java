@@ -12845,7 +12845,31 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Called as part of the transition from the background to the inactive state; 
      * here you can undo many of the changes made on entering the background.
      */
+    /// The macOS twin of applicationDidBecomeActive(), which does everything it
+    /// does EXCEPT clear the minimized flag.
+    ///
+    /// Active and visible are different things on a Mac. Cmd-Tab back to an
+    /// application whose last window is still minimized and AppKit sends
+    /// didBecomeActive and no deminiaturize -- so clearing minimized there says
+    /// the application is on screen when every window is still in the Dock,
+    /// which restarts the EDT and the foreground-only behaviour like network
+    /// error dialogs for a window nobody can see. The native delegate already
+    /// declines to clear its own isAppSuspended for exactly this reason, and
+    /// this flag was contradicting it from the Java side.
+    ///
+    /// Visibility owns the flag: unhide and deminiaturize are what clear it,
+    /// the same two events the surface tracker uses. Pairs with
+    /// macApplicationWillResignActive(), which is here for the mirror-image
+    /// reason -- resigning active on a Mac does not minimize anything.
+    public static void macApplicationDidBecomeActive() {
+        applicationDidBecomeActive(false);
+    }
+
     public static void applicationDidBecomeActive() {
+        applicationDidBecomeActive(true);
+    }
+
+    private static void applicationDidBecomeActive(boolean clearMinimized) {
         callInterruptionActive = false;
         final ArrayList<Runnable> callbacks;
         synchronized(instance.onActiveListeners) {
@@ -12855,7 +12879,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             callbacks.addAll(instance.onActiveListeners);
             instance.onActiveListeners.clear();
         }
-        minimized = false;
+        if (clearMinimized) {
+            minimized = false;
+        }
         safeCallSerially(new Runnable() {
             @Override
             public void run() {

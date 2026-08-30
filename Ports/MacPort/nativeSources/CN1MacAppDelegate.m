@@ -467,7 +467,11 @@ void cn1_mac_runtime_markJavaReady(void) {
         cn1MacJavaReady = YES;
         struct ThreadLocalData* threadStateData = getThreadLocalData();
         if (cn1MacPendingActive == 1) {
-            com_codename1_impl_ios_IOSImplementation_applicationDidBecomeActive__(threadStateData);
+            // The macOS callback, like the deactivation below: this replays an
+            // activation that happened before Java was ready, and the iOS one
+            // would clear the minimized flag for a window that may still be in
+            // the Dock.
+            com_codename1_impl_ios_IOSImplementation_macApplicationDidBecomeActive__(threadStateData);
         } else if (cn1MacPendingActive == 0) {
             // The macOS callback here too, not the iOS one. This replays a
             // deactivation that happened before Java was ready -- the user
@@ -749,7 +753,15 @@ extern void CN1MacRefreshModifiers(void);
         cn1MacPendingActive = 1;
         return;
     }
-    com_codename1_impl_ios_IOSImplementation_applicationDidBecomeActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    // The macOS callback, not the iOS one, for the same reason isAppSuspended
+    // is not cleared above: the iOS one clears the framework's minimized flag
+    // unconditionally, and Cmd-Tab back to an application whose last window is
+    // still minimized sends this and no deminiaturize. That told
+    // Display.isMinimized() the application was on screen while every window
+    // was still in the Dock, restarting the EDT and the foreground-only
+    // behaviour -- network error dialogs among it -- for a window nobody could
+    // see, and contradicting the visibility tracking immediately above.
+    com_codename1_impl_ios_IOSImplementation_macApplicationDidBecomeActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 - (void)applicationWillResignActive:(NSNotification *)notification {
