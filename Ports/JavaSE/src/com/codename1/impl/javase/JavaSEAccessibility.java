@@ -80,6 +80,33 @@ final class JavaSEAccessibility {
                 Integer.valueOf(changeType));
     }
 
+    /// How many device pixels one Swing accessibility unit is on this canvas.
+    ///
+    /// The snapshot describes its nodes in the device pixels Codename One lays out in,
+    /// while Swing accessibility asks and answers in the canvas's own coordinates. On a
+    /// display with a backing scale those differ, so a reader was told each element sat
+    /// at twice its position and was twice its size, and a point it handed back for hit
+    /// testing landed at half the intended place.
+    private double scale() {
+        if (canvas instanceof JavaSEPort.C) {
+            double s = ((JavaSEPort.C) canvas).canvasScale();
+            if (s > 0) {
+                return s;
+            }
+        }
+        return 1;
+    }
+
+    /// A canvas coordinate in the pixels the snapshot is described in.
+    private int toDevice(int canvasValue) {
+        return (int) Math.round(canvasValue * scale());
+    }
+
+    /// A snapshot coordinate in the canvas coordinates Swing accessibility uses.
+    private int toCanvas(int deviceValue) {
+        return (int) Math.round(deviceValue / scale());
+    }
+
     private AccessibilityTreeSnapshot tree() {
         // This surface's tree, not the current form's. A window has its own hierarchy,
         // so a bridge that asked for the main one described the wrong window entirely.
@@ -143,8 +170,7 @@ final class JavaSEAccessibility {
         public Dimension getSize() { return canvas.getSize(); }
         public void setSize(Dimension d) { canvas.setSize(d); }
         public Accessible getAccessibleAt(Point p) {
-            Point local = new Point(p);
-            AccessibilityNodeSnapshot node = tree().getNodeAt(local.x, local.y);
+            AccessibilityNodeSnapshot node = tree().getNodeAt(toDevice(p.x), toDevice(p.y));
             return node == null ? null : accessible(node.getId());
         }
         public boolean isFocusTraversable() { return true; }
@@ -247,13 +273,14 @@ final class JavaSEAccessibility {
             public Rectangle getBounds() {
                 if (node() == null) return new Rectangle();
                 com.codename1.ui.geom.Rectangle b = node().getBounds();
-                return new Rectangle(b.getX(), b.getY(), b.getWidth(), b.getHeight());
+                return new Rectangle(toCanvas(b.getX()), toCanvas(b.getY()),
+                        toCanvas(b.getWidth()), toCanvas(b.getHeight()));
             }
             public void setBounds(Rectangle r) { }
             public Dimension getSize() { Rectangle b = getBounds(); return new Dimension(b.width, b.height); }
             public void setSize(Dimension d) { }
             public Accessible getAccessibleAt(Point p) {
-                AccessibilityNodeSnapshot n = tree().getNodeAt(p.x, p.y);
+                AccessibilityNodeSnapshot n = tree().getNodeAt(toDevice(p.x), toDevice(p.y));
                 return n == null ? null : accessible(n.getId());
             }
             public boolean isFocusTraversable() { return node() != null && node().isFocusable(); }
