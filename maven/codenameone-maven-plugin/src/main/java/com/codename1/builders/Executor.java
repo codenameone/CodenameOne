@@ -1986,6 +1986,28 @@ public abstract class Executor {
                                 }
 
                                 /**
+                                 * Models INVOKESPECIAL of a constructor: it pops
+                                 * the declared arguments and the duplicated
+                                 * object reference, leaving the one NEW pushed.
+                                 *
+                                 * <p>Modelled because javac compiles an anonymous
+                                 * SuccessCallback as NEW, DUP, INVOKESPECIAL, so
+                                 * clearing here discarded the boolean pushed
+                                 * before it and the call was reported as unknown.
+                                 * Ordinary calls stay conservative.</p>
+                                 */
+                                private void poppedConstructorArguments(String descriptor) {
+                                    int args = countArguments(descriptor);
+                                    if (args < 0 || pushedValues.size() < args + 1) {
+                                        pushedValues.clear();
+                                        return;
+                                    }
+                                    for (int i = 0; i <= args; i++) {
+                                        pushedValues.remove(pushedValues.size() - 1);
+                                    }
+                                }
+
+                                /**
                                  * Argument 0 of a call whose descriptor
                                  * declares {@code argCount} arguments, or
                                  * null when the list does not reach back
@@ -2034,7 +2056,44 @@ public abstract class Executor {
                                         pushed(Boolean.FALSE);
                                     } else if (i == Opcodes.ICONST_1) {
                                         pushed(Boolean.TRUE);
+                                    } else if (i == Opcodes.ACONST_NULL
+                                            || i == Opcodes.ICONST_M1
+                                            || i == Opcodes.ICONST_2 || i == Opcodes.ICONST_3
+                                            || i == Opcodes.ICONST_4 || i == Opcodes.ICONST_5
+                                            || i == Opcodes.LCONST_0 || i == Opcodes.LCONST_1
+                                            || i == Opcodes.FCONST_0 || i == Opcodes.FCONST_1
+                                            || i == Opcodes.FCONST_2
+                                            || i == Opcodes.DCONST_0 || i == Opcodes.DCONST_1) {
+                                        // Each pushes exactly one value that is
+                                        // not a boolean literal. Modelled rather
+                                        // than cleared: ACONST_NULL is what javac
+                                        // emits for the documented
+                                        // requestPermissions(false, null) form,
+                                        // so clearing here discarded the very
+                                        // flag this tracker exists to read and
+                                        // the call was reported as unknown.
+                                        pushed(null);
+                                    } else if (i == Opcodes.DUP) {
+                                        // Duplicates the top of stack. javac
+                                        // emits NEW, DUP, INVOKESPECIAL for an
+                                        // anonymous SuccessCallback, so this is
+                                        // the other half of the same problem.
+                                        pushed(pushedValues.isEmpty() ? null
+                                                : pushedValues.get(pushedValues.size() - 1));
+                                    } else if (i == Opcodes.POP) {
+                                        if (pushedValues.isEmpty()) {
+                                            pushedValues.clear();
+                                        } else {
+                                            pushedValues.remove(pushedValues.size() - 1);
+                                        }
                                     } else {
+                                        // Still conservative for everything with
+                                        // a wider or less obvious stack effect --
+                                        // POP2, SWAP, the DUP_X and DUP2 family,
+                                        // arithmetic, array access. An unknown
+                                        // answer costs an entitlement that is not
+                                        // needed; a WRONG one costs a
+                                        // SecurityException on a user's device.
                                         pushedValues.clear();
                                     }
                                 }
@@ -2089,11 +2148,18 @@ public abstract class Executor {
                                 @Override
                                 public void visitMethodInsn(int i, String owner, String name, String descriptor) {
                                     Boolean arg = argumentZero(descriptor);
-                                    // Conservative: the call consumed its
-                                    // arguments and may have pushed a result,
-                                    // and modelling that exactly is not worth
-                                    // the risk of a wrong answer.
-                                    pushedValues.clear();
+                                    // Conservative for an ordinary call: it
+                                    // consumed its arguments and may have pushed
+                                    // a result, and modelling that exactly is not
+                                    // worth the risk of a wrong answer. A
+                                    // constructor is the exception, because it is
+                                    // half of how javac spells an anonymous
+                                    // callback argument.
+                                    if (name != null && name.equals("<init>")) {
+                                        poppedConstructorArguments(descriptor);
+                                    } else {
+                                        pushedValues.clear();
+                                    }
                                     scanner.usesClass(owner);
                                     if (name != null && !name.equals("<init>")) {
                                         scanner.usesClassMethod(owner, name);
@@ -2107,11 +2173,18 @@ public abstract class Executor {
                                 @Override
                                 public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
                                     Boolean arg = argumentZero(descriptor);
-                                    // Conservative: the call consumed its
-                                    // arguments and may have pushed a result,
-                                    // and modelling that exactly is not worth
-                                    // the risk of a wrong answer.
-                                    pushedValues.clear();
+                                    // Conservative for an ordinary call: it
+                                    // consumed its arguments and may have pushed
+                                    // a result, and modelling that exactly is not
+                                    // worth the risk of a wrong answer. A
+                                    // constructor is the exception, because it is
+                                    // half of how javac spells an anonymous
+                                    // callback argument.
+                                    if (name != null && name.equals("<init>")) {
+                                        poppedConstructorArguments(descriptor);
+                                    } else {
+                                        pushedValues.clear();
+                                    }
                                     scanner.usesClass(owner);
                                     if (name != null && !name.equals("<init>")) {
                                         scanner.usesClassMethod(owner, name);

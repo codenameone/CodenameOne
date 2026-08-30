@@ -198,6 +198,96 @@ class ScannerBooleanArgumentTest {
                 "the true case must read as true too");
     }
 
+    /// The documented {@code requestPermissions(false, null)} form.
+    ///
+    /// javac emits ICONST_0, ACONST_NULL, then the call. ACONST_NULL used to
+    /// fall through to the catch-all that clears every tracked value, so the
+    /// flag was gone by the time the call was visited and the build reported
+    /// unknown -- which the consumer resolves as "asking for audio", giving a
+    /// camera-only app the microphone entitlement and usage description.
+    @Test
+    void aBooleanSurvivesANullArgumentAfterIt(@TempDir File dir)
+            throws Exception {
+        writeNullCallbackCaller(dir, "NullCb", false);
+        assertEquals("[requestPermissions=false]", scan(dir).toString());
+        writeNullCallbackCaller(dir, "NullCbTrue", true);
+        assertTrue(scan(dir).contains("requestPermissions=true"),
+                "the true case must read as true too");
+    }
+
+    /// The anonymous-class form.
+    ///
+    /// javac emits ICONST_0, NEW, DUP, INVOKESPECIAL &lt;init&gt;, then the
+    /// call. DUP cleared the tracked values, and the constructor cleared them
+    /// again, so this shape reported unknown for the same reason and with the
+    /// same cost as the null form.
+    @Test
+    void aBooleanSurvivesAnAnonymousCallbackBuiltAfterIt(@TempDir File dir)
+            throws Exception {
+        writeAnonymousCallbackCaller(dir, "AnonCb", false);
+        assertEquals("[requestPermissions=false]", scan(dir).toString());
+        writeAnonymousCallbackCaller(dir, "AnonCbTrue", true);
+        assertTrue(scan(dir).contains("requestPermissions=true"),
+                "the true case must read as true too");
+    }
+
+    /// {@code requestPermissions(<literal>, null)}.
+    private static void writeNullCallbackCaller(File dir, String name,
+            boolean value) throws Exception {
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "app/" + name, null,
+                "java/lang/Object", null);
+        MethodVisitor m = w.visitMethod(Opcodes.ACC_PUBLIC
+                | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        m.visitCode();
+        m.visitInsn(value ? Opcodes.ICONST_1 : Opcodes.ICONST_0);
+        m.visitInsn(Opcodes.ACONST_NULL);
+        m.visitMethodInsn(Opcodes.INVOKESTATIC, TARGET,
+                "requestPermissions", "(ZLjava/lang/Object;)V", false);
+        m.visitInsn(Opcodes.RETURN);
+        m.visitMaxs(2, 0);
+        m.visitEnd();
+        w.visitEnd();
+        writeClass(dir, name, w);
+    }
+
+    /// {@code requestPermissions(<literal>, new Object())}, which is the
+    /// NEW / DUP / INVOKESPECIAL sequence an anonymous callback compiles to.
+    private static void writeAnonymousCallbackCaller(File dir, String name,
+            boolean value) throws Exception {
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "app/" + name, null,
+                "java/lang/Object", null);
+        MethodVisitor m = w.visitMethod(Opcodes.ACC_PUBLIC
+                | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        m.visitCode();
+        m.visitInsn(value ? Opcodes.ICONST_1 : Opcodes.ICONST_0);
+        m.visitTypeInsn(Opcodes.NEW, "java/lang/Object");
+        m.visitInsn(Opcodes.DUP);
+        m.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object",
+                "<init>", "()V", false);
+        m.visitMethodInsn(Opcodes.INVOKESTATIC, TARGET,
+                "requestPermissions", "(ZLjava/lang/Object;)V", false);
+        m.visitInsn(Opcodes.RETURN);
+        m.visitMaxs(3, 0);
+        m.visitEnd();
+        w.visitEnd();
+        writeClass(dir, name, w);
+    }
+
+    /// Writes one generated class into the scanned tree.
+    private static void writeClass(File dir, String name, ClassWriter w)
+            throws Exception {
+        File pkg = new File(dir, "app");
+        assertTrue(pkg.isDirectory() || pkg.mkdirs());
+        OutputStream out = new FileOutputStream(new File(pkg, name + ".class"));
+        try {
+            out.write(w.toByteArray());
+        } finally {
+            out.close();
+        }
+    }
+
     /// {@code requestPermissions(<literal>, () -> {})}, lambda and all.
     private static void writeLambdaCaller(File dir, String name, boolean value)
             throws Exception {
