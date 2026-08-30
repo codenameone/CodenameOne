@@ -256,6 +256,36 @@ class CameraTest extends UITestBase {
         assertFalse(opened.isClosed());
     }
 
+    /// Resuming a preempted session while its successor is still open is
+    /// refused, rather than quietly putting two consumers on the camera.
+    ///
+    /// resume() reacquires the hardware immediately, and on the Apple backend
+    /// it also takes the singleton frame-callback target back -- so the running
+    /// capture's frames would start arriving at the resumed session's listener.
+    /// The documented flow resumes AFTER the capture closes, which is when the
+    /// slot has been handed back, so this refuses only the misuse.
+    @Test
+    void resumingWhileTheCaptureIsStillOpenIsRefused() {
+        install();
+        final CameraSession background = Camera.open(camera("back", CameraFacing.BACK),
+                new CameraSessionOptions());
+        background.pause();
+        CameraSession modal = Camera.open(camera("front", CameraFacing.FRONT),
+                new CameraSessionOptions());
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() {
+                background.resume();
+            }
+        });
+        // It stays paused, so nothing was half-done on the way to refusing.
+        assertTrue(background.isPaused());
+        // And once the capture closes, the documented resume works.
+        modal.close();
+        background.resume();
+        assertFalse(background.isPaused());
+        background.close();
+    }
+
     /// A session closed while it waits in the chain is skipped, not handed back.
     @Test
     void aPreemptedSessionClosedWhileWaitingIsSkipped() {

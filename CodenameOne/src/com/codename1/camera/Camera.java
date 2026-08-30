@@ -219,6 +219,31 @@ public final class Camera {
 
     // Identity comparison is intentional: only the exact CameraSession
     // instance we returned from open() may clear the active slot, so
+    /// Refuses a resume by a session that is not the one holding the slot.
+    ///
+    /// pause() and resume() never had to consult anything while sessions could
+    /// not overlap. They can now -- that is the documented pause / Capture /
+    /// resume handoff -- and resume() reacquires the hardware immediately, so a
+    /// session resumed while the capture that was let past is still open puts
+    /// two consumers on the device. On the Apple backend resume() also takes
+    /// the singleton frame-callback target back, so the running capture's
+    /// frames start arriving at the resumed session's listener.
+    ///
+    /// The invariant this keeps is the one open() already enforces: only the
+    /// ACTIVE session may hold the camera. In the documented flow the capture's
+    /// close() has already handed the slot back by the time the application
+    /// resumes, so that flow is unaffected; resuming before then is the misuse
+    /// this now names instead of silently allowing.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
+    static void requireResumable(CameraSession s) {
+        synchronized (ACTIVE_LOCK) {
+            if (active != null && active != s && !active.isClosed()) {
+                throw new IllegalStateException(
+                    "Another CameraSession is using the camera. Close it before resuming this one.");
+            }
+        }
+    }
+
     // PMD.CompareObjectsWithEquals doesn't apply.
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     static void clearActive(CameraSession s) {

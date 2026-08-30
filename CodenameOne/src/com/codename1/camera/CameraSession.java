@@ -159,6 +159,10 @@ public final class CameraSession implements AutoCloseable {
     /// Re-acquire the hardware after `#pause()`. No-op if the session is
     /// already running.
     public void resume() {
+        // Checked BEFORE the hardware is touched: resume() reacquires the
+        // device immediately, so asking afterwards would mean two sessions had
+        // already held it. See Camera.requireResumable.
+        Camera.requireResumable(this);
         impl.resume();
         paused = false;
     }
