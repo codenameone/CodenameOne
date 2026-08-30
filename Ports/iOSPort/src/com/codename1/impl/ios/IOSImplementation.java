@@ -115,6 +115,7 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.Transform;
 import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
+import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.util.AsyncResource;
@@ -2830,6 +2831,53 @@ public class IOSImplementation extends CodenameOneImplementation {
         // apps render scrollbars exactly as before.
         if ("true".equalsIgnoreCase(Display.getInstance().getProperty("desktop.interactiveScrollbars", "false"))) {
             tp.put("@interactiveScrollBool", "true");
+        }
+        injectListFocusStyle(tp);
+    }
+
+    /*
+     * Gives "ListRendererFocus" a definition, because nothing else does.
+     *
+     * List.paintFocus() draws DefaultListCellRenderer's focus Label, and that
+     * Label's UIID is "ListRendererFocus" -- a name referenced exactly once in
+     * the whole framework (where it is set) and defined by no Codename One
+     * theme. With no definition it falls back to the default style, which is an
+     * OPAQUE WHITE fill, and UIManager.resetThemeProps additionally forces a
+     * global sel#transparency of 255.
+     *
+     * Every touch port escapes that because Display.shouldRenderSelection() is
+     * false there, so the overlay is never painted -- which is why the iOS
+     * themes could go without the UIID and why Mac Catalyst, also isDesktop()
+     * but still a touch device, is unaffected by this method. Windows and Linux
+     * escape it because their own native themes give the overlay a transparent
+     * fill and a ring. The native macOS port is the first DESKTOP port to run an
+     * iOS theme, so it is the first to paint the overlay -- and in dark mode the
+     * theme's selected foreground is white, so an opaque white bar landed under
+     * white text and the selected row's label vanished. Light mode only looked
+     * right by accident: there the selected foreground is black.
+     *
+     * So the overlay is made transparent (it can never hide a row again) and
+     * given a ring instead, which is what a desktop focus indicator is. The
+     * system accent is used rather than a colour invented here, and the guard
+     * leaves any theme that does define the UIID alone.
+     */
+    private void injectListFocusStyle(Hashtable tp) {
+        // Any entry at all under the UIID means the theme has an opinion; leave it.
+        for (Object key : tp.keySet()) {
+            if (key instanceof String && ((String) key).indexOf("ListRendererFocus") > -1) {
+                return;
+            }
+        }
+        int ring = 0x007aff;
+        int darkRing = 0x0a84ff;
+        int thickness = Math.max(1, Display.getInstance().convertToPixels(0.4f));
+        for (String prefix : new String[] {"", "sel#", "press#", "dis#"}) {
+            tp.put("ListRendererFocus." + prefix + Style.TRANSPARENCY, "0");
+            tp.put("ListRendererFocus." + prefix + Style.BORDER,
+                    Border.createLineBorder(thickness, ring));
+            tp.put("$DarkListRendererFocus." + prefix + Style.TRANSPARENCY, "0");
+            tp.put("$DarkListRendererFocus." + prefix + Style.BORDER,
+                    Border.createLineBorder(thickness, darkRing));
         }
     }
 
