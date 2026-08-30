@@ -4357,7 +4357,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Whether this is the native macOS port rather than an iOS or Mac Catalyst
     /// build. Catalyst reports "ios" and is unaffected.
     private boolean isMacPlatform() {
-        return "mac".equals(getPlatformName());
+        return isMacPlatformStatic();
+    }
+
+    /// The same test, reachable from the static native callbacks.
+    private static boolean isMacPlatformStatic() {
+        return instance != null && "mac".equals(instance.getPlatformName());
     }
 
     @Override
@@ -5498,29 +5503,44 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// benefits.
     public static void macFileChooserResult(final String r) {
         dropEvents = false;
+        // Bound to the request NOW, on the thread the native answered on,
+        // rather than read later from the shared slot: by the time the EDT runs
+        // the delivery a second openFileChooser() may have replaced it, and
+        // this result would then fire the wrong listener and orphan its own.
+        final EventDispatcher target = macDequeue(macFileChooserQueue);
+        if (target != null && target == fileChooserCallback) {
+            // Nothing else has claimed the slot, so keep it in step: the shared
+            // path clears it after delivering, and leaving a fired dispatcher
+            // there would let a later stray result fire it twice.
+            fileChooserCallback = null;
+        }
         if (deliverPickerResultOnEdt(new Runnable() {
             @Override
             public void run() {
-                fileChooserResult(r);
+                fileChooserResult(r, target);
             }
         })) {
             return;
         }
-        fileChooserResult(r);
+        fileChooserResult(r, target);
     }
 
     /// @see #macFileChooserResult(String)
     public static void macCapturePictureResult(final String r) {
         dropEvents = false;
+        final EventDispatcher target = macDequeue(macCaptureQueue);
+        if (target != null && target == captureCallback) {
+            captureCallback = null;
+        }
         if (deliverPickerResultOnEdt(new Runnable() {
             @Override
             public void run() {
-                capturePictureResult(r);
+                capturePictureResult(r, target);
             }
         })) {
             return;
         }
-        capturePictureResult(r);
+        capturePictureResult(r, target);
     }
 
     /// Queues the delivery on the EDT, answering whether it took it.
@@ -5543,6 +5563,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public static void capturePictureResult(String r) {
+        capturePictureResult(r, captureCallback);
+        captureCallback = null;
+    }
+
+    /// Delivers to ONE dispatcher rather than to whichever is current. The
+    /// single-slot caller above keeps the old behaviour for iOS; the macOS
+    /// entry point passes the dispatcher of the request this result answers.
+    private static void capturePictureResult(String r, EventDispatcher captureCallback) {
         dropEvents = false;
         if(captureCallback != null) {
             if(r != null) {
@@ -5559,7 +5587,6 @@ public class IOSImplementation extends CodenameOneImplementation {
             } else {
                 captureCallback.fireActionEvent(new ActionEvent(null));
             }
-            captureCallback = null;
         }
     }
 
@@ -5567,6 +5594,12 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Callback for the native document picker.
      */
     public static void fileChooserResult(String r) {
+        fileChooserResult(r, fileChooserCallback);
+        fileChooserCallback = null;
+    }
+
+    /// @see #capturePictureResult(String, EventDispatcher)
+    private static void fileChooserResult(String r, EventDispatcher fileChooserCallback) {
         dropEvents = false;
         if(fileChooserCallback != null) {
             if(r != null) {
@@ -5578,7 +5611,6 @@ public class IOSImplementation extends CodenameOneImplementation {
             } else {
                 fileChooserCallback.fireActionEvent(new ActionEvent(null));
             }
-            fileChooserCallback = null;
         }
     }
     
@@ -5624,6 +5656,57 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private static EventDispatcher captureCallback;
     private static EventDispatcher fileChooserCallback;
+
+    /// The dispatchers of chooser requests the native has not answered yet,
+    /// oldest first. macOS only.
+    ///
+    /// The shared callbacks above are ONE slot read at DELIVERY time, which is
+    /// only sound while a request cannot be outstanding when the next is made.
+    /// It can here: openFileChooser() returns as soon as it has queued the
+    /// panel, so two calls in a single EDT turn overwrite the slot before
+    /// either answer arrives -- the first panel's selection is then delivered
+    /// to the SECOND listener and clears the slot, and the second selection
+    /// finds it null and is dropped. Neither listener hears its own result and
+    /// one hears nothing at all.
+    ///
+    /// A queue rather than a single slot, because pairing by ORDER is exactly
+    /// right on this port: the panel runs through -[NSOpenPanel runModal],
+    /// which is application modal on the main queue, so a second panel cannot
+    /// start until the first returns and the answers come back in the order the
+    /// requests were made.
+    ///
+    /// iOS keeps the single slot. Its pickers are presented rather than run
+    /// modally and its result path is the shared one; changing it belongs with
+    /// a fix to fileChooserResult/capturePictureResult where every caller
+    /// benefits, not smuggled in here.
+    private static final java.util.ArrayList<EventDispatcher> macFileChooserQueue =
+            new java.util.ArrayList<EventDispatcher>();
+    private static final java.util.ArrayList<EventDispatcher> macCaptureQueue =
+            new java.util.ArrayList<EventDispatcher>();
+
+    /// Remembers a chooser request's dispatcher so its own result can find it.
+    private static void macEnqueue(java.util.ArrayList<EventDispatcher> queue,
+            EventDispatcher dispatcher) {
+        if (!isMacPlatformStatic() || dispatcher == null) {
+            return;
+        }
+        synchronized (queue) {
+            queue.add(dispatcher);
+        }
+    }
+
+    /// The dispatcher for the oldest unanswered request, or null when there is
+    /// none -- a result the framework never asked for, which is dropped exactly
+    /// as the single-slot path dropped it.
+    private static EventDispatcher macDequeue(
+            java.util.ArrayList<EventDispatcher> queue) {
+        synchronized (queue) {
+            if (queue.isEmpty()) {
+                return null;
+            }
+            return queue.remove(0);
+        }
+    }
     
     /**
      * Captures a photo and notifies with the image data when available
@@ -5636,6 +5719,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
+        macEnqueue(macCaptureQueue, captureCallback);
         nativeInstance.captureCamera(false, 0, 0);
         dropEvents = true;
     }
@@ -5967,6 +6051,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
+        macEnqueue(macCaptureQueue, captureCallback);
         nativeInstance.captureCamera(true, getUIPickerControllerQualityType(cnst), cnst != null ? cnst.getPreferredMaxLength() : 0);
         dropEvents = true;
     }
@@ -6045,6 +6130,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
+        macEnqueue(macCaptureQueue, captureCallback);
         nativeInstance.openGallery(type);
     }
 
@@ -6052,6 +6138,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void openFileChooser(ActionListener response, String accept) {
         fileChooserCallback = new EventDispatcher();
         fileChooserCallback.addListener(response);
+        macEnqueue(macFileChooserQueue, fileChooserCallback);
         nativeInstance.openFileChooser(accept);
         dropEvents = true;
     }
