@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.components;
 
 import com.codename1.junit.FormTest;
@@ -7,7 +29,9 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 
 import java.lang.reflect.Method;
@@ -272,5 +296,32 @@ class ToastBarTest extends UITestBase {
 
         cleanupToastBar(c);
         tb.useFormLayeredPane(false);
+    }
+    @FormTest
+    void theKeyboardGapGoesWhenTheKeyboardDoes() throws Exception {
+        // The gap left for the keyboard was written when it applied and never taken off,
+        // so it outlived the keyboard: under a bar moved to the top, and under one left
+        // at the bottom once the keyboard had gone -- blank space standing for nothing.
+        Form host = new Form("host", new BorderLayout());
+        host.show();
+        DisplayTest.flushEdt();
+        host.setOverrideInvisibleAreaUnderVKB(120);
+
+        ToastBar tb = ToastBar.getInstance();
+        tb.setPosition(Component.BOTTOM);
+        Container c = invokeGetToastBarComponent(tb);
+        assertNotNull(c, "precondition: the bar was built");
+        assertEquals(120, c.getStyle().getMarginBottom(),
+                "precondition: the keyboard's gap is under the bar");
+
+        // The keyboard goes away and the bar is asked for again.
+        host.setOverrideInvisibleAreaUnderVKB(0);
+        c = invokeGetToastBarComponent(tb);
+
+        assertEquals(0, c.getStyle().getMarginBottom(),
+                "the gap has to go when the keyboard does");
+
+        cleanupToastBar(c);
+        DisplayTest.flushEdt();
     }
 }

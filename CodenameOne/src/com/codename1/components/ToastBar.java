@@ -557,6 +557,13 @@ public final class ToastBar {
             s.setPaddingBottom(0);
             c.safeAreaPaddingBottom = 0;
         }
+        // And the gap left for the keyboard, which belongs to the bottom edge just as
+        // much as the inset does.
+        if (c.keyboardMarginBottom > 0) {
+            s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
+            s.setMarginBottom(0);
+            c.keyboardMarginBottom = 0;
+        }
         parent.removeComponent(c);
         parent.addComponent(want, c);
         parent.revalidateLater();
@@ -846,11 +853,17 @@ public final class ToastBar {
             // The host's safe area and height. A window has no notch of its own, and
             // its height is what the toast has to sit inside.
             Rectangle safeArea = f.getSafeArea();
-            // PMD Fix (CollapsibleIfStatements): Combine nested position checks to simplify the layout adjustments.
-            if (position == Component.BOTTOM && f.getInvisibleAreaUnderVKB() > 0) {
+            // Written when it applies and taken off when it stops. Only the "applies"
+            // half was here, so the gap the keyboard needed outlived the keyboard: it
+            // stayed under a bar moved to the top, and stayed under one left at the
+            // bottom once the keyboard had gone, in both cases as blank space no longer
+            // standing for anything.
+            int keyboardMargin = position == Component.BOTTOM ? f.getInvisibleAreaUnderVKB() : 0;
+            if (keyboardMargin > 0 || c.keyboardMarginBottom > 0) {
                 Style s = c.getAllStyles();
                 s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
-                s.setMarginBottom(f.getInvisibleAreaUnderVKB());
+                s.setMarginBottom(keyboardMargin);
+                c.keyboardMarginBottom = keyboardMargin;
             }
             int safeBottomMargin = (f instanceof Window
                         ? f.asContainer().getHeight()
@@ -1241,6 +1254,8 @@ public final class ToastBar {
         /// both -- taller than it should be and inset away from the edge it now sits at.
         int safeAreaPaddingTop;
         int safeAreaPaddingBottom;
+        /// The keyboard margin this class has written, so it can be taken off again.
+        int keyboardMarginBottom;
         Button leadButton = new Button();
         private TextArea label;
         private Status currentlyShowing;
