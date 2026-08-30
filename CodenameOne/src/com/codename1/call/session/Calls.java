@@ -1441,5 +1441,30 @@ public final class Calls {
         synchronized (SESSIONS) {
             SESSIONS.clear();
         }
+        // PENDING_STARTS too, and answered rather than merely dropped.
+        //
+        // A test that defers a START action and resets without answering it
+        // used to leave the action in this map with its safety timer still
+        // running. Both outlive the reset, and both address a call by id or
+        // by token -- and the next test gets a fresh LocalCallBridge whose
+        // tokens restart at 1, so a stale report or a stale timer could
+        // claim or fail an action belonging to a test that had not started
+        // when it was created. That makes the suite order-dependent, which
+        // is the shape a "flaky" test usually turns out to have.
+        //
+        // Answered false because the start was not carried out: the action
+        // is settled, so its watchdog finds it answered and does nothing,
+        // and nothing is left for a later test to inherit.
+        CallAction[] stranded;
+        synchronized (PENDING_STARTS) {
+            stranded = PENDING_STARTS.values().toArray(
+                    new CallAction[PENDING_STARTS.size()]);
+            PENDING_STARTS.clear();
+        }
+        for (CallAction a : stranded) {
+            if (!a.isAnswered()) {
+                a.answer(false);
+            }
+        }
     }
 }
