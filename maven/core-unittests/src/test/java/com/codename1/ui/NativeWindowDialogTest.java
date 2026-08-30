@@ -1592,4 +1592,42 @@ class NativeWindowDialogTest extends UITestBase {
         id.dispose();
         DisplayTest.flushEdt();
     }
+    @FormTest
+    void switchingAnInteractionDialogsModeEndsTheShowingItHad() {
+        // The mode is read when the dialog is shown, so a caller that changes it while
+        // one is up and shows again had both alive: the payload went into the
+        // lightweight layer while the operating system window stayed on screen and
+        // empty, and nativeWindow was still set so the next dispose took the native
+        // path and never tore the layer down.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        id.add(BorderLayout.CENTER, new Label("body"));
+        id.setNativeWindowMode(true);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+
+        Window w = id.getNativeWindow();
+        assertNotNull(w, "precondition: it opened a window");
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+
+        // The same dialog shown again, now asking for the lightweight representation.
+        id.setNativeWindowMode(false);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+
+        assertNull(id.getNativeWindow(),
+                "the dialog must not still be holding a window it is no longer in");
+        assertTrue(peer.isDisposed(),
+                "and the window it left has to be gone, not on screen and empty");
+        assertNotNull(id.getParent(), "while the dialog itself is in the layer now");
+
+        id.dispose();
+        DisplayTest.flushEdt();
+        assertNull(id.getParent(), "and dispose has to take the layered showing down");
+    }
 }

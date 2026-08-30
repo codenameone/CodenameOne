@@ -507,6 +507,30 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
     }
 
+    /// Ends a showing that is still up in the representation this one is not using.
+    ///
+    /// The mode is read when the dialog is shown, so a caller that changes it while the
+    /// dialog is up and shows again would otherwise leave both alive. Going to the
+    /// lightweight layer reparented the payload and left the operating system window on
+    /// screen and empty, with `nativeWindow` still set -- so the next `#dispose()` took
+    /// the native path and never tore the layer down. Going the other way pulled a live
+    /// lightweight dialog out of its layer while it still counted as showing, so the
+    /// pointer listeners it had given its host were never reclaimed.
+    ///
+    /// `#dispose()` already knows how to end either one, so this only decides whether
+    /// there is a mismatched showing to end.
+    ///
+    /// #### Parameters
+    ///
+    /// - `wantsNative`: true when this showing is about to open its own window
+    private void finishShowingInOtherMode(boolean wantsNative) {
+        boolean showingNative = nativeWindow != null;
+        boolean showingLightweight = !showingNative && getParent() != null;
+        if ((showingNative && !wantsNative) || (showingLightweight && wantsNative)) {
+            dispose();
+        }
+    }
+
     /// Puts a native-window dialog on its owner's display, centred.
     private static void placeNativeWindow(Window w, TopLevelContainer host) {
         if (host != null) {
@@ -804,8 +828,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// - `right`: space in pixels between the right of the screen and the form
     public void show(int top, int bottom, int left, int right) {
         getUnselectedStyle().setOpacity(255);
+        boolean wantsNative = usesNativeWindow();
+        finishShowingInOtherMode(wantsNative);
         disposed = false;
-        if (usesNativeWindow()) {
+        if (wantsNative) {
             showInNativeWindow(false);
             return;
         }
@@ -1946,6 +1972,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
             // Real window modality rather than the polling loop below: the framework
             // blocks input for it and the caller is parked properly instead of waking
             // every ten milliseconds to ask again.
+            finishShowingInOtherMode(true);
             disposed = false;
             getUnselectedStyle().setOpacity(255);
             showInNativeWindow(true);
