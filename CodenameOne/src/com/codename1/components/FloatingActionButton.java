@@ -390,22 +390,51 @@ public class FloatingActionButton extends Button {
 
     @Override
     protected void fireActionEvent(int x, int y) {
-        // This button's own top level, not the process-wide current form. A button in a
-        // secondary window would otherwise dispose a dialog showing on the main window
-        // -- activating a window does not change Display.getCurrent(), so the dialog it
-        // closed had nothing to do with the click.
-        TopLevelContainer top = getTopLevelContainer();
-        if (top instanceof Dialog) {
-            ((Dialog) top).dispose();
-        } else if (top == null || top instanceof Form) {
-            Form current = Display.getInstance().getCurrent();
-            if (current instanceof Dialog) {
-                ((Dialog) current).dispose();
+        // The dialog this button is actually inside, found by walking up rather than by
+        // asking for the top level. A hosted dialog is parented in its window's layered
+        // pane, so the top level is that window and the dialog around the button was
+        // never seen: the button fired and left the dialog -- and a caller blocked on it
+        // -- open.
+        Dialog enclosing = enclosingDialog(this);
+        if (enclosing != null) {
+            enclosing.dispose();
+        } else {
+            // Nothing encloses it, so the only dialog it can mean is one showing over
+            // its own surface. Its own, not the process-wide current form: a button in a
+            // secondary window would otherwise dispose a dialog on the main window --
+            // activating a window does not change Display.getCurrent(), so the dialog it
+            // closed had nothing to do with the click.
+            TopLevelContainer top = getTopLevelContainer();
+            if (top == null || top instanceof Form) {
+                Form current = Display.getInstance().getCurrent();
+                if (current instanceof Dialog) {
+                    ((Dialog) current).dispose();
+                }
             }
         }
         super.fireActionEvent(x, y);
     }
 
+
+    /// The nearest dialog this component sits inside, if any.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component to walk up from
+    ///
+    /// #### Returns
+    ///
+    /// the enclosing dialog, or null when nothing encloses it
+    private static Dialog enclosingDialog(Component c) {
+        Component probe = c;
+        while (probe != null) {
+            if (probe instanceof Dialog) {
+                return (Dialog) probe;
+            }
+            probe = probe.getParent();
+        }
+        return null;
+    }
 
     @Override
     public void released(int x, int y) {

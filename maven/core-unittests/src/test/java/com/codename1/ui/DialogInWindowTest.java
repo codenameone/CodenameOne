@@ -2647,4 +2647,39 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aFloatingActionButtonInsideAHostedDialogClosesIt() {
+        // The button looks for the dialog to close by asking for its top level. A hosted
+        // dialog is parented in its window's layered pane, so that answer is the window
+        // and the dialog around the button was never found: it fired its action and left
+        // the dialog -- and anyone blocked on it -- open.
+        final Window w = openHost(600, 500);
+        final int[] fired = new int[1];
+
+        Dialog d = new Dialog("hosted");
+        d.setLayout(new BorderLayout());
+        com.codename1.components.FloatingActionButton fab =
+                com.codename1.components.FloatingActionButton.createFAB(
+                        com.codename1.ui.FontImage.MATERIAL_ADD);
+        fab.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired[0]++;
+            }
+        });
+        d.add(BorderLayout.CENTER, fab);
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(w, d), "precondition: the dialog is up on the window");
+
+        fab.released(fab.getAbsoluteX() + 1, fab.getAbsoluteY() + 1);
+        DisplayTest.flushEdt();
+
+        assertEquals(1, fired[0], "the button still fires its own action");
+        assertTrue(d.isDisposed(), "and the dialog it sits inside has to close with it");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }
