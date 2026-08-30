@@ -2232,7 +2232,33 @@ void codenameOneGCMark() {
                 // TRUE once the cooperative handshake below gave up and froze this
                 // thread with a signal instead. It changes what the rest of this
                 // iteration may touch -- see each use.
+                //
+                // WHAT A HELD FREEZE FORBIDS. The thread is stopped at an arbitrary
+                // instruction, so it may own ANY lock a mutator can hold -- the libc
+                // allocator's, stdio's, os_log's, criticalSection. Nothing between the
+                // freeze and cn1GcMarkReleaseForced may block on one of those, or the
+                // collector waits for a thread that cannot run until the collector
+                // releases it: the same permanent wedge this whole change exists to
+                // remove, just rarer and harder to place. Note this is not only about
+                // how long a mutator holds such a lock -- there is a window between the
+                // last threadActive read and the signal landing in which the target can
+                // enter any of that code, so "it would have to be unlucky" is not an
+                // argument. Every step below is therefore classified:
+                //
+                //   pending migration ....... TAKES criticalSection -> skipped entirely
+                //   aggressive-allocator hold allocates + logs      -> skipped entirely
+                //   root snapshot rebuild ... reallocs              -> skipped (built pre-freeze)
+                //   precise stack scan ...... resolve + mark bit    -> SAFE, lock-free
+                //   native stack scan ....... resolve + mark bit    -> SAFE, lock-free
+                //   this escalation's log ... stdio / os_log        -> DEFERRED past release
+                //
+                // The mark worklist mutex is fine to take: only collector threads ever
+                // hold it, so a frozen mutator can never be the owner.
                 JAVA_BOOLEAN forcedStop = JAVA_FALSE;
+                // Deferred report for the escalation (see above). Zero means nothing to
+                // report; the values are captured under the freeze and printed after it.
+                long long forcedStopWaitUs = 0;
+                long forcedStopSeq = 0;
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
                 // PHASE 3b: demand a FRESH native-stack capture this round. Only a
@@ -2332,16 +2358,18 @@ void codenameOneGCMark() {
                                 // mutator to make progress is abnormal, and the reason
                                 // issue #5537 took so long to place is that this loop had
                                 // nothing to say for itself.
+                                //
+                                // CAPTURED here, PRINTED after the release. NSLog and
+                                // fprintf both take locks a frozen mutator can be holding
+                                // (os_log's, stdio's, and malloc's underneath either), so
+                                // logging here would deadlock the collector against the
+                                // very thread it just stopped. Counting is two integer
+                                // stores and is safe.
                                 static long cn1GcForcedStops = 0;   // GC thread only
                                 cn1GcForcedStops++;
                                 if((cn1GcForcedStops & (cn1GcForcedStops - 1)) == 0) {
-#if defined(__OBJC__)
-                                    NSLog(@"[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)",
-                                          (int)t->threadId, totalwait, cn1GcForcedStops);
-#else
-                                    fprintf(stderr, "[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)\n",
-                                            (int)t->threadId, totalwait, cn1GcForcedStops);
-#endif
+                                    forcedStopSeq = cn1GcForcedStops;
+                                    forcedStopWaitUs = totalwait;
                                 }
                                 // threadActive is still TRUE and stays that way -- the
                                 // thread is frozen, not parked. Everything below reads
@@ -2370,41 +2398,56 @@ void codenameOneGCMark() {
 #ifdef CN1_GC_CONFORM
                 long long __mg0 = cn1GcNowNs();
 #endif
-                lockCriticalSection();
-                // A force-stopped thread is SKIPPED here, and its heapAllocationSize is
-                // left alone below. The append is `pending[size] = o; size++`, so a thread
-                // frozen between those two stores has an object in the table that the
-                // count does not cover yet: migrating [0,size), zeroing those slots and
-                // resetting size to 0 would leave that object referenced by nothing the
-                // collector ever walks, and the thread's own `size++` on resume would then
-                // hand the next allocation a slot the migration had already emptied. The
-                // table is not a root source -- it only decides which objects the SWEEP
-                // may consider -- so leaving it intact for one cycle costs a deferred
-                // reclaim and nothing else. It also cannot grow without bound: a table
-                // over its threshold parks its own thread at a safepoint, which is the
-                // cooperative stop this escalation was standing in for.
-                if(allThreads[iter] == t && !forcedStop) {
-                    if (!t->lightweightThread) {
-                        // For native threads, we need to actually lock them while we traverse the
-                        // heap allocations because we can't use the usual locking mechanisms on
-                        // them.
-                        lockThreadHeapMutex();
-                    }
-                    for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
-                        JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
-                        if(obj) {
-                            t->pendingHeapAllocations[heapTrav] = 0;
-                            placeObjectInHeapCollection(obj);
-#ifdef CN1_GC_CONFORM
-                            cn1GcMigrated++;
-#endif
+                // A force-stopped thread skips this ENTIRELY -- the lock included, not
+                // just the body. Two independent reasons, and the first one is fatal:
+                //
+                // 1. lockCriticalSection() would BLOCK. The frozen thread is stopped at an
+                //    arbitrary instruction and may hold this very mutex (markDeadThread,
+                //    monitorEnter's monitor-creation branch, placeObjectInHeapCollection
+                //    all take it), and it cannot release it until this cycle releases the
+                //    freeze -- which happens after this point. Guarding only the body,
+                //    which is what this did first, still takes the lock and still
+                //    deadlocks. There is also no "it is only held briefly" defence: the
+                //    target can enter that code in the window between the last
+                //    threadActive read and the signal landing.
+                // 2. Migrating would be wrong anyway. The append is `pending[size] = o;
+                //    size++`, so a thread frozen between those two stores has an object in
+                //    the table that the count does not cover yet: migrating [0,size),
+                //    zeroing those slots and resetting size to 0 would leave that object
+                //    referenced by nothing the collector ever walks, and the thread's own
+                //    `size++` on resume would hand the next allocation a slot the
+                //    migration had already emptied.
+                //
+                // The table is not a root source -- it only decides which objects the
+                // SWEEP may consider -- so leaving it intact for one cycle costs a
+                // deferred reclaim and nothing else. It cannot grow without bound either:
+                // a table over its threshold parks its own thread at a safepoint, which is
+                // the cooperative stop this escalation was standing in for.
+                if(!forcedStop) {
+                    lockCriticalSection();
+                    if(allThreads[iter] == t) {
+                        if (!t->lightweightThread) {
+                            // For native threads, we need to actually lock them while we traverse the
+                            // heap allocations because we can't use the usual locking mechanisms on
+                            // them.
+                            lockThreadHeapMutex();
+                        }
+                        for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
+                            JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
+                            if(obj) {
+                                t->pendingHeapAllocations[heapTrav] = 0;
+                                placeObjectInHeapCollection(obj);
+    #ifdef CN1_GC_CONFORM
+                                cn1GcMigrated++;
+    #endif
+                            }
+                        }
+                        if (!t->lightweightThread) {
+                            unlockThreadHeapMutex();
                         }
                     }
-                    if (!t->lightweightThread) {
-                        unlockThreadHeapMutex();
-                    }
+                    unlockCriticalSection();
                 }
-                unlockCriticalSection();
 #ifdef CN1_GC_CONFORM
                 cn1GcMigrateNs += cn1GcNowNs() - __mg0;
 #endif
@@ -2413,11 +2456,20 @@ void codenameOneGCMark() {
                 
                 JAVA_INT allocSize = t->heapAllocationSize;
                 JAVA_BOOLEAN agressiveAllocator = JAVA_FALSE;
+                // Skipped under a held freeze, with the diagnostic below it. get_free_memory()
+                // and NSLog both take locks the stopped thread may own, and the EDT is a
+                // perfectly ordinary candidate for the escalation -- a long computation on
+                // the event thread is exactly the shape issue #5537 reported. The hold
+                // decision is also meaningless here: allocSize is read from a table this
+                // cycle deliberately did not migrate, so it describes the previous cycle's
+                // backlog rather than what this thread just produced.
 #ifndef CN1_NO_AGGRESSIVE_HOLD
-                if (isEdt(t->threadId) && !lowMemoryMode) {
-                    agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD_EDT;
-                } else {
-                    agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD;
+                if(!forcedStop) {
+                    if (isEdt(t->threadId) && !lowMemoryMode) {
+                        agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD_EDT;
+                    } else {
+                        agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD;
+                    }
                 }
 #endif
                 if (CN1_EDT_THREAD_ID == t->threadId && agressiveAllocator) {
@@ -2526,6 +2578,20 @@ void codenameOneGCMark() {
                 if(forcedStop) {
                     cn1GcMarkReleaseForced(t);
                     forcedStop = JAVA_FALSE;
+                }
+                // Only now, with the thread running again, is it safe to take a logging
+                // lock: until the release the target could have owned os_log's, stdio's or
+                // malloc's, and printing would have hung the collector on the thread it
+                // had just stopped. Captured at the escalation, printed here.
+                if(forcedStopSeq != 0) {
+#if defined(__OBJC__)
+                    NSLog(@"[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)",
+                          (int)t->threadId, forcedStopWaitUs, forcedStopSeq);
+#else
+                    fprintf(stderr, "[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)\n",
+                            (int)t->threadId, forcedStopWaitUs, forcedStopSeq);
+#endif
+                    forcedStopSeq = 0;
                 }
 #endif
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
