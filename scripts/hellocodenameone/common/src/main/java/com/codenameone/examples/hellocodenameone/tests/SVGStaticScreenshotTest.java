@@ -53,15 +53,6 @@ public class SVGStaticScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() throws Exception {
-        // Skipped on the native macOS port, which renders this frame
-        // wrongly. A DEFECT, not a capability the port lacks; the reason
-        // code is documented in port_status_supplement.json and both must
-        // be deleted when the rendering is fixed.
-        if ("mac".equals(com.codename1.ui.Display.getInstance().getPlatformName())) {
-            System.out.println("CN1SS:INFO:test=SVGStatic status=SKIPPED reason=macos-svg-curved-shapes");
-            done();
-            return true;
-        }
         // Runs on the JS port now too: the build-time SVG transcoder generates
         // com.codename1.generated.svg.SVGRegistry, and the JS launcher calls
         // installGlobal() at startup (see JavaScriptBuilder.writeLauncher), so the

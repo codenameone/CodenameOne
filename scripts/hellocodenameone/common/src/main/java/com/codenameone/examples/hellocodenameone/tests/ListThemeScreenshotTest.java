@@ -30,24 +30,6 @@ import com.codename1.ui.layouts.Layout;
 
 public class ListThemeScreenshotTest extends DualAppearanceBaseTest {
 
-    /// Skipped on the native macOS port, which renders this frame wrongly.
-    ///
-    /// The focused row is painted as a solid bar that hides its text, where Linux draws a focus outline and a touch port never focuses the list at all.
-    ///
-    /// A DEFECT, not a capability the port lacks, and skipped rather than given
-    /// a golden because a golden is the assertion that the pixels are right.
-    /// Delete this override and the port_status_supplement entry together when
-    /// the rendering is fixed.
-    @Override
-    public boolean runTest() {
-        if ("mac".equals(com.codename1.ui.Display.getInstance().getPlatformName())) {
-            System.out.println("CN1SS:INFO:test=ListTheme status=SKIPPED reason=macos-list-selection-fill");
-            skipAppearances();
-            return true;
-        }
-        return super.runTest();
-    }
-
     @Override
     protected String baseName() {
         return "ListTheme";

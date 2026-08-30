@@ -68,32 +68,6 @@ import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreensho
 // render swamps the outline entirely.
 public class ClipUnderRotation extends AbstractGraphicsScreenshotTest {
 
-    /// Skipped on the native macOS port, which fails this exact case.
-    ///
-    /// The two DIRECT-to-screen cells fill edge to edge while the two
-    /// mutable-image cells beside them clip correctly -- Bug B in the class
-    /// documentation above, the polygon clip dropped on the screen path. It is
-    /// a defect in that port, not a capability it lacks: every other clipping
-    /// test passes there, and iOS Metal, iOS GL, Mac Catalyst and Linux all
-    /// render this frame correctly.
-    ///
-    /// Skipped rather than given a golden, because a golden IS the assertion
-    /// that the pixels are right and this one's are not -- storing it would
-    /// make the suite certify the bug for as long as it stood. The reason code
-    /// is documented in port_status_supplement.json so the public table shows
-    /// the gap instead of a silent pass, and BOTH must be deleted when the
-    /// rasteriser is fixed.
-    @Override
-    public boolean runTest() {
-        if ("mac".equals(com.codename1.ui.Display.getInstance().getPlatformName())) {
-            System.out.println("CN1SS:INFO:test=ClipUnderRotation "
-                    + "status=SKIPPED reason=macos-polygon-clip-defect");
-            done();
-            return true;
-        }
-        return super.runTest();
-    }
-
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
         int x = bounds.getX();
