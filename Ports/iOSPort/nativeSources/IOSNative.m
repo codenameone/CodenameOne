@@ -15031,6 +15031,19 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
             container = (UIView *)[[CodenameOne_GLViewController instance] eaglView];
         }
         if (container == nil) return;
+        /* The backing scale of the display this surface is on, which is not the process
+         * global one as soon as a window is dragged to a second monitor: the bounds
+         * arrive in the device pixels Codename One laid them out in, and dividing them
+         * by the main screen's scale then hands VoiceOver hit regions that are shifted
+         * and the wrong size. Only Mac Catalyst can have a window on another display, so
+         * the iOS slice keeps the value it always used. */
+        CGFloat cn1Scale = scaleValue <= 0 ? [UIScreen mainScreen].scale : scaleValue;
+#if TARGET_OS_MACCATALYST
+        UIScreen *cn1Screen = container.window.screen;
+        if (cn1Screen != nil && cn1Screen.scale > 0) {
+            cn1Scale = cn1Screen.scale;
+        }
+#endif
         NSMutableArray *elements = [NSMutableArray arrayWithCapacity:[nodes count]];
         NSMutableDictionary *elementsById = [NSMutableDictionary dictionary];
         if (cn1AccessibilityLiveValues == nil) cn1AccessibilityLiveValues = [[NSMutableDictionary alloc] init];
@@ -15049,12 +15062,11 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
             element.accessibilityViewIsModal = [CN1JSONValue(node, @"modal") boolValue];
             NSArray *bounds = [node objectForKey:@"bounds"];
             if ([bounds count] == 4) {
-                CGFloat scale = scaleValue <= 0 ? [UIScreen mainScreen].scale : scaleValue;
                 element.accessibilityFrameInContainerSpace = CGRectMake(
-                        [[bounds objectAtIndex:0] doubleValue] / scale,
-                        [[bounds objectAtIndex:1] doubleValue] / scale,
-                        [[bounds objectAtIndex:2] doubleValue] / scale,
-                        [[bounds objectAtIndex:3] doubleValue] / scale);
+                        [[bounds objectAtIndex:0] doubleValue] / cn1Scale,
+                        [[bounds objectAtIndex:1] doubleValue] / cn1Scale,
+                        [[bounds objectAtIndex:2] doubleValue] / cn1Scale,
+                        [[bounds objectAtIndex:3] doubleValue] / cn1Scale);
             }
             NSMutableArray *custom = [NSMutableArray array];
             for (NSDictionary *action in element.cn1Actions) {
