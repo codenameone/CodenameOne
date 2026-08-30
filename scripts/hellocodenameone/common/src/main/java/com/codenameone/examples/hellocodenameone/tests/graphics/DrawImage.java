@@ -18,6 +18,25 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
     private FontImage fontImage;
     private Image scaled;
 
+    /// How many repaints are still allowed while waiting for an asynchronous
+    /// decode. Bounded so a picture that never decodes fails the comparison
+    /// instead of repainting for ever: a wedged suite reports nothing, a wrong
+    /// frame at least says what is wrong.
+    private int decodeRepaintsLeft = 60;
+
+    /// Whether the pictures whose decode is asynchronous are ready to draw.
+    ///
+    /// Image.createImage(byte[]) hands the browser encoded bytes and the
+    /// JavaScript port decodes them on an HTMLImageElement "load" event, so one
+    /// created during a paint cannot be drawn in that same paint. Until it is
+    /// ready the port answers a placeholder size, which is what this reads.
+    /// Every other port decodes synchronously and answers true on the first
+    /// call.
+    private boolean asyncImagesReady(int size) {
+        return fromBytes != null && encoded != null
+                && fromBytes.getWidth() == size && encoded.getWidth() == size;
+    }
+
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
         int size = bounds.getWidth() / 4;
@@ -35,6 +54,21 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
             fromBytes = Image.createImage(encoded.getImageData(), 0, encoded.getImageData().length);
             fontImage = FontImage.createFixed("" + FontImage.MATERIAL_ALARM_ON, FontImage.getMaterialDesignFont(), 0xff0000, size, size, 2);
             scaled = mutable.scaled(size * 2, size * 2).scaled(size, size);
+        }
+        // The mutable-image variants render into a FRESH image on every paint so
+        // a first-paint transient can heal (see AbstractGraphicsScreenshotTest).
+        // That only helps if something repaints AFTER the decode finishes, and
+        // nothing else will: the form is settled and the capture is next. So ask
+        // for another paint while the asynchronous pictures are still not ready.
+        // This is what made graphics-draw-image-rect differ between runs -- the
+        // bottom half, which is the two mutable-image variants, captured
+        // whatever had decoded by the first paint.
+        if (!asyncImagesReady(size) && decodeRepaintsLeft > 0) {
+            decodeRepaintsLeft--;
+            com.codename1.ui.Form current = com.codename1.ui.Display.getInstance().getCurrent();
+            if (current != null) {
+                current.repaint();
+            }
         }
         int yBound = bounds.getY();
         g.drawImage(mutable, bounds.getX(), yBound);
