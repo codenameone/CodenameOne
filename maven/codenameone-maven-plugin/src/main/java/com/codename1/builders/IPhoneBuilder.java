@@ -1855,6 +1855,28 @@ public class IPhoneBuilder extends Executor {
         return java.util.Collections.singletonList(watchMain);
     }
 
+
+    /**
+     * Whether an explicit {@code ios.includePush} turns push OFF.
+     *
+     * <p>The exact complement of the normalisation this class performs on the
+     * same hint: anything that is not a trimmed, case-insensitive
+     * {@code "true"} is rewritten to {@code "false"}, so {@code " false "},
+     * {@code "0"} and {@code "no"} all disable push. A conflict check that
+     * compared against the literal {@code "false"} caught none of them.</p>
+     *
+     * <p>Extracted so the rule can be tested. It lives inside a build method
+     * that needs a signing identity and a provisioning profile to reach,
+     * which is why the hole was open long enough to be reported rather than
+     * caught: nothing could exercise the decision on its own.</p>
+     *
+     * @param hint the raw hint, or null when the project did not set one
+     * @return true when the project explicitly disabled push
+     */
+    static boolean pushExplicitlyDisabled(String hint) {
+        return hint != null && !"true".equalsIgnoreCase(hint.trim());
+    }
+
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         // Builder instances are normally single-use, but keep scan-derived
@@ -4097,11 +4119,23 @@ public class IPhoneBuilder extends Executor {
         // something deliberate, and quietly ignoring it would ship a build
         // that disagrees with its own configuration. The way out is to
         // remove the hint or to stop referencing the package.
-        if (usesCallVoip && "false".equalsIgnoreCase(
+        // NOT normalised, and NOT a literal "false". The normalisation
+        // above rewrites any explicit value that is not a trimmed,
+        // case-insensitive "true" into "false", so " false ", "0" and
+        // "no" all disable push -- and a check comparing against the
+        // literal caught none of them. In the daemon the same check
+        // runs BEFORE that normalisation, so it saw the raw value and
+        // the hole was open there for every spelling.
+        //
+        // The predicate is the exact complement of the normalisation
+        // rather than a list of the values it rejects, so the two
+        // cannot come to disagree and the check does not depend on
+        // which of them runs first.
+        if (usesCallVoip && pushExplicitlyDisabled(
                 request.getArg("ios.includePush", null))) {
             throw new BuildException("This app uses com.codename1.call.voip,"
                     + " which rings through a VoIP push, but ios.includePush"
-                    + " is false. The build would carry PushKit and the voip"
+                    + " does not read as true. The build would carry PushKit and the voip"
                     + " background mode with no push entitlement, so no"
                     + " incoming call could ever arrive. Remove"
                     + " ios.includePush=false, or stop referencing"

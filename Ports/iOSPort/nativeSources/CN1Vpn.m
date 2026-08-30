@@ -1270,9 +1270,41 @@ static void cn1vpLoadTunnelManager(void (^done)(NETunnelProviderManager *m,
             done(nil, error);
             return;
         }
-        NETunnelProviderManager *m = [managers count] > 0
-                ? [managers objectAtIndex:0]
-                : [[[NETunnelProviderManager alloc] init] autorelease];
+        // MATCHED by provider identifier, not taken by position. This used
+        // to hand back managers[0], which is this app's tunnel only when
+        // this app has exactly one saved configuration. An app that also
+        // embeds another VPN extension -- an SDK's, or its own second one --
+        // has more, and the order is the platform's to choose: a start then
+        // overwrote somebody else's configuration with ours, and a stop
+        // after a process restart stopped their tunnel while leaving this
+        // extension running.
+        //
+        // The identifier is the same one the start writes into
+        // providerBundleIdentifier, read from the same plist key, so the
+        // question asked here is exactly "is this the manager we install".
+        NSString *ours = cn1vpPlistString(@"CN1VpnTunnelExtensionIdentifier");
+        NETunnelProviderManager *m = nil;
+        for (NSUInteger i = 0; i < [managers count]; i++) {
+            NETunnelProviderManager *candidate =
+                    [managers objectAtIndex:(NSUInteger)i];
+            NEVPNProtocol *proto = candidate.protocolConfiguration;
+            if (![proto isKindOfClass:[NETunnelProviderProtocol class]]) {
+                continue;
+            }
+            NSString *identifier =
+                    ((NETunnelProviderProtocol *)proto).providerBundleIdentifier;
+            if ([ours length] > 0 && [ours isEqualToString:identifier]) {
+                m = candidate;
+                break;
+            }
+        }
+        if (m == nil) {
+            // None of ours saved yet. A FRESH one rather than somebody
+            // else's: the start fills in its protocol and saves it, and the
+            // stop finds a connection that is already disconnected, which is
+            // the right answer for a tunnel this app has never installed.
+            m = [[[NETunnelProviderManager alloc] init] autorelease];
+        }
         done(m, nil);
     }];
 }
