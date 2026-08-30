@@ -1352,4 +1352,99 @@ class NativeWindowDialogTest extends UITestBase {
         id.dispose();
         DisplayTest.flushEdt();
     }
+    @FormTest
+    void hidingTheWindowUnderAModalDialogStillReleasesIt() throws Exception {
+        // hide() ends the modal wait exactly as dispose() does -- isModalFinished()
+        // reads both -- so a caller that hides the window getNativeWindow() handed it
+        // reaches the end of the show with the window still alive. Detaching the
+        // payload is not enough there: the peer stays registered with its owner, once
+        // per showing, for a dialog nobody can reach any more.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        final Dialog d = newDialog("hidden away");
+        d.setNativeWindowMode(true);
+        Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                d.showDialog();
+            }
+        }, "cn1-test-native-dialog-hide");
+        caller.start();
+        try {
+            for (int i = 0; i < 400; i++) {
+                Window probe = d.getNativeWindow();
+                if (probe != null && probe.isWindowShowing()) {
+                    break;
+                }
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            Window w = d.getNativeWindow();
+            assertNotNull(w, "precondition: the dialog opened a window");
+            TestWindowManager.FakeWindow peer = wm.getLastWindow();
+            assertNotNull(peer);
+
+            w.hide();
+            for (int i = 0; i < 400 && caller.isAlive(); i++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            caller.join(2000);
+            assertFalse(caller.isAlive(), "hiding the window has to end the modal wait");
+            assertNull(d.getNativeWindow(), "and the dialog lets go of it");
+            assertTrue(peer.isDisposed(),
+                    "the window has to be disposed, not merely emptied, or its peer "
+                            + "stays registered for a dialog nobody can reach");
+        } finally {
+            d.dispose();
+            DisplayTest.flushEdt();
+            caller.join(2000);
+        }
+    }
+
+    @FormTest
+    void aNativeInteractionDialogIsClampedToItsMonitor() {
+        // Non-resizable and centred, so content preferring more than the screen puts
+        // its own controls off both edges at once, where nothing can reach them.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        Label huge = new Label("huge") {
+            @Override
+            protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+                return new com.codename1.ui.geom.Dimension(5000, 4000);
+            }
+        };
+        id.add(BorderLayout.CENTER, huge);
+        id.setNativeWindowMode(true);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+
+        Window w = id.getNativeWindow();
+        assertNotNull(w, "precondition: it opened a window");
+        // Read through the same public API the clamp itself uses.
+        com.codename1.ui.geom.Rectangle work =
+                Desktop.getInstance().getPrimaryMonitor().getWorkArea();
+        int workW = work.getWidth();
+        int workH = work.getHeight();
+        // What the window was actually asked for. The drawable only follows once the
+        // port reports the resize back, which a real one does and the harness does not.
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+        assertTrue(peer.getWidth() <= workW,
+                "a window wider than the screen puts its controls out of reach: "
+                        + peer.getWidth() + " > " + workW);
+        assertTrue(peer.getHeight() <= workH,
+                "and taller than the screen does the same: "
+                        + peer.getHeight() + " > " + workH);
+
+        id.dispose();
+        DisplayTest.flushEdt();
+    }
 }

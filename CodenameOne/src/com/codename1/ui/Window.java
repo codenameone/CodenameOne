@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.impl.WindowManager;
 import com.codename1.io.Log;
 import com.codename1.ui.animations.Animation;
@@ -2582,7 +2583,7 @@ public class Window extends Container implements TopLevelContainer {
         releaseModal();
         // The accessibility tree cached for this window outlives it otherwise, keeping
         // the whole disposed hierarchy reachable.
-        com.codename1.ui.accessibility.AccessibilityManager.getInstance().releaseRoot(this);
+        AccessibilityManager.getInstance().releaseRoot(this);
         Desktop.getInstance().deregisterWindow(this);
         Display.getInstance().windowDisposed(this);
         deinitializeImpl();
@@ -4189,6 +4190,16 @@ public class Window extends Container implements TopLevelContainer {
             nativeVisible = true;
             iconified = false;
             fireWindowEvent(WindowEvent.Type.Restored);
+            // Minimizing clears nativeVisible, so this window read as not showing while
+            // it was down and the snapshot cache was free to evict it to stay under its
+            // cap. Nothing else would have rebuilt it: the tree did not change while the
+            // window was minimized, so no mutation was ever recorded, and an off-EDT
+            // reader is answered with an empty tree on a cache miss -- a screen reader
+            // would have found the restored window empty until something unrelated
+            // happened to it. Cheap when it was never evicted: the rebuild is one pass
+            // over a window that was just put back on screen and repainted in full.
+            AccessibilityManager.getInstance().invalidate(this,
+                    AccessibilityManager.CHANGE_STRUCTURE);
             repaint();
             Display.getInstance().wakeEdt();
         }

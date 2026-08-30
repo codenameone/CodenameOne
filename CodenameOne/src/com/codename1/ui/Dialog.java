@@ -2157,6 +2157,16 @@ public class Dialog extends Form implements AbstractDialog {
             // Idempotent for a window already on screen: it takes the modal blocker and
             // parks the caller without showing anything a second time.
             w.showModal();
+            // Disposed, not merely detached. Hiding a window ends the modal wait exactly
+            // as disposing it does -- isModalFinished() reads both -- so a caller that
+            // hides the window this handed it arrives here with the window still alive.
+            // finishNativeShowing() only takes the payload back out, so the peer stayed
+            // registered with its owner for a dialog nobody can reach any more, one per
+            // showing. The dispose fires Disposed, and the bridge on it calls
+            // finishNativeShowing() first; the call below is then the idempotent no-op.
+            if (!w.isWindowDisposed()) {
+                w.dispose();
+            }
             finishNativeShowing();
         }
     }

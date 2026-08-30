@@ -873,4 +873,81 @@ class AccessibilityWindowTest extends UITestBase {
             implementation.setAccessibilityTreeSupported(false);
         }
     }
+    /// The tree an off-event-thread reader -- a screen reader bridge -- would be handed
+    /// for this surface. On the event thread a cache miss rebuilds on demand, so an
+    /// eviction is only observable from another thread.
+    private static AccessibilityTreeSnapshot offEdtSnapshot(final TopLevelContainer root) {
+        final AccessibilityTreeSnapshot[] out = new AccessibilityTreeSnapshot[1];
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                out[0] = AccessibilityManager.getInstance().getSnapshot(root);
+            }
+        }, "cn1-test-a11y-reader");
+        t.start();
+        try {
+            t.join(5000);
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(err);
+        }
+        assertNotNull(out[0], "the off-thread read has to complete");
+        return out[0];
+    }
+
+    @FormTest
+    void aRestoredWindowGetsItsTreeBackAfterBeingEvicted() {
+        // Minimizing clears nativeVisible, so a minimized window reads as not showing
+        // and the snapshot cache is free to evict it to stay under its cap. Nothing
+        // would then have rebuilt it: the tree did not change while the window was
+        // down, so no mutation was ever recorded, and an off-EDT reader is answered
+        // with an empty tree on a cache miss -- a screen reader would find the restored
+        // window empty until something unrelated happened to it.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        final Window w = new Window("second", new BorderLayout());
+        try {
+            Form main = new Form("main", new BorderLayout());
+            final Button mainButton = new Button("on the main form");
+            main.add(BorderLayout.CENTER, mainButton);
+            main.show();
+            DisplayTest.flushEdt();
+
+            w.setWindowSize(400, 300);
+            w.add(BorderLayout.CENTER, new Button("in the window"));
+            w.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            assertTrue(mentions(offEdtSnapshot(w), "in the window"),
+                    "precondition: the window has a tree to lose");
+
+            // Down, and evicted from behind its back while it is down. The main form
+            // is rebuilt in between so that it, not the window, is the last tree built
+            // anywhere -- otherwise an off-EDT read of the window falls back to that
+            // last tree and the eviction is invisible.
+            w.hideNotify();
+            DisplayTest.flushEdt();
+            mainButton.setText("renamed on the main form");
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+            mgr.releaseRoot(w);
+            // Read off the event thread, which is the reader this is about: on the
+            // event thread a cache miss simply rebuilds on demand, so nothing an
+            // eviction does is visible from there at all.
+            assertFalse(mentions(offEdtSnapshot(w), "in the window"),
+                    "precondition: the cached tree is actually gone");
+
+            w.showNotify();
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            assertTrue(mentions(offEdtSnapshot(w), "in the window"),
+                    "a window the user can see again has to have a tree again");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }

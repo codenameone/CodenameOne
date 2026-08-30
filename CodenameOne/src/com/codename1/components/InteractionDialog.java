@@ -31,6 +31,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Desktop;
+import com.codename1.ui.Monitor;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.Window;
@@ -470,6 +471,20 @@ public class InteractionDialog extends Container implements AbstractDialog {
         w.show();
         int cw = Math.max(1, getPreferredW());
         int ch = Math.max(1, getPreferredH());
+        // Clamped to the monitor, as the Dialog path is. The window is not resizable and
+        // is centred, so content that prefers more than the screen -- a large image, a
+        // long line that does not wrap -- put its own controls off both edges at once,
+        // where nothing can reach them. Never null: Desktop reports a single monitor
+        // covering the display even where there is no windowing system.
+        Monitor monitor = host != null ? Desktop.getInstance().getMonitorFor(host)
+                : Desktop.getInstance().getPrimaryMonitor();
+        Rectangle work = monitor.getWorkArea();
+        if (work.getWidth() > 0) {
+            cw = Math.min(cw, work.getWidth() * 9 / 10);
+        }
+        if (work.getHeight() > 0) {
+            ch = Math.min(ch, work.getHeight() * 9 / 10);
+        }
         w.setWindowContentSize(cw, ch);
         if (host != null) {
             w.centerOn(host);
@@ -481,6 +496,12 @@ public class InteractionDialog extends Container implements AbstractDialog {
             // Idempotent for a window already on screen: it takes the blocker and parks
             // the caller without showing anything twice.
             w.showModal();
+            // Disposed rather than just detached, for the reason the Dialog path is:
+            // hiding the window ends the modal wait too, and finishNativeShowing() alone
+            // would leave the peer registered with its owner once per showing.
+            if (!w.isWindowDisposed()) {
+                w.dispose();
+            }
             finishNativeShowing();
         }
     }
