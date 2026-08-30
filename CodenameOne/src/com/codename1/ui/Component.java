@@ -9216,10 +9216,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// this component's semantic node
     public AccessibilityNode getSemantics() {
         if (semantics == null) {
-            semantics = new AccessibilityNode(this);
-            if (accessibilityText != null) {
-                semantics.setLabel(accessibilityText);
-            }
+            semantics = new AccessibilityNode(this, accessibilityText);
         }
         return semantics;
     }

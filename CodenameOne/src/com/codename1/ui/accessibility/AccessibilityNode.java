@@ -92,6 +92,21 @@ public class AccessibilityNode {
         this.owner = owner;
     }
 
+    /// Internal constructor used by {@link Component} to seed a node from the
+    /// component's accessibility text.
+    ///
+    /// The label is assigned directly rather than through {@link #setLabel(String)}
+    /// because this runs the first time anything reads the node -- typically the tree
+    /// walk that is describing the component right now. Reporting it as a change would
+    /// make describing a tree invalidate that same tree, so a refresh pass that re-posts
+    /// itself whenever work is queued would never run out of work, and on a surface that
+    /// keeps making components it would spin the event thread. Creating a node to read
+    /// it is not news to whoever asked to read it.
+    public AccessibilityNode(Component owner, String label) {
+        this.owner = owner;
+        this.label = label;
+    }
+
     private AccessibilityNode changed(int type) {
         if (owner != null) {
             AccessibilityManager.getInstance().invalidate(owner, type);

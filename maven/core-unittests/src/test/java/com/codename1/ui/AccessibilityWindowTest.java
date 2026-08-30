@@ -833,4 +833,44 @@ class AccessibilityWindowTest extends UITestBase {
             implementation.setAccessibilityTreeSupported(false);
         }
     }
+    @FormTest
+    void describingATreeDoesNotQueueAnotherRefreshOfIt() {
+        // A component's semantic node is created the first time anything reads it, and
+        // seeding its label from the accessibility text used to report itself as a
+        // content change. So the walk that described a tree invalidated that same tree.
+        // A finished pass simply stopped, which hid it; once the pass re-posts itself
+        // whenever work is queued, it never runs out of work, and on a surface that
+        // keeps making components it holds the event thread for as long as that lasts.
+        implementation.setAccessibilityTreeSupported(true);
+        try {
+            Form main = new Form("main", new BorderLayout());
+            main.add(BorderLayout.NORTH, new Button("already here"));
+            main.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            for (int i = 0; i < 4; i++) {
+                DisplayTest.flushEdt();
+            }
+            long settled = mgr.getSnapshot(main).getGeneration();
+
+            // A component nobody has read the semantics of yet, so the refresh pass
+            // that this change schedules is the thing that creates and seeds its node.
+            Button fresh = new Button("fresh");
+            fresh.setAccessibilityText("fresh label");
+            main.add(BorderLayout.CENTER, fresh);
+            DisplayTest.flushEdt();
+            for (int i = 0; i < 4; i++) {
+                DisplayTest.flushEdt();
+            }
+
+            // One change, one rebuild. Two means the rebuild described the tree, the
+            // description invalidated it, and the pass came round again -- which is
+            // unbounded on a surface that is still making components.
+            assertEquals(settled + 1, mgr.getSnapshot(main).getGeneration(),
+                    "describing a tree must not queue another refresh of that tree");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+        }
+    }
 }

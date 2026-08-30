@@ -2103,10 +2103,14 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                         //System.out.println("Stopping editing");
                         ((TextArea) c).stopEditing();
                         final TextArea ta = (TextArea) c;
-                        // The surface of the text area this is about, not of whatever
-                        // happens to enclose this code: the current form is not
-                        // necessarily what is being painted where that component lives.
-                        TopLevelContainer timerHost = ta.getTopLevelContainer();
+                        // The surface of the field about to be edited, which is this
+                        // one -- not the field being stopped. The callback exists to
+                        // start editing here; the repaint of the old field is incidental
+                        // and happens wherever it is. Binding it to the old field's
+                        // surface meant that when editing moved off a window that was
+                        // then hidden, the timer sat on a surface whose loop had stopped
+                        // and editing never began on the new field at all.
+                        TopLevelContainer timerHost = getTopLevelContainer();
                         if (timerHost == null) {
                             timerHost = CN.getCurrentTopLevel();
                         }

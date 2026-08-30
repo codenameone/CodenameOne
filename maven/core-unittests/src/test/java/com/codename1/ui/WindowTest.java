@@ -5797,4 +5797,66 @@ class WindowTest extends UITestBase {
         assertEquals(1, errors[0],
                 "the timeout belongs to the browser's own surface, which is still there");
     }
+
+    @FormTest
+    void editingResumesOnTheNewFieldAfterItsOldWindowIsHidden() {
+        // Moving editing off a field stops the old editor and resumes on the new one from
+        // a timer. That timer belongs to the surface about to be edited: bound to the old
+        // field's surface, hiding that window stopped its loop and editing never began on
+        // the new field at all.
+        implementation.setMultiWindowSupported(true);
+        implementation.setUsesInvokeAndBlockForEditString(true);
+        Form main = new Form("main", new BorderLayout());
+        TextArea target = new TextArea("target");
+        main.add(BorderLayout.CENTER, target);
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        TextArea old = new TextArea("old");
+        w.add(BorderLayout.CENTER, old);
+        w.show();
+        DisplayTest.flushEdt();
+
+        // The old field is the one the port thinks is being edited.
+        implementation.setFocusedEditingText(old);
+        DisplayTest.flushEdt();
+        assertSame(old, com.codename1.ui.Display.impl.getEditingText(),
+                "precondition: the window's field is the current editor");
+
+        // Hidden rather than disposed: the field stays parented in it, so it still
+        // resolves to that window as its surface -- a window whose loop has stopped.
+        // Disposing would detach the field and let the null fallback rescue it, which is
+        // not the case the report is about.
+        w.hide();
+        DisplayTest.flushEdt();
+        assertSame(w, old.getTopLevelContainer(),
+                "precondition: the old field still belongs to the hidden window");
+
+        target.startEditingAsync();
+        DisplayTest.flushEdt();
+
+        for (int iter = 0; iter < 200
+                && com.codename1.ui.Display.impl.getEditingText() != target; iter++) { //NOPMD CompareObjectsWithEquals
+            main.repaintAnimations();
+            DisplayTest.flushEdt();
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        assertSame(target, com.codename1.ui.Display.impl.getEditingText(),
+                "editing has to start on the new field even though the old field's window "
+                        + "has gone");
+
+        // Hidden is not gone: the window is still live and still registered, and the
+        // editor is still set. Leaving either behind hands the tests that follow a
+        // window nobody owns -- which is exactly what the window-count assertions in
+        // this class measure -- and an editing field on a surface that is going away.
+        implementation.setFocusedEditingText(null);
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

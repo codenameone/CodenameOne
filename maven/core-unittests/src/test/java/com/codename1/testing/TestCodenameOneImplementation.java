@@ -1286,6 +1286,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     public void reset() {
+        usesInvokeAndBlockForEditString = false;
         windowManager = null;
         desktop = false;
         nativeTitle = false;
@@ -2000,6 +2001,26 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public boolean isAsyncEditMode() {
         return true;
+    }
+
+    /// Whether the port is one of those that edit through invokeAndBlock, which is what
+    /// makes TextArea stop the previous editor and resume the new one from a timer.
+    /// False by default, as the real default is, so the path is only exercised by a test
+    /// that asks for it.
+    private boolean usesInvokeAndBlockForEditString;
+
+    /// Turns the invokeAndBlock editing path on for a test.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uses`: true to report that this port edits through invokeAndBlock
+    public void setUsesInvokeAndBlockForEditString(boolean uses) {
+        usesInvokeAndBlockForEditString = uses;
+    }
+
+    @Override
+    public boolean usesInvokeAndBlockForEditString() {
+        return usesInvokeAndBlockForEditString;
     }
 
     @Override

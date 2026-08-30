@@ -509,7 +509,13 @@ public final class Display extends CN1Constants {
 
             // this can happen on some cases where an application was restarted etc...
             // generally its probably a bug but we can let it slide...
-            if (INSTANCE.edt == null) {
+            // Or the one from last time has already gone. deinitialize() asks the event
+            // thread to stop but leaves this field pointing at it, so an init after that
+            // thread has actually exited found a non-null reference, started nothing, and
+            // left Codename One reporting itself initialised with no event thread at all
+            // -- every callSeriallyAndWait after that then waits for good. deinitialize()
+            // documents that init may follow it, so this is the contract it promises.
+            if (INSTANCE.edt == null || !INSTANCE.edt.isAlive()) {
                 INSTANCE.touchScreen = impl.isTouchDevice();
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
