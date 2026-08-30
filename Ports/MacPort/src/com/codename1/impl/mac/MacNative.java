@@ -53,6 +53,11 @@ class MacNative {
     native int macWindowCreate(int windowId, String title, int x, int y, int width, int height,
             boolean decorated, boolean resizable, int ownerSlot, boolean positionSet);
 
+    /// Tells AppKit the termination work is finished, so a quit answered with
+    /// NSTerminateLater can proceed. Safe to call from any thread; the native
+    /// hops to the main queue itself.
+    native void replyToTermination();
+
     native void macWindowDestroy(int slot);
 
     native void macWindowShow(int slot, boolean visible);

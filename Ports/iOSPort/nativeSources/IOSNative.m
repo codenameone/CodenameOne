@@ -6755,6 +6755,29 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
     // must run on the calling thread. Waiting is what lets it.
     __block BOOL composed = NO;
     cn1RunOnMainSync(^{
+        // The HTML body, if the caller asked for one. Message.MIME_HTML reaches
+        // this native as htmlMail, and the branch ignored it: the markup went
+        // into the composer as an NSString and Mail showed the tags rather than
+        // the formatting, where the iOS branch uses setMessageBody:isHTML:.
+        //
+        // Built HERE rather than beside the plain string above, because
+        // NSAttributedString's HTML importer is documented main-thread only --
+        // it runs the WebKit parser -- and this block is already on the main
+        // queue. A body that fails to parse keeps the plain string rather than
+        // sending nothing.
+        if (htmlMail && items.count > 0) {
+            NSData *htmlData = [nBody dataUsingEncoding:NSUTF8StringEncoding];
+            if (htmlData != nil) {
+                NSAttributedString *rich = [[NSAttributedString alloc]
+                    initWithHTML:htmlData documentAttributes:nil];
+                if (rich != nil) {
+                    [items replaceObjectAtIndex:0 withObject:rich];
+                }
+#ifndef CN1_USE_ARC
+                [rich release];
+#endif
+            }
+        }
         NSSharingService *mail =
             [NSSharingService sharingServiceNamed:NSSharingServiceNameComposeEmail];
         if (mail != nil && [mail canPerformWithItems:items]) {

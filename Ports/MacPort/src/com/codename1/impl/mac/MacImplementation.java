@@ -93,6 +93,11 @@ public class MacImplementation extends IOSImplementation {
     /// density is asked for long before any secondary window exists.
     private final MacNative macNative = new MacNative();
 
+    /// A second binding for the static termination path, which has no instance
+    /// to reach. MacNative holds no state -- it is a set of native bindings --
+    /// so a second one costs nothing.
+    private static final MacNative TERMINATION_NATIVE = new MacNative();
+
     /// @inheritDoc
     ///
     /// From the monitor's backing scale, not from how wide the window is.
@@ -482,6 +487,48 @@ public class MacImplementation extends IOSImplementation {
     ///
     /// A macOS shim rather than a change to the shared method, so the iOS
     /// delegate keeps the behaviour it has today.
+    /// Runs the termination lifecycle ON THE EDT, then tells AppKit it may
+    /// finish quitting.
+    ///
+    /// applicationWillTerminate() calls the application's stop() and destroy()
+    /// synchronously, and the delegate that used to invoke it ran on AppKit's
+    /// main thread: ordinary UI cleanup raced the framework, and cleanup that
+    /// touched BrowserComponent.setURL() reached the shared browser native's
+    /// dispatch_sync back onto the main queue it was already occupying and
+    /// deadlocked -- the application hanging on quit rather than closing.
+    ///
+    /// Blocking the main thread to wait for the EDT is not the alternative: it
+    /// is the same deadlock from the other side. So the delegate answers
+    /// NSTerminateLater and this hands the work to the EDT; when it is done,
+    /// the native reply lets the quit proceed. cn1MacReplyToTermination is
+    /// called from the EDT and does its own hop to the main queue.
+    public static void macRunTerminationLifecycle() {
+        if (!com.codename1.ui.Display.isInitialized()) {
+            TERMINATION_NATIVE.replyToTermination();
+            return;
+        }
+        com.codename1.ui.Display d = com.codename1.ui.Display.getInstance();
+        if (d == null || d.isEdt()) {
+            IOSImplementation.applicationWillTerminate();
+            TERMINATION_NATIVE.replyToTermination();
+            return;
+        }
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    IOSImplementation.applicationWillTerminate();
+                } finally {
+                    // Always replied to, including when the application's own
+                    // destroy() throws: a quit that never completes because
+                    // cleanup failed is worse than a quit that loses the tail
+                    // of that cleanup.
+                    TERMINATION_NATIVE.replyToTermination();
+                }
+            }
+        });
+    }
+
     public static void macDeliverUrl(final String url) {
         if (url == null) {
             return;

@@ -449,6 +449,19 @@ static void cn1MacDeliverURL(NSString *url) {
 /// is installed. Mirrors the watch port's cn1_watch_runtime_markJavaReady, and
 /// for the same reason: that is the first honest moment at which the Java side
 /// can be told anything.
+/// Lets a quit answered with NSTerminateLater proceed.
+///
+/// Called from the EDT once the termination lifecycle has run, so it hops to
+/// the main queue itself -- replyToApplicationShouldTerminate: is AppKit and
+/// must not be sent from the dispatch thread.
+JAVA_VOID com_codename1_impl_mac_MacNative_replyToTermination__(CODENAME_ONE_THREAD_STATE,
+        JAVA_OBJECT __cn1ThisObject) {
+    (void) __cn1ThisObject;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [NSApp replyToApplicationShouldTerminate:YES];
+    });
+}
+
 void cn1_mac_runtime_markJavaReady(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         cn1MacJavaReady = YES;
@@ -765,13 +778,37 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
     CN1MacWindowsDeliverAppHidden(NO);
 }
 
-- (void)applicationWillTerminate:(NSNotification *)notification {
-    // Not queued: there is nothing after this to replay it on, and calling into
-    // a Java side that does not exist is the crash this guard exists to avoid.
+/// Runs the termination lifecycle on the EDT before letting the quit finish.
+///
+/// applicationWillTerminate() calls the application's stop() and destroy(), and
+/// doing that from this delegate ran them on AppKit's main thread: cleanup
+/// raced the framework, and cleanup touching BrowserComponent.setURL() reached
+/// the shared browser native's dispatch_sync back onto the main queue it was
+/// already on and hung the quit.
+///
+/// NSTerminateLater rather than blocking here, because waiting on the main
+/// thread for the EDT is the same deadlock from the other side. The Java shim
+/// hands the work to the EDT and calls back through replyToTermination when it
+/// is done.
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
+    // Nothing to run, and nothing to wait for. Calling into a Java side that
+    // does not exist is the crash the readiness guard exists to avoid.
     if (!cn1MacJavaReady) {
-        return;
+        return NSTerminateNow;
     }
-    com_codename1_impl_ios_IOSImplementation_applicationWillTerminate__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    extern JAVA_VOID com_codename1_impl_mac_MacImplementation_macRunTerminationLifecycle__(
+        CODENAME_ONE_THREAD_STATE);
+    com_codename1_impl_mac_MacImplementation_macRunTerminationLifecycle__(
+        CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    return NSTerminateLater;
+}
+
+- (void)applicationWillTerminate:(NSNotification *)notification {
+    // Deliberately empty. The lifecycle runs in applicationShouldTerminate:
+    // above, which is the callback that can defer the quit; by the time this
+    // one fires the reply has already been given and AppKit is finishing.
+    // Running it here as well would call the application's destroy() twice.
+    (void) notification;
 }
 
 /// Quitting with the last window is the behaviour every other Codename One port
