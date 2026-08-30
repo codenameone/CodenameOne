@@ -888,7 +888,26 @@ extern void CN1MacRefreshModifiers(void);
         if (url == nil) {
             continue;
         }
-        NSString *spec = url.isFileURL ? url.path : [url absoluteString];
+        // absoluteString for a file URL too, not url.path. This one callback
+        // is both of UIKit's: it delivers documents opened from Finder and
+        // custom-scheme deep links, cold and warm alike, and everything it
+        // hands over ends up in shouldApplicationHandleURL, which notifies
+        // URLCallback and sets AppArg from the same string.
+        //
+        // Stripping the scheme made that string not URL-shaped, and
+        // Display.setProperty("AppArg", ...) routes through
+        // Navigation.dispatchExternalUrl only for values that look like a URL
+        // -- containing "://" or a scheme prefix. So an application that
+        // registered a document type and expected a route to match
+        // file:///tmp/report.pdf was handed /tmp/report.pdf and its route
+        // never ran, with nothing to indicate why.
+        //
+        // It is also what iOS does on the equivalent callback: cn1OpenURL:
+        // passes absoluteString unconditionally, file URLs included. Only its
+        // cold-launch helper strips to a path, and reproducing that here would
+        // mean the same double-click delivering a different AppArg depending
+        // on whether the application happened to be running.
+        NSString *spec = [url absoluteString];
         // Every URL, not just the first. Finder hands over the whole selection
         // in one call -- opening five files, or dropping them on the Dock icon,
         // is one openURLs: with five entries -- and breaking after the first
