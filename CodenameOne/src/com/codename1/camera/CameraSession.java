@@ -44,6 +44,10 @@ public final class CameraSession implements AutoCloseable {
     private FrameListener frameListener;
     private CameraView view;
     private boolean closed;
+    /// Whether pause() has released the hardware and resume() has not taken it
+    /// back. Read by Camera.open, which must let a modal Capture through while
+    /// a session is holding nothing.
+    private boolean paused;
 
     CameraSession(CameraImpl impl, CameraInfo info, CameraSessionOptions options) {
         this.impl = impl;
@@ -140,12 +144,23 @@ public final class CameraSession implements AutoCloseable {
     /// `#resume()`.
     public void pause() {
         impl.pause();
+        paused = true;
+    }
+
+    /// Whether the hardware is currently released by `#pause()`.
+    ///
+    /// Package private on purpose. Camera.open is the only caller that needs
+    /// it -- to let a modal Capture past a paused session -- and a new public
+    /// method is easy to add later and impossible to take back.
+    boolean isPaused() {
+        return paused && !closed;
     }
 
     /// Re-acquire the hardware after `#pause()`. No-op if the session is
     /// already running.
     public void resume() {
         impl.resume();
+        paused = false;
     }
 
     /// Release the session. Idempotent.

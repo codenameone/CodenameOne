@@ -71,6 +71,9 @@ import java.io.IOException;
 public final class Camera {
     private static final Object ACTIVE_LOCK = new Object();
     private static CameraSession active;
+    /// A paused session that a modal Capture was let past, to be made active
+    /// again when that capture's session closes. See open().
+    private static CameraSession preempted;
 
     private Camera() { }
 
@@ -128,10 +131,26 @@ public final class Camera {
         // user kicked off, contention is essentially zero, and we'd rather
         // serialise the rare race than ship a TOCTOU bug.
         synchronized (ACTIVE_LOCK) {
-            if (active != null && !active.isClosed()) {
+            // A PAUSED session is holding nothing, and letting it through is
+            // the documented coexistence flow: pause the session, run
+            // Capture.capturePhoto/captureVideo, resume. Refusing here made
+            // that flow throw -- the modal capture then answered its listener
+            // with null having shown no UI at all -- so the API promised a
+            // handoff its own exclusivity gate forbade.
+            //
+            // The gate still means what it says: it exists to stop two
+            // consumers HOLDING the device, and pause() is documented as
+            // releasing the hardware while keeping the session object alive.
+            if (active != null && !active.isClosed() && !active.isPaused()) {
                 throw new IllegalStateException(
                     "Only one CameraSession may be open at a time. Close the existing session first.");
             }
+            // Remembered so exclusivity survives the handoff. Without this the
+            // capture's own close() would leave no active session at all, and
+            // the paused one -- which the application is about to resume --
+            // would no longer stop a third open().
+            preempted = active != null && !active.isClosed() && active.isPaused()
+                    ? active : null;
             CameraImpl impl = newImpl();
             if (impl == null) {
                 throw new IllegalStateException("Camera is not supported on this platform.");
@@ -198,7 +217,16 @@ public final class Camera {
     static void clearActive(CameraSession s) {
         synchronized (ACTIVE_LOCK) {
             if (active == s) {
-                active = null;
+                // Hand back to the session this one was let past, if it is
+                // still there to hand back to: the application paused it around
+                // a modal capture and is about to resume it, and it has to be
+                // the active session again for the next open() to be refused.
+                active = preempted != null && !preempted.isClosed() ? preempted : null;
+                preempted = null;
+            } else if (preempted == s) {
+                // The application closed the paused session instead of
+                // resuming it; there is nothing to hand back to.
+                preempted = null;
             }
         }
     }

@@ -166,6 +166,69 @@ class CameraTest extends UITestBase {
         });
     }
 
+    /// The coexistence flow Camera's own documentation promises: pause the
+    /// session, run a modal Capture, resume.
+    ///
+    /// The gate used to refuse this, because a paused session is not a closed
+    /// one -- so Capture.capturePhoto() on the macOS port answered its listener
+    /// with null having shown no capture UI at all. pause() is documented as
+    /// releasing the hardware, and the gate exists to stop two consumers
+    /// HOLDING the device, so a paused session must not block it.
+    @Test
+    void aPausedSessionLetsAModalCaptureOpen() {
+        install();
+        CameraSession background = Camera.open(camera("back", CameraFacing.BACK),
+                new CameraSessionOptions());
+        background.pause();
+        assertTrue(background.isPaused());
+        opened = Camera.open(camera("front", CameraFacing.FRONT),
+                new CameraSessionOptions());
+        assertFalse(opened.isClosed());
+        background.close();
+    }
+
+    /// And exclusivity survives that handoff.
+    ///
+    /// When the modal capture closes, the paused session becomes the active one
+    /// again -- the application is about to resume it -- so a third open() is
+    /// still refused. Without the handback the capture's close() would leave no
+    /// active session and the next open() would run alongside the resumed one.
+    @Test
+    void theHandoffGivesTheSessionBackWhenTheCaptureCloses() {
+        install();
+        CameraSession background = Camera.open(camera("back", CameraFacing.BACK),
+                new CameraSessionOptions());
+        background.pause();
+        CameraSession modal = Camera.open(camera("front", CameraFacing.FRONT),
+                new CameraSessionOptions());
+        modal.close();
+        background.resume();
+        assertFalse(background.isPaused());
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() {
+                Camera.open(camera("front", CameraFacing.FRONT), new CameraSessionOptions());
+            }
+        });
+        background.close();
+    }
+
+    /// Closing the paused session instead of resuming it leaves nothing to hand
+    /// back to, and the next open() succeeds.
+    @Test
+    void closingThePausedSessionDuringTheCaptureLeavesNoHandback() {
+        install();
+        CameraSession background = Camera.open(camera("back", CameraFacing.BACK),
+                new CameraSessionOptions());
+        background.pause();
+        CameraSession modal = Camera.open(camera("front", CameraFacing.FRONT),
+                new CameraSessionOptions());
+        background.close();
+        modal.close();
+        opened = Camera.open(camera("back", CameraFacing.BACK),
+                new CameraSessionOptions());
+        assertFalse(opened.isClosed());
+    }
+
     @Test
     void openAfterClosingPreviousSucceeds() {
         install();
