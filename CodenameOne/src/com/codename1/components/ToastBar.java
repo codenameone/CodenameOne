@@ -530,6 +530,25 @@ public final class ToastBar {
         this.position = position;
     }
 
+    /// Puts an existing toast component in the slot the current position asks for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component already on screen
+    private void applyPositionTo(ToastBarComponent c) {
+        Container parent = c.getParent();
+        if (parent == null || !(parent.getLayout() instanceof BorderLayout)) {
+            return;
+        }
+        String want = position == Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH;
+        if (want.equals(parent.getLayout().getComponentConstraint(c))) {
+            return;
+        }
+        parent.removeComponent(c);
+        parent.addComponent(want, c);
+        parent.revalidateLater();
+    }
+
     /// Takes the shared defaults for every setting this instance has not been given
     /// in its own right.
     ///
@@ -544,8 +563,15 @@ public final class ToastBar {
         if (defaults == this) { //NOPMD CompareObjectsWithEquals
             return;
         }
-        if (!positionExplicit) {
+        if (!positionExplicit && position != defaults.position) {
             position = defaults.position;
+            // A bar already on screen has to move with it. The slot is otherwise only
+            // chosen when the component is built or reattached, so it stayed where it
+            // was created while animating as though it had gone to the other end.
+            ToastBarComponent shown = getToastBarComponent(false);
+            if (shown != null) {
+                applyPositionTo(shown);
+            }
         }
         if (!useFormLayeredPaneExplicit) {
             // Through the mover, so a bar already on screen changes pane rather than
@@ -796,6 +822,13 @@ public final class ToastBar {
                 layered.setLayout(new BorderLayout());
                 layered.addComponent(position == Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH, c);
                 updateStatus();
+            } else {
+                // The constraint above is only chosen when the component is built or
+                // reattached, and the position can change under one that is neither --
+                // inheriting the shared default now does exactly that. Left alone the
+                // bar stayed in the slot it was created in while animating as though it
+                // had moved to the other one.
+                applyPositionTo(c);
             }
             // The host's safe area and height. A window has no notch of its own, and
             // its height is what the toast has to sit inside.

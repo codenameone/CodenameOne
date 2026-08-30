@@ -25,6 +25,7 @@ package com.codename1.components;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.Window;
@@ -249,6 +250,57 @@ class ToastBarInWindowTest extends UITestBase {
         } finally {
             singleton.setPosition(originalPosition);
             singleton.setDefaultUIID(originalUiid);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void inheritingANewPositionMovesTheToastAlreadyOnScreen() {
+        // Synchronising the field is only half of it: the slot is chosen when the
+        // component is built or reattached, so a bar already on screen stayed where it
+        // was created while animating as though it had moved to the other end.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        ToastBar singleton = ToastBar.getInstance();
+        int originalPosition = singleton.getPosition();
+        Window w = new Window("host", new BorderLayout());
+        try {
+            singleton.setPosition(Component.BOTTOM);
+            w.setWindowSize(500, 400);
+            w.show();
+            DisplayTest.flushEdt();
+
+            ToastBar forWindow = ToastBar.getInstance(w);
+            ToastBar.Status s = forWindow.createStatus();
+            s.setMessage("hello");
+            s.show();
+            DisplayTest.flushEdt();
+
+            Component bar = (Component) w.getClientProperty("ToastBarComponent");
+            assertNotNull(bar, "precondition: the window has a toast component up");
+            Container parent = bar.getParent();
+            assertNotNull(parent);
+            assertEquals(BorderLayout.SOUTH, parent.getLayout().getComponentConstraint(bar),
+                    "precondition: it was built at the bottom");
+
+            singleton.setPosition(Component.TOP);
+            // What every static helper starts by doing: resolve the window's bar, which
+            // is where the inherited position is taken up.
+            ToastBar.getInstance(w);
+            DisplayTest.flushEdt();
+
+            assertEquals(BorderLayout.NORTH,
+                    bar.getParent().getLayout().getComponentConstraint(bar),
+                    "the bar already on screen has to move to the new position");
+
+            s.clear();
+            DisplayTest.flushEdt();
+        } finally {
+            singleton.setPosition(originalPosition);
             w.dispose();
             DisplayTest.flushEdt();
         }

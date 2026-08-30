@@ -35,6 +35,7 @@ import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.Container;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -185,9 +186,23 @@ public class InfiniteProgress extends Component {
             nf.show();
             f = nf;
         }
-        if (f.asContainer().getClientProperty("isInfiniteProgress") == null) {
+        Container hostCnt = f.asContainer();
+        // The original marker still decides it on a form: a nested spinner there sees
+        // the *first* spinner's own dialog as the current surface, and that dialog
+        // carries the marker. A hosted dialog never becomes the current top level, so
+        // on a window the marker could not be found however many spinners were up, and
+        // each new one re-tinted the window over the first one's choice.
+        boolean alreadyTinted = hostCnt.getClientProperty("isInfiniteProgress") != null;
+        Integer held = (Integer) hostCnt.getClientProperty(PROGRESS_DEPTH);
+        int depth = held == null ? 0 : held.intValue();
+        if (!alreadyTinted && depth == 0) {
             f.setTintColor(tintColor);
         }
+        hostCnt.putClientProperty(PROGRESS_DEPTH, Integer.valueOf(depth + 1));
+        // Released when this spinner leaves the hierarchy, which is what disposing the
+        // dialog does to it. Held per spinner rather than per host: each one is in
+        // exactly one dialog, so each releases exactly the count it took.
+        progressHost = hostCnt;
         Dialog d = new Dialog();
         // Never a window of its own, whatever the application asked for globally. This
         // one is shown modeless and does its blocking with the scrim the hosted path
@@ -207,6 +222,24 @@ public class InfiniteProgress extends Component {
         d.setTopLevelHost(f);
         d.showPacked(BorderLayout.CENTER, false);
         return d;
+    }
+
+    /// How many blocking spinners are up on a given surface.
+    private static final String PROGRESS_DEPTH = "cn1$infiniteProgressDepth";
+
+    /// The surface this spinner counted itself against, until it releases it.
+    private Container progressHost;
+
+    /// Gives back this spinner's claim on its host, once.
+    private void releaseProgressHost() {
+        Container h = progressHost;
+        if (h == null) {
+            return;
+        }
+        progressHost = null;
+        Integer held = (Integer) h.getClientProperty(PROGRESS_DEPTH);
+        int depth = held == null ? 0 : held.intValue() - 1;
+        h.putClientProperty(PROGRESS_DEPTH, depth <= 0 ? null : Integer.valueOf(depth));
     }
 
     /// True when this spinner's own top level is the one on screen.
@@ -236,6 +269,7 @@ public class InfiniteProgress extends Component {
     /// {@inheritDoc}
     @Override
     protected void deinitialize() {
+        releaseProgressHost();
         // The fallback to the current form existed because deinitialize can run after
         // the component has left its hierarchy. It threw outright in a window-only
         // application, where there is no current form either -- and that threw during

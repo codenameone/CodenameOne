@@ -1,9 +1,33 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.components;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.geom.Dimension;
@@ -233,5 +257,57 @@ class InfiniteProgressTest extends UITestBase {
 
         // Component should deinitialize properly - just verify no crash
         assertNotNull(progress);
+    }
+
+    @FormTest
+    void aSecondSpinnerOnAWindowLeavesTheFirstsTintAlone() {
+        // The guard that stops a nested spinner re-tinting reads the marker off the
+        // current surface. On a form that surface IS the first spinner's dialog, which
+        // carries it. A hosted dialog never becomes the current top level, so on a
+        // window the marker could not be found however many spinners were up, and the
+        // second one repainted the window in its own tint over the first one's.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        com.codename1.ui.Window w = new com.codename1.ui.Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        w.show();
+        DisplayTest.flushEdt();
+        com.codename1.ui.Desktop.getInstance().windowFocusChanged(w.getWindowId(), true);
+        DisplayTest.flushEdt();
+
+        InfiniteProgress first = new InfiniteProgress();
+        first.setTintColor(0x66112233);
+        Dialog d1 = first.showInfiniteBlocking();
+        DisplayTest.flushEdt();
+        int afterFirst = w.getTintColor();
+        assertEquals(0x66112233, afterFirst, "precondition: the first spinner tinted the window");
+
+        InfiniteProgress second = new InfiniteProgress();
+        second.setTintColor(0x66445566);
+        Dialog d2 = second.showInfiniteBlocking();
+        DisplayTest.flushEdt();
+        assertEquals(afterFirst, w.getTintColor(),
+                "a nested spinner must not repaint the window in its own tint");
+
+        d2.dispose();
+        DisplayTest.flushEdt();
+        d1.dispose();
+        DisplayTest.flushEdt();
+
+        // And once they have all gone the next one tints again, rather than the count
+        // being stranded and suppressing it for good.
+        InfiniteProgress third = new InfiniteProgress();
+        third.setTintColor(0x66778899);
+        Dialog d3 = third.showInfiniteBlocking();
+        DisplayTest.flushEdt();
+        assertEquals(0x66778899, w.getTintColor(),
+                "with nothing left up, the next spinner tints the window again");
+
+        d3.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
     }
 }
