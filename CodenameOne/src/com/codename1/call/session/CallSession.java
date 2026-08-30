@@ -302,19 +302,35 @@ public final class CallSession {
         if (b == null) {
             return Calls.unsupported();
         }
-        if (!Calls.owns(callId, this)) {
-            return staleSession();
+        // The ownership test and the handoff as ONE step against the
+        // registry. Checked and then handed off, an end authorised while THIS
+        // session held the id could reach the port after a replacement had
+        // claimed it -- and the SPI carries no session identity, so
+        // AndroidCallBridge.endCall looks up the id alone and would finish
+        // the replacement, acknowledge success, and leave that live call
+        // registered in Java with nothing to say it had been hung up.
+        //
+        // reportEndedRemotely never had this hole: its check is an
+        // identity-checked forget() under the registry monitor, and it
+        // reports only when that said this session owned the id. This path
+        // asked a weaker question and acted on it later.
+        //
+        // See Calls.HANDOFF for why it is not the SESSIONS monitor.
+        synchronized (Calls.HANDOFF) {
+            if (!Calls.owns(callId, this)) {
+                return staleSession();
+            }
+            int id = CallRequests.nextId();
+            EdtResult<Boolean> r = CallRequests.openAck(id);
+            // The state moves and the session is forgotten only if the system
+            // agreed. Setting ENDED up front left an app whose end request was
+            // refused holding a session that said ended over a call that was
+            // still up.
+            r.onResult(new EndOutcome(this));
+            b.endCall(id, callId, reason == null
+                    ? CallEndReason.LOCAL_ENDED.ordinal() : reason.ordinal());
+            return r;
         }
-        int id = CallRequests.nextId();
-        EdtResult<Boolean> r = CallRequests.openAck(id);
-        // The state moves and the session is forgotten only if the system
-        // agreed. Setting ENDED up front left an app whose end request was
-        // refused holding a session that said ended over a call that was
-        // still up.
-        r.onResult(new EndOutcome(this));
-        b.endCall(id, callId, reason == null
-                ? CallEndReason.LOCAL_ENDED.ordinal() : reason.ordinal());
-        return r;
     }
 
     /// Tells the system the **far end** ended the call. Use this rather than

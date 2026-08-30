@@ -185,6 +185,30 @@ public final class Calls {
         return report(callId, handle, displayName, video, CallDirection.OUTGOING);
     }
 
+    /// Orders an operation's validation against the native handoff after it.
+    ///
+    /// The registry says which session owns a call id, and every operation
+    /// that reaches a port hands off by id ALONE -- the SPI carries no
+    /// session identity, deliberately, because it crosses into Objective-C
+    /// through ParparVM. So a validation and the handoff it authorises have
+    /// to be one step with respect to the registry, or the id can change
+    /// hands in between and the port acts on whatever holds it now.
+    ///
+    /// end() is where that bit: it checked owns(), and by the time endCall
+    /// reached the port a replacement could have claimed the id -- so the
+    /// port finished the REPLACEMENT and acknowledged success, while the
+    /// replacement stayed registered in Java. reportEndedRemotely never had
+    /// the hole, because its check is an identity-checked forget() under the
+    /// registry monitor and it reports only when that said yes.
+    ///
+    /// NOT the SESSIONS monitor. That one is taken by getSession, which the
+    /// ports call while delivering, so holding it across a bridge call is a
+    /// deadlock rather than an ordering. This is held only by the operations
+    /// that register or retire an id and only for the length of one handoff,
+    /// which is the same trade CallSession's `reporting` lock makes and the
+    /// same shape as TunnelHost's `lifecycle`.
+    static final Object HANDOFF = new Object();
+
     /// Bumped by every provider reset. Guarded by SESSIONS.
     ///
     /// A report inserts its session and only then opens the request the port
@@ -242,6 +266,11 @@ public final class Calls {
                 direction == CallDirection.INCOMING
                         ? CallState.RINGING : CallState.DIALING);
         int reportedGeneration;
+        // HANDOFF spans the reservation and the report. A registration that
+        // is visible to end()'s owns() check but has not yet reached the port
+        // is exactly the state that let an end authorised against the OLD
+        // session arrive at the port after the new one claimed the id.
+        synchronized (HANDOFF) {
         synchronized (SESSIONS) {
             // Only live calls are in the map; forget() removes an ended one,
             // so presence is the whole test.
@@ -285,6 +314,7 @@ public final class Calls {
             b.reportIncomingCall(reqId, id, wire, displayName, -1, video);
         } else {
             b.reportOutgoingCall(reqId, id, wire, displayName, -1, video);
+        }
         }
         return out;
     }
