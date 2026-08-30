@@ -1240,17 +1240,40 @@ public class ByteCodeClass {
                         b.append("    CN1MacInstallAppDelegate();\n");
                         b.append("    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{\n");
                         // The dispatched block runs on a DIFFERENT thread from
-                        // the one flagged above, and gets its own thread-local
-                        // state whose lightweightThread defaults to false. The
-                        // application's main allocates from the nursery on it,
-                        // so without this the concurrent GC scans that nursery
-                        // without pausing the thread filling it -- which is the
-                        // corruption the flag exists to prevent, on the only
-                        // target where main does not run on the flagged thread.
-                        b.append("#ifdef CN1_NURSERY\n        getThreadLocalData()->lightweightThread = JAVA_TRUE;\n#endif\n");
+                        // the one flagged above, with its own thread-local state
+                        // whose flags all default to false, and the application's
+                        // main allocates from the nursery on it. So it is a Java
+                        // thread and has to be registered as one, which means
+                        // BOTH flags and not just the first: the collector reads
+                        // a lightweight thread that is not active as parked, and
+                        // a parked thread is precisely the one it may scan and
+                        // migrate the nursery and pendingHeapAllocations of
+                        // without taking the heap mutex. Setting lightweight
+                        // alone was therefore worse than setting neither -- it
+                        // invited the collector into the arena this thread was
+                        // still filling. threadRunner sets the same pair, and
+                        // retires with markDeadThread, for every thread it
+                        // starts; this block is that sequence written by hand.
+                        b.append("#ifdef CN1_NURSERY\n"
+                                + "        getThreadLocalData()->lightweightThread = JAVA_TRUE;\n"
+                                + "        getThreadLocalData()->threadActive = JAVA_TRUE;\n"
+                                + "#endif\n");
                         b.append("        ");
                         b.append(clsName);
                         b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n");
+                        // main returning does not end the process here -- AppKit
+                        // owns the main thread and keeps running -- so leaving
+                        // the worker registered would leave the collector
+                        // waiting at every safepoint for a thread that no longer
+                        // exists. markDeadThread is declared inline because it
+                        // is defined in nativeMethods.m and appears in no
+                        // header; without that it is an implicit declaration.
+                        b.append("#ifdef CN1_NURSERY\n"
+                                + "        {\n"
+                                + "            extern void markDeadThread(struct ThreadLocalData *d);\n"
+                                + "            markDeadThread(getThreadLocalData());\n"
+                                + "        }\n"
+                                + "#endif\n");
                         b.append("    });\n");
                         b.append("    [NSApp run];\n}\n\n");
                     } else {
