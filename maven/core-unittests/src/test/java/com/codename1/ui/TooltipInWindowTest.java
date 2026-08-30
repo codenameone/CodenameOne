@@ -210,4 +210,53 @@ class TooltipInWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    @FormTest
+    void aTooltipPendingOnAWindowIsCancelledWhenThePointerLeaves() {
+        // What the port does when the pointer leaves a canvas: there is no further
+        // hover to clear the armed timer, so the exit has to. The timer is scheduled
+        // against the window rather than a form, so this asserts the cancellation
+        // actually reaches a window-hosted timer -- if it did not, the tooltip would
+        // still open over a surface the pointer had left.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        Button b = new Button("hover me");
+        b.setTooltip("a tip");
+        w.add(BorderLayout.CENTER, b);
+        w.show();
+        DisplayTest.flushEdt();
+
+        ProbeTooltipManager mgr = install();
+        try {
+            mgr.setTooltipShowDelay(1);
+            hover(w, b);
+            DisplayTest.flushEdt();
+            assertTrue(mgr.prepared > 0, "precondition: the timer is armed");
+
+            // What the port now does on the way out of the canvas.
+            TooltipManager.hideTooltip();
+            DisplayTest.flushEdt();
+
+            // Pumped well past the show delay: without the cancel this opens a tooltip.
+            for (int i = 0; i < 300 && mgr.shown == 0; i++) {
+                w.repaintAnimations();
+                DisplayTest.flushEdt();
+                try {
+                    Thread.sleep(2);
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            assertEquals(0, mgr.shown,
+                    "a tooltip must not open once the pointer has left the surface");
+        } finally {
+            mgr.clearTooltip();
+            DisplayTest.flushEdt();
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }

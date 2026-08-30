@@ -4167,6 +4167,18 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void mouseExited(MouseEvent e) {
             e.consume();
+            // A tooltip timer armed by the last hover has nothing left to cancel it:
+            // only another hover does, and once the pointer is off the canvas no more
+            // are coming. The surface goes on ticking its animations either way, so the
+            // timer still fired and opened a tooltip over a surface the pointer had
+            // left. This class is the canvas for the main form and for every secondary
+            // window, so both are covered.
+            com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    com.codename1.ui.TooltipManager.hideTooltip();
+                }
+            });
         }
         public void mouseDragged(MouseEvent e) {
             e.consume();
