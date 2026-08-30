@@ -115,6 +115,17 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/device-runner.log"
 FALLBACK_LOG="$ARTIFACTS_DIR/device-runner-fallback.log"
+# Truncate before the app is launched. `open --stdout` APPENDS, and the wait
+# loop decides the suite is over by grepping this file for the end marker -- so
+# a log left by an earlier run ends the wait before the app has drawn anything,
+# and the run reports on whatever handful of screenshots arrived in the race.
+# CI never sees it because its runner starts with an empty artifacts dir; a
+# second local run is where a stale marker silently truncates the suite (a run
+# that "finished" with 3 of 150 tests, reported as 121 failures). The
+# per-test-name tallies below read the same files, so they are cleared too.
+: > "$TEST_LOG"
+: > "$FALLBACK_LOG"
+: > "$ARTIFACTS_DIR/device-runner-late-fallback.log"
 
 if [ -z "$REQUESTED_SCHEME" ]; then
   if [[ "$WORKSPACE_PATH" == *.xcworkspace ]]; then
