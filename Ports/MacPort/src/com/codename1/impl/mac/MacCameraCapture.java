@@ -162,8 +162,24 @@ final class MacCameraCapture {
         cancel.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                discard(recording[0]);
-                finish(finished, session, previous, response, null);
+                if (recording[0] == null) {
+                    finish(finished, session, previous, response, null);
+                    return;
+                }
+                // The session stays open until the recorder has finished with
+                // it. stopAndAwait() completes through the native
+                // didFinishRecordingToOutputFileAtURL: callback, and closing
+                // the session removes movieOutput and releases the camera --
+                // so closing first meant the completion never arrived: the
+                // part-written file was never deleted and its callback entry
+                // was never released. Cancelling twice is already impossible;
+                // finish() has its own guard.
+                discard(recording[0], new Runnable() {
+                    @Override
+                    public void run() {
+                        finish(finished, session, previous, response, null);
+                    }
+                });
             }
         });
 
@@ -279,8 +295,30 @@ final class MacCameraCapture {
     /// why it takes the path the recorder finally reports rather than the one it
     /// was asked for -- they are usually the same file, and when they are not,
     /// the reported one is the file that exists.
-    private static void discard(VideoRecording recording) {
+    /// Stops and deletes a cancelled recording, then runs `andThen`.
+    ///
+    /// The continuation is what keeps the camera session alive long enough:
+    /// the stop only completes through the native recorder's own callback, and
+    /// closing the session first removes the output it would have come from.
+    /// Run on the EDT, because the caller uses it to show a Form.
+    /// Runs the continuation on the event dispatch thread.
+    ///
+    /// The stop completion arrives from the native recorder's own thread, and
+    /// what the caller does with it shows a Form.
+    private static void continueOnEdt(final Runnable andThen) {
+        if (andThen == null) {
+            return;
+        }
+        if (Display.getInstance().isEdt()) {
+            andThen.run();
+        } else {
+            Display.getInstance().callSerially(andThen);
+        }
+    }
+
+    private static void discard(VideoRecording recording, final Runnable andThen) {
         if (recording == null) {
+            continueOnEdt(andThen);
             return;
         }
         final String requested = recording.getRequestedPath();
@@ -289,6 +327,7 @@ final class MacCameraCapture {
                 @Override
                 public void onSucess(String path) {
                     deleteQuietly(path != null && path.length() > 0 ? path : requested);
+                    continueOnEdt(andThen);
                 }
             }).except(new SuccessCallback<Throwable>() {
                 @Override
@@ -297,11 +336,13 @@ final class MacCameraCapture {
                     // requested one is the best guess at what was left behind.
                     Log.e(err);
                     deleteQuietly(requested);
+                    continueOnEdt(andThen);
                 }
             });
         } catch (Throwable t) {
             Log.e(t);
             deleteQuietly(requested);
+            continueOnEdt(andThen);
         }
     }
 
