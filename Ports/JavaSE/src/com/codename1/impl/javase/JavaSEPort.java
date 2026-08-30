@@ -4663,6 +4663,37 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
     }
 
+    /**
+     * Tells one surface's canvas that its tree changed, rather than all of them.
+     *
+     * <p>The surface-less form below has to reach every canvas, because it does not
+     * know which one is meant. Left to inherit that, a state, focus or pane change
+     * inside one window announced itself on every other window as well, and a screen
+     * reader refreshed and spoke surfaces that had not changed.</p>
+     *
+     * @param changeType bit mask of the accessibility change constants
+     * @param windowId the surface that changed, zero for the main one
+     */
+    @Override
+    public void accessibilityTreeChanged(final int changeType, final int windowId) {
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                if (windowId == 0) {
+                    if (canvas != null) {
+                        canvas.accessibilityChanged(changeType);
+                    }
+                    return;
+                }
+                for (C c : liveWindowCanvases()) {
+                    if (c.windowId == windowId) {
+                        c.accessibilityChanged(changeType);
+                        return;
+                    }
+                }
+            }
+        });
+    }
+
     @Override
     public boolean isAccessibilityTreeSupported() {
         return true;
