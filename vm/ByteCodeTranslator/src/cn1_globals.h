@@ -93,6 +93,53 @@
 #endif
 #endif
 
+// =========================================================================
+// UNCOOPERATIVE-MUTATOR ESCALATION (issue #5537)
+// =========================================================================
+// The mark phase stops each lightweight thread by setting threadBlockedByGC and
+// then spinning on threadActive until the thread parks itself. That handshake is
+// purely COOPERATIVE, and ParparVM emits no safepoint polls in generated code --
+// not on method entry, not on loop back-edges (grep the translator for
+// threadBlockedByGC: no hits). Every safepoint lives inside a runtime function:
+// the codenameOneGcMalloc handshake, cn1BibopMaybeGc (reached only once per BiBOP
+// PAGE, not per object), contended monitorEnter, Thread.sleep/Object.wait and the
+// CN1_YIELD_THREAD native bracket.
+//
+// So a Java loop that allocates nothing new and enters no contended monitor never
+// reaches a safepoint, and the collector's spin never ends. That is not a slow GC,
+// it is a whole-VM freeze: every other thread parks at its next allocation waiting
+// for a cycle that can never start. Issue #5537 caught it in the debugger with the
+// collector 10 minutes 9 seconds into that spin (totalwait = 609,491,500us) while a
+// game-tree search thread ran a compute-only evaluation loop.
+//
+// The escalation bounds the spin and then FREEZES the thread with the same SIGUSR2
+// stop the collector already uses for genuine native threads (cn1GcSignalStopOne),
+// which needs no cooperation at all. Only available where that machinery is
+// compiled: conservative roots on, and not Windows (no POSIX signals -- there the
+// spin stays unbounded, exactly as today, because proceeding without stopping the
+// thread would miss its roots and free live objects).
+//
+// The proper long-term answer is a safepoint poll on loop back-edges in the
+// translator, which costs throughput in every loop the VM ever runs; this makes the
+// pathological case survivable without paying that everywhere.
+//
+// -DCN1_GC_NO_FORCE_STOP restores the unbounded cooperative spin. It is the ablation arm
+// GcUncooperativeThreadIntegrationTest builds to prove the gate can fail -- without a
+// build that still wedges, an assertion that the VM does not wedge proves nothing.
+#if defined(CN1_CONSERVATIVE_GC_ROOTS) && !defined(_WIN32) && !defined(CN1_GC_NO_FORCE_STOP)
+#define CN1_GC_CAN_FORCE_STOP 1
+#endif
+
+// How long the cooperative safepoint handshake may spin before escalating, in
+// microseconds. A thread that is going to park does so in microseconds, so this is
+// pure headroom -- it only has to exceed the longest legitimate gap between a
+// mutator's safepoints, which is one BiBOP page (64KB) of allocation or one
+// unbracketed native call. Raising it lengthens the freeze in the pathological case
+// and buys nothing in the normal one.
+#ifndef CN1_GC_SAFEPOINT_WAIT_MAX_US
+#define CN1_GC_SAFEPOINT_WAIT_MAX_US 250000
+#endif
+
 //#define DEBUG_GC_ALLOCATIONS
 
 #define NUMBER_OF_SUPPORTED_THREADS 1024
@@ -1234,6 +1281,14 @@ struct ThreadLocalData {
     void* volatile gcSigStackBase;           // [sp,base) high bound (filled by GC/handler)
     char         gcSigRegs[4096];            // raw copy of the interrupted ucontext (GPRs)
     volatile sig_atomic_t gcSigRegsLen;      // valid bytes in gcSigRegs
+    // Set while the MARK LOOP owns a signal freeze it took because this thread would
+    // not reach a safepoint (see CN1_GC_CAN_FORCE_STOP). It tells
+    // cn1GcScanThreadNativeStack to reuse that freeze rather than take its own: a
+    // second SIGUSR2 aimed at a thread already spinning inside the handler stays
+    // pending until the handler returns, so the nested stop would spin out its whole
+    // timeout and then report failure on a thread that is in fact frozen. GC-thread
+    // owned, cleared by cn1GcMarkReleaseForced.
+    JAVA_BOOLEAN gcMarkForcedStop;
 #endif
 #ifdef CN1_GC_CONFORM
     // Monotonic ms at which this thread was registered. The duty denominator is the

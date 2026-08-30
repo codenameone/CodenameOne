@@ -1605,6 +1605,12 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
 static void cn1GcScanOwnStack(CODENAME_ONE_THREAD_STATE);
 static void cn1GcSignalStopThreads(struct ThreadLocalData* self);
 static void cn1GcSignalReleaseThreads(struct ThreadLocalData* self);
+#ifdef CN1_GC_CAN_FORCE_STOP
+// Escalation for a lightweight thread that will not reach a safepoint (issue #5537).
+// See the definitions next to cn1GcSignalStopOne for the contract.
+static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t);
+static void cn1GcMarkReleaseForced(struct ThreadLocalData* t);
+#endif
 void cn1GcBuildRootSnapshots(void);
 JAVA_OBJECT cn1ConservativeResolve(void* w);
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
@@ -2223,6 +2229,10 @@ void codenameOneGCMark() {
             }
             if(t != d) {
                 struct elementStruct* objects = t->threadObjectStack;
+                // TRUE once the cooperative handshake below gave up and froze this
+                // thread with a signal instead. It changes what the rest of this
+                // iteration may touch -- see each use.
+                JAVA_BOOLEAN forcedStop = JAVA_FALSE;
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
                 // PHASE 3b: demand a FRESH native-stack capture this round. Only a
@@ -2239,8 +2249,19 @@ void codenameOneGCMark() {
                 // we don't have much control and who barely call into Java anyway
                 if(t->lightweightThread) {
                     t->threadBlockedByGC = JAVA_TRUE;
-                    int totalwait = 0;
+                    // 64-bit: at 500us a spin, an int overflowed after ~36 minutes of
+                    // waiting, and signed overflow is undefined -- the one input that
+                    // can reach it is precisely the wedge this loop is trying to report.
+                    long long totalwait = 0;
                     long now = time(0);
+                    long lastReport = 0;
+#ifdef CN1_GC_CAN_FORCE_STOP
+                    // Next totalwait at which to try the escalation. A running total
+                    // rather than a modulo: CN1_GC_SAFEPOINT_WAIT_MAX_US is overridable,
+                    // and `totalwait % bound == 0` silently never fires for any bound that
+                    // is not a multiple of the 500us step.
+                    long long nextEscalation = (long long)CN1_GC_SAFEPOINT_WAIT_MAX_US;
+#endif
 #ifdef CN1_GC_CONFORM
                     // Opened and closed around the safepoint wait ALONE. Closing it later
                     // -- after the migration and the stack scans -- would fold their cost
@@ -2252,16 +2273,83 @@ void codenameOneGCMark() {
                     while(t->threadActive) {
                         usleep(500);
                         totalwait += 500;
-                        if((totalwait%10000)==0)
-                        {   long later = time(0)-now;
-                            if(later>10000)
-                            {
+                        // REPORTING, fixed. time(0) is in SECONDS; this compared the
+                        // elapsed value against 10000 and then printed it divided by
+                        // 1000, so the warning first became eligible after 2.8 HOURS and
+                        // would have understated what it found by a factor of 1000. The
+                        // collector in issue #5537 sat here for 10 minutes 9 seconds
+                        // (totalwait 609,491,500us, read out of the debugger) and never
+                        // printed a line -- the one diagnostic aimed at this failure was
+                        // silent for the whole of it. Report from 10 seconds on, once
+                        // every 10, naming the thread while it is still stuck. Kept live
+                        // even where the escalation below exists, because that escalation
+                        // can itself fail and this is then the only thing that says so.
+                        if((totalwait % 100000) == 0) {
+                            long later = time(0) - now;
+                            if(later >= 10 && later - lastReport >= 10) {
+                                lastReport = later;
 #if defined(__OBJC__)
-                            NSLog(@"GC trapped for %d seconds waiting for thread %d in slot %d (%d)",
-                                  (int)(later/1000),(int)t->threadId,iter,t->threadKilled);
+                                NSLog(@"[GC] trapped for %ld seconds waiting for thread %d in slot %d (killed=%d)",
+                                      later, (int)t->threadId, iter, (int)t->threadKilled);
+#else
+                                fprintf(stderr, "[GC] trapped for %ld seconds waiting for thread %d in slot %d (killed=%d)\n",
+                                        later, (int)t->threadId, iter, (int)t->threadKilled);
 #endif
                             }
                         }
+#ifdef CN1_GC_CAN_FORCE_STOP
+                        // ESCALATION. Past the bound this thread is not going to park --
+                        // typically because it is running generated code that reaches no
+                        // safepoint at all (see CN1_GC_CAN_FORCE_STOP in cn1_globals.h).
+                        // Freeze it with the signal stop instead, which needs no
+                        // cooperation. RETRIED on the same cadence rather than attempted
+                        // once: cn1GcSignalStopOne can time out on a descheduled handler,
+                        // and one transient failure must not sentence the collector to the
+                        // unbounded wait for the rest of the cycle. Each failed attempt
+                        // already costs about its own timeout, so the retry rate is
+                        // self-limiting. gcPthreadValid is the one PERMANENT reason the
+                        // stop cannot work, and retrying past it would rebuild the root
+                        // snapshot every 250ms for the rest of a wait that is already
+                        // never going to end.
+                        if(totalwait >= nextEscalation && t->gcPthreadValid) {
+                            nextEscalation += (long long)CN1_GC_SAFEPOINT_WAIT_MAX_US;
+                            // The snapshot rebuild MUST happen here, BEFORE the freeze: it
+                            // reallocs, and a thread frozen mid-malloc holds the libc
+                            // allocator lock. Everything this iteration does while the
+                            // freeze is held is malloc-free for the same reason (the mark
+                            // worklist is a fixed-size array; the force-visited side table
+                            // is only touched on the force path, which no root scan takes).
+                            cn1GcBuildRootSnapshots();
+                            forcedStop = cn1GcMarkForceStopUncooperative(t);
+                            if(forcedStop) {
+                                // Reported on the 1st, 2nd, 4th, 8th ... escalation of the
+                                // process. Self-limiting without a rate-limit clock, and
+                                // the running count still tells you the order of magnitude
+                                // -- one escalation is a thread that happened to sit in a
+                                // long native, thousands is a program with a compute loop
+                                // in it, and that difference is what a reader needs. Not
+                                // behind an env var: a collector that had to shoot a
+                                // mutator to make progress is abnormal, and the reason
+                                // issue #5537 took so long to place is that this loop had
+                                // nothing to say for itself.
+                                static long cn1GcForcedStops = 0;   // GC thread only
+                                cn1GcForcedStops++;
+                                if((cn1GcForcedStops & (cn1GcForcedStops - 1)) == 0) {
+#if defined(__OBJC__)
+                                    NSLog(@"[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)",
+                                          (int)t->threadId, totalwait, cn1GcForcedStops);
+#else
+                                    fprintf(stderr, "[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)\n",
+                                            (int)t->threadId, totalwait, cn1GcForcedStops);
+#endif
+                                }
+                                // threadActive is still TRUE and stays that way -- the
+                                // thread is frozen, not parked. Everything below reads
+                                // forcedStop rather than threadActive for that reason.
+                                break;
+                            }
+                        }
+#endif
                     }
 #ifdef CN1_GC_CONFORM
                     cn1GcWaitNs += cn1GcNowNs() - __wt0;
@@ -2283,7 +2371,19 @@ void codenameOneGCMark() {
                 long long __mg0 = cn1GcNowNs();
 #endif
                 lockCriticalSection();
-                if(allThreads[iter] == t) {
+                // A force-stopped thread is SKIPPED here, and its heapAllocationSize is
+                // left alone below. The append is `pending[size] = o; size++`, so a thread
+                // frozen between those two stores has an object in the table that the
+                // count does not cover yet: migrating [0,size), zeroing those slots and
+                // resetting size to 0 would leave that object referenced by nothing the
+                // collector ever walks, and the thread's own `size++` on resume would then
+                // hand the next allocation a slot the migration had already emptied. The
+                // table is not a root source -- it only decides which objects the SWEEP
+                // may consider -- so leaving it intact for one cycle costs a deferred
+                // reclaim and nothing else. It also cannot grow without bound: a table
+                // over its threshold parks its own thread at a safepoint, which is the
+                // cooperative stop this escalation was standing in for.
+                if(allThreads[iter] == t && !forcedStop) {
                     if (!t->lightweightThread) {
                         // For native threads, we need to actually lock them while we traverse the
                         // heap allocations because we can't use the usual locking mechanisms on
@@ -2328,14 +2428,21 @@ void codenameOneGCMark() {
                     
                 }
                 
-                t->heapAllocationSize = 0;
+                if(!forcedStop) {
+                    t->heapAllocationSize = 0;
+                }
 
                 int stackSize = t->threadObjectStackOffset;
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
                 // Refresh the page/extent snapshot for the VALIDATED precise scan
                 // below (also rebuilt in cn1GcScanThreadNativeStack before any
                 // signal-stop; building here first only makes it fresher).
-                cn1GcBuildRootSnapshots();
+                // NOT while a forced stop is held: this reallocs, and the frozen thread
+                // may hold the allocator lock. The escalation built the snapshot before
+                // it froze the thread, so the one this would refresh already exists.
+                if(!forcedStop) {
+                    cn1GcBuildRootSnapshots();
+                }
 #endif
 #ifdef CN1_GC_VERIFY
     { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "precise-thread-stack"; }
@@ -2402,6 +2509,24 @@ void codenameOneGCMark() {
                 cn1GcScanThreadNativeStack(d, t);
 #ifdef CN1_GC_CONFORM
                 cn1GcStackNs += cn1GcNowNs();
+#endif
+#ifdef CN1_GC_CAN_FORCE_STOP
+                // Release the forced freeze the moment this thread's roots are captured,
+                // which is HERE and not at the threadBlockedByGC clear further down. A
+                // cooperatively parked thread waits out the mark drain in a usleep; a
+                // signal-frozen one waits in an async-signal-safe BUSY spin, so holding it
+                // across the drain would burn a core for the length of a full mark. What
+                // the drain-before-unblock is protecting -- snapshot-at-the-beginning --
+                // is supplied for a released mutator by the SATB deletion barrier, which
+                // is armed for the whole mark and is already the only thing keeping
+                // genuine native threads honest; they are never blocked at all, and
+                // cn1GcScanThreadNativeStack releases its own signal stops at exactly this
+                // point for the same reason. threadBlockedByGC stays set, so if this
+                // thread does reach a safepoint it still parks.
+                if(forcedStop) {
+                    cn1GcMarkReleaseForced(t);
+                    forcedStop = JAVA_FALSE;
+                }
 #endif
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
                 cn1GcSelfCheckThreadStack(t, stackSize);
@@ -8219,6 +8344,33 @@ static void cn1GcSignalReleaseOne(struct ThreadLocalData* t) {
 #endif
 }
 
+#ifdef CN1_GC_CAN_FORCE_STOP
+// Freeze a lightweight thread that would not reach a safepoint within
+// CN1_GC_SAFEPOINT_WAIT_MAX_US (issue #5537 -- see CN1_GC_CAN_FORCE_STOP in
+// cn1_globals.h for why such a thread exists at all). Returns JAVA_TRUE once the thread
+// is parked inside the SIGUSR2 handler, and the CALLER then owns that freeze until
+// cn1GcMarkReleaseForced -- including the obligation to run nothing that allocates while
+// it is held, because the thread can have been frozen mid-malloc. The root snapshots must
+// already be built for the same reason.
+static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t) {
+    if(cn1GcSignalStopOne(t) == 0) {
+        // Timed out or the thread has no valid pthread. cn1GcSignalStopOne has already
+        // pre-released the generation, so nothing is left stranded.
+        return JAVA_FALSE;
+    }
+    t->gcMarkForcedStop = JAVA_TRUE;
+    return JAVA_TRUE;
+}
+
+static void cn1GcMarkReleaseForced(struct ThreadLocalData* t) {
+    if(!t->gcMarkForcedStop) {
+        return;
+    }
+    t->gcMarkForcedStop = JAVA_FALSE;
+    cn1GcSignalReleaseOne(t);
+}
+#endif
+
 // Scan ONE thread's native C stack [sp, base) + its register snapshot, marking every
 // resolved live object. threadStateData = the GC thread; t = the thread being scanned.
 static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadLocalData* t) {
@@ -8226,6 +8378,27 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
     size_t ssz = 0;
     char* base = cn1GcStackBase(t->gcPthread, &ssz);
     if(base == 0 || ssz == 0) return;
+
+#ifdef CN1_GC_CAN_FORCE_STOP
+    if(t->gcMarkForcedStop) {
+        // The mark loop already froze this thread (the cooperative handshake timed out)
+        // and still owns the freeze. Reuse its capture: do NOT stop again -- a second
+        // SIGUSR2 to a thread spinning inside the handler stays pending until the handler
+        // returns, so the nested stop would spin out its full timeout and then report
+        // failure on a thread that is demonstrably stopped -- and do NOT release, because
+        // the precise object-stack scan the caller runs alongside this needs the same
+        // freeze. Also no cn1GcBuildRootSnapshots here: it reallocs, the caller built the
+        // snapshot before freezing, and a frozen thread may hold the allocator lock.
+        char* fsp = (char*)t->gcSigStackPointer;
+        if(fsp != 0 && fsp >= base - (long)ssz && fsp < base) {
+            cn1ConservativeMarkRange(threadStateData, fsp, base);
+        }
+        if(t->gcSigRegsLen > 0) {
+            cn1ConservativeMarkRange(threadStateData, t->gcSigRegs, t->gcSigRegs + t->gcSigRegsLen);
+        }
+        return;
+    }
+#endif
 
     // Snapshot rebuilt BEFORE any signal-stop (realloc-while-frozen would deadlock).
     cn1GcBuildRootSnapshots();

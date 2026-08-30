@@ -1831,6 +1831,12 @@ struct ThreadLocalData* getThreadLocalData() {
         i->gcSigStopGen = 0;
         i->gcSigStackPointer = 0;
         i->gcSigRegsLen = 0;
+        // ThreadLocalData is malloc'd, NOT zeroed (see the notes on nativeStackLimit and
+        // bibopBytesLocal above). Garbage-nonzero here would tell
+        // cn1GcScanThreadNativeStack that the mark loop already froze this thread, so it
+        // would scan a RUNNING thread's stack from a garbage SP and never signal-stop it
+        // -- missed roots, then a use-after-free on whatever the sweep took.
+        i->gcMarkForcedStop = JAVA_FALSE;
         cn1TlsSelf = i;
 #endif
         pthread_setspecific(threadIdKey, i);

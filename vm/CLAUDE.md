@@ -341,6 +341,79 @@ If this is ever revisited, the thing to build FIRST is a way to drive an allocat
 residual window on purpose -- the phases after the grace walk and before `gcSatbActive` is
 cleared -- because without that, no version of this change can be validated.
 
+### There are no safepoint polls in generated code
+
+The mark phase stops each lightweight thread cooperatively: it raises `threadBlockedByGC`
+and spins on `while(t->threadActive)` until the thread parks itself. **Nothing in the
+translator emits a safepoint poll** -- not on method entry, not on loop back-edges; grep
+`vm/ByteCodeTranslator/src/com/codename1/tools/translator` for `threadBlockedByGC` and
+there are no hits. Every safepoint in this VM lives inside a *runtime function*:
+
+- `codenameOneGcMalloc`'s handshake (legacy allocations),
+- `cn1BibopMaybeGc`, reached **once per 64KB PAGE**, not per object -- a thread bumping
+  inside a page it already holds passes no safepoint,
+- contended `monitorEnter`,
+- `Thread.sleep` / `Object.wait`, and the `CN1_YIELD_THREAD` native bracket.
+
+`monitorEnter`'s **first-creation** branch is the odd one out and is worth fixing on its
+own: it `pthread_mutex_lock`s with `threadActive` still TRUE, where the contended branch
+right below it parks first. A thread that publishes the monitor into the side table, drops
+the critical section and is then beaten to the mutex by a second thread -- which parks and
+holds it across the GC handshake -- blocks there while still counted active, which is a
+three-way deadlock (collector waits for it, it waits for the mutex, the holder waits for the
+collector). The escalation below rescues that on POSIX and does not on Windows. Left alone
+here deliberately: it is a different bug on a hot path and wants its own change and gate.
+
+So a Java loop that allocates nothing new and enters no contended monitor reaches **no
+safepoint at all**, and that spin never ends. It is not a slow GC, it is a whole-VM freeze:
+every other thread parks at its next allocation waiting for a cycle that can never start.
+Issue #5537's reporter caught it in the debugger with the collector `totalwait =
+609491500` microseconds -- **10 minutes 9 seconds** -- into that spin while a game-tree
+search ran a compute-only evaluation loop.
+
+`CN1_GC_SAFEPOINT_WAIT_MAX_US` (250ms) bounds the spin, and past it the collector freezes
+the thread with the **same SIGUSR2 stop it already uses for genuine native threads**
+(`cn1GcSignalStopOne`), which needs no cooperation. Measured by
+`GcUncooperativeThreadIntegrationTest`, one 6s compute-only spin against a churning
+allocator: **maxStall 6186ms of a 6187ms spin without it, 339ms of 5948ms with it**. The
+ablation arm is `-DCN1_GC_NO_FORCE_STOP`, and the gate requires it to reproduce the wedge.
+
+Four things the escalation has to respect, all of them consequences of a thread being
+frozen wherever it happened to be rather than at a point it chose:
+
+- **Nothing may allocate while the freeze is held.** The thread can be frozen mid-`malloc`
+  holding the libc allocator lock. `cn1GcBuildRootSnapshots` reallocs, so it runs BEFORE
+  the freeze and is skipped at both of its usual call sites for the rest of that thread's
+  iteration. The scans themselves are malloc-free (fixed-size mark worklist; the
+  force-visited side table is only touched on the `force` path, which no root scan takes).
+- **The pending-allocation table is not migrated.** The append is `pending[size] = o;
+  size++`, so a thread frozen between the two stores has an object the count does not
+  cover; migrating and resetting `size` to 0 would orphan it and then hand its slot back
+  out. The table is not a root source -- it only decides what the SWEEP may consider -- so
+  skipping it for a cycle costs a deferred reclaim and nothing else.
+- **The freeze is released as soon as the roots are captured**, not at the
+  `threadBlockedByGC` clear. A parked thread waits in `usleep`; a signal-frozen one waits
+  in an async-signal-safe BUSY spin, so holding it across the mark drain would burn a core.
+  SATB is what makes an early release safe, and it is already the only thing keeping
+  genuine native threads honest.
+- **Do not signal a thread that is already frozen.** A second SIGUSR2 aimed at a thread
+  spinning inside the handler stays pending until the handler returns, so a nested stop
+  spins out its whole timeout and then reports failure on a thread that is demonstrably
+  stopped. `gcMarkForcedStop` tells `cn1GcScanThreadNativeStack` to reuse the capture.
+
+Windows has no POSIX signals, so there the spin stays unbounded -- proceeding without
+stopping the thread would miss its roots and free live objects, which is worse than a hang.
+The proper long-term answer is a back-edge poll in the translator; it costs throughput in
+every loop the VM ever runs, and this makes the pathological case survivable without paying
+that everywhere.
+
+**The diagnostic aimed at exactly this was dead for its whole life.** The spin's warning
+computed `long later = time(0) - now` -- SECONDS -- then tested `later > 10000` and printed
+`later / 1000` as "seconds". It first became eligible after 2.8 hours and would have
+understated by 1000x, so the ten-minute freeze above printed nothing and had to be read out
+of a debugger. `totalwait` was also an `int`, which is signed overflow at ~36 minutes of
+waiting. If an instrument has never been seen firing, assume it does not.
+
 ### Never call into Java from a parked thread
 
 `java_lang_System_gc__` enters `synchronized(LOCK)`, and `monitorEnter` is a GC safepoint.
