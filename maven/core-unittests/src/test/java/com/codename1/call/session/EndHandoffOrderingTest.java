@@ -27,6 +27,8 @@ import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -120,5 +122,51 @@ class EndHandoffOrderingTest {
         String src = read(CALLS);
         assertTrue(src.contains("static final Object HANDOFF = new Object();"),
                 "the lock is its own object, not the registry monitor");
+    }
+
+    @Test
+    void everyOwnershipCheckInTheClassIsOrderedAgainstTheRegistry()
+            throws Exception {
+        // Review named setHeld, setMuted and sendDigits. The gap was in seven
+        // methods, and one of them -- groupWith -- had no ownership check at
+        // all. Fixing the named three and stopping is how a bug class comes
+        // back, so this asserts the property over the whole file rather than
+        // over a list somebody has to remember to extend.
+        String[] lines = read(SESSION).split("\n", -1);
+        List<String> gaps = new ArrayList<String>();
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            if (line.indexOf("Calls.owns(callId, this)") < 0
+                    || line.trim().startsWith("//")) {
+                continue;
+            }
+            int indent = line.length() - line.replaceAll("^ +", "").length();
+            String enclosing = null;
+            for (int j = i - 1; j >= 0; j--) {
+                String candidate = lines[j];
+                if (candidate.trim().length() == 0
+                        || candidate.trim().startsWith("//")) {
+                    continue;
+                }
+                int outer = candidate.length()
+                        - candidate.replaceAll("^ +", "").length();
+                if (outer < indent) {
+                    enclosing = candidate.trim();
+                    break;
+                }
+            }
+            // `reporting` counts because it is itself nested inside HANDOFF;
+            // see the ordering note in reportStartedConnecting.
+            boolean ordered = enclosing != null
+                    && (enclosing.startsWith("synchronized (Calls.HANDOFF)")
+                            || enclosing.startsWith("synchronized (reporting)"));
+            if (!ordered) {
+                gaps.add("line " + (i + 1) + " enclosed by " + enclosing);
+            }
+        }
+        assertTrue(gaps.isEmpty(),
+                "an ownership check outside the handoff ordering authorises"
+                + " an operation the port applies to whatever holds the id"
+                + " when it arrives: " + gaps);
     }
 }

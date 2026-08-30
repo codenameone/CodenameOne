@@ -113,8 +113,7 @@ public final class CallSession {
     /// has connected.
     public void reportStartedConnecting() {
         CallBridge b = CallRequests.bridge();
-        if (b == null || direction != CallDirection.OUTGOING
-                || !Calls.owns(callId, this)) {
+        if (b == null || direction != CallDirection.OUTGOING) {
             return;
         }
         // STILL DIALING, rather than "not over". This was
@@ -153,12 +152,25 @@ public final class CallSession {
         // it orders them against each other without standing between a port
         // callback and the state it needs. TunnelHost's `lifecycle` lock
         // orders start, stop and delivery for the same reason.
-        synchronized (reporting) {
-            if (!stillDialing()) {
-                return;
+        // HANDOFF OUTSIDE `reporting`, and that order is the whole of what
+        // makes two locks safe: every path in this class takes HANDOFF
+        // first, then `reporting`, then the session monitor. Calls.report
+        // takes HANDOFF then the registry. Nothing takes them the other way
+        // round, so there is no cycle to deadlock on.
+        //
+        // Both are needed and they answer different questions. `reporting`
+        // orders this report against the connect that may overtake it;
+        // HANDOFF orders the ownership test against the handoff it
+        // authorises, because the ownership test used to sit in the guard
+        // above where a replacement could claim the id before this line ran.
+        synchronized (Calls.HANDOFF) {
+            synchronized (reporting) {
+                if (!Calls.owns(callId, this) || !stillDialing()) {
+                    return;
+                }
+                b.reportOutgoingStartedConnecting(callId,
+                        System.currentTimeMillis());
             }
-            b.reportOutgoingStartedConnecting(callId,
-                    System.currentTimeMillis());
         }
     }
 
@@ -241,21 +253,25 @@ public final class CallSession {
     /// actually flowing, because it starts the duration the user sees.
     public void reportConnected() {
         CallBridge b = CallRequests.bridge();
-        if (b == null || !Calls.owns(callId, this)) {
+        if (b == null) {
             return;
         }
         // Inside `reporting` with the transition, so a started-connecting
         // report cannot pass its own state test before this one and then
         // reach the platform after it. See the note there.
-        synchronized (reporting) {
-            if (!moveToConnected()) {
-                return;
-            }
-            long now = System.currentTimeMillis();
-            if (direction == CallDirection.OUTGOING) {
-                b.reportOutgoingConnected(callId, now);
-            } else {
-                b.reportIncomingConnected(callId, now);
+        // HANDOFF then `reporting`, the same order as everywhere else in
+        // this class; see reportStartedConnecting for why both locks exist.
+        synchronized (Calls.HANDOFF) {
+            synchronized (reporting) {
+                if (!Calls.owns(callId, this) || !moveToConnected()) {
+                    return;
+                }
+                long now = System.currentTimeMillis();
+                if (direction == CallDirection.OUTGOING) {
+                    b.reportOutgoingConnected(callId, now);
+                } else {
+                    b.reportIncomingConnected(callId, now);
+                }
             }
         }
     }
@@ -271,24 +287,32 @@ public final class CallSession {
     /// mixed pair of the two.
     public void update(CallHandle newHandle, String newDisplayName) {
         CallBridge b = CallRequests.bridge();
-        if (!Calls.owns(callId, this)) {
-            // The local fields are left alone too: this object no longer
-            // describes anything the system knows about.
-            return;
-        }
-        if (newHandle != null) {
-            synchronized (this) {
-                handle = newHandle;
+        // Under HANDOFF for the reason end() is, and named by review only for
+        // its siblings: updateCall reaches the port by call id too, so an
+        // unordered check let a rename land on whichever call held the id --
+        // relabelling somebody else's live call in the system UI, which is
+        // the one place the user is looking.
+        synchronized (Calls.HANDOFF) {
+            if (!Calls.owns(callId, this)) {
+                // The local fields are left alone too: this object no longer
+                // describes anything the system knows about.
+                return;
             }
-        }
-        if (newDisplayName != null) {
-            synchronized (this) {
-                displayName = newDisplayName;
+            if (newHandle != null) {
+                synchronized (this) {
+                    handle = newHandle;
+                }
             }
-        }
-        if (b != null) {
-            b.updateCall(callId, newHandle == null ? null
-                    : CallWire.encodeHandle(newHandle), newDisplayName, -1, false);
+            if (newDisplayName != null) {
+                synchronized (this) {
+                    displayName = newDisplayName;
+                }
+            }
+            if (b != null) {
+                b.updateCall(callId, newHandle == null ? null
+                        : CallWire.encodeHandle(newHandle), newDisplayName, -1,
+                        false);
+            }
         }
     }
 
@@ -389,19 +413,27 @@ public final class CallSession {
         if (b == null) {
             return Calls.unsupported();
         }
-        if (!Calls.owns(callId, this)) {
-            return staleSession();
+        // Under HANDOFF, like end(). The bridge identifies its target by
+        // call id alone, so an ownership check that is not ordered against
+        // the registry authorises an operation the port then applies to
+        // whatever holds the id when it arrives -- and the acknowledgement
+        // comes back to THIS session, so the two halves describe different
+        // calls. See Calls.HANDOFF.
+        synchronized (Calls.HANDOFF) {
+            if (!Calls.owns(callId, this)) {
+                return staleSession();
+            }
+            int id = CallRequests.nextId();
+            EdtResult<Boolean> r = CallRequests.openAck(id);
+            // Applied from the acknowledgement, as end() does. Setting it up
+            // front left the session claiming HELD after a transaction the system
+            // had rejected -- for instance because the call ended while the
+            // request was in flight -- with nothing to roll it back.
+            r.onResult(new StateOutcome(this,
+                    held ? CallState.HELD : CallState.ACTIVE));
+            b.setHeld(id, callId, held);
+            return r;
         }
-        int id = CallRequests.nextId();
-        EdtResult<Boolean> r = CallRequests.openAck(id);
-        // Applied from the acknowledgement, as end() does. Setting it up
-        // front left the session claiming HELD after a transaction the system
-        // had rejected -- for instance because the call ended while the
-        // request was in flight -- with nothing to roll it back.
-        r.onResult(new StateOutcome(this,
-                held ? CallState.HELD : CallState.ACTIVE));
-        b.setHeld(id, callId, held);
-        return r;
     }
 
     /// Mutes or unmutes the call in the system UI.
@@ -421,15 +453,23 @@ public final class CallSession {
         if (b == null) {
             return Calls.unsupported();
         }
-        if (!Calls.owns(callId, this)) {
-            return staleSession();
+        // Under HANDOFF, like end(). The bridge identifies its target by
+        // call id alone, so an ownership check that is not ordered against
+        // the registry authorises an operation the port then applies to
+        // whatever holds the id when it arrives -- and the acknowledgement
+        // comes back to THIS session, so the two halves describe different
+        // calls. See Calls.HANDOFF.
+        synchronized (Calls.HANDOFF) {
+            if (!Calls.owns(callId, this)) {
+                return staleSession();
+            }
+            int id = CallRequests.nextId();
+            EdtResult<Boolean> r = CallRequests.openAck(id);
+            // Applied from the acknowledgement for the same reason as setHeld.
+            r.onResult(new MuteOutcome(this, value));
+            b.setMuted(id, callId, value);
+            return r;
         }
-        int id = CallRequests.nextId();
-        EdtResult<Boolean> r = CallRequests.openAck(id);
-        // Applied from the acknowledgement for the same reason as setHeld.
-        r.onResult(new MuteOutcome(this, value));
-        b.setMuted(id, callId, value);
-        return r;
     }
 
     /// Sends DTMF digits through the system.
@@ -438,13 +478,21 @@ public final class CallSession {
         if (b == null) {
             return Calls.unsupported();
         }
-        if (!Calls.owns(callId, this)) {
-            return staleSession();
+        // Under HANDOFF, like end(). The bridge identifies its target by
+        // call id alone, so an ownership check that is not ordered against
+        // the registry authorises an operation the port then applies to
+        // whatever holds the id when it arrives -- and the acknowledgement
+        // comes back to THIS session, so the two halves describe different
+        // calls. See Calls.HANDOFF.
+        synchronized (Calls.HANDOFF) {
+            if (!Calls.owns(callId, this)) {
+                return staleSession();
+            }
+            int id = CallRequests.nextId();
+            EdtResult<Boolean> r = CallRequests.openAck(id);
+            b.sendDtmf(id, callId, digits);
+            return r;
         }
-        int id = CallRequests.nextId();
-        EdtResult<Boolean> r = CallRequests.openAck(id);
-        b.sendDtmf(id, callId, digits);
-        return r;
     }
 
     /// Puts this call in a conference with `other`, or takes it out of one
@@ -463,10 +511,23 @@ public final class CallSession {
         if (b == null) {
             return Calls.unsupported();
         }
-        int id = CallRequests.nextId();
-        EdtResult<Boolean> r = CallRequests.openAck(id);
-        b.setCallGroup(id, callId, other == null ? null : other.getCallId());
-        return r;
+        // Ownership is checked HERE for the first time. Every port answers
+        // this NOT_SUPPORTED today, so nothing could reach a live call
+        // through it -- but "the ports all refuse it" is a property of the
+        // ports, not of this method, and the first one to implement grouping
+        // would have inherited an unguarded handoff by call id. Guarded on
+        // the same terms as its siblings rather than left as the exception
+        // nobody remembered.
+        synchronized (Calls.HANDOFF) {
+            if (!Calls.owns(callId, this)) {
+                return staleSession();
+            }
+            int id = CallRequests.nextId();
+            EdtResult<Boolean> r = CallRequests.openAck(id);
+            b.setCallGroup(id, callId,
+                    other == null ? null : other.getCallId());
+            return r;
+        }
     }
 
     /// Moves the session to ENDED and forgets it, but only once the system
