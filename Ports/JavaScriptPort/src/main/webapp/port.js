@@ -5698,6 +5698,74 @@ function resolveDisplayImplementationObject() {
   return null;
 }
 
+// As invokeFirstResolvableInstanceMethod, but hands back what the call returned.
+// Needed to walk from one object to the next -- Display -> its current Form.
+function* invokeFirstResolvableInstanceMethodValue(receiver, methodIds) {
+  if (!receiver || !receiver.__class || !methodIds || !methodIds.length) {
+    return { methodId: null, value: null };
+  }
+  for (let i = 0; i < methodIds.length; i++) {
+    const methodId = methodIds[i];
+    try {
+      const method = jvm.resolveVirtual(receiver.__class, methodId);
+      if (typeof method === "function") {
+        const value = yield* cn1_ivAdapt(method(receiver));
+        return { methodId: methodId, value: value };
+      }
+    } catch (_err) {
+      // Best-effort compatibility shim. Try the next translated name.
+    }
+  }
+  return { methodId: null, value: null };
+}
+
+// Mark the whole displayed form dirty, so the paint that follows redraws all of it.
+//
+// The settle this precedes decides the UI is ready by watching the canvas stop changing. A
+// screen that draws in stages is momentarily still between two of them and satisfies that,
+// which is how graphics-draw-image-rect has twice been captured with the top half of its grid
+// drawn and the bottom half not. Widening the quiet window only moves the race; a full repaint
+// removes it, because after one there are no stages left outstanding -- whatever the frame
+// draws, it draws all of it.
+//
+// Only Display.getCurrent() and Component.repaint() are used, both of which the framework calls
+// from Java, so neither can be dropped by the unused-method cull the way a method that existed
+// solely for this would be. If neither resolves, nothing happens and the settle behaves exactly
+// as it did before.
+function* repaintEntireDisplayedForm(reason) {
+  const impl = resolveDisplayImplementationObject();
+  if (!impl || !impl.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:repaintEntireForm:reason=" + String(reason || "unknown")
+        + ":impl=null");
+    return false;
+  }
+  // CodenameOneImplementation.getCurrentForm() rather than Display.getCurrent(): the receiver is
+  // the object this file already holds, and both this and Component.repaint() are called from
+  // Java by the framework itself, so neither can be dropped by the unused-method cull. Verified
+  // present as cn1_s_getCurrentForm_R_com_codename1_ui_Form and cn1_s_repaint in a translated
+  // bundle. The short cn1_s_ spelling is what the runtime maps to the long one; the long forms
+  // follow as fallbacks.
+  const current = yield* invokeFirstResolvableInstanceMethodValue(impl, [
+    "cn1_s_getCurrentForm_R_com_codename1_ui_Form",
+    "cn1_com_codename1_impl_CodenameOneImplementation_getCurrentForm_R_com_codename1_ui_Form",
+    "cn1_com_codename1_impl_CodenameOneImplementation_getCurrentForm"
+  ]);
+  const form = current.value;
+  if (!form || !form.__class) {
+    emitDiagLine("PARPAR:DIAG:FALLBACK:repaintEntireForm:reason=" + String(reason || "unknown")
+        + ":getCurrentForm=" + String(current.methodId) + ":form=null");
+    return false;
+  }
+  const repainted = yield* invokeFirstResolvableInstanceMethod(form, [
+    "cn1_s_repaint",
+    "cn1_com_codename1_ui_Component_repaint",
+    "cn1_com_codename1_ui_Form_repaint"
+  ]);
+  emitDiagLine("PARPAR:DIAG:FALLBACK:repaintEntireForm:reason=" + String(reason || "unknown")
+      + ":form=" + form.__class + ":repaint=" + String(repainted));
+  return repainted != null;
+}
+
 function* invokeFirstResolvableInstanceMethod(receiver, methodIds) {
   if (!receiver || !receiver.__class || !methodIds || !methodIds.length) {
     return null;
@@ -5800,6 +5868,12 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
     let capturedDataUrl = "";
     if (jvm && typeof jvm.invokeHostNative === "function") {
       try {
+        const captureSettle = cn1SsSettleParams(normalizedTest);
+        if (captureSettle.staged) {
+          // Before the presentation below, not after: paintDirty() paints what is marked dirty,
+          // so the repaint has to be requested first for that paint to cover the whole form.
+          yield* repaintEntireDisplayedForm("hostCanvas:" + normalizedTest);
+        }
         yield* forceDisplayPresentationForScreenshot("hostCanvas:" + normalizedTest);
         // Serialize the canvas read against concurrent painters. The settle +
         // capture host round-trips span many rAF frames during which the
@@ -5814,7 +5888,6 @@ bindCiFallback("Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshotDom", [
           jvm.beginCaptureGate();
         }
         try {
-          const captureSettle = cn1SsSettleParams(normalizedTest);
           yield jvm.invokeHostNative("__cn1_wait_for_ui_settle__", [{
             reason: "screenshot:" + normalizedTest,
             maxFrames: captureSettle.maxFrames,
@@ -5952,6 +6025,9 @@ function cn1SsSettleParams(testName) {
   const normalized = normalizeCn1ssTestName(testName || "default");
   const heavy = normalized === "DrawImage" || normalized === "graphics-draw-image-rect";
   return {
+    // These are the screens that compose their result in stages, so they are the ones a
+    // stillness-based settle can catch half-finished. They get the full repaint before capture.
+    staged: heavy,
     maxFrames: heavy ? 120 : 48,
     stableFrames: heavy ? 6 : 3,
     quietFrames: heavy ? 6 : 3
