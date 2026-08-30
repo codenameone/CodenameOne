@@ -513,4 +513,52 @@ class SheetInWindowTest extends UITestBase {
             uim.getComponentStyle("StatusBar").setPadding(Component.TOP, 0);
         }
     }
+    @FormTest
+    void aSheetDeferredOnAWindowThatGoesAwayCanStillBeShownElsewhere() {
+        // A show that arrives mid-animation is pinned to the surface it resolved, and
+        // the retry that clears the pin is driven by that surface's own animation
+        // manager. A host hidden before the animation drained therefore never ran it,
+        // and the pin outlived the show it belonged to -- every later show went at a
+        // surface that is not there any more, even after the caller named another.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.add(BorderLayout.CENTER, new Button("filler"));
+        w.show();
+        DisplayTest.flushEdt();
+
+        Sheet sheet = new Sheet(null, "deferred");
+        sheet.getContentPane().add(new Label("body"));
+        try {
+            // An animation in flight on the window, so the show defers and pins.
+            w.getContentPane().animateLayout(600);
+            sheet.setTopLevelHost(w);
+            sheet.show();
+            DisplayTest.flushEdt();
+
+            // The window goes before the animation drains, so the retry never runs.
+            w.hide();
+            DisplayTest.flushEdt();
+
+            // Named a live surface and shown again.
+            sheet.setTopLevelHost(main);
+            sheet.show();
+            for (int i = 0; i < 40; i++) {
+                DisplayTest.flushEdt();
+            }
+
+            assertNotNull(main.getFormLayeredPaneIfExists(),
+                    "the sheet has to attach to the surface it was just given");
+            assertSame(main, sheet.getTopLevelContainer(),
+                    "and not to the one its abandoned show had pinned");
+        } finally {
+            sheet.setTopLevelHost(null);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }

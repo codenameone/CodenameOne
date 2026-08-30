@@ -34,7 +34,6 @@ import com.codename1.ui.events.BrowserNavigationCallback;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
-import com.codename1.ui.util.UITimer;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.Callback;
@@ -1420,14 +1419,14 @@ public class BrowserComponent extends Container {
     /// - `callback`: The callback
     public void execute(int timeout, final String js, final SuccessCallback<JSRef> callback) {
         if (callback != null && timeout > 0) {
-            // This component's own surface, not whatever is current: the callback
-            // belongs to the browser, and on a window the current form is not the
-            // thing being painted.
-            TopLevelContainer timerHost = getTopLevelContainer();
-            if (timerHost == null) {
-                timerHost = CN.getCurrentTopLevel();
-            }
-            UITimer.timer(timeout, false, timerHost, new Runnable() {
+            // Not tied to a surface at all. A UITimer is driven by the painting of the
+            // top level it is registered on, so binding it to the browser's own window
+            // -- which is the only surface that could be right -- stopped the clock the
+            // moment that window was hidden or minimized: the timeout this method
+            // documents then arrived when the window came back, or never. This one is a
+            // plain timer that hands the callback to the event thread when it fires,
+            // whatever is on screen by then.
+            Display.getInstance().setTimeout(timeout, new Runnable() {
 
                 @Override
                 public void run() {

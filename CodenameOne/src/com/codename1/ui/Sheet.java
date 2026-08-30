@@ -528,7 +528,16 @@ public class Sheet extends Container {
     /// the host top level, or null when there is none
     private TopLevelContainer resolveHost() {
         if (pinnedShowHost != null) {
-            return pinnedShowHost;
+            if (pinnedShowHost.isTopLevelShowing()) {
+                return pinnedShowHost;
+            }
+            // The surface the deferred show was waiting on has gone. That wait is driven
+            // by the host's own animation manager, so a host hidden or disposed before it
+            // drained never ran the retry that clears this -- and the pin then outlived
+            // the show it belonged to, sending the next one, and every one after it, at a
+            // surface that is not there any more even when the caller had since named
+            // another with setTopLevelHost().
+            pinnedShowHost = null;
         }
         if (hostTopLevel != null) {
             return hostTopLevel;
