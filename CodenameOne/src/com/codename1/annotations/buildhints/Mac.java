@@ -234,13 +234,12 @@ public @interface Mac {
     /// macOS builds. Signing certificate identity for the App Store channel.
     /// Default `Apple Distribution`.
     ///
-    /// `none` is NOT accepted here, unlike on the Developer ID channel. An
-    /// unsigned application still gets packaged into a signed `.pkg`, so the
-    /// build reports success and App Store Connect rejects the upload hours
-    /// later for an application with no signature and none of the sandbox
-    /// entitlements it has to carry. The build fails immediately instead,
-    /// naming this hint. Build only the `developerID` channel if what you want
-    /// is an unsigned application.
+    /// Unlike the Developer ID channel, this one rejects `none`. An unsigned
+    /// application still gets packaged into a signed `.pkg`, so the build
+    /// reports success and App Store Connect rejects the upload hours later for
+    /// an application with no signature and none of the sandbox entitlements it
+    /// has to carry. The build fails immediately instead, naming this hint.
+    /// Build only the `developerID` channel to get an unsigned application.
     ///
     /// An empty value reads as unset and takes the default, which is why the
     /// Developer ID channel spells the escape hatch `none` rather than "".
