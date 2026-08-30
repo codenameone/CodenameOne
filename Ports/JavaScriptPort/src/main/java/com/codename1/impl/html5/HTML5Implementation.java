@@ -3496,6 +3496,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
         });
     }
 
+    /**
+     * True when a frame carries at least one op that draws onto the canvas.
+     *
+     * <p>Text-layer mutations are DOM writes that ride the same queue so they land in the same
+     * task as the pixels they belong with. They produce no pixels of their own, so a frame made
+     * only of them must not be treated as a repaint.</p>
+     *
+     * @param frame the frame about to be replayed
+     * @return true when something in it paints
+     */
+    private boolean framePaintsPixels(JavaScriptRenderQueueState.FrameSnapshot<ExecutableOp> frame) {
+        for (ExecutableOp op : frame.getOps()) {
+            if (!(op instanceof com.codename1.impl.html5.graphics.TextLayerOp)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean drainPendingDisplayFrame() {
         JavaScriptRenderQueueState.FrameSnapshot<ExecutableOp> frame =
                 JavaScriptRenderQueueCoordinator.beginFrame(new JavaScriptRenderQueueCoordinator.GraphicsLock() {
@@ -3566,7 +3585,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // their own bounds either way; sibling components whose bounds
         // happen to fall inside the union but who are NOT in the dirty
         // list keep their previous pixels.
-        if (frame.getCropX() == 0 && frame.getCropY() == 0
+        //
+        // A frame carrying nothing but text-layer mutations paints no pixels at all, so there is
+        // nothing for a clear to be the prelude to. Until those mutations rode the queue such a
+        // frame held no ops and the drain returned early at the isEmpty() check above, which is
+        // what kept the canvas intact; now it is non-empty and would reach this clear and wipe
+        // content that this frame does not redraw. A detach-only flush -- syncToForm releasing
+        // the runs of a component that has gone, with nothing else queued -- is exactly that
+        // shape, and a full-screen crop is what a form-sized component asks for when it
+        // repaints.
+        if (framePaintsPixels(frame)
+                && frame.getCropX() == 0 && frame.getCropY() == 0
                 && frame.getCropW() >= displayWidth
                 && frame.getCropH() >= displayHeight) {
             context.clearRect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
