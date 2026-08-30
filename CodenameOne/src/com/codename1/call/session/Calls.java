@@ -843,8 +843,29 @@ public final class Calls {
     }
 
     public static void deliverCallEnded(String callId, int reasonOrdinal) {
+        // The owning session is captured HERE, where the end was received,
+        // rather than looked up when the EDT gets to it. Off the EDT the two
+        // are not the same question: a call id is reusable the moment its
+        // call is gone, so between this line and the dispatch running, the
+        // old call can disappear and a replacement can claim the id -- and
+        // the lookup then resolved the REPLACEMENT, marked it ENDED and
+        // forgot it, for an end belonging to a call that was already over.
+        //
+        // A null capture stays null. "Nobody owned this id when the end
+        // arrived" is the honest answer, and re-asking later would adopt
+        // whichever session happened along.
+        //
+        // NOT COVERED BY A TEST, and the reason is worth writing down rather
+        // than leaving as an absence: reaching the defect needs the event to
+        // be QUEUED, and core-unittests initialises no Display, so dispatch
+        // runs every event inline and capture and lookup are the same
+        // instant there. A test written against the inline path asserts the
+        // opposite of the contract -- an end delivered while a replacement
+        // holds the id does belong to the replacement -- which is exactly
+        // what a first attempt at one did.
         dispatch(new ActionEvent(ActionEvent.ENDED, callId, 0L, false, null,
-                null, false, reasonOrdinal));
+                null, false, reasonOrdinal,
+                callId == null ? null : getSession(callId)));
     }
 
     /// The system's call provider was reset and every call is gone.
@@ -926,9 +947,19 @@ public final class Calls {
 
         @Override
         public void run() {
-            if (session != null) {
-                session.setStateInternal(CallState.ENDED);
+            if (session == null) {
+                // NOTHING to retire. A cleanup with no captured session was
+                // built when the id already belonged to nobody, and
+                // forget(callId, null) removes unconditionally -- so if a
+                // replacement call claimed the id between then and now, this
+                // deleted it: accepted by the platform, returned to its
+                // caller, and absent from getSession for the rest of its
+                // life. An END action whose listener defers, or one that
+                // reports the replacement synchronously from endRequested,
+                // both land exactly there.
+                return;
             }
+            session.setStateInternal(CallState.ENDED);
             forget(callId, session);
         }
     }
@@ -973,9 +1004,22 @@ public final class Calls {
             this(kind, callId, token, flag, text, handle, video, 0);
         }
 
+        /// The session this event was received for, when the event is one
+        /// whose meaning is tied to a particular call rather than to whatever
+        /// holds its id by the time the EDT gets here. Null for every other
+        /// kind, which resolve by id on purpose.
+        private final CallSession owner;
+
         ActionEvent(int kind, String callId, long token, boolean flag,
                 String text, CallHandle handle, boolean video,
                 int ordinal) {
+            this(kind, callId, token, flag, text, handle, video, ordinal,
+                    null);
+        }
+
+        ActionEvent(int kind, String callId, long token, boolean flag,
+                String text, CallHandle handle, boolean video,
+                int ordinal, CallSession owner) {
             this.kind = kind;
             this.callId = callId;
             this.token = token;
@@ -984,12 +1028,20 @@ public final class Calls {
             this.handle = handle;
             this.video = video;
             this.ordinal = ordinal;
+            this.owner = owner;
         }
 
         @Override
         public void run() {
             CallActionListener[] ls = listeners();
-            CallSession session = callId == null ? null : getSession(callId);
+            // The CAPTURED session for an end, and a lookup for everything
+            // else. An end names the call it ended; every other event asks
+            // the platform to do something to whatever is live under that id
+            // now, which is a different question and is answered by the
+            // staleAction gate below rather than here.
+            CallSession session = kind == ENDED
+                    ? owner
+                    : (callId == null ? null : getSession(callId));
             switch (kind) {
                 case ANSWER: {
                     CallAction a = new CallAction(token, callId);

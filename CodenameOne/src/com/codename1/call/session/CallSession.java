@@ -204,6 +204,29 @@ public final class CallSession {
     /// documented to give. A separate terminal-state test before the
     /// assignment only narrows that window; it cannot close it, which is why
     /// the predicate it used to call is gone rather than merely unused.
+    /// Moves to ACTIVE, but only from a call that has not connected yet.
+    ///
+    /// moveUnlessOver rejects ENDED and nothing else, which is right for the
+    /// transitions that may happen at any point in a call and wrong for this
+    /// one. A delayed or duplicate connected callback on a HELD call moved it
+    /// back to ACTIVE and had the Android bridge call Connection.setActive --
+    /// undoing a hold the USER asked for, from a signalling event that says
+    /// nothing about hold at all.
+    ///
+    /// RINGING and DIALING are the whole of the legitimate source: hold is
+    /// left by unholding, which is its own operation, and a call already
+    /// ACTIVE has nothing to gain from being told so twice -- the platform
+    /// starts the duration the user sees from that report.
+    boolean moveToConnected() {
+        synchronized (this) {
+            if (state != CallState.RINGING && state != CallState.DIALING) {
+                return false;
+            }
+            state = CallState.ACTIVE;
+            return true;
+        }
+    }
+
     boolean moveUnlessOver(CallState next) {
         synchronized (this) {
             if (state == CallState.ENDED) {
@@ -225,7 +248,7 @@ public final class CallSession {
         // report cannot pass its own state test before this one and then
         // reach the platform after it. See the note there.
         synchronized (reporting) {
-            if (!moveUnlessOver(CallState.ACTIVE)) {
+            if (!moveToConnected()) {
                 return;
             }
             long now = System.currentTimeMillis();

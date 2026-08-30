@@ -1513,6 +1513,24 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aLateConnectedReportDoesNotUndoTheUsersHold() {
+        // moveUnlessOver rejects ENDED and nothing else, so a delayed or
+        // duplicate connected callback on a HELD call moved it back to ACTIVE
+        // and had the port call Connection.setActive -- undoing a hold the
+        // USER asked for, from a signalling event that says nothing about
+        // hold at all.
+        CallSession call = ring(CallId.random());
+        call.reportConnected();
+        assertSame(CallState.ACTIVE, call.getState());
+        CallAwait.value(call.setHeld(true));
+        assertSame(CallState.HELD, call.getState());
+
+        call.reportConnected();
+        assertSame(CallState.HELD, call.getState(),
+                "a connected report must leave a held call held");
+    }
+
+    @Test
     public void aSystemMuteThatCannotBeRefusedStillMoves() {
         // Telecom reports a mute it has already applied. A listener that
         // fails that cannot un-apply it, so the session has to agree with the
