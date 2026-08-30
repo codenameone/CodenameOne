@@ -261,8 +261,17 @@ public final class Camera {
         }
     }
 
-    // PMD.CompareObjectsWithEquals doesn't apply.
-    @SuppressWarnings("PMD.CompareObjectsWithEquals")
+    // PMD.CompareObjectsWithEquals doesn't apply: these are identity tests on
+    // session objects, which is the whole point of them.
+    //
+    // PMD.CloseResource does not apply either, and following it would be a bug.
+    // The session taken off the stack here is being handed BACK as the active
+    // one, because the application paused it around a capture and is about to
+    // resume it. This method does not own it and must not close it; closing it
+    // would destroy a live session at the moment it regains the camera. The
+    // only session being closed anywhere near here is the caller's own, which
+    // is why it is calling.
+    @SuppressWarnings({"PMD.CompareObjectsWithEquals", "PMD.CloseResource"})
     static void clearActive(CameraSession s) {
         synchronized (ACTIVE_LOCK) {
             if (active == s) {
