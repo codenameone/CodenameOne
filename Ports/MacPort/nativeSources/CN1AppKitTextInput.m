@@ -218,11 +218,18 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
     int teardownGeneration = sessionGeneration;
     dispatch_async(dispatch_get_main_queue(), ^{
         BOOL superseded = sessionGeneration != teardownGeneration;
-        if (superseded) {
-            supersededDiscardDepth++;
+        if (!superseded) {
+            [[NSTextInputContext currentInputContext] discardMarkedText];
+            return;
         }
-        [[NSTextInputContext currentInputContext] discardMarkedText];
-        if (superseded) {
+        // @finally because the counter failing to unwind is worse than what
+        // would raise: it is not scoped to this teardown, it is permanent, and
+        // what it suppresses is every later composition report -- an input
+        // method that silently stops working for the rest of the process.
+        supersededDiscardDepth++;
+        @try {
+            [[NSTextInputContext currentInputContext] discardMarkedText];
+        } @finally {
             supersededDiscardDepth--;
         }
     });
