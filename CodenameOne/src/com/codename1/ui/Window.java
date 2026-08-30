@@ -4005,6 +4005,25 @@ public class Window extends Container implements TopLevelContainer {
         return e.isConsumed();
     }
 
+    /// Whether a listener registered on this window may hear the key being dispatched.
+    ///
+    /// While an overlay owns the keyboard, only listeners belonging to an input scope
+    /// may run: everything else was registered by, or on behalf of, the surface the
+    /// overlay is covering. Without this an access key registered by a component in the
+    /// content -- an HTML document registers one per accesskey attribute -- still
+    /// activated its link or checkbox from underneath a modal dialog.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener about to be given the key
+    ///
+    /// #### Returns
+    ///
+    /// true when it may run
+    private boolean mayDispatchKeyTo(ActionListener l) {
+        return keyInputScope == null || l instanceof ScopedKeyListener;
+    }
+
     /// Whether anything at all currently claims the keyboard.
     ///
     /// #### Returns
@@ -4378,6 +4397,14 @@ public class Window extends Container implements TopLevelContainer {
     /// even though that surface never saw A go down.
     private HashMap<Integer, Container> keyPressScopes;
 
+    /// A key listener that belongs to an input scope and polices that for itself.
+    ///
+    /// Everything else registered on a window belongs to whatever the overlay is
+    /// covering. On a `Form` that surface stops hearing keys the moment a dialog is
+    /// shown, because the dialog becomes the current form; a window has to say so.
+    interface ScopedKeyListener extends ActionListener {
+    }
+
     /// Whether a key is being dispatched right now. Distinct from a null scope, which
     /// is a real answer meaning the window itself owned the key rather than any overlay.
     private boolean keyDispatchActive;
@@ -4472,6 +4499,9 @@ public class Window extends Container implements TopLevelContainer {
         // Over a copy, for the same reason the raw key dispatch below uses one.
         ActionListener[] snapshot = listeners.toArray(new ActionListener[listeners.size()]);
         for (int iter = 0; iter < snapshot.length; iter++) { // NOPMD ForLoopCanBeForeach
+            if (!mayDispatchKeyTo(snapshot[iter])) {
+                continue;
+            }
             snapshot[iter].actionPerformed(evt);
             // As the raw key dispatch below does, and as Form.fireKeyEvent does. A
             // dialog with two shortcuts on one action ran both for a single release.
@@ -4495,6 +4525,9 @@ public class Window extends Container implements TopLevelContainer {
         // list against a length captured before the loop then reads past its end.
         ActionListener[] snapshot = listeners.toArray(new ActionListener[listeners.size()]);
         for (int iter = 0; iter < snapshot.length; iter++) { // NOPMD ForLoopCanBeForeach
+            if (!mayDispatchKeyTo(snapshot[iter])) {
+                continue;
+            }
             snapshot[iter].actionPerformed(evt);
             if (evt.isConsumed()) {
                 return;

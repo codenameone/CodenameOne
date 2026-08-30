@@ -369,7 +369,7 @@ public class Dialog extends Form implements AbstractDialog {
 
     /// Delivers the back key to a dialog hosted on a window. A window has no menu bar
     /// to route it, so the dialog listens for it directly.
-    private static final class HostBackListener implements ActionListener {
+    private static final class HostBackListener implements Window.ScopedKeyListener {
         private final Dialog dlg;
 
         HostBackListener(Dialog dlg) {
@@ -2445,7 +2445,7 @@ public class Dialog extends Form implements AbstractDialog {
     /// window, so without it a dialog covered by another one would still be running its
     /// shortcuts. It fires only while the dialog it belongs to is the one holding the
     /// keyboard.
-    private static final class HostedKeyListener implements ActionListener {
+    private static final class HostedKeyListener implements Window.ScopedKeyListener {
         private final Dialog dlg;
         private final int keyCode;
         private final ActionListener delegate;

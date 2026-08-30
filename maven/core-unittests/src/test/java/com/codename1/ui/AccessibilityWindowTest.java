@@ -24,6 +24,7 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.accessibility.AccessibilityAction;
 import com.codename1.ui.accessibility.AccessibilityInspector;
 import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
@@ -695,6 +696,63 @@ class AccessibilityWindowTest extends UITestBase {
         } catch (InterruptedException err) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(err);
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+        }
+    }
+
+    @FormTest
+    void anActionOnAFormNavigatedAwayFromIsRefused() {
+        // A tree stays cached after the main form has navigated away -- deliberately, so
+        // a live secondary window keeps its own. Ids retained from the old one still
+        // resolved, so a reader holding one could invoke a command on a form nobody can
+        // see, which for a button means running whatever it navigates to.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        try {
+            Form first = new Form("first", new BorderLayout());
+            final int[] fired = new int[1];
+            Button onFirst = new Button("on the first form");
+            onFirst.addActionListener(new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    fired[0]++;
+                }
+            });
+            first.add(BorderLayout.CENTER, onFirst);
+            first.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            AccessibilityTreeSnapshot tree = mgr.getSnapshot(first);
+            long id = 0;
+            String actionId = null;
+            for (Long candidate : tree.getNodes().keySet()) {
+                AccessibilityNodeSnapshot n = tree.getNode(candidate.longValue());
+                if (n != null && n.getComponent() == onFirst //NOPMD CompareObjectsWithEquals
+                        && n.getAction(AccessibilityAction.ACTIVATE) != null) {
+                    id = candidate.longValue();
+                    actionId = AccessibilityAction.ACTIVATE;
+                    break;
+                }
+            }
+            assertNotNull(actionId, "precondition: the button has an action to invoke");
+
+            // It works while that form is the one on screen.
+            assertTrue(mgr.performAction(id, actionId, null));
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+            assertEquals(1, fired[0], "sanity: the action reaches a showing form");
+
+            // Navigate away. The old tree stays cached.
+            Form second = new Form("second", new BorderLayout());
+            second.show();
+            DisplayTest.flushEdt();
+
+            assertFalse(mgr.performAction(id, actionId, null),
+                    "an id from a form that is no longer showing must not resolve");
+            DisplayTest.flushEdt();
+            assertEquals(1, fired[0],
+                    "and nothing may run on the form the user navigated away from");
         } finally {
             implementation.setAccessibilityTreeSupported(false);
         }

@@ -44,6 +44,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /// Builds, caches, diffs, and dispatches actions for the portable semantic tree.
 ///
@@ -473,17 +474,41 @@ public final class AccessibilityManager {
     }
 
     private AccessibilityNodeSnapshot findNode(long nodeId) {
-        AccessibilityNodeSnapshot node = snapshot.getNode(nodeId);
-        if (node != null) {
-            return node;
+        if (isShowingRoot(snapshotRoot)) {
+            AccessibilityNodeSnapshot node = snapshot.getNode(nodeId);
+            if (node != null) {
+                return node;
+            }
         }
-        for (AccessibilityTreeSnapshot cached : snapshotsByRoot.values()) {
-            node = cached.getNode(nodeId);
+        for (Map.Entry<Container, AccessibilityTreeSnapshot> cached
+                : snapshotsByRoot.entrySet()) {
+            // Only surfaces that are actually on screen. A tree stays cached after the
+            // main form has navigated away -- deliberately, so a live secondary window
+            // keeps its own -- and an id retained from the old one still resolved here,
+            // so a reader could invoke a command on a form nobody can see any more.
+            if (!isShowingRoot(cached.getKey())) {
+                continue;
+            }
+            AccessibilityNodeSnapshot node = cached.getValue().getNode(nodeId);
             if (node != null) {
                 return node;
             }
         }
         return null;
+    }
+
+    /// Whether a cached root is a surface the user can currently see.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the cached root, may be null
+    ///
+    /// #### Returns
+    ///
+    /// true when it is a top level and it is showing
+    private static boolean isShowingRoot(Container root) {
+        return root instanceof TopLevelContainer
+                && ((TopLevelContainer) root).isTopLevelShowing();
     }
 
     public synchronized int getPendingChanges() {

@@ -2598,4 +2598,53 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aCoveredSurfacesOwnKeyListenerDoesNotFireUnderADialog() {
+        // A component in the window's content registers its shortcut on the window -- an
+        // HTML document registers one per accesskey attribute. The window dispatched its
+        // whole raw map regardless of who owned the keyboard, so those still fired from
+        // under a modal dialog and activated a link or checkbox nobody could see. On a
+        // Form the covered surface stops hearing keys because the dialog becomes the
+        // current form; a window has to say so.
+        final Window w = openHost(600, 500);
+        final int[] underneath = new int[1];
+        int shortcut = 'q';
+        w.addKeyListener(shortcut, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                underneath[0]++;
+            }
+        });
+        DisplayTest.flushEdt();
+
+        // Sanity: it works while the window itself owns the keyboard.
+        w.keyPressed(shortcut);
+        w.keyReleased(shortcut);
+        DisplayTest.flushEdt();
+        assertEquals(1, underneath[0], "sanity: the shortcut works with nothing over it");
+
+        Dialog d = new Dialog("over");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        w.keyPressed(shortcut);
+        w.keyReleased(shortcut);
+        DisplayTest.flushEdt();
+        assertEquals(1, underneath[0],
+                "the covered surface must not hear a key the dialog owns");
+
+        // And it hears them again once the dialog has gone.
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.keyPressed(shortcut);
+        w.keyReleased(shortcut);
+        DisplayTest.flushEdt();
+        assertEquals(2, underneath[0], "and hears them again once it is uncovered");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }
