@@ -1222,4 +1222,43 @@ class AccessibilityWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    @FormTest
+    void anActionOnAComponentTakenOutOfItsFormDoesNotRun() {
+        // The component can be removed between the id being resolved and the action
+        // running -- a rebuilt form, a list that replaced its rows -- and pressing it
+        // then acts on something no longer on screen, on a surface that is otherwise
+        // still perfectly visible.
+        implementation.setAccessibilityTreeSupported(true);
+        implementation.setAccessibilityTreeUpdateRequired(Boolean.FALSE);
+        try {
+            Form form = new Form("main", new BorderLayout());
+            final boolean[] pressed = new boolean[1];
+            Button b = new Button("press me");
+            b.addActionListener(new com.codename1.ui.events.ActionListener() {
+                @Override
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    pressed[0] = true;
+                }
+            });
+            form.add(BorderLayout.CENTER, b);
+            form.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            long id = idOf(AccessibilityInspector.snapshot(form), "press me");
+            assertTrue(id != 0, "precondition: the button is in the tree");
+
+            assertTrue(mgr.performAction(id, "activate", null),
+                    "precondition: accepted while the button is still in the form");
+            b.remove();
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            assertFalse(pressed[0],
+                    "an action must not run on a component taken out of its surface");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+            implementation.setAccessibilityTreeUpdateRequired(null);
+        }
+    }
 }

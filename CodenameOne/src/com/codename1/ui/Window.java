@@ -4679,6 +4679,33 @@ public class Window extends Container implements TopLevelContainer {
     /// `Component#getNextFocusDown()` before scanning by position, exactly as a `Form`
     /// does.
     ///
+    /// An explicit focus link, when the keyboard is allowed to go where it points.
+    ///
+    /// A component names its own neighbour through `Component#setNextFocusDown(Component)`
+    /// and the rest, and that link is honoured before anything is scanned by position.
+    /// Constraining only the geometric scan therefore left a way out of an overlay
+    /// holding the keyboard: a control inside a hosted dialog whose link named something
+    /// in the window behind it moved focus there on the first arrow press, scrolled it
+    /// into view, and every repeat until the key came up went to a component the dialog
+    /// covers.
+    ///
+    /// #### Parameters
+    ///
+    /// - `link`: the component the focus owner names, or null
+    ///
+    /// #### Returns
+    ///
+    /// that component, or null when it lies outside the scope holding the keyboard
+    private Component reachableFocusLink(Component link) {
+        if (link == null) {
+            return null;
+        }
+        if (keyInputScope != null && !keyInputScope.contains(link)) {
+            return null;
+        }
+        return link;
+    }
+
     /// `Container`'s versions of these four answer null, which is right for an
     /// ordinary container and wrong for a top level: every arrow key in a window
     /// resolved through them and moved focus nowhere, so a window could not be
@@ -4686,8 +4713,9 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     Component findNextFocusDown() {
         if (focused != null) {
-            if (focused.getNextFocusDown() != null) {
-                return focused.getNextFocusDown();
+            Component link = reachableFocusLink(focused.getNextFocusDown());
+            if (link != null) {
+                return link;
             }
             return findNextFocusVertical(true);
         }
@@ -4698,8 +4726,9 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     Component findNextFocusUp() {
         if (focused != null) {
-            if (focused.getNextFocusUp() != null) {
-                return focused.getNextFocusUp();
+            Component link = reachableFocusLink(focused.getNextFocusUp());
+            if (link != null) {
+                return link;
             }
             return findNextFocusVertical(false);
         }
@@ -4711,8 +4740,9 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     Component findNextFocusRight() {
         if (focused != null) {
-            if (focused.getNextFocusRight() != null) {
-                return focused.getNextFocusRight();
+            Component link = reachableFocusLink(focused.getNextFocusRight());
+            if (link != null) {
+                return link;
             }
             return findNextFocusHorizontal(true);
         }
@@ -4723,8 +4753,9 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     Component findNextFocusLeft() {
         if (focused != null) {
-            if (focused.getNextFocusLeft() != null) {
-                return focused.getNextFocusLeft();
+            Component link = reachableFocusLink(focused.getNextFocusLeft());
+            if (link != null) {
+                return link;
             }
             return findNextFocusHorizontal(false);
         }

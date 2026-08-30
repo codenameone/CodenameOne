@@ -644,7 +644,12 @@ public final class AccessibilityManager {
                 // shown and is a live surface a caller acts on.
                 Component target = node.getComponent();
                 TopLevelContainer top = target == null ? null : target.getTopLevelContainer();
-                if (top != null && isWithdrawnRoot(top.asContainer())) {
+                // No surface at all means the component has been taken out of the
+                // hierarchy since the id was resolved -- a rebuilt form, a list that
+                // replaced its rows. Pressing it then acts on something no longer on
+                // screen just as surely as a hidden window does. A form that has not
+                // been shown yet is not this: its components still answer with it.
+                if (top == null || isWithdrawnRoot(top.asContainer())) {
                     return;
                 }
                 action.perform(target, argument);

@@ -5859,4 +5859,41 @@ class WindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+    @FormTest
+    void anExplicitFocusLinkOutOfADialogIsNotFollowed() {
+        // A component names its own neighbour and that link is honoured before anything
+        // is scanned by position, so constraining only the geometric scan left a way out
+        // of an overlay holding the keyboard: the first arrow press moved focus to a
+        // component the dialog covers, and every repeat went there until the key came up.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        Button behind = new Button("behind the dialog");
+        w.add(BorderLayout.CENTER, behind);
+        w.show();
+        DisplayTest.flushEdt();
+
+        Container overlay = new Container(new BorderLayout());
+        Button inDialog = new Button("in the dialog");
+        overlay.add(BorderLayout.CENTER, inDialog);
+        w.getFormLayeredPane(WindowTest.class, true).add(overlay);
+        DisplayTest.flushEdt();
+
+        // The control inside the overlay points at one the overlay covers.
+        inDialog.setNextFocusDown(behind);
+        w.setFocused(inDialog);
+        w.pushKeyInputScope(overlay);
+        DisplayTest.flushEdt();
+        try {
+            assertNull(w.findNextFocusDown(),
+                    "a link out of the overlay holding the keyboard must not be followed");
+        } finally {
+            w.removeKeyInputScope(overlay);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }
