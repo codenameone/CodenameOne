@@ -345,8 +345,21 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     int w = (int)rect.size.width;
     int h = (int)rect.size.height;
 
+    // Retained, because this cache outlives the pool. contextWithOptions:
+    // returns an AUTORELEASED context and this port compiles without ARC, so
+    // the static kept a pointer to an object the next pool drain freed; the
+    // frame after that sent createCGImage:fromRect: to whatever had since been
+    // allocated in those bytes and the app died on an unrecognized selector
+    // (seen as -[__NSSingleObjectSetI createCGImage:fromRect:]). Intermittent
+    // by nature -- it needs a second delivered frame -- which is why it read as
+    // a flaky camera test rather than as the dangling pointer it is.
     static CIContext *ctx;
-    if (!ctx) ctx = [CIContext contextWithOptions:nil];
+    if (!ctx) {
+        ctx = [CIContext contextWithOptions:nil];
+#ifndef CN1_USE_ARC
+        [ctx retain];
+#endif
+    }
     CGImageRef cg = [ctx createCGImage:ci fromRect:rect];
     if (!cg) return;
     CN1Image *img = [CN1Image imageWithCGImage:cg];
