@@ -13423,6 +13423,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private static long datePickerResult;
     private static final Object PICKER_LOCK = new Object();
+    /// Whether a showNativePicker call is outstanding.
+    ///
+    /// datePickerResult is ONE slot and showNativePicker blocks on it, so two
+    /// overlapping calls cannot both be served by it -- the second's entry
+    /// reset alone republishes "pending" to the first, and any single answer
+    /// wakes both. Serialised here rather than in the native layer, because
+    /// this is the side that owns the slot and the only side that can decide
+    /// before it is reset.
+    private static boolean pickerInProgress;
     static void datePickerResult(long val) {
         synchronized(PICKER_LOCK) {
             datePickerResult = val;
@@ -13432,7 +13441,34 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public Object showNativePicker(final int type, final Component source, final Object currentValue, final Object data) {
-        datePickerResult = -2;
+        synchronized (PICKER_LOCK) {
+            if (pickerInProgress) {
+                // A picker is already up. Answering "cancelled" is the honest
+                // result for a request that cannot be shown, and it leaves the
+                // outstanding one alone: displacing it instead completed BOTH
+                // calls with the displacement's own -1, because they share the
+                // slot -- so the caller of the picker still on screen had
+                // already returned before the user touched it.
+                //
+                // invokeAndBlock keeps the event dispatch thread live while a
+                // picker is open, which is what makes a second call reachable
+                // at all.
+                return null;
+            }
+            pickerInProgress = true;
+            datePickerResult = -2;
+        }
+        try {
+            return showNativePickerImpl(type, source, currentValue, data);
+        } finally {
+            synchronized (PICKER_LOCK) {
+                pickerInProgress = false;
+            }
+        }
+    }
+
+    private Object showNativePickerImpl(final int type, final Component source,
+            final Object currentValue, final Object data) {
         int x = 0, y = 0, w = 20, h = 20, preferredHeight = 0, preferredWidth = 0;
         
         if(source != null) {
