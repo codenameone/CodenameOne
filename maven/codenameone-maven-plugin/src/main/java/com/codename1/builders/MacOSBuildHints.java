@@ -180,7 +180,27 @@ public class MacOSBuildHints {
      */
     public void parse(HintSource src, String packageName) {
         source = src;
-        String dist = hint(src, "distribution", DISTRIBUTION_DEVELOPER_ID);
+        // No explicit choice means "whatever this project produced before".
+        //
+        // MacNativeBuilder defaults macNative.distribution to appStore, so a
+        // Catalyst project that never set the hint has been producing an App
+        // Store pkg. Defaulting to developerID for it would quietly change the
+        // artifact on the build where its plugin was upgraded -- a dmg instead
+        // of the pkg, signed with a Developer ID certificate it may not even
+        // have -- which is exactly the "builds today, builds tomorrow, without
+        // editing anything" promise this class is here to keep.
+        //
+        // macNative.enabled is what a Catalyst project carries and what
+        // IPhoneBuilder still reads to switch that slice on, so it identifies
+        // the projects with something to preserve. A project without it is new
+        // to this target and takes developerID, which is the right default for
+        // a Mac application that is not going to the store: it needs no App
+        // Store credentials to produce something runnable.
+        String dist = hint(src, "distribution", null);
+        if (dist == null || dist.length() == 0) {
+            dist = isTrue(src.get("macNative.enabled", null))
+                    ? DISTRIBUTION_APP_STORE : DISTRIBUTION_DEVELOPER_ID;
+        }
         if (DISTRIBUTION_APP_STORE.equalsIgnoreCase(dist)) {
             distribution = DISTRIBUTION_APP_STORE;
         } else if (DISTRIBUTION_BOTH.equalsIgnoreCase(dist)) {

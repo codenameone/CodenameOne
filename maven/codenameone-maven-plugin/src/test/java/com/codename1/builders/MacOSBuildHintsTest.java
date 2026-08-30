@@ -93,6 +93,40 @@ public class MacOSBuildHintsTest {
         }
     }
 
+    /// A migrating Catalyst project keeps the channel it has been building.
+    ///
+    /// MacNativeBuilder defaults macNative.distribution to appStore, so a
+    /// project that never set the hint has been producing an App Store pkg.
+    /// Taking developerID for it would change the artifact on the build where
+    /// its plugin was upgraded -- a dmg signed with a Developer ID certificate
+    /// it may not have -- which is the "without editing anything" promise this
+    /// class exists to keep.
+    @Test
+    public void aMigratingCatalystProjectKeepsTheAppStoreDefault() {
+        MacOSBuildHints h = parse(raw("macNative.enabled", "true"), "com.example.app");
+        assertEquals(MacOSBuildHints.DISTRIBUTION_APP_STORE, h.getDistribution());
+    }
+
+    /// A project new to this target takes developerID, which needs no App Store
+    /// credentials to produce something runnable.
+    @Test
+    public void aProjectNewToTheTargetDefaultsToDeveloperId() {
+        assertEquals(MacOSBuildHints.DISTRIBUTION_DEVELOPER_ID,
+                parse(raw(), "com.example.app").getDistribution());
+    }
+
+    /// An explicit choice still wins, in either spelling and either direction.
+    @Test
+    public void anExplicitDistributionBeatsBothDefaults() {
+        assertEquals(MacOSBuildHints.DISTRIBUTION_DEVELOPER_ID,
+                parse(raw("macNative.enabled", "true",
+                        "macNative.distribution", "developerID"),
+                        "com.example.app").getDistribution());
+        assertEquals(MacOSBuildHints.DISTRIBUTION_APP_STORE,
+                parse(raw("macos.distribution", "appStore"),
+                        "com.example.app").getDistribution());
+    }
+
     /// The other hint that reaches project.pbxproj gets the same treatment.
     ///
     /// It is written as MACOSX_DEPLOYMENT_TARGET = <value>;, so a semicolon,
