@@ -443,6 +443,27 @@ final class LibraryClassPrefixScan {
                         utf8[name].endsWith("TypeAnnotations"));
                 continue;
             }
+            // RECORDS nest their components' attributes inside this one, so
+            // an annotation on a record component is not in the class's own
+            // attributes table where the branch above looks. "record
+            // Config(@Handler(Call.class) String name)" puts the class
+            // literal in a RuntimeVisibleAnnotations nested under Record,
+            // and skipping Record wholesale skipped it -- while the parse
+            // still SUCCEEDED, so the raw text fallback that exists for
+            // exactly this never ran, and the generated field and accessor
+            // descriptors mention only String.
+            //
+            // Read into memory and walked here rather than recursing through
+            // the stream, for the reason the annotation branch gives: a
+            // malformed body must cost this attribute rather than
+            // desynchronise the walk over the rest of the class.
+            if (name > 0 && name < count && "Record".equals(utf8[name])
+                    && length < 1 << 20) {
+                byte[] body = new byte[(int) length];
+                in.readFully(body);
+                collectRecordTypes(body, utf8, count, out);
+                continue;
+            }
             while (length > 0) {
                 long skipped = in.skip(length);
                 if (skipped <= 0) {
@@ -453,6 +474,76 @@ final class LibraryClassPrefixScan {
                     throw new java.io.IOException("truncated attribute");
                 }
                 length -= skipped;
+            }
+        }
+    }
+
+    /// Collects the types a `Record` attribute names, including the ones
+    /// only its components' annotations mention.
+    ///
+    /// The component descriptors are collected too. They are usually
+    /// redundant -- javac generates a field and an accessor carrying the
+    /// same descriptor -- but "usually" is not a property this wants to
+    /// depend on, and a descriptor costs one pool lookup.
+    ///
+    /// Bounds are checked rather than trusted, and a body that runs out
+    /// stops the walk instead of throwing: this attribute is then
+    /// incomplete, which is the same cost the annotation walk accepts, and
+    /// it cannot corrupt the caller's position in the stream because the
+    /// caller has already consumed the whole body.
+    private static void collectRecordTypes(byte[] body, String[] utf8,
+            int count, Set<String> out) {
+        int at = 0;
+        if (body.length < 2) {
+            return;
+        }
+        int components = ((body[at] & 0xff) << 8) | (body[at + 1] & 0xff);
+        at += 2;
+        for (int i = 0; i < components; i++) {
+            if (at + 6 > body.length) {
+                return;
+            }
+            at += 2; // name_index, which is the component's name and not a type
+            int descriptor = ((body[at] & 0xff) << 8) | (body[at + 1] & 0xff);
+            at += 2;
+            if (descriptor > 0 && descriptor < count && utf8[descriptor] != null) {
+                out.add(utf8[descriptor]);
+            }
+            int attributes = ((body[at] & 0xff) << 8) | (body[at + 1] & 0xff);
+            at += 2;
+            for (int a = 0; a < attributes; a++) {
+                if (at + 6 > body.length) {
+                    return;
+                }
+                int name = ((body[at] & 0xff) << 8) | (body[at + 1] & 0xff);
+                at += 2;
+                long length = ((long) (body[at] & 0xff) << 24)
+                        | ((body[at + 1] & 0xff) << 16)
+                        | ((body[at + 2] & 0xff) << 8)
+                        | (body[at + 3] & 0xff);
+                at += 4;
+                if (length < 0 || at + length > body.length) {
+                    return;
+                }
+                int end = at + (int) length;
+                if (name > 0 && name < count && utf8[name] != null) {
+                    if ("Signature".equals(utf8[name]) && length == 2) {
+                        int signature = ((body[at] & 0xff) << 8)
+                                | (body[at + 1] & 0xff);
+                        if (signature > 0 && signature < count
+                                && utf8[signature] != null) {
+                            out.add(utf8[signature]);
+                        }
+                    } else if (isAnnotationAttribute(utf8[name])) {
+                        byte[] nested = new byte[(int) length];
+                        System.arraycopy(body, at, nested, 0, (int) length);
+                        collectAnnotationTypes(nested, utf8, count, out,
+                                utf8[name].endsWith("ParameterAnnotations"),
+                                "AnnotationDefault".equals(utf8[name]),
+                                utf8[name].endsWith("TypeAnnotations"));
+                    }
+                }
+                at = end;
             }
         }
     }

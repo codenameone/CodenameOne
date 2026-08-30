@@ -352,4 +352,81 @@ class LibraryClassPrefixScanReferencesTest {
                 "com/codename1/call/directory/ in a text file".getBytes()));
         assertNull(LibraryClassPrefixScan.classReferences(new byte[]{1, 2, 3}));
     }
+
+    @Test
+    void anAnnotationOnARecordComponentCounts() throws Exception {
+        // "record Config(@Handler(...Call.class) String name)" nests the
+        // RuntimeVisibleAnnotations inside the class-level Record attribute,
+        // so it is not in the class's own attributes table where the
+        // annotation branch looks. Record was skipped as an unknown
+        // attribute, the parse SUCCEEDED, and the raw text fallback that
+        // exists for exactly this case never ran -- while the generated
+        // field and accessor descriptors mention only String, so nothing
+        // else pointed at the reference either.
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        DataOutputStream d = new DataOutputStream(out);
+        d.writeInt(0xCAFEBABE);
+        d.writeShort(0);
+        d.writeShort(60);                          // a record-era class file
+        d.writeShort(7);
+        d.writeByte(1);
+        d.writeUTF("Record");                      // #1 attribute name
+        d.writeByte(1);
+        d.writeUTF("RuntimeVisibleAnnotations");   // #2 nested attribute
+        d.writeByte(1);
+        d.writeUTF("Lcom/example/Handler;");       // #3 annotation type
+        d.writeByte(1);
+        d.writeUTF("value");                       // #4 element name
+        d.writeByte(1);
+        d.writeUTF("L" + USED + ";");              // #5 the class literal
+        d.writeByte(1);
+        d.writeUTF("name");                        // #6 component name
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);          // interfaces
+        d.writeShort(0);          // fields
+        d.writeShort(0);          // methods
+        d.writeShort(1);          // one class attribute: Record
+
+        // The nested annotation body, sized first so the lengths agree.
+        ByteArrayOutputStream ann = new ByteArrayOutputStream();
+        DataOutputStream a = new DataOutputStream(ann);
+        a.writeShort(1);          // one annotation
+        a.writeShort(3);          //   type #3
+        a.writeShort(1);          //   one pair
+        a.writeShort(4);          //     name #4
+        a.writeByte('c');         //     a class literal
+        a.writeShort(5);          //     #5
+        a.flush();
+        byte[] annotation = ann.toByteArray();
+
+        ByteArrayOutputStream rec = new ByteArrayOutputStream();
+        DataOutputStream r = new DataOutputStream(rec);
+        r.writeShort(1);          // one component
+        r.writeShort(6);          //   name #6
+        r.writeShort(6);          //   descriptor, deliberately NOT the type
+        r.writeShort(1);          //   one component attribute
+        r.writeShort(2);          //     RuntimeVisibleAnnotations
+        r.writeInt(annotation.length);
+        r.write(annotation);
+        r.flush();
+        byte[] record = rec.toByteArray();
+
+        d.writeShort(1);          // attribute name #1 (Record)
+        d.writeInt(record.length);
+        d.write(record);
+        d.flush();
+
+        Set<String> refs =
+                LibraryClassPrefixScan.classReferences(out.toByteArray());
+        boolean sawIt = false;
+        for (String ref : refs) {
+            if (ref.indexOf(USED) >= 0) {
+                sawIt = true;
+            }
+        }
+        assertTrue(sawIt,
+                "an annotation on a record component is a reference: " + refs);
+    }
 }
