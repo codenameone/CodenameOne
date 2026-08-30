@@ -151,13 +151,6 @@ public final class Camera {
                 throw new IllegalStateException(
                     "Only one CameraSession may be open at a time. Close the existing session first.");
             }
-            // Remembered so exclusivity survives the handoff. Without this the
-            // capture's own close() would leave no active session at all, and
-            // the paused one -- which the application is about to resume --
-            // would no longer stop a third open().
-            if (active != null && !active.isClosed() && active.isPaused()) {
-                preempted.add(active);
-            }
             CameraImpl impl = newImpl();
             if (impl == null) {
                 throw new IllegalStateException("Camera is not supported on this platform.");
@@ -171,6 +164,28 @@ public final class Camera {
                     Log.e(t);
                 }
                 throw new RuntimeException("Could not open camera " + info.getId(), e);
+            }
+            // Remembered so exclusivity survives the handoff. Without this the
+            // capture's own close() would leave no active session at all, and
+            // the paused one -- which the application is about to resume --
+            // would no longer stop a third open().
+            //
+            // Recorded only once the successor has actually opened, and it has
+            // to be this way round. Nothing is preempted by an open that
+            // failed: the paused session never lost the camera, and it stays
+            // the active one. Recording it before the attempt meant every
+            // unsuccessful retry -- a camera briefly busy is the ordinary case
+            // -- left another entry that no path removed, because the throw
+            // leaves through neither close(). The list only drains through
+            // clearActive(), which the successor that never existed can never
+            // call, so a long-lived paused session accumulated one entry per
+            // retry for as long as it lived.
+            //
+            // Nothing between the exclusivity check and here can have changed
+            // what is being preempted: ACTIVE_LOCK is held across the whole
+            // method, and active is only ever reassigned under it.
+            if (active != null && !active.isClosed() && active.isPaused()) {
+                preempted.add(active);
             }
             active = new CameraSession(impl, info, opts);
             return active;
