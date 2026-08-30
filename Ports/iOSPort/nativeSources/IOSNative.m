@@ -3871,9 +3871,35 @@ void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STAT
         // No preview controller: a Mac opens a file in whichever application
         // owns it, which is what the user expects and what
         // UIDocumentInteractionController was standing in for on iOS.
-        NSURL* url = [ns hasPrefix:@"file:"]
-            ? [NSURL fileURLWithPath:[ns substringFromIndex:5]]
-            : [NSURL URLWithString:ns];
+        // A file: URL is PARSED as a URL, not chopped into a path.
+        //
+        // fileURLWithPath: takes its argument literally, so the %20 in a
+        // perfectly ordinary file:///.../My%20Report.pdf became three
+        // characters of the filename and was re-encoded to %2520 on the way
+        // out -- the file did not exist under that name and nothing opened.
+        // URLWithString: is what understands the escaping.
+        //
+        // The raw-path fallbacks are what fileURLWithPath: is actually for, and
+        // both directions need one: callers pass unencoded paths with spaces,
+        // which URLWithString: rejects outright, and they pass paths with no
+        // scheme at all, which it accepts and returns schemeless so openURL:
+        // can do nothing with them.
+        NSURL* url = nil;
+        if ([ns hasPrefix:@"file:"]) {
+            url = [NSURL URLWithString:ns];
+            if (url == nil) {
+                NSString* path = [ns substringFromIndex:5];
+                while ([path hasPrefix:@"//"]) {
+                    path = [path substringFromIndex:1];
+                }
+                url = [NSURL fileURLWithPath:path];
+            }
+        } else {
+            url = [NSURL URLWithString:ns];
+            if (url == nil || [url scheme] == nil) {
+                url = [NSURL fileURLWithPath:ns];
+            }
+        }
         if (url != nil) {
             [[NSWorkspace sharedWorkspace] openURL:url];
         }
@@ -6209,6 +6235,27 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lan
 #endif
 }
 
+/// A temporary file for one data-backed media item, unique per item.
+///
+/// Every one of these used to write Documents/temp_movie.mp4 -- ONE name for
+/// every video created from a byte array or a stream. AVPlayer loads a URL
+/// asset asynchronously, so creating a second such media before the first had
+/// loaded replaced the first player's backing file underneath it: the first
+/// player then showed the second video, or failed to decode. macOS is where
+/// this bites hardest because it always takes the AVKit route.
+///
+/// Also moved out of Documents. That directory is the user's, and on iOS it is
+/// backed up to iCloud -- a scratch copy of every video an application ever
+/// played had no business in either. The system reclaims the temporary
+/// directory, which is what makes unique names affordable: naming them
+/// uniquely in a directory nothing ever clears would trade a correctness bug
+/// for an unbounded one.
+static NSString *cn1TempMediaPath(void) {
+    NSString *name = [NSString stringWithFormat:@"cn1-media-%@.mp4",
+                      [[NSUUID UUID] UUIDString]];
+    return [NSTemporaryDirectory() stringByAppendingPathComponent:name];
+}
+
 JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
 // UIKit-only helper. AppKit's equivalent is a different API rather than a
 // renamed one, so this is inert on the native macOS port until it is ported.
@@ -6229,9 +6276,7 @@ JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
     #endif
             NSData* d = [NSData dataWithBytes:data length:len];
 
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
 
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
@@ -6267,9 +6312,7 @@ JAVA_LONG createVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
 
             NSData* d = [NSData dataWithBytes:data length:len];
             
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
             
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
@@ -6328,9 +6371,7 @@ JAVA_LONG createNativeVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onComple
 
             NSData* d = [NSData dataWithBytes:data length:len];
             
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
             
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
@@ -6372,9 +6413,7 @@ JAVA_LONG createNativeVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onComple
     #endif
             NSData* d = [NSData dataWithBytes:data length:len];
 
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
 
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
@@ -6420,9 +6459,7 @@ JAVA_LONG createVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCa
             POOL_BEGIN();
             NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
 
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
 
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
@@ -6458,9 +6495,7 @@ JAVA_LONG createVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCa
             POOL_BEGIN();
             NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
             
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
             
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
@@ -6515,9 +6550,7 @@ JAVA_LONG createNativeVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onComple
             POOL_BEGIN();
             NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
 
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
 
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
@@ -6547,9 +6580,7 @@ JAVA_LONG createNativeVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onComple
             POOL_BEGIN();
             NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
             
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
             
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
