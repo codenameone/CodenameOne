@@ -2622,24 +2622,31 @@ void codenameOneGCMark() {
                 // cn1GcScanThreadNativeStack releases its own signal stops at exactly this
                 // point for the same reason. threadBlockedByGC stays set, so if this
                 // thread does reach a safepoint it still parks.
+#if !defined(CN1_DISABLE_SATB)
+                // Released as soon as this thread's roots are captured, which is HERE and
+                // not at the threadBlockedByGC clear below. A cooperatively parked thread
+                // waits out the mark drain in a usleep; a signal-frozen one waits in an
+                // async-signal-safe BUSY spin, so holding it across the drain burns a core
+                // for the length of a full mark.
+                //
+                // What the drain-before-unblock protects -- snapshot-at-the-beginning --
+                // is supplied for a released mutator by the SATB deletion barrier, which
+                // is armed for the whole mark and is already the only thing keeping
+                // genuine native threads honest; they are never blocked at all, and
+                // cn1GcScanThreadNativeStack releases its own signal stops at exactly this
+                // point for the same reason. Hence the guard: under -DCN1_DISABLE_SATB
+                // both barriers compile to no-ops and that argument evaporates, so the
+                // freeze is instead held through the drain by the block after it. A
+                // released mutator could otherwise read a child out of a captured root
+                // into a local the pre-release stack snapshot cannot contain, clear the
+                // field, and have the sweep reclaim an object it is still using.
+                // threadBlockedByGC stays set either way, so if this thread does reach a
+                // safepoint it still parks.
                 if(forcedStop) {
                     cn1GcMarkReleaseForced(t);
                     forcedStop = JAVA_FALSE;
                 }
-                // Only now, with the thread running again, is it safe to take a logging
-                // lock: until the release the target could have owned os_log's, stdio's or
-                // malloc's, and printing would have hung the collector on the thread it
-                // had just stopped. Captured at the escalation, printed here.
-                if(forcedStopSeq != 0) {
-#if defined(__OBJC__)
-                    NSLog(@"[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)",
-                          (int)t->threadId, forcedStopWaitUs, forcedStopSeq);
-#else
-                    fprintf(stderr, "[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)\n",
-                            (int)t->threadId, forcedStopWaitUs, forcedStopSeq);
 #endif
-                    forcedStopSeq = 0;
-                }
 #endif
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
                 cn1GcSelfCheckThreadStack(t, stackSize);
@@ -2670,6 +2677,31 @@ void codenameOneGCMark() {
                 { long long __t0 = cn1GcNowNs(); gcMarkDrainParallel(d); cn1GcTDrainNs += cn1GcNowNs() - __t0; }
 #else
                 gcMarkDrainParallel(d);
+#endif
+#ifdef CN1_GC_CAN_FORCE_STOP
+                // Release point for the -DCN1_DISABLE_SATB build, where the block above
+                // deliberately kept the freeze (no barrier, so the drain has to finish
+                // before this thread may run again). A no-op when SATB is armed and the
+                // freeze was already dropped.
+                if(forcedStop) {
+                    cn1GcMarkReleaseForced(t);
+                    forcedStop = JAVA_FALSE;
+                }
+                // Only now, with the thread running again, is it safe to take a logging
+                // lock: while frozen the target could have owned os_log's, stdio's or
+                // malloc's, and printing would have hung the collector on the thread it
+                // had just stopped. Captured at the escalation, printed here, and placed
+                // after BOTH release points so it is correct in either build.
+                if(forcedStopSeq != 0) {
+#if defined(__OBJC__)
+                    NSLog(@"[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)",
+                          (int)t->threadId, forcedStopWaitUs, forcedStopSeq);
+#else
+                    fprintf(stderr, "[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)\n",
+                            (int)t->threadId, forcedStopWaitUs, forcedStopSeq);
+#endif
+                    forcedStopSeq = 0;
+                }
 #endif
                 if(!agressiveAllocator) {
                     t->threadBlockedByGC = JAVA_FALSE;

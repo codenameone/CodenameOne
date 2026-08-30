@@ -124,6 +124,16 @@ class GcUncooperativeThreadIntegrationTest {
     }
 
     private void runGate(List<Path> tempDirs) throws Exception {
+        // The escalation needs POSIX signals, so CN1_GC_CAN_FORCE_STOP is deliberately not
+        // defined on Windows and the runtime keeps the unbounded cooperative wait there.
+        // The fixed arm therefore cannot emit the force-stop marker on Windows and this
+        // gate would fail for a reason that says nothing about the code under test. Skipped
+        // rather than weakened: the assertions are what make it a gate, and the platform
+        // that can satisfy them is the platform the feature exists on.
+        org.junit.jupiter.api.Assumptions.assumeFalse(CompilerHelper.isWindows(),
+                "The forced-stop escalation is not compiled on Windows (no POSIX signals),"
+                        + " so there is nothing for this gate to assert there.");
+
         Path sourceDir = Files.createTempDirectory("gc-uncoop-sources");
         Path classesDir = Files.createTempDirectory("gc-uncoop-classes");
         Path javaApiDir = Files.createTempDirectory("gc-uncoop-javaapi");
