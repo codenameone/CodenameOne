@@ -11553,12 +11553,47 @@ public class IOSImplementation extends CodenameOneImplementation {
         final String message;
         final String type;
         final long completionId;
+        /// The PushContent that came with THIS notification, or null if it
+        /// carried none.
+        ///
+        /// Held with the message for the same reason the completion id is.
+        /// PushContent is a singleton the native layer resets and rewrites for
+        /// every notification, so by the time a held message is replayed it
+        /// describes whichever notification arrived LAST: two pushes before a
+        /// callback existed meant the first callback saw the second's image,
+        /// category and action, and the second saw nothing at all, because
+        /// PushContent.get() clears as it reads.
+        final PushContent content;
 
-        PendingPush(String message, String type, long completionId) {
+        PendingPush(String message, String type, long completionId,
+                PushContent content) {
             this.message = message;
             this.type = type;
             this.completionId = completionId;
+            this.content = content;
         }
+    }
+
+    /// Puts a held notification's content back where PushContent.get() looks.
+    ///
+    /// Only the fields the native layer sets are restored, and only when the
+    /// notification had content: a push that carried none must leave
+    /// PushContent.exists() answering false rather than resurrect the previous
+    /// one's fields as empty strings.
+    private static void restorePushContent(PushContent c) {
+        PushContent.reset();
+        if (c == null) {
+            return;
+        }
+        PushContent.setTitle(c.getTitle());
+        PushContent.setBody(c.getBody());
+        PushContent.setImageUrl(c.getImageUrl());
+        PushContent.setCategory(c.getCategory());
+        PushContent.setMetaData(c.getMetaData());
+        PushContent.setActionId(c.getActionId());
+        PushContent.setActionTitle(c.getActionTitle());
+        PushContent.setTextResponse(c.getTextResponse());
+        PushContent.setType(c.getType());
     }
 
     private static final java.util.ArrayList<PendingPush> pendingPushes =
@@ -11586,6 +11621,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         // and calls into the native layer, and holding a lock across that invites
         // the deadlock this is not worth.
         for (PendingPush p : held) {
+            // Restored immediately before its own delivery, so each callback
+            // sees the content of the notification it is being given.
+            restorePushContent(p.content);
             pushReceived(p.message, p.type, p.completionId);
         }
     }
@@ -11643,7 +11681,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                         evictedCompletionId = pendingPushes.remove(0).completionId;
                         evicted = true;
                     }
-                    pendingPushes.add(new PendingPush(message, type, completionId));
+                    // Taken NOW, while PushContent still describes this
+                    // notification. get() clears as it reads, which is what
+                    // makes the snapshot exclusive to this record; the next
+                    // notification resets the singleton anyway.
+                    pendingPushes.add(new PendingPush(message, type, completionId,
+                            PushContent.get()));
                 }
             }
             if (deliverNow) {
