@@ -1448,12 +1448,52 @@ static JAVA_OBJECT* gcAdoptStack = 0;
 static long gcAdoptTop = 0, gcAdoptCap = 0;
 #endif
 
+// Nonzero while the collector is holding a thread SIGNAL-FROZEN (either the escalation in
+// codenameOneGCMark or the native-thread stop inside cn1GcScanThreadNativeStack). A frozen
+// thread halts at an arbitrary instruction and may own the libc allocator lock, so nothing
+// the collector runs in that window may allocate -- and root marking DOES allocate, through
+// cn1MatureObject's adoption buffer. Written only by the GC thread, and only while root
+// scanning, which is serial; the parallel drain runs after every freeze is released.
+static _Atomic int cn1GcFreezeHeld = 0;
+
+#ifndef CN1_DISABLE_BIBOP
+// Grow the adoption buffer to `headroom` free slots, called BEFORE a freeze is taken so the
+// growth inside cn1MatureObject is unlikely to be needed while one is held. Best effort:
+// failing to grow only makes the decline in cn1MatureObject more likely, never unsafe.
+static void cn1GcAdoptReserve(long headroom) {
+    pthread_mutex_lock(&gcAdoptMutex);
+    if(gcAdoptTop + headroom > gcAdoptCap) {
+        long ncap = gcAdoptCap ? gcAdoptCap : 4096;
+        while(ncap < gcAdoptTop + headroom) { ncap *= 2; }
+        JAVA_OBJECT* n = (JAVA_OBJECT*)realloc(gcAdoptStack, (size_t)ncap * sizeof(JAVA_OBJECT));
+        if(n != 0) { gcAdoptStack = n; gcAdoptCap = ncap; }
+    }
+    pthread_mutex_unlock(&gcAdoptMutex);
+}
+#endif
+
 static void cn1MatureObject(JAVA_OBJECT obj) {
 #ifndef CN1_DISABLE_BIBOP
     // Claim the object for adoption exactly ONCE with a CAS -3 -> -4. Under parallel
     // markers two threads can both reach the same object; the CAS loser must not
     // double-buffer/double-register. The -4 flag takes effect immediately so the cascade,
     // the mark-stamp and the sweep-skip all see it during THIS mark.
+    // DECLINE BEFORE THE CLAIM if a signal freeze is held and the buffer below would have
+    // to grow: that growth is a realloc, and the frozen thread may own the allocator lock,
+    // which would hang the collector on the thread it just stopped and never reach the
+    // release. Checked before the CAS on purpose -- claiming and then bailing is what the
+    // OOM path below does, and it leaves the object flagged -4 and unregistered forever,
+    // i.e. leaked, because the CAS can never fire again. Declining leaves it at -3: it is
+    // still marked and traced this cycle (the push below is unconditional), it simply
+    // graduates in a later one.
+    //
+    // The unlocked read of gcAdoptTop/gcAdoptCap is exact where it matters: the flag is
+    // only ever set while the collector is root-scanning, which is serial on the GC
+    // thread. Ordered flag-last so the common path pays nothing but a predictable branch.
+    if(gcAdoptTop >= gcAdoptCap
+       && atomic_load_explicit(&cn1GcFreezeHeld, memory_order_relaxed) != 0) {
+        return;
+    }
     int expected = CN1_BIBOP_HEAP_POS;
     if(!__atomic_compare_exchange_n(&obj->__heapPosition, &expected, CN1_BIBOP_ADOPTED,
                                     0, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
@@ -8446,11 +8486,18 @@ static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t) {
     }
     t->gcSigStackBase = base;
     t->gcSigStackSize = ssz;
+#ifndef CN1_DISABLE_BIBOP
+    // Give the adoption buffer headroom while allocating is still legal, so the root scans
+    // under the freeze are unlikely to need cn1MatureObject's realloc (which they must
+    // decline). Sized well above one thread's plausible adoption count per cycle.
+    cn1GcAdoptReserve(16384);
+#endif
     if(cn1GcSignalStopOne(t) == 0) {
         // Timed out. cn1GcSignalStopOne has already pre-released the generation, so
         // nothing is left stranded.
         return JAVA_FALSE;
     }
+    atomic_fetch_add_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
     t->gcMarkForcedStop = JAVA_TRUE;
     return JAVA_TRUE;
 }
@@ -8461,6 +8508,7 @@ static void cn1GcMarkReleaseForced(struct ThreadLocalData* t) {
     }
     t->gcMarkForcedStop = JAVA_FALSE;
     cn1GcSignalReleaseOne(t);
+    atomic_fetch_sub_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
 }
 #endif
 
@@ -8522,6 +8570,13 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
 
     // SIGNAL path: stop, scan, release. Used for native threads, for the forced
     // CN1_GC_SIGNAL_STOP=1 validation mode, or as a fallback for a stale capture.
+    // Same allocation ban as the escalation, and this path had it first: master already
+    // marked between the stop and the release here, so cn1MatureObject's realloc could
+    // already hang the collector against a frozen NATIVE thread. Counted rather than a
+    // boolean because the two freeze sites are independent.
+#ifndef CN1_DISABLE_BIBOP
+    cn1GcAdoptReserve(16384);
+#endif
     char* sp = cn1GcSignalStopOne(t);
     if(sp == 0) {
         // Could not stop the thread. If it is lightweight and cooperatively captured we
@@ -8535,8 +8590,10 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
                                          (char*)&t->gcRegisterSnapshot + sizeof(t->gcRegisterSnapshot));
             }
         }
-        return;
+        return;   // nothing was frozen, so the counter was never raised
     }
+    // Raised only on the success path, so the sub below always pairs with an add.
+    atomic_fetch_add_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
     if(sp >= base - (long)ssz && sp < base) {
         cn1ConservativeMarkRange(threadStateData, sp, base);
     }
@@ -8544,6 +8601,7 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
         cn1ConservativeMarkRange(threadStateData, t->gcSigRegs, t->gcSigRegs + t->gcSigRegsLen);
     }
     cn1GcSignalReleaseOne(t);
+    atomic_fetch_sub_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
 }
 
 // Scan the GC thread's OWN native stack (a root could be live only in a GC-thread C
