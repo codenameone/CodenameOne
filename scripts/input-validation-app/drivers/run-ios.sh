@@ -226,6 +226,16 @@ set +e
 ) | tee -a "$XCODEBUILD_LOG" &
 XCB_PIPE_PID=$!
 SYNC_FAILED=0
+# The app has to exist before any step deadline means anything. xcodebuild builds the
+# UI test target before it launches anything, which took just over four minutes on the
+# CI runner -- so the first step's own budget was spent waiting for a build, expired
+# four seconds before the app started, and the tap was never released. Every later step
+# then released on time against an XCUITest still blocked on the first one. Waited for
+# separately, and generously, so the per-step budgets measure what they are named for.
+if ! wait_for_log_marker "CN1IV:SUITE:STARTED" "${CN1IV_LAUNCH_TIMEOUT:-1200}"; then
+  iv_log "Timed out waiting for the app to start before releasing any gesture"
+  SYNC_FAILED=1
+fi
 release_xcui_step tap || SYNC_FAILED=1
 release_xcui_step drag || SYNC_FAILED=1
 release_xcui_step longpress || SYNC_FAILED=1
