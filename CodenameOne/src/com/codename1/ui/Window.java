@@ -1507,20 +1507,10 @@ public class Window extends Container implements TopLevelContainer {
         // callback delivered, so it lags the frame the platform reports and the
         // difference between them is not the chrome at all.
         WindowManager wm = manager();
-        int[] frame = wm.getBounds(nativePeer, new int[4]);
-        // Into one space before subtracting. The frame is in the desktop coordinates
-        // setWindowSize also speaks, while the drawable is in the device pixels this
-        // method is asked for and lays out in -- the same on a port addressed in
-        // pixels, and off by the backing scale on one that is not. Subtracted raw, a
-        // frame smaller in units than the drawable is in pixels made the chrome
-        // measure zero, and the pixel count then went out as a unit count: on a
-        // display at twice the scale a dialog asking for four hundred pixels got a
-        // window twice the size it wanted, with its title bar over the content.
+        int[] chrome = measureChrome(wm, new int[2]);
         double units = wm.getDesktopUnitsPerPixel(nativePeer);
-        int drawableW = (int) Math.round(wm.getWidth(nativePeer) * units);
-        int drawableH = (int) Math.round(wm.getHeight(nativePeer) * units);
-        int chromeW = Math.max(0, frame[2] - drawableW);
-        int chromeH = Math.max(0, frame[3] - drawableH);
+        int chromeW = chrome[0];
+        int chromeH = chrome[1];
         applyingContentSize = true;
         try {
             setWindowSize((int) Math.round(width * units) + chromeW,
@@ -1541,6 +1531,32 @@ public class Window extends Container implements TopLevelContainer {
             pendingContentWidth = -1;
             pendingContentHeight = -1;
         }
+    }
+
+    /// How much of this window's frame is chrome rather than drawable, in the desktop
+    /// coordinates the frame itself is measured in.
+    ///
+    /// The two measurements come from different spaces on a port whose windowing system
+    /// places windows in logical units: `WindowManager#getWidth` reports device pixels
+    /// and `WindowManager#getBounds` desktop units. Shared by the two callers so they
+    /// cannot answer the question differently, which is exactly what happened when the
+    /// deferred correction kept a copy of the arithmetic.
+    ///
+    /// #### Parameters
+    ///
+    /// - `wm`: this window's manager
+    ///
+    /// - `out`: a two element array receiving the width and height of the chrome
+    ///
+    /// #### Returns
+    ///
+    /// the array that was passed in
+    private int[] measureChrome(WindowManager wm, int[] out) {
+        int[] frame = wm.getBounds(nativePeer, new int[4]);
+        double units = wm.getDesktopUnitsPerPixel(nativePeer);
+        out[0] = Math.max(0, frame[2] - (int) Math.round(wm.getWidth(nativePeer) * units));
+        out[1] = Math.max(0, frame[3] - (int) Math.round(wm.getHeight(nativePeer) * units));
+        return out;
     }
 
     /// Applies a content size that could not be measured when it was asked for.
@@ -1566,9 +1582,15 @@ public class Window extends Container implements TopLevelContainer {
                     return;
                 }
                 WindowManager wm = manager();
-                int[] frame = wm.getBounds(nativePeer, new int[4]);
-                int chromeW = Math.max(0, frame[2] - wm.getWidth(nativePeer));
-                int chromeH = Math.max(0, frame[3] - wm.getHeight(nativePeer));
+                // Measured the same way as the request itself. Subtracted raw, a frame
+                // in desktop units minus a drawable in device pixels is negative on a
+                // display whose two spaces differ, so the chrome clamped to zero and a
+                // decorated window read as "not measurable yet" for good -- the request
+                // below never applied and the window stayed the size it was asked for
+                // before its geometry existed.
+                int[] chrome = measureChrome(wm, new int[2]);
+                int chromeW = chrome[0];
+                int chromeH = chrome[1];
                 if (isDecorated() && chromeW == 0 && chromeH == 0) {
                     // The geometry is still the size that was asked for rather than
                     // anything measured, so the request stays pending. Waiting is the
@@ -1622,17 +1644,37 @@ public class Window extends Container implements TopLevelContainer {
     /// True while `#setWindowContentSize(int, int)` is setting the frame itself.
     private boolean applyingContentSize;
 
-    public void setWindowBounds(final Rectangle r) {
-        // Marshalled here rather than only in the private form below, so that the
-        // supersession keeps its place in the queue. A background caller that asks for
-        // a content size and then for bounds queues the first and ran the second's
-        // supersession immediately -- clearing a request that had not been installed
-        // yet, and leaving the one that arrived afterwards to win.
+    public void setWindowBounds(Rectangle r) {
+        // Read now rather than when a queued call runs. The rectangle belongs to the
+        // caller, which is free to mutate or reuse it the moment this returns, so
+        // holding on to it moved the window to whatever it happened to contain later
+        // instead of what was asked for here.
+        setWindowBoundsSuperseding(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+    }
+
+    /// Bounds asked for by a caller, which supersede a pending content size.
+    ///
+    /// Marshalled here rather than only in the private form below, so that the
+    /// supersession keeps its place in the queue. A background caller that asks for a
+    /// content size and then for bounds queued the first and ran the second's
+    /// supersession immediately -- clearing a request that had not been installed yet,
+    /// and leaving the one that arrived afterwards to win.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the new x position in desktop coordinates
+    ///
+    /// - `y`: the new y position in desktop coordinates
+    ///
+    /// - `w`: the new width
+    ///
+    /// - `h`: the new height
+    private void setWindowBoundsSuperseding(final int x, final int y, final int w, final int h) {
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    setWindowBounds(r);
+                    setWindowBoundsSuperseding(x, y, w, h);
                 }
             });
             return;
@@ -1644,7 +1686,7 @@ public class Window extends Container implements TopLevelContainer {
         // after asking for a content size -- including the centring a native dialog
         // does immediately afterwards, which defeated the deferred sizing entirely.
         supersedePendingContentSize();
-        setWindowBounds(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+        setWindowBounds(x, y, w, h);
     }
 
     private void setWindowBounds(final int x, final int y, final int w, final int h) {

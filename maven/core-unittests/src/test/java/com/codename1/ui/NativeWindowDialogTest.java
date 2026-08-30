@@ -1478,4 +1478,77 @@ class NativeWindowDialogTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+    @FormTest
+    void aDeferredContentSizeIsMeasuredInDesktopUnitsToo() throws Exception {
+        // The correction that runs once a window's geometry becomes measurable kept its
+        // own copy of the chrome arithmetic. Subtracted raw, a frame in desktop units
+        // minus a drawable in device pixels is negative, so the chrome clamped to zero
+        // and a decorated window read as "not measurable yet" for good -- the pending
+        // request never applied and the window kept the size it was asked for before
+        // its geometry existed.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setDesktopUnitsPerPixel(0.5);
+        wm.setChromeInsets(10, 25);
+        // Nothing measurable yet, which is what an asynchronously granted scene reports.
+        wm.setChromeMeasurable(false);
+        Window w = new Window("deferred", new BorderLayout());
+        w.setDecorated(true);
+        w.show();
+        DisplayTest.flushEdt();
+
+        w.setWindowContentSize(400, 300);
+        DisplayTest.flushEdt();
+
+        // The platform grants the geometry and reports a size change.
+        wm.setChromeMeasurable(true);
+        Desktop.getInstance().windowSizeChanged(w.getWindowId(), 400, 300);
+        for (int i = 0; i < 20; i++) {
+            DisplayTest.flushEdt();
+        }
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+        assertEquals(210, peer.getWidth(),
+                "the deferred correction has to apply once the chrome is measurable");
+        assertEquals(175, peer.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void boundsAreReadWhenTheyAreAskedForNotWhenTheyAreApplied() throws Exception {
+        // The rectangle belongs to the caller, which is free to reuse it the moment the
+        // call returns. Holding on to it moved the window to whatever it contained by
+        // the time the queued call ran.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("bounds", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+
+        final com.codename1.ui.geom.Rectangle r =
+                new com.codename1.ui.geom.Rectangle(10, 20, 300, 200);
+        Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                w.setWindowBounds(r);
+                // Reused at once, exactly as a caller that keeps one rectangle would.
+                r.setBounds(999, 999, 111, 111);
+            }
+        }, "cn1-test-bounds-caller");
+        caller.start();
+        caller.join(2000);
+        for (int i = 0; i < 20; i++) {
+            DisplayTest.flushEdt();
+        }
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+        assertEquals(300, peer.getWidth(),
+                "the size asked for, not whatever the caller put in the rectangle after");
+        assertEquals(200, peer.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }
