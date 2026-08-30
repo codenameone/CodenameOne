@@ -232,9 +232,18 @@ public @interface Mac {
     String signingStyle() default "";
 
     /// macOS builds. Signing certificate identity for the App Store channel.
-    /// Default `Apple Distribution`. Set it to `none` to build unsigned -- an
-    /// empty value can't say that, because an empty hint reads as unset and takes
-    /// the default.
+    /// Default `Apple Distribution`.
+    ///
+    /// `none` is NOT accepted here, unlike on the Developer ID channel. An
+    /// unsigned application still gets packaged into a signed `.pkg`, so the
+    /// build reports success and App Store Connect rejects the upload hours
+    /// later for an application with no signature and none of the sandbox
+    /// entitlements it has to carry. The build fails immediately instead,
+    /// naming this hint. Build only the `developerID` channel if what you want
+    /// is an unsigned application.
+    ///
+    /// An empty value reads as unset and takes the default, which is why the
+    /// Developer ID channel spells the escape hatch `none` rather than "".
     @Hint(name = "macos.signingIdentity.appStore")
     String signingIdentityAppStore() default "";
 
