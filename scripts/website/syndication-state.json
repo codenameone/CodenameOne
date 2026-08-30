@@ -1791,6 +1791,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-08-30T15:01:09+00:00"
+      },
+      "devto": {
+        "id": 4530080,
+        "url": "https://dev.to/codenameone/javascript-find-in-page-dom-text-above-the-codename-one-canvas-41pj",
+        "syndicated_at": "2026-08-30T17:26:42+00:00"
       }
     }
   }
