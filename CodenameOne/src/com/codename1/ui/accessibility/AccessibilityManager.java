@@ -282,6 +282,21 @@ public final class AccessibilityManager {
                 pendingRoots.clear();
                 rootless = pendingRootlessRefresh;
                 pendingRootlessRefresh = false;
+                // Released here, with the queue, rather than held until the end. The
+                // defect this pass exists to fix is that an invalidation arriving while
+                // it runs found a refresh still scheduled and queued nothing of its own,
+                // and the pass then cleared the flag having already emptied the queue --
+                // so that root stayed stale. Clearing it now lets those invalidations
+                // schedule an ordinary pass of their own instead.
+                //
+                // Re-posting from inside the pass fixed the same defect and cost the
+                // JavaScript port its suite: that runtime drains the serial queue until
+                // it is empty within one turn, so a runnable that re-queues itself while
+                // work keeps arriving holds the drain and nothing is ever painted. An
+                // animating surface produces work every frame, so the screen froze and
+                // the test waiting on it timed out with no screenshot. Scheduling
+                // through the ordinary path lands in a later turn, which yields.
+                refreshScheduled = false;
             }
             if (rootless) {
                 getSnapshotForRoot(null);
@@ -294,17 +309,6 @@ public final class AccessibilityManager {
                     markDirty(roots.get(iter));
                 }
                 getSnapshotForRoot(roots.get(iter));
-            }
-            boolean again;
-            synchronized (AccessibilityManager.this) {
-                // Anything queued while this pass was running. The flag stays set
-                // across the re-post, because it is still scheduled -- clearing it
-                // first would let a third invalidation queue a second pass for the
-                // same work.
-                again = !pendingRoots.isEmpty() || pendingRootlessRefresh;
-                if (!again) {
-                    refreshScheduled = false;
-                }
             }
             // Named per surface. A port that pushes the tree into a native view needs
             // to know which one it just described: told only that something changed, it
@@ -319,9 +323,6 @@ public final class AccessibilityManager {
                     Display.getInstance().accessibilityTreeChanged(changes,
                             windowIdOf(roots.get(iter)));
                 }
-            }
-            if (again) {
-                Display.getInstance().callSerially(this);
             }
         }
     }
