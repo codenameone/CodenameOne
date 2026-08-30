@@ -587,6 +587,41 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     return YES;
 }
 
+#ifndef CN1_USE_ARC
+/// Balances every retain this view holds, because nothing else did.
+///
+/// The class had no dealloc at all and macWindowDestroy() does not call
+/// deleteFramebuffer, so disposing a secondary Window released the view object
+/// and leaked everything it owned -- including the screen and stencil textures,
+/// which are a full window's worth of pixels each. Open and close a few desktop
+/// windows and that is tens of megabytes that never come back; do it in a loop
+/// and the process runs out.
+///
+/// The textures go through deleteFramebuffer rather than being released here,
+/// so there is one place that knows what the framebuffer consists of.
+- (void)dealloc {
+    [self deleteFramebuffer];
+    self.commandQueue = nil;
+    self.commandBuffer = nil;
+    self.renderPassDescriptor = nil;
+    self.renderCommandEncoder = nil;
+    self.peerComponentsLayer = nil;
+    if (cn1TrackingArea != nil) {
+        [self removeTrackingArea:cn1TrackingArea];
+        [cn1TrackingArea release];
+        cn1TrackingArea = nil;
+    }
+    if (cn1InputBlocker != nil) {
+        [cn1InputBlocker removeFromSuperview];
+        [cn1InputBlocker release];
+        cn1InputBlocker = nil;
+    }
+    [consumedKeys release];
+    consumedKeys = nil;
+    [super dealloc];
+}
+#endif
+
 - (void)deleteFramebuffer {
     self.screenTexture = nil;
     self.stencilTexture = nil;
@@ -1235,6 +1270,21 @@ static int CN1MacKeyCode(NSEvent *event) {
         [self interpretKeyEvents:@[event]];
         return;
     }
+    // This press is an ordinary one, so any claim still held on the same key is
+    // stale and has to go before it can swallow this press's release.
+    //
+    // A claim is entered on the keyDown and cleared on the matching keyUp, and
+    // the keyUp does not always come: swallow a key in a text session, switch
+    // applications before letting go, and the release is delivered to whoever
+    // is frontmost instead. The claim then outlived its press, and the next
+    // ordinary press of that key had ITS release swallowed as the old one --
+    // leaving the framework a keyPressed with no keyReleased, which is how a
+    // control ends up stuck down.
+    //
+    // Reconciled here rather than on a focus-loss notification: this is the
+    // moment the claim is provably stale, and it needs no notification to
+    // arrive for that to be true.
+    [[self cn1ConsumedKeys] removeIndex:event.keyCode];
     int code = CN1MacKeyCode(event);
     if (code == 0) {
         return;

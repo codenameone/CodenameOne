@@ -58,6 +58,10 @@ class MacNative {
     /// hops to the main queue itself.
     native void replyToTermination();
 
+    /// Asks AppKit to quit, so a programmatic exit runs the same lifecycle a
+    /// Cmd-Q or a window close does. See MacImplementation.exitApplication.
+    native void requestTerminate();
+
     native void macWindowDestroy(int slot);
 
     native void macWindowShow(int slot, boolean visible);

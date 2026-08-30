@@ -3856,6 +3856,9 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
 #endif // !TARGET_OS_WATCH
 }
 
+/// Defined below, next to the media creators that share it.
+static NSURL *cn1URLForMediaString(NSString *s);
+
 void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1)
 {
 #if TARGET_OS_OSX
@@ -3871,35 +3874,9 @@ void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STAT
         // No preview controller: a Mac opens a file in whichever application
         // owns it, which is what the user expects and what
         // UIDocumentInteractionController was standing in for on iOS.
-        // A file: URL is PARSED as a URL, not chopped into a path.
-        //
-        // fileURLWithPath: takes its argument literally, so the %20 in a
-        // perfectly ordinary file:///.../My%20Report.pdf became three
-        // characters of the filename and was re-encoded to %2520 on the way
-        // out -- the file did not exist under that name and nothing opened.
-        // URLWithString: is what understands the escaping.
-        //
-        // The raw-path fallbacks are what fileURLWithPath: is actually for, and
-        // both directions need one: callers pass unencoded paths with spaces,
-        // which URLWithString: rejects outright, and they pass paths with no
-        // scheme at all, which it accepts and returns schemeless so openURL:
-        // can do nothing with them.
-        NSURL* url = nil;
-        if ([ns hasPrefix:@"file:"]) {
-            url = [NSURL URLWithString:ns];
-            if (url == nil) {
-                NSString* path = [ns substringFromIndex:5];
-                while ([path hasPrefix:@"//"]) {
-                    path = [path substringFromIndex:1];
-                }
-                url = [NSURL fileURLWithPath:path];
-            }
-        } else {
-            url = [NSURL URLWithString:ns];
-            if (url == nil || [url scheme] == nil) {
-                url = [NSURL fileURLWithPath:ns];
-            }
-        }
+        // Same reading as every media URL: see cn1URLForMediaString, which
+        // this shares so the two cannot drift.
+        NSURL* url = cn1URLForMediaString(ns);
         if (url != nil) {
             [[NSWorkspace sharedWorkspace] openURL:url];
         }
@@ -6025,6 +6002,45 @@ BOOL useAVKit() {
     
     return NO;
 }
+/// A media or document URL from the string an application handed us.
+///
+/// Two conventions arrive here and both have to work. Codename One's own is
+/// "file:" followed by a RAW path -- FileSystemStorage builds it and unfile()
+/// takes it apart again without percent decoding -- and an application calling
+/// MediaManager.createMedia() or Display.execute() may equally pass a proper,
+/// percent-ENCODED file URI.
+///
+/// Chopping the scheme off and handing the rest to fileURLWithPath: served only
+/// the first: fileURLWithPath: takes its argument literally, so the %20 in
+/// file:///tmp/My%20Video.mp4 became three characters of the filename and was
+/// re-encoded to %2520, and the player had nothing to load. URLWithString: is
+/// what understands the escaping, and it returns nil for the raw form -- an
+/// unencoded space is not a legal URL -- which is exactly the signal to fall
+/// back to the path reading.
+static NSURL *cn1URLForMediaString(NSString *s) {
+    if (s == nil) {
+        return nil;
+    }
+    if ([s hasPrefix:@"file:"]) {
+        NSURL *encoded = [NSURL URLWithString:s];
+        if (encoded != nil) {
+            return encoded;
+        }
+        NSString *path = [s substringFromIndex:5];
+        while ([path hasPrefix:@"//"]) {
+            path = [path substringFromIndex:1];
+        }
+        return [NSURL fileURLWithPath:path];
+    }
+    NSURL *url = [NSURL URLWithString:s];
+    if (url == nil || [url scheme] == nil) {
+        // A bare path with no scheme at all, which URLWithString: hands back
+        // schemeless and no player can open.
+        return [NSURL fileURLWithPath:s];
+    }
+    return url;
+}
+
 JAVA_LONG createVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
 // UIKit-only helper. AppKit's equivalent is a different API rather than a
 // renamed one, so this is inert on the native macOS port until it is ported.
@@ -6036,12 +6052,7 @@ JAVA_LONG createVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletio
     dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
             NSString* s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
-            NSURL* u;
-            if([s hasPrefix:@"file:"]) {
-                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
-            } else {
-                u = [NSURL URLWithString:s];
-            }
+            NSURL* u = cn1URLForMediaString(s);
             moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
             registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
             moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
@@ -6086,9 +6097,7 @@ JAVA_LONG createVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletio
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSString* s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
-        NSURL* u = [s hasPrefix:@"file:"]
-            ? [NSURL fileURLWithPath:[s substringFromIndex:5]]
-            : [NSURL URLWithString:s];
+        NSURL* u = cn1URLForMediaString(s);
         // Parked off screen at a nominal size, like every other peer, until the
         // framework gives it real bounds.
         moviePlayerInstance = [[AVPlayerView alloc] initWithFrame:NSMakeRect(3000, 0, 200, 200)];
@@ -6111,12 +6120,7 @@ JAVA_LONG createVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletio
     dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
             NSString* s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
-            NSURL* u;
-            if([s hasPrefix:@"file:"]) {
-                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
-            } else {
-                u = [NSURL URLWithString:s];
-            }
+            NSURL* u = cn1URLForMediaString(s);
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
             // MRC ownership: alloc is +1 to us and the player property retains it
             // again, so releasing the view later drops only the property's reference
@@ -6171,12 +6175,7 @@ JAVA_LONG createNativeVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCom
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN()
             NSString *s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
-            NSURL *u = nil;
-            if([s hasPrefix:@"file:"]) {
-                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
-            } else {
-                u = [NSURL URLWithString:s];
-            }
+            NSURL *u = cn1URLForMediaString(s);
             moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
             registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
     #ifndef AUTO_PLAY_VIDEO
@@ -6196,12 +6195,7 @@ JAVA_LONG createNativeVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCom
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN()
             NSString *s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
-            NSURL *u = nil;
-            if([s hasPrefix:@"file:"]) {
-                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
-            } else {
-                u = [NSURL URLWithString:s];
-            }
+            NSURL *u = cn1URLForMediaString(s);
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
             // MRC ownership: alloc is +1 to us and the player property retains it
             // again, so releasing the view later drops only the property's reference

@@ -502,6 +502,26 @@ public class MacImplementation extends IOSImplementation {
     /// NSTerminateLater and this hands the work to the EDT; when it is done,
     /// the native reply lets the quit proceed. cn1MacReplyToTermination is
     /// called from the EDT and does its own hop to the main queue.
+    /// Quits through AppKit, so a programmatic exit runs the same lifecycle
+    /// every other exit does.
+    ///
+    /// The inherited implementation is System.exit(0), which translates to the
+    /// C exit() and takes the process down where it stands -- past
+    /// applicationShouldTerminate:, so macRunTerminationLifecycle below never
+    /// runs and the application's stop() and destroy() never happen. Cmd-Q and
+    /// closing the window got that cleanup; Display.exitApplication() did not,
+    /// which is the sort of difference that silently loses whatever an
+    /// application saves in destroy().
+    ///
+    /// terminate: is the same request the Quit menu item sends, so every exit
+    /// now takes one path: applicationShouldTerminate: defers with
+    /// NSTerminateLater, the lifecycle runs on the EDT, and the reply lets
+    /// AppKit finish.
+    @Override
+    public void exitApplication() {
+        TERMINATION_NATIVE.requestTerminate();
+    }
+
     public static void macRunTerminationLifecycle() {
         if (!com.codename1.ui.Display.isInitialized()) {
             TERMINATION_NATIVE.replyToTermination();

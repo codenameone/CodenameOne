@@ -572,6 +572,14 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowDestroy___int(CODENAME_ONE_T
         // The next frame then drew into a freed view, which is a main-thread
         // segfault one test after the one that closed the window.
         [[CN1MacHost sharedHost] forgetRenderingView:rec.view];
+        // And drop the framebuffer now rather than whenever the view happens to
+        // be deallocated. The screen and stencil textures are a window's worth
+        // of pixels each -- megabytes -- and the view can outlive this call in
+        // an autorelease pool or behind a reference AppKit has not let go of
+        // yet, so a loop that opens and closes windows would hold several
+        // windows' worth at once. Safe to call twice: deleteFramebuffer nils
+        // what it releases, and METALView's dealloc calls it again.
+        [rec.view deleteFramebuffer];
         if (rec.modalSession != NULL) {
             [NSApp endModalSession:rec.modalSession];
             rec.modalSession = NULL;

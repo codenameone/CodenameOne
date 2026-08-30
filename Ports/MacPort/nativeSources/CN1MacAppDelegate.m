@@ -454,6 +454,25 @@ static void cn1MacDeliverURL(NSString *url) {
 /// Called from the EDT once the termination lifecycle has run, so it hops to
 /// the main queue itself -- replyToApplicationShouldTerminate: is AppKit and
 /// must not be sent from the dispatch thread.
+/// Quits the way the user does, rather than the way exit() does.
+///
+/// Display.exitApplication() called System.exit(0), which translates to the C
+/// exit() and takes the process down where it stands -- past
+/// applicationShouldTerminate:, so the deferred lifecycle never ran and the
+/// application's stop() and destroy() never happened. A Cmd-Q or a window close
+/// got that cleanup and a programmatic exit did not, which is the sort of
+/// difference that loses whatever an application saves in destroy().
+///
+/// terminate: is the request the menu item sends, so from here on every exit
+/// takes the one path.
+JAVA_VOID com_codename1_impl_mac_MacNative_requestTerminate__(CODENAME_ONE_THREAD_STATE,
+        JAVA_OBJECT __cn1ThisObject) {
+    (void) __cn1ThisObject;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [NSApp terminate:nil];
+    });
+}
+
 JAVA_VOID com_codename1_impl_mac_MacNative_replyToTermination__(CODENAME_ONE_THREAD_STATE,
         JAVA_OBJECT __cn1ThisObject) {
     (void) __cn1ThisObject;
