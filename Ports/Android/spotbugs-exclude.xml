@@ -535,6 +535,21 @@
     three-argument startForeground, API 29. Each is a capability this port compiles too far back to
     name, and each falls back rather than failing; an older platform splits the routes itself, and
     a promotion that cannot name its type still promotes.
+
+    CN1IncomingCallActivity is the ringing screen, and reaches two API 27 methods
+    (setShowWhenLocked and setTurnScreenOn) plus KeyguardManager.requestDismissKeyguard, API 26.
+    The fallback is the deprecated window flags, which do the same job on every level this port
+    supports, so a platform that answers neither still rings over the lock screen.
+
+    DE_MIGHT_IGNORE rides along for the same two sites and for the same reason it is wrong about
+    them: the exception IS the answer. "This device does not have the API" is not an error to
+    report, log or recover from. It is the branch, and the code takes the other one. A logged
+    warning on every launch of a ringing screen on an older device would be noise about a
+    capability the port never claimed to have.
+
+    No double hyphen anywhere in these comments, and that is not a style choice: it terminates an
+    XML comment, a malformed exclude file is IGNORED rather than rejected, and the whole filter
+    would fail open with every exclusion here silently gone.
     -->
     <Match>
         <Or>
@@ -543,7 +558,13 @@
             <Class name="com.codename1.impl.android.vpn.CN1VpnService" />
             <Class name="com.codename1.impl.android.call.CallScreeningRole" />
             <Class name="com.codename1.impl.android.call.CN1CallNotifications" />
+            <Class name="com.codename1.impl.android.call.CN1IncomingCallActivity" />
         </Or>
         <Bug pattern="REC_CATCH_EXCEPTION" />
+    </Match>
+    <Match>
+        <Class name="com.codename1.impl.android.call.CN1IncomingCallActivity" />
+        <Method name="dismissKeyguard" />
+        <Bug pattern="DE_MIGHT_IGNORE" />
     </Match>
 </FindBugsFilter>

@@ -53,6 +53,16 @@ public class CN1Connection extends Connection {
     private final CN1ConnectionService service;
     private boolean audioAnnounced;
     private String callerName;
+
+    /// What the ringing screen shows for this call.
+    ///
+    /// The same string the notification titles itself with, read rather than
+    /// passed through the launch intent: an extra would be a second copy that
+    /// a setCallerDisplayName after the notification was posted would leave
+    /// stale.
+    String callerLabel() {
+        return callerName;
+    }
     private boolean video;
     /// Set between onAnswer and the action being fulfilled.
     private boolean awaitingAnswer;

@@ -696,3 +696,7 @@ DTMF
 # VPN (VPN.asciidoc) terminology.
 IKEv2
 IPsec
+
+# Call management (Call-Management.asciidoc) terminology. Android names the
+# lock screen the keyguard, and the class that shows over it is KeyguardManager.
+keyguard

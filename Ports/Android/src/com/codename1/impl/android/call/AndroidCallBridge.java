@@ -658,7 +658,22 @@ public class AndroidCallBridge implements CallBridge {
         // Carried to the connection, which is the only place it can be
         // applied: dropping it here left Telecom treating every call as
         // audio-only while the bridge advertised CAPABILITY_VIDEO.
-        b.putBoolean(CN1ConnectionService.EXTRA_VIDEO, hasVideo);
+        //
+        // CLAMPED by the same predicate that clamps the account's
+        // CAPABILITY_VIDEO_CALLING, and clamped HERE because this is the one
+        // funnel both report paths pass through. Clamping the registration
+        // alone left the per-call flag unguarded: an audio-only build could
+        // still report video=true, CN1ConnectionService.adopt() would call
+        // CN1Connection.setVideo(true), and Telecom would present a video
+        // call against an account with no video capability and a manifest
+        // with no CAMERA permission -- a call the app can never capture for.
+        //
+        // The restrictive answer for the same reason the registration gives:
+        // Calls.getCapabilities() tells the app video is unavailable, and a
+        // port that then reported one anyway would be giving two answers to
+        // one question.
+        b.putBoolean(CN1ConnectionService.EXTRA_VIDEO,
+                hasVideo && declaresPermission(Manifest.permission.CAMERA));
         return b;
     }
 

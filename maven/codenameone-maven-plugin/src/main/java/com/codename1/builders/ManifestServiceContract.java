@@ -94,7 +94,22 @@ final class ManifestServiceContract {
      * @return the index of the opening angle bracket, or -1
      */
     private static int liveServiceStart(String live, String name) {
-        int at = elementStart(live, "<service", 0);
+        return liveElementStart(live, "<service", name);
+    }
+
+    /**
+     * Returns where a LIVE {@code element} declaring {@code name} starts, or
+     * {@code -1}.
+     *
+     * <p>Parameterised by element rather than fixed to {@code <service>}
+     * because the call packages generate an {@code <activity>} too -- the
+     * full-screen ringing screen -- and a suppression check that only ever
+     * looked at services would regenerate an activity the application had
+     * already declared, which AAPT rejects as a duplicate.</p>
+     */
+    private static int liveElementStart(String live, String element,
+            String name) {
+        int at = elementStart(live, element, 0);
         while (at >= 0) {
             int close = live.indexOf('>', at);
             if (close < 0) {
@@ -104,9 +119,20 @@ final class ManifestServiceContract {
             if (name.equals(attributeValue(tag, "android:name"))) {
                 return at;
             }
-            at = elementStart(live, "<service", close);
+            at = elementStart(live, element, close);
         }
         return -1;
+    }
+
+    /**
+     * Returns whether a LIVE {@code <activity>} declares {@code name}.
+     *
+     * <p>Same question as {@link #declares} and the same answer shape; the
+     * element differs because the ringing screen is an activity.</p>
+     */
+    static boolean declaresActivity(String existing, String name) {
+        return liveElementStart(withoutComments(existing), "<activity", name)
+                >= 0;
     }
 
     /**

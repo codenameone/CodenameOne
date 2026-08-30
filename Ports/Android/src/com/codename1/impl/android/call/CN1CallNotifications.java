@@ -150,7 +150,14 @@ final class CN1CallNotifications {
     }
 
     /// Takes the call off the screen. Safe to call for a call never shown.
+    ///
+    /// The ringing ACTIVITY goes with it. Every path that ends a call already
+    /// funnels through here, and a full-screen window left in front of the
+    /// keyguard for a call answered from a car head unit, or ended by the far
+    /// end, is worse than the notification it replaced -- there is nothing
+    /// behind it to dismiss it.
     static void dismiss(String callId) {
+        CN1IncomingCallActivity.dismissFor(callId);
         Context ctx = AndroidImplementation.getContext();
         if (ctx == null || callId == null) {
             return;
@@ -180,7 +187,10 @@ final class CN1CallNotifications {
         }
     }
 
-    private static String label(Context ctx, String key, String fallback) {
+    /// Package-private so CN1IncomingCallActivity draws its buttons from
+    /// the same build hints; two surfaces reading two label sources is how
+    /// they end up disagreeing.
+    static String label(Context ctx, String key, String fallback) {
         String v = AndroidImplementation.getServiceProperty(key, fallback, ctx);
         return v == null || v.length() == 0 ? fallback : v;
     }
@@ -189,6 +199,36 @@ final class CN1CallNotifications {
         int icon = ctx.getResources().getIdentifier("ic_stat_notify",
                 "drawable", ctx.getApplicationInfo().packageName);
         return icon == 0 ? ctx.getApplicationInfo().icon : icon;
+    }
+
+    /// Answers a call, from whichever surface the user used.
+    ///
+    /// The notification action and the full-screen ringing screen both come
+    /// here rather than each calling the connection: "what answering means"
+    /// wants one implementation, or the two surfaces drift apart the first
+    /// time one of them grows a step the other does not.
+    static void answer(String callId) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c == null) {
+            dismiss(callId);
+            return;
+        }
+        // Not dismissed here: onAnswer() takes the notification down itself.
+        c.onAnswer();
+    }
+
+    /// Declines a call, from whichever surface the user used.
+    static void decline(String callId) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c == null) {
+            dismiss(callId);
+            return;
+        }
+        // Not dismissed here either, and for a sharper reason: a listener
+        // that fails endRequested is saying it could NOT reject the call,
+        // Telecom then leaves it ringing, and taking the notification away
+        // would leave that restored call with no answer surface.
+        c.onReject();
     }
 
     private static PendingIntent actionIntent(Context ctx, String action,
@@ -208,14 +248,28 @@ final class CN1CallNotifications {
                 i, pendingFlags());
     }
 
+    /// The activity a full-screen intent launches.
+    ///
+    /// CN1IncomingCallActivity, not the application's launcher activity.
+    /// This used to hand the platform getLaunchIntentForPackage(), and a
+    /// full-screen intent is only as good as what it launches: Android does
+    /// not turn a launcher activity into a ringing screen, so the user
+    /// arrived at whatever form the app opens with and no Answer button --
+    /// while the notification that did carry one had been replaced by this
+    /// launch rather than shown beside it. On a locked device nothing
+    /// appeared at all, because an ordinary launcher activity has no
+    /// showWhenLocked and opens behind the keyguard.
+    ///
+    /// Null is still possible and still means "post the notification without
+    /// a full-screen intent", which is the honest degradation: the
+    /// notification alone rings and carries Answer and Decline.
     private static PendingIntent launchIntent(Context ctx, String callId,
             int notificationId) {
-        Intent i = ctx.getPackageManager()
-                .getLaunchIntentForPackage(ctx.getPackageName());
-        if (i == null) {
-            return null;
-        }
+        Intent i = new Intent(ctx, CN1IncomingCallActivity.class);
         i.putExtra(CN1ConnectionService.EXTRA_CALL_ID, callId);
+        // SINGLE_TOP so a re-post for the same call reuses the screen rather
+        // than stacking a second one behind it; NEW_TASK because this is
+        // launched from a notification with no activity of ours on top.
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                 | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return PendingIntent.getActivity(ctx, notificationId, i,
@@ -270,9 +324,9 @@ final class CN1CallNotifications {
                     // notification away here left that restored call with no
                     // answer surface. finish() clears it on the way out.
                     if (ACTION_ANSWER.equals(intent.getAction())) {
-                        c.onAnswer();
+                        answer(callId);
                     } else {
-                        c.onReject();
+                        decline(callId);
                     }
                 }
             };

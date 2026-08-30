@@ -61,6 +61,10 @@ final class CallManifestFragments {
     static final String SCREENING_SERVICE =
             "com.codename1.impl.android.call.CN1CallScreeningService";
 
+    /** The port's full-screen ringing activity. */
+    static final String INCOMING_ACTIVITY =
+            "com.codename1.impl.android.call.CN1IncomingCallActivity";
+
     private CallManifestFragments() {
     }
 
@@ -261,6 +265,15 @@ final class CallManifestFragments {
         return ManifestServiceContract.declares(existing, name);
     }
 
+    /// The same question for the ringing screen, which is an activity.
+    ///
+    /// Separate rather than folded into declares(): an element check that
+    /// looked only at services would regenerate an activity the application
+    /// had already declared, and AAPT rejects the duplicate.
+    private static boolean declaresActivity(String existing, String name) {
+        return ManifestServiceContract.declaresActivity(existing, name);
+    }
+
     /**
      * Returns {@code xml} with every {@code <!-- ... -->} span removed.
      *
@@ -402,6 +415,37 @@ final class CallManifestFragments {
                     .append("\"").append(CONNECTION_ACTION).append("\" />\n")
                     .append("            </intent-filter>\n")
                     .append("        </service>\n");
+        }
+        if ((session || voip) && !declaresActivity(have, INCOMING_ACTIVITY)) {
+            // The screen the notification's full-screen intent launches. A
+            // self-managed calling app gets no system call UI, so this is the
+            // ringing screen -- and an activity Android never heard of cannot
+            // be launched, so a missing entry here turns the full-screen
+            // intent into nothing at all.
+            //
+            // exported=false: it is launched by this app's own PendingIntent
+            // and nothing outside has any business starting it.
+            //
+            // showOnLockScreen is the manifest half of showing over the
+            // keyguard; the activity sets the runtime half itself. Both are
+            // needed, and neither is the default.
+            //
+            // excludeFromRecents and noHistory because a ringing screen is
+            // not somewhere to return to: once the call is answered or gone,
+            // an entry in Recents would re-open a screen for a call that no
+            // longer exists.
+            sb.append("        <activity android:name=\"")
+                    .append(INCOMING_ACTIVITY)
+                    .append("\"\n                  android:exported=\"false\"")
+                    .append("\n                  android:showOnLockScreen=")
+                    .append("\"true\"")
+                    .append("\n                  android:excludeFromRecents=")
+                    .append("\"true\"")
+                    .append("\n                  android:noHistory=\"true\"")
+                    .append("\n                  android:launchMode=")
+                    .append("\"singleTop\"")
+                    .append("\n                  android:theme=")
+                    .append("\"@android:style/Theme.NoTitleBar.Fullscreen\" />\n");
         }
         if (directory && !declares(have, SCREENING_SERVICE)) {
             sb.append("        <service android:name=\"")

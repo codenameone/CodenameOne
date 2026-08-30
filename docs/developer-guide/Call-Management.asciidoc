@@ -67,9 +67,13 @@ presents the call and there is nothing to build. On Android a self-managed
 calling app gets no system call screen at all: Telecom arbitrates with other
 calls, routes the audio and writes the call log, but presenting the call is
 the application's job. The port does that for you -- a call-category
-notification with a full-screen intent, which the platform turns into a
-full-screen ringing UI on a locked device and a heads-up banner on an unlocked
-one, with Answer and Decline wired to the same listeners as everywhere else.
+notification carrying a full-screen intent, and the ringing screen that intent
+launches. On an unlocked device you get the notification as a heads-up banner;
+on a locked one the platform shows the ringing screen over the keyguard.
+Answer and Decline appear on both and are wired to the same listeners as
+everywhere else. The screen is a plain one, because it ships inside the
+port and has no resources of its own: if you want your own, present it from
+your `incomingCall` listener and it draws on top.
 Two consequences are yours: the labels come from the
 `android.call.incomingTitle`, `android.call.answerLabel` and
 `android.call.declineLabel` build hints and are English until you set them,

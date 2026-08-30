@@ -261,23 +261,30 @@ public class CallManifestFragmentsTest {
                         connection(), 34)).getMessage()
                                 .contains("foregroundServiceType"),
                 "a VoIP service that cannot be promoted is not complete");
-        assertEquals("", CallManifestFragments.services(false, true, false,
-                connection(), 28),
+        // Asserted on the SERVICE rather than on the whole fragment being
+        // empty. Emptiness was a proxy for "nothing was demanded", and it
+        // stopped being one when the ringing activity started being generated
+        // beside the service -- a legacy build needs that screen as much as a
+        // modern one does. What this test is about is that the declaration
+        // was accepted, so no service is regenerated and nothing throws.
+        String legacy = CallManifestFragments.services(false, true, false,
+                connection(), 28);
+        assertFalse(legacy.contains("<service"),
                 "and a legacy build must not be asked for an enum AAPT would"
                 + " reject");
         String withType = connection().replace(" android:exported=\"true\"",
                 " android:exported=\"true\""
                 + " android:foregroundServiceType=\"phoneCall\"");
-        assertEquals("", CallManifestFragments.services(false, true, false,
-                withType, 34),
+        assertFalse(CallManifestFragments.services(false, true, false,
+                withType, 34).contains("<service"),
                 "and one that carries it is accepted");
         // A service that promotes for two reasons names both, separated by a
         // pipe -- more complete than the generated element, not less.
         String twoTypes = connection().replace(" android:exported=\"true\"",
                 " android:exported=\"true\" android:foregroundServiceType="
                 + "\"phoneCall|microphone\"");
-        assertEquals("", CallManifestFragments.services(false, true, false,
-                twoTypes, 34),
+        assertFalse(CallManifestFragments.services(false, true, false,
+                twoTypes, 34).contains("<service"),
                 "a flag list containing the type is the type");
     }
 
@@ -544,5 +551,35 @@ public class CallManifestFragmentsTest {
         assertFalse(session.contains("foregroundServiceType"),
                 "an app that never rings in the background does not run a"
                         + " foreground service for calls");
+    }
+
+    @Test
+    void theRingingScreenIsDeclaredOrTheFullScreenIntentLaunchesNothing() {
+        // A self-managed calling app gets no system call UI, so the port's
+        // notification carries a full-screen intent -- and a full-screen
+        // intent is only as good as the activity it launches. An activity
+        // Android was never told about cannot be launched at all, so without
+        // this entry the promise the guide makes evaporates silently: the
+        // notification still rings, and the ringing screen never appears.
+        String xml = CallManifestFragments.services(true, false, false);
+        assertTrue(xml.contains(CallManifestFragments.INCOMING_ACTIVITY),
+                "a session build has to declare the ringing screen");
+        assertTrue(xml.contains("android:showOnLockScreen=\"true\""),
+                "and declare it as one that shows over the keyguard, which is"
+                + " the manifest half of what the activity also sets at"
+                + " runtime");
+        assertTrue(xml.contains("android:exported=\"false\""),
+                "nothing outside this app has business launching it");
+        assertTrue(xml.contains("android:launchMode=\"singleTop\""),
+                "a re-post for the same call reuses the screen rather than"
+                + " stacking another behind it");
+
+        // Not for a directory-only build: a caller-ID app screens calls it
+        // never answers, so a ringing screen would be an activity it can
+        // never show -- the same reason it carries no MANAGE_OWN_CALLS.
+        String directoryOnly = CallManifestFragments.services(false, false, true);
+        assertFalse(directoryOnly.contains(
+                CallManifestFragments.INCOMING_ACTIVITY),
+                "a screening-only build has no calls of its own to ring for");
     }
 }
