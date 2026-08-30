@@ -1867,7 +1867,11 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     /// Binds the pending timeout to the host the dialog is actually on.
     private void startPendingTimeout() {
-        startPendingTimeout(resolveHost());
+        // The window whenever there is one. setTimeout() can be called after a modeless
+        // dialog is already up and reaches this, and an explicit setTopLevelHost() wins
+        // in resolveHost() -- so the timer went onto the owner form, which stops being
+        // animated as soon as navigation replaces it, and the dialog never closed.
+        startPendingTimeout(nativeWindow != null ? nativeWindow : resolveHost());
     }
 
     /// Starts the pending timeout against a named surface.

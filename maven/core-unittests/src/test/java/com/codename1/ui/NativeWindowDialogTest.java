@@ -1296,4 +1296,50 @@ class NativeWindowDialogTest extends UITestBase {
         host.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aTimeoutSetAfterTheNativeShowAlsoBindsToTheWindow() {
+        // setTimeout can be called once the dialog is already up, and that path resolves
+        // the host of its own. An explicit setTopLevelHost() wins there, so the timer
+        // went onto the owner form -- which stops being animated the moment navigation
+        // replaces it, leaving the dialog in its own window for good.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        id.add(BorderLayout.CENTER, new Label("body"));
+        id.setNativeWindowMode(true);
+        id.setTopLevelHost(main);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+
+        Window w = id.getNativeWindow();
+        assertNotNull(w, "precondition: it opened a native window");
+
+        // Only now, with the dialog already showing.
+        id.setTimeout(120);
+        DisplayTest.flushEdt();
+
+        Form next = new Form("next", new BorderLayout());
+        next.show();
+        DisplayTest.flushEdt();
+
+        for (int iter = 0; iter < 300 && id.isShowing(); iter++) {
+            w.repaintAnimations();
+            DisplayTest.flushEdt();
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        assertFalse(id.isShowing(),
+                "a timeout set after the show has to elapse against the window too");
+
+        id.dispose();
+        DisplayTest.flushEdt();
+    }
 }

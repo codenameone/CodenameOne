@@ -2510,4 +2510,92 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aHostedDialogsPointerListenerStillSeesTheDialogAsTheSource() {
+        // A Form builds these events with itself as the source, and a listener handed to
+        // the host still belongs to the dialog. Forwarding the host's own event gave the
+        // listener a Window where it had always been given the dialog -- so anything
+        // comparing the source, or casting it to Form, saw something else, and only on
+        // the hosted path.
+        final Window w = openHost(600, 500);
+        final Object[] pressSource = new Object[1];
+        final Object[] releaseSource = new Object[1];
+
+        final Dialog d = new Dialog("hosted");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.addPointerPressedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                pressSource[0] = evt.getSource();
+            }
+        });
+        d.addPointerReleasedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                releaseSource[0] = evt.getSource();
+            }
+        });
+        d.setTopLevelHost(w);
+        d.show(80, 80, 80, 80, true, false);
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(2, 2);
+        w.pointerReleased(2, 2);
+        DisplayTest.flushEdt();
+
+        assertSame(d, pressSource[0], "the dialog is the source of its own press event");
+        assertSame(d, releaseSource[0], "and of its own release event");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aHostedDialogsListenerCanStillConsumeTheGesture() {
+        // The listener is handed a copy of the host's event, so consuming it has to
+        // travel back or the listener can no longer stop the gesture. A consumed press
+        // makes the window return before hit testing, which is what keeps the scrim from
+        // taking it -- and with no press recorded, the lift cannot dismiss the dialog.
+        final Window w = openHost(600, 500);
+
+        final Dialog quiet = new Dialog("not consumed");
+        quiet.setLayout(new BorderLayout());
+        quiet.add(BorderLayout.CENTER, new Label("body"));
+        quiet.setDisposeWhenPointerOutOfBounds(true);
+        quiet.setTopLevelHost(w);
+        quiet.show(80, 80, 80, 80, true, false);
+        DisplayTest.flushEdt();
+
+        // Sanity: without a listener in the way, the corner press dismisses it.
+        w.pointerPressed(2, 2);
+        w.pointerReleased(2, 2);
+        DisplayTest.flushEdt();
+        assertTrue(quiet.isDisposed(), "sanity: an outside press dismisses it normally");
+
+        final Dialog d = new Dialog("consumed");
+        d.setLayout(new BorderLayout());
+        d.add(BorderLayout.CENTER, new Label("body"));
+        d.setDisposeWhenPointerOutOfBounds(true);
+        d.addPointerPressedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                evt.consume();
+            }
+        });
+        d.setTopLevelHost(w);
+        d.show(80, 80, 80, 80, true, false);
+        DisplayTest.flushEdt();
+
+        w.pointerPressed(2, 2);
+        w.pointerReleased(2, 2);
+        DisplayTest.flushEdt();
+        assertFalse(d.isDisposed(),
+                "a consumed press has to stop the gesture, so nothing dismisses it");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

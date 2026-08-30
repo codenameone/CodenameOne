@@ -2799,14 +2799,30 @@ public class Form extends Container implements TopLevelContainer {
     /// than one owner was possible.
     private static final class TransferredListener implements ActionListener {
         private final ActionListener listener;
+        private final Form owner;
 
-        TransferredListener(ActionListener listener) {
+        TransferredListener(Form owner, ActionListener listener) {
+            this.owner = owner;
             this.listener = listener;
         }
 
         @Override
         public void actionPerformed(ActionEvent evt) {
-            listener.actionPerformed(evt);
+            // Re-sourced to the form the listener was registered on. The host builds
+            // these events with itself as the source, and a listener that was handed
+            // over still belongs to this form: forwarding the host's event unchanged
+            // handed it a Window where it had always been given the dialog, so a
+            // listener comparing the source, or casting it to Form, saw something else
+            // entirely -- and only on the hosted path.
+            ActionEvent forwarded =
+                    new ActionEvent(owner, evt.getEventType(), evt.getX(), evt.getY());
+            forwarded.setPointerPressedDuringDrag(evt.isPointerPressedDuringDrag());
+            listener.actionPerformed(forwarded);
+            // Consumption belongs to the gesture, not to the copy, so it has to travel
+            // back: the host decides what to do next by asking its own event.
+            if (forwarded.isConsumed()) {
+                evt.consume();
+            }
         }
     }
 
@@ -2830,7 +2846,7 @@ public class Form extends Container implements TopLevelContainer {
         }
         ArrayList<TransferredListener> moved = new ArrayList<TransferredListener>();
         for (ActionListener l : (Collection<ActionListener>) dispatcher.getListenerCollection()) {
-            TransferredListener entry = new TransferredListener(l);
+            TransferredListener entry = new TransferredListener(this, l);
             addTransferred(host, kind, entry);
             moved.add(entry);
         }
@@ -3051,7 +3067,7 @@ public class Form extends Container implements TopLevelContainer {
                     }
                 }
             }
-            TransferredListener entry = new TransferredListener(l);
+            TransferredListener entry = new TransferredListener(this, l);
             addTransferred(host, kind, entry);
             if (tracked == null) {
                 tracked = new ArrayList<TransferredListener>();
