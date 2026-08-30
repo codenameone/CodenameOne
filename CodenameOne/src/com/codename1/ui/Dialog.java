@@ -2213,6 +2213,47 @@ public class Dialog extends Form implements AbstractDialog {
     /// #### Parameters
     ///
     /// - `w`: the window to publish to
+    /// {@inheritDoc}
+    ///
+    /// Mirrored onto the operating system window for as long as one is up. The commands
+    /// are copied across when that window is built, and a dialog is free to change them
+    /// afterwards -- from `onShow`, or at any time after a modeless show. Without this
+    /// the platform menu kept whatever it was built with.
+    ///
+    /// Button-bar commands never arrive here: `placeButtonCommands` does not call
+    /// `addCommand`, which is what keeps an OK/Cancel dialog from growing a native menu.
+    @Override
+    public void addCommand(Command cmd, int offset) {
+        super.addCommand(cmd, offset);
+        if (nativeWindow != null) {
+            nativeWindow.addCommand(cmd);
+        }
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// Taken off the operating system window too. A command removed while the dialog was
+    /// showing stayed on the platform menu and could still be picked from it, which then
+    /// reached the dialog through the command bridge as though it were still there.
+    @Override
+    public void removeCommand(Command cmd) {
+        super.removeCommand(cmd);
+        if (nativeWindow != null) {
+            nativeWindow.removeCommand(cmd);
+        }
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// Cleared from the operating system window too, for the same reason.
+    @Override
+    public void removeAllCommands() {
+        super.removeAllCommands();
+        if (nativeWindow != null) {
+            nativeWindow.removeAllCommands();
+        }
+    }
+
     private void publishNativeMenuCommands(Window w) {
         int count = getCommandCount();
         for (int i = 0; i < count; i++) {

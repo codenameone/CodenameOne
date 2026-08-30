@@ -1208,4 +1208,92 @@ class NativeWindowDialogTest extends UITestBase {
         id.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void commandsChangedWhileShowingReachTheWindowToo() {
+        // The copy happens once, when the window is built. A dialog is free to change
+        // its commands afterwards -- from onShow, or at any point after a modeless show
+        // -- and the platform menu kept whatever it was built with: a removed command
+        // stayed on it and could still be picked, reaching the dialog through the
+        // command bridge as though it were still there.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Dialog d = newDialog("menu commands");
+        d.setNativeWindowMode(true);
+        Command help = new Command("Help");
+        d.addCommand(help);
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        Window w = d.getNativeWindow();
+        assertNotNull(w);
+        assertEquals(1, w.getCommandCount(), "precondition: the one it was built with");
+
+        Command about = new Command("About");
+        d.addCommand(about);
+        DisplayTest.flushEdt();
+        assertEquals(2, w.getCommandCount(),
+                "a command added while showing has to reach the window");
+
+        d.removeCommand(about);
+        DisplayTest.flushEdt();
+        assertEquals(1, w.getCommandCount(),
+                "and one removed has to come off it, or it stays pickable");
+
+        d.removeAllCommands();
+        DisplayTest.flushEdt();
+        assertEquals(0, w.getCommandCount(), "clearing them clears the window's too");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aConsumedGameKeyShortcutStopsTheRest() {
+        // Form.fireKeyEvent stops on consumption and the raw key path does too. The game
+        // key path forwarding a hosted dialog's shortcuts did not, so a dialog with two
+        // shortcuts on one action ran both for a single release.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window host = new Window("host", new BorderLayout());
+        host.setWindowSize(500, 400);
+        host.show();
+        DisplayTest.flushEdt();
+
+        final int[] first = new int[1];
+        final int[] second = new int[1];
+        Dialog d = newDialog("shortcuts");
+        d.setTopLevelHost(host);
+        d.addGameKeyListener(Display.GAME_FIRE, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                first[0]++;
+                evt.consume();
+            }
+        });
+        d.addGameKeyListener(Display.GAME_FIRE, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                second[0]++;
+            }
+        });
+        d.showModeless();
+        DisplayTest.flushEdt();
+
+        int fire = Display.getInstance().getKeyCode(Display.GAME_FIRE);
+        host.keyPressed(fire);
+        host.keyReleased(fire);
+        DisplayTest.flushEdt();
+
+        assertEquals(1, first[0], "the first shortcut runs");
+        assertEquals(0, second[0],
+                "and having consumed the key, the second must not run as well");
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        host.dispose();
+        DisplayTest.flushEdt();
+    }
 }

@@ -4432,6 +4432,11 @@ public class Window extends Container implements TopLevelContainer {
         ActionListener[] snapshot = listeners.toArray(new ActionListener[listeners.size()]);
         for (int iter = 0; iter < snapshot.length; iter++) { // NOPMD ForLoopCanBeForeach
             snapshot[iter].actionPerformed(evt);
+            // As the raw key dispatch below does, and as Form.fireKeyEvent does. A
+            // dialog with two shortcuts on one action ran both for a single release.
+            if (evt.isConsumed()) {
+                return;
+            }
         }
     }
 
