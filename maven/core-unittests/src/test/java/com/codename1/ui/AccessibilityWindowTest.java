@@ -1077,4 +1077,55 @@ class AccessibilityWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    @FormTest
+    void anActionOnTheFormNavigatedAwayFromDoesNotRun() {
+        // The tree of the surface just left stays the last one built until a refresh
+        // replaces it, so its ids went on resolving in that interval and a reader could
+        // press a button on a form the user had already navigated away from. A form has
+        // no mapped state to ask, so what separates this from a form that was never on
+        // screen -- which is a live surface a caller acts on -- is whether it was the
+        // surface on screen when it was described.
+        implementation.setAccessibilityTreeSupported(true);
+        // Pulled from rather than projected to, so nothing rebuilds behind the test's
+        // back and the form left behind stays the last tree built.
+        implementation.setAccessibilityTreeUpdateRequired(Boolean.FALSE);
+        try {
+            Form first = new Form("first", new BorderLayout());
+            final boolean[] pressed = new boolean[1];
+            Button b = new Button("on the first form");
+            b.addActionListener(new com.codename1.ui.events.ActionListener() {
+                @Override
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    pressed[0] = true;
+                }
+            });
+            first.add(BorderLayout.CENTER, b);
+            first.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            // Described while it is the surface on screen, which is the case that has to
+            // stop working once the application moves on.
+            long id = idOf(AccessibilityInspector.snapshot(first), "on the first form");
+            assertTrue(id != 0, "precondition: the button is in the tree");
+            assertTrue(mgr.performAction(id, "activate", null),
+                    "precondition: it works while that form is the one on screen");
+            DisplayTest.flushEdt();
+            assertTrue(pressed[0], "precondition: and the action actually ran");
+
+            pressed[0] = false;
+            new Form("second", new BorderLayout()).show();
+            DisplayTest.flushEdt();
+
+            assertFalse(mgr.performAction(id, "activate", null),
+                    "an id from the form navigated away from must not resolve");
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+            assertFalse(pressed[0],
+                    "and nothing may run on a form the user has already left");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+            implementation.setAccessibilityTreeUpdateRequired(null);
+        }
+    }
 }

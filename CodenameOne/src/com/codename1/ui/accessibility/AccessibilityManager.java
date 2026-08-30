@@ -425,6 +425,7 @@ public final class AccessibilityManager {
             if (cached != null) {
                 snapshot = cached;
                 snapshotRoot = form;
+                snapshotRootWasShowing = isShowingRoot(form);
                 return snapshot;
             }
         }
@@ -435,6 +436,7 @@ public final class AccessibilityManager {
                     Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
             snapshot = emptySnapshot;
             snapshotRoot = null;
+            snapshotRootWasShowing = false;
             snapshotsByRoot.clear();
             dirtyRoots.clear();
             // The bits are not cleared by building a tree. They describe changes that
@@ -453,6 +455,14 @@ public final class AccessibilityManager {
         AccessibilityTreeSnapshot updatedSnapshot = new AccessibilityTreeSnapshot(generation, rootIds, nodes);
         snapshot = updatedSnapshot;
         snapshotRoot = form;
+        // Whether this surface was the one on screen when it was described. That is what
+        // separates a surface the application has since navigated away from -- whose
+        // retained ids must stop working -- from one that was never on screen to begin
+        // with, which is a form being prepared, or one shown a moment ago that the event
+        // thread has not made current yet. Both of those are live surfaces a caller acts
+        // on legitimately, and they are indistinguishable from the navigated-away one by
+        // asking only whether it is showing now.
+        snapshotRootWasShowing = isShowingRoot(form);
         snapshotsByRoot.put(form, updatedSnapshot);
         evictStaleRoots();
         dirtyRoots.remove(form);
@@ -553,9 +563,17 @@ public final class AccessibilityManager {
     /// #### Returns
     ///
     /// true when it is a window that is no longer on screen
-    private static boolean isWithdrawnRoot(Container root) {
-        return root instanceof Window && !((Window) root).isWindowShowing();
+    private boolean isWithdrawnRoot(Container root) {
+        if (root instanceof Window) {
+            return !((Window) root).isWindowShowing();
+        }
+        // A form, which has no mapped/unmapped state of its own: it is withdrawn when it
+        // was the surface on screen at the time it was described and is not any more.
+        return snapshotRootWasShowing && !isShowingRoot(root);
     }
+
+    /// Whether `#snapshotRoot` was the surface on screen when its tree was built.
+    private boolean snapshotRootWasShowing;
 
     /// Whether a cached root is a surface the user can currently see.
     ///
