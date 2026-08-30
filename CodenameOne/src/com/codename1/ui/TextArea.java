@@ -2103,7 +2103,14 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                         //System.out.println("Stopping editing");
                         ((TextArea) c).stopEditing();
                         final TextArea ta = (TextArea) c;
-                        UITimer.timer(30, false, new Runnable() {
+                        // The surface of the text area this is about, not of whatever
+                        // happens to enclose this code: the current form is not
+                        // necessarily what is being painted where that component lives.
+                        TopLevelContainer timerHost = ta.getTopLevelContainer();
+                        if (timerHost == null) {
+                            timerHost = CN.getCurrentTopLevel();
+                        }
+                        UITimer.timer(30, false, timerHost, new Runnable() {
                             @Override
                             public void run() {
                                 ta.repaint();

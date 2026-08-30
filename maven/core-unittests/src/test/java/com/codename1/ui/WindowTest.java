@@ -5748,4 +5748,53 @@ class WindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aBrowserOnTheMainFormKeepsItsTimeoutWhenAWindowGoesAway() {
+        // The timer overload that is given no surface binds to the focused top level,
+        // because it cannot know which surface its caller belongs to. A component does
+        // know, so the framework's own callers name theirs: without that, a browser on
+        // the main form put its timeout on whatever window happened to have the focus,
+        // and disposing that window tore down the loop the callback was waiting on.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        BrowserComponent browser = new BrowserComponent();
+        main.add(BorderLayout.CENTER, browser);
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        Desktop.getInstance().windowFocusChanged(w.getWindowId(), true);
+        DisplayTest.flushEdt();
+
+        final int[] errors = new int[1];
+        browser.execute(30, "1", new com.codename1.util.Callback<com.codename1.ui.BrowserComponent.JSRef>() {
+            public void onSucess(com.codename1.ui.BrowserComponent.JSRef v) {
+            }
+
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                errors[0]++;
+            }
+        });
+        DisplayTest.flushEdt();
+
+        // The window the timeout must NOT have been bound to goes away.
+        w.dispose();
+        DisplayTest.flushEdt();
+
+        for (int iter = 0; iter < 300 && errors[0] == 0; iter++) {
+            main.repaintAnimations();
+            DisplayTest.flushEdt();
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        assertEquals(1, errors[0],
+                "the timeout belongs to the browser's own surface, which is still there");
+    }
 }

@@ -70,12 +70,15 @@ public class Form extends Container implements TopLevelContainer {
     static int rippleX;
     static int rippleY;
     /// Used by the combo box to block some default Codename One behaviors
-    /// How many combo popups are in the middle of being shown anywhere.
+    /// How many combo popups are in the middle of being shown over *this* form.
     ///
-    /// A count rather than a flag: a popup is modal to the surface it is on, so two
-    /// windows can each have one open, and the first to close would otherwise lift
-    /// the guard while the other is still going up.
-    static int comboShowDepth;
+    /// A count rather than a flag, because a popup is modal only to the surface it is
+    /// on and two windows can each have one open, so the first to close must not lift
+    /// the guard while the other is still going up. Per form rather than shared for the
+    /// same reason: the guard is read while an unrelated form is being torn down, and a
+    /// popup open in a window would otherwise stop that form releasing its input device
+    /// -- a hosted popup neither replaces nor deinitializes it.
+    int comboShowDepth;
 
     /// Whether this form is a combo popup that routes select and cancel itself.
     ///

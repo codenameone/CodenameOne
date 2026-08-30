@@ -271,7 +271,12 @@ public final class AccessibilityManager {
             ArrayList<Container> roots;
             boolean rootless;
             synchronized (AccessibilityManager.this) {
+                // Taken, not just read. The rebuilds below used to clear this as a
+                // side effect, so a bit arriving while this pass was walking an earlier
+                // root was wiped before the pass it queued could report it -- losing the
+                // pane change VoiceOver needs to move focus to a newly opened pane.
                 changes = pendingChanges;
+                pendingChanges = 0;
                 roots = new ArrayList<Container>(pendingRoots);
                 pendingRoots.clear();
                 rootless = pendingRootlessRefresh;
@@ -418,7 +423,9 @@ public final class AccessibilityManager {
             snapshotRoot = null;
             snapshotsByRoot.clear();
             dirtyRoots.clear();
-            pendingChanges = 0;
+            // The bits are not cleared by building a tree. They describe changes that
+            // have not been announced yet, and only the refresh pass announces them --
+            // clearing here wiped whatever had arrived while that pass was running.
             return snapshot;
         }
 
@@ -435,7 +442,6 @@ public final class AccessibilityManager {
         snapshotsByRoot.put(form, updatedSnapshot);
         evictStaleRoots();
         dirtyRoots.remove(form);
-        pendingChanges = 0;
         return snapshot;
     }
 

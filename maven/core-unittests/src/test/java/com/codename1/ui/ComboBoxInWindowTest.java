@@ -439,4 +439,34 @@ class ComboBoxInWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+
+    @FormTest
+    void aPopupInAWindowDoesNotBlockTheMainFormsTeardown() throws Exception {
+        // The guard that stops a form releasing its input device while a combo popup is
+        // going up over it was process-wide. A hosted popup neither replaces nor
+        // deinitializes the main form, so a popup open in a window left that form unable
+        // to release its input device when the application navigated away from it.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        final HoldingComboBox combo = new HoldingComboBox("one", "two");
+        w.add(BorderLayout.NORTH, combo);
+        w.show();
+        DisplayTest.flushEdt();
+
+        Thread caller = openHolding(combo);
+        try {
+            assertTrue(combo.shown, "precondition: the window's popup is up");
+            assertEquals(0, main.comboShowDepth,
+                    "a popup in a window is not a popup over the main form");
+        } finally {
+            closeHolding(combo, caller);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }

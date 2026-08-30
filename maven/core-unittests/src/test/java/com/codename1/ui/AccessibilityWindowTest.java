@@ -803,4 +803,34 @@ class AccessibilityWindowTest extends UITestBase {
             implementation.setAccessibilityTreeSupported(false);
         }
     }
+
+    @FormTest
+    void aChangeBitArrivingDuringARefreshSurvivesToTheNextPass() {
+        // Building a tree used to clear the shared change mask as a side effect, so a bit
+        // raised while a pass was walking an earlier root was wiped before the pass it
+        // queued could report it. On iOS that is the pane change VoiceOver needs to move
+        // focus to a newly opened pane.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        try {
+            Form main = new Form("main", new BorderLayout());
+            Button b = new Button("on the main form");
+            main.add(BorderLayout.CENTER, b);
+            main.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            mgr.getSnapshot(main);
+            DisplayTest.flushEdt();
+
+            // Raise a bit and rebuild without letting the queued pass run in between,
+            // which is what a rebuild during a pass does to it.
+            mgr.invalidate(b, AccessibilityManager.CHANGE_PANE);
+            mgr.getSnapshot(main);
+            assertTrue((mgr.getPendingChanges() & AccessibilityManager.CHANGE_PANE) != 0,
+                    "a bit not yet announced has to survive a rebuild");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+        }
+    }
 }

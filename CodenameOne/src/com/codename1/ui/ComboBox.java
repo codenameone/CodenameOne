@@ -551,13 +551,21 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         // it is on, so with windows two can be open at once; a shared flag had whichever
         // closed first switch the other one's routing off.
         popupDialog.comboSelectCancelRouting = includeSelectCancel;
-        Form.comboShowDepth++;
+        // On the form the popup is shown over, which is the one whose teardown reads it.
+        // A window host has no such teardown, and a form elsewhere must not be told a
+        // popup is up over it.
+        Form guarded = parentForm instanceof Form ? (Form) parentForm : null;
+        if (guarded != null) {
+            guarded.comboShowDepth++;
+        }
         pushBlurOverride();
         Command result;
         try {
             result = showPopupDialog(popupDialog, l);
         } finally {
-            Form.comboShowDepth--;
+            if (guarded != null) {
+                guarded.comboShowDepth--;
+            }
             popBlurOverride();
         }
         parentForm.setTintColor(tint);

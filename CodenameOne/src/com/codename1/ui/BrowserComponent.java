@@ -1420,7 +1420,14 @@ public class BrowserComponent extends Container {
     /// - `callback`: The callback
     public void execute(int timeout, final String js, final SuccessCallback<JSRef> callback) {
         if (callback != null && timeout > 0) {
-            UITimer.timer(timeout, false, new Runnable() {
+            // This component's own surface, not whatever is current: the callback
+            // belongs to the browser, and on a window the current form is not the
+            // thing being painted.
+            TopLevelContainer timerHost = getTopLevelContainer();
+            if (timerHost == null) {
+                timerHost = CN.getCurrentTopLevel();
+            }
+            UITimer.timer(timeout, false, timerHost, new Runnable() {
 
                 @Override
                 public void run() {
