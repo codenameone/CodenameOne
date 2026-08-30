@@ -643,6 +643,45 @@ public class MacOSNativeBuilderScanTest {
         assertNull(MacOSNativeBuilder.quotePbxprojValue(null));
     }
 
+    /// A signing value cannot end the setting it is written into.
+    ///
+    /// DEVELOPMENT_TEAM, CODE_SIGN_IDENTITY and
+    /// PROVISIONING_PROFILE_SPECIFIER all come from the request and are
+    /// free-form -- a real identity reads "Developer ID Application: Acme
+    /// (ABCD1234)" -- so they cannot be answered by refusing punctuation the
+    /// way the bundle identifier is. They are escaped instead, and wrapping a
+    /// value in quotes without escaping what is inside it protects nothing: one
+    /// embedded quote closes the string and the rest continues the file as
+    /// project objects, a shell script build phase among them.
+    @Test
+    public void aSigningValueCannotEscapeItsSetting() {
+        // The embedded quote is escaped rather than ending the string.
+        assertEquals("\"a\\\"; INJECTED = 1; X = \\\"b\"",
+                MacOSNativeBuilder.quotePbxprojValue("a\"; INJECTED = 1; X = \"b"));
+        // Backslashes and newlines cannot start an escape or a new line either.
+        assertEquals("\"a\\\\b\"", MacOSNativeBuilder.quotePbxprojValue("a\\b"));
+        assertEquals("\"a\\nb\"", MacOSNativeBuilder.quotePbxprojValue("a\nb"));
+        // A real identity survives intact, since only the dangerous characters
+        // are touched.
+        assertEquals("\"Developer ID Application: Acme Inc (ABCD1234)\"",
+                MacOSNativeBuilder.quotePbxprojValue(
+                        "Developer ID Application: Acme Inc (ABCD1234)"));
+    }
+
+    /// Leading and trailing quotes are not a licence to pass the middle through.
+    ///
+    /// The already-quoted shortcut returned such a value VERBATIM, so a value
+    /// that merely began and ended with a quote bought the whole file. The
+    /// intent was only to avoid double-quoting what the template already
+    /// quotes, so the quotes come off and go back on properly.
+    @Test
+    public void anAlreadyQuotedValueIsStillEscaped() {
+        assertEquals("\"arm64 x86_64\"",
+                MacOSNativeBuilder.quotePbxprojValue("\"arm64 x86_64\""));
+        assertEquals("\"\\\"; INJECTED = 1; \\\"\"",
+                MacOSNativeBuilder.quotePbxprojValue("\"\"; INJECTED = 1; \"\""));
+    }
+
     /// Enumerating cameras is not opening a microphone.
     ///
     /// getCameras() and getDefault() run a discovery session and nothing else,

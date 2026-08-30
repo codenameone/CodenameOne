@@ -1284,22 +1284,65 @@ public class MacOSNativeBuilder extends Executor {
     /// This was missed because the value under test was x86_64, a single token
     /// that is legal bare, so the default path -- the one every build without
     /// the hint takes -- was never exercised.
+    /// The CONTENT is escaped, not merely surrounded by quotes.
+    ///
+    /// Everything this writes lands in project.pbxproj and xcodebuild is then
+    /// run on it, and on the build cloud the settings arrive with the request.
+    /// The values that come through here are free-form by nature -- a team id,
+    /// a signing identity like "Developer ID Application: Acme (ABCD1234)", a
+    /// provisioning profile name -- so unlike the bundle identifier and the
+    /// deployment target they cannot be answered by refusing punctuation. They
+    /// have to be escaped, and wrapping a value in quotes without escaping what
+    /// is inside it does nothing: one embedded quote closes the string and the
+    /// rest of the value continues the file as project objects, a shell script
+    /// build phase among them.
+    ///
+    /// Escaping here rather than at each caller on purpose. This is the one
+    /// place every pbxproj value passes through, so a setting added later is
+    /// safe without anyone remembering to make it so -- which is the property
+    /// the last round of this did not have: the bundle identifier and the
+    /// deployment target were each fixed where they were written, and these
+    /// four went on being written somewhere else.
     static String quotePbxprojValue(String value) {
         if (value == null) {
             return null;
         }
-        if (value.length() > 1 && value.startsWith("\"") && value.endsWith("\"")) {
-            return value;
+        String content = value;
+        // A value that merely STARTS and ENDS with a quote used to be returned
+        // verbatim, on the reading that it was already quoted -- which handed
+        // an attacker the whole file for the price of a leading and a trailing
+        // quote character. The intent was not to double-quote something the
+        // template already quotes, so take the quotes off and put them back
+        // properly instead of trusting them.
+        if (content.length() > 1 && content.startsWith("\"") && content.endsWith("\"")) {
+            content = content.substring(1, content.length() - 1);
         }
-        boolean bare = value.length() > 0;
-        for (int iter = 0; iter < value.length(); iter++) {
-            char c = value.charAt(iter);
+        boolean bare = content.length() > 0;
+        for (int iter = 0; iter < content.length(); iter++) {
+            char c = content.charAt(iter);
             if (!Character.isLetterOrDigit(c) && c != '_' && c != '.') {
                 bare = false;
                 break;
             }
         }
-        return bare ? value : "\"" + value + "\"";
+        if (bare) {
+            // Letters, digits, underscore and dot only, so there is nothing
+            // here that could end a setting or start an object.
+            return content;
+        }
+        StringBuilder out = new StringBuilder("\"");
+        for (int iter = 0; iter < content.length(); iter++) {
+            char c = content.charAt(iter);
+            switch (c) {
+                case '\\': out.append("\\\\"); break;
+                case '"': out.append("\\\""); break;
+                case '\n': out.append("\\n"); break;
+                case '\r': out.append("\\r"); break;
+                case '\t': out.append("\\t"); break;
+                default: out.append(c); break;
+            }
+        }
+        return out.append('"').toString();
     }
 
     /// Writes the signing configuration into the generated project.
