@@ -11882,6 +11882,70 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     
+    /// One queued local notification: which one, and the content it arrived
+    /// with.
+    private static final class MacLocalNotification {
+        final String notificationId;
+        final PushContent content;
+
+        MacLocalNotification(String notificationId, PushContent content) {
+            this.notificationId = notificationId;
+            this.content = content;
+        }
+    }
+
+    private static final java.util.ArrayList<MacLocalNotification> macLocalNotifications =
+            new java.util.ArrayList<MacLocalNotification>();
+    private static boolean macLocalNotificationWorkerRunning;
+
+    /// Delivers a local notification OFF the AppKit main thread.
+    ///
+    /// The macOS delegate pumps deliveries on the main queue, and
+    /// localNotificationReceived() runs the application's callback on whatever
+    /// thread calls it -- so the callback ran on the very queue AppKit was
+    /// executing. The callback is documented as off the EDT and may legitimately
+    /// call a non-UI API such as MediaManager.createMedia(), whose native side
+    /// dispatch_syncs to the main queue: that is a deadlock against the queue
+    /// already running it, and a cold-launch notification is exactly when an
+    /// application does that kind of setup.
+    ///
+    /// The content travels with the notification and is restored immediately
+    /// before its own callback, for the reason the held-push replay has to do
+    /// the same: PushContent is a singleton the native layer rewrites per
+    /// delivery, so a second notification would otherwise describe the first.
+    ///
+    /// ONE worker, draining in order. A thread per delivery would restore two
+    /// snapshots into the same singleton concurrently and hand both callbacks
+    /// whichever won.
+    public static void macLocalNotificationReceived(final String notificationId) {
+        // Taken here, on the thread the native layer set it on.
+        MacLocalNotification queued =
+                new MacLocalNotification(notificationId, PushContent.get());
+        synchronized (macLocalNotifications) {
+            macLocalNotifications.add(queued);
+            if (macLocalNotificationWorkerRunning) {
+                return;
+            }
+            macLocalNotificationWorkerRunning = true;
+        }
+        new Thread() {
+            public void run() {
+                for (;;) {
+                    MacLocalNotification next;
+                    synchronized (macLocalNotifications) {
+                        if (macLocalNotifications.isEmpty()) {
+                            macLocalNotificationWorkerRunning = false;
+                            return;
+                        }
+                        next = macLocalNotifications.remove(0);
+                    }
+                    restorePushContent(next.content);
+                    localNotificationReceived(next.notificationId);
+                }
+            }
+        }.start();
+    }
+
     public static void localNotificationReceived(final String notificationId) {
         if (localNotificationCallback != null) {
             // this should be invoked off the EDT...

@@ -404,7 +404,12 @@ static void cn1MacDeliverLocalNotification(NSDictionary *delivery) {
         com_codename1_push_PushContent_setTextResponse___java_lang_String(
             threadStateData, fromNSString(threadStateData, textResponse));
     }
-    com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(
+    // The macOS entry point, which hands the callback to a worker thread. This
+    // runs on AppKit's main queue, and the shared one calls the application
+    // back on the calling thread -- so a callback that touches an API whose
+    // native side dispatch_syncs to the main queue deadlocked against the queue
+    // already running it.
+    com_codename1_impl_ios_IOSImplementation_macLocalNotificationReceived___java_lang_String(
         threadStateData, fromNSString(threadStateData, localId));
 }
 
