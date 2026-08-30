@@ -7155,14 +7155,20 @@ JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(CN1_THREAD_S
 int responseGetMediaDuration = 0;
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
 #if TARGET_OS_OSX
+    // A __block LOCAL, not the file-scope response global the iOS branch below
+    // uses. The blocks run serially on the main queue, but the read happens
+    // after dispatch_sync returns: a second caller's block can land in that
+    // window and overwrite the global, so one media object reported another's
+    // duration. Per invocation, the value cannot be shared.
+    __block JAVA_INT durationMillis = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         AVPlayer* m = getAVPlayer(peer);
-        responseGetMediaDuration = m == nil ? 0
+        durationMillis = m == nil ? 0
             : CMTimeGetSeconds(m.currentItem.asset.duration) * 1000;
         POOL_END();
     });
-    return responseGetMediaDuration;
+    return durationMillis;
 #else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -7361,14 +7367,15 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(CN1_THREAD_S
     if (peer == 0) {
         return JAVA_FALSE;
     }
-    responseIsVideoPlaying = 0;
+    // Per invocation, for the reason getMediaDuration gives above.
+    __block JAVA_BOOLEAN playing = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         AVPlayer* m = getAVPlayer(peer);
-        responseIsVideoPlaying = m != nil && m.rate != 0 && m.error == nil;
+        playing = m != nil && m.rate != 0 && m.error == nil;
         POOL_END();
     });
-    return responseIsVideoPlaying;
+    return playing;
 #else
     if (peer == 0) {
         return JAVA_FALSE;
@@ -7462,14 +7469,15 @@ void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(CN1_THRE
 JAVA_BOOLEAN responseIsVideoFullScreen = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
 #if TARGET_OS_OSX
-    responseIsVideoFullScreen = 0;
+    // Per invocation, for the reason getMediaDuration gives above.
+    __block JAVA_BOOLEAN fullScreen = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         AVPlayerView* v = getAVPlayerController(peer);
-        responseIsVideoFullScreen = v != nil && v.isInFullScreenMode;
+        fullScreen = v != nil && v.isInFullScreenMode;
         POOL_END();
     });
-    return responseIsVideoFullScreen;
+    return fullScreen;
 #else
     responseIsVideoFullScreen = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
