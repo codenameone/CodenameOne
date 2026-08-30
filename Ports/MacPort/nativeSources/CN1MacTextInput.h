@@ -123,6 +123,20 @@ void CN1MacTextInputNotifyEditorAction(void);
 /// Editor bounds in Codename One pixels.
 @property (nonatomic) CGRect editorBounds;
 
+/// YES while a SUPERSEDED session's deferred teardown is discarding its marked
+/// text.
+///
+/// stop() cannot discard synchronously -- discardMarkedText belongs to the main
+/// queue and stop is called from the EDT -- so the discard is deferred, and a
+/// startTextInput for the next editor can rebind this singleton before it runs.
+/// Moving focus directly from one pure editor to another does exactly that. The
+/// view's client callbacks read the singleton, so during that window they would
+/// report the OLD composition's teardown against the NEW editor. They consult
+/// this instead and stay silent; the discard itself still happens, because the
+/// input method's composition state is stale and nothing else clears it when
+/// first responder does not change.
+@property (nonatomic, readonly) BOOL discardingSupersededComposition;
+
 - (void)startWithText:(NSString *)initialText
              selStart:(NSInteger)selStart
                selEnd:(NSInteger)selEnd

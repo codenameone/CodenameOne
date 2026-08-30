@@ -103,6 +103,13 @@ void CN1MacTextInputNotifyEditorAction(void) {
 
 @implementation CN1MacTextInputSession {
     int editSeq;
+    /// Bumped by every start, so a teardown queued by the previous session can
+    /// tell that the singleton has since been rebound to a different editor.
+    int sessionGeneration;
+    /// Non-zero while such a superseded teardown is inside discardMarkedText.
+    /// A counter rather than a flag because the callbacks it guards are
+    /// re-entrant through the input context.
+    int supersededDiscardDepth;
 }
 
 + (instancetype)sharedSession {
@@ -164,6 +171,7 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
     self.markedRange = NSMakeRange(NSNotFound, 0);
     self.multiline = multiline;
     _active = YES;
+    sessionGeneration++;
 
     dispatch_async(dispatch_get_main_queue(), ^{
         // The window the editing started in, not always the main one. Editing a
@@ -195,9 +203,33 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
     }
     _active = NO;
     self.markedRange = NSMakeRange(NSNotFound, 0);
+    // The generation this teardown belongs to. The discard has to be deferred
+    // -- discardMarkedText is main-queue only and stop is called from the EDT
+    // -- and a startTextInput for the next editor can land in the gap,
+    // rebinding this singleton before the block runs. Moving focus straight
+    // from one pure editor to another while an input method is composing does
+    // exactly that.
+    //
+    // The discard still has to happen: first responder does not change between
+    // two editors sharing a rendering view, so nothing else tells the input
+    // method to abandon the old composition. What must not happen is reporting
+    // it, because the client callbacks resolve through the singleton and would
+    // finish the composition of whichever editor now owns it.
+    int teardownGeneration = sessionGeneration;
     dispatch_async(dispatch_get_main_queue(), ^{
+        BOOL superseded = sessionGeneration != teardownGeneration;
+        if (superseded) {
+            supersededDiscardDepth++;
+        }
         [[NSTextInputContext currentInputContext] discardMarkedText];
+        if (superseded) {
+            supersededDiscardDepth--;
+        }
     });
+}
+
+- (BOOL)discardingSupersededComposition {
+    return supersededDiscardDepth > 0;
 }
 
 - (int)nextEditSeq {

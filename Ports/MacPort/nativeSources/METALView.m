@@ -1465,8 +1465,24 @@ static int CN1MacKeyCode(NSEvent *event) {
 }
 
 - (void)unmarkText {
-    CN1MacTextInputNotifyFinishComposing();
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (session.discardingSupersededComposition) {
+        // This unmark belongs to a session that has already been replaced. Its
+        // teardown is inside discardMarkedText right now, and the singleton
+        // read here has since been rebound to a different editor -- so
+        // reporting it would send tiFinishComposing, carrying the NEW session's
+        // incremented edit sequence, to an editor whose own composition may
+        // have only just begun, ending or corrupting it.
+        //
+        // cn1OwnsSession does not cover this: two editors sharing a rendering
+        // view produce the same owner, so that gate answers yes for both. It
+        // asks which VIEW owns the session; this asks which SESSION.
+        //
+        // Returning is the whole handling. The teardown is already performing
+        // the discard, so re-entering it here would only come straight back.
+        return;
+    }
+    CN1MacTextInputNotifyFinishComposing();
     session.markedRange = NSMakeRange(NSNotFound, 0);
     [[NSTextInputContext currentInputContext] discardMarkedText];
 }
