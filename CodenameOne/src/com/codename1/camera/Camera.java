@@ -219,7 +219,18 @@ public final class Camera {
 
     // Identity comparison is intentional: only the exact CameraSession
     // instance we returned from open() may clear the active slot, so
-    /// Refuses a resume by a session that is not the one holding the slot.
+    /// Releases a session's hardware, under the lock open() reads.
+    ///
+    /// The flag and the release become visible together, so an opener cannot
+    /// see a session that is still "running" while its hardware is already
+    /// gone -- which would refuse the very handoff the application paused for.
+    static void pauseSession(CameraSession s) {
+        synchronized (ACTIVE_LOCK) {
+            s.pauseUnderLock();
+        }
+    }
+
+    /// Takes the hardware back, refusing if another session holds the slot.
     ///
     /// pause() and resume() never had to consult anything while sessions could
     /// not overlap. They can now -- that is the documented pause / Capture /
@@ -229,18 +240,24 @@ public final class Camera {
     /// the singleton frame-callback target back, so the running capture's
     /// frames start arriving at the resumed session's listener.
     ///
-    /// The invariant this keeps is the one open() already enforces: only the
-    /// ACTIVE session may hold the camera. In the documented flow the capture's
-    /// close() has already handed the slot back by the time the application
-    /// resumes, so that flow is unaffected; resuming before then is the misuse
-    /// this now names instead of silently allowing.
+    /// The invariant is the one open() already enforces: only the ACTIVE
+    /// session may hold the camera. In the documented flow the capture's
+    /// close() has handed the slot back by the time the application resumes, so
+    /// that flow is unaffected; resuming before then is the misuse this names.
+    ///
+    /// Check and reacquisition are ONE step, under the same lock open() takes.
+    /// Checking and then resuming outside the lock left a window where an
+    /// opener saw this session paused, installed a successor and started it,
+    /// while this thread took the hardware back anyway. open() holds this lock
+    /// across its own native call for exactly that reason, and says so.
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
-    static void requireResumable(CameraSession s) {
+    static void resumeSession(CameraSession s) {
         synchronized (ACTIVE_LOCK) {
             if (active != null && active != s && !active.isClosed()) {
                 throw new IllegalStateException(
                     "Another CameraSession is using the camera. Close it before resuming this one.");
             }
+            s.resumeUnderLock();
         }
     }
 
