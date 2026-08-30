@@ -4320,6 +4320,18 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void keyRepeated(int keyCode) {
+        // A repeat belongs to the press that started it, on the same terms as the
+        // release. If the overlay holding that press has gone -- a timeout under a held
+        // key does exactly that -- the repeats still arriving are not addressed to
+        // whatever it uncovered. This has to be caught here rather than at the release:
+        // Component.keyRepeated runs its own press and release handlers directly, so a
+        // repeat forwarded to the newly focused component activates or navigates it
+        // without ever passing the scoped guard.
+        Integer repeating = Integer.valueOf(keyCode);
+        if (keyPressScopes != null && keyPressScopes.containsKey(repeating)
+                && keyPressScopes.get(repeating) != keyInputScope) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
         if (focused == null) {
             synthesizeRepeat(keyCode);
             return;

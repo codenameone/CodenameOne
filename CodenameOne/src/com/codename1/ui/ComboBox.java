@@ -552,19 +552,50 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         // closed first switch the other one's routing off.
         popupDialog.comboSelectCancelRouting = includeSelectCancel;
         Form.comboShowDepth++;
-        float rr = Dialog.getDefaultBlurBackgroundRadius();
-        Dialog.setDefaultBlurBackgroundRadius(-1);
+        pushBlurOverride();
         Command result;
         try {
             result = showPopupDialog(popupDialog, l);
         } finally {
             Form.comboShowDepth--;
-            Dialog.setDefaultBlurBackgroundRadius(rr);
+            popBlurOverride();
         }
         parentForm.setTintColor(tint);
         if (result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() || //NOPMD CompareObjectsWithEquals
                 popupDialog.wasDisposedDueToRotation()) {
             setSelectedIndex(originalSel);
+        }
+    }
+
+    /// How many popups currently want the blur off, and what it was before the first
+    /// of them asked.
+    ///
+    /// The radius is one process-wide value and a popup is modal only to the surface it
+    /// is on, so with windows two can be open at once. Saving and restoring it per call
+    /// meant the second popup captured the -1 the first had already installed, and
+    /// whichever finished last wrote that back -- turning the blur off for every dialog
+    /// created afterwards. Both fields are only ever touched while showing a popup,
+    /// which is event-thread work.
+    private static int blurOverrideDepth;
+    private static float blurOverrideSaved;
+
+    /// Turns the blur off for the duration of a popup, remembering the real value once.
+    private static void pushBlurOverride() {
+        if (blurOverrideDepth == 0) {
+            blurOverrideSaved = Dialog.getDefaultBlurBackgroundRadius();
+            Dialog.setDefaultBlurBackgroundRadius(-1);
+        }
+        blurOverrideDepth++;
+    }
+
+    /// Gives the real value back once the last popup wanting it off has gone.
+    private static void popBlurOverride() {
+        if (blurOverrideDepth == 0) {
+            return;
+        }
+        blurOverrideDepth--;
+        if (blurOverrideDepth == 0) {
+            Dialog.setDefaultBlurBackgroundRadius(blurOverrideSaved);
         }
     }
 

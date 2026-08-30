@@ -2436,4 +2436,78 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    /// A focusable component that takes the default `Component#keyRepeated`, which runs
+    /// its own press and release handlers. A `Button` deliberately does not repeat, so it
+    /// cannot show this.
+    private static final class RepeatCountingComponent extends Component {
+        private int presses;
+
+        RepeatCountingComponent() {
+            setFocusable(true);
+        }
+
+        @Override
+        public void keyPressed(int keyCode) {
+            presses++;
+        }
+    }
+
+    @FormTest
+    void aRepeatAfterTheOwnerIsGoneDoesNotReachWhatItUncovered() {
+        // Component.keyRepeated runs its own press and release handlers directly, so a
+        // repeat forwarded to the newly focused component acts on it without ever
+        // passing the scoped-release guard. A dialog going away under a held key -- a
+        // timeout does exactly that -- would have the repeats still arriving act on the
+        // surface it had been covering.
+        final Window w = openHost(600, 500);
+        int fire = Display.getInstance().getKeyCode(Display.GAME_FIRE);
+
+        Dialog low = new Dialog("lower");
+        low.setLayout(new BorderLayout());
+        RepeatCountingComponent below = new RepeatCountingComponent();
+        low.add(BorderLayout.CENTER, below);
+        low.setTopLevelHost(w);
+        low.showModeless();
+        DisplayTest.flushEdt();
+
+        final Dialog high = new Dialog("upper");
+        high.setLayout(new BorderLayout());
+        high.add(BorderLayout.CENTER, new Label("upper"));
+        high.setTopLevelHost(w);
+        high.showModeless();
+        DisplayTest.flushEdt();
+
+        // Held down while the upper dialog owns the keyboard.
+        w.keyPressed(fire);
+        DisplayTest.flushEdt();
+
+        // It goes away with the key still down, and the component below takes the focus.
+        high.dispose();
+        DisplayTest.flushEdt();
+        w.setFocused(below);
+        DisplayTest.flushEdt();
+        int beforeRepeats = below.presses;
+
+        w.keyRepeated(fire);
+        w.keyRepeated(fire);
+        DisplayTest.flushEdt();
+        assertEquals(beforeRepeats, below.presses,
+                "repeats of a key the uncovered surface never received must not reach it");
+
+        w.keyReleased(fire);
+        DisplayTest.flushEdt();
+
+        // A whole keystroke of its own still reaches it.
+        w.keyPressed(fire);
+        DisplayTest.flushEdt();
+        assertEquals(beforeRepeats + 1, below.presses, "a press of its own still works");
+        w.keyReleased(fire);
+        DisplayTest.flushEdt();
+
+        low.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

@@ -350,4 +350,93 @@ class ComboBoxInWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+
+    /// Opens a holding popup off the event thread and waits until it is on screen.
+    private static Thread openHolding(final HoldingComboBox combo) throws Exception {
+        Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                combo.fireClicked();
+            }
+        }, "cn1-test-combo-hold");
+        caller.start();
+        for (int i = 0; i < 400 && !combo.shown; i++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(5);
+        }
+        return caller;
+    }
+
+    /// Takes a holding popup back down and waits for its parked caller to return.
+    private static void closeHolding(HoldingComboBox combo, Thread caller) throws Exception {
+        if (combo.popup != null) {
+            combo.popup.dispose();
+        }
+        for (int i = 0; i < 400 && caller.isAlive(); i++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(5);
+        }
+        caller.join(2000);
+        assertFalse(caller.isAlive(), "its caller must not stay parked");
+    }
+
+    @FormTest
+    void twoPopupsClosingOutOfOrderGiveTheBlurBack() throws Exception {
+        // The blur radius is one process-wide value and a popup is modal only to the
+        // surface it is on, so two windows can each have one open. Saved and restored per
+        // call, the second popup captured the -1 the first had already installed; the
+        // first then put the real value back while the second was still up, and the
+        // second wrote -1 back last -- blur off for every dialog made afterwards.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        float original = Dialog.getDefaultBlurBackgroundRadius();
+        Window a = new Window("a", new BorderLayout());
+        Window b = new Window("b", new BorderLayout());
+        Thread callerA = null;
+        Thread callerB = null;
+        final HoldingComboBox comboA = new HoldingComboBox("one", "two");
+        final HoldingComboBox comboB = new HoldingComboBox("one", "two");
+        try {
+            Dialog.setDefaultBlurBackgroundRadius(7f);
+
+            a.setWindowSize(400, 300);
+            a.add(BorderLayout.NORTH, comboA);
+            a.show();
+            b.setWindowSize(400, 300);
+            b.add(BorderLayout.NORTH, comboB);
+            b.show();
+            DisplayTest.flushEdt();
+            callerA = openHolding(comboA);
+            assertTrue(comboA.shown, "precondition: the first popup is up");
+            callerB = openHolding(comboB);
+            assertTrue(comboB.shown, "precondition: the second is up as well");
+            assertEquals(-1f, Dialog.getDefaultBlurBackgroundRadius(), 0.001f,
+                    "precondition: a popup turns the blur off while it is up");
+
+            // The first one closes first, while the second is still showing.
+            closeHolding(comboA, callerA);
+            callerA = null;
+            DisplayTest.flushEdt();
+            assertEquals(-1f, Dialog.getDefaultBlurBackgroundRadius(), 0.001f,
+                    "the popup still up has to keep it off");
+            closeHolding(comboB, callerB);
+            callerB = null;
+            DisplayTest.flushEdt();
+            assertEquals(7f, Dialog.getDefaultBlurBackgroundRadius(), 0.001f,
+                    "and once both have gone the application's own value is back");
+        } finally {
+            if (callerA != null) {
+                closeHolding(comboA, callerA);
+            }
+            if (callerB != null) {
+                closeHolding(comboB, callerB);
+            }
+            Dialog.setDefaultBlurBackgroundRadius(original);
+            a.dispose();
+            b.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }
