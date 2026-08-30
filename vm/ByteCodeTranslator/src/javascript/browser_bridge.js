@@ -1234,11 +1234,23 @@
     CREATE_PATTERN_SURFACE: 57,
     DRAW_IMAGE_XY: 60, DRAW_IMAGE_XYWH: 61, DRAW_IMAGE_SRCDST: 62,
     BLIT_SURFACE_XY: 70, BLIT_SURFACE_XYWH: 71, BLIT_SURFACE_SRCDST: 72,
-    BLUR_SELF_REGION: 80, LENS_SELF_REGION: 81, GLASS_SELF_REGION: 82
+    BLUR_SELF_REGION: 80, LENS_SELF_REGION: 81, GLASS_SELF_REGION: 82,
+    // Text-layer DOM mutations. They ride the draw stream so the elements and the pixels of
+    // one frame are applied in one task; see SurfaceCommandRecorder.OP_TEXT_* and TextLayerOp.
+    TEXT_ATTACH: 90, TEXT_DETACH: 91, TEXT_CLIP_CSS: 92, TEXT_RUN_CSS: 93,
+    TEXT_CONTENT: 94, TEXT_CLEAR: 95, TEXT_DISPLAY: 96
   };
   // The display surface id. Mirrors HTML5Implementation.DISPLAY_SURFACE_ID.
   var SURF_DISPLAY_ID = 1;
   var surfaceTable = {};
+
+  // A text-layer mutation target: an element the worker created, carried as the host-ref
+  // marker it already is. Never a fresh lookup -- the worker owns the identity of these
+  // elements and only ever names them by reference.
+  function surfaceTextElement(marker) {
+    var resolved = resolveHostRef(marker);
+    return (resolved && resolved.nodeType === 1) ? resolved : null;
+  }
 
   function surfaceImageSource(marker) {
     // A drawImage source: either a host-ref marker (a loaded image / canvas
@@ -1878,6 +1890,57 @@
         case SURF.BLIT_SURFACE_SRCDST: {
           var b3 = surfaceTable[nums[ni++]];
           if (b3 && b3.canvas) { ctx.drawImage(b3.canvas, nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 8; }
+          break;
+        }
+        case SURF.TEXT_ATTACH: {
+          var taParent = surfaceTextElement(objs[oi++]);
+          var taChild = surfaceTextElement(objs[oi++]);
+          // parentNode is checked so a re-attach of a run already in place is not a move: an
+          // appendChild on a node that is already the last child still detaches and re-inserts
+          // it, which drops any selection or focus inside it.
+          if (taParent && taChild && taChild.parentNode !== taParent) {
+            taParent.appendChild(taChild);
+          }
+          break;
+        }
+        case SURF.TEXT_DETACH: {
+          var tdParent = surfaceTextElement(objs[oi++]);
+          var tdChild = surfaceTextElement(objs[oi++]);
+          if (tdParent && tdChild && tdChild.parentNode === tdParent) {
+            tdParent.removeChild(tdChild);
+          }
+          break;
+        }
+        case SURF.TEXT_CLIP_CSS:
+        case SURF.TEXT_RUN_CSS: {
+          var tcEl = surfaceTextElement(objs[oi++]);
+          var tcCss = objs[oi++];
+          if (tcEl && tcEl.style) {
+            tcEl.style.cssText = tcCss == null ? '' : String(tcCss);
+          }
+          break;
+        }
+        case SURF.TEXT_CONTENT: {
+          var ttEl = surfaceTextElement(objs[oi++]);
+          var ttText = objs[oi++];
+          if (ttEl) {
+            ttEl.textContent = ttText == null ? '' : String(ttText);
+          }
+          break;
+        }
+        case SURF.TEXT_CLEAR: {
+          var tclEl = surfaceTextElement(objs[oi++]);
+          if (tclEl) {
+            tclEl.innerHTML = '';
+          }
+          break;
+        }
+        case SURF.TEXT_DISPLAY: {
+          var tdsEl = surfaceTextElement(objs[oi++]);
+          var tdsVal = objs[oi++];
+          if (tdsEl && tdsEl.style) {
+            tdsEl.style.display = tdsVal == null ? '' : String(tdsVal);
+          }
           break;
         }
         default:

@@ -146,6 +146,21 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     // saturation, scale, offset, refraction, specular.
     public static final int OP_GLASS_SELF_REGION = 82;
 
+    // Text-layer DOM mutations. The layer renders text as real DOM above the canvas, so a frame
+    // is only coherent if its elements and its pixels are applied together. Riding the command
+    // stream is what guarantees that: the host applies these inside the same task that replays
+    // the draws, in the order the paint recorded them. Issued as side-channel writes instead
+    // they land an animation frame before the pixels they belong to, which shows as text that
+    // blanks out or is drawn twice. OP_BLUR_SELF_REGION rides the stream for the same reason.
+    // See TextLayerOp.
+    public static final int OP_TEXT_ATTACH = 90;   // 2 objs: container, child
+    public static final int OP_TEXT_DETACH = 91;   // 2 objs: container, child
+    public static final int OP_TEXT_CLIP_CSS = 92; // 1 obj (element) + 1 str (cssText)
+    public static final int OP_TEXT_RUN_CSS = 93;  // 1 obj (element) + 1 str (cssText)
+    public static final int OP_TEXT_CONTENT = 94;  // 1 obj (element) + 1 str (text)
+    public static final int OP_TEXT_CLEAR = 95;    // 1 obj (container)
+    public static final int OP_TEXT_DISPLAY = 96;  // 1 obj (container) + 1 str (display)
+
     private int[] ops = new int[64];
     private int opCount;
     private double[] nums = new double[256];
@@ -185,6 +200,36 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
             objs = n;
         }
         objs[objCount++] = v;
+    }
+
+    /**
+     * Record a text-layer DOM mutation into this stream.
+     *
+     * <p>Arguments travel as object slots, which the flush native already marshals correctly
+     * for both kinds involved here: a Java String becomes a native string, and an element
+     * becomes the host reference it already is. Nothing is read back.</p>
+     *
+     * @param kind one of the {@code OP_TEXT_*} opcodes
+     * @param target the element the mutation applies to
+     * @param child the element being attached or detached, null for the other kinds
+     * @param value the CSS declaration or text content, null for the other kinds
+     */
+    public void textLayerMutation(int kind, Object target, Object child, String value) {
+        op(kind);
+        switch (kind) {
+            case OP_TEXT_ATTACH:
+            case OP_TEXT_DETACH:
+                obj(target);
+                obj(child);
+                break;
+            case OP_TEXT_CLEAR:
+                obj(target);
+                break;
+            default:
+                obj(target);
+                obj(value);
+                break;
+        }
     }
 
     /** True if anything was recorded since the last {@link #reset()}. */
