@@ -62,6 +62,7 @@ public class GcSteadyState {
 
     private static final int CFG_SECONDS = 0, CFG_THREADS = 1, CFG_DEPTH = 2, CFG_BRANCH = 3;
     private static final int CFG_SLEEP_MS = 4, CFG_MOVES = 5, CFG_LEGACY = 6, CFG_SCRUB = 7;
+    private static final int CFG_BIGARRAY = 8;
 
     private static final int BOARD_CELLS = 64;
 
@@ -78,6 +79,23 @@ public class GcSteadyState {
     private static final int LEGACY_BLOCK_REFS = 128;
 
     static int seconds, threads, depth, branch, sleepMs, movesPerNode, legacyBlocks, scrubDepth;
+    /**
+     * Ints per throwaway array allocated at each node, or 0 for none.
+     *
+     * <p>The rest of this workload churns through the BiBOP page heap, because small
+     * objects AND small arrays are served from it -- the search's own {@code int[64]}
+     * board copy is 280 bytes and never reaches the legacy table. Anything over
+     * CN1_BIBOP_MAX_OBJECT (512 bytes) does, and a real game-tree search crosses that
+     * line routinely: a 15x15 board of ints is 900. That path is priced completely
+     * differently -- calloc, a slot in allObjectsInHeap, an entry in the conservative
+     * extent snapshot, a per-object free -- so a driver that never crosses it cannot
+     * speak for a search that does.</p>
+     *
+     * <p>Default 0, so every number measured before this knob existed still means what it
+     * meant. 256 ints (1KB) puts every node on the legacy path.</p>
+     */
+    static int bigArrayInts;
+    static long bigArraySink;
     static volatile boolean stop = false;
     static Object[][] legacyLiveSet;
     static final Object SUM_LOCK = new Object();
@@ -135,6 +153,7 @@ public class GcSteadyState {
         movesPerNode = cfg(CFG_MOVES);
         legacyBlocks = cfg(CFG_LEGACY);
         scrubDepth = cfg(CFG_SCRUB);
+        bigArrayInts = cfg(CFG_BIGARRAY);
         // Every knob is normalised before the run rather than trusted. These are ablation
         // switches: someone WILL set one to zero to remove a term, because that is what
         // they are for, and a driver that answers a legitimate ablation with an NPE, an
@@ -172,10 +191,13 @@ public class GcSteadyState {
         if (scrubDepth < 0) {
             scrubDepth = 0;
         }
+        if (bigArrayInts < 0) {
+            bigArrayInts = 0;
+        }
         System.out.println("WLCONFIG seconds=" + seconds + " threads=" + threads
                 + " depth=" + depth + " branch=" + branch + " sleepMs=" + sleepMs
                 + " moves=" + movesPerNode + " legacy=" + legacyBlocks
-                + " scrub=" + scrubDepth);
+                + " scrub=" + scrubDepth + " bigArray=" + bigArrayInts);
 
         // A retained legacy population, held for the whole run. Without it the collector's
         // table walk costs nothing and this workload cannot tell a cheap drain from an
@@ -305,6 +327,16 @@ public class GcSteadyState {
             int[] child = new int[BOARD_CELLS];
             for (int i = 0; i < BOARD_CELLS; i++) {
                 child[i] = board[i] + ((seed + b + i) & 7);
+            }
+            // Legacy-path churn: over CN1_BIBOP_MAX_OBJECT, so this one goes through
+            // calloc + allObjectsInHeap rather than the page heap. Touched at both ends
+            // and folded into a sink so neither javac nor the translator's scalar
+            // replacement can decide it is dead and delete the allocation being measured.
+            if (bigArrayInts > 0) {
+                int[] scratch = new int[bigArrayInts];
+                scratch[0] = seed + b;
+                scratch[bigArrayInts - 1] = d;
+                bigArraySink += scratch[0] ^ scratch[bigArrayInts - 1];
             }
             Move chain = null;
             for (int m = 0; m < movesPerNode; m++) {

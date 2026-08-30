@@ -1111,6 +1111,16 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean roundedSkin;
     private Rectangle safeAreaPortrait = null;
     private Rectangle safeAreaLandscape = null;
+    /// Display-relative rectangles the skin paints over the screen -- a notch,
+    /// a Dynamic Island, a punch-hole camera. They are inside the display
+    /// rect, so the pointer path would otherwise deliver a click on an opaque
+    /// cutout to whatever app content is hidden underneath it. Empty unless
+    /// the skin declares a `cutouts` property, so skins that do not are
+    /// unaffected. Note this deliberately does NOT hit-test the skin image's
+    /// alpha: the screen's rounded corners are opaque skin material too, and
+    /// unlike a cutout they are real touch surface on the hardware.
+    private java.util.List<Rectangle> cutoutsPortrait = null;
+    private java.util.List<Rectangle> cutoutsLandscape = null;
     private Map<java.awt.Point, Integer> portraitSkinHotspots;
     private java.awt.Rectangle portraitScreenCoordinates;
     private Map<java.awt.Point, Integer> landscapeSkinHotspots;
@@ -4051,6 +4061,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         Integer triggeredKeyCode;
         private boolean mouseDown;
+        /// Set when a press lands on a skin cutout, so the drag and release
+        /// that follow are swallowed with it.
+        private boolean pointerOnCutout;
         public void mousePressed(MouseEvent e) {
             if (e.isPopupTrigger()) {
                 if (showContextMenu(e)) {
@@ -4076,6 +4089,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 releaseLock = false;
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
+                // A press that starts on a cutout is swallowed, and so is the
+                // rest of the gesture: mouseDragged and mouseReleased both
+                // deliver on `mouseDown` alone, so suppressing only the press
+                // would send the app a drag and a release it never saw a
+                // press for.
+                pointerOnCutout = isPointerOnCutout(x, y);
+                if (pointerOnCutout) {
+                    requestFocus();
+                    return;
+                }
                 if (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight()) {
                     if (touchDevice) {
                         if (testRecorder != null) {
@@ -4132,6 +4155,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             this.mouseDown = false;
             cn1GrabbedDrag = false;
             e.consume();
+            if (pointerOnCutout) {
+                pointerOnCutout = false;
+                return;
+            }
             if (!isEnabled()) {
                 return;
             }
@@ -4182,6 +4209,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         public void mouseDragged(MouseEvent e) {
             e.consume();
+            if (pointerOnCutout) {
+                return;
+            }
             if (!isEnabled()) {
                 return;
             }
@@ -5111,6 +5141,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             landscapeSkinHotspots = new HashMap<Point, Integer>();
             landscapeScreenCoordinates = new Rectangle();
             boolean roundScreen = props.getProperty("roundScreen", "false").equalsIgnoreCase("true");
+            // Every field below describes THIS skin. Clear them up front:
+            // they used to be assigned only on the branches that had a value
+            // for them, so loading a legacy skin after a skin designer one
+            // left the previous device's safe area in force and kept
+            // painting the skin over the UI (see the roundedSkin branch in
+            // paintComponent).
+            roundedSkin = false;
+            safeAreaPortrait = null;
+            safeAreaLandscape = null;
+            cutoutsPortrait = parseCutouts(props.getProperty("cutouts"));
+            cutoutsLandscape = null;
             boolean hasSafeAreaProps =
                     props.getProperty("safePortraitX") != null ||
                     props.getProperty("safePortraitY") != null ||
@@ -5167,6 +5208,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
 
+
+            cutoutsLandscape = rotateCutoutsForLandscape(cutoutsPortrait,
+                    portraitScreenCoordinates.height);
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
@@ -5317,6 +5361,76 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
 
+
+    /// Parses the skin's `cutouts` property: `x,y,w,h` rectangles in
+    /// display-relative pixels, separated by `;`. Returns null when the skin
+    /// declares none, which is every skin written before the property
+    /// existed.
+    private static java.util.List<Rectangle> parseCutouts(String spec) {
+        if (spec == null || spec.trim().length() == 0) {
+            return null;
+        }
+        java.util.List<Rectangle> out = new java.util.ArrayList<Rectangle>();
+        for (String entry : spec.split(";")) {
+            String[] parts = entry.trim().split(",");
+            if (parts.length != 4) {
+                continue;
+            }
+            try {
+                int x = Integer.parseInt(parts[0].trim());
+                int y = Integer.parseInt(parts[1].trim());
+                int w = Integer.parseInt(parts[2].trim());
+                int h = Integer.parseInt(parts[3].trim());
+                if (w > 0 && h > 0) {
+                    out.add(new Rectangle(x, y, w, h));
+                }
+            } catch (NumberFormatException err) {
+                // A malformed entry disables that rectangle rather than the
+                // whole skin; the cutout stays clickable, which is the old
+                // behaviour.
+            }
+        }
+        return out.isEmpty() ? null : out;
+    }
+
+    /// skin_l.png is skin.png through Image.rotate90Degrees, which maps
+    /// (x, y) to (height - 1 - y, x). The same rotation applied to a display
+    /// rectangle sends (x, y, w, h) to (displayH - y - h, x, h, w), which is
+    /// why a notch anchored to the portrait top edge lands on the landscape
+    /// RIGHT edge.
+    private static java.util.List<Rectangle> rotateCutoutsForLandscape(
+            java.util.List<Rectangle> portraitCutouts, int displayH) {
+        if (portraitCutouts == null) {
+            return null;
+        }
+        java.util.List<Rectangle> out = new java.util.ArrayList<Rectangle>(portraitCutouts.size());
+        for (Rectangle r : portraitCutouts) {
+            out.add(new Rectangle(displayH - r.y - r.height, r.x, r.height, r.width));
+        }
+        return out;
+    }
+
+    /// True when a display-relative point falls inside one of the cutouts the
+    /// skin paints over the screen, so the pointer path should ignore it.
+    /// Static and given its list explicitly so a test can exercise it without
+    /// building a JavaSEPort: the constructor assigns the `instance`
+    /// singleton, and a throwaway port silently replaces the one the rest of
+    /// the suite is running against.
+    private static boolean isPointerOnCutout(java.util.List<Rectangle> rects, int x, int y) {
+        if (rects == null) {
+            return false;
+        }
+        for (Rectangle r : rects) {
+            if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isPointerOnCutout(int x, int y) {
+        return isPointerOnCutout(portrait ? cutoutsPortrait : cutoutsLandscape, x, y);
+    }
 
     @Override
     public com.codename1.ui.geom.Rectangle getDisplaySafeArea(com.codename1.ui.geom.Rectangle rect) {

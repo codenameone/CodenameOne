@@ -126,6 +126,7 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_Integer_cn1Value_R_int",
             "cn1_java_lang_Integer_valueOf_int_R_java_lang_Integer",
             "cn1_java_lang_System_isHighFrequencyGC_R_boolean",
+            "cn1_java_lang_System_gcIdleWaitMillis_R_int",
             "cn1_java_lang_Thread_currentThread_R_java_lang_Thread",
             "cn1_java_lang_Thread_getNativeThreadId_R_long",
             "cn1_java_lang_Thread_interrupt0",

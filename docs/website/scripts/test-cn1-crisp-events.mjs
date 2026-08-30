@@ -39,7 +39,8 @@ function load(
   hostname = "www.codenameone.com",
   legacyConsent = null,
   sessionStore = storage(),
-  fetchHandler = null
+  fetchHandler = null,
+  exposeExperiment = true
 ) {
   const timers = [];
   const timerDelays = [];
@@ -123,7 +124,7 @@ function load(
       return timers.length;
     },
   };
-  if (experimentArm) {
+  if (experimentArm && exposeExperiment) {
     window.cn1Exp004 = {
       id: "EXP-004",
       arm: experimentArm,
@@ -187,6 +188,17 @@ function normalizedCounterBody(options) {
     body.occurred_at = "<occurred_at>";
   }
   return body;
+}
+
+{
+  const state = load(
+    "accepted", "", "/", "reach", true, "www.codenameone.com", null,
+    storage(), null, false
+  );
+  assert.equal(eventCommands(state).length, 0,
+    "a retired experiment must not resume from a stale stored assignment");
+  assert.equal(state.fetches.length, 0,
+    "a retired experiment must not send exposure telemetry");
 }
 
 {

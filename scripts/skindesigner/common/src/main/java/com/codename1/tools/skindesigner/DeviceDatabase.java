@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.skindesigner;
 
 import com.codename1.io.JSONParser;
@@ -46,6 +68,20 @@ public final class DeviceDatabase {
         public final boolean hasHomeIndicator;
         public final int safeTop;
         public final int safeBottom;
+        /**
+         * Physical pixels per density-independent unit -- iOS points,
+         * Android dp. {@link #safeTop} and {@link #safeBottom} are stored
+         * in those units (Apple and Google both document their insets that
+         * way), so anything that needs them in pixels multiplies by this.
+         *
+         * <p>Written by {@code build_devices_json.py::density_scale}. Do
+         * NOT substitute {@code resolutionW / DevicePreview.VB_W}: that
+         * ratio is the designer's drawing viewbox and is only accidentally
+         * equal to the scale on a 320pt-wide phone. On an iPhone 13 Pro Max
+         * (428pt wide) it is 34% too large, and on an iPad Pro 12.9 it is
+         * more than triple.</p>
+         */
+        public final double densityScale;
         public final int safeLeft;
         public final int safeRight;
         public final String systemFont;
@@ -61,6 +97,7 @@ public final class DeviceDatabase {
                String platformName,
                boolean hasNotch, boolean hasIsland, boolean hasHole, boolean hasHomeIndicator,
                int safeTop, int safeBottom, int safeLeft, int safeRight,
+               double densityScale,
                String systemFont, String proportionalFont, String monoFont,
                int fontSmall, int fontMedium, int fontLarge,
                boolean tablet) {
@@ -81,6 +118,7 @@ public final class DeviceDatabase {
             this.hasHomeIndicator = hasHomeIndicator;
             this.safeTop = safeTop;
             this.safeBottom = safeBottom;
+            this.densityScale = densityScale;
             this.safeLeft = safeLeft;
             this.safeRight = safeRight;
             this.systemFont = systemFont;
@@ -196,6 +234,22 @@ public final class DeviceDatabase {
             boolean hasHome = bool(m, "hasHome", false);
             int safeTop = num(m, "safeTop", 0);
             int safeBottom = num(m, "safeBottom", 0);
+            // Catalogs written before devices.json version 3 carry no
+            // "scale", so mirror density_scale() rather than fall back to
+            // something that would silently produce wrong safe areas. The
+            // 1080x1920 panel is the iPhone 6/6s/7/8 Plus, which lays out
+            // 414 points wide, renders at 3x and downsamples onto the
+            // panel -- its scale is neither 2 nor 3.
+            double scale = numDouble(m, "scale", 0);
+            if (scale <= 0) {
+                if (!"ios".equals(platform)) {
+                    scale = ppi / 160.0;
+                } else if (w == 1080 && h == 1920) {
+                    scale = 1080.0 / 414.0;
+                } else {
+                    scale = Math.max(1, Math.round(ppi / 163.0));
+                }
+            }
 
             Map<String, Object> fonts = m.get("fonts") instanceof Map
                     ? (Map<String, Object>) m.get("fonts")
@@ -211,7 +265,7 @@ public final class DeviceDatabase {
             if (w <= 0 || h <= 0 || ppi <= 0) return null;
             return new Device(id, brand, os, year, form, name, w, h, inches, ppi, platform,
                     hasNotch, hasIsland, hasHole, hasHome,
-                    safeTop, safeBottom, 0, 0,
+                    safeTop, safeBottom, 0, 0, scale,
                     sysFont, propFont, monoFont, sm, md, lg, tablet);
         } catch (Exception err) {
             Log.e(err);

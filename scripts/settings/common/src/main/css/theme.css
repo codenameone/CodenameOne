@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 #Constants {
     includeNativeBool: true;
     defaultSourceDPIInt: "0";
@@ -202,6 +224,42 @@ SettingsFilterRow, SettingsFilterRowDark, SettingsList, SettingsListDark {
     padding: 0;
     margin: 0;
 }
+/* The desktop scrollbar. Its UIIDs are fixed by the look and feel -- the port
+   turns it on with interactiveScrollbars and the theme is asked for "Scroll"
+   and "ScrollThumb" by those exact names -- so unlike every other style here
+   they cannot have a Dark twin that the app switches to. The track is left
+   transparent and the thumb is given a tone that reads on both the white page
+   and the navy one. Without these rules the bar is drawn with an empty style,
+   which is why a list that scrolled perfectly well looked like it had no
+   scrollbar at all. */
+DesktopScroll, DesktopHorizontalScroll {
+    background-color: transparent;
+    padding: 0 0.9mm 0 0.9mm;
+    margin: 0;
+}
+DesktopScrollThumb, DesktopHorizontalScrollThumb {
+    background-color: #7E93BC;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopScrollThumb.selected, DesktopHorizontalScrollThumb.selected {
+    background-color: #5C79AE;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopScrollThumb.pressed, DesktopHorizontalScrollThumb.pressed {
+    background-color: #4D86FF;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+SettingsHintSearchCell, SettingsHintSearchCellDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 0 4mm;
+}
 
 SettingsIconDrop, SettingsIconDropDark {
     border-width: 1px;
@@ -257,12 +315,21 @@ SettingsSwitch.selected, SettingsSwitchDark.selected {
     margin: 0 1.2mm 0 2mm;
 }
 
-SettingsCard, SettingsCardDark, SettingsRow, SettingsRowDark {
+SettingsCard, SettingsCardDark {
     border-width: 1px;
     border-style: solid;
     border-radius: 1mm;
     padding: 3mm 3.2mm 3mm 3.2mm;
     margin: 0 0 1.4mm 0;
+}
+/* A hint row is one of a handful that have to fit between a pinned search box
+   and a pager, so it spends less height on air than a card that scrolls. */
+SettingsRow, SettingsRowDark {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1mm;
+    padding: 2.2mm 3.2mm 2.2mm 3.2mm;
+    margin: 0 0 1.2mm 0;
 }
 SettingsCardTitle, SettingsCardTitleDark, SettingsRowTitle, SettingsRowTitleDark {
     background-color: transparent;

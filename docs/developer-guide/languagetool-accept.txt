@@ -685,3 +685,10 @@ Bonjour
 # The Apple verb for signing a build. Not "code signing" here: this is the
 # spelling in the error an unavailable entitlement produces.
 codesigning
+
+# -----------------------------------------------------------------------------
+# Skin designer (Skin-Designer.asciidoc) units.
+# -----------------------------------------------------------------------------
+# Android's density-independent pixel, the unit its safe-area insets are
+# published in. Spelled the way Google spells it, alongside the iOS "pt".
+dp

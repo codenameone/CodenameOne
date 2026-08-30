@@ -1759,6 +1759,48 @@
         "url": "https://medium.com/p/bd51abdb21ca/edit",
         "syndicated_at": "2026-08-28T19:19:51+00:00"
       }
+    },
+    "watch-apps-phone-channel": {
+      "hashnode": {
+        "url": "https://debugagent.com/watch-apps-one-codebase-two-real-applications",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a92f40041f6222fb4bcb7b6",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-29T15:01:12+00:00"
+      },
+      "devto": {
+        "id": 4523495,
+        "url": "https://dev.to/codenameone/watch-apps-one-codebase-two-real-applications-215f",
+        "syndicated_at": "2026-08-29T17:06:29+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/watch-apps-one-codebase-two-real-applications-08ca92035288?postPublishedType=initial",
+        "syndicated_at": "2026-08-29T19:01:23+00:00"
+      }
+    },
+    "javascript-dom-text-search": {
+      "hashnode": {
+        "url": "https://debugagent.com/javascript-find-in-page-dom-text-above-the-codename-one-canvas",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a94457d16c137248dbe20a2",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-30T15:01:09+00:00"
+      },
+      "devto": {
+        "id": 4530080,
+        "url": "https://dev.to/codenameone/javascript-find-in-page-dom-text-above-the-codename-one-canvas-41pj",
+        "syndicated_at": "2026-08-30T17:26:42+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/javascript-find-in-page-dom-text-above-the-codename-one-canvas-aaae6fb663fb?postPublishedType=initial",
+        "syndicated_at": "2026-08-30T19:01:27+00:00"
+      }
     }
   }
 }

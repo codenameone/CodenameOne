@@ -5,7 +5,6 @@
   const CONSENT_TTL_DAYS = 365;
   const CONVERSION_ARRIVAL_KEY = "cn1-conversion-arrival-v1";
   const OSS_ATTRIBUTION_KEY = "cn1-oss-attribution-v1";
-  const EXP004_STORAGE_KEY = "cn1-exp-004-arm-v1";
   const EXP004_COUNTER_SESSION_KEY = "cn1-exp-004-counter-session-v1";
   const EXP004_COUNTER_TOKEN_KEY = "cn1-exp-004-counter-token-v1";
   const EXP004_COUNTER_EVENT_PREFIX = "cn1-exp-004-counter-event-v1-";
@@ -122,17 +121,10 @@
       return null;
     }
     const experiment = window.cn1Exp004;
-    if (experiment && experiment.telemetryEnabled === false) {
+    if (!experiment || experiment.telemetryEnabled === false) {
       return null;
     }
-    let arm = experiment && experiment.arm;
-    if (arm !== "ownership" && arm !== "reach") {
-      try {
-        arm = localStorage.getItem(EXP004_STORAGE_KEY);
-      } catch (e) {
-        return null;
-      }
-    }
+    const arm = experiment.arm;
     if (arm !== "ownership" && arm !== "reach") {
       return null;
     }
