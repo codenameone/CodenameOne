@@ -207,4 +207,50 @@ class ToastBarInWindowTest extends UITestBase {
             singleton.setDefaultMessageUIID(originalMessageUiid);
         }
     }
+
+    @FormTest
+    void aWindowInstanceKeepsFollowingLaterConfigurationChanges() {
+        // Seeding only on the cache miss froze the window's bar at whatever the shared
+        // defaults happened to be the first time it was asked for. Every configuration
+        // change after that point was silently dropped, though the static helpers have
+        // always honoured them.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        ToastBar singleton = ToastBar.getInstance();
+        int originalPosition = singleton.getPosition();
+        String originalUiid = singleton.getDefaultUIID();
+        Window w = new Window("host", new BorderLayout());
+        try {
+            w.setWindowSize(500, 400);
+            w.show();
+            DisplayTest.flushEdt();
+
+            // Created before the application configures anything.
+            ToastBar forWindow = ToastBar.getInstance(w);
+            assertNotSame(singleton, forWindow);
+
+            singleton.setPosition(Component.TOP);
+            singleton.setDefaultUIID("LaterToastBar");
+            assertEquals(Component.TOP, ToastBar.getInstance(w).getPosition(),
+                    "a change made after the window's bar existed still reaches it");
+            assertEquals("LaterToastBar", ToastBar.getInstance(w).getDefaultUIID());
+
+            // But something set on the window itself is its own, and a later change to
+            // the shared default must not take it back.
+            forWindow.setPosition(Component.BOTTOM);
+            singleton.setPosition(Component.TOP);
+            assertEquals(Component.BOTTOM, ToastBar.getInstance(w).getPosition(),
+                    "an explicit per-window setting outranks the shared default");
+            assertEquals(Component.TOP, singleton.getPosition(),
+                    "and setting it on the window does not reach back into the singleton");
+        } finally {
+            singleton.setPosition(originalPosition);
+            singleton.setDefaultUIID(originalUiid);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }

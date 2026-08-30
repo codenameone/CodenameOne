@@ -134,6 +134,17 @@ public final class ToastBar {
     private String defaultMessageUIID = "ToastBarMessage";
     //FIXME SH Need to style the {@code ToastBar} so that it looks nicer
     private boolean useFormLayeredPane;
+
+    /// Which of the inheritable settings this instance has been given in its own right.
+    ///
+    /// A window's toast bar takes the singleton's configuration so the static helpers
+    /// keep honouring settings made once at start-up, but it must not be frozen at the
+    /// moment it happened to be created -- nor have a later change to the shared
+    /// defaults overwrite something set on this window deliberately.
+    private boolean positionExplicit;
+    private boolean useFormLayeredPaneExplicit;
+    private boolean defaultUIIDExplicit;
+    private boolean defaultMessageUIIDExplicit;
     /// Flag to indicate that the status is updating.  This is used to prevent
     /// two status updates from happening at the same time.
     private boolean updatingStatus;
@@ -197,19 +208,16 @@ public final class ToastBar {
         if (b == null) {
             b = new ToastBar();
             b.host = top;
-            // Configured as the singleton is. An application sets the position, the
-            // layer choice and the UIIDs once at start-up and then calls the static
-            // helpers; those helpers reach this instance when a window has focus, and
-            // a factory-fresh one would have quietly ignored every one of those
-            // settings. Copied rather than shared so a window can still be configured
-            // on its own afterwards.
-            ToastBar defaults = ToastBarHolder.INSTANCE;
-            b.position = defaults.position;
-            b.useFormLayeredPane = defaults.useFormLayeredPane;
-            b.defaultUIID = defaults.defaultUIID;
-            b.defaultMessageUIID = defaults.defaultMessageUIID;
             c.putClientProperty(WINDOW_INSTANCE_PROP, b);
         }
+        // On every lookup, not only when one is created. An application sets the
+        // position, the layer choice and the UIIDs on the singleton and then calls the
+        // static helpers; those helpers reach this instance whenever a window has the
+        // focus. Seeding once froze the window's bar at whatever the defaults happened
+        // to be the first time it was asked for, so every configuration change after
+        // that point was silently dropped -- which the static helpers have always
+        // honoured.
+        b.inheritDefaultsFrom(ToastBarHolder.INSTANCE);
         return b;
     }
 
@@ -438,6 +446,7 @@ public final class ToastBar {
     ///
     /// - `defaultUIID`: the defaultUIID to set
     public void setDefaultUIID(String defaultUIID) {
+        defaultUIIDExplicit = true;
         this.defaultUIID = defaultUIID;
     }
 
@@ -458,6 +467,7 @@ public final class ToastBar {
     ///
     /// - `defaultMessageUIID`: the defaultMessageUIID to set
     public void setDefaultMessageUIID(String defaultMessageUIID) {
+        defaultMessageUIIDExplicit = true;
         this.defaultMessageUIID = defaultMessageUIID;
     }
 
@@ -477,17 +487,28 @@ public final class ToastBar {
     /// Self for chaining.
     ///
     public ToastBar useFormLayeredPane(boolean useFormLayeredPane) {
-        if (useFormLayeredPane != this.useFormLayeredPane) {
+        useFormLayeredPaneExplicit = true;
+        applyUseFormLayeredPane(useFormLayeredPane);
+        return this;
+    }
+
+    /// Moves the bar between the layered panes without recording the choice as this
+    /// instance's own, which is what inheriting the shared default must do.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layered`: true to use the form layered pane
+    private void applyUseFormLayeredPane(boolean layered) {
+        if (layered != this.useFormLayeredPane) {
             ToastBarComponent c = getToastBarComponent(false);
             if (c != null) {
                 c.remove();
                 getLayeredPane().remove();
             }
 
-            this.useFormLayeredPane = useFormLayeredPane;
+            this.useFormLayeredPane = layered;
 
         }
-        return this;
     }
 
     /// Gets the position of the toast bar on the screen.  Either `Component#TOP` or `Component#BOTTOM`.
@@ -505,7 +526,38 @@ public final class ToastBar {
     ///
     /// - `position`: the position to set Should be one of `Component#TOP` and `Component#BOTTOM`
     public void setPosition(int position) {
+        positionExplicit = true;
         this.position = position;
+    }
+
+    /// Takes the shared defaults for every setting this instance has not been given
+    /// in its own right.
+    ///
+    /// Explicit beats inherited in both directions and at any time: configuring a
+    /// window's bar keeps that setting however the shared default moves afterwards,
+    /// and everything else keeps following it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaults`: the shared instance to inherit from
+    private void inheritDefaultsFrom(ToastBar defaults) {
+        if (defaults == this) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
+        if (!positionExplicit) {
+            position = defaults.position;
+        }
+        if (!useFormLayeredPaneExplicit) {
+            // Through the mover, so a bar already on screen changes pane rather than
+            // having the flag flipped underneath it.
+            applyUseFormLayeredPane(defaults.useFormLayeredPane);
+        }
+        if (!defaultUIIDExplicit) {
+            defaultUIID = defaults.defaultUIID;
+        }
+        if (!defaultMessageUIIDExplicit) {
+            defaultMessageUIID = defaults.defaultMessageUIID;
+        }
     }
 
     /// Updates the ToastBar UI component with the settings of the current status.

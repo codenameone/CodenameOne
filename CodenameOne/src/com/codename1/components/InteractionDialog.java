@@ -476,7 +476,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         } else {
             w.centerOnDesktop();
         }
-        startPendingTimeout();
+        startPendingTimeout(w);
         if (modal) {
             // Idempotent for a window already on screen: it takes the blocker and parks
             // the caller without showing anything twice.
@@ -1867,10 +1867,25 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     /// Binds the pending timeout to the host the dialog is actually on.
     private void startPendingTimeout() {
+        startPendingTimeout(resolveHost());
+    }
+
+    /// Starts the pending timeout against a named surface.
+    ///
+    /// A `UITimer` is ticked by the surface it is registered on, so the timeout has to
+    /// belong to whatever actually holds the dialog. In native-window mode that is the
+    /// window, not the owner: an explicit `setTopLevelHost()` naming a form wins in
+    /// `resolveHost()`, and navigating away from that form stops it animating -- the
+    /// timer would then never fire while the dialog sat there in its own window, and a
+    /// modal `showDialog()` waiting on it would never return.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the surface to register the timeout on, may be null
+    private void startPendingTimeout(TopLevelContainer host) {
         if (pendingTimeout <= 0) {
             return;
         }
-        TopLevelContainer host = resolveHost();
         if (host == null) {
             return;
         }

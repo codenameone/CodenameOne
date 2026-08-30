@@ -1162,4 +1162,50 @@ class NativeWindowDialogTest extends UITestBase {
             Dialog.setDefaultNativeWindowMode(previous);
         }
     }
+
+    @FormTest
+    void aNativeInteractionDialogTimesOutAfterItsOwnerFormIsNavigatedAway() {
+        // A UITimer is ticked by the surface it is registered on. The timeout was bound
+        // through resolveHost(), which prefers an explicit setTopLevelHost() -- so with
+        // native-window mode it landed on the owner form rather than on the window that
+        // actually holds the dialog. Navigate off that form and it stops animating: the
+        // timer never fires, and the dialog sits in its own window for good.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        main.show();
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        id.add(BorderLayout.CENTER, new Label("body"));
+        id.setNativeWindowMode(true);
+        id.setTopLevelHost(main);
+        // Long enough to be demonstrably up first.
+        id.setTimeout(120);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+
+        Window w = id.getNativeWindow();
+        assertNotNull(w, "precondition: it opened a native window");
+
+        // The owner goes away. It is no longer the current form, so nothing ticks it.
+        Form next = new Form("next", new BorderLayout());
+        next.show();
+        DisplayTest.flushEdt();
+
+        for (int iter = 0; iter < 300 && id.isShowing(); iter++) {
+            w.repaintAnimations();
+            DisplayTest.flushEdt();
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        assertFalse(id.isShowing(),
+                "the timeout has to elapse against the window that holds the dialog");
+
+        id.dispose();
+        DisplayTest.flushEdt();
+    }
 }
