@@ -1930,54 +1930,170 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitFrame(int i, int i1, Object[] os, int i2, Object[] os1) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 /**
-                                  * The literal pushed immediately before
-                                  * the next call, or null. Cleared by
-                                  * every other visit below -- including
-                                  * labels and frames, since a constant
-                                  * that is last before a merge point is
-                                  * not a straight-line argument -- so
-                                  * "unknown" is what a missed case
-                                  * degrades to.
+                                  * The values pushed since the last point
+                                  * this could still follow, newest last.
+                                  * A slot holds TRUE/FALSE for a boolean
+                                  * literal and null for a value whose
+                                  * identity is not tracked.
+                                  *
+                                  * <p>This used to be a single slot
+                                  * holding the literal pushed IMMEDIATELY
+                                  * before the call, which cannot see the
+                                  * argument of any method that takes
+                                  * another one after it. The API this
+                                  * exists for is exactly that shape --
+                                  * {@code Camera.requestPermissions(boolean
+                                  * audio, SuccessCallback callback)} --
+                                  * so the callback push cleared the slot,
+                                  * the value always arrived null, and the
+                                  * consumer's "null counts as asking"
+                                  * fallback granted the microphone to
+                                  * every caller including the video-only
+                                  * ones the argument was added to
+                                  * recognise. The narrowing was inert.</p>
+                                  *
+                                  * <p>Indexed from the END at the call, so
+                                  * the receiver of an instance call does
+                                  * not have to be modelled: the descriptor
+                                  * says how many arguments there are and
+                                  * they are the last that many.</p>
+                                  *
+                                  * <p>Deliberately conservative. Only
+                                  * instructions that push exactly one
+                                  * value and are modelled below append;
+                                  * ANYTHING else clears the whole list, so
+                                  * an unmodelled opcode degrades to
+                                  * "unknown" rather than to a wrong
+                                  * answer. That direction matters: over
+                                  * declaring costs a permission the
+                                  * application does not need, under
+                                  * declaring costs a SecurityException on
+                                  * a user's device.</p>
                                   */
-                                private Boolean pushedBoolean;
+                                private final java.util.ArrayList<Boolean> pushedValues =
+                                        new java.util.ArrayList<Boolean>();
+
+                                /** Records one pushed value, bounding the list. */
+                                private void pushed(Boolean value) {
+                                    if (pushedValues.size() > 16) {
+                                        pushedValues.remove(0);
+                                    }
+                                    pushedValues.add(value);
+                                }
+
+                                /**
+                                 * Argument 0 of a call whose descriptor
+                                 * declares {@code argCount} arguments, or
+                                 * null when the list does not reach back
+                                 * that far.
+                                 */
+                                private Boolean argumentZero(String descriptor) {
+                                    int argCount = countArguments(descriptor);
+                                    if (argCount < 1 || pushedValues.size() < argCount) {
+                                        return null;
+                                    }
+                                    return pushedValues.get(pushedValues.size() - argCount);
+                                }
+
+                                /** Arguments declared by a method descriptor. */
+                                private int countArguments(String descriptor) {
+                                    if (descriptor == null || descriptor.length() < 2
+                                            || descriptor.charAt(0) != '(') {
+                                        return -1;
+                                    }
+                                    int count = 0;
+                                    int i = 1;
+                                    while (i < descriptor.length()
+                                            && descriptor.charAt(i) != ')') {
+                                        char c = descriptor.charAt(i);
+                                        if (c == '[') {
+                                            i++;
+                                            continue;
+                                        }
+                                        if (c == 'L') {
+                                            int end = descriptor.indexOf(';', i);
+                                            if (end < 0) {
+                                                return -1;
+                                            }
+                                            i = end + 1;
+                                        } else {
+                                            i++;
+                                        }
+                                        count++;
+                                    }
+                                    return i < descriptor.length() ? count : -1;
+                                }
 
                                 @Override
                                 public void visitInsn(int i) {
-                                    pushedBoolean = i == Opcodes.ICONST_0
-                                            ? Boolean.FALSE
-                                            : i == Opcodes.ICONST_1
-                                                    ? Boolean.TRUE : null;
+                                    if (i == Opcodes.ICONST_0) {
+                                        pushed(Boolean.FALSE);
+                                    } else if (i == Opcodes.ICONST_1) {
+                                        pushed(Boolean.TRUE);
+                                    } else {
+                                        pushedValues.clear();
+                                    }
                                 }
 
                                 @Override
                                 public void visitIntInsn(int i, int i1) {
-                                    pushedBoolean = null;
+                                    // BIPUSH / SIPUSH / NEWARRAY each push one
+                                    // value, and none of them is a boolean
+                                    // literal this cares about.
+                                    pushed(null);
                                 }
 
                                 @Override
                                 public void visitVarInsn(int i, int i1) {
-                                    pushedBoolean = null;
+                                    // A load pushes exactly one value; a store
+                                    // pops one. Modelling only the loads and
+                                    // clearing otherwise keeps this honest.
+                                    if (i == Opcodes.ILOAD || i == Opcodes.LLOAD
+                                            || i == Opcodes.FLOAD || i == Opcodes.DLOAD
+                                            || i == Opcodes.ALOAD) {
+                                        pushed(null);
+                                    } else {
+                                        pushedValues.clear();
+                                    }
                                 }
 
                                 @Override
                                 public void visitTypeInsn(int i, String string) {
-                                    pushedBoolean = null;
+                                    // NEW / ANEWARRAY push one; CHECKCAST and
+                                    // INSTANCEOF replace the top. Only the
+                                    // pushes are modelled.
+                                    if (i == Opcodes.NEW || i == Opcodes.ANEWARRAY) {
+                                        pushed(null);
+                                    } else {
+                                        pushedValues.clear();
+                                    }
                                     scanner.usesClass(string);
                                 }
 
                                 @Override
                                 public void visitFieldInsn(int i, String string, String string1, String string2) {
-                                    pushedBoolean = null;
+                                    // GETSTATIC pushes one value out of
+                                    // nothing; the others pop or pop-and-push
+                                    // and are not modelled.
+                                    if (i == Opcodes.GETSTATIC) {
+                                        pushed(null);
+                                    } else {
+                                        pushedValues.clear();
+                                    }
                                 }
 
                                 @Override
                                 public void visitMethodInsn(int i, String owner, String name, String descriptor) {
-                                    Boolean arg = pushedBoolean;
-                                    pushedBoolean = null;
+                                    Boolean arg = argumentZero(descriptor);
+                                    // Conservative: the call consumed its
+                                    // arguments and may have pushed a result,
+                                    // and modelling that exactly is not worth
+                                    // the risk of a wrong answer.
+                                    pushedValues.clear();
                                     scanner.usesClass(owner);
                                     if (name != null && !name.equals("<init>")) {
                                         scanner.usesClassMethod(owner, name);
@@ -1990,8 +2106,12 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
-                                    Boolean arg = pushedBoolean;
-                                    pushedBoolean = null;
+                                    Boolean arg = argumentZero(descriptor);
+                                    // Conservative: the call consumed its
+                                    // arguments and may have pushed a result,
+                                    // and modelling that exactly is not worth
+                                    // the risk of a wrong answer.
+                                    pushedValues.clear();
                                     scanner.usesClass(owner);
                                     if (name != null && !name.equals("<init>")) {
                                         scanner.usesClassMethod(owner, name);
@@ -2006,7 +2126,7 @@ public abstract class Executor {
                                 public void visitInvokeDynamicInsn(String name,
                                         String descriptor, Handle bootstrap,
                                         Object... args) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                     // A method reference -- store::readSamples,
                                     // or a lambda body -- is an invokedynamic
                                     // whose real target sits in the bootstrap
@@ -2063,17 +2183,17 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitJumpInsn(int i, Label label) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
                                 public void visitLabel(Label label) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
                                 public void visitLdcInsn(Object o) {
-                                    pushedBoolean = null;
+                                    pushed(null);
                                     if (o instanceof Type) {
                                         scanner.usesClass(((Type) o).getClassName());
                                     }
@@ -2081,22 +2201,22 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitIincInsn(int i, int i1) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
                                 public void visitTableSwitchInsn(int i, int i1, Label label, Label[] labels) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
                                 public void visitLookupSwitchInsn(Label label, int[] ints, Label[] labels) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
                                 public void visitMultiANewArrayInsn(String string, int i) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
@@ -2112,7 +2232,7 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitLineNumber(int i, Label label) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override

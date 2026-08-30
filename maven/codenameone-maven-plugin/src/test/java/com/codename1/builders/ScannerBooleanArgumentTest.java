@@ -161,6 +161,56 @@ class ScannerBooleanArgumentTest {
     }
 
     /**
+     * The boolean argument of a method that takes ANOTHER argument after it.
+     *
+     * <p>This is the shape of the API the hook exists for --
+     * {@code Camera.requestPermissions(boolean audio, SuccessCallback cb)}
+     * -- and it was the shape the scanner could not read. Tracking only the
+     * literal pushed IMMEDIATELY before the call meant the callback push
+     * cleared it, every such call reported null, and the consumer's
+     * "unknown counts as asking" fallback handed the microphone to
+     * video-only callers: the argument-aware narrowing was inert for the
+     * only API that has an argument to narrow on.</p>
+     */
+    @Test
+    void aBooleanFollowedByAnotherArgumentIsStillRead(@TempDir File dir)
+            throws Exception {
+        writeTwoArgCaller(dir, "TwoArg", false);
+        assertEquals("[requestPermissions=false]", scan(dir).toString());
+        writeTwoArgCaller(dir, "TwoArgTrue", true);
+        assertTrue(scan(dir).contains("requestPermissions=true"),
+                "the true case must read as true too");
+    }
+
+    /** {@code requestPermissions(<literal>, someObject)}. */
+    private static void writeTwoArgCaller(File dir, String name, boolean value)
+            throws Exception {
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "app/" + name, null,
+                "java/lang/Object", null);
+        MethodVisitor m = w.visitMethod(Opcodes.ACC_PUBLIC
+                | Opcodes.ACC_STATIC, "run", "(Ljava/lang/Object;)V", null, null);
+        m.visitCode();
+        m.visitInsn(value ? Opcodes.ICONST_1 : Opcodes.ICONST_0);
+        m.visitVarInsn(Opcodes.ALOAD, 0);
+        m.visitMethodInsn(Opcodes.INVOKESTATIC, TARGET,
+                "requestPermissions", "(ZLjava/lang/Object;)V", false);
+        m.visitInsn(Opcodes.RETURN);
+        m.visitMaxs(2, 1);
+        m.visitEnd();
+        w.visitEnd();
+
+        File pkg = new File(dir, "app");
+        assertTrue(pkg.isDirectory() || pkg.mkdirs());
+        OutputStream out = new FileOutputStream(new File(pkg, name + ".class"));
+        try {
+            out.write(w.toByteArray());
+        } finally {
+            out.close();
+        }
+    }
+
+    /**
      * A value that is not a literal reads as unknown, never as false: the
      * caller treats unknown as the feature being on, and a false here
      * would silently drop the permissions an app really needs.
