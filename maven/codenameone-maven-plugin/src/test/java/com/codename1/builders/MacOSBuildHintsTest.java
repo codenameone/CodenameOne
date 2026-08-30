@@ -35,6 +35,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /// Covers the migration half of the macOS build hints.
 ///
@@ -62,6 +63,45 @@ public class MacOSBuildHintsTest {
             m.put(kv[i], kv[i + 1]);
         }
         return m;
+    }
+
+    /// A bundle identifier that could break out of project.pbxproj is refused.
+    ///
+    /// PRODUCT_BUNDLE_IDENTIFIER = "<id>"; is written into the generated
+    /// project and xcodebuild is then run on it, and on the build cloud the
+    /// settings this comes from arrive with the request. A quote plus a newline
+    /// closes that string and continues the file as more project objects --
+    /// including a shell script build phase the build would execute.
+    @Test
+    public void aBundleIdThatCouldEscapeThePbxprojIsRefused() {
+        String[] hostile = {
+            "com.example.app\";\n\t\t\t\tOTHER_LDFLAGS = \"-run",
+            "com.example.app\nINJECTED = 1",
+            "com.example.app`id`",
+            "com.example.app$(whoami)",
+            "com.example app",
+        };
+        for (String id : hostile) {
+            try {
+                parse(raw("macos.bundleId", id), "com.example.app");
+                fail("a bundle id carrying pbxproj syntax must be refused: " + id);
+            } catch (IllegalArgumentException expected) {
+                assertTrue("the message names the setting to fix",
+                        expected.getMessage().indexOf("macos.bundleId") > -1);
+            }
+        }
+    }
+
+    /// And an ordinary identifier still builds, including the derived default.
+    @Test
+    public void anOrdinaryBundleIdIsAccepted() {
+        assertEquals("com.example.app.mac",
+                parse(raw(), "com.example.app").getBundleId());
+        assertEquals("com.example.my-app2.mac",
+                parse(raw(), "com.example.my-app2").getBundleId());
+        assertEquals("com.example.Custom-1",
+                parse(raw("macos.bundleId", "com.example.Custom-1"),
+                        "com.example.app").getBundleId());
     }
 
     /// The calendar opt-out has to reach the usage descriptions, not just the

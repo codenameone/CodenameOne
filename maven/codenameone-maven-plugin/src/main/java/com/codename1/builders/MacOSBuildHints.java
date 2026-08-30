@@ -213,6 +213,7 @@ public class MacOSBuildHints {
             // discovered now.
             bundleId = deriveBundleId ? packageName : packageName + ".mac";
         }
+        requireValidBundleId(bundleId);
 
         minDeploymentTarget = hint(src, "minDeploymentTarget", DEFAULT_DEPLOYMENT_TARGET);
         appCategory = hint(src, "appCategory", DEFAULT_APP_CATEGORY);
@@ -332,6 +333,62 @@ public class MacOSBuildHints {
 
     public String getTeamId() {
         return teamId;
+    }
+
+    /// Apple bundle identifiers are alphanumerics, hyphen and period, and
+    /// nothing here accepts anything else.
+    ///
+    /// Not cosmetic. The identifier is interpolated into project.pbxproj as
+    /// PRODUCT_BUNDLE_IDENTIFIER = "..." and passed to xcodebuild, and the
+    /// settings it comes from are supplied with the build rather than written
+    /// here. A value carrying a quote and a newline closes that string and
+    /// continues the file as more project objects -- including a shell script
+    /// build phase, which the xcodebuild run that follows would then execute on
+    /// the build host.
+    ///
+    /// REJECTED rather than escaped or stripped. An escape has to be right
+    /// against every consumer -- the pbxproj, the Info.plist, an argv element
+    /// -- and being wrong in one of them puts the hole back, while stripping
+    /// silently builds an application under an identifier its author did not
+    /// choose. An identifier outside this set cannot be signed or submitted
+    /// anyway, so there is no build being taken away, only one that would have
+    /// failed later and less clearly.
+    static void requireValidBundleId(String id) {
+        if (id == null || id.length() == 0) {
+            return;
+        }
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '-' || c == '.';
+            if (!ok) {
+                throw new IllegalArgumentException(
+                        "Invalid bundle identifier " + describeForError(id)
+                        + ": Apple bundle identifiers may contain only letters,"
+                        + " digits, hyphen and period. Set a valid"
+                        + " macos.bundleId (or package name) and build again.");
+            }
+        }
+    }
+
+    /// The offending value, with anything unprintable escaped so a crafted
+    /// identifier cannot forge log lines on its way into the build output.
+    private static String describeForError(String id) {
+        StringBuilder b = new StringBuilder("\"");
+        for (int i = 0; i < id.length() && i < 120; i++) {
+            char c = id.charAt(i);
+            if (c < 0x20 || c > 0x7e || c == '"' || c == '\\') {
+                b.append("\\u");
+                String hex = Integer.toHexString(c);
+                for (int p = hex.length(); p < 4; p++) {
+                    b.append('0');
+                }
+                b.append(hex);
+            } else {
+                b.append(c);
+            }
+        }
+        return b.append('"').toString();
     }
 
     public String getBundleId() {
