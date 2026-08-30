@@ -501,6 +501,35 @@ public class MacOSNativeBuilderScanTest {
         }
     }
 
+    /// The listening entry points, which is what
+    /// com.apple.security.network.server authorises.
+    ///
+    /// Regression: this used to be tested by looking for a
+    /// com.codename1.io.ServerSocket class that does not exist in the
+    /// repository, so the flag was never set and a sandboxed build of an
+    /// application calling Socket.listen() had its bind denied.
+    @Test
+    public void listeningOnASocketNeedsTheServerEntitlement() {
+        for (String m : new String[] {"listen", "listenLoopback"}) {
+            assertTrue("Socket." + m + " listens and needs the server entitlement",
+                    MacOSNativeBuilder.listensOnASocket("com/codename1/io/Socket", m));
+        }
+    }
+
+    /// Dialling out is not listening: com.apple.security.network.client already
+    /// covers it, and inbound authority an application never uses has to be
+    /// justified at review.
+    @Test
+    public void dialingOutIsNotListening() {
+        for (String m : new String[] {"connect", "getInputStream", "isSupported", "disconnect"}) {
+            assertFalse("Socket." + m + " does not listen",
+                    MacOSNativeBuilder.listensOnASocket("com/codename1/io/Socket", m));
+        }
+        assertFalse(MacOSNativeBuilder.listensOnASocket("com/example/MySocket", "listen"));
+        assertFalse(MacOSNativeBuilder.listensOnASocket(null, "listen"));
+        assertFalse(MacOSNativeBuilder.listensOnASocket("com/codename1/io/Socket", null));
+    }
+
     /// Util is a big class of unrelated helpers, so the match is by exact name:
     /// copying a stream or reading a UTF string must not drag CommonCrypto into
     /// an application that never asked for it.

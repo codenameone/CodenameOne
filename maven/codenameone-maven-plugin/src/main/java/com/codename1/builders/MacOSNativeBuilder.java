@@ -1606,6 +1606,34 @@ public class MacOSNativeBuilder extends Executor {
     ///
     /// The whole surface at once rather than the one method that was reported:
     /// these nine are Util's complete set of crypto delegates.
+    /// Whether the application LISTENS, which is what
+    /// com.apple.security.network.server authorises. A sandboxed app that asks
+    /// for inbound authority it never uses has to justify it at review, so this
+    /// stays as narrow as the entitlement.
+    ///
+    /// Matched on the two listening METHODS, because there is no listening
+    /// type to match: this used to test for a com/codename1/io/ServerSocket
+    /// class that does not exist in this repository, so the flag was never set
+    /// and a sandboxed build of an application calling Socket.listen() had its
+    /// bind denied. The entry points are Socket.listen and Socket.listenLoopback;
+    /// everything else on Socket dials out and is already covered by
+    /// com.apple.security.network.client.
+    ///
+    /// This is the second time the test here matched nothing. The websocket
+    /// PREFIX it replaced missed for the same reason -- the client is
+    /// com.codename1.io.WebSocket, a class rather than a package -- so the
+    /// lesson is that a name in this scanner is worth checking against the tree
+    /// rather than reading as self-evident.
+    static boolean listensOnASocket(String cls, String method) {
+        if (cls == null || method == null) {
+            return false;
+        }
+        if (!cls.equals("com/codename1/io/Socket")) {
+            return false;
+        }
+        return method.equals("listen") || method.equals("listenLoopback");
+    }
+
     static boolean usesUtilCrypto(String cls, String method) {
         if (cls == null || method == null) {
             return false;
@@ -1966,7 +1994,29 @@ public class MacOSNativeBuilder extends Executor {
             if (cls == null) {
                 return;
             }
-            if (cls.startsWith("com/codename1/bluetooth/")) {
+            // The FACADE class, not the package. This flag decides an
+            // entitlement and an Info.plist usage description -- a claim of
+            // nearby-device access that has to be justified at review -- and
+            // com.codename1.bluetooth is mostly value types that touch no
+            // hardware at all: BluetoothUuid is an immutable 128-bit UUID with
+            // no reference to Display, to the implementation or to any native,
+            // so an application parsing a UUID string it received from a server
+            // was claiming Bluetooth.
+            //
+            // Bluetooth.getInstance() is the only gate: everything that does
+            // anything -- scans, connections, GATT, the server role -- is
+            // reached from that instance, and an application that never names
+            // the facade cannot have obtained one. Naming the facade is also
+            // what the Display.getInstance().getBluetooth() route produces,
+            // since the result has to be called through.
+            //
+            // Deliberately NOT narrowed at the other site above, which sets the
+            // native-define flag: that decides whether Bluetooth support is
+            // COMPILED IN, where being wide costs binary size and being narrow
+            // ships a feature that is inert on the device. Claiming authority
+            // and linking capability are different questions and take different
+            // answers.
+            if (cls.equals("com/codename1/bluetooth/Bluetooth")) {
                 caps.usesBluetooth = true;
             }
             // A camera-backed vision component is a camera user. Excluding these
@@ -2014,18 +2064,6 @@ public class MacOSNativeBuilder extends Executor {
                     || cls.equals("com/codename1/maps/MapComponent")) {
                 caps.usesLocation = true;
             }
-            // ServerSocket alone. com.apple.security.network.server is the
-            // entitlement to LISTEN, and a sandboxed application that asks for
-            // inbound authority it never uses has to justify it at review.
-            //
-            // The websocket prefix that used to sit here matched nothing: the
-            // client is com.codename1.io.WebSocket, a class rather than a
-            // package, and it dials out -- com.apple.security.network.client
-            // already covers it. So the test granted no entitlement in practice
-            // and would have granted the wrong one had the package ever existed.
-            if (cls.equals("com/codename1/io/ServerSocket")) {
-                caps.usesServerSockets = true;
-            }
         }
 
         /// requestPermissions carries its answer in its first argument, so the
@@ -2045,6 +2083,9 @@ public class MacOSNativeBuilder extends Executor {
         public void usesClassMethod(String cls, String method) {
             if (cls == null || method == null) {
                 return;
+            }
+            if (listensOnASocket(cls, method)) {
+                caps.usesServerSockets = true;
             }
             // A low level camera session opens the microphone unless the
             // application turns it off: CameraSessionOptions.captureAudio starts
