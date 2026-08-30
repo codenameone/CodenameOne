@@ -216,6 +216,7 @@ public class MacOSBuildHints {
         requireValidBundleId(bundleId);
 
         minDeploymentTarget = hint(src, "minDeploymentTarget", DEFAULT_DEPLOYMENT_TARGET);
+        requireValidDeploymentTarget(minDeploymentTarget);
         appCategory = hint(src, "appCategory", DEFAULT_APP_CATEGORY);
         copyright = hint(src, "copyright", null);
         signingStyle = hint(src, "signing.style", null);
@@ -353,6 +354,46 @@ public class MacOSBuildHints {
     /// choose. An identifier outside this set cannot be signed or submitted
     /// anyway, so there is no build being taken away, only one that would have
     /// failed later and less clearly.
+    /// A macOS version number, and nothing else.
+    ///
+    /// The same hole the bundle identifier had, in the second of the two hints
+    /// that reach project.pbxproj: the value is written there as
+    /// MACOSX_DEPLOYMENT_TARGET = <value>;, so a semicolon, a brace or a
+    /// newline ends that setting and continues the file as more project
+    /// content -- including a build phase the xcodebuild run that follows would
+    /// execute on the build host. The settings arrive with the request.
+    ///
+    /// Digits and dots, which is every deployment target Apple accepts (11,
+    /// 11.0, 13.1.2). Refused rather than escaped, for the reason
+    /// requireValidBundleId gives.
+    static void requireValidDeploymentTarget(String target) {
+        if (target == null || target.length() == 0) {
+            return;
+        }
+        boolean lastWasDot = true;
+        for (int i = 0; i < target.length(); i++) {
+            char c = target.charAt(i);
+            boolean digit = c >= '0' && c <= '9';
+            if (!digit && c != '.') {
+                throw invalidDeploymentTarget(target);
+            }
+            if (c == '.' && lastWasDot) {
+                throw invalidDeploymentTarget(target);
+            }
+            lastWasDot = c == '.';
+        }
+        if (lastWasDot) {
+            throw invalidDeploymentTarget(target);
+        }
+    }
+
+    private static IllegalArgumentException invalidDeploymentTarget(String target) {
+        return new IllegalArgumentException(
+                "Invalid deployment target " + describeForError(target)
+                + ": macos.minDeploymentTarget must be a version number such"
+                + " as 11.0.");
+    }
+
     static void requireValidBundleId(String id) {
         if (id == null || id.length() == 0) {
             return;

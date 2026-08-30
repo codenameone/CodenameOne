@@ -33,6 +33,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -90,6 +91,42 @@ public class MacOSBuildHintsTest {
                         expected.getMessage().indexOf("macos.bundleId") > -1);
             }
         }
+    }
+
+    /// The other hint that reaches project.pbxproj gets the same treatment.
+    ///
+    /// It is written as MACOSX_DEPLOYMENT_TARGET = <value>;, so a semicolon,
+    /// brace or newline ends the setting and continues the file as more project
+    /// content -- including a build phase xcodebuild would execute.
+    @Test
+    public void aDeploymentTargetThatCouldEscapeThePbxprojIsRefused() {
+        String[] hostile = {
+            "11.0;\n\t\t\t\tOTHER_LDFLAGS = \"-run\"",
+            "11.0};",
+            "11.0 ; INJECTED = 1",
+            "latest",
+            "11..0",
+            "11.",
+        };
+        for (String t : hostile) {
+            try {
+                parse(raw("macos.minDeploymentTarget", t), "com.example.app");
+                fail("a deployment target carrying pbxproj syntax must be refused: " + t);
+            } catch (IllegalArgumentException expected) {
+                assertTrue("the message names the setting to fix",
+                        expected.getMessage().indexOf("macos.minDeploymentTarget") > -1);
+            }
+        }
+    }
+
+    /// Real deployment targets still parse, including the unset default.
+    @Test
+    public void anOrdinaryDeploymentTargetIsAccepted() {
+        for (String t : new String[] {"11", "11.0", "13.1.2", "26"}) {
+            assertEquals(t, parse(raw("macos.minDeploymentTarget", t),
+                    "com.example.app").getMinDeploymentTarget());
+        }
+        assertNotNull(parse(raw(), "com.example.app").getMinDeploymentTarget());
     }
 
     /// And an ordinary identifier still builds, including the derived default.
