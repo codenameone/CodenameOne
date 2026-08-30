@@ -310,4 +310,30 @@ class InfiniteProgressTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+    @FormTest
+    void aRefusedBlockingSpinnerGivesItsHostClaimBack() {
+        // A modal show is refused outright while the application is minimized: it returns
+        // at once and installs nothing. The claim a spinner takes on its host is given
+        // back when it leaves the hierarchy, and one that never entered never leaves --
+        // so the count stayed up for good and every later spinner on that surface skipped
+        // its tint.
+        Form host = new Form("host", new BorderLayout());
+        host.show();
+        DisplayTest.flushEdt();
+
+        implementation.setMinimized(true);
+        try {
+            Dialog d = new InfiniteProgress().showInfiniteBlocking();
+            DisplayTest.flushEdt();
+            if (d != null) {
+                d.dispose();
+                DisplayTest.flushEdt();
+            }
+        } finally {
+            implementation.setMinimized(false);
+        }
+
+        assertNull(host.getClientProperty("cn1$infiniteProgressDepth"),
+                "a spinner that was never installed must not keep a claim on its host");
+    }
 }

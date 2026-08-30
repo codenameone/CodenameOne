@@ -221,6 +221,14 @@ public class InfiniteProgress extends Component {
         d.setTransitionOutAnimator(CommonTransitions.createEmpty());
         d.setTopLevelHost(f);
         d.showPacked(BorderLayout.CENTER, false);
+        if (!isInitialized()) {
+            // The show was refused rather than performed -- showModal returns at once
+            // while the application is minimized, and the dialog is never installed. The
+            // claim above is given back when this spinner leaves the hierarchy, and one
+            // that never entered it never leaves, so the count stayed up for good and
+            // every later spinner on this surface skipped its tint.
+            releaseProgressHost();
+        }
         return d;
     }
 

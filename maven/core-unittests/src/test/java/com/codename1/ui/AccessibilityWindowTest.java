@@ -1309,4 +1309,50 @@ class AccessibilityWindowTest extends UITestBase {
             implementation.setAccessibilityTreeUpdateRequired(null);
         }
     }
+    @FormTest
+    void aWindowShownAgainAfterHidingGetsItsTreeBack() {
+        // Guards behaviour rather than a fix: show() revalidates and re-focuses, and
+        // both of those invalidate this root, so a tree evicted while the window was
+        // hidden comes back without the restore path having to ask for it. Asserted so
+        // that stays true -- a show that stopped invalidating would leave it with none.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        final Window w = new Window("second", new BorderLayout());
+        try {
+            Form main = new Form("main", new BorderLayout());
+            final Button mainButton = new Button("on the main form");
+            main.add(BorderLayout.CENTER, mainButton);
+            main.show();
+            DisplayTest.flushEdt();
+
+            w.setWindowSize(400, 300);
+            w.add(BorderLayout.CENTER, new Button("in the window"));
+            w.show();
+            DisplayTest.flushEdt();
+            assertTrue(mentions(offEdtSnapshot(w), "in the window"),
+                    "precondition: the window has a tree to lose");
+
+            // Hidden, and evicted while it is away, with the main form rebuilt in between
+            // so the window is not simply the last tree built.
+            w.hide();
+            DisplayTest.flushEdt();
+            mainButton.setText("renamed on the main form");
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+            AccessibilityManager.getInstance().releaseRoot(w);
+            assertFalse(mentions(offEdtSnapshot(w), "in the window"),
+                    "precondition: the cached tree is actually gone");
+
+            w.show();
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            assertTrue(mentions(offEdtSnapshot(w), "in the window"),
+                    "a window shown again has to have a tree again");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }

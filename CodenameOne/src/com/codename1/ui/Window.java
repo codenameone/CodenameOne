@@ -2321,6 +2321,14 @@ public class Window extends Container implements TopLevelContainer {
         initFocused();
         // Whether this is bringing a hidden window back, which decides whether what it
         // painted before still stands for what it shows now.
+        // No accessibility invalidation here, deliberately, even though this path sets
+        // the flag itself and so skips the one in showNotify(). It does not need one:
+        // revalidateWithAnimationSafety() and initFocused() above both invalidate this
+        // root, so a tree evicted while the window was hidden comes back anyway --
+        // measured, by putting a call here and watching the tree return with it taken
+        // out again. One would buy nothing and cost a walk of the whole hierarchy on
+        // every re-show. showNotify() does need its own: a window coming back from
+        // minimization is neither re-laid out nor re-focused.
         boolean wasHidden = !nativeVisible;
         nativeVisible = true;
         if (wasHidden) {

@@ -859,6 +859,26 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return accessibilityTreeSupported;
     }
 
+    private boolean minimized;
+
+    /// Models an application that has been put into the background.
+    ///
+    /// A modal show is refused outright while minimized -- it returns at once without
+    /// installing anything -- so this is how a test reaches the paths that have to cope
+    /// with a show that did not happen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimized`: true to report the application as minimized
+    public void setMinimized(boolean minimized) {
+        this.minimized = minimized;
+    }
+
+    @Override
+    public boolean isMinimized() {
+        return minimized;
+    }
+
     private final java.util.List<int[]> accessibilityNotifications =
             new java.util.ArrayList<int[]>();
 
@@ -1333,6 +1353,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     public void reset() {
+        minimized = false;
         usesInvokeAndBlockForEditString = false;
         windowManager = null;
         desktop = false;
