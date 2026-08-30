@@ -11939,8 +11939,29 @@ public class IOSImplementation extends CodenameOneImplementation {
                         }
                         next = macLocalNotifications.remove(0);
                     }
+                    // Wait for the callback rather than let the shared
+                    // method's retry take it. That retry re-delivers 1.5s later
+                    // WITHOUT the content, and a cold-launch notification is
+                    // exactly the case where the callback is still being
+                    // installed. Bounded, and on this worker rather than any
+                    // thread the platform needs.
+                    for (int iter = 0; localNotificationCallback == null
+                            && iter < 40; iter++) {
+                        try {
+                            Thread.sleep(50);
+                        } catch (InterruptedException ignored) {
+                        }
+                    }
                     restorePushContent(next.content);
-                    localNotificationReceived(next.notificationId);
+                    try {
+                        localNotificationReceived(next.notificationId);
+                    } finally {
+                        // Releases the native delivery barrier: the callback has
+                        // had its content, so the next delivery may rewrite the
+                        // singleton. Without this the pump would stay blocked
+                        // after the first local notification.
+                        nativeInstance.macRunPendingDeliveries();
+                    }
                 }
             }
         }.start();

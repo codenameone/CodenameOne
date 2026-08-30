@@ -296,8 +296,9 @@ static void cn1MacDeliverLocalNotification(NSDictionary *delivery);
 /// notification, which would otherwise overwrite the content a queued push
 /// callback is still waiting to be given.
 ///
-/// A local notification costs nothing: it is handed over on this thread, so its
-/// content has been read by the time it returns and the loop continues.
+/// A local notification takes the barrier as well. It used to cost nothing --
+/// handed over on this thread, content read before the call returned -- but its
+/// callback now runs on a worker thread and signals when it is done.
 static void cn1MacPumpDeliveryQueue(void) {
     while (cn1MacDeliveriesReleased && !cn1MacPushInFlight
             && [cn1MacPendingDeliveries count] > 0) {
@@ -314,8 +315,19 @@ static void cn1MacPumpDeliveryQueue(void) {
             struct ThreadLocalData* threadStateData = getThreadLocalData();
             com_codename1_impl_ios_IOSImplementation_macDeliverAfterEdt__(threadStateData);
         } else {
-            // Handed over on this thread, so its content is read before this
-            // returns and the next delivery may go straight out.
+            // The barrier covers these too. It used to be true that a local
+            // notification was handed over on THIS thread and its content read
+            // before the call returned -- but the callback now goes to a worker
+            // thread, because running it here deadlocked against any API whose
+            // native side dispatch_syncs to this queue. So its content has NOT
+            // been read when this returns, and pumping the next delivery would
+            // rewrite the singleton PushContent under a callback still holding
+            // it.
+            //
+            // Released by the worker through macRunPendingDeliveries once the
+            // callback has finished, which is the same door the push barrier
+            // uses.
+            cn1MacPushInFlight = YES;
             cn1MacDeliverLocalNotification(payload);
         }
         [entry release];
