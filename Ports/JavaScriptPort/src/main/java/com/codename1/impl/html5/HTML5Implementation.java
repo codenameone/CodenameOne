@@ -4306,6 +4306,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
             String v = mainLocationPart("hostname");
             return v != null ? v : ((WindowLocation)Window.current().getLocation()).getHostname();
         }
+        // The ratio between the device pixels Codename One addresses and the CSS pixels the page
+        // is laid out in. Since 7.0.267 this port reports getDisplayWidth() in device pixels, so
+        // it draws at native resolution -- which also means a width compared against a constant
+        // written in CSS pixels now moves with the display's pixel ratio. An application that
+        // wants a layout breakpoint has to divide by this to get back to the units its threshold
+        // was written in; nothing else it can reach is exact, because getDeviceDensity() buckets
+        // the ratio and convertToPixels() therefore steps rather than scales.
+        if ("browser.window.devicePixelRatio".equals(key)) {
+            return String.valueOf(getDevicePixelRatio());
+        }
         if ("browser.timezone".equals(key)) {
             String tz = detectTimezone();
             return tz != null ? tz : defaultValue;
