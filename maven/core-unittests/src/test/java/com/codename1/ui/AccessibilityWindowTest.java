@@ -33,6 +33,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// The semantic tree of a secondary window.
@@ -614,5 +615,88 @@ class AccessibilityWindowTest extends UITestBase {
                 "a surface whose window is gone describes nothing");
         assertFalse(mentions(offEdt[0], "on the main form"),
                 "and certainly not whatever window is still open");
+    }
+
+    /// A container that invalidates something else the first time the accessibility
+    /// walk descends into it -- i.e. from inside a refresh pass that is already running.
+    private static final class InvalidatesMidWalk extends Container {
+        private Runnable once;
+
+        @Override
+        public int getComponentCount() {
+            Runnable r = once;
+            if (r != null) {
+                once = null;
+                r.run();
+            }
+            return super.getComponentCount();
+        }
+    }
+
+    @FormTest
+    void aRootInvalidatedWhileTheRefreshIsRunningIsStillRebuilt() {
+        // Snapshots are built outside the queue's lock, so an invalidation can land
+        // after the pass has taken and emptied the queue. It finds refreshScheduled
+        // still set and so schedules nothing of its own; the pass then cleared the flag
+        // without looking at what had arrived, and that root stayed stale until some
+        // unrelated later invalidation happened along. An off-EDT screen reader on that
+        // window reads the stale tree in the meantime.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        try {
+            Form main = new Form("main", new BorderLayout());
+            final Button mainButton = new Button("on the main form");
+            InvalidatesMidWalk trigger = new InvalidatesMidWalk();
+            trigger.add(mainButton);
+            main.add(BorderLayout.CENTER, trigger);
+            main.show();
+            DisplayTest.flushEdt();
+
+            final Window w = new Window("second", new BorderLayout());
+            w.setWindowSize(400, 300);
+            final Button windowButton = new Button("in the window");
+            w.add(BorderLayout.CENTER, windowButton);
+            w.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            assertTrue(mentions(mgr.getSnapshot(main), "on the main form"));
+            assertTrue(mentions(mgr.getSnapshot(w), "in the window"));
+
+            // Fires while the pass below is building the main form's tree.
+            trigger.once = new Runnable() {
+                @Override
+                public void run() {
+                    windowButton.setText("renamed in the window");
+                }
+            };
+            mainButton.setText("renamed on the main form");
+            DisplayTest.flushEdt();
+            // A second turn of the loop, which is where the re-post lands.
+            DisplayTest.flushEdt();
+
+            assertNull(trigger.once, "precondition: the walk did descend into the trigger");
+
+            final AccessibilityTreeSnapshot[] offEdt = new AccessibilityTreeSnapshot[1];
+            Thread t = new Thread(new Runnable() {
+                public void run() {
+                    offEdt[0] = AccessibilityManager.getInstance().getSnapshot(w);
+                }
+            });
+            t.start();
+            t.join(5000);
+
+            assertNotNull(offEdt[0]);
+            assertTrue(mentions(offEdt[0], "renamed in the window"),
+                    "a root queued while the refresh was running still has to be rebuilt");
+
+            w.dispose();
+            DisplayTest.flushEdt();
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(err);
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+        }
     }
 }

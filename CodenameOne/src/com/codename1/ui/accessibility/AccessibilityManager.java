@@ -248,41 +248,61 @@ public final class AccessibilityManager {
             }
             if (!refreshScheduled) {
                 refreshScheduled = true;
-                Display.getInstance().callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        int changes;
-                        ArrayList<Container> roots;
-                        boolean rootless;
-                        synchronized (AccessibilityManager.this) {
-                            changes = pendingChanges;
-                            roots = new ArrayList<Container>(pendingRoots);
-                            pendingRoots.clear();
-                            rootless = pendingRootlessRefresh;
-                            pendingRootlessRefresh = false;
-                        }
-                        if (rootless) {
-                            getSnapshotForRoot(null);
-                        }
-                        int count = roots.size();
-                        for (int iter = 0; iter < count; iter++) {
-                            synchronized (AccessibilityManager.this) {
-                                // Marked stale again for each one in turn, so none is
-                                // served out of the cache this refresh exists to replace.
-                                markDirty(roots.get(iter));
-                            }
-                            getSnapshotForRoot(roots.get(iter));
-                        }
-                        synchronized (AccessibilityManager.this) {
-                            refreshScheduled = false;
-                        }
-                        Display.getInstance().accessibilityTreeChanged(changes);
-                    }
-                });
+                Display.getInstance().callSerially(new RefreshPass());
             }
         } catch (Throwable ignored) {
             // Display may not be initialized yet while an application constructs its first form.
             refreshScheduled = false;
+        }
+    }
+
+    /// One drain of the refresh queue, and the re-post that keeps it honest.
+    ///
+    /// Named rather than anonymous because it re-schedules itself: snapshots are built
+    /// outside the lock, so an invalidation arriving during a pass finds the queue
+    /// already emptied and `refreshScheduled` still set, and schedules nothing of its
+    /// own. Clearing the flag without looking left that root stale until some unrelated
+    /// later invalidation happened to come along.
+    private final class RefreshPass implements Runnable {
+        @Override
+        public void run() {
+            int changes;
+            ArrayList<Container> roots;
+            boolean rootless;
+            synchronized (AccessibilityManager.this) {
+                changes = pendingChanges;
+                roots = new ArrayList<Container>(pendingRoots);
+                pendingRoots.clear();
+                rootless = pendingRootlessRefresh;
+                pendingRootlessRefresh = false;
+            }
+            if (rootless) {
+                getSnapshotForRoot(null);
+            }
+            int count = roots.size();
+            for (int iter = 0; iter < count; iter++) {
+                synchronized (AccessibilityManager.this) {
+                    // Marked stale again for each one in turn, so none is
+                    // served out of the cache this refresh exists to replace.
+                    markDirty(roots.get(iter));
+                }
+                getSnapshotForRoot(roots.get(iter));
+            }
+            boolean again;
+            synchronized (AccessibilityManager.this) {
+                // Anything queued while this pass was running. The flag stays set
+                // across the re-post, because it is still scheduled -- clearing it
+                // first would let a third invalidation queue a second pass for the
+                // same work.
+                again = !pendingRoots.isEmpty() || pendingRootlessRefresh;
+                if (!again) {
+                    refreshScheduled = false;
+                }
+            }
+            Display.getInstance().accessibilityTreeChanged(changes);
+            if (again) {
+                Display.getInstance().callSerially(this);
+            }
         }
     }
 
