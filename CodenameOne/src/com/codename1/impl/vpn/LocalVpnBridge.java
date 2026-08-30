@@ -141,6 +141,26 @@ public class LocalVpnBridge implements VpnBridge {
         h.start(TunnelWire.server(fields), TunnelWire.routes(fields),
                 TunnelWire.dnsServers(fields), TunnelWire.mtu(fields),
                 TunnelWire.data(fields));
+        // STILL OURS? start() runs the application's onStart on this thread,
+        // and a tunnel is allowed to call Tunnels.stop() from there --
+        // TunnelHost's lifecycle lock is reentrant precisely so it can. The
+        // stop retires this host and answers its own request successfully,
+        // and then control came back here and answered the START
+        // successfully too, so a caller was told its tunnel was up moments
+        // after being told the same tunnel was down.
+        //
+        // The same reading covers a stop from another thread that lands
+        // after publication: whoever retired the host owns the outcome, and
+        // this start is no longer describing anything.
+        boolean stillOurs;
+        synchronized (this) {
+            stillOurs = tunnelHost == h; //NOPMD CompareObjectsWithEquals
+        }
+        if (!stillOurs) {
+            Tunnels.deliverAck(requestId, false, VpnError.UNKNOWN.ordinal(),
+                    "The tunnel was stopped before the start completed");
+            return;
+        }
         Tunnels.deliverAck(requestId, true, 0, null);
     }
 

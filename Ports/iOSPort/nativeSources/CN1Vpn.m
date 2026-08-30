@@ -1436,7 +1436,7 @@ void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
     // Invalidates any start in flight, armed or not. The watcher covers the
     // armed ones and this covers the window before that, where there is
     // nothing to disarm.
-    cn1vpTunnelGeneration++;
+    int generation = ++cn1vpTunnelGeneration;
     cn1vpStopWatchingTunnel();
     if (cn1vpTunnelManager != nil) {
         // WATCHED, not fired and forgotten. stopVPNTunnel begins an
@@ -1452,6 +1452,22 @@ void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
     // have been restarted while its tunnel kept running, which is exactly
     // when a stop matters most.
     cn1vpLoadTunnelManager(^(NETunnelProviderManager *m, NSError *e) {
+        // SUPERSEDED? The load is asynchronous, so a start can run and
+        // finish while this one is still in flight -- and the manager this
+        // continuation is about to stop is the shared one, so it would
+        // disconnect the tunnel that start had just brought up, after its
+        // caller was told it was connected. The start continuations are
+        // guarded this way already; this one was not, which is the whole of
+        // the asymmetry.
+        //
+        // Failed rather than answered YES: nothing was stopped, and a
+        // later start is now running, so reporting the tunnel down would be
+        // the untrue half of the two available answers.
+        if (generation != cn1vpTunnelGeneration) {
+            cn1vpTunnelAck(rid, NO, CN1_VPN_ERR_UNKNOWN,
+                    @"The tunnel stop was superseded by a later start");
+            return;
+        }
         if (m == nil) {
             // The LOAD failed, which is the only way the helper yields nil:
             // with no error it hands back a manager either way, a saved one

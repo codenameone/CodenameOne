@@ -307,6 +307,41 @@ public class TunnelsTest {
         }
     }
 
+    /// A tunnel that stops itself the moment it is started.
+    ///
+    /// TunnelHost's lifecycle lock is reentrant so that this is allowed, and
+    /// a tunnel validating its own configuration in onStart and giving up is
+    /// the ordinary reason to do it.
+    private static final class StopsItself extends VpnTunnel {
+        @Override
+        protected void onStart(TunnelConfiguration cfg) {
+            Tunnels.stop();
+        }
+
+        @Override
+        protected void onPacket(PacketBuffer p) {
+        }
+
+        @Override
+        protected void onStop(com.codename1.vpn.tunnel.TunnelStopReason r) {
+        }
+    }
+
+    @Test
+    public void aStartStoppedFromInsideOnStartIsNotReportedAsStarted() {
+        // start() runs onStart on the calling thread, and the success
+        // acknowledgement below it was unconditional. So a tunnel that
+        // stopped itself there had its stop answered successfully and then
+        // its START answered successfully too -- the caller told its tunnel
+        // was up moments after being told the same tunnel was down, with
+        // nothing running.
+        VpnAwait.assertFailedWith(VpnError.UNKNOWN,
+                Tunnels.start(new StopsItself(), new TunnelSetup()
+                        .address("10.0.0.2/32").route("0.0.0.0/0")));
+        assertNull(Tunnels.getRegistered(),
+                "and nothing is left registered for it");
+    }
+
     @Test
     public void aTunnelWithNoAddressIsRefusedRatherThanSimulated() {
         // route("0.0.0.0/0") and nothing else used to start here: the empty
