@@ -694,3 +694,10 @@ interop
 # In wide technical use for "performs well", and the word the comparison prose
 # actually wants -- "performs well" does not fit the adjective position.
 performant
+
+# -----------------------------------------------------------------------------
+# Skin designer (Skin-Designer.asciidoc) units.
+# -----------------------------------------------------------------------------
+# Android's density-independent pixel, the unit its safe-area insets are
+# published in. Spelled the way Google spells it, alongside the iOS "pt".
+dp

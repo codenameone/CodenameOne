@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.skindesigner;
 
 import com.codename1.components.OnOffSwitch;
@@ -152,6 +174,11 @@ public class SkinDesigner extends Lifecycle {
         device = DeviceDatabase.findById(id);
         source = Preferences.get(PREF_SOURCE, null);
         skin.load();
+        if (skin.migrateSafeAreaUnits(device)) {
+            // Write the migrated state straight back, so the conversion
+            // happens once rather than on every reload.
+            skin.save();
+        }
         if (device != null && skin.name == null) {
             skin.resetForDevice(device);
         }
@@ -1196,8 +1223,16 @@ public class SkinDesigner extends Lifecycle {
                 "Px/mm × 100", "", ppmm100, null));
 
         parent.add(sectionLabel("SAFE AREA"));
-        parent.add(numericPair("Top", "px", skin.safeTop, v -> { skin.safeTop = Math.max(0, v); saveState(); },
-                "Bottom", "px", skin.safeBottom, v -> { skin.safeBottom = Math.max(0, v); saveState(); }));
+        // The units Apple and Google publish their insets in, and the units
+        // the device catalog stores: points on iOS, dp on Android. The
+        // generated skin multiplies them by the device's density scale, so
+        // typing 47 here for a notched iPhone gets you the 47pt Apple
+        // documents, not 47 physical pixels. The label follows the selected
+        // device, because telling someone editing an Android skin that a dp
+        // value is "pt" invites them to convert it as though it were one.
+        String safeUnit = "ios".equals(device.platformName) ? "pt" : "dp";
+        parent.add(numericPair("Top", safeUnit, skin.safeTop, v -> { skin.safeTop = Math.max(0, v); saveState(); },
+                "Bottom", safeUnit, skin.safeBottom, v -> { skin.safeBottom = Math.max(0, v); saveState(); }));
     }
 
     private Label sectionLabel(String text) {
@@ -1496,30 +1531,6 @@ public class SkinDesigner extends Lifecycle {
      * with alpha=0) starts at (bezelPx, bezelPx) and spans the full device
      * resolution.
      */
-    /**
-     * How tall the top frame extension needs to be (in physical pixels) to
-     * fit notch cutouts above the screen rect. Notches are physical
-     * hardware cutouts (iPhone X / 11 / 12 / 13 style) and live in the
-     * device frame.
-     *
-     * Islands and punch-holes are NOT counted here — they're software/in-
-     * display features (iPhone 14 Pro+ Dynamic Island, Android camera
-     * holes), so they're drawn floating inside the screen rect with the
-     * iOS status bar / safe area pushing content below them.
-     */
-    private int computeTopCutoutPx(float scale) {
-        int maxExtentVB = 0;
-        for (SkinModel.Cutout c : skin.cutouts) {
-            if (!SkinModel.CUTOUT_NOTCH.equals(c.type)) {
-                continue;
-            }
-            if (c.h > maxExtentVB) {
-                maxExtentVB = c.h;
-            }
-        }
-        return Math.round(maxExtentVB * scale);
-    }
-
     private Image generatePortraitImage() {
         if (SkinModel.SOURCE_IMAGE.equals(source) && bodyImage != null) {
             return generateImageBased();
@@ -1528,10 +1539,9 @@ public class SkinDesigner extends Lifecycle {
         int bezelPx = Math.round(skin.bezel * framePxScale);
         int cornerPx = Math.round(skin.cornerR * framePxScale);
         int screenCornerPx = Math.max(0, cornerPx - Math.round(8 * framePxScale));
-        int topCutoutPx = computeTopCutoutPx(framePxScale);
         int totalW = device.resolutionW + bezelPx * 2;
-        int totalH = device.resolutionH + bezelPx * 2 + topCutoutPx;
-        int screenY = bezelPx + topCutoutPx;
+        int totalH = device.resolutionH + bezelPx * 2;
+        int screenY = bezelPx;
 
         Image base = Image.createImage(totalW, totalH, 0xff121822);
         Graphics g = base.getGraphics();
@@ -1549,14 +1559,7 @@ public class SkinDesigner extends Lifecycle {
         carveRoundedScreenRect(data, totalW, totalH, bezelPx, screenY,
                 device.resolutionW, device.resolutionH, screenCornerPx);
 
-        // Notches hang from the top frame extension into the gap above the
-        // screen rect (physical hardware cutout, iPhone X / 11 / 12 / 13).
-        applyTopFrameCutouts(data, totalW, totalH, bezelPx, screenY,
-                device.resolutionW, framePxScale);
-        // Islands and punch-holes float inside the screen rect — Dynamic
-        // Island and Android camera holes are software-reserved space the
-        // OS status bar paints around, not physical cutouts.
-        applyInScreenCutouts(data, totalW, totalH, bezelPx, screenY,
+        applyCutouts(data, totalW, totalH, bezelPx, screenY,
                 device.resolutionW, framePxScale);
 
         return Image.createImage(data, totalW, totalH);
@@ -1567,10 +1570,9 @@ public class SkinDesigner extends Lifecycle {
         int bezelPx = Math.round(skin.bezel * framePxScale);
         int cornerPx = Math.round(skin.cornerR * framePxScale);
         int screenCornerPx = Math.max(0, cornerPx - Math.round(8 * framePxScale));
-        int topCutoutPx = computeTopCutoutPx(framePxScale);
         int totalW = device.resolutionW + bezelPx * 2;
-        int totalH = device.resolutionH + bezelPx * 2 + topCutoutPx;
-        int screenY = bezelPx + topCutoutPx;
+        int totalH = device.resolutionH + bezelPx * 2;
+        int screenY = bezelPx;
 
         Image canvas = Image.createImage(totalW, totalH, 0);
         Graphics g = canvas.getGraphics();
@@ -1584,20 +1586,17 @@ public class SkinDesigner extends Lifecycle {
         applyRoundRectAlphaMask(data, totalW, totalH, 0, 0, totalW, totalH, cornerPx);
         carveRoundedScreenRect(data, totalW, totalH, bezelPx, screenY,
                 device.resolutionW, device.resolutionH, screenCornerPx);
-        applyTopFrameCutouts(data, totalW, totalH, bezelPx, screenY,
-                device.resolutionW, framePxScale);
-        applyInScreenCutouts(data, totalW, totalH, bezelPx, screenY,
+        applyCutouts(data, totalW, totalH, bezelPx, screenY,
                 device.resolutionW, framePxScale);
         return Image.createImage(data, totalW, totalH);
     }
 
     private Image generateOverlay(int totalW, int totalH, int bezelPx) {
-        // The screen rect in skin_map.png matches where it lives in skin.png:
-        // shifted DOWN by the top-frame cutout extension so the simulator
-        // sees the screen starting below the cutout.
-        float framePxScale = ((float) device.resolutionW) / DevicePreview.VB_W;
-        int topCutoutPx = computeTopCutoutPx(framePxScale);
-        int screenY = bezelPx + topCutoutPx;
+        // The screen rect in skin_map.png matches where it lives in
+        // skin.png: inset from every edge by the bezel, cutouts included.
+        // A cutout is painted ON the screen, so it does not move the
+        // screen's origin.
+        int screenY = bezelPx;
         Image overlay = Image.createImage(totalW, totalH, 0);
         Graphics g = overlay.getGraphics();
         g.setColor(0x000000);
@@ -1661,52 +1660,64 @@ public class SkinDesigner extends Lifecycle {
     }
 
     /**
-     * Renders notch cutouts (physical hardware cutouts) hanging from the
-     * top frame extension down to the screen top. Used for iPhone X / 11 /
-     * 12 / 13 style devices where the notch occupies a U-shaped chunk of
-     * the device frame above the display.
+     * Paints the cutouts as opaque shapes ON the screen rect -- a notch
+     * hanging from the screen's top edge, a Dynamic Island floating below
+     * it, a punch-hole camera anywhere inside.
+     *
+     * <p>Every one of them, notches included, lives inside the display on
+     * real hardware: an iPhone 13 Pro Max reports 1284x2778 pixels and the
+     * notch eats into the top of that rectangle. Notches used to be drawn
+     * into a frame extension ABOVE the screen instead, which made the skin
+     * taller than the device, left the status-bar band conspicuously empty,
+     * and pushed displayY down by the notch height. That is also why they
+     * were excluded from the safe-area top: nothing was covering the screen,
+     * so nothing had to be reserved. Now the shape overlaps app content, so
+     * buildProperties counts it like any other cutout.</p>
      */
-    private void applyTopFrameCutouts(int[] data, int w, int h,
-                                      int bezelPx, int screenY, int sw, float scale) {
-        int cx = bezelPx + sw / 2;
+    private void applyCutouts(int[] data, int w, int h,
+                              int bezelPx, int screenY, int sw, float scale) {
         for (SkinModel.Cutout c : skin.cutouts) {
-            if (!SkinModel.CUTOUT_NOTCH.equals(c.type)) {
-                continue;
+            int[] r = cutoutRectPx(c, scale);
+            int x0 = bezelPx + r[0];
+            int oy = screenY + r[1];
+            int cw = r[2];
+            int ch = r[3];
+            if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
+                // Square top corners flush with the bezel, rounded bottom
+                // ones. fillRoundedRect rounds all four, so the top pair is
+                // filled back in as a plain rect.
+                int rad = Math.max(2, Math.round(8 * scale));
+                fillRoundedRect(data, w, h, x0, oy, cw, ch, rad);
+                fillRect(data, w, h, x0, oy, cw, Math.min(ch, rad));
+            } else if (SkinModel.CUTOUT_ISLAND.equals(c.type)) {
+                fillRoundedRect(data, w, h, x0, oy, cw, ch, ch / 2);
+            } else if (SkinModel.CUTOUT_HOLE.equals(c.type)) {
+                // An ellipse filling the box, which is what DevicePreview
+                // draws (g.fillArc with the cutout's w and h). A circle of
+                // diameter cw ignored c.h, so a hole taller or wider than it
+                // is square painted opaque pixels outside its own rectangle
+                // -- and that rectangle is what the simulator hit-tests.
+                fillEllipse(data, w, h, x0, oy, cw, ch);
             }
-            int cw = Math.round(c.w * scale);
-            int ch = Math.round(c.h * scale);
-            int ox = cx + Math.round(c.x * scale);
-            int oy = screenY - ch;
-            int x0 = ox - cw / 2;
-            fillRect(data, w, h, x0, oy, cw, ch);
         }
     }
 
     /**
-     * Renders software cutouts (Dynamic Island, punch-hole cameras) as
-     * opaque pills/circles floating *inside* the screen rect. The iOS
-     * theme reserves the safe-area top for the status bar, and these
-     * shapes appear painted on top of that area in the skin overlay.
+     * A cutout's bounding box in DISPLAY-relative pixels: {x, y, w, h}, with
+     * (0, 0) at the screen's top-left rather than the skin image's.
+     *
+     * <p>Shared by {@link #applyCutouts} and {@link #buildProperties} so the
+     * shape that gets painted and the rectangle written into the
+     * {@code cutouts} property are the same rectangle by construction. A
+     * notch is anchored to the screen's top edge, so its own offset does not
+     * apply.</p>
      */
-    private void applyInScreenCutouts(int[] data, int w, int h,
-                                      int bezelPx, int screenY, int sw, float scale) {
-        int cx = bezelPx + sw / 2;
-        for (SkinModel.Cutout c : skin.cutouts) {
-            if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
-                continue;
-            }
-            int cw = Math.round(c.w * scale);
-            int ch = Math.round(c.h * scale);
-            int ox = cx + Math.round(c.x * scale);
-            int oy = screenY + Math.round(c.y * scale);
-            if (SkinModel.CUTOUT_ISLAND.equals(c.type)) {
-                int x0 = ox - cw / 2;
-                fillRoundedRect(data, w, h, x0, oy, cw, ch, ch / 2);
-            } else if (SkinModel.CUTOUT_HOLE.equals(c.type)) {
-                int r = cw / 2;
-                fillCircle(data, w, h, ox, oy + ch / 2, r);
-            }
-        }
+    private int[] cutoutRectPx(SkinModel.Cutout c, float scale) {
+        int cw = Math.round(c.w * scale);
+        int ch = Math.round(c.h * scale);
+        int ox = device.resolutionW / 2 + Math.round(c.x * scale);
+        int y = SkinModel.CUTOUT_NOTCH.equals(c.type) ? 0 : Math.round(c.y * scale);
+        return new int[] { ox - cw / 2, y, cw, ch };
     }
 
     private void applyRoundRectAlphaMask(int[] data, int w, int h,
@@ -1736,9 +1747,6 @@ public class SkinDesigner extends Lifecycle {
         }
     }
 
-    // applyCutouts (the old in-screen renderer) replaced by
-    // applyTopFrameCutouts which positions cutouts above the screen.
-
     private void fillRect(int[] data, int w, int h, int x, int y, int rw, int rh) {
         int x2 = Math.min(w, x + rw);
         int y2 = Math.min(h, y + rh);
@@ -1749,6 +1757,26 @@ public class SkinDesigner extends Lifecycle {
         }
     }
 
+    private void fillEllipse(int[] data, int w, int h, int x, int y, int rw, int rh) {
+        if (rw <= 0 || rh <= 0) return;
+        float ax = rw / 2f;
+        float by = rh / 2f;
+        float cx = x + ax - 0.5f;
+        float cy = y + by - 0.5f;
+        int x2 = Math.min(w, x + rw);
+        int y2 = Math.min(h, y + rh);
+        for (int yy = Math.max(0, y); yy < y2; yy++) {
+            for (int xx = Math.max(0, x); xx < x2; xx++) {
+                float dx = (xx - cx) / ax;
+                float dy = (yy - cy) / by;
+                if (dx * dx + dy * dy <= 1f) {
+                    data[yy * w + xx] = 0xff000000;
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("unused")
     private void fillCircle(int[] data, int w, int h, int cx, int cy, int r) {
         int r2 = r * r;
         for (int yy = Math.max(0, cy - r); yy < Math.min(h, cy + r + 1); yy++) {
@@ -1820,31 +1848,75 @@ public class SkinDesigner extends Lifecycle {
         // and other in-screen cutouts appear "floating" on top of the
         // status bar / app content rather than carved out of it.
         p.put("roundScreen", "true");
-        float framePxScale = ((float) device.resolutionW) / DevicePreview.VB_W;
-        int topCutoutPxForDisplay = computeTopCutoutPx(framePxScale);
         p.put("displayX", String.valueOf(bezelPx));
-        p.put("displayY", String.valueOf(bezelPx + topCutoutPxForDisplay));
+        p.put("displayY", String.valueOf(bezelPx));
         p.put("displayWidth", String.valueOf(device.resolutionW));
         p.put("displayHeight", String.valueOf(device.resolutionH));
-        // Notch cutouts live in the top frame extension above the screen,
-        // so they don't eat into safeTop. But islands and punch-holes are
-        // drawn floating *inside* the screen and the iOS status bar
-        // reserves space for them — extend safeTop to cover their bottom
-        // edge so app content lands below.
-        int inScreenCutoutBottomVB = 0;
+        // Every cutout is painted on the screen, so every cutout has to be
+        // covered by the safe area or app content renders underneath it --
+        // notches included, which is what the OS does on the hardware.
+        // Extend safeTop to the lowest cutout edge when that sits below the
+        // platform's own status-bar inset.
+        //
+        // The two quantities being maxed live in DIFFERENT units, so both
+        // are converted to pixels first. Cutout geometry is drawn by hand
+        // in the 320-wide preview viewbox and scales by vbToPx. The safe
+        // insets came from the device catalog in density-independent units
+        // (iOS points, Android dp) and scale by the device's density --
+        // multiplying those by vbToPx too is what made an iPhone 13 Pro Max
+        // reserve 189px where the hardware reserves 141px, and an iPad Pro
+        // 12.9 reserve 154px where the hardware reserves 48px.
+        float vbToPx = (float) device.resolutionW / DevicePreview.VB_W;
+        int cutoutBottomPx = 0;
         for (SkinModel.Cutout c : skin.cutouts) {
-            if (SkinModel.CUTOUT_NOTCH.equals(c.type)) {
-                continue;
-            }
-            int extentVB = c.y + c.h;
-            if (extentVB > inScreenCutoutBottomVB) {
-                inScreenCutoutBottomVB = extentVB;
+            // Measured off the rectangle that actually gets painted and
+            // declared, not recomputed from viewbox units: round(y) +
+            // round(h) and round(y + h) differ by a pixel often enough, and
+            // the difference would leave a cutout edge one pixel below the
+            // reserved band.
+            int[] r = cutoutRectPx(c, vbToPx);
+            int extentPx = r[1] + r[3];
+            if (extentPx > cutoutBottomPx) {
+                cutoutBottomPx = extentPx;
             }
         }
-        int effectiveSafeTopVB = Math.max(skin.safeTop, inScreenCutoutBottomVB);
-        float vbToPx = (float) device.resolutionW / DevicePreview.VB_W;
-        int safeTopPx = Math.round(effectiveSafeTopVB * vbToPx);
-        int safeBottomPx = Math.round(skin.safeBottom * vbToPx);
+        double densityScale = device.densityScale;
+        int safeTopPx = Math.max(
+                (int) Math.round(skin.safeTop * densityScale), cutoutBottomPx);
+        int safeBottomPx = (int) Math.round(skin.safeBottom * densityScale);
+
+        // Painting the notch on the screen also puts it on the simulator's
+        // input surface: JavaSEPort's round-screen path accepts every
+        // coordinate inside the display rect, so without this a click on the
+        // opaque notch reaches whatever app content is hidden under it. The
+        // skin file had no way to say "these pixels are not display", and
+        // skin_map.png cannot stand in for one -- the shipped round skins all
+        // carry a map that marks only the screen, so hit-testing against it
+        // would also reject the screen's rounded CORNERS, which are real
+        // touch surface on the hardware. So declare the cutouts explicitly.
+        // A skin without this property behaves exactly as before.
+        // Rectangles, not shapes. The simulator rejects the whole box, so a
+        // visible corner of the box outside a pill or ellipse is rejected
+        // with it. That costs nothing: safeTopPx above is floored at the
+        // lowest cutout edge, so every rectangle here lies inside the
+        // reserved band, where app content does not render. Carrying the
+        // shape instead would mean a second copy of the rasteriser's
+        // geometry inside JavaSEPort, free to drift from the one that paints
+        // the pixels -- which is what cutoutRectPx exists to prevent. What
+        // does matter is that the painted shape never escapes its rectangle,
+        // and each branch above stays inside the box it is given.
+        StringBuilder cutoutRects = new StringBuilder();
+        for (SkinModel.Cutout c : skin.cutouts) {
+            int[] r = cutoutRectPx(c, vbToPx);
+            if (cutoutRects.length() > 0) {
+                cutoutRects.append(';');
+            }
+            cutoutRects.append(r[0]).append(',').append(r[1]).append(',')
+                    .append(r[2]).append(',').append(r[3]);
+        }
+        if (cutoutRects.length() > 0) {
+            p.put("cutouts", cutoutRects.toString());
+        }
 
         // Safe area is consumed by Container.snapToSafeAreaInternal, which
         // treats the rect's X/Y as inset margins from the *display* origin
@@ -1857,13 +1929,18 @@ public class SkinDesigner extends Lifecycle {
         p.put("safePortraitWidth", String.valueOf(safeW));
         p.put("safePortraitHeight", String.valueOf(safeH));
 
-        // Landscape is portrait rotated 90° clockwise. The display now has
-        // width = portraitH and height = portraitW. The portrait top inset
-        // becomes the landscape *left* inset; the portrait bottom inset
-        // becomes the landscape right inset.
+        // skin_l.png is skin.png through Image.rotate90Degrees, which maps
+        // source (x, y) to (height - 1 - y, x): the portrait TOP row becomes
+        // the landscape RIGHT column. So the notch is drawn on the right in
+        // landscape, and the top inset has to be the landscape RIGHT inset.
+        // Writing it as safeLandscapeX instead reserved the left edge while
+        // the notch sat on the right, and app content rendered underneath the
+        // opaque shape. snapToSafeAreaInternal derives the right margin as
+        // surfaceWidth - width - x, so putting the BOTTOM inset in X leaves
+        // exactly safeTopPx on the right.
         int landSafeW = Math.max(1, device.resolutionH - safeTopPx - safeBottomPx);
         int landSafeH = device.resolutionW;
-        p.put("safeLandscapeX", String.valueOf(safeTopPx));
+        p.put("safeLandscapeX", String.valueOf(safeBottomPx));
         p.put("safeLandscapeY", "0");
         p.put("safeLandscapeWidth", String.valueOf(landSafeW));
         p.put("safeLandscapeHeight", String.valueOf(landSafeH));
