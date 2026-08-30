@@ -26,6 +26,8 @@ import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -60,6 +62,54 @@ public class MacOSBuildHintsTest {
             m.put(kv[i], kv[i + 1]);
         }
         return m;
+    }
+
+    /// The calendar opt-out has to reach the usage descriptions, not just the
+    /// entitlement.
+    ///
+    /// Regression: the plist flag was seeded with the scan result and the
+    /// channels were ORed onto it, so no override could clear it. The
+    /// entitlement was suppressed and the plist still declared every calendar
+    /// and reminder description -- a privacy review for access the build hint
+    /// had switched off.
+    @Test
+    public void calendarsOptOutSuppressesTheUsageDescriptions() {
+        MacOSBuildHints h = parse(raw(
+                "macos.distribution", "developer-id",
+                "macos.entitlements.personalInformation.calendars", "false"),
+                "com.example.app");
+        List<MacOSBuildHints.EntitlementOverrides> channels =
+                new ArrayList<MacOSBuildHints.EntitlementOverrides>();
+        for (String c : h.getChannels()) {
+            channels.add(h.entitlementsFor(c));
+        }
+        assertFalse("an explicit calendars=false must clear the descriptions"
+                        + " even when the scan detected calendar use",
+                MacOSNativeBuilder.calendarUsageDescriptionsGranted(channels, true));
+        // And the entitlement agrees, which is the point of resolving both the
+        // same way.
+        for (MacOSBuildHints.EntitlementOverrides o : channels) {
+            assertFalse("the entitlement is suppressed too", o.calendars(true));
+        }
+    }
+
+    /// Unset, the scan still decides -- in both directions.
+    @Test
+    public void unsetCalendarsLeavesTheScanInCharge() {
+        MacOSBuildHints h = parse(raw("macos.distribution", "developer-id"),
+                "com.example.app");
+        List<MacOSBuildHints.EntitlementOverrides> channels =
+                new ArrayList<MacOSBuildHints.EntitlementOverrides>();
+        for (String c : h.getChannels()) {
+            channels.add(h.entitlementsFor(c));
+        }
+        assertTrue("detected calendar use must still declare the descriptions",
+                MacOSNativeBuilder.calendarUsageDescriptionsGranted(channels, true));
+        assertFalse("an app that never touches the calendar declares nothing",
+                MacOSNativeBuilder.calendarUsageDescriptionsGranted(channels, false));
+        assertTrue("no channels at all leaves the scan's answer standing",
+                MacOSNativeBuilder.calendarUsageDescriptionsGranted(
+                        new ArrayList<MacOSBuildHints.EntitlementOverrides>(), true));
     }
 
     @Test

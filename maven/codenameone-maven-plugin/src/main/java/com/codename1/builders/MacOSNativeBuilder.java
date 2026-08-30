@@ -951,10 +951,29 @@ public class MacOSNativeBuilder extends Executor {
         // something the class scan detects, it is inherited from the iOS
         // usage-description hints -- and whichever channel grants the
         // entitlement needs the descriptions in the one shared plist.
-        boolean calendarsGranted = calendarDetected;
+        // Resolved the way the ENTITLEMENT is resolved, with the detected
+        // value as each channel's default rather than as a floor.
+        //
+        // Seeding with calendarDetected made the OR below unable to clear it,
+        // so macos.entitlements.personalInformation.calendars=false suppressed
+        // the entitlement -- MacOSXcodeProject asks overrides.calendars(detected)
+        // and gets false -- while this plist still declared every calendar and
+        // reminder usage description. That is the documented two-way override
+        // working in one direction only, and it spends the application a
+        // privacy review for access its own build hint switched off.
+        //
+        // resolve() is override == UNSET ? detected : override == ON, so
+        // passing calendarDetected is what makes an unset channel keep the
+        // scan's answer and an explicit false actually mean false. With no
+        // channels there is no override to consult and the scan's answer
+        // stands, which is what the old seed did for that case.
+        List<MacOSBuildHints.EntitlementOverrides> calendarChannels =
+                new ArrayList<MacOSBuildHints.EntitlementOverrides>();
         for (String channel : hints.getChannels()) {
-            calendarsGranted |= hints.entitlementsFor(channel).calendars(false);
+            calendarChannels.add(hints.entitlementsFor(channel));
         }
+        boolean calendarsGranted =
+                calendarUsageDescriptionsGranted(calendarChannels, calendarDetected);
         plist.putAll(MacOSXcodeProject.privacyUsageDescriptions(
                 effectiveCapabilities(hints, caps), calendarsGranted,
                 new MacOSXcodeProject.UsageDescriptionResolver() {
@@ -1624,6 +1643,36 @@ public class MacOSNativeBuilder extends Executor {
     /// com.codename1.io.WebSocket, a class rather than a package -- so the
     /// lesson is that a name in this scanner is worth checking against the tree
     /// rather than reading as self-evident.
+    /// Whether the plist should carry the calendar and reminder usage
+    /// descriptions, resolved the way the ENTITLEMENT is resolved: the detected
+    /// value is each channel's DEFAULT, not a floor under it.
+    ///
+    /// This used to seed the answer with the scan result and OR the channels
+    /// onto it, which no override could then clear. So
+    /// macos.entitlements.personalInformation.calendars=false suppressed the
+    /// entitlement -- MacOSXcodeProject asks overrides.calendars(detected) and
+    /// gets false -- while the plist still declared every calendar and reminder
+    /// usage description. That is the documented two-way override working in
+    /// one direction only, and it spends the application a privacy review for
+    /// access its own build hint switched off.
+    ///
+    /// EntitlementOverrides.resolve is
+    /// {@code override == UNSET ? detected : override == ON}, so passing the
+    /// detected value is what lets an unset channel keep the scan's answer and
+    /// an explicit false actually mean false. With no channels there is no
+    /// override to consult and the scan's answer stands.
+    static boolean calendarUsageDescriptionsGranted(
+            List<MacOSBuildHints.EntitlementOverrides> channels, boolean detected) {
+        if (channels == null || channels.isEmpty()) {
+            return detected;
+        }
+        boolean granted = false;
+        for (MacOSBuildHints.EntitlementOverrides o : channels) {
+            granted |= o.calendars(detected);
+        }
+        return granted;
+    }
+
     static boolean listensOnASocket(String cls, String method) {
         if (cls == null || method == null) {
             return false;
