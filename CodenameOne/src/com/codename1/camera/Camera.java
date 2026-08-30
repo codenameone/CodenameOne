@@ -71,9 +71,15 @@ import java.io.IOException;
 public final class Camera {
     private static final Object ACTIVE_LOCK = new Object();
     private static CameraSession active;
-    /// A paused session that a modal Capture was let past, to be made active
-    /// again when that capture's session closes. See open().
-    private static CameraSession preempted;
+    /// Paused sessions a later open() was let past, oldest first.
+    ///
+    /// A STACK rather than one slot, because the handoffs nest: pause A, open
+    /// and pause B, open C. A single slot held only the most recent, so closing
+    /// C restored B and closing B then left no active session at all -- A was
+    /// forgotten while still holding the hardware it was about to resume, and
+    /// the next open() was accepted alongside it.
+    private static final java.util.ArrayList<CameraSession> preempted =
+            new java.util.ArrayList<CameraSession>();
 
     private Camera() { }
 
@@ -149,8 +155,9 @@ public final class Camera {
             // capture's own close() would leave no active session at all, and
             // the paused one -- which the application is about to resume --
             // would no longer stop a third open().
-            preempted = active != null && !active.isClosed() && active.isPaused()
-                    ? active : null;
+            if (active != null && !active.isClosed() && active.isPaused()) {
+                preempted.add(active);
+            }
             CameraImpl impl = newImpl();
             if (impl == null) {
                 throw new IllegalStateException("Camera is not supported on this platform.");
@@ -217,16 +224,29 @@ public final class Camera {
     static void clearActive(CameraSession s) {
         synchronized (ACTIVE_LOCK) {
             if (active == s) {
-                // Hand back to the session this one was let past, if it is
-                // still there to hand back to: the application paused it around
-                // a modal capture and is about to resume it, and it has to be
-                // the active session again for the next open() to be refused.
-                active = preempted != null && !preempted.isClosed() ? preempted : null;
-                preempted = null;
-            } else if (preempted == s) {
-                // The application closed the paused session instead of
-                // resuming it; there is nothing to hand back to.
-                preempted = null;
+                // Hand back to the most recent session this one was let past,
+                // if there is still one to hand back to: the application paused
+                // it around a modal capture and is about to resume it, and it
+                // has to be the active session again for the next open() to be
+                // refused. Sessions the application closed while they waited
+                // are discarded on the way.
+                active = null;
+                while (!preempted.isEmpty()) {
+                    CameraSession candidate = preempted.remove(preempted.size() - 1);
+                    if (!candidate.isClosed()) {
+                        active = candidate;
+                        break;
+                    }
+                }
+            } else {
+                // Closed while preempted -- the application closed the paused
+                // session instead of resuming it -- so there is nothing to hand
+                // back to for that one.
+                for (int i = preempted.size() - 1; i >= 0; i--) {
+                    if (preempted.get(i) == s) {
+                        preempted.remove(i);
+                    }
+                }
             }
         }
     }

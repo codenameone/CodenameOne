@@ -212,6 +212,77 @@ class CameraTest extends UITestBase {
         background.close();
     }
 
+    /// Nested handoffs give every session back, in order.
+    ///
+    /// pause A, open and pause B, open C. A single preempted slot held only the
+    /// most recent, so closing C restored B and closing B then left NO active
+    /// session -- A was forgotten while still holding the hardware it was about
+    /// to resume, and the next open() was accepted alongside it.
+    ///
+    /// Each level is checked by RESUMING the restored session and watching the
+    /// next open() be refused: a restored session that is still paused holds
+    /// nothing, so it correctly does not block one.
+    @Test
+    void nestedHandoffsUnwindToTheOutermostSession() {
+        install();
+        CameraSession a = Camera.open(camera("back", CameraFacing.BACK),
+                new CameraSessionOptions());
+        a.pause();
+        CameraSession b = Camera.open(camera("front", CameraFacing.FRONT),
+                new CameraSessionOptions());
+        b.pause();
+        CameraSession c = Camera.open(camera("back", CameraFacing.BACK),
+                new CameraSessionOptions());
+        c.close();
+        // B is the active session again; resumed, it holds the device.
+        b.resume();
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() {
+                Camera.open(camera("back", CameraFacing.BACK), new CameraSessionOptions());
+            }
+        });
+        b.close();
+        // ...and now A is, which is the one the single slot lost outright.
+        a.resume();
+        assertFalse(a.isPaused());
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() {
+                Camera.open(camera("front", CameraFacing.FRONT), new CameraSessionOptions());
+            }
+        });
+        a.close();
+        opened = Camera.open(camera("back", CameraFacing.BACK),
+                new CameraSessionOptions());
+        assertFalse(opened.isClosed());
+    }
+
+    /// A session closed while it waits in the chain is skipped, not handed back.
+    @Test
+    void aPreemptedSessionClosedWhileWaitingIsSkipped() {
+        install();
+        CameraSession a = Camera.open(camera("back", CameraFacing.BACK),
+                new CameraSessionOptions());
+        a.pause();
+        CameraSession b = Camera.open(camera("front", CameraFacing.FRONT),
+                new CameraSessionOptions());
+        b.pause();
+        CameraSession c = Camera.open(camera("back", CameraFacing.BACK),
+                new CameraSessionOptions());
+        b.close();
+        c.close();
+        // B was closed while waiting, so the handback skipped it and reached A.
+        a.resume();
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() {
+                Camera.open(camera("back", CameraFacing.BACK), new CameraSessionOptions());
+            }
+        });
+        a.close();
+        opened = Camera.open(camera("back", CameraFacing.BACK),
+                new CameraSessionOptions());
+        assertFalse(opened.isClosed());
+    }
+
     /// Closing the paused session instead of resuming it leaves nothing to hand
     /// back to, and the next open() succeeds.
     @Test
