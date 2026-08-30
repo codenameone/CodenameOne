@@ -71,31 +71,48 @@ public class CN1IncomingCallActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         showOverKeyguard();
-        callId = getIntent() == null ? null
-                : getIntent().getStringExtra(EXTRA_CALL_ID);
-        if (callId == null || CN1ConnectionService.find(callId) == null) {
-            // The call went away between the notification being posted and
-            // this screen opening -- the caller hung up, or the user answered
-            // from the notification. Finishing rather than showing a screen
-            // for a call nobody can answer.
-            finish();
-            return;
-        }
-        setContentView(buildUi());
+        bindTo(getIntent());
     }
 
     @Override
     protected void onNewIntent(android.content.Intent intent) {
         super.onNewIntent(intent);
-        // SINGLE_TOP, so a second notification for the same call reuses this
-        // instance; without this the screen would keep ringing for the call
-        // it was opened with.
+        // setIntent so getIntent() agrees with what is on screen; the
+        // platform does not do it for a singleTop redelivery.
         setIntent(intent);
+        bindTo(intent);
+    }
+
+    /// Points this screen at the call `intent` names, and draws it.
+    ///
+    /// ONE path for both entry points. onNewIntent used to assign callId and
+    /// stop there, which left the caller line showing whoever onCreate had
+    /// drawn while Answer and Decline acted on the new call -- a screen
+    /// saying one name and answering a different call, which is worse than
+    /// either showing the wrong call or answering the wrong one alone.
+    ///
+    /// A singleTop redelivery is a real case rather than a theoretical one:
+    /// a second incoming call while this one is still ringing reuses the
+    /// instance by design. Rebinding to the newest is the behaviour that
+    /// follows -- there is one full-screen ringing surface and it shows the
+    /// call that just arrived, while the earlier call keeps its own
+    /// notification with its own Answer and Decline.
+    private void bindTo(android.content.Intent intent) {
         String id = intent == null ? null
                 : intent.getStringExtra(EXTRA_CALL_ID);
-        if (id != null) {
-            callId = id;
+        if (id == null || CN1ConnectionService.find(id) == null) {
+            // The call went away between the notification being posted and
+            // this screen binding to it -- the caller hung up, or the user
+            // answered from the notification. Finishing rather than showing a
+            // screen for a call nobody can answer, and checked on every bind
+            // rather than only the first: a redelivery can name a call that
+            // ended while the intent was in flight just as easily.
+            finish();
+            return;
         }
+        // BEFORE buildUi, which reads it back through callerLabel().
+        callId = id;
+        setContentView(buildUi());
     }
 
     /// Puts this window in front of the lock screen and lights the display.
