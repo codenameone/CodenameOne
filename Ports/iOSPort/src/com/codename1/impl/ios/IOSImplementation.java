@@ -11875,6 +11875,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public static void setLocalNotificationCallback(LocalNotificationCallback callback) {
         localNotificationCallback = callback;
+        // Releases any delivery waiting for exactly this, which is how a
+        // notification that cold-launched the application reaches a callback
+        // installed afterwards. setPushCallback drains its own backlog here for
+        // the same reason.
+        synchronized (macLocalNotifications) {
+            macLocalNotifications.notifyAll();
+        }
     }
     
     public static LocalNotificationCallback getLocalNotificationCallback() {
@@ -11939,17 +11946,28 @@ public class IOSImplementation extends CodenameOneImplementation {
                         }
                         next = macLocalNotifications.remove(0);
                     }
-                    // Wait for the callback rather than let the shared
-                    // method's retry take it. That retry re-delivers 1.5s later
-                    // WITHOUT the content, and a cold-launch notification is
-                    // exactly the case where the callback is still being
-                    // installed. Bounded, and on this worker rather than any
-                    // thread the platform needs.
-                    for (int iter = 0; localNotificationCallback == null
-                            && iter < 40; iter++) {
-                        try {
-                            Thread.sleep(50);
-                        } catch (InterruptedException ignored) {
+                    // Wait for the callback, for as long as it takes.
+                    //
+                    // Not a timeout. A fixed wait means a cold launch slower
+                    // than the number loses its launch notification outright:
+                    // the shared method's retry is guarded by pushCallback, so
+                    // an application that handles local notifications and not
+                    // push gets no second chance, and the finally below would
+                    // already have advanced the native queue past it.
+                    //
+                    // Woken by setLocalNotificationCallback, the same way
+                    // setPushCallback drains what arrived before it. The wait
+                    // is unbounded and holds the native delivery barrier, which
+                    // matters only for an application that registers NO local
+                    // notification callback at all -- one that asked the system
+                    // for notifications with nothing to receive them, which is
+                    // the same case the push barrier already documents.
+                    synchronized (macLocalNotifications) {
+                        while (localNotificationCallback == null) {
+                            try {
+                                macLocalNotifications.wait();
+                            } catch (InterruptedException ignored) {
+                            }
                         }
                     }
                     restorePushContent(next.content);

@@ -504,6 +504,12 @@ extern int isPainted();
 extern int displayWidth;
 extern int displayHeight;
 
+/// A media or document URL from an application-supplied string; defined further
+/// down, beside the media creators. Declared here because callers appear
+/// earlier in the file than the definition -- Display.execute(), canExecute()
+/// and the share sheet all build their URL through it.
+static NSURL *cn1URLForMediaString(NSString *s);
+
 extern void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
 
@@ -3831,9 +3837,9 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
         // whether a local file could be opened called string methods on an
         // NSURL. It compiled with an incompatible-pointer warning and answered
         // with whatever that produced.
-        NSURL *target = [ns hasPrefix:@"file:"]
-            ? [NSURL fileURLWithPath:[ns substringFromIndex:5]]
-            : [NSURL URLWithString:ns];
+        // Same reading as every other URL built from an application string;
+        // see cn1URLForMediaString.
+        NSURL *target = cn1URLForMediaString(ns);
         if (target == nil) {
             result = JAVA_FALSE;
         } else {
@@ -3855,9 +3861,6 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
     return NO;
 #endif // !TARGET_OS_WATCH
 }
-
-/// Defined below, next to the media creators that share it.
-static NSURL *cn1URLForMediaString(NSString *s);
 
 void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1)
 {
@@ -13342,7 +13345,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
             if (someText != nil) [dataToShare addObject:someText];
             if (i != nil) [dataToShare addObject:i];
         } else if (someText != nil && [someText hasPrefix:@"file:"]) {
-            NSURL* fileURL = [NSURL fileURLWithPath:[someText substringFromIndex:5]];
+            NSURL* fileURL = cn1URLForMediaString(someText);
             if ([[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
                 [dataToShare addObject:fileURL];
             } else {
@@ -13387,7 +13390,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
         } else {
             BOOL shareFile = NO;
             if (someText != nil && [someText hasPrefix:@"file:"]) {
-                NSURL* fileURL = [NSURL fileURLWithPath:[someText substringFromIndex:5]];
+                NSURL* fileURL = cn1URLForMediaString(someText);
                 if ([[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
                     shareFile = YES;
                     dataToShare = [NSArray arrayWithObjects:fileURL, nil];
@@ -13465,7 +13468,7 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
             if (someText != nil) [dataToShare addObject:someText];
             if (i != nil) [dataToShare addObject:i];
         } else if (someText != nil && [someText hasPrefix:@"file:"]) {
-            NSURL* fileURL = [NSURL fileURLWithPath:[someText substringFromIndex:5]];
+            NSURL* fileURL = cn1URLForMediaString(someText);
             [dataToShare addObject:[[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]
                                    ? (id)fileURL : (id)someText];
         } else if (someText != nil) {
@@ -13508,7 +13511,7 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
         } else {
             BOOL shareFile = NO;
             if (someText != nil && [someText hasPrefix:@"file:"]) {
-                NSURL* fileURL = [NSURL fileURLWithPath:[someText substringFromIndex:5]];
+                NSURL* fileURL = cn1URLForMediaString(someText);
                 if ([[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
                     shareFile = YES;
                     dataToShare = [NSArray arrayWithObjects:fileURL, nil];
