@@ -4186,12 +4186,14 @@ public class Window extends Container implements TopLevelContainer {
         // by the time the release arrives the overlay underneath has been uncovered and
         // focused. Sampling the scope at release time finds that one and hands it a
         // release whose press it never saw.
-        if (keyPressScopes == null) {
-            keyPressScopes = new HashMap<Integer, Container>();
-        }
+        if (!keyRepeatSynthetic) {
+            if (keyPressScopes == null) {
+                keyPressScopes = new HashMap<Integer, Container>();
+            }
         // Null is a value here, not an absence -- it means the window itself owned the
         // key -- so membership is what says a press is outstanding.
-        keyPressScopes.put(Integer.valueOf(keyCode), keyInputScope);
+            keyPressScopes.put(Integer.valueOf(keyCode), keyInputScope);
+        }
         if (!focusWithinKeyScope()) {
             return;
         }
@@ -4240,8 +4242,14 @@ public class Window extends Container implements TopLevelContainer {
         Container scopeAtRelease = keyInputScope;
         Integer held = Integer.valueOf(keyCode);
         if (keyPressScopes != null && keyPressScopes.containsKey(held)) {
-            Container pressScope = keyPressScopes.remove(held);
-            if (keyPressScopes.isEmpty()) {
+            // A repeat is a pair synthesized for a key that is still physically down,
+            // so it must leave the record alone: consuming it here meant the hardware
+            // release still to come found nothing and was handed to whatever was on top
+            // by then -- a dialog that timed out under a held arrow key had its release
+            // delivered to the surface it uncovered.
+            Container pressScope = keyRepeatSynthetic
+                    ? keyPressScopes.get(held) : keyPressScopes.remove(held);
+            if (!keyRepeatSynthetic && keyPressScopes.isEmpty()) {
                 keyPressScopes = null;
             }
             if (pressScope != keyInputScope) { //NOPMD CompareObjectsWithEquals
@@ -4313,8 +4321,7 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     public void keyRepeated(int keyCode) {
         if (focused == null) {
-            keyPressed(keyCode);
-            keyReleased(keyCode);
+            synthesizeRepeat(keyCode);
             return;
         }
         if (focused.isEnabled()) {
@@ -4324,10 +4331,32 @@ public class Window extends Container implements TopLevelContainer {
         if (!focused.handlesInput()
                 && (game == Display.GAME_DOWN || game == Display.GAME_UP
                     || game == Display.GAME_LEFT || game == Display.GAME_RIGHT)) {
-            keyPressed(keyCode);
-            keyReleased(keyCode);
+            synthesizeRepeat(keyCode);
         }
     }
+
+    /// Runs one repeat as the press/release pair `Form` uses, without letting it look
+    /// like a keystroke of its own.
+    ///
+    /// The key is still physically down: its ownership belongs to the press that
+    /// started it and has to outlast every repeat, or the hardware release is orphaned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the key being repeated
+    private void synthesizeRepeat(int keyCode) {
+        keyRepeatSynthetic = true;
+        try {
+            keyPressed(keyCode);
+            keyReleased(keyCode);
+        } finally {
+            keyRepeatSynthetic = false;
+        }
+    }
+
+    /// Whether the press/release pair being dispatched was synthesized for a repeat of
+    /// a key that is still down, rather than being a keystroke in its own right.
+    private boolean keyRepeatSynthetic;
 
     /// The overlay that owned the keyboard when each currently-held key went down.
     ///

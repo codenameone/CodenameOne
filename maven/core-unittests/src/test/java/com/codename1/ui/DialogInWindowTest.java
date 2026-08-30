@@ -2376,4 +2376,64 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void aRepeatDoesNotHandTheHeldKeysReleaseToWhatComesNext() {
+        // Holding a key makes the window synthesize a press/release pair per repeat, for
+        // a key that is still physically down. Consuming the record on those releases
+        // left the hardware release with nothing: it fell back to whoever held the
+        // keyboard by then, so a dialog that went away under a held key handed its
+        // release to the surface it uncovered.
+        final Window w = openHost(600, 500);
+        final int[] lowerShortcut = new int[1];
+        int held = 'x';
+
+        Dialog low = new Dialog("lower");
+        low.setLayout(new BorderLayout());
+        low.add(BorderLayout.CENTER, new Label("lower"));
+        low.addKeyListener(held, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                lowerShortcut[0]++;
+            }
+        });
+        low.setTopLevelHost(w);
+        low.showModeless();
+        DisplayTest.flushEdt();
+
+        final Dialog high = new Dialog("upper");
+        high.setLayout(new BorderLayout());
+        high.add(BorderLayout.CENTER, new Label("upper"));
+        high.setTopLevelHost(w);
+        high.showModeless();
+        DisplayTest.flushEdt();
+
+        // Down while the upper dialog owns the keyboard, then held long enough to repeat.
+        w.keyPressed(held);
+        DisplayTest.flushEdt();
+        w.keyRepeated(held);
+        w.keyRepeated(held);
+        DisplayTest.flushEdt();
+
+        // It goes away with the key still down -- a timeout does exactly this.
+        high.dispose();
+        DisplayTest.flushEdt();
+
+        // The hardware release finally arrives.
+        w.keyReleased(held);
+        DisplayTest.flushEdt();
+        assertEquals(0, lowerShortcut[0],
+                "the uncovered dialog must not answer a key it never saw pressed");
+
+        // And a whole keystroke of its own still reaches it.
+        w.keyPressed(held);
+        DisplayTest.flushEdt();
+        w.keyReleased(held);
+        DisplayTest.flushEdt();
+        assertEquals(1, lowerShortcut[0], "a keystroke of its own still works");
+
+        low.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }
