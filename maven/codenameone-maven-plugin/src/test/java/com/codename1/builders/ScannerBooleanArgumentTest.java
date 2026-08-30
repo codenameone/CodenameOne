@@ -182,6 +182,69 @@ class ScannerBooleanArgumentTest {
                 "the true case must read as true too");
     }
 
+    /// The lambda form, which is how the API is actually called.
+    ///
+    /// javac compiles requestPermissions(false, event -> ...) as ICONST_0,
+    /// INVOKEDYNAMIC building the lambda, then the call. Clearing the tracked
+    /// values at the invokedynamic threw away the argument, so the narrowing
+    /// stayed inert for the shape everybody writes.
+    @Test
+    void aBooleanSurvivesTheLambdaBuiltAfterIt(@TempDir File dir)
+            throws Exception {
+        writeLambdaCaller(dir, "Lambda", false);
+        assertEquals("[requestPermissions=false]", scan(dir).toString());
+        writeLambdaCaller(dir, "LambdaTrue", true);
+        assertTrue(scan(dir).contains("requestPermissions=true"),
+                "the true case must read as true too");
+    }
+
+    /// {@code requestPermissions(<literal>, () -> {})}, lambda and all.
+    private static void writeLambdaCaller(File dir, String name, boolean value)
+            throws Exception {
+        ClassWriter w = new ClassWriter(0);
+        w.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "app/" + name, null,
+                "java/lang/Object", null);
+        MethodVisitor body = w.visitMethod(Opcodes.ACC_PRIVATE
+                | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
+                "lambda$run$0", "()V", null, null);
+        body.visitCode();
+        body.visitInsn(Opcodes.RETURN);
+        body.visitMaxs(0, 0);
+        body.visitEnd();
+
+        MethodVisitor m = w.visitMethod(Opcodes.ACC_PUBLIC
+                | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        m.visitCode();
+        m.visitInsn(value ? Opcodes.ICONST_1 : Opcodes.ICONST_0);
+        Handle bootstrap = new Handle(Opcodes.H_INVOKESTATIC,
+                "java/lang/invoke/LambdaMetafactory", "metafactory",
+                "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;"
+                + "Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;"
+                + "Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)"
+                + "Ljava/lang/invoke/CallSite;", false);
+        // No captures, so the call site takes nothing and yields the listener.
+        m.visitInvokeDynamicInsn("run", "()Ljava/lang/Runnable;", bootstrap,
+                Type.getType("()V"),
+                new Handle(Opcodes.H_INVOKESTATIC, "app/" + name,
+                        "lambda$run$0", "()V", false),
+                Type.getType("()V"));
+        m.visitMethodInsn(Opcodes.INVOKESTATIC, TARGET,
+                "requestPermissions", "(ZLjava/lang/Runnable;)V", false);
+        m.visitInsn(Opcodes.RETURN);
+        m.visitMaxs(2, 0);
+        m.visitEnd();
+        w.visitEnd();
+
+        File pkg = new File(dir, "app");
+        assertTrue(pkg.isDirectory() || pkg.mkdirs());
+        OutputStream out = new FileOutputStream(new File(pkg, name + ".class"));
+        try {
+            out.write(w.toByteArray());
+        } finally {
+            out.close();
+        }
+    }
+
     /** {@code requestPermissions(<literal>, someObject)}. */
     private static void writeTwoArgCaller(File dir, String name, boolean value)
             throws Exception {

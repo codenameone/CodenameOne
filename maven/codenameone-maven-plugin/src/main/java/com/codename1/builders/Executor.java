@@ -2126,7 +2126,29 @@ public abstract class Executor {
                                 public void visitInvokeDynamicInsn(String name,
                                         String descriptor, Handle bootstrap,
                                         Object... args) {
-                                    pushedValues.clear();
+                                    // Modelled, not cleared. javac compiles
+                                    // requestPermissions(false, event -> ...)
+                                    // as ICONST_0, INVOKEDYNAMIC (building the
+                                    // lambda), then the call -- so clearing
+                                    // here threw away the very argument this
+                                    // tracker exists to read, and the lambda
+                                    // form is the common one. The call site's
+                                    // descriptor names the captured values as
+                                    // its arguments and the functional
+                                    // interface instance as its return, so it
+                                    // consumes and produces exactly like the
+                                    // ordinary call it resembles.
+                                    int captured = countArguments(descriptor);
+                                    if (captured < 0
+                                            || pushedValues.size() < captured) {
+                                        pushedValues.clear();
+                                    } else {
+                                        for (int i = 0; i < captured; i++) {
+                                            pushedValues.remove(
+                                                    pushedValues.size() - 1);
+                                        }
+                                    }
+                                    pushed(null);
                                     // A method reference -- store::readSamples,
                                     // or a lambda body -- is an invokedynamic
                                     // whose real target sits in the bootstrap
