@@ -5944,4 +5944,55 @@ class WindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    @FormTest
+    void aStylusStrokeDoesNotContinueIntoTheOverlayThatInterruptedIt() {
+        // The stylus continuation resolves the component under the pointer afresh, and
+        // it ran before the cancellation was consulted -- so once an overlay took the
+        // pointer the stroke hit tested into that overlay and carried on into it, on a
+        // gesture whose press it never saw.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        implementation.setPointerType(com.codename1.ui.events.PointerEvent.TYPE_STYLUS);
+        try {
+            final int[] strokes = new int[1];
+            Container overlay = new Container(new BorderLayout());
+            Button inOverlay = new Button("in the overlay");
+            inOverlay.addStylusListener(new com.codename1.ui.events.ActionListener() {
+                @Override
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    strokes[0]++;
+                }
+            });
+            overlay.add(BorderLayout.CENTER, inOverlay);
+
+            w.pointerPressed(new int[] {10}, new int[] {10});
+            DisplayTest.flushEdt();
+
+            // A press handler puts an overlay up, which takes the pointer. Laid out, so
+            // the hit test this is about can actually land in it.
+            Container layer = w.getFormLayeredPane(WindowTest.class, true);
+            layer.setLayout(new BorderLayout());
+            layer.add(BorderLayout.CENTER, overlay);
+            w.revalidate();
+            DisplayTest.flushEdt();
+            w.pushPointerInputScope(overlay);
+            DisplayTest.flushEdt();
+
+            w.pointerDragged(new int[] {20}, new int[] {20});
+            w.pointerReleased(new int[] {20}, new int[] {20});
+            DisplayTest.flushEdt();
+            assertEquals(0, strokes[0],
+                    "the rest of a cancelled stroke must not reach the overlay that took it");
+        } finally {
+            implementation.setPointerType(com.codename1.ui.events.PointerEvent.TYPE_UNKNOWN);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }

@@ -3295,7 +3295,13 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
-        if (Display.getInstance().isStylusPointer()) {
+        // Not once the gesture has been taken away. This resolves the component under
+        // the pointer afresh, so after an overlay took the pointer it hit tested into
+        // that overlay and handed it the rest of a gesture whose press it never saw --
+        // a stylus press that puts a dialog up would have gone on stroking into the
+        // dialog. Only the continuation is suppressed; the bookkeeping below still runs,
+        // so the flags this gesture set are cleared as they always were.
+        if (Display.getInstance().isStylusPointer() && !gestureCancelled) {
             Component stylusCmp = resolveComponentAt(x, y);
             if (stylusCmp != null) {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerDrag, x, y);
@@ -3355,7 +3361,13 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
-        if (Display.getInstance().isStylusPointer()) {
+        // Not once the gesture has been taken away. This resolves the component under
+        // the pointer afresh, so after an overlay took the pointer it hit tested into
+        // that overlay and handed it the rest of a gesture whose press it never saw --
+        // a stylus press that puts a dialog up would have gone on stroking into the
+        // dialog. Only the continuation is suppressed; the bookkeeping below still runs,
+        // so the flags this gesture set are cleared as they always were.
+        if (Display.getInstance().isStylusPointer() && !gestureCancelled) {
             Component stylusCmp = resolveComponentAt(x, y);
             if (stylusCmp != null) {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerReleased, x, y);
