@@ -1278,7 +1278,14 @@ struct ThreadLocalData {
     volatile sig_atomic_t gcSigRelease;     // GC publishes highest released gen (monotonic)
     volatile sig_atomic_t gcSigStopGen;     // generation counter (GC thread writes only)
     void* volatile gcSigStackPointer;        // SP captured inside the signal handler
-    void* volatile gcSigStackBase;           // [sp,base) high bound (filled by GC/handler)
+    // [sp,base) high bound and stack size, resolved BEFORE a forced freeze and reused
+    // while it is held. cn1GcStackBase must not be called under one: it is two plain
+    // accessors on Apple, but on Linux it is pthread_getattr_np, which mallocs (and
+    // reads /proc/self/maps for the initial thread), so calling it while the target is
+    // stopped can wait on an allocator lock the target owns. Written by the GC thread in
+    // cn1GcMarkForceStopUncooperative, read by cn1GcScanThreadNativeStack.
+    void* volatile gcSigStackBase;
+    size_t       gcSigStackSize;
     char         gcSigRegs[4096];            // raw copy of the interrupted ucontext (GPRs)
     volatile sig_atomic_t gcSigRegsLen;      // valid bytes in gcSigRegs
     // Set while the MARK LOOP owns a signal freeze it took because this thread would

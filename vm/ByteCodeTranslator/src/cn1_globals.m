@@ -2250,10 +2250,17 @@ void codenameOneGCMark() {
                 //   root snapshot rebuild ... reallocs              -> skipped (built pre-freeze)
                 //   precise stack scan ...... resolve + mark bit    -> SAFE, lock-free
                 //   native stack scan ....... resolve + mark bit    -> SAFE, lock-free
+                //   stack-bounds lookup ..... mallocs on Linux      -> done pre-freeze
                 //   this escalation's log ... stdio / os_log        -> DEFERRED past release
                 //
                 // The mark worklist mutex is fine to take: only collector threads ever
                 // hold it, so a frozen mutator can never be the owner.
+                //
+                // The stack-bounds entry is the one to learn from: cn1GcStackBase is two
+                // plain accessors on Apple and pthread_getattr_np on Linux, and only the
+                // Linux spelling allocates. Checking the Apple one and calling the
+                // function safe is how it got onto this list as SAFE the first time. A
+                // cross-platform helper has to be classified on its WORST platform.
                 JAVA_BOOLEAN forcedStop = JAVA_FALSE;
                 // Deferred report for the escalation (see above). Zero means nothing to
                 // report; the values are captured under the freeze and printed after it.
@@ -8419,9 +8426,29 @@ static void cn1GcSignalReleaseOne(struct ThreadLocalData* t) {
 // it is held, because the thread can have been frozen mid-malloc. The root snapshots must
 // already be built for the same reason.
 static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t) {
+    // Stack bounds FIRST, while the target is still running. cn1GcStackBase is two plain
+    // accessors on Apple and pthread_getattr_np on Linux, and the Linux one mallocs (plus
+    // reads /proc/self/maps for the initial thread) -- so resolving it under the freeze
+    // can block on an allocator lock the frozen thread owns. Reasoning about the Apple
+    // spelling and letting the conclusion cover both is how this got classified safe the
+    // first time. The bounds do not change for a live pthread, so resolving here and
+    // reusing them for the whole freeze loses nothing.
+    if(!t->gcPthreadValid) {
+        return JAVA_FALSE;
+    }
+    size_t ssz = 0;
+    char* base = cn1GcStackBase(t->gcPthread, &ssz);
+    if(base == 0 || ssz == 0) {
+        // No bounds means the conservative scan could not read this thread's native stack
+        // even once it was stopped, so freezing it would buy nothing and skip its roots.
+        // Report failure and let the caller fall back to waiting.
+        return JAVA_FALSE;
+    }
+    t->gcSigStackBase = base;
+    t->gcSigStackSize = ssz;
     if(cn1GcSignalStopOne(t) == 0) {
-        // Timed out or the thread has no valid pthread. cn1GcSignalStopOne has already
-        // pre-released the generation, so nothing is left stranded.
+        // Timed out. cn1GcSignalStopOne has already pre-released the generation, so
+        // nothing is left stranded.
         return JAVA_FALSE;
     }
     t->gcMarkForcedStop = JAVA_TRUE;
@@ -8441,23 +8468,27 @@ static void cn1GcMarkReleaseForced(struct ThreadLocalData* t) {
 // resolved live object. threadStateData = the GC thread; t = the thread being scanned.
 static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadLocalData* t) {
     if(!t->gcPthreadValid) return;
-    size_t ssz = 0;
-    char* base = cn1GcStackBase(t->gcPthread, &ssz);
-    if(base == 0 || ssz == 0) return;
 
 #ifdef CN1_GC_CAN_FORCE_STOP
+    // FIRST, ahead of cn1GcStackBase: the mark loop may already be holding a signal
+    // freeze on this thread, and cn1GcStackBase is pthread_getattr_np on Linux, which
+    // mallocs -- calling it under the freeze can block on an allocator lock the frozen
+    // thread owns. cn1GcMarkForceStopUncooperative resolved the bounds before it froze
+    // the thread precisely so this path never has to.
     if(t->gcMarkForcedStop) {
-        // The mark loop already froze this thread (the cooperative handshake timed out)
-        // and still owns the freeze. Reuse its capture: do NOT stop again -- a second
-        // SIGUSR2 to a thread spinning inside the handler stays pending until the handler
-        // returns, so the nested stop would spin out its full timeout and then report
-        // failure on a thread that is demonstrably stopped -- and do NOT release, because
-        // the precise object-stack scan the caller runs alongside this needs the same
-        // freeze. Also no cn1GcBuildRootSnapshots here: it reallocs, the caller built the
-        // snapshot before freezing, and a frozen thread may hold the allocator lock.
+        // Reuse the mark loop's capture: do NOT stop again -- a second SIGUSR2 to a
+        // thread spinning inside the handler stays pending until the handler returns, so
+        // the nested stop would spin out its full timeout and then report failure on a
+        // thread that is demonstrably stopped -- and do NOT release, because the precise
+        // object-stack scan the caller runs alongside this needs the same freeze. No
+        // cn1GcBuildRootSnapshots either: it reallocs, and the caller built the snapshot
+        // before freezing for the same reason.
+        char* fbase = (char*)t->gcSigStackBase;
+        size_t fssz = t->gcSigStackSize;
         char* fsp = (char*)t->gcSigStackPointer;
-        if(fsp != 0 && fsp >= base - (long)ssz && fsp < base) {
-            cn1ConservativeMarkRange(threadStateData, fsp, base);
+        if(fbase != 0 && fssz != 0 && fsp != 0
+                && fsp >= fbase - (long)fssz && fsp < fbase) {
+            cn1ConservativeMarkRange(threadStateData, fsp, fbase);
         }
         if(t->gcSigRegsLen > 0) {
             cn1ConservativeMarkRange(threadStateData, t->gcSigRegs, t->gcSigRegs + t->gcSigRegsLen);
@@ -8465,6 +8496,10 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
         return;
     }
 #endif
+
+    size_t ssz = 0;
+    char* base = cn1GcStackBase(t->gcPthread, &ssz);
+    if(base == 0 || ssz == 0) return;
 
     // Snapshot rebuilt BEFORE any signal-stop (realloc-while-frozen would deadlock).
     cn1GcBuildRootSnapshots();

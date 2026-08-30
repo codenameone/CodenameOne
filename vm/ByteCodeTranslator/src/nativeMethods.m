@@ -1830,6 +1830,8 @@ struct ThreadLocalData* getThreadLocalData() {
         i->gcSigRelease = 0;
         i->gcSigStopGen = 0;
         i->gcSigStackPointer = 0;
+        i->gcSigStackBase = 0;
+        i->gcSigStackSize = 0;
         i->gcSigRegsLen = 0;
         // ThreadLocalData is malloc'd, NOT zeroed (see the notes on nativeStackLimit and
         // bibopBytesLocal above). Garbage-nonzero here would tell
