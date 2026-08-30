@@ -133,6 +133,27 @@ public class MacOSBuildHints {
         return defaultValue;
     }
 
+    /// Whether these settings came from a project that was building Mac
+    /// Catalyst, and therefore has behaviour to preserve.
+    ///
+    /// macNative.enabled is the hint that switched the Catalyst slice on and is
+    /// what IPhoneBuilder still reads, so it names exactly the projects whose
+    /// defaults must not move under them. A project without it is new to this
+    /// target and takes the defaults chosen for it.
+    ///
+    /// Note this is about hints the project OMITS. The macNative.* spellings it
+    /// does set are honoured for everyone, which is the promise this class
+    /// makes elsewhere; the defaults are the part that was quietly diverging.
+    ///
+    /// Deliberately NOT applied to minDeploymentTarget, whose legacy default is
+    /// 10.15 against 11.0 here. That floor is technical rather than a
+    /// preference: macOS 11 is the first release on Apple Silicon, and this
+    /// port builds universal. A Catalyst app can target 10.15; a native arm64
+    /// one cannot.
+    private static boolean isLegacyCatalystProject(HintSource src) {
+        return isTrue(src.get("macNative.enabled", null));
+    }
+
     private static boolean isTrue(String v) {
         return "true".equalsIgnoreCase(v) || "1".equals(v) || "on".equalsIgnoreCase(v);
     }
@@ -198,7 +219,7 @@ public class MacOSBuildHints {
         // Store credentials to produce something runnable.
         String dist = hint(src, "distribution", null);
         if (dist == null || dist.length() == 0) {
-            dist = isTrue(src.get("macNative.enabled", null))
+            dist = isLegacyCatalystProject(src)
                     ? DISTRIBUTION_APP_STORE : DISTRIBUTION_DEVELOPER_ID;
         }
         if (DISTRIBUTION_APP_STORE.equalsIgnoreCase(dist)) {
@@ -224,7 +245,21 @@ public class MacOSBuildHints {
                         src.get("ios.teamId", null),
                         src.get("ios.debug.teamId", null)));
 
-        deriveBundleId = isTrue(hint(src, "deriveBundleId", "false"));
+        // Legacy projects keep the identifier they already ship under.
+        //
+        // MacNativeBuilder defaults macNative.deriveBundleId to true, so a
+        // Catalyst project that never set it has been building as the package
+        // name itself. Taking false here would append ".mac" and change the
+        // application's IDENTITY on the build where its plugin was upgraded --
+        // a different record in App Store Connect, a provisioning profile that
+        // no longer matches, and an update that is not an update.
+        //
+        // The ".mac" default stays for projects new to this target, where it is
+        // right for the reason below: a macOS app and an iOS app are distinct
+        // products, and sharing one id is a submission failure found late
+        // rather than a build failure found now.
+        deriveBundleId = isTrue(hint(src, "deriveBundleId",
+                isLegacyCatalystProject(src) ? "true" : "false"));
         bundleId = hint(src, "bundleId", null);
         if (bundleId == null || bundleId.length() == 0) {
             // A separate identifier by default. A macOS app and an iOS app are
@@ -239,7 +274,15 @@ public class MacOSBuildHints {
         requireValidDeploymentTarget(minDeploymentTarget);
         appCategory = hint(src, "appCategory", DEFAULT_APP_CATEGORY);
         copyright = hint(src, "copyright", null);
-        signingStyle = hint(src, "signing.style", null);
+        // Same rule, same reason. MacNativeBuilder defaults
+        // macNative.signing.style to automatic, and null here reads as manual
+        // through usesAutomaticSigning() -- so a migrated App Store project
+        // that let Xcode resolve its profile was rejected by
+        // channelRequiringAStagedProfile() until it staged one or edited its
+        // settings. Manual stays the default for projects new to this target,
+        // where being explicit about the certificate is worth the setting.
+        signingStyle = hint(src, "signing.style",
+                isLegacyCatalystProject(src) ? "automatic" : null);
         // Defaulted, not left null. The Catalyst builder defaults these to the
         // same two strings, so a project carrying only a team id signed there
         // and would silently produce an unsigned dmg or pkg here -- a build you

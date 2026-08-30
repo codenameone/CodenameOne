@@ -107,6 +107,51 @@ public class MacOSBuildHintsTest {
         assertEquals(MacOSBuildHints.DISTRIBUTION_APP_STORE, h.getDistribution());
     }
 
+    /// A migrating project keeps the IDENTITY it already ships under.
+    ///
+    /// MacNativeBuilder defaults macNative.deriveBundleId to true, so a
+    /// Catalyst project that never set it has been building as the package name
+    /// itself. Appending ".mac" would change the application's identity on the
+    /// build where its plugin was upgraded: a different record in App Store
+    /// Connect, a provisioning profile that no longer matches, and an update
+    /// that is not an update.
+    @Test
+    public void aMigratingCatalystProjectKeepsItsBundleIdentifier() {
+        assertEquals("com.example.app",
+                parse(raw("macNative.enabled", "true"), "com.example.app").getBundleId());
+        // New to this target: the separate ".mac" identifier, because a macOS
+        // app and an iOS app are distinct products.
+        assertEquals("com.example.app.mac",
+                parse(raw(), "com.example.app").getBundleId());
+    }
+
+    /// And it keeps automatic signing, which is what it has been using.
+    ///
+    /// null reads as manual through usesAutomaticSigning(), so a migrated App
+    /// Store project that let Xcode resolve its profile was rejected until it
+    /// staged one by hand.
+    @Test
+    public void aMigratingCatalystProjectKeepsAutomaticSigning() {
+        assertTrue(parse(raw("macNative.enabled", "true"),
+                "com.example.app").usesAutomaticSigning());
+        assertFalse("a project new to this target is explicit about signing",
+                parse(raw(), "com.example.app").usesAutomaticSigning());
+        // An explicit choice still wins for the legacy project.
+        assertFalse(parse(raw("macNative.enabled", "true",
+                "macNative.signing.style", "manual"),
+                "com.example.app").usesAutomaticSigning());
+    }
+
+    /// The deployment floor is NOT preserved, and that is deliberate: 11.0 is
+    /// the first macOS on Apple Silicon and this port builds universal, so a
+    /// Catalyst app's 10.15 is not a floor a native arm64 build can keep.
+    @Test
+    public void theDeploymentFloorIsNotInheritedFromCatalyst() {
+        assertEquals(MacOSBuildHints.DEFAULT_DEPLOYMENT_TARGET,
+                parse(raw("macNative.enabled", "true"),
+                        "com.example.app").getMinDeploymentTarget());
+    }
+
     /// A project new to this target takes developerID, which needs no App Store
     /// credentials to produce something runnable.
     @Test
