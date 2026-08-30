@@ -1551,4 +1551,45 @@ class NativeWindowDialogTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+    @FormTest
+    void theMonitorCapIsMeasuredInTheSamePixelsTheContentIs() {
+        // The work area is in desktop coordinates and the preferred size in device
+        // pixels. Compared raw, the cap on a display at twice the scale came out at half
+        // what it should be, so a large dialog was held to about 45% of the usable width
+        // instead of 90% -- a visibly undersized window rather than an oversized one.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setDesktopUnitsPerPixel(0.5);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        com.codename1.components.InteractionDialog id =
+                new com.codename1.components.InteractionDialog(new BorderLayout());
+        Label huge = new Label("huge") {
+            @Override
+            protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+                return new com.codename1.ui.geom.Dimension(5000, 4000);
+            }
+        };
+        id.add(BorderLayout.CENTER, huge);
+        id.setNativeWindowMode(true);
+        id.show(0, 0, 0, 0);
+        DisplayTest.flushEdt();
+
+        Window w = id.getNativeWindow();
+        assertNotNull(w, "precondition: it opened a window");
+        // 1440x900 of desktop units is 2880x1800 pixels, and nine tenths of that is
+        // what a dialog wanting more than the screen has to be given.
+        com.codename1.ui.geom.Rectangle work = w.getWorkAreaInPixels();
+        assertEquals(2880, work.getWidth(),
+                "the usable width in the pixels a layout is measured in");
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+        // The frame is in desktop units: nine tenths of 2880 pixels is 2592, which is
+        // 1296 units, and there is no chrome in this manager by default.
+        assertEquals(1296, peer.getWidth(),
+                "a dialog capped at nine tenths of the screen, not of half of it");
+
+        id.dispose();
+        DisplayTest.flushEdt();
+    }
 }

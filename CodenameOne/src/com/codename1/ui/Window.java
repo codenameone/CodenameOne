@@ -1533,6 +1533,48 @@ public class Window extends Container implements TopLevelContainer {
         }
     }
 
+    /// How many units of the coordinate space this window's bounds use one device pixel
+    /// occupies, on the display it is currently on.
+    ///
+    /// Bounds, monitor bounds and work areas are all in desktop coordinates, while sizes
+    /// Codename One lays out -- a preferred size, a content size -- are device pixels.
+    /// The two are the same on a platform addressed in pixels and differ by the backing
+    /// scale on one that is not, so anything comparing a layout size against a screen
+    /// dimension has to convert first. `#getScale()` is not that number: it reports the
+    /// display's backing scale, which is two on a retina display whether or not the
+    /// platform's own coordinates already count pixels.
+    ///
+    /// #### Returns
+    ///
+    /// desktop units per device pixel, one when the two spaces are the same
+    double getDesktopUnitsPerPixel() {
+        if (nativePeer == null) {
+            return 1.0;
+        }
+        return manager().getDesktopUnitsPerPixel(nativePeer);
+    }
+
+    /// The usable area of this window's display, in the device pixels a layout uses.
+    ///
+    /// `Monitor#getWorkArea()` is in desktop coordinates, which count pixels only where
+    /// the platform's own coordinates do. Compared raw against a preferred size, the
+    /// usable width on a display at twice the scale reads as half what it is -- so a
+    /// dialog capped at nine tenths of it was really held to about 45%.
+    ///
+    /// #### Returns
+    ///
+    /// the work area of the display this window is on, in device pixels
+    public Rectangle getWorkAreaInPixels() {
+        Rectangle work = getMonitor().getWorkArea();
+        double units = getDesktopUnitsPerPixel();
+        if (units <= 0 || units == 1.0) {
+            return work;
+        }
+        return new Rectangle(work.getX(), work.getY(),
+                (int) Math.round(work.getWidth() / units),
+                (int) Math.round(work.getHeight() / units));
+    }
+
     /// How much of this window's frame is chrome rather than drawable, in the desktop
     /// coordinates the frame itself is measured in.
     ///

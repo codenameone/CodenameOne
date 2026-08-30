@@ -2510,14 +2510,18 @@ public class Dialog extends Form implements AbstractDialog {
     /// - `host`: the top level it belongs to, may be null
     private void sizeAndPlaceNativeWindow(Window w, TopLevelContainer host) {
         revalidate();
+        // Onto the owner's display before anything is measured against it. Both the
+        // conversion below and the one inside setWindowContentSize read the window's own
+        // monitor, so sizing first and moving afterwards measured against whichever
+        // display the platform happened to open the window on -- a different scale there
+        // left a window that cannot be resized substantially the wrong size.
+        placeNativeWindow(w, host);
         Dimension pref = getDialogPreferredSize();
         int cw = Math.max(1, pref.getWidth());
         int ch = Math.max(1, pref.getHeight());
-        // Never null: Desktop reports a single monitor covering the display even where
-        // there is no windowing system.
-        Monitor m = host != null ? Desktop.getInstance().getMonitorFor(host)
-                : Desktop.getInstance().getPrimaryMonitor();
-        Rectangle work = m.getWorkArea();
+        // The window's own display, which the placement above has just put on the
+        // owner's, and in the pixels the preferred size is measured in.
+        Rectangle work = w.getWorkAreaInPixels();
         if (work.getWidth() > 0) {
             cw = Math.min(cw, work.getWidth() * 9 / 10);
         }
@@ -2527,6 +2531,12 @@ public class Dialog extends Form implements AbstractDialog {
         // The drawable size, not the frame's: a decorated window's chrome sits outside
         // the surface, so asking for a frame this size clips the box by the title bar.
         w.setWindowContentSize(cw, ch);
+        // Centred again at the size it ended up rather than the one it opened with.
+        placeNativeWindow(w, host);
+    }
+
+    /// Puts a native-window dialog on its owner's display, centred.
+    private static void placeNativeWindow(Window w, TopLevelContainer host) {
         if (host != null) {
             w.centerOn(host);
         } else {

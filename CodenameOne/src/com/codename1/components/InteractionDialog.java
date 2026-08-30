@@ -31,7 +31,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Desktop;
-import com.codename1.ui.Monitor;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.Window;
@@ -469,16 +468,21 @@ public class InteractionDialog extends Container implements AbstractDialog {
         // one. Sizing first asked for a frame the size of the content and left the
         // dialog clipped by the height of the title bar.
         w.show();
+        // Onto the owner's display first, for the reason the Dialog path does it: the
+        // conversions below and inside setWindowContentSize read the window's own
+        // monitor, so sizing before the move measured against whichever display the
+        // platform opened it on.
+        placeNativeWindow(w, host);
         int cw = Math.max(1, getPreferredW());
         int ch = Math.max(1, getPreferredH());
         // Clamped to the monitor, as the Dialog path is. The window is not resizable and
         // is centred, so content that prefers more than the screen -- a large image, a
         // long line that does not wrap -- put its own controls off both edges at once,
         // where nothing can reach them. Never null: Desktop reports a single monitor
-        // covering the display even where there is no windowing system.
-        Monitor monitor = host != null ? Desktop.getInstance().getMonitorFor(host)
-                : Desktop.getInstance().getPrimaryMonitor();
-        Rectangle work = monitor.getWorkArea();
+        // covering the display even where there is no windowing system. In device pixels
+        // rather than desktop coordinates: compared raw, the cap on a scaled display came
+        // out at half what it should be.
+        Rectangle work = w.getWorkAreaInPixels();
         if (work.getWidth() > 0) {
             cw = Math.min(cw, work.getWidth() * 9 / 10);
         }
@@ -486,11 +490,8 @@ public class InteractionDialog extends Container implements AbstractDialog {
             ch = Math.min(ch, work.getHeight() * 9 / 10);
         }
         w.setWindowContentSize(cw, ch);
-        if (host != null) {
-            w.centerOn(host);
-        } else {
-            w.centerOnDesktop();
-        }
+        // Centred again at the size it ended up rather than the one it opened with.
+        placeNativeWindow(w, host);
         startPendingTimeout(w);
         if (modal) {
             // Idempotent for a window already on screen: it takes the blocker and parks
@@ -503,6 +504,15 @@ public class InteractionDialog extends Container implements AbstractDialog {
                 w.dispose();
             }
             finishNativeShowing();
+        }
+    }
+
+    /// Puts a native-window dialog on its owner's display, centred.
+    private static void placeNativeWindow(Window w, TopLevelContainer host) {
+        if (host != null) {
+            w.centerOn(host);
+        } else {
+            w.centerOnDesktop();
         }
     }
 
