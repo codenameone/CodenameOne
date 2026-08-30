@@ -1570,7 +1570,12 @@ public class Window extends Container implements TopLevelContainer {
         if (units <= 0 || units == 1.0) {
             return work;
         }
-        return new Rectangle(work.getX(), work.getY(),
+        // The origin too, or the rectangle is half in one space and half in the other:
+        // a caller testing containment or an edge against it would be comparing a pixel
+        // size to a desktop-unit position.
+        return new Rectangle(
+                (int) Math.round(work.getX() / units),
+                (int) Math.round(work.getY() / units),
                 (int) Math.round(work.getWidth() / units),
                 (int) Math.round(work.getHeight() / units));
     }

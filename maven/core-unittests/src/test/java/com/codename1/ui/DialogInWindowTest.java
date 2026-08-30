@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -2979,5 +2980,48 @@ class DialogInWindowTest extends UITestBase {
         DisplayTest.flushEdt();
         w.dispose();
         DisplayTest.flushEdt();
+    }
+    @FormTest
+    void focusDoesNotLandInsideAHiddenBranchOfTheDialog() {
+        // Visibility is asked of each component on its own, so a child of a hidden
+        // container still answers that it is visible and focusable. Descending into that
+        // branch put the keyboard on a control the user cannot see, and the scope check
+        // then called it valid because it does belong to the dialog.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            Dialog d = new Dialog("pick");
+            d.setLayout(new com.codename1.ui.layouts.BoxLayout(
+                    com.codename1.ui.layouts.BoxLayout.Y_AXIS));
+            Container hidden = new Container(new BorderLayout());
+            Button buried = new Button("in the hidden branch");
+            hidden.add(BorderLayout.CENTER, buried);
+            hidden.setVisible(false);
+            Button visible = new Button("the one you can see");
+            d.add(hidden);
+            d.add(visible);
+            d.setTopLevelHost(w);
+
+            d.showModeless();
+            DisplayTest.flushEdt();
+            try {
+                assertNotSame(buried, w.getFocused(),
+                        "focus must not land in a branch that is not on screen");
+                assertSame(visible, w.getFocused(),
+                        "it belongs on the first control the user can actually see");
+            } finally {
+                d.dispose();
+                DisplayTest.flushEdt();
+            }
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
     }
 }

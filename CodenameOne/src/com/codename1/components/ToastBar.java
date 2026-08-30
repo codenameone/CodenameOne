@@ -544,6 +544,19 @@ public final class ToastBar {
         if (want.equals(parent.getLayout().getComponentConstraint(c))) {
             return;
         }
+        // The inset written for the edge it is leaving. Only the edge the bar sits at is
+        // ever written, so left in place it stayed on the far side while the new edge's
+        // inset was added on top of it.
+        Style s = c.getAllStyles();
+        s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        if (c.safeAreaPaddingTop > 0) {
+            s.setPaddingTop(0);
+            c.safeAreaPaddingTop = 0;
+        }
+        if (c.safeAreaPaddingBottom > 0) {
+            s.setPaddingBottom(0);
+            c.safeAreaPaddingBottom = 0;
+        }
         parent.removeComponent(c);
         parent.addComponent(want, c);
         parent.revalidateLater();
@@ -848,6 +861,7 @@ public final class ToastBar {
                 Style s = c.getAllStyles();
                 s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
                 s.setPaddingBottom(safeBottomMargin);
+                c.safeAreaPaddingBottom = safeBottomMargin;
             } else if (position == Component.TOP && safeArea.getY() > 0) {
                 Container parent = c.getParent();
                 if (parent != null) {
@@ -856,6 +870,7 @@ public final class ToastBar {
                         Style s = c.getAllStyles();
                         s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
                         s.setPaddingTop(neededPadding);
+                        c.safeAreaPaddingTop = neededPadding;
                     }
                 }
             }
@@ -1217,6 +1232,15 @@ public final class ToastBar {
         private final Slider progressBar;
         private final Label icon;
         boolean hidden = true;
+        /// The safe-area padding this class has written, so a move can take it off.
+        ///
+        /// The inset belongs to the edge the bar sits at, and only that edge is written
+        /// when it is applied. Moving the bar to the other end therefore left the old
+        /// edge's inset in place and added the new one on top, so a bar that started at
+        /// the bottom of a device with a home indicator and was moved to the top carried
+        /// both -- taller than it should be and inset away from the edge it now sits at.
+        int safeAreaPaddingTop;
+        int safeAreaPaddingBottom;
         Button leadButton = new Button();
         private TextArea label;
         private Status currentlyShowing;

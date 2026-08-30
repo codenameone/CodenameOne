@@ -1630,4 +1630,27 @@ class NativeWindowDialogTest extends UITestBase {
         DisplayTest.flushEdt();
         assertNull(id.getParent(), "and dispose has to take the layered showing down");
     }
+    @FormTest
+    void theWorkAreaIsWhollyInPixelsNotHalfOfIt() {
+        // Converting the size but not the origin hands back a rectangle in two spaces at
+        // once, so anything testing containment or an edge against it compares a pixel
+        // size to a desktop-unit position.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setDesktopUnitsPerPixel(0.5);
+        wm.setMonitors(java.util.Collections.singletonList(
+                new TestWindowManager.FakeMonitor(100, 50, 1440, 900, 2.0, 192, "scaled")));
+        Window w = new Window("sized", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            com.codename1.ui.geom.Rectangle work = w.getWorkAreaInPixels();
+            assertEquals(200, work.getX(), "the origin belongs in the same space as the size");
+            assertEquals(100, work.getY());
+            assertEquals(2880, work.getWidth());
+            assertEquals(1800, work.getHeight());
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }

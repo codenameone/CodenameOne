@@ -2778,7 +2778,17 @@ public class Dialog extends Form implements AbstractDialog {
             while (!isDisposed()) {
                 CN.invokeAndBlock(BLOCKING_SLEEP);
             }
-            Display.getInstance().setShowVirtualKeyboard(false);
+            // Only when the editing this would end belongs to the surface this dialog
+            // was on. Hosted modality claims its host's pointer and keyboard and leaves
+            // every other window interactive, but this call is process wide -- on iOS it
+            // reaches the global stopTextEditing -- so closing a dialog in one window
+            // dismissed the keyboard of a field being typed into in another.
+            Component editing = Display.impl.getEditingText();
+            TopLevelContainer editingHost =
+                    editing == null ? null : editing.getTopLevelContainer();
+            if (editing == null || editingHost == null || editingHost == resolveHost()) { //NOPMD CompareObjectsWithEquals
+                Display.getInstance().setShowVirtualKeyboard(false);
+            }
         }
     }
 
@@ -2837,6 +2847,14 @@ public class Dialog extends Form implements AbstractDialog {
             return c;
         }
         if (c instanceof Container) {
+            // Not into a branch that is not on screen. Visibility is asked of each
+            // component on its own, so a child of a hidden or disabled container still
+            // answers that it is visible and focusable -- and the host accepts it, after
+            // which the scope check finds it inside the dialog and calls it valid. The
+            // keyboard then went to a control the user cannot see.
+            if (!c.isVisible() || !c.isEnabled()) {
+                return null;
+            }
             Container cnt = (Container) c;
             int count = cnt.getComponentCount();
             for (int i = 0; i < count; i++) {
