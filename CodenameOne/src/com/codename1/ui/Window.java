@@ -4100,16 +4100,22 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// true if the event was consumed
     private boolean firePointerEvent(int kind, EventDispatcher dispatcher, ActionEvent e) {
+        if (gestureCancelled) {
+            // Before the no-scope branch below, not after it. An overlay that takes the
+            // pointer mid-gesture can be gone by the time the drag or the release
+            // arrives -- a tooltip, a menu that dismissed itself -- and removing the
+            // last scope leaves no scope at all while this gesture is still cancelled.
+            // Checked afterwards, the remainder of a gesture nobody is meant to see went
+            // to the window's ordinary listeners, so whatever sat behind the overlay
+            // acted on a drag or a release whose press it never got. The next press
+            // clears the flag, which is where a new gesture is allowed to start.
+            return false;
+        }
         if (pointerInputScopes == null) {
             if (dispatcher != null && dispatcher.hasListeners()) {
                 dispatcher.fireActionEvent(e);
             }
             return e.isConsumed();
-        }
-        if (gestureCancelled) {
-            // The overlay that owns the pointer never saw this gesture begin, so the
-            // rest of it is not addressed to it.
-            return false;
         }
         if (pointerScopeExempt != null && dispatcher != null && dispatcher.hasListeners()) {
             // Only this event's listeners, and only the topmost overlay's: the list

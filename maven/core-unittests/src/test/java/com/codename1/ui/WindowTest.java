@@ -5896,4 +5896,52 @@ class WindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    @FormTest
+    void aCancelledGestureStaysCancelledAfterTheOverlayGoes() {
+        // An overlay that takes the pointer mid-gesture can be gone by the time the drag
+        // or the release arrives -- a tooltip, a menu that dismissed itself. Removing the
+        // last scope leaves no scope at all while the gesture is still cancelled, and the
+        // remainder then went to the window's ordinary listeners, so whatever sat behind
+        // the overlay acted on a release whose press it never saw.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            final int[] released = new int[1];
+            w.addPointerReleasedListener(new com.codename1.ui.events.ActionListener() {
+                @Override
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    released[0]++;
+                }
+            });
+
+            // The press starts an ordinary gesture on the window.
+            w.pointerPressed(new int[] {10}, new int[] {10});
+            DisplayTest.flushEdt();
+
+            // An overlay takes the pointer away and is then disposed, which removes the
+            // last scope while this gesture is still in flight.
+            Container overlay = new Container(new BorderLayout());
+            w.getFormLayeredPane(WindowTest.class, true).add(overlay);
+            // Pushing the scope is what cancels the gesture in flight, which is how a
+            // dialog shown from a press does it.
+            w.pushPointerInputScope(overlay);
+            w.removePointerInputScope(overlay);
+            DisplayTest.flushEdt();
+
+            w.pointerReleased(new int[] {10}, new int[] {10});
+            DisplayTest.flushEdt();
+
+            assertEquals(0, released[0],
+                    "the rest of a cancelled gesture must not reach the window's listeners");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }
