@@ -2367,6 +2367,19 @@ public class Dialog extends Form implements AbstractDialog {
         if (hostedKeyListeners == null) {
             hostedKeyListeners = new ArrayList<HostedKeyListener>();
         }
+        // Once each. Adding the dialog to the layer initializes it, and a subclass that
+        // registers a listener from initComponent() is doing so with the host already
+        // set -- so it is published there and then, and the bulk publication that
+        // follows put a second wrapper on the same listener. Both fired, so every one of
+        // those shortcuts ran the application's callback twice for a single key.
+        int published = hostedKeyListeners.size();
+        for (int iter = 0; iter < published; iter++) {
+            HostedKeyListener existing = hostedKeyListeners.get(iter);
+            if (existing.keyCode == keyCode && existing.game == game
+                    && existing.delegate == listener) { //NOPMD CompareObjectsWithEquals
+                return;
+            }
+        }
         HostedKeyListener wrapper = new HostedKeyListener(this, keyCode, listener, game);
         hostedKeyListeners.add(wrapper);
         if (game) {

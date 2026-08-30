@@ -3125,4 +3125,68 @@ class DialogInWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    /// A dialog that registers its shortcut the way a subclass naturally would.
+    private static final class ShortcutDialog extends Dialog {
+        private final ActionListener shortcut;
+        private boolean registered;
+
+        ShortcutDialog(ActionListener shortcut) {
+            this.shortcut = shortcut;
+        }
+
+        @Override
+        protected void initComponent() {
+            super.initComponent();
+            // Registered from here, which is where a subclass would do it -- and by then
+            // the dialog is already attached to its host.
+            if (!registered) {
+                registered = true;
+                addKeyListener('x', shortcut);
+            }
+        }
+    }
+
+    @FormTest
+    void aShortcutRegisteredWhileInitialisingRunsOnce() {
+        // Adding the dialog to the layer initializes it, so a listener registered from
+        // initComponent() is published to the host there and then -- and the bulk
+        // publication that follows added a second wrapper for the same listener, so one
+        // key press ran the application's callback twice.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            final int[] fired = new int[1];
+            ShortcutDialog d = new ShortcutDialog(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    fired[0]++;
+                }
+            });
+            d.setLayout(new BorderLayout());
+            d.add(BorderLayout.CENTER, new Label("body"));
+            d.setTopLevelHost(w);
+            d.showModeless();
+            DisplayTest.flushEdt();
+            try {
+                w.keyPressed('x');
+                w.keyReleased('x');
+                DisplayTest.flushEdt();
+
+                assertEquals(1, fired[0],
+                        "one key press has to run the shortcut once, not once per wrapper");
+            } finally {
+                d.dispose();
+                DisplayTest.flushEdt();
+            }
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }
