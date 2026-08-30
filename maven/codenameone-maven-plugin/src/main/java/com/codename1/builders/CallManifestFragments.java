@@ -426,9 +426,21 @@ final class CallManifestFragments {
             // exported=false: it is launched by this app's own PendingIntent
             // and nothing outside has any business starting it.
             //
-            // showOnLockScreen is the manifest half of showing over the
-            // keyguard; the activity sets the runtime half itself. Both are
-            // needed, and neither is the default.
+            // showWhenLocked, NOT showOnLockScreen. The latter is not a
+            // public <activity> attribute: the documented manifest set is
+            // showWhenLocked and turnScreenOn, both API 27. AAPT rejects an
+            // attribute it cannot resolve, so emitting the private spelling
+            // would have failed the manifest of every call build outright
+            // rather than degrading to no lock-screen behaviour.
+            //
+            // Gated on the compile SDK for the same reason the connection
+            // service's foregroundServiceType is: AAPT also rejects an
+            // attribute the compile SDK does not know, and the legacy
+            // configuration this project still supports compiles against 28.
+            // Below 27 the attributes are not merely unavailable but
+            // unnecessary, because the activity's runtime path uses the
+            // pre-27 window flags there, which is the only mechanism that
+            // platform has.
             //
             // excludeFromRecents and noHistory because a ringing screen is
             // not somewhere to return to: once the call is answered or gone,
@@ -436,10 +448,14 @@ final class CallManifestFragments {
             // longer exists.
             sb.append("        <activity android:name=\"")
                     .append(INCOMING_ACTIVITY)
-                    .append("\"\n                  android:exported=\"false\"")
-                    .append("\n                  android:showOnLockScreen=")
-                    .append("\"true\"")
-                    .append("\n                  android:excludeFromRecents=")
+                    .append("\"\n                  android:exported=\"false\"");
+            if (compileSdk <= 0 || compileSdk >= 27) {
+                sb.append("\n                  android:showWhenLocked=")
+                        .append("\"true\"")
+                        .append("\n                  android:turnScreenOn=")
+                        .append("\"true\"");
+            }
+            sb.append("\n                  android:excludeFromRecents=")
                     .append("\"true\"")
                     .append("\n                  android:noHistory=\"true\"")
                     .append("\n                  android:launchMode=")

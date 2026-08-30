@@ -564,10 +564,26 @@ public class CallManifestFragmentsTest {
         String xml = CallManifestFragments.services(true, false, false);
         assertTrue(xml.contains(CallManifestFragments.INCOMING_ACTIVITY),
                 "a session build has to declare the ringing screen");
-        assertTrue(xml.contains("android:showOnLockScreen=\"true\""),
-                "and declare it as one that shows over the keyguard, which is"
-                + " the manifest half of what the activity also sets at"
-                + " runtime");
+        assertTrue(xml.contains("android:showWhenLocked=\"true\""),
+                "and declare it as one that shows over the keyguard");
+        assertFalse(xml.contains("showOnLockScreen"),
+                "with the PUBLIC attribute: showOnLockScreen is not in the"
+                + " <activity> schema, and AAPT rejects an attribute it"
+                + " cannot resolve, so that spelling failed the manifest of"
+                + " every call build rather than degrading");
+
+        // Both lock-screen attributes arrived in API 27, and AAPT rejects one
+        // the compile SDK does not know -- the same trap the connection
+        // service's foregroundServiceType is gated for. The legacy
+        // configuration compiles against 28, so this is not hypothetical.
+        String legacy = CallManifestFragments.services(true, false, false, "",
+                26);
+        assertTrue(legacy.contains(CallManifestFragments.INCOMING_ACTIVITY),
+                "the screen is still declared on an older compile SDK");
+        assertFalse(legacy.contains("showWhenLocked"),
+                "but without an attribute that SDK cannot resolve; the"
+                + " activity falls back to the pre-27 window flags there,"
+                + " which is the only mechanism that platform has");
         assertTrue(xml.contains("android:exported=\"false\""),
                 "nothing outside this app has business launching it");
         assertTrue(xml.contains("android:launchMode=\"singleTop\""),
