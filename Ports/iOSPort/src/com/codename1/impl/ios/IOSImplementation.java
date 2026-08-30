@@ -13562,12 +13562,29 @@ public class IOSImplementation extends CodenameOneImplementation {
             datePickerResult = -2;
         }
         try {
+            nativePickerAcquired(source);
             return showNativePickerImpl(type, source, currentValue, data);
         } finally {
             synchronized (PICKER_LOCK) {
                 pickerInProgress = false;
             }
         }
+    }
+
+    /// Invoked once this call owns the picker slot and is certain to present,
+    /// and never for a request the gate above turned away.
+    ///
+    /// The distinction matters to a port that has to stage process-wide state
+    /// for the presentation to consume, because a rejected request that staged
+    /// anyway would overwrite what the picker still on screen is relying on.
+    /// Called outside PICKER_LOCK on purpose: an override reaches the native
+    /// layer, and only one thread can be here at a time anyway -- every other
+    /// one is turned away by the gate before reaching this point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the component the picker was requested for, possibly null
+    protected void nativePickerAcquired(Component source) {
     }
 
     private Object showNativePickerImpl(final int type, final Component source,

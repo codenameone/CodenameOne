@@ -232,11 +232,20 @@ public class MacImplementation extends IOSImplementation {
     /// right when the user tapped the Picker, wrong when the application opened
     /// one for a component in another visible window, which put the popover over
     /// the wrong window at unrelated coordinates.
+    ///
+    /// Hooked here rather than by overriding showNativePicker, because the
+    /// owner is process-wide and the native presentation consumes it
+    /// asynchronously. invokeAndBlock keeps the EDT live while a picker is up,
+    /// so a second request is reachable, and the shared implementation answers
+    /// that one "cancelled" without presenting anything. Staging before the
+    /// call therefore let a request that was about to be refused overwrite the
+    /// owner belonging to the picker still on screen -- anchoring it in the
+    /// second window at coordinates measured in the first, or, if it had
+    /// already presented, leaving a stale owner for the next presentation to
+    /// pick up. This hook runs only for the request that took the slot.
     @Override
-    public Object showNativePicker(int type, com.codename1.ui.Component source,
-            Object currentValue, Object data) {
+    protected void nativePickerAcquired(com.codename1.ui.Component source) {
         nameNextPresentationWindow(source);
-        return super.showNativePicker(type, source, currentValue, data);
     }
 
     /// Names the surface a component lives on for the next popover presentation.
