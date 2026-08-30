@@ -474,11 +474,14 @@ public final class AccessibilityManager {
     }
 
     private AccessibilityNodeSnapshot findNode(long nodeId) {
-        if (isShowingRoot(snapshotRoot)) {
-            AccessibilityNodeSnapshot node = snapshot.getNode(nodeId);
-            if (node != null) {
-                return node;
-            }
+        // The tree most recently built, whatever it describes. Gating this one on the
+        // root being current as well refused an action the moment a caller performed one
+        // straight after showing a form -- the device suite does exactly that, and the
+        // surface is not current at that instant. The hazard reported was ids surviving
+        // in the *cached* trees below, which is where the check belongs.
+        AccessibilityNodeSnapshot node = snapshot.getNode(nodeId);
+        if (node != null) {
+            return node;
         }
         for (Map.Entry<Container, AccessibilityTreeSnapshot> cached
                 : snapshotsByRoot.entrySet()) {
@@ -489,7 +492,7 @@ public final class AccessibilityManager {
             if (!isShowingRoot(cached.getKey())) {
                 continue;
             }
-            AccessibilityNodeSnapshot node = cached.getValue().getNode(nodeId);
+            node = cached.getValue().getNode(nodeId);
             if (node != null) {
                 return node;
             }

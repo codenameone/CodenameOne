@@ -2225,9 +2225,7 @@ public class Dialog extends Form implements AbstractDialog {
     @Override
     public void addCommand(Command cmd, int offset) {
         super.addCommand(cmd, offset);
-        if (nativeWindow != null) {
-            nativeWindow.addCommand(cmd);
-        }
+        syncNativeMenuCommands();
     }
 
     /// {@inheritDoc}
@@ -2238,9 +2236,7 @@ public class Dialog extends Form implements AbstractDialog {
     @Override
     public void removeCommand(Command cmd) {
         super.removeCommand(cmd);
-        if (nativeWindow != null) {
-            nativeWindow.removeCommand(cmd);
-        }
+        syncNativeMenuCommands();
     }
 
     /// {@inheritDoc}
@@ -2249,9 +2245,23 @@ public class Dialog extends Form implements AbstractDialog {
     @Override
     public void removeAllCommands() {
         super.removeAllCommands();
-        if (nativeWindow != null) {
-            nativeWindow.removeAllCommands();
+        syncNativeMenuCommands();
+    }
+
+    /// Puts the operating system window's menu back in step with this dialog's own
+    /// ordered commands.
+    ///
+    /// Rebuilt rather than patched, because a window appends and a dialog inserts: a
+    /// command added at an offset -- a high-priority action at the front -- went to the
+    /// end of the native menu, so the two showed a different order for every insertion
+    /// that was not at the tail.
+    private void syncNativeMenuCommands() {
+        Window w = nativeWindow;
+        if (w == null) {
+            return;
         }
+        w.removeAllCommands();
+        publishNativeMenuCommands(w);
     }
 
     private void publishNativeMenuCommands(Window w) {

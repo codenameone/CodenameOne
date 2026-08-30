@@ -757,4 +757,50 @@ class AccessibilityWindowTest extends UITestBase {
             implementation.setAccessibilityTreeSupported(false);
         }
     }
+
+    @FormTest
+    void anActionOnTheTreeJustBuiltIsAcceptedEvenBeforeItsFormIsCurrent() {
+        // A caller routinely acts immediately after asking for a form to be shown, so the
+        // most recently built tree has to answer whether or not its root is the current
+        // surface at that instant. Gating this one the same way as the cached trees below
+        // it refused those actions outright -- the device suite caught it, having taken a
+        // snapshot and performed an action on it without waiting.
+        implementation.setAccessibilityTreeSupported(true);
+        try {
+            Form other = new Form("other", new BorderLayout());
+            other.show();
+            DisplayTest.flushEdt();
+
+            // Built for a form that is not the one on screen.
+            Form target = new Form("target", new BorderLayout());
+            final int[] fired = new int[1];
+            Button save = new Button("save");
+            save.addActionListener(new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    fired[0]++;
+                }
+            });
+            target.add(BorderLayout.CENTER, save);
+            AccessibilityTreeSnapshot tree = AccessibilityInspector.snapshot(target);
+
+            long id = 0;
+            for (Long candidate : tree.getNodes().keySet()) {
+                AccessibilityNodeSnapshot n = tree.getNode(candidate.longValue());
+                if (n != null && n.getComponent() == save //NOPMD CompareObjectsWithEquals
+                        && n.getAction(AccessibilityAction.ACTIVATE) != null) {
+                    id = candidate.longValue();
+                    break;
+                }
+            }
+            assertTrue(id != 0L, "precondition: the tree describes the button");
+
+            assertTrue(AccessibilityManager.getInstance()
+                            .performAction(id, AccessibilityAction.ACTIVATE, null),
+                    "the tree just built has to answer for its own ids");
+            DisplayTest.flushEdt();
+            assertEquals(1, fired[0], "and the action has to run");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+        }
+    }
 }

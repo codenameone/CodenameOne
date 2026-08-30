@@ -1242,6 +1242,16 @@ class NativeWindowDialogTest extends UITestBase {
         assertEquals(1, w.getCommandCount(),
                 "and one removed has to come off it, or it stays pickable");
 
+        // Order too, not just the count: a window appends where a dialog inserts, so a
+        // command added at the front went to the end of the native menu.
+        Command front = new Command("Front");
+        d.addCommand(front, 0);
+        DisplayTest.flushEdt();
+        assertEquals(2, w.getCommandCount());
+        assertSame(front, w.getCommand(0),
+                "a command inserted at the front of the dialog is at the front of the menu");
+        assertSame(help, w.getCommand(1), "and the one it went in front of follows it");
+
         d.removeAllCommands();
         DisplayTest.flushEdt();
         assertEquals(0, w.getCommandCount(), "clearing them clears the window's too");
