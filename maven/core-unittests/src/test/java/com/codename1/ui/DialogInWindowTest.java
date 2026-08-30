@@ -2310,4 +2310,70 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    @FormTest
+    void overlappingKeysEachKeepTheirOwnReleaseScope() {
+        // Keys overlap. Hold one down, press another on a control that closes the
+        // dialog, release that one, then release the first. A single saved slot was
+        // consumed by the second key's release, so the first key's release fell back to
+        // whatever had just been uncovered -- and ran its shortcut for a press it never
+        // saw.
+        final Window w = openHost(600, 500);
+        final int[] lowerShortcut = new int[1];
+        int enter = Display.getInstance().getKeyCode(Display.GAME_FIRE);
+        int held = 'x';
+
+        Dialog low = new Dialog("lower");
+        low.setLayout(new BorderLayout());
+        low.add(BorderLayout.CENTER, new Label("lower"));
+        low.addKeyListener(held, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                lowerShortcut[0]++;
+            }
+        });
+        low.setTopLevelHost(w);
+        low.showModeless();
+        DisplayTest.flushEdt();
+
+        final Dialog high = new Dialog("upper");
+        high.setLayout(new BorderLayout());
+        Button ok = new Button("OK") {
+            @Override
+            public void keyPressed(int keyCode) {
+                super.keyPressed(keyCode);
+                high.dispose();
+            }
+        };
+        high.add(BorderLayout.CENTER, ok);
+        high.setTopLevelHost(w);
+        high.showModeless();
+        DisplayTest.flushEdt();
+        w.setFocused(ok);
+        DisplayTest.flushEdt();
+
+        w.keyPressed(held);            // goes down while the upper dialog owns the keys
+        DisplayTest.flushEdt();
+        w.keyPressed(enter);           // and this one closes it
+        DisplayTest.flushEdt();
+        assertTrue(high.isDisposed(), "the second press closed the dialog on top");
+        w.keyReleased(enter);
+        DisplayTest.flushEdt();
+        w.keyReleased(held);
+        DisplayTest.flushEdt();
+
+        assertEquals(0, lowerShortcut[0],
+                "the uncovered dialog must not answer a key it never saw pressed");
+
+        // Its own press and release still reach it.
+        w.keyPressed(held);
+        DisplayTest.flushEdt();
+        w.keyReleased(held);
+        DisplayTest.flushEdt();
+        assertEquals(1, lowerShortcut[0], "a keystroke of its own still works");
+
+        low.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

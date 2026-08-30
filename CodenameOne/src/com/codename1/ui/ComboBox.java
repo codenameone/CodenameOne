@@ -546,12 +546,21 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         Dialog popupDialog = createPopupDialog(l);
         popupDialog.setTopLevelHost(parentForm);
         int originalSel = getSelectedIndex();
-        Form.comboLock = includeSelectCancel;
+        // On the popup itself, because that is what the routing is about -- the two
+        // readers in Form test their own menu bar. A popup is modal only to the surface
+        // it is on, so with windows two can be open at once; a shared flag had whichever
+        // closed first switch the other one's routing off.
+        popupDialog.comboSelectCancelRouting = includeSelectCancel;
+        Form.comboShowDepth++;
         float rr = Dialog.getDefaultBlurBackgroundRadius();
         Dialog.setDefaultBlurBackgroundRadius(-1);
-        Command result = showPopupDialog(popupDialog, l);
-        Dialog.setDefaultBlurBackgroundRadius(rr);
-        Form.comboLock = false;
+        Command result;
+        try {
+            result = showPopupDialog(popupDialog, l);
+        } finally {
+            Form.comboShowDepth--;
+            Dialog.setDefaultBlurBackgroundRadius(rr);
+        }
         parentForm.setTintColor(tint);
         if (result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() || //NOPMD CompareObjectsWithEquals
                 popupDialog.wasDisposedDueToRotation()) {

@@ -252,4 +252,102 @@ class ComboBoxInWindowTest extends UITestBase {
             caller.join(2000);
         }
     }
+
+    /// A combo whose popup stays up until the test takes it down, and which hands the
+    /// popup back so a command can be pushed through it while it is still showing.
+    private static final class HoldingComboBox extends ComboBox<String> {
+        private Dialog popup;
+        private boolean shown;
+
+        HoldingComboBox(String... items) {
+            super(items);
+        }
+
+        @Override
+        protected Dialog createPopupDialog(List<String> l) {
+            Dialog d = super.createPopupDialog(l);
+            popup = d;
+            d.addShowListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    shown = true;
+                }
+            });
+            return d;
+        }
+    }
+
+    @FormTest
+    void aPopupClosingInOneWindowLeavesAnothersPopupRouting() throws Exception {
+        // A popup is modal only to the surface it is on, so with windows two can be
+        // open at once. They shared one process-wide flag, and whichever came back
+        // first cleared it: the popup still on screen silently stopped routing its own
+        // select and cancel.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window a = new Window("a", new BorderLayout());
+        a.setWindowSize(400, 300);
+        final HoldingComboBox comboA = new HoldingComboBox("one", "two");
+        comboA.setIncludeSelectCancel(true);
+        a.add(BorderLayout.NORTH, comboA);
+        a.show();
+
+        Window b = new Window("b", new BorderLayout());
+        b.setWindowSize(400, 300);
+        ProbeComboBox comboB = new ProbeComboBox(b, "one", "two");
+        comboB.setIncludeSelectCancel(true);
+        b.add(BorderLayout.NORTH, comboB);
+        b.show();
+        DisplayTest.flushEdt();
+
+        Thread callerA = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                comboA.fireClicked();
+            }
+        }, "cn1-test-combo-a");
+        callerA.start();
+        for (int i = 0; i < 400 && !comboA.shown; i++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(5);
+        }
+        try {
+            assertTrue(comboA.shown, "precondition: the first window's popup is up");
+
+            // The second window's popup opens and closes underneath it.
+            clickOffEdt(comboB);
+            DisplayTest.flushEdt();
+
+            // Now push a command through the popup that is still showing. While it
+            // routes its own commands an unrelated command goes to the focused
+            // component, not to the command listener; once the routing is lost the
+            // listener hears it.
+            final int[] heard = new int[1];
+            comboA.popup.addCommandListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    heard[0]++;
+                }
+            });
+            Command unrelated = new Command("unrelated");
+            comboA.popup.actionCommandImpl(unrelated, new ActionEvent(unrelated));
+            assertEquals(0, heard[0],
+                    "the popup still on screen has to keep routing its own commands");
+        } finally {
+            if (comboA.popup != null) {
+                comboA.popup.dispose();
+            }
+            for (int i = 0; i < 400 && callerA.isAlive(); i++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            callerA.join(2000);
+            assertFalse(callerA.isAlive(), "its caller must not stay parked");
+            a.dispose();
+            b.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }

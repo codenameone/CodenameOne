@@ -70,7 +70,20 @@ public class Form extends Container implements TopLevelContainer {
     static int rippleX;
     static int rippleY;
     /// Used by the combo box to block some default Codename One behaviors
-    static boolean comboLock;
+    /// How many combo popups are in the middle of being shown anywhere.
+    ///
+    /// A count rather than a flag: a popup is modal to the surface it is on, so two
+    /// windows can each have one open, and the first to close would otherwise lift
+    /// the guard while the other is still going up.
+    static int comboShowDepth;
+
+    /// Whether this form is a combo popup that routes select and cancel itself.
+    ///
+    /// Per instance, not static. Both readers ask about *this* form's own menu bar,
+    /// so one shared flag answered on behalf of every other surface too: with a popup
+    /// open in one window, commands in an unrelated dialog in another were suppressed
+    /// as though they were the popup's.
+    boolean comboSelectCancelRouting;
     private static Motion rippleMotion;
     private static Component rippleComponent;
     private final Container contentPane;
@@ -2631,7 +2644,7 @@ public class Form extends Container implements TopLevelContainer {
             }
         }
 
-        if (comboLock) {
+        if (comboSelectCancelRouting) {
             if (cmd == menuBar.getCancelMenuItem()) { //NOPMD CompareObjectsWithEquals
                 actionCommand(cmd);
                 return;
@@ -2665,7 +2678,7 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
 
-        if (comboLock) {
+        if (comboSelectCancelRouting) {
             if (cmd == menuBar.getCancelMenuItem()) { //NOPMD CompareObjectsWithEquals
                 actionCommand(cmd);
                 return;
@@ -2730,7 +2743,7 @@ public class Form extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     void deinitializeImpl() {
-        if (!comboLock) {
+        if (comboShowDepth == 0) {
             // Some input devices are compound widgets that contain
             // comboboxes.  If those comboboxes are selected, then
             // it shows the combobox popup (which is a Dialog) which will

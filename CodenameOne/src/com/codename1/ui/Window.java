@@ -3626,6 +3626,10 @@ public class Window extends Container implements TopLevelContainer {
     /// pressed state with no release coming; and the framework's own recorded targets
     /// and timers, which otherwise keep firing into a tree nobody can see.
     void cancelPendingInput() {
+        // Held keys never arrive as releases once the window has gone, so their
+        // recorded scopes would sit here until some later press happened to reuse the
+        // same key code.
+        keyPressScopes = null;
         if (dragged != null && dragged.isDragAndDropInitialized()) {
             // Finished outside the window so no drop target is found: the user never
             // completed the drag, the window simply went away. This still restores
@@ -4182,9 +4186,12 @@ public class Window extends Container implements TopLevelContainer {
         // by the time the release arrives the overlay underneath has been uncovered and
         // focused. Sampling the scope at release time finds that one and hands it a
         // release whose press it never saw.
-        keyPressScope = keyInputScope;
-        keyPressScopeCode = keyCode;
-        keyPressScopeValid = true;
+        if (keyPressScopes == null) {
+            keyPressScopes = new HashMap<Integer, Container>();
+        }
+        // Null is a value here, not an absence -- it means the window itself owned the
+        // key -- so membership is what says a press is outstanding.
+        keyPressScopes.put(Integer.valueOf(keyCode), keyInputScope);
         if (!focusWithinKeyScope()) {
             return;
         }
@@ -4231,10 +4238,12 @@ public class Window extends Container implements TopLevelContainer {
         // on its own, because the press handler may already have closed the overlay
         // that owned it.
         Container scopeAtRelease = keyInputScope;
-        if (keyPressScopeValid && keyPressScopeCode == keyCode) {
-            Container pressScope = keyPressScope;
-            keyPressScopeValid = false;
-            keyPressScope = null;
+        Integer held = Integer.valueOf(keyCode);
+        if (keyPressScopes != null && keyPressScopes.containsKey(held)) {
+            Container pressScope = keyPressScopes.remove(held);
+            if (keyPressScopes.isEmpty()) {
+                keyPressScopes = null;
+            }
             if (pressScope != keyInputScope) { //NOPMD CompareObjectsWithEquals
                 // The overlay that took the press has gone, or another has taken the
                 // keyboard since. Either way this release is not addressed to whoever
@@ -4320,15 +4329,13 @@ public class Window extends Container implements TopLevelContainer {
         }
     }
 
-    /// The overlay that owned the keyboard when the last key went down.
-    private Container keyPressScope;
-
-    /// The key that scope was recorded for, so an unrelated release does not consume it.
-    private int keyPressScopeCode;
-
-    /// Whether a press has been seen whose release is still to come. Distinct from a
-    /// null scope, which is a real answer meaning the window itself owned the key.
-    private boolean keyPressScopeValid;
+    /// The overlay that owned the keyboard when each currently-held key went down.
+    ///
+    /// One entry per key rather than a single slot, because keys overlap: hold A, press
+    /// B on a control that closes the dialog, release B, release A. With one slot B's
+    /// release consumed it, and A's release was then handed to whatever B had uncovered
+    /// even though that surface never saw A go down.
+    private HashMap<Integer, Container> keyPressScopes;
 
     /// Whether a key is being dispatched right now. Distinct from a null scope, which
     /// is a real answer meaning the window itself owned the key rather than any overlay.
