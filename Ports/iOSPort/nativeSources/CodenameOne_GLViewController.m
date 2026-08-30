@@ -2523,10 +2523,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMaskGlobalIm
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGlobalImpl(JAVA_OBJECT points)
 {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-#else
+// Runs on macOS too. This was stubbed out behind TARGET_OS_OSX as a
+// "UIKit-only helper", and it is nothing of the sort: the body builds a
+// ClipRect from the polygon and queues it with upcomingAddClip, exactly as
+// the RECT clip immediately above does -- no UIKit anywhere -- and
+// ClipRect's own Metal branch renders a polygon through the stencil, which
+// is how iOS Metal satisfies these same tests.
+//
+// Stubbed, every non-rectangular clip was silently discarded and the last
+// rectangle stood in for it. Measured on the running Mac app: 13957 clips
+// reached the native layer and NOT ONE arrived as a polygon. That is the
+// whole of the rotated-clip failure (the fill covered the entire cell) and
+// of the SVG one (clipped_badge and gradient_circle drawn as oversized
+// unclipped shapes) -- one dropped call, two "rendering defects".
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* pArray = points;
     JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -2551,7 +2560,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGloba
     [[CodenameOne_GLViewController instance] upcomingAddClip:f];
 #ifndef CN1_USE_ARC
     [f release];
-#endif
 #endif
 }
 
