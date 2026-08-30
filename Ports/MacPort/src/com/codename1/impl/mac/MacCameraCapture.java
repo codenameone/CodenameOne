@@ -172,10 +172,25 @@ final class MacCameraCapture {
         // reached by the one route where the await it relies on is a no-op.
         final boolean[] stopPending = {false};
         final boolean[] cancelRequested = {false};
+        // The photo equivalent of stopPending. A photo capture has no
+        // VideoRecording to look at, so nothing else here can tell that one is
+        // in flight.
+        final boolean[] photoPending = {false};
 
         cancel.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
+                if (photoPending[0]) {
+                    // Closing now would remove photoOutput and release the
+                    // camera while AVFoundation is still processing the
+                    // capture, and the completion that the callback's own
+                    // cancellation cleanup depends on may then never arrive --
+                    // leaving its PHOTO_CBS entry retained for good. Exactly
+                    // the reason the video path does not close early either.
+                    cancelRequested[0] = true;
+                    cancel.setEnabled(false);
+                    return;
+                }
                 if (recording[0] == null) {
                     finish(finished, session, previous, response, null);
                     return;
@@ -298,9 +313,18 @@ final class MacCameraCapture {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
                     shutter.setEnabled(false);
+                    photoPending[0] = true;
                     session.takePhoto().ready(new SuccessCallback<CapturedPhoto>() {
                         @Override
                         public void onSucess(CapturedPhoto photo) {
+                            if (cancelRequested[0]) {
+                                // Cancelled while this capture was in flight.
+                                // The photo exists now, so it can be removed --
+                                // and only now is it safe to close the session.
+                                deleteQuietly(photo == null ? null : photo.getFilePath());
+                                finish(finished, session, previous, response, null);
+                                return;
+                            }
                             if (finished[0]) {
                                 // Cancelled while the capture was still in
                                 // flight. finish() would ignore this, but
