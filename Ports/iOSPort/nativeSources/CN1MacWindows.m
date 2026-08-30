@@ -2026,8 +2026,29 @@ double CN1MacWindowEditingScale(void) {
  * statics with nothing to thread. Returning nil rather than a fallback keeps the
  * decision at the call site, which is where the existing behaviour lives.
  */
+static int g_focusedWindowId = -1;
+
+void CN1MacWindowNoteFocus(int windowId, BOOL gained) {
+    pthread_mutex_lock(&g_slotLock);
+    if (gained) {
+        g_focusedWindowId = windowId;
+    } else if (g_focusedWindowId == windowId) {
+        g_focusedWindowId = -1;
+    }
+    pthread_mutex_unlock(&g_slotLock);
+}
+
 UIViewController* CN1MacWindowPresentingController(void) {
     __block UIViewController* found = nil;
+    int focused;
+    pthread_mutex_lock(&g_slotLock);
+    focused = g_focusedWindowId;
+    pthread_mutex_unlock(&g_slotLock);
+    /* The main scene is where the user is, and it already presents correctly through
+     * CodenameOne_GLViewController. */
+    if (focused < 0) {
+        return nil;
+    }
     CN1MacRunOnMainSync(^{
         for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
             if (![scene isKindOfClass:[UIWindowScene class]]) {
@@ -2037,9 +2058,11 @@ UIViewController* CN1MacWindowPresentingController(void) {
             if (windowScene.activationState != UISceneActivationStateForegroundActive) {
                 continue;
             }
-            /* A scene no Codename One window claims is the main one, which already
-             * presents correctly through CodenameOne_GLViewController. */
-            if (CN1MacWindowIdForScene(windowScene) < 0) {
+            /* The one the user is actually in, not merely the first that is foreground
+             * active: several scenes can be, connectedScenes has no focus ordering, and
+             * taking the first put the sheet over an arbitrary window -- or over a
+             * secondary one when the action was invoked from the main scene. */
+            if (CN1MacWindowIdForScene(windowScene) != focused) {
                 continue;
             }
             for (UIWindow* window in windowScene.windows) {

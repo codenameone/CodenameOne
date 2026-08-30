@@ -368,6 +368,13 @@ final class TopLevelSupport {
     ///
     /// the top level to act on, or null when the application has neither
     static TopLevelContainer current() {
+        // Every port that has windows reports focus for them, Mac Catalyst included:
+        // its scene delegate calls CN1MacWindowDeliverFocus from sceneDidBecomeActive
+        // and sceneWillResignActive, which reaches windowFocusCallback and so
+        // Desktop.getFocusedWindow(). Checked because a review read the callback as
+        // declared but never invoked, which would have left every overlay routed
+        // through here on the main form; the call sites are in
+        // CodenameOne_GLSceneDelegate.m, not in the two files that only declare it.
         if (Display.impl != null && Display.impl.getWindowManager() != null) {
             Window focused = Desktop.getInstance().getFocusedWindow();
             if (focused != null && focused.isWindowShowing()) {
