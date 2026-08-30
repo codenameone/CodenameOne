@@ -3499,16 +3499,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     /**
      * True when a frame carries at least one op that draws onto the canvas.
      *
-     * <p>Text-layer mutations are DOM writes that ride the same queue so they land in the same
-     * task as the pixels they belong with. They produce no pixels of their own, so a frame made
-     * only of them must not be treated as a repaint.</p>
+     * <p>State commands do not count. A clip or a transform records what later draws are subject
+     * to and leaves the canvas exactly as it was, and a text-layer mutation writes to the
+     * document rather than the canvas. Asking merely "is anything here besides a text mutation"
+     * is not enough: PaintSurface.paintDirty() calls setClip(0, 0, width, height) before painting
+     * each animatable and BufferedGraphics records that unconditionally, so every painted frame
+     * carries a ClipRect whether or not a pixel follows it.</p>
      *
      * @param frame the frame about to be replayed
      * @return true when something in it paints
      */
     private boolean framePaintsPixels(JavaScriptRenderQueueState.FrameSnapshot<ExecutableOp> frame) {
         for (ExecutableOp op : frame.getOps()) {
-            if (!(op instanceof com.codename1.impl.html5.graphics.TextLayerOp)) {
+            if (!BufferedGraphics.isStateOnlyOp(op)) {
                 return true;
             }
         }
