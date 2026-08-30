@@ -122,13 +122,51 @@ public class BufferedGraphics extends HTML5Graphics {
     // canvas, so we must not emit the draws at all. Mirrors the GL clipBlock
     // mechanism. Issue #5263.
     private void addOp(ExecutableOp operation) {
-        if (clipEmpty
-                && !(operation instanceof ClipRect)
-                && !(operation instanceof ClipShape)
-                && !(operation instanceof SetTransform)) {
+        if (clipEmpty && !isStateOnlyOp(operation)) {
             return;
         }
         upcoming.add(operation);
+    }
+
+    /**
+     * True when an op sets renderer state rather than producing pixels.
+     *
+     * <p>Two callers need the same answer and must not be allowed to drift apart. {@link #addOp}
+     * uses it to decide what survives an empty clip -- a draw may not render, but the clip and
+     * transform still have to be recorded so a later non-empty clip restores drawing. The drain
+     * uses it to decide whether a frame repaints anything, which is what qualifies it for the
+     * full-frame clear.</p>
+     *
+     * <p>Text-layer mutations belong here too. They ride this queue so a frame's elements and its
+     * pixels reach the host together, but they write to the document, not the canvas.</p>
+     *
+     * @param operation the recorded op
+     * @return true when replaying it leaves the canvas unchanged
+     */
+    static boolean isStateOnlyOp(ExecutableOp operation) {
+        return operation instanceof ClipRect
+                || operation instanceof ClipShape
+                || operation instanceof SetTransform
+                || operation instanceof com.codename1.impl.html5.graphics.TextLayerOp;
+    }
+
+    /**
+     * Queue a text-layer DOM mutation into this frame's command buffer.
+     *
+     * <p>Deliberately not routed through {@link #addOp}: that culls draws under an empty clip,
+     * and a mutation is not a draw. The release of a run whose component has just been clipped
+     * away is issued under exactly that empty clip, and dropping it would leave the run on
+     * screen with no pixels beneath it.</p>
+     *
+     * @param kind one of the {@code SurfaceCommandRecorder.OP_TEXT_*} opcodes
+     * @param target the element the mutation applies to
+     * @param child the element being attached or detached, null for the other kinds
+     * @param value the CSS declaration or text content, null for the other kinds
+     */
+    void recordTextLayerOp(int kind, Object target, Object child, String value) {
+        synchronized (upcoming) {
+            upcoming.add(new com.codename1.impl.html5.graphics.TextLayerOp(kind, target, child, value));
+        }
     }
 
     /**

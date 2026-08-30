@@ -1683,7 +1683,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
         textLayerEnabled = !"0".equals(getParameterByName("cn1TextLayer"));
         semanticOverlayEnabled = !"0".equals(getParameterByName("cn1Semantics"));
         if (textLayerEnabled) {
-            textLayer = new JavaScriptTextLayer(document, textLayerContainer);
+            // The sink reads ``graphics`` at record time rather than capturing it: the display
+            // graphics is built further down this method, after the layer exists.
+            textLayer = new JavaScriptTextLayer(document, textLayerContainer,
+                    new JavaScriptTextLayer.MutationSink() {
+                        @Override
+                        public void record(int kind, Object target, Object child, String value) {
+                            if (graphics != null) {
+                                graphics.recordTextLayerOp(kind, target, child, value);
+                            }
+                        }
+                    });
         }
         if (textLayerEnabled) {
             // Paint locking caches a component's pixels in an image and serves that image
@@ -3486,6 +3496,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
         });
     }
 
+    /**
+     * True when a frame carries at least one op that draws onto the canvas.
+     *
+     * <p>State commands do not count. A clip or a transform records what later draws are subject
+     * to and leaves the canvas exactly as it was, and a text-layer mutation writes to the
+     * document rather than the canvas. Asking merely "is anything here besides a text mutation"
+     * is not enough: PaintSurface.paintDirty() calls setClip(0, 0, width, height) before painting
+     * each animatable and BufferedGraphics records that unconditionally, so every painted frame
+     * carries a ClipRect whether or not a pixel follows it.</p>
+     *
+     * @param frame the frame about to be replayed
+     * @return true when something in it paints
+     */
+    private boolean framePaintsPixels(JavaScriptRenderQueueState.FrameSnapshot<ExecutableOp> frame) {
+        for (ExecutableOp op : frame.getOps()) {
+            if (!BufferedGraphics.isStateOnlyOp(op)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean drainPendingDisplayFrame() {
         JavaScriptRenderQueueState.FrameSnapshot<ExecutableOp> frame =
                 JavaScriptRenderQueueCoordinator.beginFrame(new JavaScriptRenderQueueCoordinator.GraphicsLock() {
@@ -3499,28 +3531,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return false;
         }
         if (textLayer != null) {
-            // A form transition paints two pre-rendered offscreen buffers instead of painting
-            // components, so no run is refreshed while it runs. Those buffers carry their own
-            // rasterized text, so the layer must step aside for the duration or the outgoing
-            // form's text would float above the animation.
-            // A buffered transition -- a fade, where areMutableImagesFast() is true -- paints
-            // only its prebuilt images and never puts a component through the display graphics,
-            // so the frame-start hook never runs and would leave the outgoing form's DOM text
-            // fixed above the animation for its whole duration. Catch it here, which does run
-            // every display frame.
-            //
-            // Suspending only, never resuming: the components of this frame have already
-            // painted, so lifting the suspension now would show runs that this frame's canvas
-            // also rasterized. Resuming is left to the frame-start hook, which runs before any
-            // component paints.
-            if (!textLayer.isSuspended() && Display.getInstance().isInTransition()) {
-                textLayer.setSuspended(true);
-            }
-            // Releases runs whose component has been removed, hidden, or whose form is no
-            // longer displayed; none of those ever paints again, so nothing else would clean
-            // them up.
+            // syncToForm is NOT called here. By this point the frame's ops have already been
+            // snapshotted, so a release recorded now would ship with the NEXT frame -- the
+            // removed component's text would stay on screen over the pixels that replaced it
+            // for one frame, which is what a rebuilt navigation showed as a doubled label. It
+            // runs in flushGraphics instead, while the buffer this frame ships is still open.
             Form displayed = Display.getInstance().getCurrent();
-            textLayer.syncToForm(displayed);
             if (textLayer.consumeReattachFlag() && displayed != null) {
                 // A run came back after being detached, so it holds a fresh stacking index
                 // while everything that did not repaint still holds an older one. One full
@@ -3572,7 +3588,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // their own bounds either way; sibling components whose bounds
         // happen to fall inside the union but who are NOT in the dirty
         // list keep their previous pixels.
-        if (frame.getCropX() == 0 && frame.getCropY() == 0
+        //
+        // A frame carrying nothing but text-layer mutations paints no pixels at all, so there is
+        // nothing for a clear to be the prelude to. Until those mutations rode the queue such a
+        // frame held no ops and the drain returned early at the isEmpty() check above, which is
+        // what kept the canvas intact; now it is non-empty and would reach this clear and wipe
+        // content that this frame does not redraw. A detach-only flush -- syncToForm releasing
+        // the runs of a component that has gone, with nothing else queued -- is exactly that
+        // shape, and a full-screen crop is what a form-sized component asks for when it
+        // repaints.
+        if (framePaintsPixels(frame)
+                && frame.getCropX() == 0 && frame.getCropY() == 0
                 && frame.getCropW() >= displayWidth
                 && frame.getCropH() >= displayHeight) {
             context.clearRect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
@@ -3588,6 +3614,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         ClipRect.resetClip(context, graphics.getClipState());
         context.restore();
+        if (textLayer != null && Display.getInstance().isInTransition()) {
+            // A form transition paints two pre-rendered offscreen buffers instead of painting
+            // components, so no run is refreshed while it runs. Those buffers carry their own
+            // rasterized text, so the layer must step aside for the duration or the outgoing
+            // form's text would float above the animation. A buffered transition -- a fade,
+            // where areMutableImagesFast() is true -- never puts a component through the display
+            // graphics at all, so the frame-start hook never runs and would leave that text
+            // fixed above the animation for its whole duration. This runs every display frame,
+            // which is what catches it.
+            //
+            // Suspending only, never resuming: the components of this frame have already
+            // painted, so lifting the suspension now would show runs that this frame's canvas
+            // also rasterized. Resuming is left to the frame-start hook, which runs before any
+            // component paints.
+            //
+            // Suspend into THIS frame, not through the sink. beginFrame() above snapshotted and
+            // cleared the queue, so anything recorded through the sink now lands in the buffer
+            // the NEXT frame ships -- and this frame, the first of the transition, would be
+            // composited with the outgoing form's DOM text still over it. Writing straight into
+            // the recorder puts the hide in the same flush as the transition's own pixels.
+            //
+            // It matters even more when there is no next frame: a buffered transition paints
+            // only its prebuilt images, so if the last flush went out before this ran, a
+            // sink-recorded hide would never ship at all and the stale text would sit over the
+            // whole animation.
+            textLayer.suspendIntoFrame(context);
+        }
         graphics.flush();
         // The batch is on its way, so the sources it blits can be collected again.
         blitSourcesInFlight.clear();
@@ -6773,6 +6826,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
         displayFlushes++;
+        if (textLayer != null) {
+            // Releases runs whose component has been removed, hidden, or whose form is no longer
+            // displayed; none of those ever paints again, so nothing else would clean them up.
+            //
+            // Here rather than in the drain because of when the buffer closes. The components of
+            // this frame have finished painting and their ops are still in ``upcoming``, so a
+            // detach recorded now travels with the very pixels that replace the text -- the host
+            // applies both in one task and the frame is never seen half-updated.
+            textLayer.syncToForm(Display.getInstance().getCurrent());
+        }
         JavaScriptRenderQueueCoordinator.waitUntilFlushable(new JavaScriptRenderQueueCoordinator.FlushBarrier() {
             @Override
             public boolean isGraphicsLocked() {
