@@ -699,6 +699,27 @@ public class MacOSNativeBuilder extends Executor {
         applySigningToProject(distDir, appName, hints);
 
         resultDir = new File(tmpFile, "result");
+        // Emptied, not just created. The build directory survives a local build
+        // that was not preceded by mvn clean, and each producer only removes
+        // what IT is about to write: collectBundle clears the bundle it
+        // rebuilds, buildDmg and buildPkg clear the containers actually
+        // requested. So switching distribution or packaging left the previous
+        // channel's artifacts sitting beside the new ones -- a dmg next to the
+        // pkg that replaced it, both looking equally current, and the wrong one
+        // as easy to ship as the right one.
+        //
+        // deleteRecursively rather than the private helper: it unlinks symlinks
+        // instead of descending them, which is what a .app in here requires.
+        try {
+            deleteRecursively(resultDir);
+        } catch (IOException ex) {
+            // Fatal rather than logged and carried on. The whole point of the
+            // clear is that a stale artifact must not sit beside a current one
+            // looking equally shippable; continuing would leave exactly that.
+            throw new BuildException("Could not clear the previous macOS build "
+                    + "results at " + resultDir + " (" + ex + "). Remove that "
+                    + "directory, or run a clean build.");
+        }
         resultDir.mkdirs();
 
         if (hints.isSourceOnly()) {
