@@ -1447,4 +1447,35 @@ class NativeWindowDialogTest extends UITestBase {
         id.dispose();
         DisplayTest.flushEdt();
     }
+    @FormTest
+    void contentSizeIsInPixelsEvenWhereTheDesktopIsNot() {
+        // AWT places windows in logical units while Codename One lays out in device
+        // pixels, so on a display at twice the scale a frame is half as many units as
+        // it is pixels. Subtracting the drawable from the frame raw made the chrome
+        // measure zero -- the frame is the smaller number -- and then sent the pixel
+        // count out as a unit count, so a dialog asking for 400 got a window twice the
+        // size it wanted with its title bar over the content.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setDesktopUnitsPerPixel(0.5);
+        wm.setChromeInsets(10, 25);
+        Window w = new Window("sized", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+
+        w.setWindowContentSize(400, 300);
+        DisplayTest.flushEdt();
+
+        // 400 pixels is 200 units, plus the chrome, which is measured in units too.
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(210, peer.getWidth(),
+                "the frame asked for is the content in desktop units plus the chrome");
+        assertEquals(175, peer.getHeight());
+        // And what the platform then hands back as a drawable is what was asked for.
+        assertEquals(400, wm.getWidth(peer),
+                "the drawable has to come back the size the caller asked for");
+        assertEquals(300, wm.getHeight(peer));
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

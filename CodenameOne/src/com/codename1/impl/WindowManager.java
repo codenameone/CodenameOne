@@ -155,6 +155,30 @@ public abstract class WindowManager {
     /// the array that was passed in
     public abstract int[] getBounds(Object peer, int[] out);
 
+    /// How many units of the coordinate space `#setBounds` and `#getBounds` use one
+    /// device pixel occupies, for this window's display.
+    ///
+    /// The two are not always the same space. `#getWidth` and `#getHeight` report the
+    /// drawable in the device pixels Codename One lays out in, while the bounds calls
+    /// are in desktop coordinates -- and a port whose windowing system is itself
+    /// resolution independent measures those in logical units instead, so on a display
+    /// with a backing scale of two a frame is half as many units as it is pixels.
+    /// Subtracting one from the other without this conversion measures nothing.
+    ///
+    /// The default is one, which is right for every port whose desktop coordinates are
+    /// device pixels; only a port that reports bounds in logical units overrides it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the window peer
+    ///
+    /// #### Returns
+    ///
+    /// desktop units per device pixel, one when the two spaces are the same
+    public double getDesktopUnitsPerPixel(Object peer) {
+        return 1.0;
+    }
+
     /// Returns the width of the window's drawable area in device pixels.
     ///
     /// #### Parameters

@@ -484,13 +484,41 @@ public class TestWindowManager extends WindowManager {
         return out;
     }
 
+    private double desktopUnitsPerPixel = 1.0;
+
+    /// Models a port whose desktop coordinates are not device pixels.
+    ///
+    /// The default of one is every pixel-addressed port: `setBounds` and the drawable
+    /// are the same space. A windowing system that is itself resolution independent --
+    /// AWT is -- places windows in logical units while Codename One lays out in device
+    /// pixels, so on a display at twice the scale a frame is half as many units as it
+    /// is pixels, and the drawable this reports grows accordingly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `units`: desktop units per device pixel, so 0.5 for a display at twice the scale
+    public void setDesktopUnitsPerPixel(double units) {
+        this.desktopUnitsPerPixel = units;
+    }
+
+    @Override
+    public double getDesktopUnitsPerPixel(Object peer) {
+        return desktopUnitsPerPixel;
+    }
+
+    /// The drawable in device pixels, which is what the real ports report.
+    private int toPixels(int desktopUnits) {
+        double u = desktopUnitsPerPixel > 0 ? desktopUnitsPerPixel : 1.0;
+        return Math.max(0, (int) Math.round(desktopUnits / u));
+    }
+
     @Override
     public int getWidth(Object peer) {
         FakeWindow w = win(peer);
         if (w == null) {
             return 0;
         }
-        return chromeMeasurable ? Math.max(0, w.width - chromeWidth) : w.width;
+        return toPixels(chromeMeasurable ? Math.max(0, w.width - chromeWidth) : w.width);
     }
 
     @Override
@@ -499,7 +527,7 @@ public class TestWindowManager extends WindowManager {
         if (w == null) {
             return 0;
         }
-        return chromeMeasurable ? Math.max(0, w.height - chromeHeight) : w.height;
+        return toPixels(chromeMeasurable ? Math.max(0, w.height - chromeHeight) : w.height);
     }
 
     /// How much of a window's frame is chrome rather than drawable area.

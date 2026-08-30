@@ -1508,11 +1508,23 @@ public class Window extends Container implements TopLevelContainer {
         // difference between them is not the chrome at all.
         WindowManager wm = manager();
         int[] frame = wm.getBounds(nativePeer, new int[4]);
-        int chromeW = Math.max(0, frame[2] - wm.getWidth(nativePeer));
-        int chromeH = Math.max(0, frame[3] - wm.getHeight(nativePeer));
+        // Into one space before subtracting. The frame is in the desktop coordinates
+        // setWindowSize also speaks, while the drawable is in the device pixels this
+        // method is asked for and lays out in -- the same on a port addressed in
+        // pixels, and off by the backing scale on one that is not. Subtracted raw, a
+        // frame smaller in units than the drawable is in pixels made the chrome
+        // measure zero, and the pixel count then went out as a unit count: on a
+        // display at twice the scale a dialog asking for four hundred pixels got a
+        // window twice the size it wanted, with its title bar over the content.
+        double units = wm.getDesktopUnitsPerPixel(nativePeer);
+        int drawableW = (int) Math.round(wm.getWidth(nativePeer) * units);
+        int drawableH = (int) Math.round(wm.getHeight(nativePeer) * units);
+        int chromeW = Math.max(0, frame[2] - drawableW);
+        int chromeH = Math.max(0, frame[3] - drawableH);
         applyingContentSize = true;
         try {
-            setWindowSize(width + chromeW, height + chromeH);
+            setWindowSize((int) Math.round(width * units) + chromeW,
+                    (int) Math.round(height * units) + chromeH);
         } finally {
             applyingContentSize = false;
         }
