@@ -2819,4 +2819,165 @@ class DialogInWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+
+    /// Opens one inset, dismiss-on-outside-press dialog on the host, once.
+    private static Dialog openOverlayOnce(Window w, boolean[] once) {
+        if (once[0]) {
+            return null;
+        }
+        once[0] = true;
+        Dialog over = new Dialog("over");
+        over.setLayout(new BorderLayout());
+        over.add(BorderLayout.CENTER, new Label("body"));
+        over.setDisposeWhenPointerOutOfBounds(true);
+        over.setTopLevelHost(w);
+        over.show(80, 80, 80, 80, true, false);
+        return over;
+    }
+
+    @FormTest
+    void aStylusPressThatOpensAnOverlayDoesNotHandItTheRelease() {
+        // The stylus dispatch runs before the gesture is started, so an overlay opened
+        // from a stylus listener raised the cancelled flag and the gesture start cleared
+        // it again a moment later -- the press then carried on into UI that had not
+        // existed when the pen went down.
+        final Window w = openHost(600, 500);
+        final Dialog[] shown = new Dialog[1];
+        final boolean[] once = new boolean[1];
+        Label pad = new Label("pad");
+        w.add(BorderLayout.CENTER, pad);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+        pad.addStylusListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                shown[0] = openOverlayOnce(w, once);
+            }
+        });
+
+        implementation.setPointerType(com.codename1.ui.events.PointerEvent.TYPE_STYLUS);
+        try {
+            w.pointerPressed(2, 2);
+            DisplayTest.flushEdt();
+            assertNotNull(shown[0], "the stylus listener showed a dialog");
+
+            w.pointerReleased(2, 2);
+            DisplayTest.flushEdt();
+            assertFalse(shown[0].isDisposed(),
+                    "the lift must not dismiss a dialog the pen press never touched");
+        } finally {
+            implementation.setPointerType(com.codename1.ui.events.PointerEvent.TYPE_UNKNOWN);
+            if (shown[0] != null && !shown[0].isDisposed()) {
+                shown[0].dispose();
+            }
+            DisplayTest.flushEdt();
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void aReleaseListenerThatOpensAnOverlayDoesNotAlsoReleaseWhatWasPressed() {
+        // The release forwarded to the component captured before the listeners ran, so a
+        // listener that put an overlay up still let that component act on the lift the
+        // overlay had just claimed.
+        final Window w = openHost(600, 500);
+        final int[] released = new int[1];
+        Button under = new Button("under");
+        under.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                released[0]++;
+            }
+        });
+        w.add(BorderLayout.CENTER, under);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+        int bx = under.getAbsoluteX() + under.getWidth() / 2;
+        int by = under.getAbsoluteY() + under.getHeight() / 2;
+
+        final boolean[] once = new boolean[1];
+        final Dialog[] shown = new Dialog[1];
+        w.addPointerReleasedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                shown[0] = openOverlayOnce(w, once);
+            }
+        });
+
+        w.pointerPressed(bx, by);
+        DisplayTest.flushEdt();
+        w.pointerReleased(bx, by);
+        DisplayTest.flushEdt();
+
+        assertNotNull(shown[0], "the release listener showed a dialog");
+        assertEquals(0, released[0],
+                "the component under it must not also act on a lift the overlay claimed");
+
+        shown[0].dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    /// A button that records long presses delivered to it.
+    private static final class HoldCountingButton extends Button {
+        private int holds;
+
+        HoldCountingButton(String text) {
+            super(text);
+        }
+
+        @Override
+        public void longPointerPress(int x, int y) {
+            holds++;
+        }
+    }
+
+    @FormTest
+    void aLongPressListenerThatOpensAnOverlayStopsThere() {
+        // The hold continued into hit testing after the overlay went up. The pressed
+        // component had been cleared, so the fallback target was whatever now held the
+        // focus -- a control inside the overlay that had just appeared under the finger,
+        // which then received a hold the user never aimed at it.
+        final Window w = openHost(600, 500);
+        Button under = new Button("under");
+        w.add(BorderLayout.CENTER, under);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+        int bx = under.getAbsoluteX() + under.getWidth() / 2;
+        int by = under.getAbsoluteY() + under.getHeight() / 2;
+
+        final boolean[] once = new boolean[1];
+        final Dialog[] shown = new Dialog[1];
+        final HoldCountingButton[] inOverlay = new HoldCountingButton[1];
+        w.addLongPressListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                if (once[0]) {
+                    return;
+                }
+                once[0] = true;
+                Dialog over = new Dialog("over");
+                over.setLayout(new BorderLayout());
+                HoldCountingButton inside = new HoldCountingButton("inside");
+                over.add(BorderLayout.CENTER, inside);
+                over.setTopLevelHost(w);
+                inOverlay[0] = inside;
+                shown[0] = over;
+                over.show(80, 80, 80, 80, true, false);
+            }
+        });
+
+        w.pointerPressed(bx, by);
+        DisplayTest.flushEdt();
+        w.longPointerPress(bx, by);
+        DisplayTest.flushEdt();
+
+        assertNotNull(shown[0], "the long press listener showed a dialog");
+        assertNotNull(inOverlay[0]);
+        assertEquals(0, inOverlay[0].holds,
+                "the hold must not carry on into the overlay it just opened");
+
+        shown[0].dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
 }

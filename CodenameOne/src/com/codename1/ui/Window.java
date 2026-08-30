@@ -3068,6 +3068,17 @@ public class Window extends Container implements TopLevelContainer {
     /// window has no equivalent of.
     @Override
     public void pointerPressed(int x, int y) {
+        // The gesture starts here, before any callback below can run, because those
+        // callbacks are free to put an overlay up too -- a context menu handler and a
+        // stylus listener both are. Starting it further down meant the flag they raised
+        // by taking the pointer was cleared again a moment later, and the press carried
+        // on into UI that had not existed when the pen or finger went down.
+        initialPressX = x;
+        initialPressY = y;
+        currentPointerPress = new Object();
+        // A real press starts a real gesture again.
+        gestureCancelled = false;
+        dragged = null;
         // A secondary (right / stylus barrel) press is a context menu request first,
         // exactly as on a Form. Without this a right click in a window never reached
         // the component's context menu listener, and an unconsumed right press could
@@ -3100,12 +3111,6 @@ public class Window extends Container implements TopLevelContainer {
         // afterwards that nested release found no gesture to clear, and this method then
         // installed a fresh press whose release had already happened, leaving the
         // component latched until some later gesture freed it.
-        initialPressX = x;
-        initialPressY = y;
-        currentPointerPress = new Object();
-        // A real press starts a real gesture again.
-        gestureCancelled = false;
-        dragged = null;
         if (firePointerEvent(POINTER_SCOPE_PRESSED, pointerPressedListeners,
                 new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y))) {
             return;
@@ -3209,6 +3214,13 @@ public class Window extends Container implements TopLevelContainer {
         if (firePointerEvent(POINTER_SCOPE_DRAGGED, pointerDraggedListeners, dragEvent)) {
             return;
         }
+        if (gestureCancelled) {
+            // The same rule as the other three dispatch points: a drag listener is free
+            // to put an overlay up, and the gesture ends when that overlay takes the
+            // pointer. The targets are already cleared, so this only stops autoRelease
+            // acting for a gesture nobody owns any more.
+            return;
+        }
         autoRelease(x, y);
         Component target = dragged != null ? dragged : pressedCmp;
         if (target != null) {
@@ -3278,6 +3290,17 @@ public class Window extends Container implements TopLevelContainer {
                 endGesture(releasing);
                 return;
             }
+        }
+        if (gestureCancelled) {
+            // A release listener put an overlay up without consuming the event. The
+            // gesture it belonged to ended as that overlay took the pointer, so the
+            // component captured before the listeners ran must not be given the release
+            // -- it would act on a lift the overlay has already claimed.
+            if (releasingDragged != null && releasingDragged.isDragAndDropInitialized()) {
+                LeadUtil.dragFinished(releasingDragged, x, y);
+            }
+            endGesture(releasing);
+            return;
         }
         Component target = releasingDragged != null ? releasingDragged : releasingPressed;
         if (target != null) {
@@ -3383,6 +3406,13 @@ public class Window extends Container implements TopLevelContainer {
         // silently dropped every addLongPressListener attached to the window.
         if (firePointerEvent(POINTER_SCOPE_LONG_PRESS, longPressListeners,
                 new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y))) {
+            return;
+        }
+        if (gestureCancelled) {
+            // A long press listener put an overlay up without consuming the event, and
+            // the hold it would have completed went with the pointer. Carrying on would
+            // hand the context menu or the long press to the overlay that has just
+            // appeared under the finger.
             return;
         }
         // A long press is the touch equivalent of a right click, so it is a context
