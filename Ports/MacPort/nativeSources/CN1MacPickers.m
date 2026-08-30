@@ -390,6 +390,27 @@ static void cn1PickerPresent(CN1MacPickerController *controller, NSView *content
     NSViewController *vc = controller;
     vc.view = content;
 
+    // Close and answer whatever is already open before taking the slot.
+    //
+    // "One at a time" is this file's stated contract, and the framework's:
+    // there is a single datePickerResult callback and showNativePicker blocks
+    // on it. But blocking is invokeAndBlock, which keeps the event dispatch
+    // thread processing events -- so application code CAN reach a second
+    // showNativePicker while the first popover is up, and this assignment used
+    // to simply overwrite it. That left the first popover on screen with
+    // nothing referencing it (leaked, since cn1PickerFinish is what releases
+    // it), left its caller blocked with no path to a result, and pointed every
+    // later Done/Cancel at the second popover -- so one of the two blocked
+    // callers could be released with the other's index or value.
+    //
+    // Cancelling the first is the honest resolution rather than queueing: its
+    // popover is gone from the screen the moment the second one covers it, so
+    // -1 is what actually happened to it, and every caller still leaves through
+    // cn1PickerFinish exactly once.
+    if (cn1MacPicker != nil) {
+        cn1PickerFinish(-1);
+    }
+
     NSPopover *popover = [[NSPopover alloc] init];
     popover.contentViewController = vc;
     popover.contentSize = content.frame.size;
