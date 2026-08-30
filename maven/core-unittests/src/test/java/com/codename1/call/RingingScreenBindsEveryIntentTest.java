@@ -136,4 +136,50 @@ class RingingScreenBindsEveryIntentTest {
                 "onStart has to refuse a call that ended while this screen"
                 + " was being built");
     }
+
+    @Test
+    @EnabledIf("portPresent")
+    void aRebindClaimsTheCallBeforeItTestsIt() throws Exception {
+        // dismissFor compares against callId, so between a find() that said
+        // "live" and an assignment that had not happened yet, a dismissal for
+        // the NEW call was compared against the OLD id and dropped -- and
+        // then the screen was drawn for a call that had already ended.
+        //
+        // Claiming first makes that window harmless: a dismissal inside it
+        // matches and finishes the screen.
+        String bind = body(source(), "private void bindTo(");
+        int claim = bind.indexOf("callId = id");
+        int test = bind.indexOf("CN1ConnectionService.find(id)");
+        assertTrue(claim >= 0 && test > claim,
+                "the id is claimed before it is tested, so a dismissal"
+                + " arriving in between matches this screen");
+    }
+
+    @Test
+    @EnabledIf("portPresent")
+    void aRebindRechecksAfterDrawingBecauseOnStartWillNotRunAgain()
+            throws Exception {
+        // The create path gets a second look in onStart. A singleTop
+        // redelivery arrives at an already-STARTED activity, so onStart does
+        // not run again and that second look has to happen here, or the
+        // window between the check and the screen appearing is covered on
+        // first launch and uncovered on every reuse.
+        String bind = body(source(), "private void bindTo(");
+        int draw = bind.indexOf("setContentView(");
+        int recheck = bind.indexOf("CN1ConnectionService.find(callId)");
+        assertTrue(draw >= 0, "binding draws");
+        assertTrue(recheck > draw,
+                "and looks again afterwards, because no later callback will");
+    }
+
+    @Test
+    @EnabledIf("portPresent")
+    void theCallIdIsVisibleToTheThreadThatEndsTheCall() throws Exception {
+        // dismissFor runs on whichever thread ended the call while the
+        // lifecycle callbacks write this on the main one. A plain field gives
+        // that reader no reason ever to see the new id, which is the same
+        // lost dismissal by a different route.
+        assertTrue(source().contains("private volatile String callId"),
+                "callId is read across threads and has to say so");
+    }
 }

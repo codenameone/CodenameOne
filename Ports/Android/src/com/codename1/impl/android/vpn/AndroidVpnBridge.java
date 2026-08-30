@@ -1536,6 +1536,15 @@ public class AndroidVpnBridge implements VpnBridge {
     /// perfect (a foreign tunnel coming up while ours is connecting is still
     /// indistinguishable) but it removes the case that matters: an app that
     /// never started a tunnel never hears that one is up.
+    /// Whether a VPN transport has been seen up since this app last claimed
+    /// one.
+    ///
+    /// Guarded by this bridge's monitor, like startRequested and
+    /// stopRequested, and cleared with them: it answers "could a loss
+    /// arriving now be ours", which is only meaningful for the ownership
+    /// currently claimed.
+    private boolean transportUp;
+
     void onTunnelTransport(boolean available) {
         // The tests and the writes in ONE critical section, which is the
         // rule reconciledStatus states for the same three fields: split,
@@ -1553,6 +1562,37 @@ public class AndroidVpnBridge implements VpnBridge {
                 // the stop the caller just asked for.
                 return;
             }
+            if (available) {
+                // OBSERVED, so a later loss can be attributed. Set here
+                // rather than at registration because registerNetworkCallback
+                // reports an already-matching network through onAvailable
+                // too, so a tunnel that was up before this bridge started
+                // watching still arrives as one.
+                transportUp = true;
+            }
+            if (!available && !transportUp) {
+                // The SYMMETRIC half of the guard above, and it was missing.
+                // This callback is registered on a bare TRANSPORT_VPN
+                // request, so it fires for any VPN on the device; the
+                // available direction already refuses a foreign tunnel, and
+                // the lost direction accepted one.
+                //
+                // What that cost: Android replacing another app's VPN with
+                // this profile delivers the foreign onLost while
+                // startRequested is true. This cleared both flags, bumped
+                // the epoch and published DISCONNECTED -- and then the guard
+                // at the top of this method discarded our OWN transport
+                // arriving a moment later, because neither flag was set any
+                // more. Vpn.getStatus() and every listener were left saying
+                // disconnected over a VPN that was up.
+                //
+                // A loss can only be ours if something of ours was ever up.
+                // That is not a perfect attribution and does not claim to be
+                // -- the platform offers none -- but it is the half of the
+                // question that is answerable, and it removes the case where
+                // a foreign tunnel's departure takes our own start with it.
+                return;
+            }
             if (!available) {
                 // The tunnel is actually gone, which is the point at which
                 // this app stops owning one -- whether it asked to stop or
@@ -1564,6 +1604,7 @@ public class AndroidVpnBridge implements VpnBridge {
                 // platform call that this happened; see its declaration.
                 stopRequested = false;
                 startRequested = false;
+                transportUp = false;
                 ownershipEpoch++;
             }
         }

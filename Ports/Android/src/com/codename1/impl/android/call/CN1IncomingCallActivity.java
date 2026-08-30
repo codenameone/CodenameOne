@@ -65,7 +65,11 @@ public class CN1IncomingCallActivity extends Activity {
     /// The call this screen is ringing for.
     static final String EXTRA_CALL_ID = CN1ConnectionService.EXTRA_CALL_ID;
 
-    private String callId;
+    /// VOLATILE because dismissFor reads it from whichever thread ended the
+    /// call, while the lifecycle callbacks write it on the main one. A plain
+    /// field gives that reader no reason ever to see the new id, which is the
+    /// same lost dismissal by a different route.
+    private volatile String callId;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -113,7 +117,21 @@ public class CN1IncomingCallActivity extends Activity {
     private void bindTo(android.content.Intent intent) {
         String id = intent == null ? null
                 : intent.getStringExtra(EXTRA_CALL_ID);
-        if (id == null || CN1ConnectionService.find(id) == null) {
+        if (id == null) {
+            finish();
+            return;
+        }
+        // CLAIMED BEFORE the liveness test, not after it. dismissFor compares
+        // against this field, so between a find() that said "live" and an
+        // assignment that had not happened yet, a dismissal for the NEW call
+        // was compared against the OLD id and dropped -- and then this drew a
+        // screen for a call that had already ended.
+        //
+        // Claiming first turns that window into a harmless one: a dismissal
+        // arriving inside it matches and finishes the screen, and one
+        // arriving before it is answered by the check below.
+        callId = id;
+        if (CN1ConnectionService.find(id) == null) {
             // The call went away between the notification being posted and
             // this screen binding to it -- the caller hung up, or the user
             // answered from the notification. Finishing rather than showing a
@@ -123,9 +141,15 @@ public class CN1IncomingCallActivity extends Activity {
             finish();
             return;
         }
-        // BEFORE buildUi, which reads it back through callerLabel().
-        callId = id;
         setContentView(buildUi());
+        // RECHECKED after the draw, because onStart does not run again for a
+        // redelivery. The create path gets its second look there; a singleTop
+        // rebind arrives at an already-started activity, so without this the
+        // window between the check above and the screen appearing was covered
+        // on first launch and uncovered on every reuse.
+        if (CN1ConnectionService.find(callId) == null) {
+            finish();
+        }
     }
 
     /// Puts this window in front of the lock screen and lights the display.

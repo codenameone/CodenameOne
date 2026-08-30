@@ -1451,6 +1451,68 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aConnectingReportCannotOvertakeTheConnectItLostTo() {
+        // Signalling runs on whatever thread the app's transport delivers on,
+        // so reportStartedConnecting and reportConnected can race. Guarding
+        // the STATE was not enough: the check released the monitor before the
+        // bridge call, so the connecting report could pass its test, the
+        // connect could move the session to ACTIVE and tell Telecom
+        // setActive, and only then would the connecting report arrive with
+        // setDialing. Telecom regresses to dialing, the session stays ACTIVE,
+        // and the system shows a state the API denies.
+        //
+        // Asserted on the PLATFORM order rather than on the session, because
+        // the session was never the half that was wrong.
+        //
+        // SEQUENTIAL, and honest about what that covers: it pins the state
+        // rule -- a connecting report after the connect reaches nobody -- and
+        // it does NOT exercise the interleaving, because reaching the window
+        // between the state test and the bridge call needs a seam in
+        // production code that exists only for the test. The serialisation
+        // itself is covered structurally in
+        // ReportSerialisationParityTest.
+        final List<String> reports = new ArrayList<String>();
+        LocalCallBridge ordered = new LocalCallBridge() {
+            @Override
+            public void reportOutgoingStartedConnecting(String callId,
+                    long timestampMs) {
+                synchronized (reports) {
+                    reports.add("connecting");
+                }
+                super.reportOutgoingStartedConnecting(callId, timestampMs);
+            }
+
+            @Override
+            public void reportOutgoingConnected(String callId,
+                    long timestampMs) {
+                synchronized (reports) {
+                    reports.add("connected");
+                }
+                super.reportOutgoingConnected(callId, timestampMs);
+            }
+        };
+        CallRequests.resetForTest(ordered);
+        CallAwait.value(Calls.configure(
+                new CallConfiguration().displayName("Acme")));
+        String id = CallId.random();
+        CallSession call = CallAwait.value(Calls.reportOutgoing(id,
+                CallHandle.phone("+14155551212"), "Ada", false));
+
+        call.reportConnected();
+        assertSame(CallState.ACTIVE, call.getState());
+        // The late one, which is what the race delivers.
+        call.reportStartedConnecting();
+
+        synchronized (reports) {
+            assertEquals(1, reports.size(),
+                    "the connecting report must not reach the platform after"
+                    + " the connect: it would leave Telecom dialing over a"
+                    + " call this session calls active -- got " + reports);
+            assertEquals("connected", reports.get(0));
+        }
+    }
+
+    @Test
     public void aSystemMuteThatCannotBeRefusedStillMoves() {
         // Telecom reports a mute it has already applied. A listener that
         // fails that cannot un-apply it, so the session has to agree with the

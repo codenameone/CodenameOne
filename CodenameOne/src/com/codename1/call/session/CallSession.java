@@ -133,15 +133,43 @@ public final class CallSession {
         // moveUnlessOver(DIALING) was either a no-op or that regression --
         // there was no case it existed to serve.
         //
-        // The window between this answer and the bridge call is the same one
-        // every report here lives with, and is not what this closes: a
-        // connect landing in it is a report ordering the platform resolves,
-        // not a state this object can contradict.
-        if (!stillDialing()) {
-            return;
+        // The test and the report are ONE step, under `reporting`. Guarding
+        // the state alone was not enough, and the reason I first gave for
+        // leaving that window open was wrong: I said a connect landing in it
+        // was a report ordering the platform resolves. The platform does not
+        // resolve anything -- it applies the last report it is given. So
+        // signalling on two threads could run this check while the call was
+        // still dialing, let reportConnected move the session to ACTIVE and
+        // call Telecom's setActive, and only then arrive here with
+        // setDialing. Telecom regresses to dialing and the Java session stays
+        // ACTIVE: not a race about which correct state wins, but the two
+        // halves of this API disagreeing, with the system showing the wrong
+        // one to the user.
+        //
+        // A SEPARATE lock, not the session monitor, and that is the whole
+        // trick: the monitor cannot be held across a bridge call because the
+        // ports call back into Java, so holding it here is a deadlock. This
+        // one is held only for the length of a report and only by reports, so
+        // it orders them against each other without standing between a port
+        // callback and the state it needs. TunnelHost's `lifecycle` lock
+        // orders start, stop and delivery for the same reason.
+        synchronized (reporting) {
+            if (!stillDialing()) {
+                return;
+            }
+            b.reportOutgoingStartedConnecting(callId,
+                    System.currentTimeMillis());
         }
-        b.reportOutgoingStartedConnecting(callId, System.currentTimeMillis());
     }
+
+    /// Orders a state test against the native report that follows it.
+    ///
+    /// Two reports that both move a live call and both tell the platform have
+    /// to reach the platform in the order they took effect in Java, or the
+    /// system shows a state the session denies. `end` needs no part of this:
+    /// ENDED is terminal, so a report racing it fails moveUnlessOver and
+    /// never reaches its bridge call at all.
+    private final Object reporting = new Object();
 
     /// Whether this call has not connected yet.
     ///
@@ -190,15 +218,22 @@ public final class CallSession {
     /// actually flowing, because it starts the duration the user sees.
     public void reportConnected() {
         CallBridge b = CallRequests.bridge();
-        if (b == null || !Calls.owns(callId, this)
-                || !moveUnlessOver(CallState.ACTIVE)) {
+        if (b == null || !Calls.owns(callId, this)) {
             return;
         }
-        long now = System.currentTimeMillis();
-        if (direction == CallDirection.OUTGOING) {
-            b.reportOutgoingConnected(callId, now);
-        } else {
-            b.reportIncomingConnected(callId, now);
+        // Inside `reporting` with the transition, so a started-connecting
+        // report cannot pass its own state test before this one and then
+        // reach the platform after it. See the note there.
+        synchronized (reporting) {
+            if (!moveUnlessOver(CallState.ACTIVE)) {
+                return;
+            }
+            long now = System.currentTimeMillis();
+            if (direction == CallDirection.OUTGOING) {
+                b.reportOutgoingConnected(callId, now);
+            } else {
+                b.reportIncomingConnected(callId, now);
+            }
         }
     }
 
