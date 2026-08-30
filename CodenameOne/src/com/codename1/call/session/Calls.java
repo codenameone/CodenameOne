@@ -271,50 +271,50 @@ public final class Calls {
         // is exactly the state that let an end authorised against the OLD
         // session arrive at the port after the new one claimed the id.
         synchronized (HANDOFF) {
-        synchronized (SESSIONS) {
-            // Only live calls are in the map; forget() removes an ended one,
-            // so presence is the whole test.
-            if (SESSIONS.containsKey(id)) {
-                out.error(new CallException(CallError.DUPLICATE_CALL,
-                        "A call with this id is already live: " + id));
-                return out;
+            synchronized (SESSIONS) {
+                // Only live calls are in the map; forget() removes an ended one,
+                // so presence is the whole test.
+                if (SESSIONS.containsKey(id)) {
+                    out.error(new CallException(CallError.DUPLICATE_CALL,
+                            "A call with this id is already live: " + id));
+                    return out;
+                }
+                SESSIONS.put(id, session);
+                reportedGeneration = resetGeneration;
             }
-            SESSIONS.put(id, session);
-            reportedGeneration = resetGeneration;
-        }
-        // The app has answered the system's request by reporting the call,
-        // which is exactly what startCallRequested documents. Taken BEFORE
-        // the platform is asked, so the START arm's settle cannot fail an
-        // action this report is in the middle of honouring.
-        CallAction started;
-        synchronized (PENDING_STARTS) {
-            started = PENDING_STARTS.remove(id);
-        }
-        if (started != null && !started.isAnswered()) {
-            // CLAIMED here, ANSWERED from the handover. Answering true at
-            // this point told the system the call had been placed before the
-            // platform had accepted it -- and a report the port refuses (a
-            // cold start whose Calls.configure has not finished is the
-            // ordinary way) then left the Telecom connection dialing for ever
-            // with the failed handover having removed the Java session.
-            //
-            // defer() is exactly the "answer is coming later" primitive the
-            // listener contract already documents, so settleStart leaves it
-            // alone and the acknowledgement below decides.
-            started.defer();
-        }
-        int reqId = CallRequests.nextId();
-        EdtResult<Boolean> ack = CallRequests.openAck(reqId);
-        // The session is only handed over once the system has accepted it,
-        // so an app can never act on a call that was refused.
-        ack.onResult(new SessionHandover(out, session, id, reportedGeneration,
-                started));
-        String wire = CallWire.encodeHandle(handle);
-        if (direction == CallDirection.INCOMING) {
-            b.reportIncomingCall(reqId, id, wire, displayName, -1, video);
-        } else {
-            b.reportOutgoingCall(reqId, id, wire, displayName, -1, video);
-        }
+            // The app has answered the system's request by reporting the call,
+            // which is exactly what startCallRequested documents. Taken BEFORE
+            // the platform is asked, so the START arm's settle cannot fail an
+            // action this report is in the middle of honouring.
+            CallAction started;
+            synchronized (PENDING_STARTS) {
+                started = PENDING_STARTS.remove(id);
+            }
+            if (started != null && !started.isAnswered()) {
+                // CLAIMED here, ANSWERED from the handover. Answering true at
+                // this point told the system the call had been placed before the
+                // platform had accepted it -- and a report the port refuses (a
+                // cold start whose Calls.configure has not finished is the
+                // ordinary way) then left the Telecom connection dialing for ever
+                // with the failed handover having removed the Java session.
+                //
+                // defer() is exactly the "answer is coming later" primitive the
+                // listener contract already documents, so settleStart leaves it
+                // alone and the acknowledgement below decides.
+                started.defer();
+            }
+            int reqId = CallRequests.nextId();
+            EdtResult<Boolean> ack = CallRequests.openAck(reqId);
+            // The session is only handed over once the system has accepted it,
+            // so an app can never act on a call that was refused.
+            ack.onResult(new SessionHandover(out, session, id, reportedGeneration,
+                    started));
+            String wire = CallWire.encodeHandle(handle);
+            if (direction == CallDirection.INCOMING) {
+                b.reportIncomingCall(reqId, id, wire, displayName, -1, video);
+            } else {
+                b.reportOutgoingCall(reqId, id, wire, displayName, -1, video);
+            }
         }
         return out;
     }
