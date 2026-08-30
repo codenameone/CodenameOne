@@ -11621,19 +11621,39 @@ public class IOSImplementation extends CodenameOneImplementation {
         // and calls into the native layer, and holding a lock across that invites
         // the deadlock this is not worth.
         for (PendingPush p : held) {
-            // Restored immediately before its own delivery, so each callback
-            // sees the content of the notification it is being given.
-            restorePushContent(p.content);
-            pushReceived(p.message, p.type, p.completionId);
+            // The content travels WITH the delivery and is restored inside it.
+            // Restoring here instead would restore every snapshot before the
+            // first queued callback ran.
+            pushReceived(p.message, p.type, p.completionId, true, p.content);
         }
     }
 
     public static void pushReceived(final String message, final String type,
             final long completionId) {
+        pushReceived(message, type, completionId, false, null);
+    }
+
+    /// Delivers one push, optionally restoring the PushContent it arrived with.
+    ///
+    /// The restore has to happen INSIDE the queued delivery. pushReceived only
+    /// hands the callback to the EDT with callSerially, so a replay loop that
+    /// restored each snapshot before calling it had restored the LAST one
+    /// before the FIRST delivery ran -- every callback then read the final
+    /// notification's metadata, which is the bug the snapshot was added to fix,
+    /// moved one step along rather than removed.
+    ///
+    /// restore is false for a live push, where the native layer has already
+    /// written the singleton and rewriting it here would be wrong.
+    private static void pushReceived(final String message, final String type,
+            final long completionId, final boolean restore,
+            final PushContent content) {
         if(pushCallback != null) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
                     try {
+                        if (restore) {
+                            restorePushContent(content);
+                        }
                         if(type != null) {
                             Display.getInstance().setProperty("pushType", type);
                             PushContent.setType(Integer.parseInt(type));
@@ -11685,8 +11705,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                     // notification. get() clears as it reads, which is what
                     // makes the snapshot exclusive to this record; the next
                     // notification resets the singleton anyway.
+                    // A replay that finds the callback gone again re-queues
+                    // the content it was handed, not the singleton: the restore
+                    // now happens inside the delivery, so the singleton does
+                    // not describe this push at this point.
                     pendingPushes.add(new PendingPush(message, type, completionId,
-                            PushContent.get()));
+                            restore ? content : PushContent.get()));
                 }
             }
             if (deliverNow) {
