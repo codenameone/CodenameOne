@@ -3509,23 +3509,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return false;
         }
         if (textLayer != null) {
-            // A form transition paints two pre-rendered offscreen buffers instead of painting
-            // components, so no run is refreshed while it runs. Those buffers carry their own
-            // rasterized text, so the layer must step aside for the duration or the outgoing
-            // form's text would float above the animation.
-            // A buffered transition -- a fade, where areMutableImagesFast() is true -- paints
-            // only its prebuilt images and never puts a component through the display graphics,
-            // so the frame-start hook never runs and would leave the outgoing form's DOM text
-            // fixed above the animation for its whole duration. Catch it here, which does run
-            // every display frame.
-            //
-            // Suspending only, never resuming: the components of this frame have already
-            // painted, so lifting the suspension now would show runs that this frame's canvas
-            // also rasterized. Resuming is left to the frame-start hook, which runs before any
-            // component paints.
-            if (!textLayer.isSuspended() && Display.getInstance().isInTransition()) {
-                textLayer.setSuspended(true);
-            }
             // syncToForm is NOT called here. By this point the frame's ops have already been
             // snapshotted, so a release recorded now would ship with the NEXT frame -- the
             // removed component's text would stay on screen over the pixels that replaced it
@@ -3599,6 +3582,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         ClipRect.resetClip(context, graphics.getClipState());
         context.restore();
+        if (textLayer != null && Display.getInstance().isInTransition()) {
+            // A form transition paints two pre-rendered offscreen buffers instead of painting
+            // components, so no run is refreshed while it runs. Those buffers carry their own
+            // rasterized text, so the layer must step aside for the duration or the outgoing
+            // form's text would float above the animation. A buffered transition -- a fade,
+            // where areMutableImagesFast() is true -- never puts a component through the display
+            // graphics at all, so the frame-start hook never runs and would leave that text
+            // fixed above the animation for its whole duration. This runs every display frame,
+            // which is what catches it.
+            //
+            // Suspending only, never resuming: the components of this frame have already
+            // painted, so lifting the suspension now would show runs that this frame's canvas
+            // also rasterized. Resuming is left to the frame-start hook, which runs before any
+            // component paints.
+            //
+            // Suspend into THIS frame, not through the sink. beginFrame() above snapshotted and
+            // cleared the queue, so anything recorded through the sink now lands in the buffer
+            // the NEXT frame ships -- and this frame, the first of the transition, would be
+            // composited with the outgoing form's DOM text still over it. Writing straight into
+            // the recorder puts the hide in the same flush as the transition's own pixels.
+            //
+            // It matters even more when there is no next frame: a buffered transition paints
+            // only its prebuilt images, so if the last flush went out before this ran, a
+            // sink-recorded hide would never ship at all and the stale text would sit over the
+            // whole animation.
+            textLayer.suspendIntoFrame(context);
+        }
         graphics.flush();
         // The batch is on its way, so the sources it blits can be collected again.
         blitSourcesInFlight.clear();

@@ -25,7 +25,9 @@ package com.codename1.impl.html5;
 import com.codename1.html5.js.dom.HTMLDocument;
 import com.codename1.html5.js.dom.HTMLElement;
 import com.codename1.impl.html5.HTML5Implementation.NativeFont;
+import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 import com.codename1.impl.html5.graphics.SurfaceCommandRecorder;
+import com.codename1.impl.html5.graphics.TextLayerOp;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -208,6 +210,28 @@ public final class JavaScriptTextLayer {
         suspended = value;
         sink.record(SurfaceCommandRecorder.OP_TEXT_DISPLAY, container, null,
                 value ? "none" : "block");
+    }
+
+    /**
+     * Suspends as part of the frame being drained, writing the mutation straight into that
+     * frame's recorder instead of through the sink.
+     *
+     * <p>The sink records into the buffer the <em>next</em> frame ships. That is right for a
+     * caller inside a component paint, whose frame has not been handed off yet, and wrong for
+     * the drain, which runs after the queue has been snapshotted: the hide would arrive a frame
+     * after the transition it is meant to hide behind, and if no further flush followed it
+     * would never arrive at all. Recording into the recorder puts it in the flush now being
+     * assembled.</p>
+     *
+     * @param frameRecorder the display recorder for the frame being drained
+     */
+    public void suspendIntoFrame(CanvasRenderingContext2D frameRecorder) {
+        if (suspended) {
+            return;
+        }
+        suspended = true;
+        new TextLayerOp(SurfaceCommandRecorder.OP_TEXT_DISPLAY, container, null, "none")
+                .execute(frameRecorder);
     }
 
     /**
