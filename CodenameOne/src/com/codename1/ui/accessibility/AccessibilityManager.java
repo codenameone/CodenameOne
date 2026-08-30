@@ -85,7 +85,15 @@ public final class AccessibilityManager {
 
     /// Roots invalidated since the pending refresh was scheduled, all of which it has
     /// to rebuild rather than only the one that scheduled it.
-    private final ArrayList<Container> pendingRoots = new ArrayList<Container>();
+    /// The roots waiting to be rebuilt, each with the changes recorded against it.
+    ///
+    /// Per root rather than one shared mask: the mask is handed to the port with the
+    /// surface it describes, and a port acts on the bits. On iOS a pane change is a
+    /// screen-change notification, so forwarding the union to every queued surface moved
+    /// the reader's focus on a window where nothing of the sort had happened. Ordered,
+    /// so surfaces are still rebuilt in the order they went stale.
+    private final LinkedHashMap<Container, Integer> pendingRoots =
+            new LinkedHashMap<Container, Integer>();
 
     /// Whether a mutation with no resolvable surface is waiting for the refresh. Not
     /// the same as an empty queue, which is also what disposing every queued root
@@ -107,17 +115,28 @@ public final class AccessibilityManager {
     /// walks a generic collection, and the compiler's cast for that would sit inside
     /// that method's catch of Throwable -- which ParparVM does not raise for a failed
     /// cast, so the repository's cast-semantics gate rejects it.
-    private void queueEveryLiveRoot() {
+    private void queueEveryLiveRoot(int changeType) {
         for (Container root : snapshotsByRoot.keySet()) {
-            if (!pendingRoots.contains(root)) {
-                pendingRoots.add(root);
-            }
+            queueRoot(root, changeType);
         }
         TopLevelContainer current = CN.getCurrentTopLevel();
         Container currentRoot = current == null ? null : current.asContainer();
-        if (currentRoot != null && !pendingRoots.contains(currentRoot)) {
-            pendingRoots.add(currentRoot);
+        if (currentRoot != null) {
+            queueRoot(currentRoot, changeType);
         }
+    }
+
+    /// Records a change against a root, keeping whatever was already recorded for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the surface that changed
+    ///
+    /// - `changeType`: the bits to add to its mask
+    private void queueRoot(Container root, int changeType) {
+        Integer existing = pendingRoots.get(root);
+        pendingRoots.put(root, Integer.valueOf(
+                existing == null ? changeType : existing.intValue() | changeType));
     }
 
     /// How many roots are currently recorded as stale.
@@ -237,7 +256,7 @@ public final class AccessibilityManager {
             // snapshot cache is capped because it holds whole trees; this holds
             // references to containers that are alive anyway.
             if (allRoots) {
-                queueEveryLiveRoot();
+                queueEveryLiveRoot(changeType);
             } else if (refreshRoot == null) {
                 // A mutation whose component belongs to no surface at all. Recorded
                 // separately from the queue, because an empty queue can also mean every
@@ -245,8 +264,8 @@ public final class AccessibilityManager {
                 // cached surface is right for the first and destroys every other
                 // window's tree for the second.
                 pendingRootlessRefresh = true;
-            } else if (!pendingRoots.contains(refreshRoot)) {
-                pendingRoots.add(refreshRoot);
+            } else {
+                queueRoot(refreshRoot, changeType);
             }
             if (!refreshScheduled) {
                 refreshScheduled = true;
@@ -270,6 +289,7 @@ public final class AccessibilityManager {
         public void run() {
             int changes;
             ArrayList<Container> roots;
+            ArrayList<Integer> masks;
             boolean rootless;
             synchronized (AccessibilityManager.this) {
                 // Taken, not just read. The rebuilds below used to clear this as a
@@ -278,7 +298,8 @@ public final class AccessibilityManager {
                 // pane change VoiceOver needs to move focus to a newly opened pane.
                 changes = pendingChanges;
                 pendingChanges = 0;
-                roots = new ArrayList<Container>(pendingRoots);
+                roots = new ArrayList<Container>(pendingRoots.keySet());
+                masks = new ArrayList<Integer>(pendingRoots.values());
                 pendingRoots.clear();
                 rootless = pendingRootlessRefresh;
                 pendingRootlessRefresh = false;
@@ -316,8 +337,12 @@ public final class AccessibilityManager {
                 Display.getInstance().accessibilityTreeChanged(changes);
             } else {
                 for (int iter = 0; iter < count; iter++) {
-                    Display.getInstance().accessibilityTreeChanged(changes,
-                            windowIdOf(roots.get(iter)));
+                    // Its own changes, not the union. A port acts on these bits -- iOS
+                    // reads a pane change as "move the reader to the top of this screen"
+                    // -- so handing one surface's bits to another moved the reader on a
+                    // window where nothing had happened.
+                    Display.getInstance().accessibilityTreeChanged(
+                            masks.get(iter).intValue(), windowIdOf(roots.get(iter)));
                 }
             }
             if (again) {
@@ -611,8 +636,19 @@ public final class AccessibilityManager {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                action.perform(node.getComponent(), argument);
-                invalidate(node.getComponent(), CHANGE_STATE | CHANGE_VALUE | CHANGE_CONTENT);
+                // Asked again here, not only when the id was resolved. A window can be
+                // hidden or disposed between the two, and the action would then press a
+                // button on a surface that has gone. The question is the same narrow one
+                // the lookup asks -- has this surface been taken off screen -- rather
+                // than "is it showing", which is equally false for a form that was never
+                // shown and is a live surface a caller acts on.
+                Component target = node.getComponent();
+                TopLevelContainer top = target == null ? null : target.getTopLevelContainer();
+                if (top != null && isWithdrawnRoot(top.asContainer())) {
+                    return;
+                }
+                action.perform(target, argument);
+                invalidate(target, CHANGE_STATE | CHANGE_VALUE | CHANGE_CONTENT);
             }
         });
         return true;

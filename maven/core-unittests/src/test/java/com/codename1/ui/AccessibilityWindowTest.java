@@ -1128,4 +1128,98 @@ class AccessibilityWindowTest extends UITestBase {
             implementation.setAccessibilityTreeUpdateRequired(null);
         }
     }
+    @FormTest
+    void eachSurfaceIsToldOnlyItsOwnChanges() {
+        // The mask goes to the port with the surface it describes, and a port acts on
+        // the bits: iOS reads a pane change as "move the reader to the top of this
+        // screen". Sending the union to every queued surface moved the reader on a
+        // window where nothing of the sort had happened.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        final Window w = new Window("second", new BorderLayout());
+        try {
+            Form main = new Form("main", new BorderLayout());
+            final Button mainButton = new Button("on the main form");
+            main.add(BorderLayout.CENTER, mainButton);
+            main.show();
+            DisplayTest.flushEdt();
+
+            w.setWindowSize(400, 300);
+            final Button windowButton = new Button("in the window");
+            w.add(BorderLayout.CENTER, windowButton);
+            w.show();
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            implementation.clearAccessibilityNotifications();
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            // A pane change on the window and a plain content change on the main form,
+            // both queued before the pass runs.
+            mgr.invalidate(windowButton, AccessibilityManager.CHANGE_PANE);
+            mgr.invalidate(mainButton, AccessibilityManager.CHANGE_CONTENT);
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            boolean sawMain = false;
+            for (int[] n : implementation.getAccessibilityNotifications()) {
+                if (n[1] == 0) {
+                    sawMain = true;
+                    assertEquals(0, n[0] & AccessibilityManager.CHANGE_PANE,
+                            "the main form must not be told about the window's pane change");
+                }
+            }
+            assertTrue(sawMain, "precondition: the main form was rebuilt too");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void anActionIsDroppedIfItsWindowGoesBeforeItRuns() {
+        // A window can be hidden between the id being resolved and the action running,
+        // and the action would then press a button on a surface that has gone.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        implementation.setAccessibilityTreeUpdateRequired(Boolean.FALSE);
+        final Window w = new Window("second", new BorderLayout());
+        try {
+            new Form("main", new BorderLayout()).show();
+            DisplayTest.flushEdt();
+
+            w.setWindowSize(400, 300);
+            final boolean[] pressed = new boolean[1];
+            Button b = new Button("in the window");
+            b.addActionListener(new com.codename1.ui.events.ActionListener() {
+                @Override
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    pressed[0] = true;
+                }
+            });
+            w.add(BorderLayout.CENTER, b);
+            w.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            long id = idOf(AccessibilityInspector.snapshot(w), "in the window");
+            assertTrue(id != 0, "precondition: the button is in the tree");
+
+            // Accepted while the window is up, then the window goes before the queued
+            // action reaches the event thread.
+            assertTrue(mgr.performAction(id, "activate", null),
+                    "precondition: the action is accepted while the window is showing");
+            w.hide();
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            assertFalse(pressed[0],
+                    "an action must not run on a window that has gone in the meantime");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+            implementation.setAccessibilityTreeUpdateRequired(null);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }
