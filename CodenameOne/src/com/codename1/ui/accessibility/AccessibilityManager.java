@@ -33,6 +33,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.Slider;
+import com.codename1.ui.Window;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
@@ -485,7 +486,11 @@ public final class AccessibilityManager {
         // straight after showing a form -- the device suite does exactly that, and the
         // surface is not current at that instant. The hazard reported was ids surviving
         // in the *cached* trees below, which is where the check belongs.
-        AccessibilityNodeSnapshot node = snapshot.getNode(nodeId);
+        // Unless that surface has since been taken off screen. A window hidden without
+        // being disposed stays the last tree built, and its ids went on resolving here
+        // -- so a reader holding one could press a button on a window nobody can see.
+        AccessibilityNodeSnapshot node = isWithdrawnRoot(snapshotRoot)
+                ? null : snapshot.getNode(nodeId);
         if (node != null) {
             return node;
         }
@@ -504,6 +509,26 @@ public final class AccessibilityManager {
             }
         }
         return null;
+    }
+
+    /// Whether a root has been taken off screen since its tree was built.
+    ///
+    /// Only a window can be: the platform maps it and unmaps it again, and once it is
+    /// unmapped an id retained from it must not act on it. A form's showing flag cannot
+    /// answer this question -- it means "is the current surface", which is equally false
+    /// for a form being prepared off screen and for the instant between `Form#show()` and
+    /// the event thread processing it. Both are live surfaces a caller legitimately acts
+    /// on, which is why the check below is the wrong one to apply here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root that owns the most recently built tree, may be null
+    ///
+    /// #### Returns
+    ///
+    /// true when it is a window that is no longer on screen
+    private static boolean isWithdrawnRoot(Container root) {
+        return root instanceof Window && !((Window) root).isWindowShowing();
     }
 
     /// Whether a cached root is a surface the user can currently see.

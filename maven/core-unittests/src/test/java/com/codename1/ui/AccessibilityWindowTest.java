@@ -950,4 +950,86 @@ class AccessibilityWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    @FormTest
+    void anActionOnAWindowHiddenSinceTheTreeWasBuiltDoesNotRun() {
+        // A reader holds an id from the last tree built anywhere. If that surface is
+        // hidden -- a window hidden without being disposed -- acting on it would press
+        // a button on a window the user cannot see.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        // A port that is pulled from rather than projected to -- the desktop and iOS
+        // bridges ask for a tree when they want one. Nothing then rebuilds the window's
+        // tree behind the manager's back when it is hidden, so the ids in the tree that
+        // was already built are exactly what a reader is still holding.
+        implementation.setAccessibilityTreeUpdateRequired(Boolean.FALSE);
+        final Window w = new Window("second", new BorderLayout());
+        try {
+            new Form("main", new BorderLayout()).show();
+            DisplayTest.flushEdt();
+
+            w.setWindowSize(400, 300);
+            final boolean[] pressed = new boolean[1];
+            Button b = new Button("in the window");
+            b.addActionListener(new com.codename1.ui.events.ActionListener() {
+                @Override
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    pressed[0] = true;
+                }
+            });
+            w.add(BorderLayout.CENTER, b);
+            w.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            long id = idOf(mgr.getSnapshot(w), "in the window");
+            assertTrue(id != 0, "precondition: the button is in the tree");
+            // Still reachable while the window is up.
+            assertTrue(mgr.performAction(id, "activate", null));
+            DisplayTest.flushEdt();
+            assertTrue(pressed[0], "precondition: the action works while it is showing");
+
+            pressed[0] = false;
+            w.hide();
+            DisplayTest.flushEdt();
+            assertFalse(mgr.performAction(id, "activate", null),
+                    "an id from a window that has been taken off screen must not resolve");
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+            assertFalse(pressed[0],
+                    "an id retained from a hidden window must not press its buttons");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+            implementation.setAccessibilityTreeUpdateRequired(null);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    /// The id of the first node carrying this label, or 0.
+    private static long idOf(AccessibilityTreeSnapshot snap, String label) {
+        for (Long id : snap.getRootIds()) {
+            long found = idWalk(snap, id, label);
+            if (found != 0) {
+                return found;
+            }
+        }
+        return 0;
+    }
+
+    private static long idWalk(AccessibilityTreeSnapshot snap, Long id, String label) {
+        AccessibilityNodeSnapshot n = snap.getNode(id);
+        if (n == null) {
+            return 0;
+        }
+        if (label.equals(n.getLabel())) {
+            return id.longValue();
+        }
+        for (Long child : n.getChildIds()) {
+            long found = idWalk(snap, child, label);
+            if (found != 0) {
+                return found;
+            }
+        }
+        return 0;
+    }
 }

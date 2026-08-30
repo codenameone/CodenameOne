@@ -859,6 +859,31 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return accessibilityTreeSupported;
     }
 
+    private Boolean accessibilityTreeUpdateRequired;
+
+    /// Models a port that exposes the tree but never projects it eagerly.
+    ///
+    /// The default ties this to `#isAccessibilityTreeSupported()`, which is the
+    /// Android shape: assistive technology is active, so every invalidation schedules a
+    /// rebuild. Ports that are pulled from instead -- the desktop and iOS bridges ask
+    /// for a tree when they want one -- report false here while still supporting it, and
+    /// then nothing rebuilds a surface behind the manager's back.
+    ///
+    /// #### Parameters
+    ///
+    /// - `required`: true or false to force it, null to follow whether it is supported
+    public void setAccessibilityTreeUpdateRequired(Boolean required) {
+        this.accessibilityTreeUpdateRequired = required;
+    }
+
+    @Override
+    public boolean isAccessibilityTreeUpdateRequired() {
+        if (accessibilityTreeUpdateRequired != null) {
+            return accessibilityTreeUpdateRequired.booleanValue();
+        }
+        return super.isAccessibilityTreeUpdateRequired();
+    }
+
     /// Returns the fake window manager as its concrete type, for assertions.
     public TestWindowManager getTestWindowManager() {
         return windowManager;
