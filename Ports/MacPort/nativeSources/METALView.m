@@ -778,9 +778,8 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 #define CN1_PE_MODIFIER_ALT     (1 << 2)
 #define CN1_PE_MODIFIER_META    (1 << 3)
 
-/// PointerEvent's modifier mask for the keys held during this event.
-static int cn1ModifiersOf(NSEvent *event) {
-    NSEventModifierFlags flags = event.modifierFlags;
+/// PointerEvent's modifier mask for a set of AppKit flags.
+static int cn1ModifiersOfFlags(NSEventModifierFlags flags) {
     int m = 0;
     if (flags & NSEventModifierFlagShift)   { m |= CN1_PE_MODIFIER_SHIFT; }
     if (flags & NSEventModifierFlagControl) { m |= CN1_PE_MODIFIER_CONTROL; }
@@ -788,6 +787,11 @@ static int cn1ModifiersOf(NSEvent *event) {
     if (flags & NSEventModifierFlagOption)  { m |= CN1_PE_MODIFIER_ALT; }
     if (flags & NSEventModifierFlagCommand) { m |= CN1_PE_MODIFIER_META; }
     return m;
+}
+
+/// PointerEvent's modifier mask for the keys held during this event.
+static int cn1ModifiersOf(NSEvent *event) {
+    return cn1ModifiersOfFlags(event.modifierFlags);
 }
 
 /// The modifier keys held right now, in PointerEvent's mask.
@@ -806,6 +810,24 @@ static int cn1CurrentModifiers = 0;
 
 int CN1MacCurrentModifiers(void) {
     return cn1CurrentModifiers;
+}
+
+/// Re-reads the modifiers from AppKit, for the activation boundary.
+///
+/// The three updates above are all key-window events, and an application that
+/// is not active receives none of them. Cmd-Tab away while holding Command and
+/// release it in the other application and this one never sees the
+/// flagsChanged: that would have cleared the bit, so the mask stayed "Command
+/// held" and the next mouse-driven action read as Command-clicked until some
+/// unrelated key event corrected it.
+///
+/// +[NSEvent modifierFlags] is the current GLOBAL state and answers whether or
+/// not this application is active, which is why the boundary can be resynced
+/// rather than merely cleared: a user who Cmd-Tabs back while still holding
+/// Command is holding it, and zeroing the mask would be just as wrong in the
+/// other direction.
+void CN1MacRefreshModifiers(void) {
+    cn1CurrentModifiers = cn1ModifiersOfFlags([NSEvent modifierFlags]);
 }
 
 /// The buttons currently HELD, which is what getButtonMask() answers.

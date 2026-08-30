@@ -729,7 +729,16 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
     }
 }
 
+/// Defined in METALView.m; resyncs the held-modifier mask from AppKit.
+extern void CN1MacRefreshModifiers(void);
+
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
+    // Resync the held modifiers across the activation boundary, BEFORE the
+    // early return below: the mask is native state and is wrong whether or not
+    // Java has started yet. See CN1MacRefreshModifiers -- an inactive
+    // application receives no flagsChanged:, so a modifier released while
+    // another application was frontmost stayed "held" here.
+    CN1MacRefreshModifiers();
     // isAppSuspended is NOT cleared here. Active and visible are different
     // things on a Mac: Cmd-Tab back to an application whose window is still
     // minimized sends this and no deminiaturize, so clearing the flag resumed
@@ -744,6 +753,11 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
 }
 
 - (void)applicationWillResignActive:(NSNotification *)notification {
+    // The other half of the boundary. Whatever is held as this application
+    // loses focus is the last thing it can observe first hand; anything after
+    // that happens where it cannot see, which is what the refresh on activation
+    // exists to correct.
+    CN1MacRefreshModifiers();
     if (!cn1MacJavaReady) {
         cn1MacPendingActive = 0;
         return;
