@@ -23,6 +23,7 @@
 package com.codename1.ui.accessibility;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.AnimationManager;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.CN;
@@ -296,13 +297,27 @@ public final class AccessibilityManager {
                 getSnapshotForRoot(roots.get(iter));
             }
             boolean again;
+            boolean defer;
             synchronized (AccessibilityManager.this) {
                 // Anything queued while this pass was running. The flag stays set
                 // across the re-post, because it is still scheduled -- clearing it
                 // first would let a third invalidation queue a second pass for the
                 // same work.
                 again = !pendingRoots.isEmpty() || pendingRootlessRefresh;
-                if (!again) {
+                // Unless the surface it is about to describe is still moving. Re-posting
+                // straight away cost the JavaScript port its suite: that runtime drains
+                // the serial queue until it is empty within one turn, so a runnable that
+                // re-queues itself while work keeps arriving holds the drain open and
+                // nothing is painted. An animation produces work every frame, so the
+                // screen froze and the test waiting on it produced no screenshot.
+                //
+                // Nothing is dropped by waiting: the roots stay queued and stay dirty,
+                // and the next frame's invalidation -- which an animation is by
+                // definition still producing -- schedules the pass that drains them. It
+                // is also the tree worth building, since the one mid-animation is
+                // replaced by the next frame anyway.
+                defer = again && anyAnimating(pendingRoots);
+                if (!again || defer) {
                     refreshScheduled = false;
                 }
             }
@@ -320,10 +335,34 @@ public final class AccessibilityManager {
                             windowIdOf(roots.get(iter)));
                 }
             }
-            if (again) {
+            if (again && !defer) {
                 Display.getInstance().callSerially(this);
             }
         }
+    }
+
+    /// Whether any of these roots is in the middle of an animation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `roots`: the roots waiting to be described
+    ///
+    /// #### Returns
+    ///
+    /// true when at least one of them is still moving
+    private static boolean anyAnimating(ArrayList<Container> roots) {
+        int count = roots.size();
+        for (int iter = 0; iter < count; iter++) {
+            Container root = roots.get(iter);
+            if (!(root instanceof TopLevelContainer)) {
+                continue;
+            }
+            AnimationManager manager = ((TopLevelContainer) root).getAnimationManager();
+            if (manager != null && manager.isAnimating()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void invalidateAll() {
