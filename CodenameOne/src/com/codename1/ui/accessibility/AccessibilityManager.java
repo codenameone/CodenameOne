@@ -388,6 +388,7 @@ public final class AccessibilityManager {
             return;
         }
         snapshotsByRoot.remove(root);
+        rootWasShowing.remove(root);
         dirtyRoots.remove(root);
         // Out of the refresh queue as well, or a refresh already scheduled would walk
         // a hierarchy that has just been destroyed and cache a tree for it -- putting
@@ -450,7 +451,6 @@ public final class AccessibilityManager {
             if (cached != null) {
                 snapshot = cached;
                 snapshotRoot = form;
-                snapshotRootWasShowing = isShowingRoot(form);
                 return snapshot;
             }
         }
@@ -461,8 +461,8 @@ public final class AccessibilityManager {
                     Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
             snapshot = emptySnapshot;
             snapshotRoot = null;
-            snapshotRootWasShowing = false;
             snapshotsByRoot.clear();
+            rootWasShowing.clear();
             dirtyRoots.clear();
             // The bits are not cleared by building a tree. They describe changes that
             // have not been announced yet, and only the refresh pass announces them --
@@ -487,7 +487,7 @@ public final class AccessibilityManager {
         // thread has not made current yet. Both of those are live surfaces a caller acts
         // on legitimately, and they are indistinguishable from the navigated-away one by
         // asking only whether it is showing now.
-        snapshotRootWasShowing = isShowingRoot(form);
+        rootWasShowing.put(form, Boolean.valueOf(isShowingRoot(form)));
         snapshotsByRoot.put(form, updatedSnapshot);
         evictStaleRoots();
         dirtyRoots.remove(form);
@@ -519,6 +519,7 @@ public final class AccessibilityManager {
                 return;
             }
             snapshotsByRoot.remove(evictable);
+            rootWasShowing.remove(evictable);
             // And out of the dirty set with it. Dirtiness is only ever recorded for a
             // root that has a cached tree, so an entry left behind here describes a
             // tree that no longer exists -- and because a form never releases its root
@@ -594,11 +595,23 @@ public final class AccessibilityManager {
         }
         // A form, which has no mapped/unmapped state of its own: it is withdrawn when it
         // was the surface on screen at the time it was described and is not any more.
-        return snapshotRootWasShowing && !isShowingRoot(root);
+        // This root's own history, not the last-built tree's. The question is asked of
+        // whichever surface owns the action being performed, which is routinely not the
+        // one described most recently -- an action resolved from a cached tree for the
+        // form on screen, while the latest tree belongs to one being prepared off it.
+        // Answered from a single flag, that action was measured against the wrong
+        // surface's history entirely.
+        Boolean described = rootWasShowing.get(root);
+        return described != null && described.booleanValue() && !isShowingRoot(root);
     }
 
     /// Whether `#snapshotRoot` was the surface on screen when its tree was built.
-    private boolean snapshotRootWasShowing;
+    /// Whether each described root was the surface on screen when its tree was built.
+    ///
+    /// Kept beside the trees themselves and dropped with them, because it answers for the
+    /// root it is recorded against rather than for whichever one was described last.
+    private final LinkedHashMap<Container, Boolean> rootWasShowing =
+            new LinkedHashMap<Container, Boolean>();
 
     /// Whether a cached root is a surface the user can currently see.
     ///

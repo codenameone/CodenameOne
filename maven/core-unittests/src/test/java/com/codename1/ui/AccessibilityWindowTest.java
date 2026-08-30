@@ -1261,4 +1261,52 @@ class AccessibilityWindowTest extends UITestBase {
             implementation.setAccessibilityTreeUpdateRequired(null);
         }
     }
+    @FormTest
+    void anActionIsJudgedAgainstItsOwnFormNotTheLastOneDescribed() {
+        // The action's surface is routinely not the one described most recently: a tree
+        // for the form on screen sits in the cache while a form being prepared off it is
+        // the latest one built. Judged from a single flag recorded for that latest tree,
+        // an action on the visible form was measured against the prepared form's history
+        // -- so navigating away before it ran left it looking live, and it pressed a
+        // button on a form the user had already left.
+        implementation.setAccessibilityTreeSupported(true);
+        implementation.setAccessibilityTreeUpdateRequired(Boolean.FALSE);
+        try {
+            Form onScreen = new Form("on screen", new BorderLayout());
+            final boolean[] pressed = new boolean[1];
+            Button b = new Button("press me");
+            b.addActionListener(new com.codename1.ui.events.ActionListener() {
+                @Override
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    pressed[0] = true;
+                }
+            });
+            onScreen.add(BorderLayout.CENTER, b);
+            onScreen.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager mgr = AccessibilityManager.getInstance();
+            long id = idOf(AccessibilityInspector.snapshot(onScreen), "press me");
+            assertTrue(id != 0, "precondition: the button is in the tree");
+
+            // A form that is prepared but never shown becomes the latest tree built, so
+            // the last-described history now describes it rather than the visible form.
+            Form prepared = new Form("prepared", new BorderLayout());
+            prepared.add(BorderLayout.CENTER, new Button("not on screen"));
+            AccessibilityInspector.snapshot(prepared);
+
+            assertTrue(mgr.performAction(id, "activate", null),
+                    "precondition: accepted while its own form is still on screen");
+            new Form("second", new BorderLayout()).show();
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            assertFalse(pressed[0],
+                    "the action belongs to the form navigated away from, not the last "
+                            + "tree built, and must not run");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+            implementation.setAccessibilityTreeUpdateRequired(null);
+        }
+    }
 }
