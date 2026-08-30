@@ -2682,4 +2682,141 @@ class DialogInWindowTest extends UITestBase {
         w.dispose();
         DisplayTest.flushEdt();
     }
+
+    /// Whether a component sits anywhere inside the given container.
+    private static boolean isInside(Container ancestor, Component c) {
+        Component probe = c;
+        while (probe != null) {
+            if (probe == ancestor) { //NOPMD CompareObjectsWithEquals
+                return true;
+            }
+            probe = probe.getParent();
+        }
+        return false;
+    }
+
+    @FormTest
+    void anArrowKeyCannotMoveFocusOutOfAHostedDialog() {
+        // Traversal searched the layers and then the content behind them, so an arrow
+        // press with nothing left in that direction moved focus to a component the
+        // dialog covers. The next key is refused for being outside the scope and focus
+        // is reset to the *first* control in the dialog -- so the press silently threw
+        // away where the user was.
+        final Window w = openHost(600, 500);
+        // Below the dialog's card, so "down" has somewhere to escape to if traversal is
+        // allowed to leave the scope.
+        Button behind = new Button("behind");
+        w.add(BorderLayout.SOUTH, behind);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+
+        Dialog d = new Dialog("over");
+        d.setLayout(new com.codename1.ui.layouts.BoxLayout(
+                com.codename1.ui.layouts.BoxLayout.Y_AXIS));
+        Button firstInDialog = new Button("first");
+        Button lastInDialog = new Button("last");
+        d.add(firstInDialog);
+        d.add(lastInDialog);
+        d.setTopLevelHost(w);
+        d.show(20, 220, 20, 20, true, false);
+        DisplayTest.flushEdt();
+
+        // The lower of the dialog's two controls: there is nothing below it inside the
+        // dialog, and something below it outside.
+        w.setFocused(lastInDialog);
+        DisplayTest.flushEdt();
+        assertSame(lastInDialog, w.getFocused(),
+                "precondition: the lower control actually holds the focus");
+
+        int down = Display.getInstance().getKeyCode(Display.GAME_DOWN);
+        w.keyPressed(down);
+
+        // Checked here, between the press and the release: the release repairs an escape
+        // by re-focusing inside the scope, so by then the damage is invisible. It is real
+        // while it lasts -- the window scrolls the component it moved to into view, and
+        // that component is one the dialog covers.
+        Component afterPress = w.getFocused();
+        assertFalse(afterPress == behind, //NOPMD CompareObjectsWithEquals
+                "an arrow press must not move focus to the component the dialog covers");
+        assertTrue(afterPress == null || isInside(d, afterPress), //NOPMD CompareObjectsWithEquals
+                "focus stays inside the dialog holding the keyboard");
+
+        w.keyReleased(down);
+        DisplayTest.flushEdt();
+
+        d.dispose();
+        DisplayTest.flushEdt();
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    /// A tooltip manager that records whether a tooltip was ever actually built.
+    private static final class CountingTooltipManager extends TooltipManager {
+        private int shown;
+
+        @Override
+        protected void showTooltip(String tip, Component cmp) {
+            shown++;
+        }
+    }
+
+    @FormTest
+    void aPressThatOpensAnOverlayStillCancelsAPendingTooltip() {
+        // The press dismisses any pending tooltip so a hover timer cannot go on to build
+        // one for a component the overlay now covers. Returning early once the gesture
+        // was cancelled skipped that, leaving a tooltip to appear over -- or behind --
+        // the dialog the press had just opened.
+        final Window w = openHost(600, 500);
+        Button hovered = new Button("hover me");
+        hovered.setTooltip("a tip");
+        w.add(BorderLayout.CENTER, hovered);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+
+        TooltipManager previous = TooltipManager.getInstance();
+        CountingTooltipManager counter = new CountingTooltipManager();
+        counter.setTooltipShowDelay(10);
+        TooltipManager.enableTooltips(counter);
+        final boolean[] once = new boolean[1];
+        try {
+            int hx = hovered.getAbsoluteX() + hovered.getWidth() / 2;
+            int hy = hovered.getAbsoluteY() + hovered.getHeight() / 2;
+            w.pointerHover(new int[] { hx }, new int[] { hy });
+            DisplayTest.flushEdt();
+
+            w.addPointerPressedListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    if (once[0]) {
+                        return;
+                    }
+                    once[0] = true;
+                    Dialog over = new Dialog("over");
+                    over.setLayout(new BorderLayout());
+                    over.add(BorderLayout.CENTER, new Label("body"));
+                    over.setTopLevelHost(w);
+                    over.showModeless();
+                }
+            });
+            w.pointerPressed(hx, hy);
+            DisplayTest.flushEdt();
+            assertTrue(once[0], "precondition: the press put an overlay up");
+
+            // Long enough for a surviving hover timer to have elapsed.
+            for (int iter = 0; iter < 80; iter++) {
+                w.repaintAnimations();
+                DisplayTest.flushEdt();
+                try {
+                    Thread.sleep(2);
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            assertEquals(0, counter.shown,
+                    "the press has to cancel the pending tooltip even when it opened an overlay");
+        } finally {
+            TooltipManager.enableTooltips(previous);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }

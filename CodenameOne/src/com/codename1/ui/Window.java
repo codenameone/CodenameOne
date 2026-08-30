@@ -3110,6 +3110,14 @@ public class Window extends Container implements TopLevelContainer {
                 new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y))) {
             return;
         }
+        // Before the cancelled-gesture return below, not after it. A press dismisses any
+        // tooltip so it cannot linger over a drag image or be stranded when the gesture
+        // rebuilds the UI, as on a Form -- and a press that puts an overlay up is exactly
+        // when a pending hover timer would otherwise go on to build a tooltip for a
+        // component the overlay now covers.
+        if (TooltipManager.getInstance() != null) {
+            TooltipManager.getInstance().clearTooltip();
+        }
         if (gestureCancelled) {
             // A listener put an overlay up without consuming the press -- showing a
             // dialog from a press is routine, and a blocking progress dialog goes up
@@ -3119,11 +3127,6 @@ public class Window extends Container implements TopLevelContainer {
             // went down and makes it the release target, so the lift activates or
             // dismisses UI this press never touched.
             return;
-        }
-        // A press dismisses any tooltip so it cannot linger over a drag image or be
-        // stranded when the gesture rebuilds the UI, as on a Form.
-        if (TooltipManager.getInstance() != null) {
-            TooltipManager.getInstance().clearTooltip();
         }
         Component cmp = resolveComponentAt(x, y);
         // Gated exactly as Form.pointerPressed gates it. Many components -- Button
@@ -4607,6 +4610,30 @@ public class Window extends Container implements TopLevelContainer {
     /// the next focusable component, or null
     private Component findNextFocusVertical(boolean down) {
         Component c;
+        if (keyInputScope != null) {
+            // Only inside the overlay holding the keyboard. Searching on into the layers
+            // and the content behind it moved focus to a component the overlay covers,
+            // and every key after that was refused for being outside the scope -- so an
+            // arrow press left navigation stranded behind a modal dialog.
+            c = TopLevelSupport.findNextFocusVertical(focused, null, keyInputScope, down);
+            if (c != null) {
+                return c;
+            }
+            if (isCyclicFocus()) {
+                c = TopLevelSupport.findNextFocusVertical(focused, null, keyInputScope, !down);
+                if (c != null) {
+                    Component current =
+                            TopLevelSupport.findNextFocusVertical(c, null, keyInputScope, !down);
+                    while (current != null) {
+                        c = current;
+                        current = TopLevelSupport.findNextFocusVertical(
+                                c, null, keyInputScope, !down);
+                    }
+                    return c;
+                }
+            }
+            return null;
+        }
         // The whole-window overlay first, which is what Form does with its own
         // formLayeredPane. A form-mode InteractionDialog, a side menu and anything else
         // installed through getFormLayeredPane() lives here, NOT in the content-area
@@ -4655,6 +4682,29 @@ public class Window extends Container implements TopLevelContainer {
     /// the next focusable component, or null
     private Component findNextFocusHorizontal(boolean right) {
         Component c;
+        if (keyInputScope != null) {
+            // Inside the overlay holding the keyboard only, for the reason given in the
+            // vertical case above.
+            c = TopLevelSupport.findNextFocusHorizontal(focused, null, keyInputScope, right);
+            if (c != null) {
+                return c;
+            }
+            if (isCyclicFocus()) {
+                c = TopLevelSupport.findNextFocusHorizontal(
+                        focused, null, keyInputScope, !right);
+                if (c != null) {
+                    Component current = TopLevelSupport.findNextFocusHorizontal(
+                            c, null, keyInputScope, !right);
+                    while (current != null) {
+                        c = current;
+                        current = TopLevelSupport.findNextFocusHorizontal(
+                                c, null, keyInputScope, !right);
+                    }
+                    return c;
+                }
+            }
+            return null;
+        }
         // The whole-window overlay first, which is what Form does with its own
         // formLayeredPane. A form-mode InteractionDialog, a side menu and anything else
         // installed through getFormLayeredPane() lives here, NOT in the content-area
