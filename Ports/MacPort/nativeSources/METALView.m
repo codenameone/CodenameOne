@@ -465,6 +465,32 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // the same test the pointer and key paths use.
     extern void screenSizeChanged(int width, int height);
     extern BOOL cn1MacRuntimeIsJavaReady(void);
+    // Publish the size to the shared displayWidth/displayHeight globals as
+    // well. They live in CodenameOne_GLViewController.m, start life at -1, and
+    // every one of their assignments is inside UIKit-only code (view.bounds,
+    // viewWillTransitionToSize:, didRotateFromInterfaceOrientation:) that this
+    // port never reaches -- so on macOS they stayed -1 for the whole run while
+    // the port kept its real size on CN1MacHost.
+    //
+    // Shared code reads them and cannot know that. Both readers pass them
+    // straight to a flush as a RECT: gausianBlurImage flushes the screen
+    // before reading a mutable image back, and Display.screenshot() drains
+    // through flushBufferForReadback. A flush of 0,0,-1x-1 becomes
+    // ClipRect's drawingRect, which clamps every screen op in that drain to a
+    // negative-width scissor -- so the ops were not drawn late or in the wrong
+    // place, they were discarded. That is the missing tiles in the blur grid
+    // and the stale previous form under a capture.
+    //
+    // Set unconditionally and before the guards below: the value has to be
+    // right from the first sizing, whereas screenSizeChanged deliberately
+    // waits for a SECOND one and for Java. Main view only, for the same reason
+    // screenSizeChanged is -- these globals name the one main display.
+    if (self.cn1WindowId < 0) {
+        extern int displayWidth;
+        extern int displayHeight;
+        displayWidth = pw;
+        displayHeight = ph;
+    }
     if (sizeWasKnown && self.cn1WindowId < 0 && cn1MacRuntimeIsJavaReady()) {
         screenSizeChanged(pw, ph);
     }
