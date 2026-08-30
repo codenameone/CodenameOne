@@ -68,6 +68,20 @@
       ]
     },
     {
+      "test": "GaussianBlur",
+      "reason": "The blurred-tile grid is drawn scattered, with gaps and missing cells, where every other port lays it out cleanly. A rendering DEFECT in the native macOS port, not a missing capability: the blur itself is supported and the other graphics baselines pass there.",
+      "platform_support": "A defect under investigation, not the platform's answer. This entry and the skip in the test must be deleted together when the rendering is fixed; it is here so the table shows a gap where a stored golden would have certified the wrong pixels.",
+      "verification": "Mac Catalyst, iOS and Linux render this frame correctly against stored goldens, so the feature works and the defect is specific to the native macOS renderer.",
+      "reason_codes": [
+        {
+          "prefix": "macos-blur-grid-layout",
+          "ports": [
+            "macos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "GoogleWebMapScreenshotTest",
       "reason": "The live Google Maps JavaScript map needs three things at once: a web view that composites into the screenshot, a billed Google Maps API key, and network access to Google's tile servers. The deterministic desktop and web pipelines are not given the key, the Mac Catalyst and browser captures do not composite the native web view, tvOS ships no WebKit, and the watch form factor has no map surface at all.",
       "platform_support": "Every listed port supports BrowserComponent and the map API where the table says so; this skip is about one live, key-gated and network-dependent third-party map rendering inside a screenshot comparison, not about map support.",
@@ -113,6 +127,20 @@
       ]
     },
     {
+      "test": "ListThemeScreenshotTest",
+      "reason": "The focused row is painted as a solid bar that hides its own text. Linux draws a focus outline for the same state and a touch port never focuses a list at all, so this is specific to this port rather than shared desktop behaviour.",
+      "platform_support": "A defect under investigation, not the platform's answer. This entry and the skip in the test must be deleted together when the rendering is fixed; it is here so the table shows a gap where a stored golden would have certified the wrong pixels.",
+      "verification": "Mac Catalyst, iOS and Linux render this frame correctly against stored goldens, so the feature works and the defect is specific to the native macOS renderer.",
+      "reason_codes": [
+        {
+          "prefix": "macos-list-selection-fill",
+          "ports": [
+            "macos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "NativeMapFallbackScreenshotTest",
       "reason": "This test asserts what the map component draws when NO native map provider is installed. On targets that ship an active native provider the fallback is unreachable by construction, and on the watch form factor there is no map surface to fall back to.",
       "platform_support": "A skip here means the port has a real native map, which is the better outcome; the ports that render the fallback are the ones without one.",
@@ -146,6 +174,20 @@
           "prefix": "watch-form-factor",
           "ports": [
             "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "SVGStaticScreenshotTest",
+      "reason": "clipped_badge.svg and gradient_circle.svg render as oversized unclipped polygons. The polygon and path SVGs in the same frame are correct, so this is the curved primitives and the <clipPath>, and it is the same family as the rotated-clip defect recorded for ClipUnderRotation.",
+      "platform_support": "A defect under investigation, not the platform's answer. This entry and the skip in the test must be deleted together when the rendering is fixed; it is here so the table shows a gap where a stored golden would have certified the wrong pixels.",
+      "verification": "Mac Catalyst, iOS and Linux render this frame correctly against stored goldens, so the feature works and the defect is specific to the native macOS renderer.",
+      "reason_codes": [
+        {
+          "prefix": "macos-svg-curved-shapes",
+          "ports": [
+            "macos"
           ]
         }
       ]
@@ -185,6 +227,20 @@
             "windows-x64",
             "windows-arm64",
             "javascript"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "TabsScreenshotTest",
+      "reason": "The capture lands in the middle of a transition, with the ripple still expanding and the tab pill half drawn, where the settled frame is what every other port captures.",
+      "platform_support": "A defect under investigation, not the platform's answer. This entry and the skip in the test must be deleted together when the rendering is fixed; it is here so the table shows a gap where a stored golden would have certified the wrong pixels.",
+      "verification": "Mac Catalyst, iOS and Linux render this frame correctly against stored goldens, so the feature works and the defect is specific to the native macOS renderer.",
+      "reason_codes": [
+        {
+          "prefix": "macos-capture-mid-transition",
+          "ports": [
+            "macos"
           ]
         }
       ]
