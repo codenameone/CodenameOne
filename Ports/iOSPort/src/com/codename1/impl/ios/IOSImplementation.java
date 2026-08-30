@@ -65,6 +65,7 @@ import com.codename1.push.PushActionsProvider;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
 import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -13455,7 +13456,19 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void accessibilityTreeChanged(int changeType) {
-        IOSNative.updateAccessibilityTree(getAccessibilityTreeSnapshot().toJson(), changeType);
+        // The main surface by name rather than "the latest tree". The surface-less
+        // accessor answers with whatever was rebuilt last, which since the tree became
+        // per surface can be a window -- and this pushes onto the main view.
+        accessibilityTreeChanged(changeType, 0);
+    }
+
+    @Override
+    public void accessibilityTreeChanged(int changeType, int windowId) {
+        AccessibilityTreeSnapshot tree = getAccessibilityTreeSnapshot(windowId);
+        if (tree == null) {
+            return;
+        }
+        IOSNative.updateAccessibilityTree(tree.toJson(), changeType, windowId);
     }
 
     @Override

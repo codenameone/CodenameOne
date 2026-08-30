@@ -108,6 +108,11 @@ void CN1MacWindowSetEditingSlot(int slot);
 
 /** The view the native editor belongs in, or nil for the application's main view. */
 UIView* CN1MacWindowEditingHostView(void);
+
+/* The view a window's own accessibility elements belong on, or nil when no Codename
+ * One window owns that id. Each window draws into its own view, so a tree installed
+ * on the main view describes a surface the reader is not looking at. */
+UIView* CN1MacWindowContentViewForWindowId(int windowId);
 /* The controller a system sheet should be presented from when the user is in a
  * Codename One window, or nil when the main scene should present it as before. */
 UIViewController* CN1MacWindowPresentingController(void);

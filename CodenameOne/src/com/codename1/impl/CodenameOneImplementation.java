@@ -12487,6 +12487,27 @@ public abstract class CodenameOneImplementation {
     public void accessibilityTreeChanged(int changeType) {
     }
 
+    /// Called after the semantic tree of one rendered surface changes.
+    ///
+    /// Zero is the application's main surface; any other value names a desktop window.
+    /// A port that pushes the tree into a native view has to know which one, or it
+    /// installs whichever surface was rebuilt last onto the main view -- so changing a
+    /// window replaces the main surface's elements with the window's and leaves the
+    /// window itself exposing nothing. Pull-based ports can ignore it and re-read the
+    /// surface they are asked about.
+    ///
+    /// The default forwards to the surface-less form, which is what every port that
+    /// has only one surface already implements.
+    ///
+    /// #### Parameters
+    ///
+    /// - `changeType`: bit mask of `AccessibilityManager.CHANGE_*` constants
+    ///
+    /// - `windowId`: the surface that changed, zero for the main one
+    public void accessibilityTreeChanged(int changeType, int windowId) {
+        accessibilityTreeChanged(changeType);
+    }
+
     /// Returns the latest immutable semantic tree for the current form.
     public AccessibilityTreeSnapshot getAccessibilityTreeSnapshot() {
         return AccessibilityManager.getInstance().getCurrentSnapshot();

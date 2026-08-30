@@ -859,6 +859,28 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return accessibilityTreeSupported;
     }
 
+    private final java.util.List<int[]> accessibilityNotifications =
+            new java.util.ArrayList<int[]>();
+
+    /// Every surface the framework said had changed, as {changeType, windowId} pairs.
+    ///
+    /// A port that pushes the tree into a native view is told which surface it is
+    /// describing; recorded here so a test can assert the window was named rather than
+    /// the main surface being described over and over.
+    public java.util.List<int[]> getAccessibilityNotifications() {
+        return new java.util.ArrayList<int[]>(accessibilityNotifications);
+    }
+
+    public void clearAccessibilityNotifications() {
+        accessibilityNotifications.clear();
+    }
+
+    @Override
+    public void accessibilityTreeChanged(int changeType, int windowId) {
+        accessibilityNotifications.add(new int[]{changeType, windowId});
+        super.accessibilityTreeChanged(changeType, windowId);
+    }
+
     private Boolean accessibilityTreeUpdateRequired;
 
     /// Models a port that exposes the tree but never projects it eagerly.

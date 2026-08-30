@@ -306,7 +306,20 @@ public final class AccessibilityManager {
                     refreshScheduled = false;
                 }
             }
-            Display.getInstance().accessibilityTreeChanged(changes);
+            // Named per surface. A port that pushes the tree into a native view needs
+            // to know which one it just described: told only that something changed, it
+            // reads whatever was rebuilt last and installs that on the main view, so a
+            // change inside a window replaced the main surface's elements with the
+            // window's. Ports with one surface, and ports that pull, are unaffected --
+            // the two argument form forwards to the old one by default.
+            if (count == 0) {
+                Display.getInstance().accessibilityTreeChanged(changes);
+            } else {
+                for (int iter = 0; iter < count; iter++) {
+                    Display.getInstance().accessibilityTreeChanged(changes,
+                            windowIdOf(roots.get(iter)));
+                }
+            }
             if (again) {
                 Display.getInstance().callSerially(this);
             }
@@ -509,6 +522,19 @@ public final class AccessibilityManager {
             }
         }
         return null;
+    }
+
+    /// The surface a rebuilt root belongs to, zero for the application's main one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root that was rebuilt, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the window id, or zero for a form
+    private static int windowIdOf(Container root) {
+        return root instanceof Window ? ((Window) root).getWindowId() : 0;
     }
 
     /// Whether a root has been taken off screen since its tree was built.

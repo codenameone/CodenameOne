@@ -15002,8 +15002,8 @@ static NSString *CN1AccessibilityValueForNode(NSDictionary *node) {
     return value;
 }
 
-void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType) {
+void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType, JAVA_INT windowId) {
     if (json == JAVA_NULL) return;
     POOL_BEGIN();
     NSString *jsonString = toNSString(CN1_THREAD_STATE_PASS_ARG json);
@@ -15011,7 +15011,25 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
     NSDictionary *tree = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
     NSArray *nodes = [tree objectForKey:@"nodes"];
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIView *container = (UIView *)[[CodenameOne_GLViewController instance] eaglView];
+        /* The view of the surface this tree describes. Every surface used to be
+         * installed on the main one, so a change inside a desktop window replaced the
+         * main surface's elements with the window's hierarchy and left the window
+         * exposing nothing. Only Mac Catalyst has windows; everywhere else the lookup
+         * is absent and the main view is the only surface there is. */
+        UIView *container = nil;
+#if TARGET_OS_MACCATALYST
+        if (windowId != 0) {
+            container = CN1MacWindowContentViewForWindowId((int) windowId);
+            /* The window is gone, or its scene has not been granted yet. Falling back
+             * to the main view here is what this exists to prevent. */
+            if (container == nil) return;
+        }
+#else
+        if (windowId != 0) return;
+#endif
+        if (container == nil) {
+            container = (UIView *)[[CodenameOne_GLViewController instance] eaglView];
+        }
         if (container == nil) return;
         NSMutableArray *elements = [NSMutableArray arrayWithCapacity:[nodes count]];
         NSMutableDictionary *elementsById = [NSMutableDictionary dictionary];
@@ -15079,8 +15097,8 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
     POOL_END();
 }
 #else
-void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType) {
+void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType, JAVA_INT windowId) {
     // watchOS uses a separate SwiftUI accessibility model.
 }
 #endif

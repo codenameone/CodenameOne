@@ -2066,6 +2066,23 @@ UIView* CN1MacWindowPresentingView(void) {
     return c == nil ? nil : c.view;
 }
 
+UIView* CN1MacWindowContentViewForWindowId(int windowId) {
+    int i;
+    UIView* content = nil;
+    /* Under the lock like every other slot read: this runs on the event dispatch
+     * thread while adoption can be replacing the content view. */
+    pthread_mutex_lock(&g_slotLock);
+    for (i = 0; i < CN1_MAC_MAX_WINDOWS; i++) {
+        CN1MacWindow* w = slotAt(i);
+        if (w != NULL && w->windowId == windowId) {
+            content = w->content == nil ? nil : [[w->content retain] autorelease];
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_slotLock);
+    return content;
+}
+
 UIView* CN1MacWindowEditingHostView(void) {
     CN1MacWindow* w;
     UIView* content;

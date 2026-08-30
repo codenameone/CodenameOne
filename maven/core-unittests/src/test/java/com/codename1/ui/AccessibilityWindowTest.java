@@ -33,6 +33,7 @@ import com.codename1.ui.layouts.BorderLayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1031,5 +1032,49 @@ class AccessibilityWindowTest extends UITestBase {
             }
         }
         return 0;
+    }
+    @FormTest
+    void aChangeInsideAWindowNamesThatWindowToThePort() {
+        // A port that pushes the tree into a native view has to be told which surface it
+        // just described. Told only that something changed, it reads whatever was
+        // rebuilt last and installs it on the main view -- so a change inside a window
+        // replaced the main surface's elements with the window's, and left the window
+        // itself exposing nothing.
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        final Window w = new Window("second", new BorderLayout());
+        try {
+            Form main = new Form("main", new BorderLayout());
+            main.add(BorderLayout.CENTER, new Button("on the main form"));
+            main.show();
+            DisplayTest.flushEdt();
+
+            w.setWindowSize(400, 300);
+            final Button windowButton = new Button("in the window");
+            w.add(BorderLayout.CENTER, windowButton);
+            w.show();
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            implementation.clearAccessibilityNotifications();
+            windowButton.setText("renamed in the window");
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            boolean namedTheWindow = false;
+            for (int[] n : implementation.getAccessibilityNotifications()) {
+                if (n[1] == w.getWindowId()) {
+                    namedTheWindow = true;
+                }
+                assertNotEquals(0, n[1],
+                        "a change inside a window must not be reported as the main surface");
+            }
+            assertTrue(namedTheWindow,
+                    "the window that changed has to be named to the port");
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
     }
 }

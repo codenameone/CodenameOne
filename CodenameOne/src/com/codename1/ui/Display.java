@@ -764,6 +764,17 @@ public final class Display extends CN1Constants {
         impl.accessibilityTreeChanged(changeType);
     }
 
+    /// Notifies the native port that one surface's semantic tree changed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `changeType`: bit mask of `AccessibilityManager.CHANGE_*` constants
+    ///
+    /// - `windowId`: the surface that changed, zero for the application's main one
+    public void accessibilityTreeChanged(int changeType, int windowId) {
+        impl.accessibilityTreeChanged(changeType, windowId);
+    }
+
     /// Returns true when the active port exposes lightweight components through
     /// a native virtual accessibility tree.
     public boolean isAccessibilityTreeSupported() {
