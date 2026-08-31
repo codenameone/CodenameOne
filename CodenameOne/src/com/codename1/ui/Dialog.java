@@ -2492,7 +2492,7 @@ public class Dialog extends Form implements AbstractDialog {
         for (int iter = 0; iter < published; iter++) {
             HostedKeyListener existing = hostedKeyListeners.get(iter);
             if (existing.keyCode == keyCode && existing.game == game
-                    && existing.delegate == listener) { //NOPMD CompareObjectsWithEquals
+                    && sameListener(existing.delegate, listener)) {
                 return;
             }
         }

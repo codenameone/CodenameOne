@@ -3065,7 +3065,7 @@ public class Form extends Container implements TopLevelContainer {
             // meant one press called the listener twice.
             if (tracked != null) {
                 for (TransferredListener existing : tracked) {
-                    if (existing.listener == l) { //NOPMD CompareObjectsWithEquals
+                    if (sameListener(existing.listener, l)) {
                         return true;
                     }
                 }
@@ -3095,29 +3095,30 @@ public class Form extends Container implements TopLevelContainer {
         return true;
     }
 
-    /// Whether a wrapper handed to a host stands for the listener a caller is removing.
+    /// Whether a wrapper handed to a host stands for the listener a caller has named.
     ///
-    /// By equality, because that is how a listener is removed everywhere else: both
-    /// EventDispatcher and removeKeyListener hand it to a list, which matches on
-    /// equals. A caller passing a distinct but equal listener therefore has its
-    /// registration taken off -- and comparing by identity when looking for what was
-    /// handed to the host left that behind, still firing the listener that was just
-    /// removed, and restored to this form again at teardown.
+    /// By equality, because that is how a listener is matched everywhere else:
+    /// EventDispatcher adds through a list's contains and removes through its remove,
+    /// and removeKeyListener does the same -- all of which compare with equals. A
+    /// caller passing a distinct but equal listener is therefore naming the one already
+    /// registered, and comparing by identity here read it as a different listener: a
+    /// second wrapper for one registration, so the host called it twice for one event,
+    /// and a removal that could not find the wrapper it had to take off.
     ///
     /// #### Parameters
     ///
-    /// - `published`: the listener a wrapper was made for
+    /// - `registered`: the listener a wrapper was made for
     ///
-    /// - `removed`: the listener the caller is removing
+    /// - `candidate`: the listener the caller has named
     ///
     /// #### Returns
     ///
     /// true when the wrapper stands for that listener
-    static boolean sameListener(ActionListener published, ActionListener removed) {
-        if (removed == null) {
-            return published == null;
+    static boolean sameListener(ActionListener registered, ActionListener candidate) {
+        if (candidate == null) {
+            return registered == null;
         }
-        return removed.equals(published);
+        return candidate.equals(registered);
     }
 
     private ArrayList<TransferredListener> trackedFor(int kind) {

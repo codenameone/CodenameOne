@@ -3851,4 +3851,42 @@ class DialogInWindowTest extends UITestBase {
         }
     }
 
+    /// An equal listener is the same registration, so it is handed over once.
+    ///
+    /// A dispatcher adds through a list's contains, which compares with equals, so a
+    /// second listener equal to one already registered is not a second registration.
+    /// Treating it as one here made a second wrapper for it, and the host called them
+    /// both for a single event.
+    @FormTest
+    void registeringAnEqualPointerListenerHandsOverOneWrapper() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            Dialog dlg = new Dialog("hosted");
+            dlg.setTopLevelHost(w);
+            dlg.showModeless();
+            DisplayTest.flushEdt();
+            assertSame(w, dlg.getTopLevelContainer(), "precondition: hosted in the window");
+
+            dlg.addPointerPressedListener(new NamedListener("tap"));
+            assertEquals(1, transferredPointerCountOf(dlg),
+                    "precondition: the first one was handed over");
+
+            // Equal, not the same object: the dispatcher would not add it twice.
+            dlg.addPointerPressedListener(new NamedListener("tap"));
+
+            assertEquals(1, transferredPointerCountOf(dlg),
+                    "an equal listener is the same registration, so the host must not"
+                            + " end up calling it twice for one event");
+            dlg.dispose();
+            DisplayTest.flushEdt();
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
 }
