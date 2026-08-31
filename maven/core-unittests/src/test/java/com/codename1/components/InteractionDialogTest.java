@@ -868,4 +868,69 @@ class InteractionDialogTest extends UITestBase {
                 "ending the showing has to stop the clock, not just ignore what it does");
     }
 
+    /// A directional dispose ends the showing too, so it retires the clock.
+    ///
+    /// disposeToTheLeft and its siblings do not go through dispose(), and the clock is
+    /// deliberately not tied to the surface -- so leaving it armed there held a timer
+    /// thread and this hierarchy until a deadline nobody was waiting for, and closed the
+    /// next showing if one arrived before it.
+    @FormTest
+    void aDirectionalDisposeStopsTheTimeoutClock() {
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("timed");
+        dialog.add(new Label("body"));
+        dialog.setTimeout(600000);
+        dialog.show(10, 10, 10, 10);
+        assertNotNull(timeoutClockOf(dialog), "precondition: showing armed a clock");
+
+        dialog.disposeToTheLeft();
+        DisplayTest.flushEdt();
+
+        assertNull(timeoutClockOf(dialog),
+                "a directional dispose ends the showing, so it has to stop the clock");
+    }
+
+    /// resize() describes margins against a host, which a platform window does not have.
+    ///
+    /// In native window mode the dialog's parent is the window's own content pane, so
+    /// the lightweight body rewrote that pane's geometry and animated a layer built on
+    /// the owner surface -- disturbing the window's root layout while resizing nothing
+    /// the caller asked about. It is inert here, like the margin arguments to show().
+    @FormTest
+    void resizeDoesNotTouchTheOwnerSurfaceInNativeWindowMode() {
+        implementation.setMultiWindowSupported(true);
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("native");
+        dialog.add(new Label("body"));
+        dialog.setNativeWindowMode(true);
+        dialog.show(10, 10, 10, 10);
+        DisplayTest.flushEdt();
+        assertNotNull(dialog.getNativeWindow(), "precondition: it really is in a window");
+
+        Container parentBefore = dialog.getParent();
+        Style style = dialog.getUnselectedStyle();
+        int marginTop = (int) style.getMarginTop();
+        int marginLeft = (int) style.getMarginLeftNoRTL();
+
+        dialog.resize(37, 37, 37, 37);
+        DisplayTest.flushEdt();
+
+        assertSame(parentBefore, dialog.getParent(),
+                "resize must not reparent a dialog the platform owns");
+        // The margins are the operation: the lightweight body writes all four and then
+        // rewrites the parent's geometry from them. Untouched here means it did not run.
+        assertEquals(marginTop, (int) style.getMarginTop(),
+                "resize must not write host margins onto a dialog the platform places");
+        assertEquals(marginLeft, (int) style.getMarginLeftNoRTL(),
+                "resize must not write host margins onto a dialog the platform places");
+        dialog.dispose();
+        DisplayTest.flushEdt();
+    }
+
 }

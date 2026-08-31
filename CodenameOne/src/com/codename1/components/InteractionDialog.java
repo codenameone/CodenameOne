@@ -786,7 +786,29 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
     }
 
+    /// Repositions a dialog that is laid out inside a host surface.
+    ///
+    /// The four arguments are margins against that host, so they describe nothing a
+    /// platform window has: in native window mode the dialog is the content of a window
+    /// the operating system places, sizes and lets the user drag. This is inert there
+    /// rather than approximated, which is the same rule the margin arguments to show()
+    /// follow -- and the body below would otherwise rewrite the geometry of the window's
+    /// own content pane and animate a layer built on the owner surface, neither of which
+    /// has anything to do with the dialog the caller is trying to resize.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: margin from the top of the host
+    ///
+    /// - `bottom`: margin from the bottom of the host
+    ///
+    /// - `left`: margin from the left of the host
+    ///
+    /// - `right`: margin from the right of the host
     public void resize(final int top, final int bottom, final int left, final int right) {
+        if (nativeWindow != null) {
+            return;
+        }
         if (!disposed) {
             final TopLevelContainer f = resolveHost();
             if (f == null) {
@@ -1024,6 +1046,11 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     private void disposeTo(int direction, final Runnable onFinish) {
         disposed = true;
+        // Before the branch, because both sides of it end the showing: a directional
+        // dispose is a dispose, and skipping this left the clock running against a
+        // showing that is over -- holding a timer thread and this hierarchy until the
+        // deadline, and closing the next showing if one arrived first.
+        retireArmedTimeout();
         releaseInferredHost();
         if (nativeWindow != null) {
             // There is no layered pane to slide out of, and no direction that means
