@@ -109,7 +109,7 @@ public class OtpField extends Container {
         this.numericOnly = numericOnly;
         this.boxes = new TextField[length];
         setUIID("OtpField");
-        Container row = new Container(BoxLayout.x());
+        Container row = new DigitRow();
         row.setUIID("Container");
         for (int i = 0; i < length; i++) {
             TextField tf = new TextField();
@@ -192,9 +192,38 @@ public class OtpField extends Container {
         return boxes[i];
     }
 
+    /// The row of boxes, pinned left to right.
+    ///
+    /// A code is a sequence of digits, and digits read left to right in every
+    /// locale -- the platforms' own code fields do not mirror them. `BoxLayout`
+    /// lays its children out in reverse when its parent is right to left, which
+    /// would put the first digit on the right and show the whole code backwards
+    /// on a Hebrew or Arabic form, so this row opts out of that. Everything that
+    /// walks the boxes by position -- the caret, the hit test -- can then take
+    /// their order as given.
+    ///
+    /// Re-applied after `initLaf`, which is where the look and feel assigns the
+    /// flag: setting it once in the constructor would not survive being added to
+    /// a form, let alone a theme change.
+    private static final class DigitRow extends Container {
+        DigitRow() {
+            super(BoxLayout.x());
+            setRTL(false);
+        }
+
+        @Override
+        protected void initLaf(com.codename1.ui.plaf.UIManager uim) {
+            super.initLaf(uim);
+            setRTL(false);
+        }
+    }
+
     /// The box a tap at this absolute x landed on, or the count of boxes when it
     /// landed past the last one. Absolute rather than local because pointer
     /// coordinates arrive in form space.
+    ///
+    /// The boxes are in left-to-right order whatever the form's direction, which
+    /// is what `DigitRow` is for, so this walks them in order.
     ///
     /// #### Parameters
     ///

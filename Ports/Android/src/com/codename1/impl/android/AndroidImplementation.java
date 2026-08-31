@@ -470,6 +470,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (client == null || value == null || !value.isText()) {
             return false;
         }
+        // Only into a field that asked for this. The hint lives on the surface and is put
+        // there and taken away on Android's UI thread, while the session it describes changes
+        // on the EDT, so for a moment after the user moves from a code field to an ordinary
+        // one the view still advertises smsOTPCode while the session behind it is something
+        // else. A fill delivered in that gap would otherwise land a code in whatever the user
+        // tapped into. Asking what the CURRENT session advertises closes it: the answer is
+        // read from the same field the identity check below uses.
+        if (editorAutofillHints() == null) {
+            return false;
+        }
         com.codename1.ui.Display.getInstance().callSerially(
                 new ApplyAutofilledText(client, value.getTextValue().toString()));
         return true;
@@ -494,7 +504,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // fire its listeners -- and an OtpField's completion listener submits a code, so a
             // late fill would verify one for a flow the user has already left. The rest of this
             // bridge guards its callbacks the same way.
-            if (client != activeInputClient) {
+            if (client != activeInputClient || editorAutofillHints() == null) {
                 return;
             }
             // A filled value replaces the field rather than being inserted at the caret: the

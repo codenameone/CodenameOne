@@ -29,6 +29,8 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
@@ -323,6 +325,38 @@ class OtpFieldTest extends UITestBase {
         TextField box = f.getBox(5);
         assertEquals(2, f.getInputField().offsetAtPoint(box.getAbsoluteX() + 1,
                 box.getAbsoluteY() + 1));
+    }
+
+    @FormTest
+    void theBoxesReadLeftToRightOnARightToLeftForm() {
+        // A code is digits, and digits read left to right everywhere; BoxLayout
+        // reverses its children on an RTL form, which would draw the first digit
+        // on the right and show the whole code backwards. The hit test walks the
+        // boxes in order, so it depends on this too.
+        LookAndFeel laf = UIManager.getInstance().getLookAndFeel();
+        boolean wasRtl = laf.isRTL();
+        laf.setRTL(true);
+        try {
+            OtpField f = new OtpField(6);
+            Form form = new Form("t", BoxLayout.y());
+            form.add(f);
+            form.show();
+            form.revalidate();
+            f.setText("123456");
+            form.revalidate();
+
+            for (int i = 1; i < 6; i++) {
+                assertTrue(f.getBox(i - 1).getAbsoluteX() < f.getBox(i).getAbsoluteX(),
+                        "box " + (i - 1) + " must sit left of box " + i);
+            }
+            TextField third = f.getBox(2);
+            assertEquals(2, f.getInputField().offsetAtPoint(
+                    third.getAbsoluteX() + third.getWidth() / 2,
+                    third.getAbsoluteY() + third.getHeight() / 2),
+                    "a tap must still land on the box it hit");
+        } finally {
+            laf.setRTL(wasRtl);
+        }
     }
 
     // ---- completion ---------------------------------------------------
