@@ -313,9 +313,9 @@ public class PhoneNumberField extends Container {
         // the list the application supplied is a defensible default in a way the first
         // entry of the full table is not.
         Country listed = null;
-        for (int i = 0; i < countries.length; i++) {
-            if (countries[i].equals(country)) {
-                listed = countries[i];
+        for (Country candidate : countries) {
+            if (candidate.equals(country)) {
+                listed = candidate;
                 break;
             }
         }
@@ -380,11 +380,11 @@ public class PhoneNumberField extends Container {
     private static Country longestMatch(Country[] list, String digits) {
         Country match = null;
         int matchLength = 0;
-        for (int i = 0; i < list.length; i++) {
-            String dial = list[i].getDialCode();
+        for (Country candidate : list) {
+            String dial = candidate.getDialCode();
             if (digits.length() > dial.length() && digits.startsWith(dial)
                     && dial.length() > matchLength) {
-                match = list[i];
+                match = candidate;
                 matchLength = dial.length();
             }
         }
@@ -439,11 +439,11 @@ public class PhoneNumberField extends Container {
         // at most one of them can match and the length never decides anything --
         // but a list an application supplies is under no such discipline, and a
         // shorter code would otherwise swallow a longer one's numbers.
-        for (int i = 0; i < list.length; i++) {
-            String dial = list[i].getDialCode();
+        for (Country candidate : list) {
+            String dial = candidate.getDialCode();
             if (digits.length() > dial.length() && digits.startsWith(dial)) {
-                if (dial.length() > matchLength || (dial.length() == matchLength && list[i].equals(country))) {
-                    match = list[i];
+                if (dial.length() > matchLength || (dial.length() == matchLength && candidate.equals(country))) {
+                    match = candidate;
                     matchLength = dial.length();
                 }
             }
@@ -531,8 +531,7 @@ public class PhoneNumberField extends Container {
     private void fillCountryList(Container list, Country[] offered, String filter, final Dialog dlg) {
         list.removeAll();
         String needle = foldCase(filter);
-        for (int i = 0; i < offered.length; i++) {
-            final Country c = offered[i];
+        for (final Country c : offered) {
             String label = displayName(c);
             if (!matchesSearch(label, c, needle)) {
                 continue;
@@ -618,9 +617,9 @@ public class PhoneNumberField extends Container {
             if (separator >= 0) {
                 tail = iso.substring(separator + 1);
             }
-            for (int i = 0; i < list.length; i++) {
-                if (list[i].getIsoCode().equalsIgnoreCase(tail)) {
-                    return list[i];
+            for (Country candidate : list) {
+                if (candidate.getIsoCode().equalsIgnoreCase(tail)) {
+                    return candidate;
                 }
             }
         }
@@ -671,14 +670,14 @@ public class PhoneNumberField extends Container {
             return null;
         }
         Country[] all = allCountries();
-        for (int i = 0; i < all.length; i++) {
+        for (Country candidate : all) {
             // equalsIgnoreCase rather than folding the argument: String.toUpperCase folds
             // with the device's locale, and a Turkish device turns "il" into a dotted
             // capital I that matches no ISO 3166 code -- so this documented case
             // insensitive lookup would find nothing at all there. Character-wise case
             // comparison carries no locale.
-            if (all[i].getIsoCode().equalsIgnoreCase(isoCode)) {
-                return all[i];
+            if (candidate.getIsoCode().equalsIgnoreCase(isoCode)) {
+                return candidate;
             }
         }
         return null;
