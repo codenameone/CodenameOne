@@ -356,7 +356,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 A `Sheet` takes `setTopLevelHost` too, and `Sheet.getCurrentSheet(TopLevelContainer)`
 answers per surface - with more than one surface, "the current sheet" has no single
 answer. `ToastBar` gives each window its own instance through
-`ToastBar.getInstance(TopLevelContainer)`; the singleton keeps following the current
+`ToastBar.getForTopLevel(TopLevelContainer)`; the singleton keeps following the current
 form, which is what an application with one surface relies on. The static helpers
 (`ToastBar.showMessage` and friends) target the window the user is actually in.
 

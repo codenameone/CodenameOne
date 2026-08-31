@@ -233,9 +233,9 @@ class OverlayHostInWindowTest extends UITestBase {
         com.codename1.ui.Desktop.getInstance().windowFocusChanged(w.getWindowId(), true);
         DisplayTest.flushEdt();
 
-        assertSame(ToastBar.getInstance(w), ToastBar.getInstance(com.codename1.ui.CN.getCurrentTopLevel()),
+        assertSame(ToastBar.getForTopLevel(w), ToastBar.getForTopLevel(com.codename1.ui.CN.getCurrentTopLevel()),
                 "the static helpers resolve the same instance the window itself gets");
-        assertNotSame(ToastBar.getInstance(), ToastBar.getInstance(w));
+        assertNotSame(ToastBar.getInstance(), ToastBar.getForTopLevel(w));
 
         w.dispose();
         DisplayTest.flushEdt();

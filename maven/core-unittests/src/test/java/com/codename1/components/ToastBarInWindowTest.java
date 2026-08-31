@@ -53,14 +53,14 @@ class ToastBarInWindowTest extends UITestBase {
         DisplayTest.flushEdt();
 
         ToastBar singleton = ToastBar.getInstance();
-        assertSame(singleton, ToastBar.getInstance(main),
+        assertSame(singleton, ToastBar.getForTopLevel(main),
                 "a form keeps the singleton, which is what follows the current form");
-        assertSame(singleton, ToastBar.getInstance(null));
+        assertSame(singleton, ToastBar.getForTopLevel(null));
 
-        ToastBar forWindow = ToastBar.getInstance(w);
+        ToastBar forWindow = ToastBar.getForTopLevel(w);
         assertNotSame(singleton, forWindow,
                 "a window needs its own, or one window's toasts redirect another's");
-        assertSame(forWindow, ToastBar.getInstance(w),
+        assertSame(forWindow, ToastBar.getForTopLevel(w),
                 "and the same window has to keep giving back the same one");
 
         w.dispose();
@@ -81,7 +81,7 @@ class ToastBarInWindowTest extends UITestBase {
 
         // The instance is cached on the window itself, so it dies with the window and
         // needs no registry to clean up. Disposing and reopening gives a fresh one.
-        ToastBar bound = ToastBar.getInstance(w);
+        ToastBar bound = ToastBar.getForTopLevel(w);
         assertSame(bound, w.getClientProperty("cn1$ToastBar"),
                 "a window's toast bar is cached on the window");
         assertNull(main.getClientProperty("cn1$ToastBar"),
@@ -106,7 +106,7 @@ class ToastBarInWindowTest extends UITestBase {
         w.setWindowSize(400, 300);
         w.show();
         DisplayTest.flushEdt();
-        ToastBar first = ToastBar.getInstance(w);
+        ToastBar first = ToastBar.getForTopLevel(w);
         assertNotNull(first);
 
         w.dispose();
@@ -118,7 +118,7 @@ class ToastBarInWindowTest extends UITestBase {
         second.setWindowSize(400, 300);
         second.show();
         DisplayTest.flushEdt();
-        assertNotSame(first, ToastBar.getInstance(second),
+        assertNotSame(first, ToastBar.getForTopLevel(second),
                 "a new window gets a new one rather than inheriting the old window's");
 
         second.dispose();
@@ -127,7 +127,7 @@ class ToastBarInWindowTest extends UITestBase {
 
     @FormTest
     void aNullTopLevelFallsBackToTheSingleton() {
-        assertSame(ToastBar.getInstance(), ToastBar.getInstance(null),
+        assertSame(ToastBar.getInstance(), ToastBar.getForTopLevel(null),
                 "callers with nothing to resolve still get the singleton");
     }
 
@@ -148,7 +148,7 @@ class ToastBarInWindowTest extends UITestBase {
         DisplayTest.flushEdt();
 
         ToastBar singleton = ToastBar.getInstance();
-        ToastBar forWindow = ToastBar.getInstance(w);
+        ToastBar forWindow = ToastBar.getForTopLevel(w);
         assertNotSame(singleton, forWindow);
 
         // The singleton is form-only by contract, so a legacy caller reaching for it
@@ -187,7 +187,7 @@ class ToastBarInWindowTest extends UITestBase {
             w.show();
             DisplayTest.flushEdt();
 
-            ToastBar forWindow = ToastBar.getInstance(w);
+            ToastBar forWindow = ToastBar.getForTopLevel(w);
             assertNotSame(singleton, forWindow);
             assertEquals(Component.TOP, forWindow.getPosition(),
                     "a window's toast bar starts from the configuration the "
@@ -230,20 +230,20 @@ class ToastBarInWindowTest extends UITestBase {
             DisplayTest.flushEdt();
 
             // Created before the application configures anything.
-            ToastBar forWindow = ToastBar.getInstance(w);
+            ToastBar forWindow = ToastBar.getForTopLevel(w);
             assertNotSame(singleton, forWindow);
 
             singleton.setPosition(Component.TOP);
             singleton.setDefaultUIID("LaterToastBar");
-            assertEquals(Component.TOP, ToastBar.getInstance(w).getPosition(),
+            assertEquals(Component.TOP, ToastBar.getForTopLevel(w).getPosition(),
                     "a change made after the window's bar existed still reaches it");
-            assertEquals("LaterToastBar", ToastBar.getInstance(w).getDefaultUIID());
+            assertEquals("LaterToastBar", ToastBar.getForTopLevel(w).getDefaultUIID());
 
             // But something set on the window itself is its own, and a later change to
             // the shared default must not take it back.
             forWindow.setPosition(Component.BOTTOM);
             singleton.setPosition(Component.TOP);
-            assertEquals(Component.BOTTOM, ToastBar.getInstance(w).getPosition(),
+            assertEquals(Component.BOTTOM, ToastBar.getForTopLevel(w).getPosition(),
                     "an explicit per-window setting outranks the shared default");
             assertEquals(Component.TOP, singleton.getPosition(),
                     "and setting it on the window does not reach back into the singleton");
@@ -274,7 +274,7 @@ class ToastBarInWindowTest extends UITestBase {
             w.show();
             DisplayTest.flushEdt();
 
-            ToastBar forWindow = ToastBar.getInstance(w);
+            ToastBar forWindow = ToastBar.getForTopLevel(w);
             ToastBar.Status s = forWindow.createStatus();
             s.setMessage("hello");
             s.show();
@@ -290,7 +290,7 @@ class ToastBarInWindowTest extends UITestBase {
             singleton.setPosition(Component.TOP);
             // What every static helper starts by doing: resolve the window's bar, which
             // is where the inherited position is taken up.
-            ToastBar.getInstance(w);
+            ToastBar.getForTopLevel(w);
             DisplayTest.flushEdt();
 
             assertEquals(BorderLayout.NORTH,

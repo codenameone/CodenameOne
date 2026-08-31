@@ -178,7 +178,7 @@ public final class ToastBar {
     ///
     /// The singleton shows on whichever `com.codename1.ui.Form` is current, including
     /// while a desktop window has the focus. To toast on a window use
-    /// `#getInstance(com.codename1.ui.TopLevelContainer)`, which is what the static
+    /// `#getForTopLevel(com.codename1.ui.TopLevelContainer)`, which is what the static
     /// helpers on this class do.
     public static ToastBar getInstance() {
         return ToastBarHolder.INSTANCE;
@@ -199,7 +199,7 @@ public final class ToastBar {
     /// #### Returns
     ///
     /// the toast bar for that top level, never null
-    public static ToastBar getInstance(TopLevelContainer top) {
+    public static ToastBar getForTopLevel(TopLevelContainer top) {
         if (!(top instanceof Window)) {
             return ToastBarHolder.INSTANCE;
         }
@@ -239,7 +239,7 @@ public final class ToastBar {
         }
         // The current form, not the top level the user is in. The singleton is
         // form-only by contract, and it has to stay that way: a window already has its
-        // own instance from getInstance(TopLevelContainer), and letting the singleton
+        // own instance from getForTopLevel(TopLevelContainer), and letting the singleton
         // resolve to that window as well would give two instances with two status
         // lists the same cached component to fight over -- one expiring a toast the
         // other still thinks it is showing. Callers that want the surface the user is
@@ -272,7 +272,7 @@ public final class ToastBar {
     ///
     /// the status if we want to clear it before timeout elapses
     public static Status showMessage(String msg, char icon, int timeout, ActionListener listener) {
-        Status s = ToastBar.getInstance(CN.getCurrentTopLevel()).createStatus();
+        Status s = ToastBar.getForTopLevel(CN.getCurrentTopLevel()).createStatus();
         Style stl = UIManager.getInstance().getComponentStyle(s.getMessageUIID());
         s.setIcon(FontImage.createMaterial(icon, stl, 4));
         s.setMessage(msg);
@@ -372,7 +372,7 @@ public final class ToastBar {
      */
     public static void showConnectionProgress(String message, final ConnectionRequest cr,
                                               final SuccessCallback<NetworkEvent> onSuccess, final FailureCallback<NetworkEvent> onError) {
-        final ToastBar.Status s = ToastBar.getInstance(CN.getCurrentTopLevel()).createStatus();
+        final ToastBar.Status s = ToastBar.getForTopLevel(CN.getCurrentTopLevel()).createStatus();
         s.setProgress(-1);
         s.setMessage(message);
         s.show();
