@@ -1961,7 +1961,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
         // registered on, so it could not outlive the dialog; this one can, and without
         // the token a dialog disposed and then shown again inside the original timeout
         // would be closed by the previous showing's timer.
-        final int token = ++timeoutGeneration;
+        //
+        // Retiring first also takes down a clock that is still pending, which is what a
+        // replacement timeout armed while an earlier one is running would otherwise
+        // leave behind: the field would point at the new timer and the old thread would
+        // run on, holding this dialog, until a deadline nobody is waiting for.
+        retireArmedTimeout();
+        final int token = timeoutGeneration;
         // Not tied to the surface. A UITimer is driven by the painting of the top level
         // it is registered on, so a window that is minimized or hidden stops the clock
         // -- and a modal dialog whose timeout is what releases the caller then holds it
@@ -1975,6 +1981,11 @@ public class InteractionDialog extends Container implements AbstractDialog {
         // deadline. Timer takes a long, so nothing has to be narrowed.
         java.util.Timer clock = new java.util.Timer();
         clock.schedule(new TimeoutSchedule(this, token), Math.max(0L, millis));
+        // Held so it can be stopped. The token alone only makes the callback do
+        // nothing when it eventually runs: the timer thread is not a daemon and the
+        // scheduled task holds this dialog, so until the original deadline passed both
+        // the thread and the whole hierarchy stayed alive -- once per early dispose.
+        timeoutClock = clock;
     }
 
     /// Closes the showing that armed it, once, from the event thread.
@@ -2020,13 +2031,27 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// to is discarded rather than closing whatever is on screen by then.
     private int timeoutGeneration;
 
+    /// The armed clock itself, so it can be stopped rather than only ignored.
+    private java.util.Timer timeoutClock;
+
     /// Retires whatever timeout is currently armed.
     ///
     /// Every path that ends a showing has to call this, not just `dispose()`: the clock
     /// is deliberately not tied to the surface, so it survives the window being torn
     /// down. Bumping twice is harmless -- the counter only ever has to stop matching.
+    ///
+    /// The counter settles what a callback already in flight does; cancelling settles
+    /// whether one is still coming at all. Both are needed: Timer runs a non-daemon
+    /// thread and the scheduled task holds this dialog, so a token-only retirement left
+    /// the thread and the hierarchy alive until the deadline it no longer cared about.
     private void retireArmedTimeout() {
         timeoutGeneration++;
+        if (timeoutClock != null) {
+            // cancel() discards the scheduled task and lets the timer thread exit; there
+            // is nothing else on this timer, so there is nothing left to purge.
+            timeoutClock.cancel();
+            timeoutClock = null;
+        }
     }
 
     /// Shows this interaction dialog and blocks until it is disposed.

@@ -826,4 +826,46 @@ class InteractionDialogTest extends UITestBase {
         dialog.dispose();
     }
 
+    /// The armed clock itself, via reflection.
+    private static Object timeoutClockOf(InteractionDialog d) {
+        try {
+            java.lang.reflect.Field f =
+                    InteractionDialog.class.getDeclaredField("timeoutClock");
+            f.setAccessible(true);
+            return f.get(d);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// An armed timeout has to be stopped, not merely ignored.
+    ///
+    /// The generation token settles what a callback already in flight does. It does not
+    /// settle whether one is still coming: Timer runs a non-daemon thread and the
+    /// scheduled task holds the dialog, so a token-only retirement kept both alive until
+    /// a deadline nobody was waiting for -- once per early dispose, and once more for
+    /// every replacement timeout armed over a pending one.
+    @FormTest
+    void endingAShowingStopsItsTimeoutClock() {
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("timed");
+        dialog.add(new Label("body"));
+        dialog.setTimeout(600000);
+        dialog.show(10, 10, 10, 10);
+        Object armed = timeoutClockOf(dialog);
+        assertNotNull(armed, "precondition: showing armed a clock");
+
+        // A replacement armed over the pending one must not strand it.
+        dialog.setTimeout(600000);
+        assertNotSame(armed, timeoutClockOf(dialog),
+                "precondition: the replacement is a different clock");
+
+        dialog.dispose();
+        assertNull(timeoutClockOf(dialog),
+                "ending the showing has to stop the clock, not just ignore what it does");
+    }
+
 }
