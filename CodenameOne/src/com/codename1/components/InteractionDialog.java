@@ -1955,7 +1955,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         if (host == null) {
             return;
         }
-        int millis = (int) pendingTimeout;
+        long millis = pendingTimeout;
         pendingTimeout = 0;
         // Which showing armed this clock. A UITimer dies with the surface it is
         // registered on, so it could not outlive the dialog; this one can, and without
@@ -1968,14 +1968,51 @@ public class InteractionDialog extends Container implements AbstractDialog {
         // for as long as the window stays down, which for a window never restored is
         // for good. The host still decides whether there is a timeout at all; it just
         // does not have to be painted for it to arrive.
-        Display.getInstance().setTimeout(millis, new Runnable() {
-            @Override
-            public void run() {
-                if (token == timeoutGeneration) {
-                    dispose();
-                }
+        //
+        // Scheduled at the caller's own scale. setTimeout(long) accepts delays that do
+        // not fit in an int, and narrowing one wraps it negative past about 24.8 days,
+        // which makes Timer.schedule throw on the spot instead of firing at the
+        // deadline. Timer takes a long, so nothing has to be narrowed.
+        java.util.Timer clock = new java.util.Timer();
+        clock.schedule(new TimeoutSchedule(this, token), Math.max(0L, millis));
+    }
+
+    /// Closes the showing that armed it, once, from the event thread.
+    ///
+    /// Named rather than anonymous: an anonymous subclass here is
+    /// SIC_INNER_SHOULD_BE_STATIC_ANON under the zero-findings SpotBugs gate.
+    private static final class TimeoutSchedule extends java.util.TimerTask {
+        private final InteractionDialog dlg;
+        private final int token;
+
+        TimeoutSchedule(InteractionDialog dlg, int token) {
+            this.dlg = dlg;
+            this.token = token;
+        }
+
+        @Override
+        public void run() {
+            // Disposing is UI work, and this runs on the timer's own thread.
+            Display.getInstance().callSerially(new TimeoutDispatch(dlg, token));
+        }
+    }
+
+    /// The event-thread half of a timeout, gated on the showing that armed it.
+    private static final class TimeoutDispatch implements Runnable {
+        private final InteractionDialog dlg;
+        private final int token;
+
+        TimeoutDispatch(InteractionDialog dlg, int token) {
+            this.dlg = dlg;
+            this.token = token;
+        }
+
+        @Override
+        public void run() {
+            if (token == dlg.timeoutGeneration) {
+                dlg.dispose();
             }
-        });
+        }
     }
 
     /// Identifies the showing a timeout was armed under. Bumped by every arming and by

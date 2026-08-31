@@ -3367,6 +3367,16 @@ class DialogInWindowTest extends UITestBase {
             dlg.dispose();
             assertNull(timeoutClockOf(dlg),
                     "and ending the showing has to take that clock back down");
+
+            // Longer than an int holds in milliseconds -- about 24.8 days. setTimeout
+            // takes a long and the deadline poll has always honoured these, so arming
+            // the clock must not narrow the delay: the wrap goes negative and
+            // Timer.schedule throws on the spot rather than at the deadline.
+            Dialog longDlg = new Dialog("long");
+            longDlg.setTimeout(((long) Integer.MAX_VALUE) + 60000L);
+            assertNotNull(timeoutClockOf(longDlg),
+                    "a timeout too large for an int still has to arm a clock");
+            longDlg.dispose();
         } finally {
             w.dispose();
             DisplayTest.flushEdt();

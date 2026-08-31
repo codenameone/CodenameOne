@@ -1666,13 +1666,37 @@ public class Dialog extends Form implements AbstractDialog {
         // deadline as it fires, so whichever of the two reaches it first wins and the
         // other finds nothing to do.
         cancelTimeoutClock();
-        timeoutClock = Display.getInstance().setTimeout((int) time, new TimeoutClock(this));
+        // Scheduled at the caller's own scale. Display.setTimeout takes an int, and
+        // setTimeout(long) accepts delays that do not fit in one -- past about 24.8 days
+        // the narrowing wraps negative and Timer.schedule throws on the spot, turning a
+        // call the deadline poll has always honoured into an immediate failure. Timer
+        // itself takes a long, so nothing has to be narrowed. A negative delay is
+        // clamped rather than rejected, matching the poll: a deadline already in the
+        // past fires at the first opportunity.
+        java.util.Timer clock = new java.util.Timer();
+        clock.schedule(new TimeoutSchedule(new TimeoutClock(this)), Math.max(0L, time));
+        timeoutClock = clock;
+    }
+
+    /// Hands a timer thread's callback back to the event thread.
+    ///
+    /// Named rather than anonymous: an anonymous subclass here is
+    /// SIC_INNER_SHOULD_BE_STATIC_ANON under the zero-findings SpotBugs gate.
+    private static final class TimeoutSchedule extends java.util.TimerTask {
+        private final Runnable body;
+
+        TimeoutSchedule(Runnable body) {
+            this.body = body;
+        }
+
+        @Override
+        public void run() {
+            // Disposing is UI work, and this runs on the timer's own thread.
+            Display.getInstance().callSerially(body);
+        }
     }
 
     /// Polls the deadline from a timer thread rather than from the animation loop.
-    ///
-    /// Named rather than anonymous: an anonymous Runnable here is
-    /// SIC_INNER_SHOULD_BE_STATIC_ANON under the zero-findings SpotBugs gate.
     private static final class TimeoutClock implements Runnable {
         private final Dialog dlg;
 
