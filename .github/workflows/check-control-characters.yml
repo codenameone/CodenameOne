@@ -1,0 +1,33 @@
+name: Check control characters
+
+# A raw control byte in a source file is invisible in an editor and turns the
+# file binary to grep, which then reports "no match" instead of an error -- a
+# search comes back empty and reads as "the symbol is not there". Every
+# language here has an escape that compiles to the same value, so the gate is
+# absolute: no baseline, no exclusions.
+#
+# Deliberately its own workflow rather than a step in pr.yml: that workflow's
+# paths filter excludes scripts/** and docs/**, so a PR touching only those
+# would skip the check -- and this tree has had a corrupted file in each.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+  check-control-characters:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Scan tracked text files for raw control characters
+        shell: bash
+        run: scripts/check-control-characters.py

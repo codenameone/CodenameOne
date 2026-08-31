@@ -1262,6 +1262,74 @@
     return marker;
   }
 
+  // Whether ctx.drawImage() can accept this source right now.
+  //
+  // A source that merely EXISTS is not enough. Per the HTML spec drawImage
+  // throws InvalidStateError for an <img> whose request is broken and for a
+  // canvas of zero width or height -- and an exception thrown inside
+  // replaySurfaceCommands unwinds the whole batch, so every op AFTER it in
+  // that surface's command buffer is silently lost. An image still decoding
+  // is not broken; it draws nothing and is skipped here so the ops after it
+  // still run.
+  //
+  // That is the shape graphics-draw-image-rect kept failing in: its two
+  // mutable-image cells came out truncated at the first EncodedImage draw
+  // while the directly-painted cells were complete, because each mutable
+  // image is its own surface with its own batch -- so the throw took out the
+  // rest of those two cells and left the display batch untouched.
+  function drawableImageSource(src) {
+    if (!src) {
+      return false;
+    }
+    // <img>: a completed decode with real intrinsic pixels.
+    if (typeof src.naturalWidth === 'number') {
+      return src.complete === true && src.naturalWidth > 0 && src.naturalHeight > 0;
+    }
+    // canvas / ImageBitmap / OffscreenCanvas: non-zero intrinsic size.
+    if (typeof src.width === 'number' && typeof src.height === 'number') {
+      return src.width > 0 && src.height > 0;
+    }
+    // <video> and anything else the spec accepts: let drawImage decide, with
+    // the per-op guard below as the backstop.
+    return true;
+  }
+
+  // One drawImage, isolated. A source that turns out to be undrawable costs
+  // its own op and nothing else -- never the remainder of the frame.
+  function safeDrawImage(ctx, src, args) {
+    if (!drawableImageSource(src)) {
+      surfaceDrawImageDropped++;
+      return;
+    }
+    try {
+      if (args.length === 2) {
+        ctx.drawImage(src, args[0], args[1]);
+      } else if (args.length === 4) {
+        ctx.drawImage(src, args[0], args[1], args[2], args[3]);
+      } else {
+        ctx.drawImage(src, args[0], args[1], args[2], args[3],
+          args[4], args[5], args[6], args[7]);
+      }
+    } catch (_edi) {
+      surfaceDrawImageDropped++;
+    }
+  }
+
+  // Dropped image ops since load. Reported with the screenshot diagnostics so
+  // a frame that lost a draw says so, instead of being read as a rendering
+  // difference.
+  var surfaceDrawImageDropped = 0;
+
+  // Drops charged to the frame currently on the canvas.
+  //
+  // A frame is the display surface's batch plus the offscreen batches flushed
+  // since the previous display batch (a mutable image flushes just before the
+  // blit that draws it), so the difference across two display flushes is what
+  // that frame lost. Non-zero means the frame on screen is missing pixels it
+  // was asked to draw -- which is a frame nothing should screenshot.
+  var surfaceFrameDropped = 0;
+  var surfaceDropsAtFrameStart = 0;
+
   function getSurface(id, createW, createH) {
     var s = surfaceTable[id];
     if (s) {
@@ -1816,19 +1884,25 @@
           break;
         }
         case SURF.SET_FILL_PATTERN: if (curPattern) { ctx.fillStyle = curPattern; } break;
+        // The argument cursors advance whether or not the draw happens, so a
+        // skipped op can never desync the ops behind it.
         case SURF.DRAW_IMAGE_XY: {
           var i1 = surfaceImageSource(objs[oi++]);
-          if (i1) { ctx.drawImage(i1, nums[ni++], nums[ni++]); } else { ni += 2; }
+          var i1a = [nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, i1, i1a);
           break;
         }
         case SURF.DRAW_IMAGE_XYWH: {
           var i2 = surfaceImageSource(objs[oi++]);
-          if (i2) { ctx.drawImage(i2, nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 4; }
+          var i2a = [nums[ni++], nums[ni++], nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, i2, i2a);
           break;
         }
         case SURF.DRAW_IMAGE_SRCDST: {
           var i3 = surfaceImageSource(objs[oi++]);
-          if (i3) { ctx.drawImage(i3, nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 8; }
+          var i3a = [nums[ni++], nums[ni++], nums[ni++], nums[ni++],
+            nums[ni++], nums[ni++], nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, i3, i3a);
           break;
         }
         case SURF.BLUR_SELF_REGION: {
@@ -1877,19 +1951,26 @@
           }
           break;
         }
+        // Blitting one surface onto another goes through the same guard: a
+        // zero-sized backing canvas throws exactly like a broken image, and
+        // taking the rest of the batch with it is what truncates a frame.
         case SURF.BLIT_SURFACE_XY: {
           var b1 = surfaceTable[nums[ni++]];
-          if (b1 && b1.canvas) { ctx.drawImage(b1.canvas, nums[ni++], nums[ni++]); } else { ni += 2; }
+          var b1a = [nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, b1 ? b1.canvas : null, b1a);
           break;
         }
         case SURF.BLIT_SURFACE_XYWH: {
           var b2 = surfaceTable[nums[ni++]];
-          if (b2 && b2.canvas) { ctx.drawImage(b2.canvas, nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 4; }
+          var b2a = [nums[ni++], nums[ni++], nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, b2 ? b2.canvas : null, b2a);
           break;
         }
         case SURF.BLIT_SURFACE_SRCDST: {
           var b3 = surfaceTable[nums[ni++]];
-          if (b3 && b3.canvas) { ctx.drawImage(b3.canvas, nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 8; }
+          var b3a = [nums[ni++], nums[ni++], nums[ni++], nums[ni++],
+            nums[ni++], nums[ni++], nums[ni++], nums[ni++]];
+          safeDrawImage(ctx, b3 ? b3.canvas : null, b3a);
           break;
         }
         case SURF.TEXT_ATTACH: {
@@ -2007,6 +2088,12 @@
     if (id === SURF_DISPLAY_ID && opCount > 0) {
       noteCanvasOperation(s.canvas, 'method', 'fill', true, null);
       global.__cn1RenderQueueSeq = (global.__cn1RenderQueueSeq | 0) + 1;
+    }
+    if (id === SURF_DISPLAY_ID) {
+      // Close the frame: everything dropped since the previous display batch
+      // belongs to the one just replayed, offscreen batches included.
+      surfaceFrameDropped = (surfaceDrawImageDropped | 0) - (surfaceDropsAtFrameStart | 0);
+      surfaceDropsAtFrameStart = surfaceDrawImageDropped | 0;
     }
     return null;
   });
@@ -5029,6 +5116,15 @@
     var baselinePaintSeq = baseline ? (baseline.canvasLastPaintSeq | 0) : 0;
     var baselinePaintCount = baseline ? (baseline.canvasPaintCount | 0) : 0;
     var attempts = 24;
+    // A frame that is missing draws gets a much longer budget, because the
+    // thing it waits for is known and bounded: an image decode, after which
+    // the port repaints and the next frame drops nothing. 24 frames is ~0.4s,
+    // and the Java side already allows this content 4s to arrive -- so the
+    // capture used to give up long before the decode it was waiting for could
+    // land, and ship the incomplete frame. The loop still exits the moment a
+    // clean frame appears, so a healthy capture pays nothing for this.
+    var attemptsIncompleteFrame = 240;
+    var lastFrameDropped = 0;
     var best = null;
     var startRenderSeq = global.__cn1RenderQueueSeq | 0;
     var seenRenderSeq = startRenderSeq;
@@ -5044,6 +5140,12 @@
       }
       if ((b.canvasDisplayAffinity | 0) !== (a.canvasDisplayAffinity | 0)) {
         return (b.canvasDisplayAffinity | 0) > (a.canvasDisplayAffinity | 0) ? b : a;
+      }
+      // A frame that drew everything beats one that lost an image, so the
+      // bounded fallback below cannot prefer an incomplete frame that happens
+      // to score higher.
+      if (((b.frameDropped | 0) === 0) !== ((a.frameDropped | 0) === 0)) {
+        return (b.frameDropped | 0) === 0 ? b : a;
       }
       if (!!b.changedFromPrevious !== !!a.changedFromPrevious) {
         return b.changedFromPrevious ? b : a;
@@ -5073,8 +5175,24 @@
           sample.paintedSinceStart =
             ((sample.canvasLastPaintSeq | 0) > (baselinePaintSeq | 0))
             || ((sample.canvasPaintCount | 0) > (baselinePaintCount | 0));
+          sample.frameDropped = surfaceFrameDropped | 0;
+          // A frame that could not draw one of its images is incomplete, and
+          // no amount of stillness makes it complete: an image still decoding
+          // leaves the canvas idle, so the quiet-frame test reads "settled"
+          // while pixels are missing. That is the rest of the
+          // graphics-draw-image-rect failure -- with the batch truncation
+          // fixed, the capture still shipped the frame painted before the
+          // EncodedImage decodes landed. Wait for a frame that drew everything
+          // it was asked to draw; the attempt budget below still bounds it, so
+          // an image that never decodes captures and fails as it does today
+          // rather than hanging the suite.
+          lastFrameDropped = sample.frameDropped | 0;
+          if (sample.frameDropped > 0) {
+            quietFrames = 0;
+          }
           best = chooseBetter(best, sample);
           if (quietFrames >= quietFramesRequired
+              && (sample.frameDropped | 0) === 0
               && (sample.canvasScore | 0) > 0
               && (sample.paintedSinceStart || renderAdvanced || sample.changedFromPrevious)) {
             return sample;
@@ -5084,7 +5202,8 @@
             sample = null;
           }
         }
-        if (index + 1 >= attempts) {
+        var limit = lastFrameDropped > 0 ? attemptsIncompleteFrame : attempts;
+        if (index + 1 >= limit) {
           return best;
         }
         return runAttempt(index + 1);
@@ -5192,6 +5311,14 @@
       diag('SCREENSHOT_START', 'canvasRenderAdvanced', renderAdvanced ? 1 : 0);
       diag('SCREENSHOT_START', 'canvasQuietObserved', quietFrames | 0);
       diag('SCREENSHOT_START', 'attempt', result.attempt | 0);
+      // Image ops the replay could not draw. A capture with a non-zero count
+      // is missing pixels for a reason the screenshot diff cannot show, so it
+      // must not be read as a rendering difference.
+      diag('SCREENSHOT_START', 'drawImageDropped', surfaceDrawImageDropped | 0);
+      // Drops charged to the captured frame itself. Zero is the condition the
+      // capture waits for; a non-zero value here means the wait was exhausted
+      // and the screenshot is knowingly incomplete.
+      diag('SCREENSHOT_START', 'frameDropped', result.frameDropped | 0);
       diag('SCREENSHOT_START', 'changed', result.changedFromPrevious ? 1 : 0);
       diag('SCREENSHOT_START', 'pngLen', String(result.dataUrl || '').length);
       global.__cn1LastCaptureMeta = {
