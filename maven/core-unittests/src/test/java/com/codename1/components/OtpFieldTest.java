@@ -25,6 +25,9 @@ package com.codename1.components;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.EditField;
+import com.codename1.ui.Form;
+import com.codename1.ui.TextField;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -276,6 +279,50 @@ class OtpFieldTest extends UITestBase {
         OtpField f = new OtpField(4);
         f.getInputField().setComposingText("123456789", 0);
         assertEquals("1234", f.getText());
+    }
+
+    // ---- tapping a box --------------------------------------------------
+
+    @FormTest
+    void tappingABoxPutsTheCaretInThatBox() {
+        // The inherited hit test measures the field's own text layout, which sits at
+        // the field's left edge and is never painted. A tap has to answer with the box
+        // the user aimed at, or a correction lands on the wrong digit.
+        OtpField f = new OtpField(6);
+        Form form = new Form("t", BoxLayout.y());
+        form.add(f);
+        form.show();
+        form.revalidate();
+        f.setText("123456");
+        form.revalidate();
+
+        EditField input = f.getInputField();
+        for (int i = 0; i < 6; i++) {
+            TextField box = f.getBox(i);
+            int x = box.getAbsoluteX() + box.getWidth() / 2;
+            int y = box.getAbsoluteY() + box.getHeight() / 2;
+            assertEquals(i, input.offsetAtPoint(x, y), "tap on box " + i);
+        }
+        TextField last = f.getBox(5);
+        assertEquals(6, input.offsetAtPoint(last.getAbsoluteX() + last.getWidth() + 40,
+                last.getAbsoluteY() + 1), "a tap past the last box means the end");
+    }
+
+    @FormTest
+    void tappingAnEmptyBoxMeansTheEndOfWhatWasEntered() {
+        // the caller assigns this offset to the caret without clamping it, so an
+        // offset past the text would put the caret outside the document
+        OtpField f = new OtpField(6);
+        Form form = new Form("t", BoxLayout.y());
+        form.add(f);
+        form.show();
+        form.revalidate();
+        f.setText("12");
+        form.revalidate();
+
+        TextField box = f.getBox(5);
+        assertEquals(2, f.getInputField().offsetAtPoint(box.getAbsoluteX() + 1,
+                box.getAbsoluteY() + 1));
     }
 
     // ---- completion ---------------------------------------------------

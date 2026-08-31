@@ -192,6 +192,26 @@ public class OtpField extends Container {
         return boxes[i];
     }
 
+    /// The box a tap at this absolute x landed on, or the count of boxes when it
+    /// landed past the last one. Absolute rather than local because pointer
+    /// coordinates arrive in form space.
+    ///
+    /// #### Parameters
+    ///
+    /// - `absX`: the absolute x of the pointer
+    ///
+    /// #### Returns
+    ///
+    /// the box index, from 0, or the length when the tap was past the last box
+    int boxIndexAt(int absX) {
+        for (int i = 0; i < length; i++) {
+            if (absX < boxes[i].getAbsoluteX() + boxes[i].getWidth()) {
+                return i;
+            }
+        }
+        return length;
+    }
+
     /// True once the caret has run past the last box, i.e. the code is full and
     /// the caret belongs at the trailing edge rather than in front of a digit.
     boolean caretPastEnd(int caretOffset) {
@@ -365,6 +385,20 @@ public class OtpField extends Container {
         @Override
         public void setComposingText(String text, int relativeCaret) {
             super.setComposingText(limit(text), relativeCaret);
+        }
+
+        /// Where a tap puts the caret. The inherited hit test measures the field's own
+        /// text, laid out from its left edge -- a rendering that exists in the metrics
+        /// and nowhere on the screen, because this component draws boxes instead and
+        /// this layer draws nothing. Answering from it puts the caret nowhere near the
+        /// box the user aimed at, so a correction lands on the wrong digit.
+        ///
+        /// Clamped to the text, because a tap on an empty box means the end of what has
+        /// been entered rather than an offset past it -- and the caller assigns this
+        /// offset to the caret without clamping it itself.
+        @Override
+        public int offsetAtPoint(int absX, int absY) {
+            return Math.min(owner.boxIndexAt(absX), getText().length());
         }
 
         /// Drops what this field will not take: characters outside the allowed set, and
