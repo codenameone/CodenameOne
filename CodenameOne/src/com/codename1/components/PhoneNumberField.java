@@ -67,6 +67,16 @@ import java.util.List;
 /// phone.getE164(); // "+972501234567"
 /// ```
 ///
+/// A number that already carries its own calling code is used as it stands, and
+/// the selector is not applied to it. Pasting is one way that happens; platform
+/// autofill is the other, since it offers the device's own number in exactly
+/// that form:
+///
+/// ```java
+/// // Israel selected, the user pastes +1 415 555 0100
+/// phone.getE164(); // "+14155550100", not the selection with that appended
+/// ```
+///
 /// A national trunk prefix is a digit, and it is kept:
 ///
 /// ```java
@@ -333,7 +343,52 @@ public class PhoneNumberField extends Container {
 
     /// The national part as typed, digits only.
     public String getNationalNumber() {
-        return digitsOf(number.getText());
+        String digits = digitsOf(number.getText());
+        if (!isInternational()) {
+            return digits;
+        }
+        // The value already says which country it is for, so the national part is what
+        // follows that country's calling code rather than the whole thing. Resolved
+        // against the full table rather than the offered list: the number means what it
+        // means whichever countries this field happens to be offering.
+        Country match = longestMatch(allCountries(), digits);
+        return match == null ? digits : digits.substring(match.getDialCode().length());
+    }
+
+    /// True when what has been typed is an international number rather than a national
+    /// one -- pasted, or handed over by the platform, which offers the device's own
+    /// number in exactly that form.
+    private boolean isInternational() {
+        String raw = number.getText();
+        if (raw == null) {
+            return false;
+        }
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c == '+') {
+                return true;
+            }
+            if (c != ' ' && c != '\t') {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /// The country in `list` whose calling code the digits start with, longest first,
+    /// or null when none does.
+    private static Country longestMatch(Country[] list, String digits) {
+        Country match = null;
+        int matchLength = 0;
+        for (int i = 0; i < list.length; i++) {
+            String dial = list[i].getDialCode();
+            if (digits.length() > dial.length() && digits.startsWith(dial)
+                    && dial.length() > matchLength) {
+                match = list[i];
+                matchLength = dial.length();
+            }
+        }
+        return match;
     }
 
     /// The number in E.164 form -- "+", the calling code, then the national
@@ -343,6 +398,14 @@ public class PhoneNumberField extends Container {
     ///
     /// the E.164 number, or null when the national part is empty
     public String getE164() {
+        if (isInternational()) {
+            // Used as typed. A value that already carries a calling code is a whole
+            // number, and prepending the selector's code to it would produce one that is
+            // neither the one that was pasted nor the one the selector shows -- pasting
+            // +972501234567 with Israel selected once produced +972972501234567.
+            String digits = digitsOf(number.getText());
+            return digits.length() == 0 ? null : "+" + digits;
+        }
         String national = getNationalNumber();
         if (national.length() == 0) {
             return null;
@@ -386,7 +449,11 @@ public class PhoneNumberField extends Container {
             }
         }
         if (match == null) {
-            number.setText(digits);
+            // No country here can express it -- a narrowed list, or a calling code the
+            // table does not carry. Kept in international form so it survives unchanged
+            // rather than being read back as the selected country's code followed by all
+            // of it, which is a different number and a plausible looking one.
+            number.setText("+" + digits);
             return;
         }
         setCountry(match);
@@ -402,8 +469,13 @@ public class PhoneNumberField extends Container {
     ///
     /// true when the number could be an E.164 number
     public boolean isValid() {
-        String national = getNationalNumber();
-        return national.length() >= 4 && national.length() + country.getDialCode().length() <= 15;
+        String e164 = getE164();
+        if (e164 == null) {
+            return false;
+        }
+        // measured against what getE164 would actually send, which is not the selector's
+        // code plus the field when the field holds a whole number of its own
+        return getNationalNumber().length() >= 4 && e164.length() - 1 <= 15;
     }
 
     /// The field holding the national part, exposed for theming and for

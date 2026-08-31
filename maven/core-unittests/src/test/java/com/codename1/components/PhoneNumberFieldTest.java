@@ -198,6 +198,39 @@ class PhoneNumberFieldTest extends UITestBase {
         assertEquals(TextArea.PHONENUMBER, new PhoneNumberField().getNumberField().getConstraint());
     }
 
+    // ---- a number that already says which country it is for --------------
+
+    @FormTest
+    void aPastedInternationalNumberIsNotGivenASecondCallingCode() {
+        // the field carries the phone constraint, so the platform offers the device's
+        // own number here -- in international form
+        PhoneNumberField f = new PhoneNumberField();
+        f.setCountry(PhoneNumberField.findCountry("IL"));
+        f.getNumberField().setText("+972501234567");
+        assertEquals("+972501234567", f.getE164());
+        assertEquals("501234567", f.getNationalNumber());
+        assertTrue(f.isValid());
+    }
+
+    @FormTest
+    void aPastedNumberFromAnotherCountryIsUsedAsItStands() {
+        PhoneNumberField f = new PhoneNumberField();
+        f.setCountry(PhoneNumberField.findCountry("US"));
+        f.getNumberField().setText("+44 7911 123456");
+        assertEquals("+447911123456", f.getE164(),
+                "the selector does not apply to a number that carries its own code");
+    }
+
+    @FormTest
+    void aNumberNoOfferedCountryCanExpressSurvivesUnchanged() {
+        PhoneNumberField f = new PhoneNumberField();
+        f.setCountries(new Country[]{PhoneNumberField.findCountry("US")});
+        f.setE164("+447911123456");
+        assertEquals("+447911123456", f.getE164(),
+                "storing it as a national number would read back as +1447911123456");
+        assertEquals("US", f.getCountry().getIsoCode(), "and the selector is left alone");
+    }
+
     // ---- parsing an existing number ------------------------------------
 
     @FormTest
