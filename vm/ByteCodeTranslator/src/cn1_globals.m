@@ -1448,12 +1448,52 @@ static JAVA_OBJECT* gcAdoptStack = 0;
 static long gcAdoptTop = 0, gcAdoptCap = 0;
 #endif
 
+// Nonzero while the collector is holding a thread SIGNAL-FROZEN (either the escalation in
+// codenameOneGCMark or the native-thread stop inside cn1GcScanThreadNativeStack). A frozen
+// thread halts at an arbitrary instruction and may own the libc allocator lock, so nothing
+// the collector runs in that window may allocate -- and root marking DOES allocate, through
+// cn1MatureObject's adoption buffer. Written only by the GC thread, and only while root
+// scanning, which is serial; the parallel drain runs after every freeze is released.
+static _Atomic int cn1GcFreezeHeld = 0;
+
+#ifndef CN1_DISABLE_BIBOP
+// Grow the adoption buffer to `headroom` free slots, called BEFORE a freeze is taken so the
+// growth inside cn1MatureObject is unlikely to be needed while one is held. Best effort:
+// failing to grow only makes the decline in cn1MatureObject more likely, never unsafe.
+static void cn1GcAdoptReserve(long headroom) {
+    pthread_mutex_lock(&gcAdoptMutex);
+    if(gcAdoptTop + headroom > gcAdoptCap) {
+        long ncap = gcAdoptCap ? gcAdoptCap : 4096;
+        while(ncap < gcAdoptTop + headroom) { ncap *= 2; }
+        JAVA_OBJECT* n = (JAVA_OBJECT*)realloc(gcAdoptStack, (size_t)ncap * sizeof(JAVA_OBJECT));
+        if(n != 0) { gcAdoptStack = n; gcAdoptCap = ncap; }
+    }
+    pthread_mutex_unlock(&gcAdoptMutex);
+}
+#endif
+
 static void cn1MatureObject(JAVA_OBJECT obj) {
 #ifndef CN1_DISABLE_BIBOP
     // Claim the object for adoption exactly ONCE with a CAS -3 -> -4. Under parallel
     // markers two threads can both reach the same object; the CAS loser must not
     // double-buffer/double-register. The -4 flag takes effect immediately so the cascade,
     // the mark-stamp and the sweep-skip all see it during THIS mark.
+    // DECLINE BEFORE THE CLAIM if a signal freeze is held and the buffer below would have
+    // to grow: that growth is a realloc, and the frozen thread may own the allocator lock,
+    // which would hang the collector on the thread it just stopped and never reach the
+    // release. Checked before the CAS on purpose -- claiming and then bailing is what the
+    // OOM path below does, and it leaves the object flagged -4 and unregistered forever,
+    // i.e. leaked, because the CAS can never fire again. Declining leaves it at -3: it is
+    // still marked and traced this cycle (the push below is unconditional), it simply
+    // graduates in a later one.
+    //
+    // The unlocked read of gcAdoptTop/gcAdoptCap is exact where it matters: the flag is
+    // only ever set while the collector is root-scanning, which is serial on the GC
+    // thread. Ordered flag-last so the common path pays nothing but a predictable branch.
+    if(gcAdoptTop >= gcAdoptCap
+       && atomic_load_explicit(&cn1GcFreezeHeld, memory_order_relaxed) != 0) {
+        return;
+    }
     int expected = CN1_BIBOP_HEAP_POS;
     if(!__atomic_compare_exchange_n(&obj->__heapPosition, &expected, CN1_BIBOP_ADOPTED,
                                     0, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
@@ -1605,6 +1645,12 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
 static void cn1GcScanOwnStack(CODENAME_ONE_THREAD_STATE);
 static void cn1GcSignalStopThreads(struct ThreadLocalData* self);
 static void cn1GcSignalReleaseThreads(struct ThreadLocalData* self);
+#ifdef CN1_GC_CAN_FORCE_STOP
+// Escalation for a lightweight thread that will not reach a safepoint (issue #5537).
+// See the definitions next to cn1GcSignalStopOne for the contract.
+static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t);
+static void cn1GcMarkReleaseForced(struct ThreadLocalData* t);
+#endif
 void cn1GcBuildRootSnapshots(void);
 JAVA_OBJECT cn1ConservativeResolve(void* w);
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
@@ -2223,6 +2269,56 @@ void codenameOneGCMark() {
             }
             if(t != d) {
                 struct elementStruct* objects = t->threadObjectStack;
+                // TRUE once the cooperative handshake below gave up and froze this
+                // thread with a signal instead. It changes what the rest of this
+                // iteration may touch -- see each use.
+                //
+                // WHAT A HELD FREEZE FORBIDS. The thread is stopped at an arbitrary
+                // instruction, so it may own ANY lock a mutator can hold -- the libc
+                // allocator's, stdio's, os_log's, criticalSection. Nothing between the
+                // freeze and cn1GcMarkReleaseForced may block on one of those, or the
+                // collector waits for a thread that cannot run until the collector
+                // releases it: the same permanent wedge this whole change exists to
+                // remove, just rarer and harder to place. Note this is not only about
+                // how long a mutator holds such a lock -- there is a window between the
+                // last threadActive read and the signal landing in which the target can
+                // enter any of that code, so "it would have to be unlucky" is not an
+                // argument. Every step below is therefore classified:
+                //
+                //   pending migration ....... TAKES criticalSection -> skipped entirely
+                //   aggressive-allocator hold allocates + logs      -> skipped entirely
+                //   root snapshot rebuild ... reallocs              -> skipped (built pre-freeze)
+                //   precise stack scan ...... resolve + mark bit    -> SAFE, lock-free
+                //   native stack scan ....... resolve + mark bit    -> SAFE, lock-free
+                //   stack-bounds lookup ..... mallocs on Linux      -> done pre-freeze
+                //   this escalation's log ... stdio / os_log        -> DEFERRED past release
+                //
+                // The mark worklist mutex is fine to take: only collector threads ever
+                // hold it, so a frozen mutator can never be the owner.
+                //
+                // Note what is NOT on the list: markStatics and gcMarkDrainParallel, which
+                // run after the release. Both allocate -- markStatics force-marks, which
+                // reaches the force-visited table's malloc, and the first parallel drain
+                // creates its workers with pthread_create -- so the release must stay ahead
+                // of them. That is also why the escalation is compiled out when the SATB
+                // barrier is (see CN1_GC_CAN_FORCE_STOP): without the barrier the only way
+                // to keep it would be to hold the freeze across exactly those two.
+                //
+                // And a thread inside its own nursery minor collection is never frozen at
+                // all: cn1MarkForceStopUncooperative declines it, because the root scans
+                // mark through the TARGET's thread state and nurseryPromoting makes
+                // gcMarkObject return without marking anything.
+                //
+                // The stack-bounds entry is the one to learn from: cn1GcStackBase is two
+                // plain accessors on Apple and pthread_getattr_np on Linux, and only the
+                // Linux spelling allocates. Checking the Apple one and calling the
+                // function safe is how it got onto this list as SAFE the first time. A
+                // cross-platform helper has to be classified on its WORST platform.
+                JAVA_BOOLEAN forcedStop = JAVA_FALSE;
+                // Deferred report for the escalation (see above). Zero means nothing to
+                // report; the values are captured under the freeze and printed after it.
+                long long forcedStopWaitUs = 0;
+                long forcedStopSeq = 0;
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
                 // PHASE 3b: demand a FRESH native-stack capture this round. Only a
@@ -2239,8 +2335,19 @@ void codenameOneGCMark() {
                 // we don't have much control and who barely call into Java anyway
                 if(t->lightweightThread) {
                     t->threadBlockedByGC = JAVA_TRUE;
-                    int totalwait = 0;
+                    // 64-bit: at 500us a spin, an int overflowed after ~36 minutes of
+                    // waiting, and signed overflow is undefined -- the one input that
+                    // can reach it is precisely the wedge this loop is trying to report.
+                    long long totalwait = 0;
                     long now = time(0);
+                    long lastReport = 0;
+#ifdef CN1_GC_CAN_FORCE_STOP
+                    // Next totalwait at which to try the escalation. A running total
+                    // rather than a modulo: CN1_GC_SAFEPOINT_WAIT_MAX_US is overridable,
+                    // and `totalwait % bound == 0` silently never fires for any bound that
+                    // is not a multiple of the 500us step.
+                    long long nextEscalation = (long long)CN1_GC_SAFEPOINT_WAIT_MAX_US;
+#endif
 #ifdef CN1_GC_CONFORM
                     // Opened and closed around the safepoint wait ALONE. Closing it later
                     // -- after the migration and the stack scans -- would fold their cost
@@ -2252,16 +2359,85 @@ void codenameOneGCMark() {
                     while(t->threadActive) {
                         usleep(500);
                         totalwait += 500;
-                        if((totalwait%10000)==0)
-                        {   long later = time(0)-now;
-                            if(later>10000)
-                            {
+                        // REPORTING, fixed. time(0) is in SECONDS; this compared the
+                        // elapsed value against 10000 and then printed it divided by
+                        // 1000, so the warning first became eligible after 2.8 HOURS and
+                        // would have understated what it found by a factor of 1000. The
+                        // collector in issue #5537 sat here for 10 minutes 9 seconds
+                        // (totalwait 609,491,500us, read out of the debugger) and never
+                        // printed a line -- the one diagnostic aimed at this failure was
+                        // silent for the whole of it. Report from 10 seconds on, once
+                        // every 10, naming the thread while it is still stuck. Kept live
+                        // even where the escalation below exists, because that escalation
+                        // can itself fail and this is then the only thing that says so.
+                        if((totalwait % 100000) == 0) {
+                            long later = time(0) - now;
+                            if(later >= 10 && later - lastReport >= 10) {
+                                lastReport = later;
 #if defined(__OBJC__)
-                            NSLog(@"GC trapped for %d seconds waiting for thread %d in slot %d (%d)",
-                                  (int)(later/1000),(int)t->threadId,iter,t->threadKilled);
+                                NSLog(@"[GC] trapped for %ld seconds waiting for thread %d in slot %d (killed=%d)",
+                                      later, (int)t->threadId, iter, (int)t->threadKilled);
+#else
+                                fprintf(stderr, "[GC] trapped for %ld seconds waiting for thread %d in slot %d (killed=%d)\n",
+                                        later, (int)t->threadId, iter, (int)t->threadKilled);
 #endif
                             }
                         }
+#ifdef CN1_GC_CAN_FORCE_STOP
+                        // ESCALATION. Past the bound this thread is not going to park --
+                        // typically because it is running generated code that reaches no
+                        // safepoint at all (see CN1_GC_CAN_FORCE_STOP in cn1_globals.h).
+                        // Freeze it with the signal stop instead, which needs no
+                        // cooperation. RETRIED on the same cadence rather than attempted
+                        // once: cn1GcSignalStopOne can time out on a descheduled handler,
+                        // and one transient failure must not sentence the collector to the
+                        // unbounded wait for the rest of the cycle. Each failed attempt
+                        // already costs about its own timeout, so the retry rate is
+                        // self-limiting. gcPthreadValid is the one PERMANENT reason the
+                        // stop cannot work, and retrying past it would rebuild the root
+                        // snapshot every 250ms for the rest of a wait that is already
+                        // never going to end.
+                        if(totalwait >= nextEscalation && t->gcPthreadValid) {
+                            nextEscalation += (long long)CN1_GC_SAFEPOINT_WAIT_MAX_US;
+                            // The snapshot rebuild MUST happen here, BEFORE the freeze: it
+                            // reallocs, and a thread frozen mid-malloc holds the libc
+                            // allocator lock. Everything this iteration does while the
+                            // freeze is held is malloc-free for the same reason (the mark
+                            // worklist is a fixed-size array; the force-visited side table
+                            // is only touched on the force path, which no root scan takes).
+                            cn1GcBuildRootSnapshots();
+                            forcedStop = cn1GcMarkForceStopUncooperative(t);
+                            if(forcedStop) {
+                                // Reported on the 1st, 2nd, 4th, 8th ... escalation of the
+                                // process. Self-limiting without a rate-limit clock, and
+                                // the running count still tells you the order of magnitude
+                                // -- one escalation is a thread that happened to sit in a
+                                // long native, thousands is a program with a compute loop
+                                // in it, and that difference is what a reader needs. Not
+                                // behind an env var: a collector that had to shoot a
+                                // mutator to make progress is abnormal, and the reason
+                                // issue #5537 took so long to place is that this loop had
+                                // nothing to say for itself.
+                                //
+                                // CAPTURED here, PRINTED after the release. NSLog and
+                                // fprintf both take locks a frozen mutator can be holding
+                                // (os_log's, stdio's, and malloc's underneath either), so
+                                // logging here would deadlock the collector against the
+                                // very thread it just stopped. Counting is two integer
+                                // stores and is safe.
+                                static long cn1GcForcedStops = 0;   // GC thread only
+                                cn1GcForcedStops++;
+                                if((cn1GcForcedStops & (cn1GcForcedStops - 1)) == 0) {
+                                    forcedStopSeq = cn1GcForcedStops;
+                                    forcedStopWaitUs = totalwait;
+                                }
+                                // threadActive is still TRUE and stays that way -- the
+                                // thread is frozen, not parked. Everything below reads
+                                // forcedStop rather than threadActive for that reason.
+                                break;
+                            }
+                        }
+#endif
                     }
 #ifdef CN1_GC_CONFORM
                     cn1GcWaitNs += cn1GcNowNs() - __wt0;
@@ -2282,29 +2458,56 @@ void codenameOneGCMark() {
 #ifdef CN1_GC_CONFORM
                 long long __mg0 = cn1GcNowNs();
 #endif
-                lockCriticalSection();
-                if(allThreads[iter] == t) {
-                    if (!t->lightweightThread) {
-                        // For native threads, we need to actually lock them while we traverse the
-                        // heap allocations because we can't use the usual locking mechanisms on
-                        // them.
-                        lockThreadHeapMutex();
-                    }
-                    for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
-                        JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
-                        if(obj) {
-                            t->pendingHeapAllocations[heapTrav] = 0;
-                            placeObjectInHeapCollection(obj);
-#ifdef CN1_GC_CONFORM
-                            cn1GcMigrated++;
-#endif
+                // A force-stopped thread skips this ENTIRELY -- the lock included, not
+                // just the body. Two independent reasons, and the first one is fatal:
+                //
+                // 1. lockCriticalSection() would BLOCK. The frozen thread is stopped at an
+                //    arbitrary instruction and may hold this very mutex (markDeadThread,
+                //    monitorEnter's monitor-creation branch, placeObjectInHeapCollection
+                //    all take it), and it cannot release it until this cycle releases the
+                //    freeze -- which happens after this point. Guarding only the body,
+                //    which is what this did first, still takes the lock and still
+                //    deadlocks. There is also no "it is only held briefly" defence: the
+                //    target can enter that code in the window between the last
+                //    threadActive read and the signal landing.
+                // 2. Migrating would be wrong anyway. The append is `pending[size] = o;
+                //    size++`, so a thread frozen between those two stores has an object in
+                //    the table that the count does not cover yet: migrating [0,size),
+                //    zeroing those slots and resetting size to 0 would leave that object
+                //    referenced by nothing the collector ever walks, and the thread's own
+                //    `size++` on resume would hand the next allocation a slot the
+                //    migration had already emptied.
+                //
+                // The table is not a root source -- it only decides which objects the
+                // SWEEP may consider -- so leaving it intact for one cycle costs a
+                // deferred reclaim and nothing else. It cannot grow without bound either:
+                // a table over its threshold parks its own thread at a safepoint, which is
+                // the cooperative stop this escalation was standing in for.
+                if(!forcedStop) {
+                    lockCriticalSection();
+                    if(allThreads[iter] == t) {
+                        if (!t->lightweightThread) {
+                            // For native threads, we need to actually lock them while we traverse the
+                            // heap allocations because we can't use the usual locking mechanisms on
+                            // them.
+                            lockThreadHeapMutex();
+                        }
+                        for(int heapTrav = 0 ; heapTrav < t->heapAllocationSize ; heapTrav++) {
+                            JAVA_OBJECT obj = (JAVA_OBJECT)t->pendingHeapAllocations[heapTrav];
+                            if(obj) {
+                                t->pendingHeapAllocations[heapTrav] = 0;
+                                placeObjectInHeapCollection(obj);
+    #ifdef CN1_GC_CONFORM
+                                cn1GcMigrated++;
+    #endif
+                            }
+                        }
+                        if (!t->lightweightThread) {
+                            unlockThreadHeapMutex();
                         }
                     }
-                    if (!t->lightweightThread) {
-                        unlockThreadHeapMutex();
-                    }
+                    unlockCriticalSection();
                 }
-                unlockCriticalSection();
 #ifdef CN1_GC_CONFORM
                 cn1GcMigrateNs += cn1GcNowNs() - __mg0;
 #endif
@@ -2313,11 +2516,20 @@ void codenameOneGCMark() {
                 
                 JAVA_INT allocSize = t->heapAllocationSize;
                 JAVA_BOOLEAN agressiveAllocator = JAVA_FALSE;
+                // Skipped under a held freeze, with the diagnostic below it. get_free_memory()
+                // and NSLog both take locks the stopped thread may own, and the EDT is a
+                // perfectly ordinary candidate for the escalation -- a long computation on
+                // the event thread is exactly the shape issue #5537 reported. The hold
+                // decision is also meaningless here: allocSize is read from a table this
+                // cycle deliberately did not migrate, so it describes the previous cycle's
+                // backlog rather than what this thread just produced.
 #ifndef CN1_NO_AGGRESSIVE_HOLD
-                if (isEdt(t->threadId) && !lowMemoryMode) {
-                    agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD_EDT;
-                } else {
-                    agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD;
+                if(!forcedStop) {
+                    if (isEdt(t->threadId) && !lowMemoryMode) {
+                        agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD_EDT;
+                    } else {
+                        agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD;
+                    }
                 }
 #endif
                 if (CN1_EDT_THREAD_ID == t->threadId && agressiveAllocator) {
@@ -2328,14 +2540,21 @@ void codenameOneGCMark() {
                     
                 }
                 
-                t->heapAllocationSize = 0;
+                if(!forcedStop) {
+                    t->heapAllocationSize = 0;
+                }
 
                 int stackSize = t->threadObjectStackOffset;
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
                 // Refresh the page/extent snapshot for the VALIDATED precise scan
                 // below (also rebuilt in cn1GcScanThreadNativeStack before any
                 // signal-stop; building here first only makes it fresher).
-                cn1GcBuildRootSnapshots();
+                // NOT while a forced stop is held: this reallocs, and the frozen thread
+                // may hold the allocator lock. The escalation built the snapshot before
+                // it froze the thread, so the one this would refresh already exists.
+                if(!forcedStop) {
+                    cn1GcBuildRootSnapshots();
+                }
 #endif
 #ifdef CN1_GC_VERIFY
     { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "precise-thread-stack"; }
@@ -2402,6 +2621,44 @@ void codenameOneGCMark() {
                 cn1GcScanThreadNativeStack(d, t);
 #ifdef CN1_GC_CONFORM
                 cn1GcStackNs += cn1GcNowNs();
+#endif
+#ifdef CN1_GC_CAN_FORCE_STOP
+                // Released as soon as this thread's roots are captured, which is HERE and
+                // not at the threadBlockedByGC clear below. A cooperatively parked thread
+                // waits out the mark drain in a usleep; a signal-frozen one waits in an
+                // async-signal-safe BUSY spin, so holding it across the drain would burn a
+                // core for the length of a full mark -- and would drag markStatics and
+                // gcMarkDrainParallel, neither of which is allocation-free, inside a window
+                // where this thread may own the allocator lock.
+                //
+                // What the drain-before-unblock protects -- snapshot-at-the-beginning -- is
+                // supplied for a released mutator by the SATB deletion barrier, which is
+                // armed for the whole mark and is already the only thing keeping genuine
+                // native threads honest; they are never blocked at all, and
+                // cn1GcScanThreadNativeStack releases its own signal stops at exactly this
+                // point for the same reason. That dependency is enforced rather than
+                // assumed: CN1_GC_CAN_FORCE_STOP is not defined when the barrier is
+                // compiled out (see cn1_globals.h), so this release can never run without
+                // it. threadBlockedByGC stays set, so if this thread does reach a safepoint
+                // it still parks.
+                if(forcedStop) {
+                    cn1GcMarkReleaseForced(t);
+                    forcedStop = JAVA_FALSE;
+                }
+                // Only now, with the thread running again, is it safe to take a logging
+                // lock: while frozen the target could have owned os_log's, stdio's or
+                // malloc's, and printing would have hung the collector on the thread it had
+                // just stopped. Captured at the escalation, printed here.
+                if(forcedStopSeq != 0) {
+#if defined(__OBJC__)
+                    NSLog(@"[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)",
+                          (int)t->threadId, forcedStopWaitUs, forcedStopSeq);
+#else
+                    fprintf(stderr, "[GC] force-stopped thread %d after %lldus at a safepoint it never reached (%ld so far)\n",
+                            (int)t->threadId, forcedStopWaitUs, forcedStopSeq);
+#endif
+                    forcedStopSeq = 0;
+                }
 #endif
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
                 cn1GcSelfCheckThreadStack(t, stackSize);
@@ -8219,10 +8476,113 @@ static void cn1GcSignalReleaseOne(struct ThreadLocalData* t) {
 #endif
 }
 
+#ifdef CN1_GC_CAN_FORCE_STOP
+// Freeze a lightweight thread that would not reach a safepoint within
+// CN1_GC_SAFEPOINT_WAIT_MAX_US (issue #5537 -- see CN1_GC_CAN_FORCE_STOP in
+// cn1_globals.h for why such a thread exists at all). Returns JAVA_TRUE once the thread
+// is parked inside the SIGUSR2 handler, and the CALLER then owns that freeze until
+// cn1GcMarkReleaseForced -- including the obligation to run nothing that allocates while
+// it is held, because the thread can have been frozen mid-malloc. The root snapshots must
+// already be built for the same reason.
+static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t) {
+    // Stack bounds FIRST, while the target is still running. cn1GcStackBase is two plain
+    // accessors on Apple and pthread_getattr_np on Linux, and the Linux one mallocs (plus
+    // reads /proc/self/maps for the initial thread) -- so resolving it under the freeze
+    // can block on an allocator lock the frozen thread owns. Reasoning about the Apple
+    // spelling and letting the conclusion cover both is how this got classified safe the
+    // first time. The bounds do not change for a live pthread, so resolving here and
+    // reusing them for the whole freeze loses nothing.
+    if(!t->gcPthreadValid) {
+        return JAVA_FALSE;
+    }
+    size_t ssz = 0;
+    char* base = cn1GcStackBase(t->gcPthread, &ssz);
+    if(base == 0 || ssz == 0) {
+        // No bounds means the conservative scan could not read this thread's native stack
+        // even once it was stopped, so freezing it would buy nothing and skip its roots.
+        // Report failure and let the caller fall back to waiting.
+        return JAVA_FALSE;
+    }
+    t->gcSigStackBase = base;
+    t->gcSigStackSize = ssz;
+#ifndef CN1_DISABLE_BIBOP
+    // Give the adoption buffer headroom while allocating is still legal, so the root scans
+    // under the freeze are unlikely to need cn1MatureObject's realloc (which they must
+    // decline). Sized well above one thread's plausible adoption count per cycle.
+    cn1GcAdoptReserve(16384);
+#endif
+    if(cn1GcSignalStopOne(t) == 0) {
+        // Timed out. cn1GcSignalStopOne has already pre-released the generation, so
+        // nothing is left stranded.
+        return JAVA_FALSE;
+    }
+#ifdef CN1_NURSERY
+    // DECLINE a thread caught inside its own minor collection. cn1NurseryWriteBarrier
+    // raises nurseryPromoting and deliberately leaves threadActive TRUE for the duration,
+    // so it is a prime candidate for this escalation -- and the root scans below call
+    // gcMarkObject(t, ...) with the TARGET's thread state, whose first act under that flag
+    // is to promote-or-return WITHOUT marking. Freezing here would therefore hand the
+    // sweep a thread whose roots were all silently skipped, and mature objects live only
+    // from this thread would be reclaimed under it.
+    //
+    // Checked AFTER the stop, not before: read while the thread is running, the flag can
+    // be raised in the window between the read and the signal landing. A frozen thread's
+    // flag cannot change, so this is exact. Released and reported as a failure so the
+    // caller's retry simply tries again after the next interval, by which time the minor
+    // collection is normally over -- and the cooperative wait is still in force meanwhile.
+    if(t->nurseryPromoting) {
+        cn1GcSignalReleaseOne(t);   // before any bookkeeping, so there is none to unwind
+        return JAVA_FALSE;
+    }
+#endif
+    atomic_fetch_add_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
+    t->gcMarkForcedStop = JAVA_TRUE;
+    return JAVA_TRUE;
+}
+
+static void cn1GcMarkReleaseForced(struct ThreadLocalData* t) {
+    if(!t->gcMarkForcedStop) {
+        return;
+    }
+    t->gcMarkForcedStop = JAVA_FALSE;
+    cn1GcSignalReleaseOne(t);
+    atomic_fetch_sub_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
+}
+#endif
+
 // Scan ONE thread's native C stack [sp, base) + its register snapshot, marking every
 // resolved live object. threadStateData = the GC thread; t = the thread being scanned.
 static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadLocalData* t) {
     if(!t->gcPthreadValid) return;
+
+#ifdef CN1_GC_CAN_FORCE_STOP
+    // FIRST, ahead of cn1GcStackBase: the mark loop may already be holding a signal
+    // freeze on this thread, and cn1GcStackBase is pthread_getattr_np on Linux, which
+    // mallocs -- calling it under the freeze can block on an allocator lock the frozen
+    // thread owns. cn1GcMarkForceStopUncooperative resolved the bounds before it froze
+    // the thread precisely so this path never has to.
+    if(t->gcMarkForcedStop) {
+        // Reuse the mark loop's capture: do NOT stop again -- a second SIGUSR2 to a
+        // thread spinning inside the handler stays pending until the handler returns, so
+        // the nested stop would spin out its full timeout and then report failure on a
+        // thread that is demonstrably stopped -- and do NOT release, because the precise
+        // object-stack scan the caller runs alongside this needs the same freeze. No
+        // cn1GcBuildRootSnapshots either: it reallocs, and the caller built the snapshot
+        // before freezing for the same reason.
+        char* fbase = (char*)t->gcSigStackBase;
+        size_t fssz = t->gcSigStackSize;
+        char* fsp = (char*)t->gcSigStackPointer;
+        if(fbase != 0 && fssz != 0 && fsp != 0
+                && fsp >= fbase - (long)fssz && fsp < fbase) {
+            cn1ConservativeMarkRange(threadStateData, fsp, fbase);
+        }
+        if(t->gcSigRegsLen > 0) {
+            cn1ConservativeMarkRange(threadStateData, t->gcSigRegs, t->gcSigRegs + t->gcSigRegsLen);
+        }
+        return;
+    }
+#endif
+
     size_t ssz = 0;
     char* base = cn1GcStackBase(t->gcPthread, &ssz);
     if(base == 0 || ssz == 0) return;
@@ -8248,6 +8608,13 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
 
     // SIGNAL path: stop, scan, release. Used for native threads, for the forced
     // CN1_GC_SIGNAL_STOP=1 validation mode, or as a fallback for a stale capture.
+    // Same allocation ban as the escalation, and this path had it first: master already
+    // marked between the stop and the release here, so cn1MatureObject's realloc could
+    // already hang the collector against a frozen NATIVE thread. Counted rather than a
+    // boolean because the two freeze sites are independent.
+#ifndef CN1_DISABLE_BIBOP
+    cn1GcAdoptReserve(16384);
+#endif
     char* sp = cn1GcSignalStopOne(t);
     if(sp == 0) {
         // Could not stop the thread. If it is lightweight and cooperatively captured we
@@ -8261,8 +8628,10 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
                                          (char*)&t->gcRegisterSnapshot + sizeof(t->gcRegisterSnapshot));
             }
         }
-        return;
+        return;   // nothing was frozen, so the counter was never raised
     }
+    // Raised only on the success path, so the sub below always pairs with an add.
+    atomic_fetch_add_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
     if(sp >= base - (long)ssz && sp < base) {
         cn1ConservativeMarkRange(threadStateData, sp, base);
     }
@@ -8270,6 +8639,7 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
         cn1ConservativeMarkRange(threadStateData, t->gcSigRegs, t->gcSigRegs + t->gcSigRegsLen);
     }
     cn1GcSignalReleaseOne(t);
+    atomic_fetch_sub_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
 }
 
 // Scan the GC thread's OWN native stack (a root could be live only in a GC-thread C
