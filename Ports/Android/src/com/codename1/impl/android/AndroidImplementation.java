@@ -515,6 +515,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // "123-456" by an autofill service that kept the separator, and a replacement
             // would leave the field holding a value it would never have let anyone type,
             // never reaching the length that completes it.
+            // Ending any composition first. A commit replaces the composed range in
+            // preference to the selection, so selecting the whole field is not enough to
+            // replace the whole field while an input method is mid-word: the filled value
+            // would land inside the composition and leave whatever surrounded it, which
+            // for a code field means a full-length wrong code that submits itself.
+            client.finishComposing();
             client.setSelectionRange(0, client.getTextLength());
             client.commitText(text);
         }

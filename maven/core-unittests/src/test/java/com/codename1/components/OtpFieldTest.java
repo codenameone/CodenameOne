@@ -261,6 +261,7 @@ class OtpFieldTest extends UITestBase {
         OtpField f = new OtpField(6);
         f.setText("99");
         EditField input = f.getInputField();
+        input.finishComposing();
         input.setSelectionRange(0, input.getText().length());
         input.commitText("123456");
         assertEquals("123456", f.getText());
@@ -397,6 +398,25 @@ class OtpFieldTest extends UITestBase {
             assertTrue(f.getBox(i).getWidth() > 0,
                     "box " + i + " was squeezed out of existence");
         }
+    }
+
+    @FormTest
+    void aFilledValueReplacesTheWholeFieldEvenMidComposition() {
+        // The sequence the Android autofill bridge drives. A commit replaces the composed
+        // range in preference to the selection, so without ending the composition first
+        // the filled code lands inside it and keeps what surrounded it -- here that would
+        // leave "991234", a full length wrong code that submits itself.
+        OtpField f = new OtpField(6);
+        EditField input = f.getInputField();
+        input.commitText("99");
+        input.setComposingText("12", 0);
+        assertEquals("9912", f.getText());
+
+        input.finishComposing();
+        input.setSelectionRange(0, input.getText().length());
+        input.commitText("123456");
+
+        assertEquals("123456", f.getText());
     }
 
     // ---- completion ---------------------------------------------------
