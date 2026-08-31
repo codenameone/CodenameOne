@@ -22,48 +22,68 @@
  */
 package com.codename1.components;
 
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.EditField;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.Border;
 
 import java.util.ArrayList;
 
-/// Segmented one-time-password input -- one box per digit, auto-advances to
-/// the next box on input and steps back on backspace. Standard pattern for
-/// SMS / authenticator code entry screens.
+/// Segmented one-time-code input -- one box per digit, with a caret that walks
+/// from box to box as the code is typed. The standard entry screen for an SMS
+/// or authenticator code, and the second half of phone number verification.
 ///
 /// #### Example
 ///
 /// ```java
 /// OtpField otp = new OtpField(6);
-/// otp.addCompleteListener(new ActionListener() {
-///     public void actionPerformed(ActionEvent evt) {
-///         String code = otp.getText();
-///         // verify code...
-///     }
-/// });
+/// otp.addCompleteListener(e -> verify(otp.getText()));
 /// form.add(otp);
 /// ```
 ///
-/// Style the individual boxes with the UIID "OtpDigit"; the field itself uses
-/// "OtpField".
+/// #### Receiving the code from the SMS
+///
+/// The field carries `TextArea#ONE_TIME_CODE`, so the platform offers the code
+/// from the incoming message by itself: on iOS the keyboard's suggestion bar
+/// shows it above the keys, on Android the autofill service offers it on the
+/// field. Accepting it fills every box at once. The application reads no
+/// messages and asks for no messaging permission -- it only says what the field
+/// is for, and the platform does the rest. A platform that cannot offer the
+/// code is unaffected, and the code is typed.
+///
+/// This is why the boxes are drawn rather than being separate editors. A code
+/// arrives as one value, and a row of one-character fields can only receive one
+/// character of it. Behind the boxes is a single field holding the whole code,
+/// so an offered code, a paste and a keyboard all land the same way.
+///
+/// #### Styling
+///
+/// Each box uses the UIID "OtpDigit" and the field itself uses "OtpField".
 public class OtpField extends Container {
 
     private final int length;
     private final boolean numericOnly;
     private final TextField[] boxes;
+    private final OtpInput input;
     private final ArrayList<ActionListener> completeListeners = new ArrayList<ActionListener>();
-    private boolean updating;
+    private boolean complete;
 
-    /// Builds a 6-digit numeric OTP field -- the common case.
+    /// Builds a 6-digit numeric field -- the common case.
     public OtpField() {
         this(6, true);
     }
 
-    /// Builds an OTP field of the given length, numeric only.
+    /// Builds a field of the given length, numeric only.
     ///
     /// #### Parameters
     ///
@@ -79,9 +99,9 @@ public class OtpField extends Container {
     /// - `length`: number of digits / characters
     ///
     /// - `numericOnly`: true to restrict input to digits; false to allow any
-    ///   character (alphanumeric OTP codes are sometimes used)
+    ///   character (alphanumeric codes are sometimes used)
     public OtpField(int length, boolean numericOnly) {
-        super(BoxLayout.x());
+        super(new LayeredLayout());
         if (length < 2 || length > 16) {
             throw new IllegalArgumentException("OTP length must be between 2 and 16");
         }
@@ -89,135 +109,141 @@ public class OtpField extends Container {
         this.numericOnly = numericOnly;
         this.boxes = new TextField[length];
         setUIID("OtpField");
-        buildBoxes();
-    }
-
-    private void buildBoxes() {
+        Container row = new Container(BoxLayout.x());
+        row.setUIID("Container");
         for (int i = 0; i < length; i++) {
-            final int index = i;
-            final TextField tf = new TextField();
+            TextField tf = new TextField();
             tf.setUIID("OtpDigit");
             tf.setColumns(1);
             tf.setMaxSize(1);
             tf.setSingleLineTextArea(true);
-            if (numericOnly) {
-                tf.setConstraint(TextField.NUMERIC);
-            }
-            tf.addDataChangedListener(new DataChangedListener() {
-                @Override
-                public void dataChanged(int type, int idx) {
-                    if (updating) {
-                        return;
-                    }
-                    handleChange(index, tf);
-                }
-            });
+            // display only: the value lives in the field underneath, and a box that
+            // took focus would tear the single editing session into one per box
+            tf.setEditable(false);
+            tf.setFocusable(false);
+            tf.getAllStyles().setAlignment(CENTER);
             boxes[i] = tf;
-            add(tf);
+            row.add(tf);
         }
+        add(FlowLayout.encloseCenter(row));
+        input = new OtpInput(this);
+        add(input);
+        input.addDataChangedListener(new DataChangedListener() {
+            @Override
+            public void dataChanged(int type, int index) {
+                valueChanged();
+            }
+        });
     }
 
-    private void handleChange(int index, TextField source) {
-        String text = source.getText();
-        if (text == null) {
-            text = "";
+    /// Keeps the boxes showing the value and fires completion on the edit that
+    /// fills the last one.
+    private void valueChanged() {
+        String text = input.getText();
+        for (int i = 0; i < length; i++) {
+            boxes[i].setText(i < text.length() ? text.substring(i, i + 1) : "");
         }
-        // If multiple chars were pasted, distribute across boxes.
-        if (text.length() > 1) {
-            distributePaste(index, text);
-            return;
-        }
-        if (text.length() == 1) {
-            // advance focus to next box if not last
-            if (index < length - 1) {
-                boxes[index + 1].startEditingAsync();
-            } else {
-                fireCompleteIfFull();
-            }
-        } else {
-            // empty -- step back to previous box on backspace
-            if (index > 0) {
-                boxes[index - 1].startEditingAsync();
-            }
-        }
-    }
-
-    private void distributePaste(int startIndex, String text) {
-        updating = true;
-        try {
-            int p = startIndex;
-            for (int i = 0; i < text.length() && p < length; i++) {
-                char c = text.charAt(i);
-                if (numericOnly && (c < '0' || c > '9')) {
-                    continue;
-                }
-                boxes[p].setText(String.valueOf(c));
-                p++;
-            }
-            // clear any remaining cells past where we wrote
-            if (p > startIndex) {
-                // last cell to focus is the one after the last written, or
-                // the last box if we wrote to the end
-                int focus = p < length ? p : length - 1;
-                boxes[focus].startEditingAsync();
-            }
-        } finally {
-            updating = false;
-        }
-        fireCompleteIfFull();
-    }
-
-    private void fireCompleteIfFull() {
-        String code = getText();
-        if (code.length() == length) {
+        boolean full = text.length() == length;
+        if (full && !complete) {
+            complete = true;
             ActionEvent evt = new ActionEvent(this);
-            for (ActionListener listener : completeListeners) {
+            for (ActionListener listener : new ArrayList<ActionListener>(completeListeners)) {
                 listener.actionPerformed(evt);
                 if (evt.isConsumed()) {
                     break;
                 }
             }
+            return;
         }
+        complete = full;
     }
 
-    /// Returns the current value, in order from the first box to the last.
-    /// Empty boxes are omitted, so a partial entry returns a shorter string.
-    public String getText() {
-        StringBuilder b = new StringBuilder(length);
-        for (int i = 0; i < length; i++) {
-            String t = boxes[i].getText();
-            if (t != null) {
-                b.append(t);
+    /// Drops everything this field will not accept: characters outside the
+    /// allowed set, and anything past the last box. Applied to typing, paste,
+    /// dictation and a code offered by the platform alike, because all four
+    /// arrive through the same path.
+    String accept(String text, int room) {
+        if (text == null || room <= 0) {
+            return "";
+        }
+        StringBuilder b = new StringBuilder(text.length());
+        for (int i = 0; i < text.length() && b.length() < room; i++) {
+            char c = text.charAt(i);
+            if (numericOnly && (c < '0' || c > '9')) {
+                continue;
             }
+            if (c == '\n' || c == '\r' || c == '\t') {
+                continue;
+            }
+            b.append(c);
         }
         return b.toString();
     }
 
-    /// Sets the value, distributing one character per box. Excess characters
-    /// are silently dropped; shorter strings leave the remaining boxes empty.
-    public void setText(String code) {
-        updating = true;
-        try {
-            for (int i = 0; i < length; i++) {
-                if (code != null && i < code.length()) {
-                    boxes[i].setText(String.valueOf(code.charAt(i)));
-                } else {
-                    boxes[i].setText("");
-                }
-            }
-        } finally {
-            updating = false;
+    /// The box the caret sits in, clamped to the last box once the code is full.
+    TextField caretBox(int caretOffset) {
+        int i = caretOffset;
+        if (i >= length) {
+            i = length - 1;
         }
+        if (i < 0) {
+            i = 0;
+        }
+        return boxes[i];
     }
 
-    /// Clears all boxes.
+    /// True once the caret has run past the last box, i.e. the code is full and
+    /// the caret belongs at the trailing edge rather than in front of a digit.
+    boolean caretPastEnd(int caretOffset) {
+        return caretOffset >= length;
+    }
+
+    /// Returns the current value, in order from the first box to the last. A
+    /// partial entry returns a shorter string.
+    public String getText() {
+        return input.getText();
+    }
+
+    /// Sets the value, one character per box. Excess characters are dropped, as
+    /// are characters this field does not accept; a shorter string leaves the
+    /// remaining boxes empty.
+    ///
+    /// #### Parameters
+    ///
+    /// - `code`: the value, or null to clear
+    public void setText(String code) {
+        String accepted = accept(code, length);
+        input.setText(accepted);
+        // setText resets the caret to the start; entry continues after the last
+        // character that was set, which is where the next one belongs
+        input.moveCaret(accepted.length(), false);
+        valueChanged();
+    }
+
+    /// Clears every box and puts the caret back in the first one, ready for a
+    /// fresh code.
     public void clear() {
         setText("");
-        boxes[0].startEditingAsync();
+        startEditing();
     }
 
-    /// Adds a listener fired when the field becomes completely filled. Useful
-    /// to trigger automatic verification.
+    /// Focuses the field and opens the keyboard, so a verification screen can
+    /// put the user straight into the code without a tap.
+    public void startEditing() {
+        input.requestFocus();
+    }
+
+    /// True when every box holds a character.
+    public boolean isComplete() {
+        return input.getText().length() == length;
+    }
+
+    /// Adds a listener fired on the edit that fills the last box. Useful to
+    /// verify the code without a submit button.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
     public void addCompleteListener(ActionListener l) {
         if (l != null) {
             completeListeners.add(l);
@@ -225,18 +251,134 @@ public class OtpField extends Container {
     }
 
     /// Removes a previously-registered listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
     public void removeCompleteListener(ActionListener l) {
         completeListeners.remove(l);
     }
 
-    /// Returns the underlying [TextField] for the box at `index`. Useful for
-    /// custom theming / focus management.
+    /// Adds a listener fired on every change to the value, not only on the one
+    /// that completes it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addDataChangedListener(DataChangedListener l) {
+        input.addDataChangedListener(l);
+    }
+
+    /// Removes a previously-registered listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeDataChangedListener(DataChangedListener l) {
+        input.removeDataChangedListener(l);
+    }
+
+    /// Returns the box at `index`, which displays the character at that
+    /// position. Useful for theming an individual box; the value itself is read
+    /// and written through `#getText()` / `#setText(String)`, since a code is
+    /// entered into the field as a whole rather than box by box.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the box position, from 0
+    ///
+    /// #### Returns
+    ///
+    /// the box at that position
     public TextField getBox(int index) {
         return boxes[index];
+    }
+
+    /// The field that actually holds the code and carries the one-time-code
+    /// hint. It spans the boxes and draws only the caret. Exposed for the cases
+    /// the boxes cannot serve: adding a done listener, or reading the caret.
+    public EditField getInputField() {
+        return input;
     }
 
     /// Returns the configured length (number of boxes).
     public int getLength() {
         return length;
+    }
+
+    /// True when the field accepts digits only.
+    public boolean isNumericOnly() {
+        return numericOnly;
+    }
+
+    /// The field that actually holds the code. It spans the boxes, draws
+    /// nothing but the caret, and carries the one-time-code hint that lets the
+    /// platform offer the code from the incoming message.
+    private static final class OtpInput extends EditField {
+
+        private final OtpField owner;
+        private boolean caretOn = true;
+        private long lastBlink;
+
+        OtpInput(OtpField owner) {
+            super("");
+            this.owner = owner;
+            setUIID("OtpFieldInput");
+            // no pixels of its own: the boxes underneath are the field's appearance
+            getAllStyles().setBgTransparency(0);
+            getAllStyles().setBorder(Border.createEmpty());
+            getAllStyles().setPadding(0, 0, 0, 0);
+            getAllStyles().setMargin(0, 0, 0, 0);
+            setConstraint((owner.numericOnly ? TextArea.NUMERIC : TextArea.ANY) | TextArea.ONE_TIME_CODE);
+        }
+
+        @Override
+        protected boolean handleTypedText(String text) {
+            int used = getText().length() - (getSelectionEnd() - getSelectionStart());
+            String accepted = owner.accept(text, owner.length - used);
+            if (accepted.equals(text)) {
+                return false;
+            }
+            if (accepted.length() > 0) {
+                insertText(accepted);
+            }
+            return true;
+        }
+
+        @Override
+        protected Dimension calcPreferredSize() {
+            // the boxes decide how big the field is; this layer only overlays them
+            return new Dimension(0, 0);
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            if (!caretOn || !hasFocus() || !isEditableState()) {
+                return;
+            }
+            int caret = getCaretOffset();
+            TextField box = owner.caretBox(caret);
+            int h = box.getHeight() / 2;
+            int w = Math.max(1, box.getWidth() / 16);
+            int x = owner.caretPastEnd(caret)
+                    ? box.getAbsoluteX() + box.getWidth() - box.getStyle().getPaddingRight(isRTL()) - w
+                    : box.getAbsoluteX() + (box.getWidth() - w) / 2;
+            g.setColor(box.getStyle().getFgColor());
+            g.fillRect(x, box.getAbsoluteY() + (box.getHeight() - h) / 2, w, h);
+        }
+
+        @Override
+        public boolean animate() {
+            boolean sup = super.animate();
+            if (hasFocus()) {
+                long now = System.currentTimeMillis();
+                if (now - lastBlink >= 500) {
+                    caretOn = !caretOn;
+                    lastBlink = now;
+                    return true;
+                }
+            }
+            return sup;
+        }
     }
 }

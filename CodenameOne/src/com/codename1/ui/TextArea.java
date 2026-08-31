@@ -132,6 +132,23 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// This flag is a hint to the implementation that the text in this
     /// field should be upper case
     public static final int UPPERCASE = 0x800000;
+    /// This flag is a hint to the implementation that this field holds a
+    /// one-time code the user received out of band, typically by SMS.
+    ///
+    /// It is the client half of phone number verification: the code is
+    /// delivered to the device by a message the application never reads, and
+    /// the platform offers it on a field carrying this hint. On iOS the
+    /// keyboard's suggestion bar offers the code from Messages, on Android the
+    /// autofill service offers it from the SMS. Neither route needs permission
+    /// to read messages, and neither is available to a field that does not say
+    /// what it is for -- which is what this flag says.
+    ///
+    /// Combine it with `#NUMERIC` for the usual all digit code. The hint alone
+    /// changes no behavior on a platform that cannot offer the code.
+    ///
+    /// See `com.codename1.components.OtpField` for a field that already carries
+    /// this and renders the code one box per digit.
+    public static final int ONE_TIME_CODE = 0x1000000;
     /// Indicates the enter key to be used for editing the text area and by the
     /// text field
     private static final char ENTER_KEY = '\n';
