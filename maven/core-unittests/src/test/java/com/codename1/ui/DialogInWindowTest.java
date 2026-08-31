@@ -3328,4 +3328,49 @@ class DialogInWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    /// The off-surface half of a dialog timeout, via reflection.
+    private static Object timeoutClockOf(Dialog d) {
+        try {
+            java.lang.reflect.Field f = Dialog.class.getDeclaredField("timeoutClock");
+            f.setAccessible(true);
+            return f.get(d);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// A timeout must not depend on the dialog's surface being painted.
+    ///
+    /// The deadline is polled from animate(), which rides the animation loop of whatever
+    /// is being painted. A dialog hosted in a window, or living in a native window of
+    /// its own, is not painted at all while that window is minimized -- and minimizing
+    /// deliberately does not dispose it, so a modal caller waiting on the timeout to
+    /// release it waited for as long as the window stayed down. Asserted structurally:
+    /// arming a timeout has to leave a clock that the surface does not drive, and ending
+    /// the showing has to take it back down again.
+    @FormTest
+    void aDialogTimeoutIsArmedOffTheSurface() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            Dialog dlg = new Dialog("timed");
+            assertNull(timeoutClockOf(dlg), "precondition: nothing armed before setTimeout");
+
+            dlg.setTimeout(600000);
+            assertNotNull(timeoutClockOf(dlg),
+                    "arming a timeout has to leave a clock the surface does not drive,"
+                            + " or a minimized window stalls it indefinitely");
+
+            dlg.dispose();
+            assertNull(timeoutClockOf(dlg),
+                    "and ending the showing has to take that clock back down");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
 }

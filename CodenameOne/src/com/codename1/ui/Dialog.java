@@ -163,6 +163,9 @@ public class Dialog extends Form implements AbstractDialog {
     private boolean disposed;
     /// Indicates the time in which the alert should be disposed
     private long time;
+    /// The off-surface half of the timeout, so it still arrives while the surface
+    /// holding the dialog is not being painted. Null when no timeout is armed.
+    private java.util.Timer timeoutClock;
     /// Indicates the last command selected by the user in this form
     private Command lastCommandPressed;
     /// Indicates that this is a menu preventing getCurrent() from ever returning this class
@@ -1654,6 +1657,45 @@ public class Dialog extends Form implements AbstractDialog {
     public void setTimeout(long time) {
         this.time = System.currentTimeMillis() + time;
         super.registerAnimatedInternal(this);
+        // Armed off the surface as well as on it. The registration above is polled from
+        // animate(), which rides the animation loop of whatever is being painted -- and
+        // a dialog hosted in a window, or living in a native window of its own, is not
+        // painted at all while that window is minimized. Minimizing deliberately does
+        // not dispose the dialog, so a modal caller waiting for the timeout to release
+        // it waited for as long as the window stayed down. isTimedOut() clears the
+        // deadline as it fires, so whichever of the two reaches it first wins and the
+        // other finds nothing to do.
+        cancelTimeoutClock();
+        timeoutClock = Display.getInstance().setTimeout((int) time, new TimeoutClock(this));
+    }
+
+    /// Polls the deadline from a timer thread rather than from the animation loop.
+    ///
+    /// Named rather than anonymous: an anonymous Runnable here is
+    /// SIC_INNER_SHOULD_BE_STATIC_ANON under the zero-findings SpotBugs gate.
+    private static final class TimeoutClock implements Runnable {
+        private final Dialog dlg;
+
+        TimeoutClock(Dialog dlg) {
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void run() {
+            dlg.isTimedOut();
+        }
+    }
+
+    /// Stops the off-surface clock, if one is armed.
+    ///
+    /// Called as a showing ends and as the deadline is reached, so a timer does not sit
+    /// on a thread of its own for the remainder of a long timeout that nothing is
+    /// waiting for any more.
+    private void cancelTimeoutClock() {
+        if (timeoutClock != null) {
+            timeoutClock.cancel();
+            timeoutClock = null;
+        }
     }
 
     /// {@inheritDoc}
@@ -3554,6 +3596,10 @@ public class Dialog extends Form implements AbstractDialog {
             return;
         }
         setDisposed(true);
+        // The showing this clock belonged to is over. The deadline itself is left alone:
+        // it survives a dispose today, so a dialog shown again inside its original
+        // timeout still times out through the animation poll, exactly as before.
+        cancelTimeoutClock();
 
         if (nativeWindow != null) {
             // The window fires Disposed, which is what actually tears the dialog down.
@@ -3644,6 +3690,7 @@ public class Dialog extends Form implements AbstractDialog {
     private boolean isTimedOut() {
         if (time != 0 && System.currentTimeMillis() >= time) {
             time = 0;
+            cancelTimeoutClock();
             dispose();
             deregisterAnimatedInternal(this);
             return true;
