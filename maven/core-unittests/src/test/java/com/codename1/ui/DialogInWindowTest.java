@@ -3432,4 +3432,42 @@ class DialogInWindowTest extends UITestBase {
                         + " or the show that follows has no timeout at all");
     }
 
+    /// Showing a dialog again re-arms the clock its previous showing took down.
+    ///
+    /// A deadline outlives the showing that set it: disposing before the timeout stops
+    /// the clock but keeps the deadline, so the next show still honours it. setTimeout
+    /// is not called a second time, so nothing else would arm one -- and without a clock
+    /// the reused dialog is polled only while it is painted, which a minimized window
+    /// does not do. That is the stall the clock exists to prevent, returning by reuse.
+    @FormTest
+    void showingATimedDialogAgainRearmsItsClock() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            Dialog dlg = new Dialog("reused");
+            dlg.setTimeout(600000);
+            assertNotNull(timeoutClockOf(dlg), "precondition: setTimeout armed a clock");
+
+            dlg.dispose();
+            assertNull(timeoutClockOf(dlg), "precondition: dispose took it down");
+            assertNotEquals(0L, deadlineOf(dlg),
+                    "precondition: the deadline survives, so the next show owes a timeout");
+
+            dlg.showModal(0, 0, 0, 0, false, false, false);
+            DisplayTest.flushEdt();
+
+            assertNotNull(timeoutClockOf(dlg),
+                    "showing it again has to arm a clock for what is left of the"
+                            + " deadline, or only painting can close it");
+            dlg.dispose();
+            DisplayTest.flushEdt();
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
 }

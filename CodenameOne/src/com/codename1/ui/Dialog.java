@@ -1666,15 +1666,27 @@ public class Dialog extends Form implements AbstractDialog {
         // deadline as it fires, so whichever of the two reaches it first wins and the
         // other finds nothing to do.
         cancelTimeoutClock();
-        // Scheduled at the caller's own scale. Display.setTimeout takes an int, and
-        // setTimeout(long) accepts delays that do not fit in one -- past about 24.8 days
-        // the narrowing wraps negative and Timer.schedule throws on the spot, turning a
-        // call the deadline poll has always honoured into an immediate failure. Timer
-        // itself takes a long, so nothing has to be narrowed. A negative delay is
-        // clamped rather than rejected, matching the poll: a deadline already in the
-        // past fires at the first opportunity.
+        armTimeoutClockIfPending();
+    }
+
+    /// Arms the off-surface clock for whatever is left of the deadline.
+    ///
+    /// Scheduled at the caller's own scale. Display.setTimeout takes an int, and
+    /// setTimeout(long) accepts delays that do not fit in one -- past about 24.8 days
+    /// the narrowing wraps negative and Timer.schedule throws on the spot, turning a
+    /// call the deadline poll has always honoured into an immediate failure. Timer
+    /// itself takes a long, so nothing has to be narrowed. A delay already in the past
+    /// is clamped rather than rejected, matching the poll.
+    ///
+    /// Does nothing when there is no deadline, and nothing when one is already armed,
+    /// so the show path can call it unconditionally.
+    private void armTimeoutClockIfPending() {
+        if (time == 0 || timeoutClock != null) {
+            return;
+        }
         java.util.Timer clock = new java.util.Timer();
-        clock.schedule(new TimeoutSchedule(new TimeoutClock(this)), Math.max(0L, time));
+        clock.schedule(new TimeoutSchedule(new TimeoutClock(this)),
+                Math.max(0L, time - System.currentTimeMillis()));
         timeoutClock = clock;
     }
 
@@ -3174,6 +3186,14 @@ public class Dialog extends Form implements AbstractDialog {
         this.bottom = bottom;
         this.left = left;
         this.right = right;
+        // A deadline outlives the showing that set it. Disposing a dialog before its
+        // timeout stops the clock but deliberately keeps the deadline, so that showing
+        // it again still honours what the caller asked for -- and setTimeout is not
+        // called a second time, so nothing else would arm a clock for it. Without this
+        // the reused dialog is back to being polled only while it is painted, which a
+        // minimized window does not do: the stall this clock exists to prevent. A
+        // deadline already in the past is closed by the first paint instead.
+        armTimeoutClockIfPending();
         if (usesNativeWindow()) {
             showInNativeWindow(modal);
             return;
