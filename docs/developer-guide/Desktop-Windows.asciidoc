@@ -438,13 +438,6 @@ all work on a window as they do on a form.
   over the wrong window.
 * `Form` transitions into or out of a window - see <<window-transitions>> for why, and
   for what to use instead.
-* System sheets on Mac Catalyst - sharing (`ShareButton` and `Display.share()`), camera
-  capture, the photo gallery, the file chooser and the full-screen video player. All
-  are presented by the application's main scene, so invoking one from a secondary
-  window shows it over the main window instead; the share sheet also anchors its
-  popover to the main window's coordinates, so it lands in the wrong place as well.
-  These work normally from the main window. Per-window presentation is expected to
-  arrive with the native AppKit macOS port rather than being retrofitted to Catalyst.
 * A `Toolbar` on a window. `Toolbar` is installed through `Form.setToolbar` and is
   bound to a form throughout, so there is no supported way to put one on a window yet.
   Window commands go to the platform through `addCommand`.
@@ -528,6 +521,12 @@ bundle it has always had.
 `Desktop.isSupported()` reads the key back out of the running bundle rather than
 trusting a build flag, so the API and the `Info.plist` can never disagree -- including
 in a project that was generated once and then hand-edited.
+
+System sheets follow the focused window. Sharing (`ShareButton` and `Display.share()`),
+camera capture, the photo gallery, the file chooser and the full-screen video player are
+presented from the scene the user is actually in, and the share popover anchors against
+that window's own coordinates and screen scale rather than the main scene's. Invoking
+one from a secondary window opens it over that window, where it belongs.
 
 Catalyst differs in one implementation detail worth knowing: a window's Codename One
 content is rendered into an off-screen raster and presented to the scene's view, rather
