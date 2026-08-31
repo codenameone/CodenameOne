@@ -488,6 +488,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void run() {
+            // The session may be gone: the platform fills on the UI thread and this runs a hop
+            // later on the EDT, and in between the user can have moved to another field or left
+            // the screen. Applying it then would edit a field nothing is bound to any more and
+            // fire its listeners -- and an OtpField's completion listener submits a code, so a
+            // late fill would verify one for a flow the user has already left. The rest of this
+            // bridge guards its callbacks the same way.
+            if (client != activeInputClient) {
+                return;
+            }
             // A filled value replaces the field rather than being inserted at the caret: the
             // platform is answering "the value is this", not typing into what is there. It
             // still arrives as a commit rather than a raw range replacement, because a field
@@ -502,12 +511,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /// The value the platform should see for the bound field, or null when nothing is bound.
+    ///
+    /// Answered from the state snapshot rather than the editor itself. This runs on Android's UI
+    /// thread whenever an autofill service asks what the field holds, while the document belongs
+    /// to the EDT, and reading a length and then a range out of a document another thread is
+    /// editing is two reads of something that can change in between. Clamped offsets would not
+    /// rescue it either, since the buffer underneath can be restructured mid-read. The snapshot
+    /// is immutable and is what the rest of this bridge already uses to answer the platform
+    /// across that boundary; a value one edit out of date is the correct trade against a crash
+    /// inside somebody else's autofill query.
     static android.view.autofill.AutofillValue editorAutofillValue() {
-        com.codename1.ui.TextInputClient client = activeInputClient;
-        if (client == null) {
+        com.codename1.ui.TextInputState state = activeInputState;
+        if (activeInputClient == null || state == null) {
             return null;
         }
-        return android.view.autofill.AutofillValue.forText(client.getTextRange(0, client.getTextLength()));
+        String text = state.getText();
+        return android.view.autofill.AutofillValue.forText(text == null ? "" : text);
     }
 
     private static void configureEditorInfo(android.view.inputmethod.EditorInfo editorInfo, com.codename1.ui.TextInputConfig cfg) {
