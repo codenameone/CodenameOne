@@ -83,6 +83,39 @@ class PhoneNumberFieldTest extends UITestBase {
     }
 
     @FormTest
+    void searchingFindsACountryByItsFirstLetterInAnyLocale() {
+        // "Israel".toLowerCase() is "israel" in most locales and "ısrael" in Turkish,
+        // while the i the user types stays dotted -- so the country could not be found
+        // by typing its first letter on a Turkish device
+        java.util.Locale previous = java.util.Locale.getDefault();
+        java.util.Locale.setDefault(new java.util.Locale("tr", "TR"));
+        try {
+            Country il = PhoneNumberField.findCountry("IL");
+            assertTrue(PhoneNumberField.matchesSearch("Israel", il,
+                    PhoneNumberField.foldCase("i")), "by name");
+            assertTrue(PhoneNumberField.matchesSearch("Israel", il,
+                    PhoneNumberField.foldCase("IL")), "by ISO code");
+            assertTrue(PhoneNumberField.matchesSearch("Israel", il,
+                    PhoneNumberField.foldCase("972")), "by calling code");
+            assertFalse(PhoneNumberField.matchesSearch("Israel", il,
+                    PhoneNumberField.foldCase("zz")), "and still filters");
+            assertTrue(PhoneNumberField.matchesSearch("Israel", il,
+                    PhoneNumberField.foldCase("")), "an empty search offers everything");
+        } finally {
+            java.util.Locale.setDefault(previous);
+        }
+    }
+
+    @FormTest
+    void searchingStillMatchesAnAccentedNameByItsAccentedLetter() {
+        Country ax = PhoneNumberField.findCountry("AX");
+        assertNotNull(ax);
+        assertTrue(PhoneNumberField.matchesSearch(ax.getName(), ax,
+                PhoneNumberField.foldCase(ax.getName().substring(0, 1))),
+                "folding must not be ASCII-only");
+    }
+
+    @FormTest
     void everyEntryIsWellFormedAndUnique() {
         Set<String> seen = new HashSet<String>();
         for (Country c : PhoneNumberField.getAllCountries()) {

@@ -440,14 +440,11 @@ public class PhoneNumberField extends Container {
 
     private void fillCountryList(Container list, Country[] offered, String filter, final Dialog dlg) {
         list.removeAll();
-        String needle = filter == null ? "" : filter.toLowerCase();
+        String needle = foldCase(filter);
         for (int i = 0; i < offered.length; i++) {
             final Country c = offered[i];
             String label = displayName(c);
-            if (needle.length() > 0
-                    && label.toLowerCase().indexOf(needle) < 0
-                    && c.getDialCode().indexOf(needle) < 0
-                    && c.getIsoCode().toLowerCase().indexOf(needle) < 0) {
+            if (!matchesSearch(label, c, needle)) {
                 continue;
             }
             MultiButton entry = new MultiButton(label);
@@ -461,6 +458,56 @@ public class PhoneNumberField extends Container {
             });
             list.add(entry);
         }
+    }
+
+    /// True when a country should be offered for what has been typed into the
+    /// search field. The needle must already be folded.
+    ///
+    /// #### Parameters
+    ///
+    /// - `label`: the name being shown for the country
+    ///
+    /// - `c`: the country
+    ///
+    /// - `needle`: the folded search text, empty to match everything
+    ///
+    /// #### Returns
+    ///
+    /// true when the country matches
+    static boolean matchesSearch(String label, Country c, String needle) {
+        if (needle.length() == 0) {
+            return true;
+        }
+        return foldCase(label).indexOf(needle) >= 0
+                || c.getDialCode().indexOf(needle) >= 0
+                || foldCase(c.getIsoCode()).indexOf(needle) >= 0;
+    }
+
+    /// Lower cases without asking the device what that means.
+    ///
+    /// `String.toLowerCase` folds with the default locale, and the two sides of a
+    /// search do not survive that: on a Turkish device the capital I of "Israel"
+    /// becomes a dotless i while the i the user typed stays dotted, so the country
+    /// cannot be found by typing its first letter. Folding character by character
+    /// uses the Unicode mapping instead, which is the same everywhere -- and unlike
+    /// an ASCII-only fold it still matches an accented name by its accented letter.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the text to fold, or null
+    ///
+    /// #### Returns
+    ///
+    /// the folded text, empty for null
+    static String foldCase(String s) {
+        if (s == null) {
+            return "";
+        }
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            b.append(Character.toLowerCase(s.charAt(i)));
+        }
+        return b.toString();
     }
 
     /// The name shown for a country: its English name unless the theme's
