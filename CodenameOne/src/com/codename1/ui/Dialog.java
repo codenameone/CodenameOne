@@ -2833,6 +2833,46 @@ public class Dialog extends Form implements AbstractDialog {
         }
     }
 
+    /// Ends a showing that is in a different representation from the one about to
+    /// start.
+    ///
+    /// setNativeWindowMode() takes effect on the next showing, which a caller is
+    /// entitled to reach by flipping it while this dialog is up and showing again. The
+    /// dispatch below would then walk straight into the new representation carrying a
+    /// dialog still parented in the old one: attaching it throws, and by then a window
+    /// or a scrim has already been built, so the failure leaves half an overlay behind.
+    ///
+    /// Only across representations. Showing again in the same one is handled where it
+    /// happens -- showInNativeWindow replaces its window, showInHostLayer its layer --
+    /// because each knows what of its own it has to take down first.
+    ///
+    /// #### Parameters
+    ///
+    /// - `wantsNative`: whether the showing about to start is a window of its own
+    ///
+    /// #### Returns
+    ///
+    /// whether the showing about to start goes into a host window's layered pane
+    private boolean finishShowingInOtherMode(boolean wantsNative) {
+        // The native showing goes first, and the answer below is worked out after it.
+        // A dialog in a window of its own is reached through that window, so while it
+        // stands resolveHost() answers with a Window whatever is really underneath --
+        // and choosing the layered path from that, then tearing the window down, sent
+        // it at a host that had turned back into a Form in the meantime.
+        if (nativeWindow != null && !wantsNative) {
+            dispose();
+            // The show that is starting called for this, so it is not disposed: the
+            // flag belongs to the showing that just ended.
+            setDisposed(false);
+        }
+        boolean wantsHosted = !wantsNative && usesHostLayer();
+        if (layerHost != null && !wantsHosted) {
+            dispose();
+            setDisposed(false);
+        }
+        return wantsHosted;
+    }
+
     /// Whether this showing goes into a window's layered pane rather than taking over
     /// the main surface.
     ///
@@ -3251,12 +3291,16 @@ public class Dialog extends Form implements AbstractDialog {
         // the reused dialog is back to being polled only while it is painted, which a
         // minimized window does not do: the stall this clock exists to prevent. A
         // deadline already in the past is closed by the first paint instead.
+        boolean wantsNative = usesNativeWindow();
+        // Before the clock, because ending a showing stops the clock that belonged to
+        // it -- arming first would hand the new showing a clock and then cancel it.
+        boolean wantsHosted = finishShowingInOtherMode(wantsNative);
         armTimeoutClockIfPending();
-        if (usesNativeWindow()) {
+        if (wantsNative) {
             showInNativeWindow(modal);
             return;
         }
-        if (usesHostLayer()) {
+        if (wantsHosted) {
             showInHostLayer(top, bottom, left, right, includeTitle, modal);
             return;
         }

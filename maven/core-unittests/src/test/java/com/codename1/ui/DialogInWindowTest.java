@@ -3592,4 +3592,56 @@ class DialogInWindowTest extends UITestBase {
                 "the window dying ends the showing, so it has to stop the clock too");
     }
 
+    /// Flipping the mode while up and showing again ends the old representation first.
+    ///
+    /// setNativeWindowMode() takes effect on the next showing, so a caller may flip it
+    /// while the dialog is up. Dispatching straight into the new representation carried
+    /// a dialog still parented in the old one, which throws on attach -- after a window
+    /// or a scrim had already been built, so the failure left half an overlay behind.
+    @FormTest
+    void switchingModeBetweenShowingsEndsThePreviousOne() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            // Hosted first, then asked for a window of its own.
+            Dialog toNative = new Dialog("hosted first");
+            toNative.setNativeWindowMode(false);
+            toNative.showModeless();
+            DisplayTest.flushEdt();
+            assertNull(toNative.getNativeWindow(), "precondition: hosted, not native");
+
+            toNative.setNativeWindowMode(true);
+            toNative.showModeless();
+            DisplayTest.flushEdt();
+            assertNotNull(toNative.getNativeWindow(),
+                    "the second showing has to be the representation just asked for");
+            toNative.dispose();
+            DisplayTest.flushEdt();
+
+            // And the other way.
+            Dialog toHosted = new Dialog("native first");
+            toHosted.setNativeWindowMode(true);
+            toHosted.showModeless();
+            DisplayTest.flushEdt();
+            assertNotNull(toHosted.getNativeWindow(), "precondition: native");
+            Window owned = toHosted.getNativeWindow();
+
+            toHosted.setNativeWindowMode(false);
+            toHosted.showModeless();
+            DisplayTest.flushEdt();
+            assertNull(toHosted.getNativeWindow(),
+                    "the window showing has to end when the dialog moves into a layer");
+            assertTrue(owned.isWindowDisposed(),
+                    "and the window that showing owned goes with it");
+            toHosted.dispose();
+            DisplayTest.flushEdt();
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
 }
