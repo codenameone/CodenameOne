@@ -83,6 +83,8 @@ class PhoneVerificationTest extends UITestBase {
         assertFalse(PhoneVerification.isPlausibleE164("+1234567890123456"), "sixteen digits is too long");
         assertFalse(PhoneVerification.isPlausibleE164("972501234567"), "no leading plus");
         assertFalse(PhoneVerification.isPlausibleE164("+97250-123456"), "not all digits");
+        assertFalse(PhoneVerification.isPlausibleE164("+01234567"),
+                "E.164 reserves zero, so no calling code starts with one");
         assertFalse(PhoneVerification.isPlausibleE164(null));
     }
 

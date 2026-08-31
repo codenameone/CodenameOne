@@ -504,6 +504,13 @@ public class PhoneNumberField extends Container {
         if (e164 == null) {
             return false;
         }
+        // A calling code never starts with zero, so a number typed in international form
+        // that does is not one. The same rule as PhoneVerification.isPlausibleE164, which
+        // is the check the flow makes before sending. It applies only here: a leading zero
+        // in a NATIONAL number is a trunk prefix, which this field keeps on purpose.
+        if (e164.length() > 1 && e164.charAt(1) == '0') {
+            return false;
+        }
         // measured against what getE164 would actually send, which is not the selector's
         // code plus the field when the field holds a whole number of its own
         return getNationalNumber().length() >= 4 && e164.length() - 1 <= 15;

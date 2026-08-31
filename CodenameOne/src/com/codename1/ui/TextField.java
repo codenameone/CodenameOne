@@ -1265,11 +1265,17 @@ public class TextField extends TextArea {
     ///
     /// true if the String is valid
     public boolean validChar(String c) {
-        if (getConstraint() == TextArea.NUMERIC) {
+        // The base type, not the whole constraint. Every modifier -- PASSWORD, SENSITIVE,
+        // NON_PREDICTIVE, USERNAME, UPPERCASE, ONE_TIME_CODE -- is a bit above the base,
+        // and comparing the whole value meant a single one of them turned a numeric field
+        // back into a field that took anything. Every other consumer of a constraint in
+        // the framework already masks; these comparisons were simply left behind.
+        int constraint = getConstraint() & 0xffff;
+        if (constraint == TextArea.NUMERIC) {
             return c.charAt(0) >= '0' && c.charAt(0) <= '9';
-        } else if (getConstraint() == TextArea.PHONENUMBER) {
+        } else if (constraint == TextArea.PHONENUMBER) {
             return (c.charAt(0) >= '0' && c.charAt(0) <= '9') || c.charAt(0) == '+';
-        } else if (getConstraint() == TextArea.DECIMAL) {
+        } else if (constraint == TextArea.DECIMAL) {
             return (c.charAt(0) >= '0' && c.charAt(0) <= '9') || c.charAt(0) == '+' || c.charAt(0) == '-' || c.charAt(0) == '.' || c.charAt(0) == ',';
         }
 

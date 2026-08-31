@@ -1129,10 +1129,11 @@ public class CodenameOneView {
                 editorInfo.imeOptions |= EditorInfo.IME_ACTION_NONE;
             }
             int inputType = 0;
-            int constraint = txt.getConstraint();
-            if ((constraint & TextArea.PASSWORD) == TextArea.PASSWORD) {
-                constraint = constraint ^ TextArea.PASSWORD;
-            }
+            // The base type only. PASSWORD was already being stripped by hand here, which
+            // is the same intent applied to one modifier out of six: every other bit above
+            // the base -- SENSITIVE, NON_PREDICTIVE, USERNAME, UPPERCASE, ONE_TIME_CODE --
+            // fell through to the text keyboard and took the numeric one with it.
+            int constraint = txt.getConstraint() & 0xffff;
             switch (constraint) {
                 case TextArea.NUMERIC:
                     inputType = EditorInfo.TYPE_CLASS_NUMBER | EditorInfo.TYPE_NUMBER_FLAG_SIGNED;

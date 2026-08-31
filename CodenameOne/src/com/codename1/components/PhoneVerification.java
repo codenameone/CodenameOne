@@ -359,6 +359,11 @@ public class PhoneVerification extends Container {
             if (c < '0' || c > '9') {
                 return false;
             }
+            // A calling code never starts with zero -- E.164 reserves that digit -- so a
+            // number that does is not one, however many digits follow it.
+            if (digits == 0 && c == '0') {
+                return false;
+            }
             digits++;
         }
         return digits >= 5 && digits <= 15;

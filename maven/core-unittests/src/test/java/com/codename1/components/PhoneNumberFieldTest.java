@@ -312,6 +312,20 @@ class PhoneNumberFieldTest extends UITestBase {
         assertFalse(f.isValid());
     }
 
+    @FormTest
+    void aPastedNumberWhoseCallingCodeStartsWithZeroIsNotValid() {
+        // E.164 reserves zero as a first digit, so this cannot be a number however many
+        // digits follow. A leading zero in a NATIONAL number is a trunk prefix, which the
+        // field keeps on purpose -- so the rule applies only to the international form.
+        PhoneNumberField f = new PhoneNumberField();
+        f.getNumberField().setText("+01234567");
+        assertFalse(f.isValid());
+
+        f.setCountry(PhoneNumberField.findCountry("IL"));
+        f.getNumberField().setText("0501234567");
+        assertTrue(f.isValid(), "a national trunk prefix is not the same thing");
+    }
+
     // ---- narrowing the list --------------------------------------------
 
     @FormTest
