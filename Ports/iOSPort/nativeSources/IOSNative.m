@@ -17743,6 +17743,24 @@ static void cn1_resetContext(void) {
         cn1_biometricsContext = nil;
     }
 }
+
+// The shared context above belongs to the authenticate/stopAuthentication pair,
+// which invalidates it mid-prompt. The query methods must not read through it:
+// they would see whatever state the last prompt left behind -- so a user who
+// leaves the app, enrolls a fingerprint in Settings and comes back would keep
+// getting the pre-enrollment answer -- and they would race an invalidate on a
+// prompt that is still up. They evaluate on a context of their own instead.
+// Caller releases.
+static LAContext *cn1_newQueryContext(void) {
+    return [[LAContext alloc] init];
+}
+
+// LAError codes, spelled numerically because the symbolic names were renamed in
+// iOS 11 (LAErrorTouchIDNotEnrolled -> LAErrorBiometryNotEnrolled and friends)
+// and the pre-11 spellings are deprecated. The Java side maps the same values in
+// IOSBiometrics.mapLAError.
+#define CN1_LA_ERROR_BIOMETRY_NOT_ENROLLED (-7)
+#define CN1_LA_ERROR_BIOMETRY_LOCKOUT (-8)
 #endif // !TARGET_OS_TV
 
 #if !TARGET_OS_WATCH
@@ -17899,10 +17917,30 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported___R_boolean(
     if (NSClassFromString(@"LAContext") == NULL) {
         return JAVA_FALSE;
     }
+    POOL_BEGIN();
     NSError *error = nil;
-    LAContext *ctx = cn1_ensureContext();
-    BOOL ok = [ctx canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error];
-    return ok ? JAVA_TRUE : JAVA_FALSE;
+    LAContext *ctx = cn1_newQueryContext();
+    BOOL present = [ctx canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error];
+    if (!present && error != nil) {
+        // A sensor the user never enrolled into, or one locked out after too many
+        // failed attempts, is still a sensor. Only "not available" means the device
+        // physically has none -- which is the whole difference between this method
+        // and canAuthenticateBiometric below.
+        present = (error.code == CN1_LA_ERROR_BIOMETRY_NOT_ENROLLED
+                || error.code == CN1_LA_ERROR_BIOMETRY_LOCKOUT);
+    }
+    if (!present) {
+        if (@available(iOS 11.0, *)) {
+            // Populated by the canEvaluatePolicy call above and reports the sensor
+            // the hardware has rather than whether it can be used right now. It
+            // answers the question directly on the handful of biometrics-free
+            // devices, so no list of device models has to be maintained here.
+            present = (ctx.biometryType != LABiometryTypeNone);
+        }
+    }
+    [ctx release];
+    POOL_END();
+    return present ? JAVA_TRUE : JAVA_FALSE;
 #else
     // watchOS/tvOS have no LAPolicyDeviceOwnerAuthenticationWithBiometrics.
     return JAVA_FALSE;
@@ -17910,7 +17948,22 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported___R_boolean(
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canAuthenticateBiometric___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-    return com_codename1_impl_ios_IOSNative_isBiometricsSupported___R_boolean(CN1_THREAD_STATE_PASS_ARG me);
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    if (NSClassFromString(@"LAContext") == NULL) {
+        return JAVA_FALSE;
+    }
+    POOL_BEGIN();
+    NSError *error = nil;
+    LAContext *ctx = cn1_newQueryContext();
+    // The unadorned policy answer: hardware present, enrolled, and not locked out.
+    BOOL ok = [ctx canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error];
+    [ctx release];
+    POOL_END();
+    return ok ? JAVA_TRUE : JAVA_FALSE;
+#else
+    // watchOS/tvOS have no LAPolicyDeviceOwnerAuthenticationWithBiometrics.
+    return JAVA_FALSE;
+#endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getAvailableBiometricTypes___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
@@ -17918,22 +17971,26 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getAvailableBiometricTypes___R_int(CN1
     if (NSClassFromString(@"LAContext") == NULL) {
         return 0;
     }
+    POOL_BEGIN();
     NSError *error = nil;
-    LAContext *ctx = cn1_ensureContext();
-    if (![ctx canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error]) {
-        return 0;
-    }
+    LAContext *ctx = cn1_newQueryContext();
     JAVA_INT mask = 0;
-    if (@available(iOS 11.0, *)) {
-        if (ctx.biometryType == LABiometryTypeTouchID) {
+    // Reports what is ENROLLED, so unlike isBiometricsSupported a failure here is
+    // final and the error code is not consulted.
+    if ([ctx canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics error:&error]) {
+        if (@available(iOS 11.0, *)) {
+            if (ctx.biometryType == LABiometryTypeTouchID) {
+                mask |= 1;
+            } else if (ctx.biometryType == LABiometryTypeFaceID) {
+                mask |= 2;
+            }
+        } else {
+            // Pre-iOS 11: only Touch ID exists.
             mask |= 1;
-        } else if (ctx.biometryType == LABiometryTypeFaceID) {
-            mask |= 2;
         }
-    } else {
-        // Pre-iOS 11: only Touch ID exists.
-        mask |= 1;
     }
+    [ctx release];
+    POOL_END();
     return mask;
 #else
     // watchOS/tvOS have no LAPolicyDeviceOwnerAuthenticationWithBiometrics.
