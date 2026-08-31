@@ -146,6 +146,17 @@ public class BrowserComponent extends Container {
     /// List of registered browser navigation callbacks.
     private Vector<BrowserNavigationCallback> browserNavigationCallbacks;
     private Hashtable<Integer, SuccessCallback<JSRef>> returnValueCallbacks;
+
+    /// The clock armed for a scripted call that has not answered yet.
+    ///
+    /// Held so an answer can stop it. The timer runs on a thread of its own that is not
+    /// a daemon, and its task holds this component, the callback and the script, so a
+    /// call that replied promptly still kept all of it alive until a timeout it never
+    /// needed -- once per execute(), which a page calling in a loop turns into a pile of
+    /// threads that can also keep a JavaSE process from exiting.
+    ///
+    /// Keyed by callback, which is how the timeout task already finds its own entry.
+    private Hashtable<SuccessCallback<JSRef>, Timer> returnValueTimeouts;
     private int nextReturnValueCallbackId = 0;
     private String tmpUrl;
     /// Sets of callbacks that are registered to persist for multiple calls.
@@ -565,9 +576,26 @@ public class BrowserComponent extends Container {
 
     private SuccessCallback<JSRef> popReturnValueCallback(int id) {
         if (returnValueCallbacks != null) {
-            return returnValueCallbacks.remove(id);
+            SuccessCallback<JSRef> callback = returnValueCallbacks.remove(id);
+            if (callback != null) {
+                // The answer arrived, so the clock waiting for it has nothing left to
+                // report. Stopping it is what lets its thread end and this component go.
+                cancelReturnValueTimeout(callback);
+            }
+            return callback;
         }
         return null;
+    }
+
+    /// Stops and forgets the clock armed for one scripted call, if there is one.
+    private void cancelReturnValueTimeout(SuccessCallback<JSRef> callback) {
+        if (returnValueTimeouts == null) {
+            return;
+        }
+        Timer clock = returnValueTimeouts.remove(callback);
+        if (clock != null) {
+            clock.cancel();
+        }
     }
 
     @Override
@@ -1426,10 +1454,12 @@ public class BrowserComponent extends Container {
             // documents then arrived when the window came back, or never. This one is a
             // plain timer that hands the callback to the event thread when it fires,
             // whatever is on screen by then.
-            Display.getInstance().setTimeout(timeout, new Runnable() {
+            Timer clock = Display.getInstance().setTimeout(timeout, new Runnable() {
 
                 @Override
                 public void run() {
+                    // This clock has fired, so it is spent whatever it decides below.
+                    cancelReturnValueTimeout(callback);
                     if (returnValueCallbacks().contains(callback)) {
                         Object key = null;
                         for (Map.Entry e : returnValueCallbacks.entrySet()) {
@@ -1453,6 +1483,13 @@ public class BrowserComponent extends Container {
                 }
 
             });
+            // Kept so an answer can stop it -- see returnValueTimeouts. Registered
+            // before the call goes out, because the answer can come back before this
+            // method returns and would then have nothing to cancel.
+            if (returnValueTimeouts == null) {
+                returnValueTimeouts = new Hashtable<SuccessCallback<JSRef>, Timer>();
+            }
+            returnValueTimeouts.put(callback, clock);
         }
         execute(js, callback);
 

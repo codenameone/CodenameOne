@@ -133,4 +133,68 @@ public class BrowserComponentCoverageTest extends UITestBase {
             }
         }
     }
+    /// The clock armed for a scripted call, via reflection.
+    private static java.util.Hashtable<?, ?> timeoutsOf(BrowserComponent bc) {
+        try {
+            java.lang.reflect.Field f =
+                    BrowserComponent.class.getDeclaredField("returnValueTimeouts");
+            f.setAccessible(true);
+            return (java.util.Hashtable<?, ?>) f.get(bc);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// Delivers the answer the way the message listener does.
+    private static void deliverAnswer(BrowserComponent bc, SuccessCallback<JSRef> cb) {
+        try {
+            java.lang.reflect.Field f =
+                    BrowserComponent.class.getDeclaredField("returnValueCallbacks");
+            f.setAccessible(true);
+            java.util.Hashtable<?, ?> callbacks = (java.util.Hashtable<?, ?>) f.get(bc);
+            Integer id = null;
+            for (java.util.Map.Entry<?, ?> e : callbacks.entrySet()) {
+                if (e.getValue() == cb) {
+                    id = (Integer) e.getKey();
+                    break;
+                }
+            }
+            Assertions.assertNotNull(id, "precondition: the call registered a callback");
+            java.lang.reflect.Method m = BrowserComponent.class.getDeclaredMethod(
+                    "popReturnValueCallback", int.class);
+            m.setAccessible(true);
+            m.invoke(bc, id.intValue());
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// An answer stops the clock that was waiting for it.
+    ///
+    /// The timer runs on a thread of its own that is not a daemon, and its task holds
+    /// the component, the callback and the script. Discarding it meant a call that
+    /// replied at once still kept all of that alive until a timeout it never needed --
+    /// once per execute(), which a page calling in a loop turns into a pile of threads
+    /// that can also keep a JavaSE process from exiting.
+    @FormTest
+    public void anAnswerStopsTheScriptTimeoutClock() {
+        BrowserComponent bc = new BrowserComponent();
+        SuccessCallback<JSRef> cb = new SuccessCallback<JSRef>() {
+            @Override
+            public void onSucess(JSRef value) {
+            }
+        };
+
+        bc.execute(600000, "eval('1+1')", cb);
+        java.util.Hashtable<?, ?> armed = timeoutsOf(bc);
+        Assertions.assertNotNull(armed, "precondition: the call armed a clock");
+        Assertions.assertEquals(1, armed.size(), "precondition: exactly one clock");
+
+        deliverAnswer(bc, cb);
+
+        Assertions.assertEquals(0, timeoutsOf(bc).size(),
+                "the answer has to stop the clock waiting for it, or its thread and"
+                        + " everything it holds live on until a deadline nobody needs");
+    }
+
 }
