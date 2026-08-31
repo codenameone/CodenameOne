@@ -37,6 +37,11 @@
 #include <setjmp.h>
 #include <math.h>
 #include <stdatomic.h>
+/* For CN1_RESUME_THREAD, which yields a virtual thread rather than sleeping the
+   carrier it runs on. Off the backend every entry point here is a static inline
+   stub answering "there is no virtual thread", so the macro folds back to the
+   plain sleep and every other platform is byte-for-byte unchanged. */
+#include "cn1_virtual_thread.h"
 #include <stdint.h>
 
 // Darwin's setjmp/longjmp SAVE and RESTORE the caller's signal mask -- a sigprocmask
@@ -1957,7 +1962,15 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 #else
 #define CN1_GC_PARK_RELEASE(ts) do { (void)(ts); } while(0)
 #endif
-#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); while (__cn1rts->threadBlockedByGC){ usleep((JAVA_INT)1000);} __cn1rts->threadActive = JAVA_TRUE; CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
+/* Sleeping here sleeps the CARRIER, and a carrier hosts many virtual threads --
+ * hostCount is min(workers, cores), so on a 2-core pin 64 connections share 2
+ * carriers. One carrier sleeping a millisecond therefore freezes ~32 connections
+ * that were ready to run, which is why p50 stays good while p99 does not. Yield
+ * instead when this is a virtual thread: the carrier goes and serves the others,
+ * and the collector gets its safepoint just the same. The pacing park already
+ * did this; this site, the hottest of the four (once per syscall return), did
+ * not. Platform threads still sleep -- there is nothing to yield to. */
+#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } __cn1rts->threadActive = JAVA_TRUE; CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
 
 extern struct ThreadLocalData* getThreadLocalData();
 
