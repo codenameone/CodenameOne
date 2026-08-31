@@ -887,11 +887,18 @@ public final class ToastBar {
                     && (safeArea.getY() > 0 || c.safeAreaPaddingTop > 0)) {
                 Container parent = c.getParent();
                 if (parent != null) {
-                    int applied = Math.max(0, safeArea.getY() - parent.getAbsoluteY());
-                    Style s = c.getAllStyles();
-                    s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-                    s.setPaddingTop(applied);
-                    c.safeAreaPaddingTop = applied;
+                    int needed = safeArea.getY() - parent.getAbsoluteY();
+                    // Only what this owns. A top inset that resolves to nothing was
+                    // always left alone -- the padding there is the style's own, and
+                    // writing a zero over it takes away whatever the theme asked for.
+                    // The clearing half is for an inset this actually applied.
+                    if (needed > 0 || c.safeAreaPaddingTop > 0) {
+                        int applied = Math.max(0, needed);
+                        Style s = c.getAllStyles();
+                        s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+                        s.setPaddingTop(applied);
+                        c.safeAreaPaddingTop = applied;
+                    }
                 }
             }
 
