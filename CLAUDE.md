@@ -216,6 +216,36 @@ scripts/check-cast-semantics.sh
 scripts/check-cast-semantics.sh --write-baseline   # after fixing a method
 ```
 
+### Never write a control character into source
+
+A raw control byte -- NUL, US, SOH, DEL -- typed straight into a file instead of
+as an escape is invisible in an editor and makes the file *binary* to the tools
+around it. `grep` then prints nothing at all for that file: not an error, not
+"binary file matches", just success with no output, so a search reads as "the
+symbol is not there". `git diff` degrades to "Binary files differ" and
+`javac -encoding ascii` refuses the file outright.
+
+The byte is never required. Every language here has an escape that compiles to
+the identical value, so `scripts/check-control-characters.py` is absolute:
+**no baseline and no exclusions**, and a finding is always fixed by writing the
+escape (`'\0'`, `"\u001f"`, `\x1f`). TAB, LF and CR are the only control
+characters allowed. It covers every tracked text file -- source, scripts,
+config and docs -- because this tree had corrupted files in several of them.
+
+It runs as its own workflow (`.github/workflows/check-control-characters.yml`)
+rather than inside `pr.yml`, whose `paths` filter excludes `scripts/**` and
+`docs/**` and would let a PR touching only those skip the check.
+
+```bash
+scripts/check-control-characters.py            # every tracked text file
+scripts/check-control-characters.py PATH ...   # just these
+```
+
+Note the related Java trap the gate cannot see, because it is a compile error:
+`\u` followed by anything that is not four hex digits is illegal *anywhere* in a
+Java file, comments included -- javac processes unicode escapes before it parses
+comments. Write "backslash-u" in prose, or double the backslash.
+
 ### Working with Native Code
 
 Platform-specific native code locations:

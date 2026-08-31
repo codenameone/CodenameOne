@@ -1041,7 +1041,7 @@ public final class IOSNative {
 
     /// Enriched local notification scheduling carrying actions, grouping, time-sensitive
     /// flag and an image attachment. actionsEncoded packs the actions as
-    /// idtitleplaceholderbutton records separated by .
+    /// id, title, placeholder and button joined by 0x01, records separated by 0x02.
     native void sendLocalNotification2(String id, String alertTitle, String alertBody, String alertSound, int badgeNumber, long fireDate, int repeatType, boolean foreground, String categoryId, String threadId, boolean timeSensitive, String imageAttachmentPath, String actionsEncoded);
 
     native void cancelLocalNotification(String id);

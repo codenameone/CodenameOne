@@ -2075,8 +2075,26 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 || apiClass.packageName.startsWith("com.codenameone.playground");
     }
 
+    /// Renders a string as the body of a Java string literal.
+    ///
+    /// Control characters go in as unicode escapes -- backslash-u plus four hex digits --
+    /// rather than as themselves. The member separator is 0x1f, and writing it raw put an
+    /// unprintable byte into generated source, which made the file binary to grep and to
+    /// every other line-oriented tool. Anything outside printable ASCII is escaped for the
+    /// same reason, and because this repository requires ASCII-only Java sources.
     private static String escape(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        StringBuilder out = new StringBuilder(value.length() + 8);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '\\' || c == '"') {
+                out.append('\\').append(c);
+            } else if (c < 0x20 || c > 0x7e) {
+                out.append(String.format("\\u%04x", (int) c));
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     private static void writeInvokeStatic(Writer writer, List<ApiClass> classes) throws IOException {

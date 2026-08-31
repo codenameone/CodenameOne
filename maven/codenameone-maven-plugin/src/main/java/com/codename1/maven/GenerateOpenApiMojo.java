@@ -396,7 +396,7 @@ public class GenerateOpenApiMojo extends AbstractMojo {
 
         private static String shapeOf(SchemaInfo s) {
             if (s.isEnum) {
-                return " enum:" + s.enumGeneratable + ":" + s.enumValues;
+                return "\u0000enum:" + s.enumGeneratable + ":" + s.enumValues;
             }
             StringBuilder sb = new StringBuilder();
             for (PropInfo p : s.props) {

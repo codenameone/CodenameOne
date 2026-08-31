@@ -561,9 +561,9 @@ public class LinuxImplementation extends CodenameOneImplementation {
             contactCache = new java.util.HashMap<String, String[]>();
             String blob = LinuxNative.contactsGetAll();
             if (blob != null && blob.length() > 0) {
-                String[] records = blob.split("");
+                String[] records = blob.split("\u001e");
                 for (int i = 0; i < records.length; i++) {
-                    String[] f = records[i].split("", -1);
+                    String[] f = records[i].split("\u001f", -1);
                     if (f.length >= 1 && f[0].length() > 0) {
                         contactCache.put(f[0], f);
                     }
