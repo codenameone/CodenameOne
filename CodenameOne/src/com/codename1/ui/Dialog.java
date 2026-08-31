@@ -1706,8 +1706,27 @@ public class Dialog extends Form implements AbstractDialog {
 
         @Override
         public void run() {
-            dlg.isTimedOut();
+            // Only while the dialog is on screen. setTimeout() is often called while a
+            // dialog is still being configured, and if the delay runs out before show()
+            // then isTimedOut() here would clear the deadline and dispose nothing --
+            // leaving show() to put up a dialog with no timeout at all, open for good.
+            // Leaving the deadline alone keeps what happened before this clock existed:
+            // nothing polls a dialog that is not being painted, so the deadline waits,
+            // and the animation poll finds it already past on the first paint and closes
+            // the dialog at once.
+            if (dlg.isShowingAnywhere()) {
+                dlg.isTimedOut();
+            }
         }
+    }
+
+    /// Whether this dialog is on screen, in any of the three ways it can be.
+    ///
+    /// Shown the historical way it becomes the current surface; hosted, it is parented
+    /// into a window's layer; in native mode it has a window of its own. None of the
+    /// three is implied by the others.
+    private boolean isShowingAnywhere() {
+        return layerHost != null || nativeWindow != null || isTopLevelShowing();
     }
 
     /// Stops the off-surface clock, if one is armed.

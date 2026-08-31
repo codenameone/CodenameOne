@@ -30,6 +30,7 @@ import com.codename1.ui.layouts.BorderLayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -3381,6 +3382,54 @@ class DialogInWindowTest extends UITestBase {
             w.dispose();
             DisplayTest.flushEdt();
         }
+    }
+
+    /// The dialog's timeout deadline, via reflection.
+    private static long deadlineOf(Dialog d) {
+        try {
+            java.lang.reflect.Field f = Dialog.class.getDeclaredField("time");
+            f.setAccessible(true);
+            return f.getLong(d);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// A deadline that runs out before show() must survive to be honoured by it.
+    ///
+    /// setTimeout() is routinely called while a dialog is still being configured. The
+    /// off-surface clock fires on wall time whether or not anything is on screen, so
+    /// acting on it there clears the deadline and disposes nothing -- and the show()
+    /// that follows puts up a dialog with no timeout at all, open for good. Nothing
+    /// polled a detached dialog before that clock existed, which is the behaviour being
+    /// preserved: the deadline waits, and the first paint after show() closes it.
+    @FormTest
+    void aTimeoutElapsingBeforeShowKeepsItsDeadline() {
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        Dialog dlg = new Dialog("configured but not shown");
+        dlg.setTimeout(40);
+        assertNotEquals(0L, deadlineOf(dlg), "precondition: a deadline was set");
+
+        // Well past it, with the event thread free to deliver the clock's callback.
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(400);
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        DisplayTest.flushEdt();
+        DisplayTest.flushEdt();
+
+        assertNotEquals(0L, deadlineOf(dlg),
+                "the clock must not retire a deadline for a dialog that was never shown,"
+                        + " or the show that follows has no timeout at all");
     }
 
 }
