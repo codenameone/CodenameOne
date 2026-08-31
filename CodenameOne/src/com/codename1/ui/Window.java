@@ -3506,6 +3506,16 @@ public class Window extends Container implements TopLevelContainer {
     /// it to be reported.
     @Override
     protected void longKeyPress(int keyCode) {
+        // The scope this key went down in, exactly as the repeat and release paths ask.
+        // The timer that brings us here is armed by the press and fires later, so a
+        // handler that opened or dismissed an overlay in between has changed which
+        // control is focused: without this the long press lands on whatever the change
+        // exposed, a control that never saw the key go down.
+        Integer held = Integer.valueOf(keyCode);
+        if (keyPressScopes != null && keyPressScopes.containsKey(held)
+                && keyPressScopes.get(held) != keyInputScope) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
         if (focused != null && focused.getTopLevelContainer() == this) { //NOPMD CompareObjectsWithEquals
             focused.longKeyPress(keyCode);
         }

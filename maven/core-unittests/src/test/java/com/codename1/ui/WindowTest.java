@@ -5995,4 +5995,73 @@ class WindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    /// Counts long key presses reaching a component.
+    private static final class LongKeyCountingComponent extends Component {
+        private int longPresses;
+
+        LongKeyCountingComponent() {
+            setFocusable(true);
+        }
+
+        @Override
+        protected void longKeyPress(int keyCode) {
+            longPresses++;
+        }
+
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            return new com.codename1.ui.geom.Dimension(120, 90);
+        }
+    }
+
+    @FormTest
+    void aLongKeyPressDoesNotLandOnWhateverTheDialogUncovered() {
+        // The long press timer is armed by the key going down and fires later, so a
+        // handler that dismissed the overlay in between has changed which control is
+        // focused. The repeat and release paths already refuse that; this one went
+        // straight to the newly focused component, which never saw the key go down.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        LongKeyCountingComponent behind = new LongKeyCountingComponent();
+        w.add(BorderLayout.CENTER, behind);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            Container overlay = new Container(new BorderLayout());
+            Button inOverlay = new Button("in the overlay");
+            overlay.add(BorderLayout.CENTER, inOverlay);
+            Container layer = w.getFormLayeredPane(WindowTest.class, true);
+            layer.setLayout(new BorderLayout());
+            layer.add(BorderLayout.CENTER, overlay);
+            w.revalidate();
+            DisplayTest.flushEdt();
+
+            w.setFocused(inOverlay);
+            w.pushKeyInputScope(overlay);
+            DisplayTest.flushEdt();
+
+            // The key goes down while the overlay owns the keyboard.
+            w.keyPressed('x');
+            DisplayTest.flushEdt();
+
+            // A handler dismisses the overlay before the long press interval elapses.
+            w.removeKeyInputScope(overlay);
+            overlay.remove();
+            w.setFocused(behind);
+            DisplayTest.flushEdt();
+
+            w.longKeyPress('x');
+            DisplayTest.flushEdt();
+
+            assertEquals(0, behind.longPresses,
+                    "a long press must not reach a control that never saw the key down");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }
