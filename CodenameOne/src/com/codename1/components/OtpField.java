@@ -22,7 +22,6 @@
  */
 package com.codename1.components;
 
-import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.EditField;
 import com.codename1.ui.Graphics;
