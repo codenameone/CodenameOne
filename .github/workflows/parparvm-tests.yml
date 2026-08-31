@@ -219,6 +219,11 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/github-script@v9
         with:
+          # Retried rather than fatal on a transient 5xx. The publisher
+          # already warns instead of throwing; this is the cheaper half of
+          # the same fix, so the comment usually still lands. 4xx codes the
+          # action treats as permanent are not retried.
+          retries: 3
           script: |
             const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
             await publishQualityComment({

@@ -274,4 +274,77 @@ class GattConnectionTest extends UITestBase {
         assertEquals(Integer.valueOf(185), r.get());
         assertEquals(185, p.getMtu());
     }
+
+    @Test
+    void theServiceCacheIsPublishedBeforeTheResourceReportsDone() {
+        // AsyncResource sets its done flag inside the monitor and notifies
+        // observers BEFORE it runs its callbacks, so a cache filled from an
+        // ordinary onResult listener lands after a waiter has already woken.
+        // Anyone who saw the resource finish -- await(), a poll, an observer
+        // -- must already be able to read what it published.
+        p.connectNow();
+        AsyncResource<List<GattService>> r = p.discoverServices();
+        final List<GattService> seenAtNotify =
+                new ArrayList<GattService>();
+        final boolean[] notified = new boolean[1];
+        r.addObserver(new java.util.Observer() {
+            @Override
+            public void update(java.util.Observable o, Object arg) {
+                notified[0] = true;
+                seenAtNotify.addAll(p.getServices());
+            }
+        });
+        GattService svc = p.buildService(SVC);
+        p.completeNext(Arrays.asList(svc));
+        assertTrue(notified[0], "the observer must have been notified");
+        assertEquals(1, seenAtNotify.size(),
+                "getServices() was empty for anyone who saw the resource "
+                        + "finish -- the cache is published too late");
+        assertNotNull(p.getService(SVC));
+    }
+
+    @Test
+    void theMtuIsPublishedBeforeTheResourceReportsDone() {
+        p.connectNow();
+        AsyncResource<Integer> r = p.requestMtu(185);
+        final int[] seenAtNotify = new int[1];
+        r.addObserver(new java.util.Observer() {
+            @Override
+            public void update(java.util.Observable o, Object arg) {
+                seenAtNotify[0] = p.getMtu();
+            }
+        });
+        p.completeNext(Integer.valueOf(185));
+        assertEquals(185, seenAtNotify[0],
+                "getMtu() still answered the old value for a caller that "
+                        + "saw requestMtu() finish");
+    }
+
+    @Test
+    void aDiscoveryThatTimedOutDoesNotOverwriteTheCacheLater()
+            throws Exception {
+        // The queue fails the operation on timeout, but the platform still
+        // owns its own resource and can answer afterwards. Publishing then
+        // would overwrite a cache a LATER discovery has since established.
+        p.connectNow();
+        AsyncResource<List<GattService>> first = p.discoverServices();
+        p.completeNext(Arrays.asList(p.buildService(SVC)));
+        assertNotNull(p.getService(SVC));
+
+        p.setOpTimeout(50);
+        AsyncResource<List<GattService>> late = p.discoverServices();
+        final java.util.concurrent.CountDownLatch failed =
+                new java.util.concurrent.CountDownLatch(1);
+        late.except(t -> failed.countDown());
+        assertTrue(failed.await(20, java.util.concurrent.TimeUnit.SECONDS),
+                "the operation should have timed out");
+        p.setOpTimeout(0);
+
+        // the platform answers the timed-out request, with nothing in it
+        p.completeNext(new ArrayList<GattService>());
+        assertNotNull(p.getService(SVC),
+                "a late answer to a timed-out discovery must not replace the"
+                        + " cache");
+        assertNotNull(first.get(null));
+    }
 }

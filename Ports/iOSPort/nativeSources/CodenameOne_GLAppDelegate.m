@@ -32,6 +32,9 @@
 #import <objc/message.h>
 #import "EAGLView.h"
 #import "CodenameOne_GLViewController.h"
+#ifdef CN1_INCLUDE_CALL
+#import "CN1Call.h"
+#endif
 #ifdef CN1_USE_INTENTS
 // Core Spotlight is Objective-C and needs no Swift; it carries the indexing half of
 // com.codename1.intents. Imported under the define so an app that never references the
@@ -663,6 +666,13 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
         NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
         [self cn1StoreAppArgForURL:url];
     }
+#ifdef CN1_INCLUDE_CALL
+    // HERE and not in didFinishLaunching: a VoIP push can be delivered during
+    // launch, and a PKPushRegistry that does not exist yet loses it -- which
+    // is the case iOS terminates the process for. A no-op in builds without
+    // CN1_CALL_VOIP.
+    cn1CallInstallPushRegistry();
+#endif
     return YES;
 }
 

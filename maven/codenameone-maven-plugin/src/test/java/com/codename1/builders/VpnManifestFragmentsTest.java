@@ -1,0 +1,327 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.builders;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/// The manifest a packet tunnel needs.
+///
+/// Every assertion here is about something that fails SILENTLY: a VpnService
+/// Android will not bind, a promotion it refuses, or a generated element that
+/// suppressed the developer's own.
+class VpnManifestFragmentsTest {
+
+    @Test
+    public void theServiceIsBindableByTheSystemOnly() {
+        String out = VpnManifestFragments.services(true, "");
+        // Without android:permission Android refuses the binding, and
+        // establish() then answers null on a build that looks complete.
+        assertTrue(out.contains(
+                "android:permission=\"android.permission.BIND_VPN_SERVICE\""),
+                "the permission attribute is what makes this a VPN service");
+        assertTrue(out.contains("android.net.VpnService"),
+                "the action is how the system finds it");
+        // Mandatory from API 31 for any component with an intent filter.
+        assertTrue(out.contains("android:exported="),
+                "a component with an intent filter must say so from API 31");
+    }
+
+    @Test
+    public void theServiceDeclaresTheTypeItPromotesWith() {
+        // Android 14 refuses a promotion whose type the manifest does not
+        // declare, and an unpromoted VpnService is one the platform shuts
+        // down shortly after the tunnel comes up.
+        assertTrue(VpnManifestFragments.services(true, "")
+                .contains("android:foregroundServiceType=\"systemExempted\""));
+    }
+
+    @Test
+    public void aTunnelBuildCompilesAgainstAnSdkThatKnowsItsType() {
+        // systemExempted and the foregroundServiceType attribute arrive at
+        // 34 and 29, and AAPT rejects an enum value the compile SDK has
+        // never heard of -- so the legacy configuration, which is still
+        // supported and can sit at 28, failed on the generated manifest
+        // before anything was compiled.
+        assertEquals(34, AndroidGradleBuilder.TUNNEL_MIN_COMPILE_SDK);
+        assertEquals(34, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
+                false, false, false, true),
+                "a tunnel build is raised to an SDK that knows its type");
+        assertEquals(28, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
+                false, false, false, false),
+                "and an app without one keeps its legacy compile SDK");
+    }
+
+    @Test
+    public void nothingIsEmittedWithoutTheTunnel() {
+        assertEquals("", VpnManifestFragments.services(false, ""));
+        assertEquals("x", VpnManifestFragments.injectPermissions(false, "x"));
+    }
+
+    @Test
+    public void thePromotionPermissionsAreDeclared() {
+        String out = VpnManifestFragments.injectPermissions(true, "");
+        assertTrue(out.contains("android.permission.FOREGROUND_SERVICE\""),
+                "Android refuses the promotion without it");
+        assertTrue(out.contains(
+                "android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED"),
+                "Android 14 wants the permission matching the type");
+        // BIND_VPN_SERVICE is the system's, not the app's; an app that
+        // declares it is asking for something it cannot be granted.
+        assertFalse(out.contains("BIND_VPN_SERVICE"),
+                "the service declares that the SYSTEM holds this one");
+    }
+
+    /** A declaration the system will actually bind as a VPN. */
+    private static String bindable() {
+        return "        <service android:name=\""
+                + VpnManifestFragments.TUNNEL_SERVICE + "\""
+                + " android:permission=\""
+                + VpnManifestFragments.BIND_VPN_SERVICE + "\""
+                + " android:exported=\"true\""
+                + " android:foregroundServiceType=\"systemExempted\">\n"
+                + "            <intent-filter>\n"
+                + "                <action android:name=\""
+                + VpnManifestFragments.VPN_ACTION + "\" />\n"
+                + "            </intent-filter>\n"
+                + "        </service>\n";
+    }
+
+    @Test
+    public void aProjectsOwnDeclarationIsNotDuplicated() {
+        // A COMPLETE one. This test used to pass a bare
+        // <service android:name="..."/>, which is exactly the declaration
+        // the build must not stand aside for -- the assertion was encoding
+        // the defect.
+        assertEquals("", VpnManifestFragments.services(true, bindable()));
+        String perms = "    <uses-permission android:name="
+                + "\"android.permission.FOREGROUND_SERVICE\" />\n";
+        assertEquals(1, count(VpnManifestFragments.injectPermissions(true, perms),
+                "\"android.permission.FOREGROUND_SERVICE\""),
+                "a permission the project already declares is not repeated");
+    }
+
+    @Test
+    public void aDeclarationAndroidCannotBindIsRefused() {
+        // Two things make a <service> a VPN service and neither is the class
+        // name: android:permission says only the system, holding
+        // BIND_VPN_SERVICE, may bind it, and the android.net.VpnService
+        // action is how the system finds it. Suppressing the generated
+        // element on the NAME alone let a declaration carrying neither
+        // replace the working one -- a build that looks complete, refuses
+        // the binding, fails at establish() with nothing to say why, and
+        // goes on reporting Tunnels.isSupported() as true.
+        //
+        // Refused rather than merged: rewriting XML the project wrote is
+        // guesswork about intent, and it is what the VoIP background mode
+        // does one builder over for the same reason.
+        String bare = "        <service android:name=\""
+                + VpnManifestFragments.TUNNEL_SERVICE + "\" />\n";
+        String both = assertThrows(IllegalArgumentException.class,
+                () -> VpnManifestFragments.services(true, bare)).getMessage();
+        for (String needed : new String[] {"android:permission",
+                "android:exported", "android:foregroundServiceType",
+                "intent-filter"}) {
+            assertTrue(both.contains(needed),
+                    "the message names every missing part; " + needed
+                    + " is absent from: " + both);
+        }
+
+        String noPermission = bindable()
+                .replace(" android:permission=\""
+                        + VpnManifestFragments.BIND_VPN_SERVICE + "\"", "");
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> VpnManifestFragments.services(true, noPermission))
+                        .getMessage().contains("android:permission"),
+                "a filter without the permission is still unbindable");
+
+        String noFilter = "        <service android:name=\""
+                + VpnManifestFragments.TUNNEL_SERVICE + "\""
+                + " android:permission=\""
+                + VpnManifestFragments.BIND_VPN_SERVICE + "\""
+                + " android:exported=\"true\""
+                + " android:foregroundServiceType=\"systemExempted\" />\n";
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> VpnManifestFragments.services(true, noFilter))
+                        .getMessage().contains("intent-filter"),
+                "and the permission alone leaves nothing to find it by");
+
+        // The ACTION has to be in a filter, not merely in the body. A
+        // meta-data that names it tells the system nothing, and the element
+        // it suppressed was the one that could be found.
+        String metaDataOnly = "        <service android:name=\""
+                + VpnManifestFragments.TUNNEL_SERVICE + "\""
+                + " android:permission=\""
+                + VpnManifestFragments.BIND_VPN_SERVICE + "\""
+                + " android:exported=\"true\""
+                + " android:foregroundServiceType=\"systemExempted\">\n"
+                + "            <meta-data android:name=\""
+                + VpnManifestFragments.VPN_ACTION + "\""
+                + " android:value=\"x\" />\n"
+                + "        </service>\n";
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> VpnManifestFragments.services(true, metaDataOnly))
+                        .getMessage().contains("intent-filter"),
+                "the action outside a filter is not a filter");
+
+        // And the foreground TYPE, which Android 14 refuses a promotion
+        // without -- the service promotes itself with exactly this one.
+        String noType = bindable()
+                .replace(" android:foregroundServiceType=\"systemExempted\"",
+                        "");
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> VpnManifestFragments.services(true, noType))
+                        .getMessage().contains("foregroundServiceType"),
+                "a declaration that cannot be promoted is not complete");
+
+        // A COMMENTED-OUT declaration is not one, so it is not judged
+        // either: the build supplies its own and nothing is refused.
+        String commented = "        <!-- <service android:name=\""
+                + VpnManifestFragments.TUNNEL_SERVICE + "\" /> -->\n";
+        assertTrue(VpnManifestFragments.services(true, commented)
+                .contains(VpnManifestFragments.BIND_VPN_SERVICE),
+                "the generated element still goes in");
+    }
+
+    @Test
+    public void xmlSpacingAroundEqualsIsStillXml() {
+        // android:name = "x" is the same declaration as android:name="x",
+        // and either quoting is valid. Read as a literal substring, a
+        // project that formatted its manifest that way had its service
+        // reported ABSENT -- so the build appended a SECOND declaration of
+        // the same class -- and its attributes reported MISSING, refusing a
+        // configuration that was correct.
+        String spaced = bindable()
+                .replace("android:name=\"", "android:name = \"")
+                .replace("android:permission=\"", "android:permission =\"")
+                .replace("android:exported=\"true\"",
+                        "android:exported\t=\ntrue".replace("\ntrue",
+                                "\n'true'"));
+        assertEquals("", VpnManifestFragments.services(true, spaced),
+                "a spaced but complete declaration is complete: " + spaced);
+        assertTrue(VpnManifestFragments.declares(spaced,
+                VpnManifestFragments.TUNNEL_SERVICE),
+                "and it is a declaration, so nothing is appended beside it");
+        // The name is a WHOLE attribute, not a substring of a longer one.
+        String decoy = "        <service android:nameGroup=\""
+                + VpnManifestFragments.TUNNEL_SERVICE + "\" />\n";
+        assertFalse(VpnManifestFragments.declares(decoy,
+                VpnManifestFragments.TUNNEL_SERVICE),
+                "android:nameGroup is not android:name");
+        assertTrue(VpnManifestFragments.services(true, decoy)
+                .contains(VpnManifestFragments.BIND_VPN_SERVICE),
+                "so the real element is still generated");
+    }
+
+    @Test
+    public void aBoundedPermissionDoesNotSatisfyAnUnboundedOne() {
+        // A declaration capped with android:maxSdkVersion asks for the
+        // permission only up to that level, and the generated ones are
+        // unbounded because the platform needs them at the level the app
+        // actually runs. Suppressing on the NAME alone let a capped
+        // FOREGROUND_SERVICE stand in for one the service needs on 34, so
+        // the promotion failed with the manifest looking complete.
+        String capped = "    <uses-permission android:name="
+                + "\"android.permission.FOREGROUND_SERVICE\""
+                + " android:maxSdkVersion=\"33\" />\n";
+        String out = VpnManifestFragments.injectPermissions(true, capped);
+        assertEquals(2, count(out,
+                "\"android.permission.FOREGROUND_SERVICE\""),
+                "the unbounded one goes in beside the capped one: " + out);
+        // An UNBOUNDED declaration still suppresses, so this is not simply
+        // refusing to see what the project wrote.
+        String plain = "    <uses-permission android:name="
+                + "\"android.permission.FOREGROUND_SERVICE\" />\n";
+        assertEquals(1, count(
+                VpnManifestFragments.injectPermissions(true, plain),
+                "\"android.permission.FOREGROUND_SERVICE\""),
+                "a permission the project already declares is not repeated");
+    }
+
+    @Test
+    public void aSpacedClosingTagEndsTheElement() {
+        // "</service >" is valid XML, and an exact search for "</service>"
+        // ran past this element into a LATER <service> -- whose own action
+        // then satisfied the filter test, so the generated declaration was
+        // suppressed for a component that is still undiscoverable.
+        String spacedClose = ("        <service android:name=\"SVC\""
+                + " android:permission=\"PERM\""
+                + " android:exported=\"true\""
+                + " android:foregroundServiceType=\"systemExempted\">\n"
+                + "        </service >\n"
+                + "        <service android:name=\"other.Service\">\n"
+                + "            <intent-filter>\n"
+                + "                <action android:name=\"ACT\" />\n"
+                + "            </intent-filter>\n"
+                + "        </service>\n")
+                .replace("SVC", VpnManifestFragments.TUNNEL_SERVICE)
+                .replace("PERM", VpnManifestFragments.BIND_VPN_SERVICE)
+                .replace("ACT", VpnManifestFragments.VPN_ACTION);
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> VpnManifestFragments.services(true, spacedClose))
+                        .getMessage().contains("intent-filter"),
+                "another service's action does not belong to ours");
+    }
+
+    @Test
+    public void aCommentedOutDeclarationIsNotADeclaration() {
+        // The lesson the call fragments learned twice: commenting a
+        // declaration out is how a developer disables one, and treating it
+        // as supplied means the manifest ships with neither.
+        String mine = "        <!-- <service android:name=\""
+                + VpnManifestFragments.TUNNEL_SERVICE + "\" /> -->\n";
+        assertTrue(VpnManifestFragments.services(true, mine)
+                .contains(VpnManifestFragments.TUNNEL_SERVICE));
+        String perms = "    <!-- <uses-permission android:name="
+                + "\"android.permission.FOREGROUND_SERVICE\" /> -->\n";
+        assertTrue(VpnManifestFragments.injectPermissions(true, perms)
+                .contains("<uses-permission android:name="
+                        + "\"android.permission.FOREGROUND_SERVICE\""));
+    }
+
+    @Test
+    public void aPermissionNamedAsAValueIsNotADeclaration() {
+        // android:permission on a component names one it REQUIRES -- our own
+        // <service> does exactly that with BIND_VPN_SERVICE.
+        String mine = "        <service android:name=\"com.example.S\""
+                + " android:permission=\"android.permission.FOREGROUND_SERVICE\" />\n";
+        assertTrue(VpnManifestFragments.injectPermissions(true, mine)
+                .contains("<uses-permission android:name="
+                        + "\"android.permission.FOREGROUND_SERVICE\""),
+                "requiring a permission is not declaring it");
+    }
+
+    private static int count(String haystack, String needle) {
+        int n = 0;
+        int at = haystack.indexOf(needle);
+        while (at >= 0) {
+            n++;
+            at = haystack.indexOf(needle, at + needle.length());
+        }
+        return n;
+    }
+}

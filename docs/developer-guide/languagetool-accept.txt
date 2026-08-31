@@ -695,6 +695,20 @@ interop
 # actually wants -- "performs well" does not fit the adjective position.
 performant
 
+# Call management (Call-Management.asciidoc) terminology.
+CallKit
+PushKit
+Telecom
+VoIP
+DTMF
+# Android names the lock screen the keyguard, and the class that shows a
+# ringing screen over it is KeyguardManager.
+keyguard
+
+# VPN (VPN.asciidoc) terminology.
+IKEv2
+IPsec
+
 # -----------------------------------------------------------------------------
 # Skin designer (Skin-Designer.asciidoc) units.
 # -----------------------------------------------------------------------------

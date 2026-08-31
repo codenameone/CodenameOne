@@ -160,6 +160,69 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // native initialization a bounded minute.
             return TEST_TIMEOUT_MS_NATIVE * 2;
         }
+        if (!"HTML5".equals(Display.getInstance().getPlatformName())
+                && testClass instanceof GoogleWebMapScreenshotTest) {
+            // The same poll-cap-inside-the-budget inversion the VectorMap
+            // branch above exists to fix, in a test nobody applied it to.
+            // waitForMapReady polls for 24s and only THEN reports
+            // "SKIPPED reason=map-tiles-never-loaded" -- the outcome the test
+            // was written to produce, because an unreachable Google Maps API
+            // says nothing about the port and a red there is one the suite
+            // cannot act on. Against the 30s default that skip had 5s to
+            // happen in, once form setup, the web view, the 1s settle and the
+            // capture were paid for. The runner declared the timeout first,
+            // so the graceful answer was unreachable and an unreachable
+            // network was indistinguishable from a broken renderer.
+            //
+            // Observed in run 33231956992 on the Metal leg: the first attempt
+            // exhausted its budget and went silent as designed, the retry ran
+            // 34.6s without ever reaching its own 24s cap, and the test failed
+            // at stage=retry-created having never reported anything.
+            //
+            // Derived from the cap rather than restated, exactly as the
+            // VectorMap branch is, so the ordering cannot drift when either
+            // side is tuned. The cost is paid only when the map never loads:
+            // the first attempt's deliberate hand-off to the silent-timeout
+            // retry now waits out this budget instead of the default, so a
+            // tiles-never-load run takes about a minute longer and ends in
+            // a SKIP that names the reason rather than a failure that does
+            // not.
+            return GoogleWebMapScreenshotTest.MAX_WAIT_MS
+                    + TEST_TIMEOUT_MS_NATIVE;
+        }
+        if (!"HTML5".equals(Display.getInstance().getPlatformName())
+                && (testClass instanceof VideoIODecodedFramesScreenshotTest
+                        || testClass instanceof VideoIORoundTripTest)) {
+            // The two tests that drive a real native video encode and decode,
+            // and the only two with a multi-second cost of their own before
+            // anything can go wrong: 7-8s and ~6s respectively on a healthy
+            // simulator, against a 30s default that every other test enters
+            // with essentially empty.
+            //
+            // That headroom is what absorbs this simulator's stalls, and the
+            // stalls are neither rare nor small. In run 33210835375
+            // FillRoundRect -- one rounded rectangle, normally under 0.1s --
+            // sat 26.3s between "awaiting" and its PNG with no log line in
+            // between, and GaussianBlur sat 24.3s. Both passed, because a 25s
+            // stall still fits inside a budget nothing else was using.
+            //
+            // These two have no such slack, and no second chance either:
+            // isRetrySafe() is false for both (their work outlives runTest(),
+            // so resetForRetry() would let a late done() complete the retry),
+            // which is exactly the retry that recovers every other stalled
+            // test. So a stall that costs FillRoundRect nothing fails them.
+            // Both have: on master at 73aa2663e both timed out at 30s
+            // "waiting for DONE stage=created", and on 35bdb4b54a
+            // VideoIODecodedFrames did -- its EDT frame-render phase taking
+            // 22.3s and its worker encode/decode plus capture a further 49.7s,
+            // for a screenshot that then matched its reference. Two serial
+            // phases means paying the stall window twice.
+            //
+            // Three times the default covers the work plus a stall window per
+            // phase. The suite caps are 2100s absolute and 720s idle, so
+            // neither is threatened by a 90s test.
+            return TEST_TIMEOUT_MS_NATIVE * 3;
+        }
         return "HTML5".equals(Display.getInstance().getPlatformName())
                 ? TEST_TIMEOUT_MS_HTML5
                 : TEST_TIMEOUT_MS_NATIVE;

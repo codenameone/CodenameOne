@@ -24,7 +24,9 @@ package com.codename1.builders;
 
 import com.codename1.build.shared.PlatformFeatureCatalog;
 import com.codename1.util.IOSAppIntentsBuilder;
+import com.codename1.util.IOSCallDirectoryExtensionBuilder;
 import com.codename1.util.IOSDocumentProviderExtensionBuilder;
+import com.codename1.util.IOSVpnTunnelExtensionBuilder;
 import com.codename1.util.IOSWalletExtensionBuilder;
 import com.codename1.util.MatterExtensionBuilder;
 import com.codename1.util.IOSWidgetExtensionBuilder;
@@ -234,8 +236,219 @@ public class IPhoneBuilder extends Executor {
     ///
     /// - `buildinRes`: the directory holding CodenameOne_GLViewController.h
     /// - `name`: the define to enable
+    /// Appends one `CN1Call*` entry to the Info.plist injection fragment.
+    ///
+    /// A null or empty value is skipped rather than written as an empty
+    /// string, because the native side reads these as "was this configured"
+    /// and an empty entry answers yes. A key the project already injected is
+    /// left alone: a plist with a duplicate key does not reliably keep either
+    /// value.
+    ///
+    /// @param inject the fragment so far
+    /// @param key the Info.plist key
+    /// @param value the value, or null to leave the key out
+    /// Returns `plist` with every `<!-- ... -->` span removed.
+    ///
+    /// Every "does the project already supply this?" test asks a text
+    /// question of the `ios.plistInject` fragment, and a plain search answers
+    /// yes for a declaration the project has COMMENTED OUT. The plist parser
+    /// drops the comment, so the builder then stands aside for a key that is
+    /// not there -- leaving an app registered for VoIP pushes with no live
+    /// background mode to wake it, or a host plist with no app group for the
+    /// call directory to read. Both fail only at runtime, on a device.
+    ///
+    /// An unterminated comment swallows the rest of the fragment, which is
+    /// what a parser would do with it too.
+    ///
+    /// @param plist the fragment
+    /// @return the fragment with its comments removed
+    static String plistWithoutComments(String plist) {
+        if (plist == null) {
+            return null;
+        }
+        int open = plist.indexOf("<!--");
+        if (open < 0) {
+            return plist;
+        }
+        StringBuilder sb = new StringBuilder();
+        int from = 0;
+        while (open >= 0) {
+            sb.append(plist, from, open);
+            int close = plist.indexOf("-->", open + 4);
+            if (close < 0) {
+                return sb.toString();
+            }
+            from = close + 3;
+            open = plist.indexOf("<!--", from);
+        }
+        sb.append(plist, from, plist.length());
+        return sb.toString();
+    }
+
+    /// @return the fragment, with the entry appended when it was wanted
+    /// Keys the generated Call Directory extension resolves as well, so an
+    /// injected value of the wrong TYPE is a build error rather than the
+    /// project's own choice. See appendCallPlist.
+    private static final String[] CALL_PLIST_COORDINATED = {
+        "CN1CallAppGroup",
+        "CN1CallDirectoryExtensionIdentifier",
+    };
+
+    private static boolean isCoordinatedCallKey(String key) {
+        for (int i = 0; i < CALL_PLIST_COORDINATED.length; i++) {
+            if (CALL_PLIST_COORDINATED[i].equals(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The tag name of the value element a key is given in an
+    /// `ios.plistInject` fragment, or null when the fragment does not give
+    /// that key a value at all.
+    ///
+    /// A plist key is followed by exactly one value element, so this reads
+    /// the FIRST element after the key rather than searching for a type it
+    /// hoped to find. A key given `<false/>` has a value; it is simply not a
+    /// string, and reading "no string here" as "no value here" is what let a
+    /// wrong-typed value through unexamined.
+    static String injectedPlistValueTag(String inject, String key) {
+        String live = plistWithoutComments(inject);
+        int start = plistValueStart(live, key);
+        if (start < 0) {
+            return null;
+        }
+        int nameEnd = plistTagNameEnd(live, start);
+        return nameEnd > start + 1 ? live.substring(start + 1, nameEnd) : null;
+    }
+
+    /// The index of the `<` that opens the value element belonging to `key`,
+    /// or -1 when the fragment does not give that key a value.
+    ///
+    /// One place where "the value of this key" is decided, because every
+    /// reader that worked it out for itself got it wrong in a different way.
+    private static int plistValueStart(String live, String key) {
+        int after = plistKeyNamed(live, key, 0);
+        if (after < 0) {
+            return -1;
+        }
+        int i = after;
+        while (i < live.length() && Character.isWhitespace(live.charAt(i))) {
+            i++;
+        }
+        return i < live.length() && live.charAt(i) == '<' ? i : -1;
+    }
+
+    /// The index just past the `</key>` of the next `<key>` element naming
+    /// `key` at or after `from`, or -1.
+    ///
+    /// Structural rather than a literal `"<key>" + key + "</key>"` search:
+    /// `<key >UIBackgroundModes</key >` is the same plist and only the
+    /// serializer writes the compact spelling, so a project that formatted
+    /// its own ios.plistInject that way had its declaration read as absent
+    /// -- and every decision downstream is about whether the project
+    /// supplies something.
+    ///
+    /// Built on plistKeyEnd and the tag helpers beside it rather than on a
+    /// second scanner of its own: they already handle the self-closing
+    /// `<key/>` and the markup-versus-text distinction, and two readers of
+    /// one format is how the spellings drifted apart in the first place.
+    static int plistKeyNamed(String live, String key, int from) {
+        int at = from;
+        while (at >= 0 && at < live.length()) {
+            at = live.indexOf("<key", at);
+            if (at < 0) {
+                return -1;
+            }
+            int contentStart = plistOpenTagEnd(live, at);
+            int close = contentStart < 0 ? -1
+                    : plistKeyContentEnd(live, at, contentStart);
+            if (contentStart < 0 || close < 0) {
+                return -1;
+            }
+            if (key.equals(live.substring(contentStart, close).trim())) {
+                return plistKeyEnd(live, at);
+            }
+            at = contentStart;
+        }
+        return -1;
+    }
+
+    /// The index just past the tag NAME of the element opening at `start`.
+    ///
+    /// Stops at whitespace, `/` or `>`, so `<string />`, `<string/>` and
+    /// `<string>` all give the same name.
+    private static int plistTagNameEnd(String live, int start) {
+        int end = start + 1;
+        while (end < live.length()) {
+            char c = live.charAt(end);
+            if (c == '>' || c == '/' || Character.isWhitespace(c)) {
+                break;
+            }
+            end++;
+        }
+        return end > start + 1 ? end : -1;
+    }
+
+    private static String appendCallPlist(String inject, String key,
+            String value) throws BuildException {
+        // The EXACT key, not a substring of the fragment: a project with an
+        // unrelated MyCN1CallAppGroupSetting suppressed generation entirely,
+        // and the host plist then carried neither the group nor the extension
+        // identifier -- so every directory write and reload failed at runtime.
+        // Tested against the LIVE fragment and appended to the original: a
+        // project that commented an old CN1CallAppGroup out was treated as
+        // supplying it, so neither the comment nor a generated key reached
+        // the host plist.
+        if (value == null || value.trim().length() == 0) {
+            return inject;
+        }
+        if (plistKeyNamed(plistWithoutComments(inject), key, 0) >= 0) {
+            String tag = injectedPlistValueTag(inject, key);
+            if (isCoordinatedCallKey(key) && tag != null
+                    && !"string".equals(tag)) {
+                // A VALID plist value of the wrong type -- <false/>, an
+                // <array>, a <dict>. The key check has already suppressed
+                // generation, so the host plist carries a CN1CallAppGroup
+                // that is a boolean: the app cannot address the container the
+                // generated extension reads, and every directory write fails
+                // on a device with nothing in the build to see. The other
+                // call keys are left alone, because the injected value IS
+                // what the native code reads and nothing else resolves it.
+                throw new BuildException("ios.plistInject sets " + key
+                        + " to a <" + tag + "> value, but this key has to be"
+                        + " a <string> -- the generated Call Directory"
+                        + " extension resolves the same value and the two"
+                        + " have to agree. Remove the key from"
+                        + " ios.plistInject, or give it the string '"
+                        + value.trim() + "'.");
+            }
+            return inject;
+        }
+        return inject + "\n<key>" + key + "</key><string>"
+                + escapePlistText(value.trim()) + "</string>";
+    }
+
     private void enableNearbyDefine(File buildinRes, String name)
             throws BuildException {
+        enableFeatureDefine(buildinRes, name, "com.codename1.nearby");
+    }
+
+    /// Uncomments a `//#define` in the staged iOS header, failing loudly when
+    /// the marker is not there.
+    ///
+    /// Generalised from the nearby version so the call and VPN natives get
+    /// the same guarantee rather than a second copy of it. The guarantee is
+    /// the point: `replaceInFile` is a `String.replace`, so a marker that is
+    /// absent is a silent no-op, and the build would finish with the native
+    /// compiled out -- the app ships, the API reports the feature
+    /// unsupported, and nothing anywhere says why.
+    ///
+    /// @param buildinRes the staged native sources
+    /// @param name the define to enable
+    /// @param apiName the package that earned it, for the error message
+    private void enableFeatureDefine(File buildinRes, String name,
+            String apiName) throws BuildException {
         File header = new File(buildinRes, "CodenameOne_GLViewController.h");
         try {
             // Checked, because replaceInFile is a String.replace and a
@@ -251,12 +464,12 @@ public class IPhoneBuilder extends Executor {
                     // Already enabled, which is the same outcome.
                     return;
                 }
-                throw new BuildException("This app uses"
-                        + " com.codename1.nearby, which needs " + name
+                throw new BuildException("This app uses "
+                        + apiName + ", which needs " + name
                         + " enabled in CodenameOne_GLViewController.h, and"
                         + " the staged header does not carry that marker."
-                        + " The iOS port in use is older than the nearby"
-                        + " support or has been overridden; build against a"
+                        + " The iOS port in use is older than that support"
+                        + " or has been overridden; build against a"
                         + " port that has it.");
             }
             replaceInFile(header, "//#define " + name, "#define " + name);
@@ -554,7 +767,197 @@ public class IPhoneBuilder extends Executor {
         return false;
     }
 
-    private static String escapeNearbyPlistText(String value) {
+    /// Escapes text going into a plist `<string>`.
+    ///
+    /// Named for the plist rather than for nearby, because the call provider
+    /// block needs the same escaping and a second copy of three replaces is
+    /// a second place to forget one.
+    /// The identifier the Call Directory appex will actually carry.
+    ///
+    /// Resolved in one place because two of them have to agree: the target's
+    /// PRODUCT_BUNDLE_IDENTIFIER, and the CN1CallDirectoryExtensionIdentifier
+    /// the HOST plist carries, which is the string the native reload request
+    /// addresses. Reading the override in only the first left the app asking
+    /// the system to reload an extension identifier nothing had installed,
+    /// and the request fails with nothing to see in the app.
+    private static String callDirectoryBundleId(BuildRequest request) {
+        String override = request.getArg(
+                "ios.call.directory.buildSettings.PRODUCT_BUNDLE_IDENTIFIER",
+                null);
+        if (override != null && override.trim().length() > 0) {
+            String value = override.trim();
+            // NO Xcode substitution. Xcode expands $(...) for the target it
+            // builds and nothing expands it here, so the same hint became
+            // one identifier in PRODUCT_BUNDLE_IDENTIFIER and a literal
+            // "$(APP_BUNDLE_IDENTIFIER).calldirectory" in the host plist and
+            // the profile check -- the app then asking the system to reload
+            // an extension identifier nothing installed, and the archive
+            // validated against an App ID that is not the one it ships.
+            //
+            // Refused rather than expanded: resolving these means
+            // reimplementing Xcode's setting evaluation, and getting it
+            // subtly wrong here would produce the same disagreement with no
+            // hint that a substitution was involved.
+            //
+            // Unchecked, as the manifest fragments' refusals are. This is a
+            // static helper two callers deep and the alternative is a
+            // throws clause threaded up through methods that have nothing to
+            // do with it.
+            if (value.indexOf("$(") >= 0 || value.indexOf("${") >= 0) {
+                throw new IllegalArgumentException("ios.call.directory"
+                        + ".buildSettings.PRODUCT_BUNDLE_IDENTIFIER is '"
+                        + value + "'. Xcode build-setting substitutions"
+                        + " cannot be used here: the same string is written"
+                        + " into the host Info.plist and checked against the"
+                        + " provisioning profile, and neither expands it, so"
+                        + " the extension the app asks the system to reload"
+                        + " would not be the one it built. Give the bundle"
+                        + " identifier itself.");
+            }
+            // INSIDE the host's namespace. Apple requires an embedded app
+            // extension's bundle identifier to be the containing app's plus
+            // a suffix, and rejects the archive at embedded-binary
+            // validation otherwise -- at upload, long after every check here
+            // has passed, and with a message about the binary rather than
+            // about this hint. A matching extension profile does not save
+            // it: the profile can be issued for an App ID that is simply not
+            // allowed to sit inside this app.
+            String host = request.getPackageName();
+            if (host != null && host.length() > 0
+                    && !(value.startsWith(host + ".")
+                            && value.length() > host.length() + 1)) {
+                throw new IllegalArgumentException("ios.call.directory"
+                        + ".buildSettings.PRODUCT_BUNDLE_IDENTIFIER is '"
+                        + value + "', which is not inside '" + host + "'."
+                        + " An app extension's bundle identifier has to be"
+                        + " the containing app's followed by a suffix, so"
+                        + " Apple would reject the archive when it validates"
+                        + " the embedded binary. Use something like '" + host
+                        + ".calldirectory'.");
+            }
+            return value;
+        }
+        return IOSCallDirectoryExtensionBuilder.bundleId(
+                request.getPackageName());
+    }
+
+    /// The values of a comma or space separated `ios.background_modes`
+    /// hint, so a mode is matched whole. `"remote-notification"` contains
+    /// neither `"voip"` nor any other mode as a substring, but
+    /// `"myvoipmode"` does, and a substring test on the raw hint reads that
+    /// as voip already being present.
+    static java.util.List<String> listedModes(String hint) {
+        java.util.ArrayList<String> out = new java.util.ArrayList<String>();
+        if (hint == null) {
+            return out;
+        }
+        java.util.StringTokenizer tok =
+                new java.util.StringTokenizer(hint, ", \t\r\n");
+        while (tok.hasMoreTokens()) {
+            String t = tok.nextToken().trim();
+            if (t.length() > 0) {
+                out.add(t);
+            }
+        }
+        return out;
+    }
+
+    /// Whether an `ios.plistInject` fragment declares `voip` **inside its
+    /// UIBackgroundModes array**.
+    ///
+    /// Searching the whole fragment was wrong in both directions: a URL
+    /// scheme called `myvoipapp` elsewhere in the plist passed a fragment
+    /// whose background modes were only `remote-notification`, and the app
+    /// then shipped unable to be woken by a call.
+    static boolean injectedModesIncludeVoip(String injected) {
+        if (injected == null) {
+            return false;
+        }
+        // Live elements only. A modes array the project commented out is not
+        // one it supplies, and reading it as supplied skipped generating the
+        // real one -- so the app shipped with no voip mode at all.
+        String live = plistWithoutComments(injected);
+        int after = plistKeyNamed(live, "UIBackgroundModes", 0);
+        while (after >= 0) {
+            // The key's IMMEDIATE value. Scanning forward for the next
+            // <array> anywhere meant a UIBackgroundModes given some other
+            // value -- a <string>, a <false/> -- was answered from an
+            // unrelated later array that happened to contain "voip", so the
+            // fragment was accepted as already declaring the mode and the
+            // real one was never generated. The app then could not be woken
+            // by a call, which is the whole point of the mode.
+            int probe = after;
+            while (probe < live.length()
+                    && Character.isWhitespace(live.charAt(probe))) {
+                probe++;
+            }
+            int open = plistElementOpen(live, probe, "array");
+            if (open > 0) {
+                int close = live.indexOf("</array", open);
+                if (close < 0) {
+                    return false;
+                }
+                String body = live.substring(open, close);
+                if (arrayHasString(body, "voip")) {
+                    return true;
+                }
+                after = plistKeyNamed(live, "UIBackgroundModes", close);
+                continue;
+            }
+            after = plistKeyNamed(live, "UIBackgroundModes", after);
+        }
+        return false;
+    }
+
+    /// The index just past a `<name ...>` start tag beginning at `from`, or
+    /// -1 when the text there is not that element.
+    ///
+    /// `<array >` is valid XML and `<array>` is what the serializer writes,
+    /// so a literal comparison rejected a fragment that already declared
+    /// what it was being asked for -- and the build then refused a
+    /// configuration that was correct, which is a worse answer than the one
+    /// the literal test was added to replace.
+    private static int plistElementOpen(String live, int from, String name) {
+        if (from < 0 || from >= live.length() || live.charAt(from) != '<') {
+            return -1;
+        }
+        int nameEnd = plistTagNameEnd(live, from);
+        if (nameEnd < 0 || !name.equals(live.substring(from + 1, nameEnd))) {
+            return -1;
+        }
+        int at = nameEnd;
+        while (at < live.length() && live.charAt(at) != '>') {
+            if (live.charAt(at) == '/') {
+                // Self-closing, so it has no body to look into.
+                return -1;
+            }
+            at++;
+        }
+        return at < live.length() ? at + 1 : -1;
+    }
+
+    /// Whether a plist `<array>` body carries exactly this `<string>` value.
+    private static boolean arrayHasString(String body, String value) {
+        int at = body.indexOf('<');
+        while (at >= 0) {
+            int open = plistElementOpen(body, at, "string");
+            if (open > 0) {
+                int end = body.indexOf("</string", open);
+                if (end < 0) {
+                    return false;
+                }
+                if (value.equals(body.substring(open, end).trim())) {
+                    return true;
+                }
+                at = body.indexOf('<', end + 1);
+                continue;
+            }
+            at = body.indexOf('<', at + 1);
+        }
+        return false;
+    }
+
+    private static String escapePlistText(String value) {
         return value.replace("&", "&amp;").replace("<", "&lt;")
                 .replace(">", "&gt;");
     }
@@ -612,7 +1015,7 @@ public class IPhoneBuilder extends Executor {
             if (v.length() == 0) {
                 continue;
             }
-            b.append("<string>").append(escapeNearbyPlistText(v))
+            b.append("<string>").append(escapePlistText(v))
                     .append("</string>");
         }
         b.append("</array>");
@@ -815,6 +1218,63 @@ public class IPhoneBuilder extends Executor {
     private boolean usesNearbyRanging;
     private boolean usesNearbyTransport;
     private boolean usesNearbyCompanion;
+
+    // Tracked separately for the reason the nearby flags are: each buys a
+    // different amount. Owning a call links CallKit; ringing while not
+    // running adds PushKit and the voip background mode, which Apple rejects
+    // an app for carrying without a working call implementation; labelling
+    // somebody else's caller needs neither and gets its own extension.
+
+    /// Class-name prefixes whose presence in a submitted library counts the
+    /// same as presence in the application's own classes.
+    ///
+    /// The builder's scanner reads only the app's compiled classes, so a
+    /// feature used exclusively by a cn1lib was invisible to it: no
+    /// permissions, no services, no native defines, and a library calling an
+    /// API that was never switched on.
+    private static final String[] CALL_VPN_LIB_PREFIXES = {
+        "com/codename1/call/session/",
+        "com/codename1/call/voip/",
+        "com/codename1/call/directory/",
+        "com/codename1/vpn/profile/",
+        "com/codename1/vpn/tunnel/",
+    };
+
+    /// Folds call and VPN usage found inside submitted libraries into the
+    /// scanner's flags.
+    ///
+    /// @param libsDir the submitted-libraries folder
+    private java.util.Set<String> foldInCallAndVpnLibraryUsage(
+            java.io.File libsDir) {
+        java.util.Set<String> found =
+                LibraryClassPrefixScan.prefixesFound(libsDir,
+                        CALL_VPN_LIB_PREFIXES);
+        if (found.isEmpty()) {
+            return found;
+        }
+        debug("Call/VPN usage found inside a submitted library: " + found);
+        usesCallSession |= found.contains("com/codename1/call/session/");
+        usesCallVoip |= found.contains("com/codename1/call/voip/");
+        usesCallDirectory |= found.contains("com/codename1/call/directory/");
+        usesManagedVpn |= found.contains("com/codename1/vpn/profile/");
+        usesCustomTunnel |= found.contains("com/codename1/vpn/tunnel/");
+        return found;
+    }
+
+    private boolean usesCallSession;
+    private boolean usesCallVoip;
+    private boolean usesCallDirectory;
+    private boolean usesManagedVpn;
+
+    /// Whether the app referenced com.codename1.vpn.tunnel.
+    ///
+    /// Referencing it is NOT enough to generate the extension: see
+    /// customTunnelEnabled, which also requires the project to say it holds
+    /// the Network Extension grant.
+    private boolean usesCustomTunnel;
+
+    /// Whether the Info.plist needs the CN1Call* provider block.
+    private boolean callPlistWanted;
     private boolean usesCn1Vision;
     private boolean usesCn1Language;
     private boolean usesCn1Inference;
@@ -918,6 +1378,12 @@ public class IPhoneBuilder extends Executor {
     /// The app group the Matter extension and its host share. Resolved
     /// alongside the extension and read again when the target is written.
     private String matterAppGroup;
+
+    /// The App Group the Call Directory extension and the app share.
+    private String callDirectoryAppGroup;
+
+    /// Whether the Call Directory extension target is generated.
+    private boolean callDirectoryExtensionEnabled;
 
     /**
      * Whether the API scan saw {@code com.codename1.wearable}.
@@ -1387,6 +1853,28 @@ public class IPhoneBuilder extends Executor {
             }
         }
         return java.util.Collections.singletonList(watchMain);
+    }
+
+
+    /**
+     * Whether an explicit {@code ios.includePush} turns push OFF.
+     *
+     * <p>The exact complement of the normalisation this class performs on the
+     * same hint: anything that is not a trimmed, case-insensitive
+     * {@code "true"} is rewritten to {@code "false"}, so {@code " false "},
+     * {@code "0"} and {@code "no"} all disable push. A conflict check that
+     * compared against the literal {@code "false"} caught none of them.</p>
+     *
+     * <p>Extracted so the rule can be tested. It lives inside a build method
+     * that needs a signing identity and a provisioning profile to reach,
+     * which is why the hole was open long enough to be reported rather than
+     * caught: nothing could exercise the decision on its own.</p>
+     *
+     * @param hint the raw hint, or null when the project did not set one
+     * @return true when the project explicitly disabled push
+     */
+    static boolean pushExplicitlyDisabled(String hint) {
+        return hint != null && !"true".equalsIgnoreCase(hint.trim());
     }
 
     @Override
@@ -2047,6 +2535,21 @@ public class IPhoneBuilder extends Executor {
                     // Augmented reality (com.codename1.ar.*). Gated on actual
                     // usage so ARKit/SceneKit and the CN1AR natives are only
                     // built for apps that reference the AR API.
+                    if (cls.indexOf("com/codename1/call/session/") == 0) {
+                        usesCallSession = true;
+                    }
+                    if (cls.indexOf("com/codename1/call/voip/") == 0) {
+                        usesCallVoip = true;
+                    }
+                    if (cls.indexOf("com/codename1/call/directory/") == 0) {
+                        usesCallDirectory = true;
+                    }
+                    if (cls.indexOf("com/codename1/vpn/profile/") == 0) {
+                        usesManagedVpn = true;
+                    }
+                    if (cls.indexOf("com/codename1/vpn/tunnel/") == 0) {
+                        usesCustomTunnel = true;
+                    }
                     if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
                         usesNearbyRanging = true;
                     }
@@ -2401,6 +2904,21 @@ public class IPhoneBuilder extends Executor {
         // undefined and the frameworks unlinked. The feature was simply
         // absent from a build that looked clean. The database scan above
         // reads both trees for the same reason.
+        java.util.Set<String> callVpnFromLibraries =
+                foldInCallAndVpnLibraryUsage(buildinRes);
+        // Consumed into the catalog as well as folded into the flags. The
+        // flags decide the defines and the extension targets; the CATALOG is
+        // what adds CallKit, PushKit, AVFoundation, NetworkExtension and the
+        // microphone privacy string. Setting only the flags left a
+        // library-only app with the defines enabled and the frameworks
+        // unlinked -- a build that fails late for a reason nothing in it
+        // names, exactly as the nearby comment below describes.
+        //
+        // The entry prefix IS the key: the catalog matches a consumed class
+        // by startsWith, and a prefix starts with itself.
+        for (String callVpnPrefix : callVpnFromLibraries) {
+            aiAcc.consume(callVpnPrefix);
+        }
         NearbyManifestFragments.NearbyUsage libraryNearby =
                 NearbyManifestFragments.scanForNearbyUsage(buildinRes);
         if (!libraryNearby.isEmpty()) {
@@ -3339,6 +3857,67 @@ public class IPhoneBuilder extends Executor {
 
 
 
+        // BEFORE includePush is read, not after. A VoIP push IS a push, and
+        // this copy has no pushV3 -- it reads ios.includePush directly.
+        // Turning the hint on is what gets the push entitlement onto an app
+        // that never touched PushClient.
+        //
+        // It used to be set further down, after this field had been computed
+        // AND after the false value had already stripped the push source
+        // defines, so the automatic enablement did nothing at all unless the
+        // project had set the hint itself -- which is the one case that
+        // needed no inference. The class scan runs earlier in this method, so
+        // usesCallVoip is already known here.
+        // ONE spelling of the hint from here down. The readers below
+        // disagree -- one uses equals("true") and the calculation uses
+        // equalsIgnoreCase -- so "TRUE" skipped the profile requirement
+        // and then resolved to false anyway, producing a build with
+        // PushKit, the voip background mode and no push entitlement.
+        // Normalised once rather than asking every reader to agree; a
+        // value that is not a case-insensitive true was already read as
+        // false by all of them.
+        String pushHint = request.getArg("ios.includePush", null);
+        if (pushHint != null) {
+            request.putArgument("ios.includePush",
+                    "true".equalsIgnoreCase(pushHint.trim())
+                            ? "true" : "false");
+        }
+        // A VoIP app that turned push OFF is a contradiction the build
+        // cannot resolve for it. Inferring the default is not enough: an
+        // explicit ios.includePush=false still wins below, so the app got
+        // PushKit compiled in and the voip background mode declared while
+        // includePush stayed false -- signed, installable, and unable to
+        // receive the one kind of push the integration exists for.
+        //
+        // Refused rather than overridden: the hint is the project saying
+        // something deliberate, and quietly ignoring it would ship a build
+        // that disagrees with its own configuration. The way out is to
+        // remove the hint or to stop referencing the package.
+        // NOT normalised, and NOT a literal "false". The normalisation
+        // above rewrites any explicit value that is not a trimmed,
+        // case-insensitive "true" into "false", so " false ", "0" and
+        // "no" all disable push -- and a check comparing against the
+        // literal caught none of them. In the daemon the same check
+        // runs BEFORE that normalisation, so it saw the raw value and
+        // the hole was open there for every spelling.
+        //
+        // The predicate is the exact complement of the normalisation
+        // rather than a list of the values it rejects, so the two
+        // cannot come to disagree and the check does not depend on
+        // which of them runs first.
+        if (usesCallVoip && pushExplicitlyDisabled(
+                request.getArg("ios.includePush", null))) {
+            throw new BuildException("This app uses com.codename1.call.voip,"
+                    + " which rings through a VoIP push, but ios.includePush"
+                    + " does not read as true. The build would carry PushKit and the voip"
+                    + " background mode with no push entitlement, so no"
+                    + " incoming call could ever arrive. Remove"
+                    + " ios.includePush=false, or stop referencing"
+                    + " com.codename1.call.voip.");
+        }
+        if (usesCallVoip && request.getArg("ios.includePush", null) == null) {
+            request.putArgument("ios.includePush", "true");
+        }
         includePush = request.getArg("ios.includePush", "false").equalsIgnoreCase("true");
 
         if ((request.getPushCertificate() != null || includePush) || usesLocalNotifications) {
@@ -4545,6 +5124,359 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // System call integration: uncomment CN1_INCLUDE_CALL and
+            // whichever sub-defines the app earned, so CN1Call.m compiles in
+            // only the halves it asked for. The frameworks come from the
+            // PlatformFeatureCatalog entries through the loop below; only the
+            // defines, the background mode and the Info.plist block are
+            // decided here, because none of those is something a declarative
+            // table can express.
+            if (usesCallSession || usesCallVoip || usesCallDirectory) {
+                enableFeatureDefine(buildinRes, "CN1_INCLUDE_CALL",
+                        "com.codename1.call");
+                if (usesCallVoip) {
+                    enableFeatureDefine(buildinRes, "CN1_CALL_VOIP",
+                            "com.codename1.call.voip");
+                    // ios.includePush is inferred where includePush is
+                    // computed, far above: setting it here was too late for
+                    // every decision that had already read the field. The
+                    // cloud builder does the same inference through pushV3,
+                    // where it ALSO makes the provisioning check demand Push
+                    // Notifications.
+                    // The voip background mode, added only for an app that
+                    // referenced the push package. Apple rejects an app that
+                    // carries it without a working call implementation, which
+                    // is the entire reason com.codename1.call.voip is a
+                    // separate package from com.codename1.call.session.
+                    // Only when the project is not already declaring the
+                    // array itself. Plist assembly REFUSES a build that uses
+                    // both ios.background_modes and a UIBackgroundModes in
+                    // ios.plistInject, so setting the hint unconditionally
+                    // broke apps whose injected array already carried voip --
+                    // a configuration that worked until the scanner noticed
+                    // com.codename1.call.voip.
+                    // COMMENTS STRIPPED: a commented-out UIBackgroundModes
+                    // array still matched both tests below, so the builder
+                    // skipped ios.background_modes for a key the parser had
+                    // already dropped -- an app registered for VoIP pushes
+                    // that nothing wakes.
+                    String injected = plistWithoutComments(
+                            request.getArg("ios.plistInject", ""));
+                    // The EXACT key: a fragment carrying MyUIBackgroundModes
+                    // matched a bare substring, so the builder treated the
+                    // background modes as user supplied, skipped
+                    // ios.background_modes, and left the real key absent --
+                    // an app registered for VoIP pushes that nothing wakes.
+                    if (plistKeyNamed(injected, "UIBackgroundModes", 0) >= 0) {
+                        if (!injectedModesIncludeVoip(injected)) {
+                            // Failed rather than warned. The two mechanisms
+                            // cannot be combined -- plist assembly refuses a
+                            // build that uses both -- so continuing would
+                            // ship an app that registers for VoIP pushes and
+                            // is never woken by one. That is precisely the
+                            // failure nobody can diagnose from a device.
+                            throw new BuildException("This app uses"
+                                    + " com.codename1.call.voip, which needs"
+                                    + " \"voip\" in UIBackgroundModes. The"
+                                    + " ios.plistInject build hint declares"
+                                    + " UIBackgroundModes itself and the two"
+                                    + " cannot be combined, so add <string>voip"
+                                    + "</string> to that array.");
+                        }
+                    } else {
+                        String modes = request.getArg("ios.background_modes", "");
+                        if (!listedModes(modes).contains("voip")) {
+                            request.putArgument("ios.background_modes",
+                                    modes.length() == 0 ? "voip"
+                                            : modes + ",voip");
+                        }
+                    }
+                }
+                if (usesCallDirectory) {
+                    enableFeatureDefine(buildinRes, "CN1_CALL_DIRECTORY",
+                            "com.codename1.call.directory");
+                    // The extension is a separate process and cannot see this
+                    // one's memory, so the numbers reach it through a shared
+                    // App Group -- and CN1Call.m reads the group's name and
+                    // the extension's bundle id out of Info.plist. Without
+                    // all three the API compiled, linked, and then failed
+                    // every setEntries with "No App Group is configured".
+                    callDirectoryExtensionEnabled = true;
+                    // A present-but-empty hint is not an override: it
+                    // produced an empty App Group entitlement, no
+                    // CN1CallAppGroup in the host plist, and a profile check
+                    // that treated the empty requirement as satisfied -- so
+                    // the build reached signing with no shared container at
+                    // all.
+                    String groupHint = request.getArg("ios.call.appGroup", "");
+                    String group = groupHint.trim().length() > 0
+                            ? groupHint.trim()
+                            : IOSCallDirectoryExtensionBuilder
+                                    .defaultAppGroup(request.getPackageName());
+                    callDirectoryAppGroup = group;
+                    String appGroups = request.getArg("ios.app_groups", "");
+                    if (!declaresAppGroup(appGroups, group)) {
+                        // SPACE, not a comma. generateEntitlements splits
+                        // ios.app_groups on " " alone, so a comma-joined pair
+                        // came out as a single <string> "group.a,group.b"
+                        // that matches neither configured group -- and the
+                        // host then cannot reach the container it shares with
+                        // the extension. declaresAppGroup above tolerates
+                        // either separator when READING, which is what hid
+                        // this.
+                        request.putArgument("ios.app_groups",
+                                appGroups.trim().length() == 0 ? group
+                                        : appGroups.trim() + " " + group);
+                    }
+                }
+                // The call provider's identity is written into Info.plist
+                // further down, in the plist assembly, because native code
+                // needs it BEFORE any Java runs: on a cold start a VoIP push
+                // must be reported to CallKit before this app's own code has
+                // had a chance to configure anything, so the name, icon and
+                // ringtone have to be baked into the bundle.
+                callPlistWanted = true;
+                // SESSION or VOIP only. A directory-only app owns no calls
+                // and never reaches AVAudioSession: it hands a list of
+                // numbers to an extension and stops there, and the catalog
+                // entry for com.codename1.call.directory says so by linking
+                // CallKit and declaring no microphone string. Injecting the
+                // disclosure for it shipped a voice-capture claim the app
+                // cannot act on, and would REFUSE a project that set the
+                // description to false -- rejecting it for declining a
+                // disclosure it genuinely does not need. The Android path
+                // already omits RECORD_AUDIO for directory-only usage.
+                //
+                // Straight into privacyUsageDescriptions rather than through
+                // putArgument: the sweep that turns ios.NS*UsageDescription
+                // args into that map runs EARLIER in this method, and the
+                // plist is rendered from the map alone -- so the argument
+                // this used to set was never read, and the safety net it was
+                // meant to be did nothing. Which mattered: an app that
+                // reaches the call API only from a cn1lib sets
+                // usesCallSession through foldInCallAndVpnLibraryUsage but
+                // produces no PlatformFeatureCatalog hit, so the catalog's
+                // own microphone entry never fired either and the build
+                // shipped with no purpose string at all. The calendar and
+                // reminders strings are placed the same way.
+                if (usesCallSession || usesCallVoip) {
+                    // A BLANK value is not a purpose string. The argument
+                    // sweep has already put the key in this map, so testing
+                    // containsKey alone kept an empty
+                    // ios.NSMicrophoneUsageDescription and the renderer
+                    // emitted an empty <string> -- which iOS treats exactly
+                    // as a missing one and terminates the app for. Blank
+                    // falls back to the default, as an absent hint does.
+                    String micPurpose = effectivePurposeString(request,
+                            "ios.NSMicrophoneUsageDescription");
+                    if (micPurpose != null
+                            && micPurpose.trim().length() == 0) {
+                        micPurpose = null;
+                    }
+                    if ("false".equalsIgnoreCase(micPurpose)) {
+                        // Suppressing it outright is a decision this build
+                        // cannot honour: a call app reaches AVAudioSession's
+                        // record prompt by definition, and iOS TERMINATES an
+                        // app that asks for a protected resource with no
+                        // purpose string. Failing says so where it can still
+                        // be acted on, as the commissioning path does.
+                        throw new BuildException(
+                                "This app uses com.codename1.call, which"
+                                + " reaches the microphone, but its"
+                                + " NSMicrophoneUsageDescription is false,"
+                                + " empty, or -- through ios.plistInject --"
+                                + " not a string at all. iOS terminates an"
+                                + " app that asks for the microphone with no"
+                                + " purpose string. Supply one through"
+                                + " ios.NSMicrophoneUsageDescription.");
+                    }
+                    String existingMic = privacyUsageDescriptions.get(
+                            "NSMicrophoneUsageDescription");
+                    if (existingMic == null
+                            || existingMic.trim().length() == 0) {
+                        privacyUsageDescriptions.put(
+                                "NSMicrophoneUsageDescription",
+                                micPurpose != null ? micPurpose
+                                        : "Carries your voice during a call.");
+                    }
+                }
+                if ((usesCallSession || usesCallVoip)
+                        && CallManifestFragments.videoRequested(
+                                request.getArg("ios.call.video", null),
+                                request.getArg("call.video", null))) {
+                    // iOS refuses the camera prompt outright without a
+                    // purpose string, so a video app that asked for CAMERA
+                    // got a denial it could not clear. Behind the project's
+                    // own statement that it does video, unlike the
+                    // microphone -- and behind owning calls at all, because a
+                    // directory app has no media of any kind.
+                    //
+                    // Blank and false handled exactly as the microphone's
+                    // are, and placed in the map for the same reason. Here
+                    // the contradiction is sharper still: the project has
+                    // just said it does video.
+                    String cameraPurpose = effectivePurposeString(request,
+                            "ios.NSCameraUsageDescription");
+                    if (cameraPurpose != null
+                            && cameraPurpose.trim().length() == 0) {
+                        cameraPurpose = null;
+                    }
+                    if ("false".equalsIgnoreCase(cameraPurpose)) {
+                        throw new BuildException(
+                                "This app sets ios.call.video, so it asks for"
+                                + " the camera, but its"
+                                + " NSCameraUsageDescription is false, empty,"
+                                + " or -- through ios.plistInject -- not a"
+                                + " string at all. iOS refuses the camera"
+                                + " prompt with no purpose string and the"
+                                + " denial cannot be cleared. Supply one"
+                                + " through ios.NSCameraUsageDescription, or"
+                                + " turn ios.call.video off.");
+                    }
+                    String existingCamera = privacyUsageDescriptions.get(
+                            "NSCameraUsageDescription");
+                    if (existingCamera == null
+                            || existingCamera.trim().length() == 0) {
+                        privacyUsageDescriptions.put("NSCameraUsageDescription",
+                                cameraPurpose != null ? cameraPurpose
+                                        : "Carries the video of a call.");
+                    }
+                }
+            }
+
+            // A packet tunnel the app implements. On iOS it has no host
+            // yet; see the refusal below.
+            if (usesCustomTunnel) {
+                log("This app references com.codename1.vpn.tunnel. On iOS"
+                        + " that package has no host yet, so"
+                        + " Tunnels.isSupported() answers false; the Android"
+                        + " build of the same app runs tunnels normally.");
+            }
+            if (usesCustomTunnel
+                    && "true".equals(request.getArg("ios.vpn.tunnel",
+                            "false"))) {
+                // REFUSED, and this is the honest state of the iOS half.
+                //
+                // The extension has to carry a virtual machine to run the
+                // application's VpnTunnel, so the target compiles the app's
+                // translated sources. Those include the iOS port's own
+                // natives, and IOSNative.m calls UIApplicationMain and
+                // [UIApplication sharedApplication] -- which
+                // UIApplication.h declares NS_EXTENSION_UNAVAILABLE_IOS. An
+                // app-extension target compiles with
+                // APPLICATION_EXTENSION_API_ONLY, so those are errors, and
+                // turning that setting off would produce a binary Apple
+                // rejects at submission for using them.
+                //
+                // Excluding those natives does not work either: the
+                // translated classes reference them, and every source in the
+                // target is compiled rather than pulled in on demand.
+                //
+                // What this needs is a translation ROOTED AT THE TUNNEL, so
+                // the extension carries the tunnel's dependencies and not
+                // the application shell. That is ByteCodeTranslator work
+                // rather than a build setting, and until it exists this
+                // build refuses instead of generating a target that cannot
+                // compile -- or, worse, one that compiles and is rejected.
+                //
+                // Everything else here is ready for it: the provider, the
+                // entitlements, the Info.plist, the embed phase and the
+                // main-symbol rename are generated and unit tested. Android
+                // is unaffected and runs tunnels today.
+                throw new BuildException("ios.vpn.tunnel is not supported"
+                        + " yet. A packet tunnel on iOS runs in a Network"
+                        + " Extension that has to carry a virtual machine,"
+                        + " and the translation that would give it one"
+                        + " without the application shell -- which uses"
+                        + " UIKit APIs an extension may not call -- is not"
+                        + " implemented. com.codename1.vpn.tunnel works on"
+                        + " Android; on iOS, Tunnels.isSupported() answers"
+                        + " false. Remove the hint to build the rest of the"
+                        + " app.");
+            }
+            // VPN configuration management.
+            //
+            // Both entitlements here are single-element arrays, which the
+            // generic ios.entitlements.<key> namespace cannot encode -- it
+            // reads a value with no newline as a <string> -- so they are
+            // written in the array form the namespace does understand.
+            if (usesManagedVpn) {
+                enableFeatureDefine(buildinRes, "CN1_INCLUDE_VPN",
+                        "com.codename1.vpn");
+                // Personal VPN. Self-serve: any paid account can enable the
+                // capability on the App ID, but it must BE enabled or the app
+                // will not sign.
+                //
+                // Deliberately the only entitlement written here. There is no
+                // packet-tunnel branch: com.codename1.vpn.tunnel does not
+                // exist, because a tunnel body cannot be written in this
+                // framework -- the extension it runs in has no Java virtual
+                // machine. Injecting the specially-granted networkextension
+                // entitlement for a package nobody can import would fail
+                // codesigning for no reason anyone could act on.
+                //
+                // The bare value is correct and a newline must NOT be added
+                // to force the array. This key is in the renderer's
+                // ARRAY_VALUED_ENTITLEMENTS set, so it is emitted as an
+                // <array> however many entries it has -- which is the only
+                // thing that CAN work here, because the newline convention
+                // used for multi-element keys like the NFC formats cannot
+                // express a ONE element array: the value is trimmed before it
+                // is split, so "allow-vpn\n" and "allow-vpn" are the same
+                // string and both used to come out as a <string>. Writing
+                // "allow-vpn\n" here would either change nothing or, without
+                // the trim, emit an empty second element that fails
+                // codesigning differently.
+                //
+                // The RAW door -- ios.entitlementsInject, which replaces a
+                // generated key rather than adding to it -- is checked in the
+                // BuildDaemon twin and deliberately NOT here. Nothing in this
+                // file reads that hint; the fragment is passed through and
+                // merged by buildNamespacedEntitlements, which lives only
+                // there. A copy here would be a check over a value this
+                // builder never sees, so a twin diff showing this asymmetry
+                // is reading the right answer.
+                String vpnEntitlement = request.getArg("ios.entitlements.com"
+                        + ".apple.developer.networking.vpn.api", null);
+                // A BLANK hint counts as absent. buildNamespacedEntitlements
+                // skips an empty value entirely, so a configuration that set
+                // this key to "" or to whitespace suppressed the generated
+                // entry here and then contributed nothing itself -- shipping
+                // an app that uses com.codename1.vpn.profile with no Personal
+                // VPN entitlement, which fails only at runtime on a device.
+                if (vpnEntitlement == null
+                        || vpnEntitlement.trim().length() == 0) {
+                    request.putArgument("ios.entitlements.com.apple.developer"
+                            + ".networking.vpn.api", "allow-vpn");
+                } else if (!"allow-vpn".equals(vpnEntitlement.trim())) {
+                    // A NON-BLANK override is the same hole one step over.
+                    // Blank was handled above because it silently suppressed
+                    // the entitlement; a value like "false" survives instead,
+                    // and the array renderer emits <string>false</string> --
+                    // an entitlement no profile grants, so the archive fails
+                    // at codesign in a message about the app rather than
+                    // about the value that caused it.
+                    //
+                    // Refused rather than replaced: the hint is the project
+                    // saying something deliberate, and overwriting it
+                    // silently would ship a build that disagrees with its own
+                    // configuration. allow-vpn is the only value Apple
+                    // defines for this key, so there is nothing else to
+                    // honour.
+                    throw new BuildException("This app uses"
+                            + " com.codename1.vpn.profile, so its"
+                            + " com.apple.developer.networking.vpn.api"
+                            + " entitlement has to be 'allow-vpn' -- the only"
+                            + " value Apple defines for it. The build hint"
+                            + " ios.entitlements.com.apple.developer"
+                            + ".networking.vpn.api sets it to '"
+                            + vpnEntitlement.trim() + "', which no"
+                            + " provisioning profile grants, so the archive"
+                            + " would fail at codesign. Remove the hint and"
+                            + " let the build supply the value.");
+                }
+            }
+
             // Nearby devices: uncomment CN1_INCLUDE_NEARBY and whichever of
             // the three sub-defines the app earned, so CN1Nearby.m compiles
             // in only the halves it asked for. The frameworks themselves come
@@ -5414,6 +6346,7 @@ public class IPhoneBuilder extends Executor {
             // the ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
             boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled
                     || surfacesExtensionEnabled || matterExtensionEnabled
+                    || callDirectoryExtensionEnabled
                     || documentProviderEnabled
                     || hasAppExtensionArchives(appExtensionArchiveDir);
             if (needsXcodeProjectMutation) {
@@ -5835,6 +6768,14 @@ public class IPhoneBuilder extends Executor {
 
                     if (walletExtensionEnabled) {
                         appendWalletExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
+                    }
+
+                    if (callDirectoryExtensionEnabled) {
+                        // Same ordering note as the Matter extension: this
+                        // runs after the global deployment-target pass, so
+                        // the extension keeps its own.
+                        appendCallDirectoryExtensionTarget(appExtensionsBuilder,
+                                request, new File(tmpFile, "dist"));
                     }
 
                     if (matterExtensionEnabled) {
@@ -10213,6 +11154,173 @@ public class IPhoneBuilder extends Executor {
      *
      * <p>Only reached when the scanner saw {@code com.codename1.home.commissioning}.</p>
      */
+    /// Adds the generated Call Directory extension target to the schemes
+    /// script.
+    ///
+    /// Modelled on [#appendMatterExtensionTarget], including the guard that
+    /// keeps a re-run of `fix_xcode_schemes.rb` from creating the target
+    /// twice -- the build re-executes it after dependency integration, and an
+    /// unguarded `new_target` produced duplicates on the Wallet work.
+    ///
+    /// Objective-C rather than Swift, so no SWIFT_VERSION and no embedded
+    /// Swift runtime: an extension is memory-capped and CallKit has an
+    /// Objective-C interface, unlike MatterSupport.
+    /// The file name Xcode will give a generated extension's product, or null
+    /// when only Xcode could work it out.
+    ///
+    /// PRODUCT_NAME defaults to `$(TARGET_NAME)`, and a target created with
+    /// the extension's name therefore builds `<extensionName>.appex`. A
+    /// literal override is honoured -- it is a name, and the embed phase can
+    /// use it. Anything else still holding a `$` is a setting whose value
+    /// depends on the configuration or the SDK, which this build has no way
+    /// to expand; the app-extension path treats the same shape as
+    /// unresolvable for the same reason.
+    ///
+    /// @param productName the PRODUCT_NAME the target will carry, or null
+    /// @param extensionName the target's name
+    /// @return the product's base name, or null when it cannot be known
+    static String effectiveExtensionProductName(String productName,
+            String extensionName) {
+        String value = productName == null ? "" : productName.trim();
+        if (value.length() == 0
+                || "$(TARGET_NAME)".equals(value)
+                || "${TARGET_NAME}".equals(value)) {
+            return extensionName;
+        }
+        if (value.indexOf('$') >= 0) {
+            return null;
+        }
+        return value;
+    }
+
+    /**
+     * Generates the packet tunnel extension and adds it to the project.
+     *
+     * <p>Modelled on {@link #appendCallDirectoryExtensionTarget}, with one
+     * difference that matters: this target's sources are Objective-C that
+     * calls INTO the translated app. The Xcode project the translator
+     * produces compiles the whole app for every target that lists its
+     * sources, which is what puts a virtual machine inside the extension --
+     * so the generated provider can construct the application's own
+     * VpnTunnel rather than reimplementing it.</p>
+     */
+    private void appendCallDirectoryExtensionTarget(StringBuilder sb,
+            BuildRequest request, File distDir)
+            throws IOException, BuildException {
+        String name = IOSCallDirectoryExtensionBuilder.EXTENSION_NAME;
+        String displayName = request.getDisplayName() == null
+                ? name : request.getDisplayName();
+        // The host's own versions: an embedded extension whose marketing or
+        // build version differs from its containing app fails archive
+        // validation.
+        IOSWalletExtensionBuilder.writeFileMap(
+                IOSCallDirectoryExtensionBuilder.buildFileMap(
+                        request.getPackageName(), callDirectoryAppGroup,
+                        displayName, embeddedExtensionShortVersion(request),
+                        embeddedExtensionBundleVersion(request)),
+                new File(distDir, name));
+        log("Adding call directory extension target " + name
+                + " (app group " + callDirectoryAppGroup + ")");
+
+        Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
+        // No $(APP_PROVISIONING_PROFILE) rewrite of the MAIN target here,
+        // unlike the cloud builder's copy of this method. That indirection
+        // exists to stop the archive's global signing flags clobbering an
+        // extension, and this copy has no hasExtensionTargets and no such
+        // flags -- it hands the project to a local Xcode. Adding it would
+        // point the main target at a variable nothing sets.
+        buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER",
+                callDirectoryBundleId(request));
+        buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
+        buildSettingsMap.put("INFOPLIST_FILE", name + "/Info.plist");
+        buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS",
+                name + "/" + name + ".entitlements");
+        buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET",
+                IOSCallDirectoryExtensionBuilder.DEPLOYMENT_TARGET);
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY",
+                embeddedExtensionDeviceFamily(
+                        request.getArg("ios.project_type", "ios")));
+        buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS",
+                "$(inherited) @executable_path/Frameworks"
+                + " @executable_path/../../Frameworks");
+        buildSettingsMap.put("SKIP_INSTALL", "YES");
+        buildSettingsMap.put("CLANG_ENABLE_OBJC_ARC", "YES");
+        buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
+        for (String key : request.getArgs()) {
+            if (key.startsWith("ios.call.directory.buildSettings.")) {
+                String overrideValue = request.getArg(key, "");
+                if (overrideValue.trim().length() == 0) {
+                    // A present-but-empty override is not an override. Left
+                    // in, it replaced the resolved bundle identifier with
+                    // nothing: a simulator target with no identifier, a
+                    // signed build reporting an empty App ID, and a host
+                    // plist still naming the default.
+                    continue;
+                }
+                buildSettingsMap.put(
+                        key.substring("ios.call.directory.buildSettings.".length()),
+                        request.getArg(key, ""));
+            }
+        }
+        // What Xcode will actually NAME the built product, which is not
+        // always the target. PRODUCT_NAME is set to $(TARGET_NAME) above and
+        // the ios.call.directory.buildSettings.* loop can replace it, so the
+        // embed phase below had the host copying CN1CallDirectory.appex while
+        // Xcode built <override>.appex -- a product that does not exist, and
+        // an archive that fails naming a file the developer never wrote.
+        String productName = effectiveExtensionProductName(
+                buildSettingsMap.get("PRODUCT_NAME"), name);
+        if (productName == null) {
+            // Refused rather than guessed; see effectiveExtensionProductName.
+            throw new RuntimeException(
+                    "ios.call.directory.buildSettings.PRODUCT_NAME is \""
+                    + buildSettingsMap.get("PRODUCT_NAME") + "\", which this"
+                    + " build cannot evaluate, so it cannot know what the"
+                    + " extension's product will be called or embed it in the"
+                    + " app. Use a literal name, or $(TARGET_NAME).");
+        }
+        sb.append("\nif xcproj.targets.find{|e| e.name=='" + name + "'}.nil?\n"
+                + "service_target = xcproj.new_target(:app_extension, '" + name
+                + "', :ios, '"
+                + IOSCallDirectoryExtensionBuilder.DEPLOYMENT_TARGET + "')\n"
+                + "service_target.add_system_framework('CallKit')\n"
+                + "service_group = xcproj.new_group('" + name + "')\n");
+        appendFilesToXcodeProjGroup(sb, new File(distDir, name), "service_group",
+                "service_target", distDir);
+        sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
+                + "main_app_target.add_dependency(service_target)\n"
+                // The PRODUCT name, not the target name; see above.
+                + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('"
+                + productName + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                + "embed_phase = main_app_target.copy_files_build_phases.find{|p| "
+                + "p.name=='Embed App Extensions'} || "
+                + "main_app_target.new_copy_files_build_phase('Embed App Extensions')\n"
+                + "embed_phase.build_action_mask = \"2147483647\"\n"
+                + "embed_phase.dst_subfolder_spec = \"13\"\n"
+                + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
+                + "embed_file = embed_phase.add_file_reference(fileref)\n");
+        if (macNativeBuilder.isEnabled()) {
+            // Same guard the widget extension carries. This iOS build also
+            // produces a Mac Catalyst slice, and a Call Directory extension
+            // is iOS-only -- MacNativeBuilder marks only the APP target
+            // SUPPORTS_MACCATALYST and its Mac entitlements carry no app
+            // group, so building and embedding this target for the Mac
+            // destination fails the Catalyst archive. The iOS app keeps its
+            // directory; the Mac slice ships without one.
+            sb.append("dep = main_app_target.dependencies.find{|d| d.target"
+                    + " && d.target.uuid == service_target.uuid}\n"
+                    + "dep.platform_filter = 'ios' if dep\n"
+                    + "embed_file.platform_filter = 'ios'\n");
+            buildSettingsMap.put("SUPPORTS_MACCATALYST", "NO");
+        }
+        sb.append("service_target.build_configurations.each{|e| \n");
+        for (String buildSettingKey : buildSettingsMap.keySet()) {
+            sb.append("  e.build_settings['" + buildSettingKey + "'] = \""
+                    + buildSettingsMap.get(buildSettingKey) + "\"\n");
+        }
+        sb.append("}\nend\n");
+    }
+
     private void appendMatterExtensionTarget(StringBuilder sb, BuildRequest request, File distDir)
             throws IOException, BuildException {
         String name = MatterExtensionBuilder.EXTENSION_NAME;
@@ -12899,7 +14007,16 @@ public class IPhoneBuilder extends Executor {
 
         if (backgroundModesStr != null) {
             String[] backgroundModes = backgroundModesStr.split(",");
-            if (!inject.contains("UIBackgroundModes")) {
+            // The LIVE key, read the way the VoIP branch far above reads
+            // it. A raw substring test saw a declaration the project had
+            // COMMENTED OUT: that branch stripped comments, concluded the
+            // project supplies no modes and set ios.background_modes, and
+            // then this one found the commented text and refused the build
+            // for using both mechanisms. The plist parser sees what the
+            // stripped read sees, so this is the reading that matches what
+            // ships.
+            if (plistKeyNamed(plistWithoutComments(inject),
+                    "UIBackgroundModes", 0) < 0) {
                 inject += "\n<key>UIBackgroundModes</key><array>";
                 for (String mode : backgroundModes) {
                     if (mode.trim().isEmpty()) {
@@ -12928,6 +14045,53 @@ public class IPhoneBuilder extends Executor {
                 }
             }
             inject += "</array>";
+        }
+
+        // The call provider's identity. Native code reads these during launch,
+        // before any Java has run, because a VoIP push arriving on a cold
+        // start must be reported to CallKit inside the push handler -- and
+        // missing that deadline kills the process and eventually revokes the
+        // app's VoIP push entitlement altogether.
+        if (callPlistWanted) {
+            inject = appendCallPlist(inject, "CN1CallProviderName",
+                    request.getArg("ios.call.providerName",
+                            request.getDisplayName()));
+            inject = appendCallPlist(inject, "CN1CallRingtoneSound",
+                    request.getArg("ios.call.ringtone", null));
+            inject = appendCallPlist(inject, "CN1CallIconTemplateImageName",
+                    request.getArg("ios.call.icon", null));
+            inject = appendCallPlist(inject, "CN1CallDefaultCallerName",
+                    request.getArg("ios.call.unknownCaller", null));
+            inject = appendCallPlist(inject, "CN1CallPendingTTLSeconds",
+                    request.getArg("ios.call.pushTTL", "30"));
+            // The SHARED hint too, exactly as the camera-purpose-string path
+            // does. Reading only the ios-qualified one wrote
+            // CN1CallSupportsVideo=false for a project that set the
+            // documented cross-platform call.video, so the provider built
+            // before Java starts was audio-only and a cold-start VoIP video
+            // call was reported through a provider claiming not to support
+            // video.
+            // Through the SAME reader the camera disclosure uses. Compared
+            // exactly at one site and trimmed here, " true " turned the
+            // purpose string off and this flag on -- the provider offering
+            // video the app is then denied the camera for.
+            inject = appendCallPlist(inject, "CN1CallSupportsVideo",
+                    String.valueOf(CallManifestFragments.videoRequested(
+                            request.getArg("ios.call.video", null),
+                            request.getArg("call.video", null))));
+            inject = appendCallPlist(inject, "CN1CallIncludesCallsInRecents",
+                    request.getArg("ios.call.recents", "true"));
+            // The two keys the directory half needs. CN1Call.m refuses
+            // setDirectorySource without the group and reloadDirectory
+            // without the identifier, so both are written whenever the
+            // extension is generated.
+            if (callDirectoryExtensionEnabled) {
+                inject = appendCallPlist(inject, "CN1CallAppGroup",
+                        callDirectoryAppGroup);
+                inject = appendCallPlist(inject,
+                        "CN1CallDirectoryExtensionIdentifier",
+                        callDirectoryBundleId(request));
+            }
         }
 
         // Receive-shared-content: the host app reads the shared payload from this App Group

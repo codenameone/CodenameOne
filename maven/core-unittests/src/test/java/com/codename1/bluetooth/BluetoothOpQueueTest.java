@@ -26,6 +26,7 @@ import com.codename1.bluetooth.gatt.GattCharacteristic;
 import com.codename1.bluetooth.gatt.GattService;
 import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -65,6 +66,128 @@ class BluetoothOpQueueTest extends UITestBase {
         c3 = p.buildCharacteristic(s, BluetoothUuid.fromShort(0x2A39),
                 GattCharacteristic.PROPERTY_READ);
         p.connectNow();
+    }
+
+    @Test
+    void cancellingAPublishingOperationReachesTheQueuedOne() {
+        // AsyncResource.cancel() marks itself done and notifies OBSERVERS; it
+        // never runs the callback chain. Propagating the cancel through an
+        // onResult listener was therefore dead code for the single event it
+        // existed to catch -- so a cancelled requestMtu still started when
+        // its turn came, and still wrote the MTU cache behind a caller who
+        // had given up.
+        AsyncResource<byte[]> inFlight = p.readCharacteristic(c1);
+        AsyncResource<Integer> cancelled = p.requestMtu(185);
+        assertEquals(1, p.pendingCount(),
+                "the read is in flight; the mtu request is queued behind it");
+
+        cancelled.cancel(true);
+        p.completeNext(bytes(1, 2));
+        assertArrayEquals(bytes(1, 2), inFlight.get());
+
+        // The cancelled operation is skipped rather than started, so the
+        // platform is never asked and the queue is not left holding it.
+        assertEquals(0, p.pendingCount(),
+                "a cancelled queued operation must be skipped, not started");
+        assertEquals(23, p.getMtu(),
+                "a cancelled request must not publish an MTU");
+
+        // And the queue is still usable afterwards.
+        AsyncResource<byte[]> after = p.readCharacteristic(c2);
+        p.completeNext(bytes(5, 6));
+        assertArrayEquals(bytes(5, 6), after.get());
+    }
+
+    @Test
+    void cancellingAnInFlightOperationKeepsTheNativeSlot() {
+        // Cancel cancels the CALLER's interest; the platform still has the
+        // request and will still answer it. Starting the next operation
+        // immediately put two in flight at once -- on Android the second
+        // overwrites the first's pending slot, so the first callback settles
+        // the second request with the wrong result. The slot stays reserved
+        // until the platform answers.
+        AsyncResource<Integer> inFlight = p.requestMtu(185);
+        AsyncResource<byte[]> behind = p.readCharacteristic(c1);
+        assertEquals(1, p.pendingCount(), "the read is queued behind it");
+
+        inFlight.cancel(true);
+        assertEquals(1, p.pendingCount(),
+                "the platform still owns the cancelled request");
+
+        // The platform answers the cancelled request; the queue moves on and
+        // the answer is not published to the caller who gave up.
+        p.completeNext(Integer.valueOf(185));
+        assertEquals(23, p.getMtu(),
+                "a cancelled request must not publish an MTU");
+        assertSame(c1, p.peekNext().characteristic,
+                "the next operation runs once the slot is free");
+        p.completeNext(bytes(7, 8));
+        assertArrayEquals(bytes(7, 8), behind.get());
+    }
+
+    @Test
+    void aLostCallbackAfterACancelDoesNotWedgeTheQueue() {
+        // The case the reserved slot would otherwise strand: the caller
+        // cancels and the platform never answers. Releasing on the safety
+        // timeout is the difference between one lost operation and a
+        // peripheral that accepts nothing else for the life of the
+        // connection.
+        p.setOpTimeout(50);
+        AsyncResource<Integer> inFlight = p.requestMtu(185);
+        AsyncResource<byte[]> behind = p.readCharacteristic(c1);
+        inFlight.cancel(true);
+
+        long limit = System.currentTimeMillis() + 5000;
+        while (p.pendingCount() < 2 && System.currentTimeMillis() < limit) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        assertEquals(2, p.pendingCount(),
+                "the timeout must release a cancelled operation's slot");
+        p.takeNext();
+        p.completeNext(bytes(9, 9));
+        assertArrayEquals(bytes(9, 9), behind.get());
+    }
+
+    @Test
+    void aThrowingCallbackDoesNotWedgeTheQueue() {
+        // requestMtu, not readCharacteristic. Only the operations that
+        // publish state before completing -- requestMtu and discoverServices
+        // -- have the hazard: the queue watches their INTERNAL resource, and
+        // the listener that completes the caller's is registered on it
+        // FIRST, ahead of the queue's advancement listener. Completing the
+        // caller's resource runs the app's callbacks inline, so an app
+        // callback that threw came out through the publishing listener, the
+        // advancement never ran, and every later GATT operation on this
+        // peripheral queued behind one nothing would start again. The
+        // peripheral was dead for the life of the connection with no error
+        // anywhere. Operations with no publish step register the advancement
+        // before the app can attach anything, which is why they were fine.
+        AsyncResource<Integer> mtuRequest = p.requestMtu(185);
+        mtuRequest.ready(new SuccessCallback<Integer>() {
+            @Override
+            public void onSucess(Integer value) {
+                throw new IllegalStateException("a badly behaved app");
+            }
+        });
+        AsyncResource<byte[]> queued = p.readCharacteristic(c1);
+
+        assertEquals(FakeBlePeripheral.OpKind.REQUEST_MTU, p.peekNext().kind);
+        p.completeNext(Integer.valueOf(185));
+        assertTrue(mtuRequest.isDone());
+        assertEquals(185, p.getMtu(),
+                "the state update still happens; only the app callback threw");
+
+        assertEquals(1, p.pendingCount(),
+                "the queue must advance even though the callback threw");
+        assertSame(c1, p.peekNext().characteristic);
+        p.completeNext(bytes(3, 4));
+        assertArrayEquals(bytes(3, 4), queued.get(),
+                "the operation behind the throwing callback still answers");
     }
 
     @Test

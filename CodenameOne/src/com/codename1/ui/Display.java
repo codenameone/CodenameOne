@@ -509,7 +509,14 @@ public final class Display extends CN1Constants {
 
             // this can happen on some cases where an application was restarted etc...
             // generally its probably a bug but we can let it slide...
-            if (INSTANCE.edt == null) {
+            // A recorded thread that is no longer ALIVE is not a dispatch
+            // thread. Nothing clears this field when an EDT terminates, so
+            // testing only for null left a dead thread recorded for ever and
+            // re-initialising never started a working one -- the display then
+            // has no dispatch at all. This is a thread that has actually
+            // died, not one that might be mid-teardown; the speculative
+            // machinery that used to be here was removed on purpose.
+            if (INSTANCE.edt == null || !INSTANCE.edt.isAlive()) {
                 INSTANCE.touchScreen = impl.isTouchDevice();
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
@@ -5790,6 +5797,29 @@ public final class Display extends CN1Constants {
     /// the nearby bridge, or null
     public com.codename1.nearby.spi.NearbyBridge getNearbyBridge() {
         return impl.getNearbyBridge();
+    }
+
+    /// Returns the platform bridge used by the `com.codename1.call` API to reach the system call
+    /// stack -- CallKit and PushKit on iOS, `ConnectionService` and `TelecomManager` on Android --
+    /// or null when unsupported on this port. Internal -- application code uses the
+    /// `com.codename1.call` packages rather than this bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the call bridge, or null
+    public com.codename1.call.spi.CallBridge getCallBridge() {
+        return impl.getCallBridge();
+    }
+
+    /// Returns the platform bridge used by the `com.codename1.vpn` API to manage VPN
+    /// configurations, or null when unsupported on this port. Internal -- application code uses
+    /// the `com.codename1.vpn` packages rather than this bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the VPN bridge, or null
+    public com.codename1.vpn.spi.VpnBridge getVpnBridge() {
+        return impl.getVpnBridge();
     }
 
     /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external

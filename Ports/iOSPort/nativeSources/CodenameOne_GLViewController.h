@@ -344,6 +344,71 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 #undef CN1_NEARBY_TRANSPORT
 #endif
 
+// CN1_INCLUDE_CALL gates the com.codename1.call native bridge (CN1Call.{h,m}:
+// CallKit's provider and call controller, PushKit's VoIP registry, and the
+// Call Directory data store). IPhoneBuilder uncomments this only when the
+// classpath scanner saw com.codename1.call.*, so an app that never rings
+// anything ships without CallKit symbols -- which matters here more than for
+// most features, because CallKit is one of the frameworks App Store review
+// looks at and an app carrying it with no calling feature invites questions.
+//#define CN1_INCLUDE_CALL
+
+// The two expensive halves are gated separately, because each costs something
+// an ordinary calling app must not pay. CN1_CALL_VOIP links PushKit and earns
+// the voip background mode, which Apple rejects an app for carrying without a
+// working call implementation. CN1_CALL_DIRECTORY generates a Call Directory
+// app extension and its App Group. IPhoneBuilder uncomments each from its own
+// scanner flag.
+//#define CN1_CALL_VOIP
+//#define CN1_CALL_DIRECTORY
+
+// CallKit does not exist on tvOS or watchOS, and PushKit does not exist on
+// watchOS. Undoing the defines here, in the header every call translation unit
+// includes first, compiles those halves out rather than leaving each function
+// to guard itself -- and the public API then reports them unsupported, which
+// is the answer an app on an Apple TV should get.
+//
+// Mac Catalyst DOES have CallKit and is deliberately left alone.
+#if TARGET_OS_TV || TARGET_OS_WATCH
+#undef CN1_INCLUDE_CALL
+#undef CN1_CALL_VOIP
+#undef CN1_CALL_DIRECTORY
+#endif
+
+// CN1_INCLUDE_VPN gates the com.codename1.vpn native bridge (CN1Vpn.{h,m}:
+// NEVPNManager and the IKEv2/IPsec protocol configuration). Note this is a
+// different thing from the VPN DETECTION in IOSNative.m, which is always
+// compiled in, needs no entitlement, and answers whether some VPN is carrying
+// this device's traffic.
+//#define CN1_INCLUDE_VPN
+
+// CN1_VPN_TUNNEL gates com.codename1.vpn.tunnel: a packet tunnel the app
+// writes, which runs in a generated Network Extension target.
+//
+// This comment used to say the capability could not exist, because the
+// extension is a separate process "with no ParparVM in it". That was wrong
+// about the only part that mattered: the extension is a target THIS BUILD
+// generates, so it carries a translated VM exactly as the app target does,
+// and the app's VpnTunnel subclass is translated into it. What is true is
+// that it shares nothing else with the app -- no statics, no Display, no
+// open connections -- which is why the setup travels as data.
+//
+// Its entitlement, com.apple.developer.networking.networkextension, is one
+// Apple grants case by case rather than one a paid account switches on, so
+// the builder never injects it automatically.
+//#define CN1_VPN_TUNNEL
+
+// NetworkExtension's VPN manager is unavailable on tvOS and watchOS.
+#if TARGET_OS_TV || TARGET_OS_WATCH
+#undef CN1_INCLUDE_VPN
+#undef CN1_VPN_TUNNEL
+#endif
+
+// A packet tunnel needs the VPN bridge that starts it.
+#ifndef CN1_INCLUDE_VPN
+#undef CN1_VPN_TUNNEL
+#endif
+
 // CN1_INCLUDE_MATTER_SETUP gates the MatterSupport add-device flow, which is
 // much more expensive than the rest: it needs its own app-extension target,
 // the com.apple.developer.matter.allow-setup-payload entitlement, an app group

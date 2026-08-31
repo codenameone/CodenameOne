@@ -122,7 +122,22 @@ class TvNativeBuilder {
             // measured rather than assumed: the tvOS SDK ships it, so the
             // transport links normally and weak-linking would only obscure
             // that. Same distinction the CoreSpotlight note below draws.
-            + "NearbyInteraction.framework;AccessorySetupKit.framework";
+            + "NearbyInteraction.framework;AccessorySetupKit.framework;"
+            // CallKit and PushKit are absent from the tvOS SDK -- measured
+            // against AppleTVOS26.2, where neither .framework directory
+            // exists -- and the iOS slice links both when the app references
+            // com.codename1.call.session or .voip. Weak-linked here or the
+            // tvOS slice fails while resolving the framework. CN1Call.m
+            // compiles itself out through the TARGET_OS_TV undefs in
+            // CodenameOne_GLViewController.h, so nothing on that slice calls
+            // into either one.
+            //
+            // NetworkExtension is deliberately NOT here, and that was
+            // measured the same way: the tvOS SDK ships it, so the VPN
+            // package's framework links normally and weak-linking would only
+            // obscure that. Same distinction the MultipeerConnectivity note
+            // above draws.
+            + "CallKit.framework;PushKit.framework";
     // CoreSpotlight is deliberately NOT in this list, although the watch list carries it.
     //
     // The two platforms differ, and it was measured rather than reasoned about. On the
