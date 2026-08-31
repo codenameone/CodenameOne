@@ -5116,6 +5116,15 @@
     var baselinePaintSeq = baseline ? (baseline.canvasLastPaintSeq | 0) : 0;
     var baselinePaintCount = baseline ? (baseline.canvasPaintCount | 0) : 0;
     var attempts = 24;
+    // A frame that is missing draws gets a much longer budget, because the
+    // thing it waits for is known and bounded: an image decode, after which
+    // the port repaints and the next frame drops nothing. 24 frames is ~0.4s,
+    // and the Java side already allows this content 4s to arrive -- so the
+    // capture used to give up long before the decode it was waiting for could
+    // land, and ship the incomplete frame. The loop still exits the moment a
+    // clean frame appears, so a healthy capture pays nothing for this.
+    var attemptsIncompleteFrame = 240;
+    var lastFrameDropped = 0;
     var best = null;
     var startRenderSeq = global.__cn1RenderQueueSeq | 0;
     var seenRenderSeq = startRenderSeq;
@@ -5177,6 +5186,7 @@
           // it was asked to draw; the attempt budget below still bounds it, so
           // an image that never decodes captures and fails as it does today
           // rather than hanging the suite.
+          lastFrameDropped = sample.frameDropped | 0;
           if (sample.frameDropped > 0) {
             quietFrames = 0;
           }
@@ -5192,7 +5202,8 @@
             sample = null;
           }
         }
-        if (index + 1 >= attempts) {
+        var limit = lastFrameDropped > 0 ? attemptsIncompleteFrame : attempts;
+        if (index + 1 >= limit) {
           return best;
         }
         return runAttempt(index + 1);
