@@ -252,6 +252,24 @@ class PhoneNumberFieldTest extends UITestBase {
     }
 
     @FormTest
+    void aReplacementListSuppliesTheEntryItCarriesForTheSelectedCountry() {
+        // countries are equal by ISO code, so a list can carry a different object for
+        // the same country; keeping the old one would dial a code the selector no
+        // longer offers
+        PhoneNumberField f = new PhoneNumberField();
+        f.setCountry(new Country("US", "999", "Somewhere else"));
+        f.getNumberField().setText("5550100");
+        assertEquals("+9995550100", f.getE164());
+
+        f.setCountries(new Country[]{
+                PhoneNumberField.findCountry("US"),
+                PhoneNumberField.findCountry("IL")});
+        assertEquals("US", f.getCountry().getIsoCode());
+        assertEquals("+15550100", f.getE164(),
+                "the selection must be the object the offered list carries");
+    }
+
+    @FormTest
     void anEmptyListIsRefused() {
         PhoneNumberField f = new PhoneNumberField();
         assertThrows(IllegalArgumentException.class, () -> f.setCountries(new Country[0]));

@@ -277,16 +277,21 @@ public class PhoneNumberField extends Container {
         }
         this.countries = new Country[countries.length];
         System.arraycopy(countries, 0, this.countries, 0, countries.length);
-        boolean stillListed = false;
+        // The entry from the new list, not merely the knowledge that one matches.
+        // Countries are equal when their ISO codes are, so a list can carry a different
+        // object for the same country -- the built-in United States beside an
+        // application's own -- and keeping the old one would leave the field dialling a
+        // code the selector no longer offers. Where nothing matches, the first entry of
+        // the list the application supplied is a defensible default in a way the first
+        // entry of the full table is not.
+        Country listed = null;
         for (int i = 0; i < countries.length; i++) {
             if (countries[i].equals(country)) {
-                stillListed = true;
+                listed = countries[i];
                 break;
             }
         }
-        if (!stillListed) {
-            setCountry(countries[0]);
-        }
+        setCountry(listed != null ? listed : countries[0]);
     }
 
     /// The selected country, never null.
