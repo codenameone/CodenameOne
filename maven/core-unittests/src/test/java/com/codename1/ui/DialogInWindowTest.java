@@ -3189,4 +3189,86 @@ class DialogInWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    @FormTest
+    void aHostedDialogsKeyListenerSeesTheDialogAndItsOwnCode() {
+        // A listener added to a Dialog is handed an event sourced from that dialog when
+        // it is shown the historical way, and a game listener is handed the game action
+        // rather than the key that produced it. Forwarding the host window's own event
+        // changed both, so a listener that compares the source, or reads the code it
+        // registered for, saw something else.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            Dialog d = new Dialog("shortcuts");
+            d.setLayout(new BorderLayout());
+            d.add(BorderLayout.CENTER, new Label("body"));
+            d.setTopLevelHost(w);
+
+            final Object[] keySource = new Object[1];
+            final int[] keyCode = new int[1];
+            d.addKeyListener('k', new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    keySource[0] = evt.getSource();
+                    keyCode[0] = evt.getKeyEvent();
+                }
+            });
+
+            final Object[] gameSource = new Object[1];
+            final int[] gameCode = new int[1];
+            int fire = Display.GAME_FIRE;
+            d.addGameKeyListener(fire, new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    gameSource[0] = evt.getSource();
+                    gameCode[0] = evt.getKeyEvent();
+                }
+            });
+
+            d.showModeless();
+            DisplayTest.flushEdt();
+            try {
+                w.keyPressed('k');
+                w.keyReleased('k');
+                DisplayTest.flushEdt();
+                assertSame(d, keySource[0],
+                        "the listener belongs to the dialog, so the dialog is the source");
+                assertEquals('k', keyCode[0], "and the key it registered for");
+
+                // Asserted rather than guarded: a key that maps to the fire action
+                // has to exist, and skipping this half quietly if it did not would
+                // leave the game contract untested while still reporting green.
+                int gameKey = keyForGameAction(fire);
+                assertTrue(gameKey != 0, "precondition: some key maps to the fire action");
+                w.keyPressed(gameKey);
+                w.keyReleased(gameKey);
+                DisplayTest.flushEdt();
+                assertSame(d, gameSource[0], "same for a game listener");
+                assertEquals(fire, gameCode[0],
+                        "a game listener is handed the action, not the key behind it");
+            } finally {
+                d.dispose();
+                DisplayTest.flushEdt();
+            }
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    /// A physical key that maps to this game action, or 0 when none does here.
+    private static int keyForGameAction(int action) {
+        for (int code = -100; code < 200; code++) {
+            if (code != 0 && Display.getInstance().getGameAction(code) == action) {
+                return code;
+            }
+        }
+        return 0;
+    }
 }

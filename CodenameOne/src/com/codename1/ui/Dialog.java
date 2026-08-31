@@ -2500,7 +2500,21 @@ public class Dialog extends Form implements AbstractDialog {
             if (!host.isKeyDispatchOwner(dlg)) {
                 return;
             }
-            delegate.actionPerformed(evt);
+            // Sourced from the dialog, and carrying the code this listener was
+            // registered for. A listener added to a Dialog is handed an event whose
+            // source is that dialog when it is shown the historical way, and a game
+            // listener is handed the game action rather than the key that produced it.
+            // Forwarding the host's own event changed both: the source became the
+            // window, so a listener that compares or casts it saw something else -- and
+            // on the iOS VM a bad cast is not even an exception, it reads the wrong
+            // object's fields -- and a game listener saw the physical key code.
+            ActionEvent forwarded = new ActionEvent(dlg, keyCode);
+            delegate.actionPerformed(forwarded);
+            // Back to the host, which is what stops the next listener for this key and
+            // the window's own default handling.
+            if (forwarded.isConsumed()) {
+                evt.consume();
+            }
         }
     }
 
