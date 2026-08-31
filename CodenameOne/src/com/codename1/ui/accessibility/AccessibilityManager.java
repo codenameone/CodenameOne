@@ -27,6 +27,7 @@ import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.CN;
 import com.codename1.ui.Container;
+import com.codename1.ui.Desktop;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -130,6 +131,23 @@ public final class AccessibilityManager {
     private void queueEveryLiveRoot(int changeType) {
         for (Container root : snapshotsByRoot.keySet()) {
             queueRoot(root, changeType);
+        }
+        // The open windows, not only the ones already described. A cache holds what has
+        // been asked for, and the moment this exists to serve -- assistive technology
+        // starting after an application has opened several windows -- is exactly the
+        // moment nothing has been. Taking the cache as the census left every one of
+        // those windows empty until something in it happened to change.
+        if (Desktop.isSupported()) {
+            Window[] open = Desktop.getInstance().getWindows();
+            for (Window w : open) {
+                queueRoot(w, changeType);
+            }
+        }
+        // The main form as well as the focused surface. When a window has focus these
+        // are two different things, and the form behind it is no less live for it.
+        Form main = Display.getInstance().getCurrent();
+        if (main != null) {
+            queueRoot(main, changeType);
         }
         TopLevelContainer current = CN.getCurrentTopLevel();
         Container currentRoot = current == null ? null : current.asContainer();

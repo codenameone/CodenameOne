@@ -1447,4 +1447,70 @@ class AccessibilityWindowTest extends UITestBase {
         }
     }
 
+    /// Windows opened before anything was described are still described.
+    ///
+    /// The cache holds what has been asked for, and the moment an all-root refresh
+    /// exists to serve -- assistive technology starting after an application has opened
+    /// several windows -- is exactly the moment nothing has been asked for. Taking the
+    /// cache as the census of live surfaces left every one of those windows empty until
+    /// something in it happened to change, and left the main form empty too whenever a
+    /// window held the focus.
+    @FormTest
+    void everyOpenWindowIsDescribedEvenWhenNoneWasCached() {
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        Window first = null;
+        Window second = null;
+        try {
+            Form main = new Form("main", new BorderLayout());
+            main.add(BorderLayout.CENTER, new Button("on the main form"));
+            main.show();
+            DisplayTest.flushEdt();
+
+            // Both opened while nothing is projecting, so nothing is cached for them.
+            first = new Window("first", new BorderLayout());
+            first.setWindowSize(400, 300);
+            first.add(BorderLayout.CENTER, new Button("in the first"));
+            first.show();
+            DisplayTest.flushEdt();
+
+            second = new Window("second", new BorderLayout());
+            second.setWindowSize(400, 300);
+            second.add(BorderLayout.CENTER, new Button("in the second"));
+            second.show();
+            DisplayTest.flushEdt();
+
+            AccessibilityManager.getInstance().releaseRoot(first);
+            AccessibilityManager.getInstance().releaseRoot(second);
+            AccessibilityManager.getInstance().releaseRoot(main);
+
+            implementation.clearAccessibilityNotifications();
+            AccessibilityManager.getInstance().invalidate(null,
+                    AccessibilityManager.CHANGE_STRUCTURE);
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            boolean sawFirst = false;
+            boolean sawSecond = false;
+            boolean sawMain = false;
+            for (int[] n : implementation.getAccessibilityNotifications()) {
+                sawFirst = sawFirst || n[1] == first.getWindowId();
+                sawSecond = sawSecond || n[1] == second.getWindowId();
+                sawMain = sawMain || n[1] == 0;
+            }
+            assertTrue(sawFirst, "a window that was never described is still a live surface");
+            assertTrue(sawSecond, "and so is the one behind the focused one");
+            assertTrue(sawMain, "and so is the main form while a window holds focus");
+        } finally {
+            if (second != null) {
+                second.dispose();
+            }
+            if (first != null) {
+                first.dispose();
+            }
+            DisplayTest.flushEdt();
+            implementation.setAccessibilityTreeSupported(false);
+        }
+    }
+
 }
