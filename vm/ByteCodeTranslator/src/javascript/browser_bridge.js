@@ -1320,6 +1320,16 @@
   // difference.
   var surfaceDrawImageDropped = 0;
 
+  // Drops charged to the frame currently on the canvas.
+  //
+  // A frame is the display surface's batch plus the offscreen batches flushed
+  // since the previous display batch (a mutable image flushes just before the
+  // blit that draws it), so the difference across two display flushes is what
+  // that frame lost. Non-zero means the frame on screen is missing pixels it
+  // was asked to draw -- which is a frame nothing should screenshot.
+  var surfaceFrameDropped = 0;
+  var surfaceDropsAtFrameStart = 0;
+
   function getSurface(id, createW, createH) {
     var s = surfaceTable[id];
     if (s) {
@@ -2078,6 +2088,12 @@
     if (id === SURF_DISPLAY_ID && opCount > 0) {
       noteCanvasOperation(s.canvas, 'method', 'fill', true, null);
       global.__cn1RenderQueueSeq = (global.__cn1RenderQueueSeq | 0) + 1;
+    }
+    if (id === SURF_DISPLAY_ID) {
+      // Close the frame: everything dropped since the previous display batch
+      // belongs to the one just replayed, offscreen batches included.
+      surfaceFrameDropped = (surfaceDrawImageDropped | 0) - (surfaceDropsAtFrameStart | 0);
+      surfaceDropsAtFrameStart = surfaceDrawImageDropped | 0;
     }
     return null;
   });
@@ -5116,6 +5132,12 @@
       if ((b.canvasDisplayAffinity | 0) !== (a.canvasDisplayAffinity | 0)) {
         return (b.canvasDisplayAffinity | 0) > (a.canvasDisplayAffinity | 0) ? b : a;
       }
+      // A frame that drew everything beats one that lost an image, so the
+      // bounded fallback below cannot prefer an incomplete frame that happens
+      // to score higher.
+      if (((b.frameDropped | 0) === 0) !== ((a.frameDropped | 0) === 0)) {
+        return (b.frameDropped | 0) === 0 ? b : a;
+      }
       if (!!b.changedFromPrevious !== !!a.changedFromPrevious) {
         return b.changedFromPrevious ? b : a;
       }
@@ -5144,8 +5166,23 @@
           sample.paintedSinceStart =
             ((sample.canvasLastPaintSeq | 0) > (baselinePaintSeq | 0))
             || ((sample.canvasPaintCount | 0) > (baselinePaintCount | 0));
+          sample.frameDropped = surfaceFrameDropped | 0;
+          // A frame that could not draw one of its images is incomplete, and
+          // no amount of stillness makes it complete: an image still decoding
+          // leaves the canvas idle, so the quiet-frame test reads "settled"
+          // while pixels are missing. That is the rest of the
+          // graphics-draw-image-rect failure -- with the batch truncation
+          // fixed, the capture still shipped the frame painted before the
+          // EncodedImage decodes landed. Wait for a frame that drew everything
+          // it was asked to draw; the attempt budget below still bounds it, so
+          // an image that never decodes captures and fails as it does today
+          // rather than hanging the suite.
+          if (sample.frameDropped > 0) {
+            quietFrames = 0;
+          }
           best = chooseBetter(best, sample);
           if (quietFrames >= quietFramesRequired
+              && (sample.frameDropped | 0) === 0
               && (sample.canvasScore | 0) > 0
               && (sample.paintedSinceStart || renderAdvanced || sample.changedFromPrevious)) {
             return sample;
@@ -5267,6 +5304,10 @@
       // is missing pixels for a reason the screenshot diff cannot show, so it
       // must not be read as a rendering difference.
       diag('SCREENSHOT_START', 'drawImageDropped', surfaceDrawImageDropped | 0);
+      // Drops charged to the captured frame itself. Zero is the condition the
+      // capture waits for; a non-zero value here means the wait was exhausted
+      // and the screenshot is knowingly incomplete.
+      diag('SCREENSHOT_START', 'frameDropped', result.frameDropped | 0);
       diag('SCREENSHOT_START', 'changed', result.changedFromPrevious ? 1 : 0);
       diag('SCREENSHOT_START', 'pngLen', String(result.dataUrl || '').length);
       global.__cn1LastCaptureMeta = {
