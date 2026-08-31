@@ -2137,6 +2137,15 @@ public class Dialog extends Form implements AbstractDialog {
     /// to it. It comes back out of the layer instead.
     @Override
     void disposeImpl() {
+        // Here as well as in dispose(), because this is the lower funnel and not
+        // everything comes through the upper one: MenuBar.showMenu tears a menu dialog
+        // down by calling this directly, and onShowCompletedImpl does the same for a
+        // dialog disposed before it finished showing. A showing that ends without
+        // stopping its clock leaves a timer thread holding the dialog until a deadline
+        // nobody is waiting for. Idempotent, so the ordinary dispose() path calling
+        // both is harmless -- and dispose() still needs its own, because the native
+        // branch there returns before this ever runs.
+        cancelTimeoutClock();
         if (layerHost != null) {
             disposeFromHostLayer();
             return;

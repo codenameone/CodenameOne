@@ -3456,7 +3456,9 @@ class DialogInWindowTest extends UITestBase {
             assertNotEquals(0L, deadlineOf(dlg),
                     "precondition: the deadline survives, so the next show owes a timeout");
 
-            dlg.showModal(0, 0, 0, 0, false, false, false);
+            // The public entry, not showModal directly: it is what clears the disposed
+            // flag, and without that the showing tears itself straight back down.
+            dlg.show(0, 0, 0, 0, false, false);
             DisplayTest.flushEdt();
 
             assertNotNull(timeoutClockOf(dlg),
@@ -3468,6 +3470,30 @@ class DialogInWindowTest extends UITestBase {
             w.dispose();
             DisplayTest.flushEdt();
         }
+    }
+
+    /// A menu dialog is torn down through disposeImpl, and that ends a showing too.
+    ///
+    /// MenuBar.showMenu calls disposeImpl directly rather than dispose(), which is why
+    /// the dialog overrides the lower one. A showing that ends without stopping its
+    /// clock leaves a timer thread holding the dialog until a deadline nobody is
+    /// waiting for -- the same gap the directional disposes had.
+    @FormTest
+    void disposeImplStopsTheTimeoutClock() {
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        Dialog dlg = new Dialog("menu-like");
+        dlg.setTimeout(600000);
+        assertNotNull(timeoutClockOf(dlg), "precondition: setTimeout armed a clock");
+
+        // The teardown MenuBar uses, not the public one.
+        dlg.disposeImpl();
+        DisplayTest.flushEdt();
+
+        assertNull(timeoutClockOf(dlg),
+                "the lower teardown ends a showing too, so it has to stop the clock");
     }
 
 }
