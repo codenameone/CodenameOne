@@ -172,6 +172,8 @@ static CN1TextInputView* cn1TextInputView = nil;
     [_markedTextStyle release];
     [_cn1Tokenizer release];
     [_textInteraction release];
+    // the port builds without ARC, so the copy property's ivar is ours to release
+    [_textContentType release];
     [super dealloc];
 }
 
