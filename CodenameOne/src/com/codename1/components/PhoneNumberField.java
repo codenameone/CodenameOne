@@ -158,8 +158,26 @@ public class PhoneNumberField extends Container {
         }
     }
 
-    /// ISO code, calling code and English name for every region libphonenumber
-    /// assigns a calling code to, ordered by name. Parsed once, on first use.
+    /// ISO code, calling code and English name for every region with a numbering
+    /// plan of its own, ordered by name. Parsed once, on first use.
+    ///
+    /// Generated from libphonenumber's region metadata rather than written out by
+    /// hand, and that is the point: two hundred and forty-five calling codes typed
+    /// from memory would contain mistakes nobody would find until somebody in that
+    /// country could not sign in.
+    ///
+    /// It follows that eight ISO 3166 codes are absent -- AN, AQ, BV, GS, HM, PN, TF
+    /// and UM -- and their absence is correct rather than an oversight. One of them
+    /// stopped being a country in 2010; most of the rest have no permanent
+    /// population; and none of them has a numbering plan of its own, which is why
+    /// the metadata carries none. Pitcairn's numbers, for instance, are reachable
+    /// through New Zealand's +64 rather than through anything assigned to PN.
+    ///
+    /// Do not add one by hand. A calling code invented for a territory is exactly
+    /// the error this table is generated to avoid, and adding the one that gets
+    /// noticed while leaving the seven that do not is worse than either. An
+    /// application that serves such a place passes its own list to
+    /// `#setCountries(Country[])`, which is what that method is for.
     private static final String COUNTRY_TABLE =
             "AF|93|Afghanistan;AL|355|Albania;DZ|213|Algeria;AS|1|American Samoa;AD|376|Andorra;"
             + "AO|244|Angola;AI|1|Anguilla;AG|1|Antigua & Barbuda;AR|54|Argentina;AM|374|Armenia;AW|297|Aruba;"
@@ -534,6 +552,10 @@ public class PhoneNumberField extends Container {
                 }
             }
         }
+        // A device reporting a region the list does not carry -- one of the eight
+        // without a numbering plan, or a country the application has narrowed away --
+        // gets the first entry. Any choice here is arbitrary; this one is at least
+        // stable, and the user's own first act on this screen is to pick a country.
         return list[0];
     }
 
@@ -551,7 +573,11 @@ public class PhoneNumberField extends Container {
         return b.toString();
     }
 
-    /// Every known country, ordered by English name.
+    /// Every country with a numbering plan of its own, ordered by English name.
+    ///
+    /// A handful of ISO 3166 regions are deliberately absent -- see the note on the
+    /// table itself -- because they have no calling code assigned to them. An
+    /// application that needs one supplies its own list.
     public static Country[] getAllCountries() {
         Country[] all = allCountries();
         Country[] copy = new Country[all.length];
