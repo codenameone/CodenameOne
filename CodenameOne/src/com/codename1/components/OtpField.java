@@ -35,6 +35,7 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Border;
 
@@ -110,7 +111,7 @@ public class OtpField extends Container {
         this.numericOnly = numericOnly;
         this.boxes = new TextField[length];
         setUIID("OtpField");
-        Container row = new DigitRow();
+        Container row = new DigitRow(length);
         row.setUIID("Container");
         for (int i = 0; i < length; i++) {
             TextField tf = new TextField();
@@ -206,9 +207,17 @@ public class OtpField extends Container {
     /// Re-applied after `initLaf`, which is where the look and feel assigns the
     /// flag: setting it once in the constructor would not survive being added to
     /// a form, let alone a theme change.
+    ///
+    /// A grid rather than a box for a reason of its own. A box row hands each
+    /// child its preferred width and, when it runs out of room, gives what is
+    /// left of it to one child and zero to every child after that -- so a long
+    /// code on a narrow screen loses its last boxes entirely, while the field
+    /// still expects those characters and offers nowhere to tap to fix them. A
+    /// grid divides whatever width it has between the columns, so the boxes get
+    /// narrower and all of them stay.
     private static final class DigitRow extends Container {
-        DigitRow() {
-            super(BoxLayout.x());
+        DigitRow(int length) {
+            super(new GridLayout(1, length));
             setRTL(false);
         }
 

@@ -25,8 +25,10 @@ package com.codename1.components;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.EditField;
+import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextInputConfig;
@@ -366,6 +368,34 @@ class OtpFieldTest extends UITestBase {
                     "a tap must still land on the box it hit");
         } finally {
             laf.setRTL(wasRtl);
+        }
+    }
+
+    @FormTest
+    void everyBoxSurvivesALongCodeOnANarrowScreen() {
+        // A box row gives what is left of the width to one child and zero to every
+        // child after it, so the last boxes of a long code vanish on a narrow screen
+        // while the field still expects those characters.
+        OtpField f = new OtpField(16);
+        Form form = new Form("t", BoxLayout.y());
+        form.add(f);
+        form.show();
+        form.revalidate();
+
+        // The row holding the boxes is what runs out of width, so squeeze that
+        // directly: laying out an ancestor would not re-lay its grandchildren, and a
+        // test that only resizes an ancestor passes whatever the row does.
+        Container row = f.getBox(0).getParent();
+        assertTrue(row.getPreferredW() > 240, "the row has to be squeezed to mean anything");
+        row.setWidth(240);
+        // the layout manager directly: layoutContainer() is a no-op on a container that
+        // is not dirty, so a test that called it would lay nothing out and pass whatever
+        // the row does
+        row.getLayout().layoutContainer(row);
+
+        for (int i = 0; i < 16; i++) {
+            assertTrue(f.getBox(i).getWidth() > 0,
+                    "box " + i + " was squeezed out of existence");
         }
     }
 

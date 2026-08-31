@@ -532,7 +532,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// inside somebody else's autofill query.
     static android.view.autofill.AutofillValue editorAutofillValue() {
         com.codename1.ui.TextInputState state = activeInputState;
-        if (activeInputClient == null || state == null) {
+        // Gated the same way the write path is, and for a sharper reason: between the EDT
+        // moving to another field and the UI thread taking the hint off the view, the
+        // surface still looks like a code field over a session that is something else --
+        // and answering this query then would hand that field's text to an SMS autofill
+        // service. The field after a code field is as likely to be a password as anything.
+        if (activeInputClient == null || state == null || editorAutofillHints() == null) {
             return null;
         }
         String text = state.getText();
