@@ -50,7 +50,6 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.animations.Transition;
-import com.codename1.ui.util.UITimer;
 
 /// Unlike a regular dialog the interaction dialog only looks like a dialog,
 /// it resides in the layered pane and can be used to implement features where
@@ -908,6 +907,8 @@ public class InteractionDialog extends Container implements AbstractDialog {
     @Override
     public void dispose() {
         disposed = true;
+        // Retires any armed timeout: it belongs to the showing that is ending here.
+        timeoutGeneration++;
         releaseInferredHost();
         if (nativeWindow != null) {
             // The window fires Disposed, which is what takes the dialog back out. None
@@ -1933,12 +1934,12 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     /// Starts the pending timeout against a named surface.
     ///
-    /// A `UITimer` is ticked by the surface it is registered on, so the timeout has to
-    /// belong to whatever actually holds the dialog. In native-window mode that is the
-    /// window, not the owner: an explicit `setTopLevelHost()` naming a form wins in
-    /// `resolveHost()`, and navigating away from that form stops it animating -- the
-    /// timer would then never fire while the dialog sat there in its own window, and a
-    /// modal `showDialog()` waiting on it would never return.
+    /// The surface decides whether there is a timeout at all -- there is nothing to
+    /// close while the dialog is not up -- but it does not drive the clock. That
+    /// distinction is the fix: a timer ticked by the surface it is registered on stops
+    /// whenever that surface stops being painted, and a modal `showDialog()` whose
+    /// timeout is the thing that releases the caller then blocks for as long as the
+    /// window stays minimized, which for a window never restored is for good.
     ///
     /// #### Parameters
     ///
@@ -1952,13 +1953,30 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
         int millis = (int) pendingTimeout;
         pendingTimeout = 0;
-        UITimer.timer(millis, false, host, new Runnable() {
+        // Which showing armed this clock. A UITimer dies with the surface it is
+        // registered on, so it could not outlive the dialog; this one can, and without
+        // the token a dialog disposed and then shown again inside the original timeout
+        // would be closed by the previous showing's timer.
+        final int token = ++timeoutGeneration;
+        // Not tied to the surface. A UITimer is driven by the painting of the top level
+        // it is registered on, so a window that is minimized or hidden stops the clock
+        // -- and a modal dialog whose timeout is what releases the caller then holds it
+        // for as long as the window stays down, which for a window never restored is
+        // for good. The host still decides whether there is a timeout at all; it just
+        // does not have to be painted for it to arrive.
+        Display.getInstance().setTimeout(millis, new Runnable() {
             @Override
             public void run() {
-                dispose();
+                if (token == timeoutGeneration) {
+                    dispose();
+                }
             }
         });
     }
+
+    /// Bumped by every arming and every dispose, so a timeout that outlives the showing
+    /// that armed it is discarded rather than closing whatever is on screen now.
+    private int timeoutGeneration;
 
     /// Shows this interaction dialog and blocks until it is disposed.
     @Override

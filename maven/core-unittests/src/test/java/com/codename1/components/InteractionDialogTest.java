@@ -27,12 +27,15 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.Window;
+import com.codename1.ui.animations.Animation;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
@@ -719,4 +722,61 @@ class InteractionDialogTest extends UITestBase {
         assertEquals(5000L, pendingTimeoutOf(dialog),
                 "it is held until there is somewhere to bind it");
     }
+    /// A surface that counts what gets registered on its animation loop.
+    ///
+    /// Named rather than anonymous: an anonymous subclass here trips
+    /// SIC_INNER_SHOULD_BE_STATIC_ANON under the zero-findings SpotBugs gate.
+    private static final class CountingForm extends Form {
+        private int registrations;
+
+        CountingForm(String title, Layout layout) {
+            super(title, layout);
+        }
+
+        @Override
+        protected void onRegisterAnimated(Animation cmp) {
+            registrations++;
+        }
+    }
+
+    /// Shows a dialog on a counting host and reports what the show registered.
+    private static int registrationsForShow(boolean withTimeout) {
+        CountingForm f = new CountingForm("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("timed");
+        dialog.add(new Label("body"));
+        if (withTimeout) {
+            // Long enough that it cannot fire during the test -- this is about how the
+            // timeout is driven, not about it arriving.
+            dialog.setTimeout(600000);
+        }
+        int before = f.registrations;
+        dialog.show(10, 10, 10, 10);
+        int after = f.registrations;
+        dialog.dispose();
+        DisplayTest.flushEdt();
+        return after - before;
+    }
+
+    /// The timeout must not be driven by the surface's animation loop.
+    ///
+    /// A UITimer runs by registering itself as an animation on the top level it is bound
+    /// to, so it only ticks while that surface is being painted -- a minimized or hidden
+    /// window stops the clock, and a modal showDialog() whose timeout is what releases
+    /// the caller then blocks for as long as the window stays down. Asserted structurally
+    /// rather than by waiting: arming a timeout must add nothing to the host's animation
+    /// list, which is exactly what stops the surface from being able to stall it.
+    @FormTest
+    void armingATimeoutRegistersNothingOnTheSurface() {
+        int withoutTimeout = registrationsForShow(false);
+        int withTimeout = registrationsForShow(true);
+
+        assertEquals(withoutTimeout, withTimeout,
+                "arming a timeout registered " + (withTimeout - withoutTimeout)
+                        + " extra animation(s) on the host, so the surface drives the"
+                        + " clock and can stall it by not painting");
+    }
+
 }

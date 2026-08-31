@@ -219,6 +219,9 @@ public class Dialog extends Form implements AbstractDialog {
     /// historical way by taking over the main surface. Every behaviour that belongs to
     /// that historical path is gated on this being null.
     private Window layerHost;
+    /// Guards the one frame in which a hosted dialog pumps its own animation list.
+    /// The list contains the dialog itself, so the pump reaches animate() again.
+    private boolean pumpingHostedAnimations;
 
     /// What this dialog was told about native window mode, or null when it was not
     /// told. A `Boolean` rather than a boolean so "unset" is distinguishable, which is
@@ -3611,8 +3614,31 @@ public class Dialog extends Form implements AbstractDialog {
     /// {@inheritDoc}
     @Override
     public boolean animate() {
-        isTimedOut();
-        return false;
+        if (isTimedOut()) {
+            return false;
+        }
+        if (layerHost == null || pumpingHostedAnimations) {
+            // Shown the historical way the dialog is the surface being painted, so
+            // Display already loops its animatableComponents -- and this dialog is one
+            // of the entries whenever a timeout is set: setTimeout registers the
+            // dialog with registerAnimatedInternal so that isTimedOut is polled at all.
+            // Calling super here would re-enter that very loop through
+            // Form.animate() -> repaintAnimations(), which is unbounded recursion.
+            // The flag catches the same re-entry from the hosted branch below, where
+            // the loop reaches this entry one frame later.
+            return false;
+        }
+        // Hosted, the dialog is not the painted surface: nothing loops its own
+        // animatableComponents, so anything the application registered on the dialog
+        // through registerAnimated() sat in that list and never advanced. Form.animate()
+        // drains it for a form nested in another surface, which is exactly what a hosted
+        // dialog is.
+        pumpingHostedAnimations = true;
+        try {
+            return super.animate();
+        } finally {
+            pumpingHostedAnimations = false;
+        }
     }
 
     private boolean isTimedOut() {

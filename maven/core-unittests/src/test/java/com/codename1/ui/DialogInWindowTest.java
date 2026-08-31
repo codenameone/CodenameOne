@@ -3271,4 +3271,61 @@ class DialogInWindowTest extends UITestBase {
         }
         return 0;
     }
+    /// Counts the animation passes it is given.
+    private static final class CountingAnimation implements com.codename1.ui.animations.Animation {
+        private int ticks;
+
+        @Override
+        public boolean animate() {
+            ticks++;
+            return false;
+        }
+
+        @Override
+        public void paint(com.codename1.ui.Graphics g) {
+        }
+    }
+
+    @FormTest
+    void anAnimationRegisteredOnAHostedDialogStillAdvances() {
+        // A hosted dialog is a form nested in another surface, and the inherited pass is
+        // what drains the animations registered on it. Overriding that away for the
+        // timeout check meant anything registered through registerAnimated() on the
+        // dialog sat in its own list and never advanced while it was hosted.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            Dialog d = new Dialog("animated");
+            d.setLayout(new BorderLayout());
+            d.add(BorderLayout.CENTER, new Label("body"));
+            d.setTopLevelHost(w);
+            d.showModeless();
+            DisplayTest.flushEdt();
+            try {
+                CountingAnimation anim = new CountingAnimation();
+                d.registerAnimated(anim);
+                DisplayTest.flushEdt();
+
+                for (int i = 0; i < 20; i++) {
+                    w.repaintAnimations();
+                    DisplayTest.flushEdt();
+                }
+
+                assertTrue(anim.ticks > 0,
+                        "an animation registered on the hosted dialog has to advance");
+            } finally {
+                d.dispose();
+                DisplayTest.flushEdt();
+            }
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }
