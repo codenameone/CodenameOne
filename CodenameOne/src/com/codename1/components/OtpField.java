@@ -438,8 +438,14 @@ public class OtpField extends Container {
         /// that can never be complete and a verification that never fires.
         @Override
         public void commitText(String text) {
-            // a commit is the input method's final answer, whatever it left the composing
-            // range saying
+            // A commit is the input method's final answer.
+            //
+            // It also ends the composition, which is worth stating because it was
+            // questioned: the commit replaces the composed range through the editor's
+            // ordinary document-change path, and that path clears the composing range. So
+            // a second commit follows the first rather than replacing it, and an input
+            // method that delivers a code in fragments builds it up correctly. Verified
+            // rather than assumed -- EditorViewInputTest holds it.
             provisional = false;
             super.commitText(limit(text));
             owner.valueChanged();
@@ -466,9 +472,12 @@ public class OtpField extends Container {
 
         /// True while an input method is still building the value.
         ///
-        /// Tracked here rather than read from the editor's composing range because that
-        /// range says what the platform last marked, and a commit does not necessarily
-        /// clear it; what matters is whether the value has been finalized.
+        /// A property of the delivery rather than of the document: what this needs to
+        /// know is whether the text that just arrived was provisional, which is answered
+        /// by which method delivered it. Reading the editor's composing range would
+        /// answer the same question today by depending on when that range happens to be
+        /// set and cleared around each notification, which is more than this needs to
+        /// rely on.
         boolean isProvisional() {
             return provisional;
         }
