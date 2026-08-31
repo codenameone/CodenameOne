@@ -86,9 +86,23 @@ public abstract class Executor {
     // JVM/JavaSE executable jar. The cloud target submits to the "linux" queue; the
     // local "local-linux-device" target builds on the developer's own machine.
     public static final String BUILD_TARGET_LINUX_NATIVE = "linux-device";
-    // Native Mac (ParparVM Catalyst slice, rides the iOS pipeline with
-    // macNative.enabled). The cloud target name; "mac-source" is the local project.
+    // Native Mac (AppKit). The cloud target name; "mac-source" is the local
+    // Xcode project. Both names are inherited from the Mac Catalyst target that
+    // preceded this port, so an existing project keeps building without an edit
+    // and simply gets the AppKit app instead.
     public static final String BUILD_TARGET_MAC_NATIVE = "mac-os-x-native";
+    // The local counterpart, mirroring local-linux-device: builds the AppKit app
+    // on the developer's own Mac rather than submitting it. Separate from the
+    // cloud name for the same reason Windows and Linux keep the two apart --
+    // "which machine compiled this" is not something a target string should
+    // leave ambiguous.
+    public static final String BUILD_TARGET_MAC_NATIVE_LOCAL = "local-mac-device";
+    // Mac Catalyst has no target of its own, deliberately. It IS an iPhone
+    // build: IPhoneBuilder switches to the Catalyst slice on the
+    // macNative.enabled hint alone and has always done so, so an iOS target
+    // plus that hint is the whole of it. Giving it a target name would add a
+    // second spelling for something the hint already says, in the maven
+    // targeting, the ant template and both builders.
     private String buildTarget;
 
     private static boolean disableDelete;
@@ -414,6 +428,22 @@ public abstract class Executor {
         public void usesClass(String cls);
 
         public void usesClassMethod(String cls, String method);
+
+        /**
+         * The class whose body the following {@code usesClass*} callbacks belong
+         * to, reported before any of them.
+         *
+         * <p>{@link #declaresType(String, String, boolean)} cannot serve: it
+         * fires at {@code visitEnd()}, after every reference in the class has
+         * already been delivered. A scanner that needs to know WHO made a
+         * reference -- rather than only what was referenced -- has nothing else
+         * to ask. That distinction is load-bearing wherever the tree being
+         * scanned is the application merged with the framework, because a
+         * framework class's own references are present in every build ever
+         * made.</p>
+         */
+        public default void scanningType(String cls) {
+        }
 
         /**
          * Reports that {@code cls} declares {@code iface} among its
@@ -822,12 +852,15 @@ public abstract class Executor {
     protected DatabaseUsage scanForDatabaseUsage(File classesDir) throws IOException {
         boolean[] found = {false, false};
         if (classesDir != null && classesDir.isDirectory()) {
-            scanForDatabaseUsage(classesDir, "", found);
+            // One budget for the whole scan, so a hundred small archives cannot
+            // add up to what one big one is refused for.
+            scanForDatabaseUsage(classesDir, "", found, new PermScanBudget());
         }
         return new DatabaseUsage(found[0], found[1]);
     }
 
-    private void scanForDatabaseUsage(File dir, String relativePath, boolean[] found)
+    private void scanForDatabaseUsage(File dir, String relativePath, boolean[] found,
+            PermScanBudget budget)
             throws IOException {
         File[] children = dir.listFiles();
         if (children == null) {
@@ -841,18 +874,18 @@ public abstract class Executor {
             String childPath = relativePath.length() == 0
                     ? child.getName() : relativePath + "/" + child.getName();
             if (child.isDirectory()) {
-                scanForDatabaseUsage(child, childPath, found);
+                scanForDatabaseUsage(child, childPath, found, budget);
             } else if (child.getName().endsWith(".aar")) {
                 // An Android archive carries its bytecode in a nested classes.jar, and the
                 // generated gradle links it like any other dependency, so encryption configured
                 // inside one has to count exactly as a plain jar's does.
-                scanArchiveForDatabaseUsage(child, found);
+                scanArchiveForDatabaseUsage(child, found, budget);
             } else if (child.getName().endsWith(".jar")) {
                 // A library can be the only thing that touches the database: the application calls
                 // the library, and Android stages the jar into libs and links it through the
                 // generated fileTree. Reading loose class files alone reported no database use and
                 // dropped the engine out from under code that runs it.
-                scanArchiveForDatabaseUsage(child, found);
+                scanArchiveForDatabaseUsage(child, found, budget);
             } else if (child.getName().endsWith(".class")
                     && !isFrameworkDatabaseClass(childPath)) {
                 inspectClassForDatabaseUsage(readAllBytes(child), found);
@@ -861,7 +894,8 @@ public abstract class Executor {
     }
 
     /// Reads the class entries of a library archive, which carry the same weight as loose ones.
-    private void scanArchiveForDatabaseUsage(File archive, boolean[] found) {
+    private void scanArchiveForDatabaseUsage(File archive, boolean[] found,
+            PermScanBudget budget) {
         java.util.zip.ZipFile zip = null;
         try {
             zip = new java.util.zip.ZipFile(archive);
@@ -869,6 +903,16 @@ public abstract class Executor {
             while (entries.hasMoreElements() && !(found[0] && found[1])) {
                 java.util.zip.ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
+                // Charged before any branch, exactly as the permission scanner
+                // beside this one does and for the same reason: skipping an
+                // entry here is cheap, because ZipFile is random access, but
+                // cheap per entry is not the same as bounded, and the central
+                // directory of the OUTER archive is attacker-controlled too.
+                // Charging only the entries this scan wanted left directories,
+                // nested archives and every other name free to iterate past the
+                // advertised limit -- and a nested .jar is not even cheap, since
+                // each one costs a whole recursive scan.
+                budget.entry(name);
                 if (entry.isDirectory()) {
                     continue;
                 }
@@ -886,10 +930,19 @@ public abstract class Executor {
                     try {
                         java.io.InputStream nested = zip.getInputStream(entry);
                         try {
-                            scanNestedArchiveForDatabaseUsage(nested, found);
+                            scanNestedArchiveForDatabaseUsage(nested, found, budget);
                         } finally {
                             nested.close();
                         }
+                    } catch (ScanBudgetExceeded refused) {
+                        // Same exception, opposite handling, for the reason the
+                        // comment above gives: the consequence of dropping
+                        // classes here is silent and lands on the device. A .jar
+                        // that turns out not to be an archive genuinely says
+                        // nothing about the entries after it; a refusal says the
+                        // rest is unknown, and unknown has to be resolved
+                        // upwards rather than skipped past.
+                        throw refused;
                     } catch (IOException cannotReadEntry) {
                         log("WARNING: could not read " + name + " inside " + archive
                                 + " while looking for database use; the rest of the archive was "
@@ -905,16 +958,37 @@ public abstract class Executor {
                 try {
                     java.io.InputStream in = zip.getInputStream(entry);
                     try {
-                        inspectClassForDatabaseUsage(readAllBytes(in), found);
+                        inspectClassForDatabaseUsage(
+                                budget.readEntry(in, name, entry.getSize()), found);
                     } finally {
                         in.close();
                     }
+                } catch (ScanBudgetExceeded refused) {
+                    // Not swallowed like an unreadable entry. Skipping one entry
+                    // and reading on is right when that entry is corrupt; it is
+                    // wrong when the budget stopped us, because the aggregate
+                    // budget then refuses every entry after it as well and the
+                    // archive quietly contributes nothing while looking read.
+                    throw refused;
                 } catch (IOException cannotReadEntry) {
                     log("WARNING: could not read " + name + " inside " + archive
                             + " while looking for database use; the rest of the archive was still "
                             + "read");
                 }
             }
+        } catch (ScanBudgetExceeded refused) {
+            // Answer YES rather than continue with a partial read. This gate
+            // decides whether the SQLite and cipher implementations are linked
+            // in, so a false negative is a green build that fails on the device
+            // the first time the application opens a database -- and a refusal
+            // means the rest of the archive is UNKNOWN, not absent. Being wrong
+            // in this direction costs a fatter binary (and on Android a higher
+            // minimum SDK), which is the loud, recoverable half of the trade.
+            found[0] = true;
+            found[1] = true;
+            log("WARNING: " + archive + " was refused by the scan budget ("
+                    + refused.getMessage() + "); assuming it uses an encrypted database, "
+                    + "because what it contains past that point cannot be known");
         } catch (IOException cannotRead) {
             // An archive that cannot be opened says nothing either way, and refusing to build over
             // it would fail every application carrying a jar this cannot parse.
@@ -931,15 +1005,36 @@ public abstract class Executor {
     }
 
     /// Reads the class entries of an archive inside an archive, which is where an AAR keeps them.
-    private void scanNestedArchiveForDatabaseUsage(java.io.InputStream nested, boolean[] found)
-            throws IOException {
-        java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(nested);
+    private void scanNestedArchiveForDatabaseUsage(java.io.InputStream nested, boolean[] found,
+            PermScanBudget budget) throws IOException {
+        // Bounded at the source, exactly as extractNestedClassesForPermissions
+        // is. The per-entry budgets below cannot see the bytes getNextEntry()
+        // spends parsing local headers, and an enclosing AAR compresses fifty
+        // thousand near-identical headers to almost nothing -- so without this a
+        // small upload buys gigabytes of header parsing that nothing charges
+        // for. The permission scanner has had this since it was written; this
+        // scan was a weaker copy of that loop standing next to it.
+        java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(
+                new BoundedInputStream(nested, budget));
         java.util.zip.ZipEntry entry = in.getNextEntry();
         while (entry != null && !(found[0] && found[1])) {
             String name = entry.getName();
+            // Charged before ANY test of what the entry is, directories
+            // included. A directory carries no payload, so neither byte budget
+            // ever reaches it, and its header is the whole cost -- which is
+            // precisely the case entry()'s own contract calls out by name.
+            budget.entry(name);
             if (!entry.isDirectory() && name.endsWith(".class")
                     && !isFrameworkDatabaseClass(name)) {
-                inspectClassForDatabaseUsage(readAllBytes(in), found);
+                inspectClassForDatabaseUsage(budget.readEntry(in, name, entry.getSize()), found);
+            } else {
+                // Drained rather than skipped. Stepping over an entry is not
+                // free on a ZipInputStream: getNextEntry() has to inflate
+                // whatever is left of the current one before it can find the
+                // next, so an entry this scan does not want costs the same CPU
+                // as one it does. A directory drains to nothing, which is
+                // correct and cheap.
+                budget.drain(in, name, entry.getSize());
             }
             entry = in.getNextEntry();
         }
@@ -1190,11 +1285,496 @@ public abstract class Executor {
         }
         return out.toByteArray();
     }
+
+    /**
+     * Scans the class entries of a library archive for permissions.
+     *
+     * <p>Extracted to a temporary directory and handed back to
+     * {@link #scanClassesForPermissions}, rather than read straight out of the
+     * zip, so the ASM-version fallbacks stay in one place: this codebase reads
+     * bytecode with ASM 5 and drops to a constant-pool scan for anything newer,
+     * and duplicating that decision here is how the two would drift.</p>
+     */
+    /**
+     * What one library archive may expand to while it is scanned for protected
+     * API usage.
+     *
+     * <p>The archives are customer-supplied and this scan runs on a shared build
+     * host, so the extraction needs a budget: a few kilobytes of deflate stream
+     * expands without limit, and filling the temporary disk takes down every
+     * build on the machine rather than only the one that submitted the
+     * archive.</p>
+     *
+     * <p>Generous against real libraries by a wide margin. A class file is
+     * bounded by the JVM's own method and constant-pool limits and is rarely past
+     * a megabyte, and a large cn1lib holds thousands of them rather than tens of
+     * thousands. Exceeding a budget abandons the scan for that archive through
+     * the warning {@link #scanArchiveForPermissions} already prints, rather than
+     * failing the build: refusing to scan is not a reason to refuse to build, and
+     * the warning says which entitlements are consequently unjustified.</p>
+     */
+    private static final long PERM_SCAN_MAX_ENTRY_BYTES = 16L * 1024 * 1024;
+
+    /** The aggregate companion to {@link #PERM_SCAN_MAX_ENTRY_BYTES}. */
+    private static final long PERM_SCAN_MAX_TOTAL_BYTES = 256L * 1024 * 1024;
+
+    /** The entry-count companion, for an archive of many small bombs. */
+    // Package-visible, with the budget class, so the limits can be exercised
+    // directly: this accounting has now been wrong twice and neither time was
+    // reachable from a public entry point.
+    static final int PERM_SCAN_MAX_ENTRIES = 50000;
+
+    /**
+     * The running extraction budget for one archive, shared by the outer scan and
+     * the nested-jar descent so the two cannot disagree about the limit -- and so
+     * a bomb cannot get twice the budget by being nested.
+     */
+    /**
+     * A stream that refuses to yield more than a fixed number of bytes.
+     *
+     * <p>Wrapped around a nested archive before ZipInputStream sees it.
+     * getNextEntry() inflates and parses each local header -- the entry name
+     * included, and a name may be 64KB -- before any per-entry budget can
+     * charge for it, so an archive of 50,000 maximally-named entries is
+     * gigabytes of metadata that the payload budgets never observe. Counting
+     * what the stream yields bounds headers and payloads alike, at the one
+     * place every byte has to pass through.</p>
+     */
+    static final class BoundedInputStream extends InputStream {
+        private final InputStream delegate;
+        private final PermScanBudget budget;
+
+        BoundedInputStream(InputStream delegate, PermScanBudget budget) {
+            this.delegate = delegate;
+            this.budget = budget;
+        }
+
+        private void charge(long n) throws IOException {
+            if (n <= 0) {
+                return;
+            }
+            // The BUDGET, not a counter of this stream's own. One allowance per
+            // archive scan, shared by every nested jar in it: a per-stream bound
+            // resets on each nested entry, so an aar that spreads its metadata
+            // over many nested jars paid the limit once per jar and the total
+            // was unbounded again.
+            budget.chargeStream(n);
+        }
+
+        @Override
+        public int read() throws IOException {
+            int b = delegate.read();
+            if (b >= 0) {
+                charge(1);
+            }
+            return b;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            int n = delegate.read(b, off, len);
+            charge(n);
+            return n;
+        }
+
+        @Override
+        public long skip(long n) throws IOException {
+            long skipped = delegate.skip(n);
+            charge(skipped);
+            return skipped;
+        }
+
+        @Override
+        public int available() throws IOException {
+            return delegate.available();
+        }
+
+        @Override
+        public void close() throws IOException {
+            delegate.close();
+        }
+    }
+
+    /**
+     * Thrown when a scan refuses to keep reading, as opposed to failing to read.
+     *
+     * <p>The difference matters to the database scan. An archive that cannot be
+     * parsed says nothing either way and is skipped, which is right. A budget
+     * refusal is not that: the bytes were readable and we chose to stop, so what
+     * comes after them is unknown rather than absent -- and answering "no
+     * database use" for an unknown ships an application whose SQLite or cipher
+     * implementation was left out of the build. A separate type is what lets the
+     * two be told apart at the catch.</p>
+     */
+    static final class ScanBudgetExceeded extends IOException {
+        ScanBudgetExceeded(String message) {
+            super(message);
+        }
+    }
+
+    static final class PermScanBudget {
+        private long total;
+        private int extracted;
+        private int entries;
+        private final long streamLimit;
+        private long streamBytes;
+
+        PermScanBudget() {
+            this(PERM_SCAN_MAX_TOTAL_BYTES);
+        }
+
+        /// The stream allowance is a constructor argument so a test can pick one
+        /// it can actually reach; production always takes the real default.
+        PermScanBudget(long streamLimit) {
+            this.streamLimit = streamLimit;
+        }
+
+        /// Charges raw bytes pulled from a nested archive, headers included.
+        void chargeStream(long n) throws IOException {
+            if (n <= 0) {
+                return;
+            }
+            streamBytes += n;
+            if (streamBytes > streamLimit) {
+                throw new ScanBudgetExceeded("nested archives fed more than " + streamLimit
+                        + " bytes to the permission scan; refusing to keep reading");
+            }
+        }
+
+        /**
+         * Charges one archive entry, whatever becomes of it.
+         *
+         * <p>Every entry, not just the ones extracted: a nested entry that is
+         * drained costs no data bytes, so the byte budgets say nothing about it,
+         * and its ZIP header compresses to almost nothing in the enclosing
+         * archive. Counting only extracted entries therefore let a small upload
+         * ask the daemon to step through an unbounded number of empty or
+         * directory entries.</p>
+         */
+        void entry(String name) throws IOException {
+            if (++entries > PERM_SCAN_MAX_ENTRIES) {
+                throw new ScanBudgetExceeded("more than " + PERM_SCAN_MAX_ENTRIES
+                        + " archive entries; refusing to keep scanning (at " + name + ")");
+            }
+        }
+
+        /**
+         * The file the next entry extracts to, numbered flat.
+         *
+         * <p>Flattened onto a counter rather than the entry's own path: the
+         * scanner reads the class's own name out of its bytecode, never off the
+         * file system, and a flat name cannot escape the temporary directory the
+         * way an archive path could.</p>
+         */
+        File nextFile(File tmp) throws IOException {
+            if (extracted >= PERM_SCAN_MAX_ENTRIES) {
+                throw new ScanBudgetExceeded("more than " + PERM_SCAN_MAX_ENTRIES
+                        + " class entries; refusing to keep extracting");
+            }
+            return new File(tmp, (extracted++) + ".class");
+        }
+
+        /**
+         * Reads one entry to its end under the budget WITHOUT keeping it.
+         *
+         * <p>For an entry the scan does not want, which it still cannot afford to
+         * let the stream inflate unbounded.</p>
+         */
+        void drain(InputStream in, String name, long declared) throws IOException {
+            copy(in, null, name, declared);
+        }
+
+        /**
+         * Reads one entry into memory under the same budget as {@link #copy}.
+         *
+         * <p>For a scan that hands the bytes straight to ASM rather than to a
+         * file. The database scan used to do this with an unbounded
+         * ByteArrayOutputStream, so one crafted entry in a submitted jar could
+         * expand until the build JVM died -- on a shared build host, taking
+         * whatever else was running with it. The bytes are charged as they
+         * arrive, which is the only check a compression bomb cannot lie its way
+         * past, and the declared size is a hint used to refuse early rather than
+         * a bound.</p>
+         */
+        byte[] readEntry(InputStream in, String name, long declared) throws IOException {
+            if (declared > PERM_SCAN_MAX_ENTRY_BYTES) {
+                throw new ScanBudgetExceeded("entry " + name + " declares " + declared
+                        + " bytes; refusing to read it");
+            }
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(
+                    declared > 0 && declared < 65536 ? (int) declared : 8192);
+            byte[] buf = new byte[8192];
+            int n;
+            long entryBytes = 0;
+            while ((n = in.read(buf)) != -1) {
+                entryBytes += n;
+                total += n;
+                if (entryBytes > PERM_SCAN_MAX_ENTRY_BYTES) {
+                    throw new ScanBudgetExceeded("class entry " + name + " expands past "
+                            + PERM_SCAN_MAX_ENTRY_BYTES + " bytes; refusing to keep reading");
+                }
+                if (total > PERM_SCAN_MAX_TOTAL_BYTES) {
+                    throw new ScanBudgetExceeded("class entries expand beyond the "
+                            + PERM_SCAN_MAX_TOTAL_BYTES
+                            + " byte scan budget; refusing to keep reading");
+                }
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        }
+
+        /**
+         * Copies one entry under the budget.
+         *
+         * @param declared the size the archive CLAIMS, used only to skip an entry
+         *                 without reading it. It comes out of the same untrusted
+         *                 file as the bytes, so it is a hint and never the bound.
+         */
+        void copy(InputStream in, File out, String name, long declared) throws IOException {
+            if (declared > PERM_SCAN_MAX_ENTRY_BYTES) {
+                throw new ScanBudgetExceeded("entry " + name + " declares " + declared
+                        + " bytes; refusing to read it");
+            }
+            if (out == null) {
+                // Drain: the same accounting, no file. Kept on one code path so
+                // the limits cannot come to differ between what is extracted and
+                // what is merely stepped over.
+                byte[] buf = new byte[8192];
+                int n;
+                long entryBytes = 0;
+                while ((n = in.read(buf)) != -1) {
+                    entryBytes += n;
+                    total += n;
+                    if (entryBytes > PERM_SCAN_MAX_ENTRY_BYTES) {
+                        throw new ScanBudgetExceeded("entry " + name + " expands past "
+                                + PERM_SCAN_MAX_ENTRY_BYTES + " bytes; refusing to keep reading");
+                    }
+                    if (total > PERM_SCAN_MAX_TOTAL_BYTES) {
+                        throw new ScanBudgetExceeded("archive entries expand beyond the "
+                                + PERM_SCAN_MAX_TOTAL_BYTES
+                                + " byte scan budget; refusing to keep reading");
+                    }
+                }
+                return;
+            }
+            FileOutputStream fos = new FileOutputStream(out);
+            try {
+                byte[] buf = new byte[8192];
+                int n;
+                long entryBytes = 0;
+                while ((n = in.read(buf)) != -1) {
+                    entryBytes += n;
+                    total += n;
+                    // Checked as the bytes arrive, which is the only check a
+                    // compression bomb cannot lie its way past.
+                    if (entryBytes > PERM_SCAN_MAX_ENTRY_BYTES) {
+                        throw new ScanBudgetExceeded("class entry " + name + " expands past "
+                                + PERM_SCAN_MAX_ENTRY_BYTES + " bytes; refusing to keep reading");
+                    }
+                    if (total > PERM_SCAN_MAX_TOTAL_BYTES) {
+                        throw new ScanBudgetExceeded("class entries expand beyond the "
+                                + PERM_SCAN_MAX_TOTAL_BYTES
+                                + " byte scan budget; refusing to keep extracting");
+                    }
+                    fos.write(buf, 0, n);
+                }
+            } finally {
+                fos.close();
+            }
+        }
+    }
+
+    /**
+     * Extracts the {@code .class} entries of a nested archive, continuing the
+     * caller's flat numbering.
+     *
+     * @return the next free number
+     */
+    // static and package-visible so a test can drive the real loop: asserting
+    // that the budget counts is worth little unless something also asserts
+    // this loop charges it.
+    static void extractNestedClassesForPermissions(InputStream nested, File tmp,
+            PermScanBudget budget) throws IOException {
+        // Bounded at the source: see BoundedInputStream. The per-entry budgets
+        // below cannot see the bytes getNextEntry() spends parsing headers.
+        java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
+                new BoundedInputStream(nested, budget));
+        java.util.zip.ZipEntry inner;
+        while ((inner = zis.getNextEntry()) != null) {
+            // Charged before the branch, so a drained entry costs the same
+            // against the count as an extracted one.
+            budget.entry(inner.getName());
+            if (inner.isDirectory() || !inner.getName().endsWith(".class")) {
+                // Drained under the budget rather than skipped. This is a
+                // ZipInputStream, so the next getNextEntry() has to reach the end
+                // of this entry to find the boundary and inflates it to get
+                // there -- an entry we never extract is decompressed anyway. A
+                // few kilobytes of deflate stream in a non-class entry could
+                // therefore still occupy the daemon for as long as it liked,
+                // which the class-entry limits alone did nothing about. The
+                // outer scan needs no such thing: it reads through ZipFile,
+                // where skipping an entry is random access and costs nothing.
+                budget.drain(zis, inner.getName(), inner.getSize());
+                continue;
+            }
+            budget.copy(zis, budget.nextFile(tmp), inner.getName(), inner.getSize());
+        }
+    }
+
+    /// One archive's entries, scanned under a single budget.
+    ///
+    /// Extracted so the outer loop can be driven by a test the way the nested
+    /// one can. Three defects have been found in this accounting and none of
+    /// them was reachable while it lived inside an instance method on an
+    /// abstract class.
+    static void scanArchiveEntriesForPermissions(java.util.zip.ZipFile zip, File tmp,
+            String archiveName, StringBuilder message, PermScanBudget budget) throws IOException {
+        java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+        while (entries.hasMoreElements()) {
+            java.util.zip.ZipEntry entry = entries.nextElement();
+            // Charged before any branch. Skipping an entry here is cheap --
+            // ZipFile is random access -- but cheap per entry is not the same
+            // as unbounded, and the central directory of the OUTER archive is
+            // attacker-controlled too. Charging only the nested loop left this
+            // one free to iterate past the advertised limit.
+            budget.entry(entry.getName());
+            if (entry.isDirectory()) {
+                continue;
+            }
+            if (entry.getName().endsWith(".jar")) {
+                // An Android archive keeps its bytecode in a nested
+                // classes.jar, so an .aar scanned for .class entries
+                // alone yields nothing at all -- and the permissions it
+                // would have justified are simply absent from the
+                // signature, which shows up as a denial on the device
+                // rather than as a build failure. The database scan
+                // beside this one already descends for the same reason.
+                //
+                // Caught per entry: a name ending in .jar need not be an
+                // archive, and one unreadable entry says nothing about
+                // the rest of the library.
+                try {
+                    InputStream nested = zip.getInputStream(entry);
+                    try {
+                        extractNestedClassesForPermissions(nested, tmp, budget);
+                    } finally {
+                        nested.close();
+                    }
+                } catch (ScanBudgetExceeded refused) {
+                    // Let it out, so the caller's handler reports it. Swallowing
+                    // it here left the loudest case the quietest: the budget is
+                    // shared, so every entry after the refusal is refused too,
+                    // and the archive finished with no protected API found and
+                    // not one word about why. The permissions it would have
+                    // justified are then simply absent from the manifest.
+                    throw refused;
+                } catch (IOException cannotReadEntry) {
+                    message.append("WARNING: could not read ")
+                            .append(entry.getName()).append(" inside ")
+                            .append(archiveName)
+                            .append(" while looking for protected API usage; the rest of "
+                                    + "the archive was still read\n");
+                }
+                continue;
+            }
+            if (!entry.getName().endsWith(".class")) {
+                continue;
+            }
+            InputStream in = zip.getInputStream(entry);
+            try {
+                budget.copy(in, budget.nextFile(tmp), entry.getName(), entry.getSize());
+            } finally {
+                in.close();
+            }
+        }
+    }
+
+    private void scanArchiveForPermissions(File archive, ClassScanner scanner,
+            PermScanBudget budget) throws IOException {
+        File tmp = File.createTempFile("cn1-perm-scan", ".d");
+        if (!tmp.delete() || !tmp.mkdirs()) {
+            return;
+        }
+        try {
+            ScanBudgetExceeded refused = null;
+            try {
+                java.util.zip.ZipFile zip = new java.util.zip.ZipFile(archive);
+                try {
+                    scanArchiveEntriesForPermissions(zip, tmp, archive.getName(), message, budget);
+                } finally {
+                    zip.close();
+                }
+            } catch (ScanBudgetExceeded stopped) {
+                refused = new ScanBudgetExceeded("scanning " + archive.getName()
+                        + " for protected API usage was refused: " + stopped.getMessage()
+                        + ". Its remaining entries cannot be read, so the permissions and "
+                        + "entitlements it would justify cannot be determined");
+            } catch (IOException ex) {
+                // A library that cannot be read must not fail the build, but it must
+                // not pass silently either: the entitlements it would have justified
+                // are the ones now missing.
+                message.append("WARNING: could not scan ").append(archive.getName())
+                        .append(" for protected API usage (").append(ex.toString()).append(")\n");
+            }
+            // Whatever was extracted before the failure is still scanned. This
+            // call used to sit inside the try, so an archive that failed on its
+            // last entry threw away the answers from every entry before it --
+            // classes already on disk, already parsed for, and simply dropped.
+            scanClassesForPermissions(tmp, scanner, budget);
+            if (refused != null) {
+                // Rethrown rather than warned about, unlike an unreadable
+                // archive. That one says nothing either way and is common and
+                // benign; a refusal means a readable archive we chose to stop
+                // reading, so the rest is UNKNOWN. Both ways of guessing at an
+                // unknown are harmful here -- a missing permission is a denial
+                // on the device, an invented one is a question from a store
+                // reviewer -- so there is no conservative answer to pick, only a
+                // loud one. Every builder turns this into a build failure naming
+                // the archive, which the developer can split or shrink.
+                throw refused;
+            }
+        } finally {
+            deletePermissionScanTemp(tmp);
+        }
+    }
+
+    private static void deletePermissionScanTemp(File f) {
+        File[] children = f.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                deletePermissionScanTemp(child);
+            }
+        }
+        f.delete();
+    }
+
     protected void scanClassesForPermissions(File directory, final ClassScanner scanner) throws IOException {
+        // ONE budget for the whole traversal. It used to be created per archive,
+        // which is no cap at all when the number of archives is chosen by
+        // whoever submitted them: a hundred small bombs each stayed inside the
+        // per-archive allowance and together decompressed without limit on a
+        // shared build host. The database scan was given a shared budget for
+        // exactly this reason and this one was left behind.
+        scanClassesForPermissions(directory, scanner, new PermScanBudget());
+    }
+
+    private void scanClassesForPermissions(File directory, final ClassScanner scanner,
+            PermScanBudget budget) throws IOException {
         File[] list = directory.listFiles();
         for (final File current : list) {
             if (current.isDirectory()) {
-                scanClassesForPermissions(current, scanner);
+                scanClassesForPermissions(current, scanner, budget);
+            } else if (current.getName().endsWith(".jar") || current.getName().endsWith(".aar")) {
+                // A submitted library can be the only thing that reaches a
+                // protected API: the application calls the cn1lib, and unzip()
+                // routes library jars to btres rather than unpacking them beside
+                // the loose classes. Reading loose classes alone therefore
+                // reported no camera, microphone, Bluetooth or location use and
+                // produced a bundle with neither the entitlement nor the usage
+                // description -- which macOS answers by killing the process.
+                // scanForDatabaseUsage already descends into archives for the
+                // same reason; this is that rule applied to permissions.
+                scanArchiveForPermissions(current, scanner, budget);
             } else {
                 if (current.getName().endsWith(".class")) {
                     InputStream is = new FileInputStream(current);
@@ -1221,6 +1801,10 @@ public abstract class Executor {
                         public void visit(int i, int accessFlags, String string, String string1, String superName, String[] interfaces) {
                             scannedName = string;
                             scannedSuper = superName;
+                            // Announced first, before the references below and
+                            // before any method body, so a scanner can attribute
+                            // what follows to the class that made it.
+                            scanner.scanningType(string);
                             // ACC_PUBLIC 0x0001, ACC_INTERFACE 0x0200,
                             // ACC_ABSTRACT 0x0400. A class the generated
                             // bindings construct from another package has
@@ -1346,54 +1930,236 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitFrame(int i, int i1, Object[] os, int i2, Object[] os1) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 /**
-                                  * The literal pushed immediately before
-                                  * the next call, or null. Cleared by
-                                  * every other visit below -- including
-                                  * labels and frames, since a constant
-                                  * that is last before a merge point is
-                                  * not a straight-line argument -- so
-                                  * "unknown" is what a missed case
-                                  * degrades to.
+                                  * The values pushed since the last point
+                                  * this could still follow, newest last.
+                                  * A slot holds TRUE/FALSE for a boolean
+                                  * literal and null for a value whose
+                                  * identity is not tracked.
+                                  *
+                                  * <p>This used to be a single slot
+                                  * holding the literal pushed IMMEDIATELY
+                                  * before the call, which cannot see the
+                                  * argument of any method that takes
+                                  * another one after it. The API this
+                                  * exists for is exactly that shape --
+                                  * {@code Camera.requestPermissions(boolean
+                                  * audio, SuccessCallback callback)} --
+                                  * so the callback push cleared the slot,
+                                  * the value always arrived null, and the
+                                  * consumer's "null counts as asking"
+                                  * fallback granted the microphone to
+                                  * every caller including the video-only
+                                  * ones the argument was added to
+                                  * recognise. The narrowing was inert.</p>
+                                  *
+                                  * <p>Indexed from the END at the call, so
+                                  * the receiver of an instance call does
+                                  * not have to be modelled: the descriptor
+                                  * says how many arguments there are and
+                                  * they are the last that many.</p>
+                                  *
+                                  * <p>Deliberately conservative. Only
+                                  * instructions that push exactly one
+                                  * value and are modelled below append;
+                                  * ANYTHING else clears the whole list, so
+                                  * an unmodelled opcode degrades to
+                                  * "unknown" rather than to a wrong
+                                  * answer. That direction matters: over
+                                  * declaring costs a permission the
+                                  * application does not need, under
+                                  * declaring costs a SecurityException on
+                                  * a user's device.</p>
                                   */
-                                private Boolean pushedBoolean;
+                                private final java.util.ArrayList<Boolean> pushedValues =
+                                        new java.util.ArrayList<Boolean>();
+
+                                /** Records one pushed value, bounding the list. */
+                                private void pushed(Boolean value) {
+                                    if (pushedValues.size() > 16) {
+                                        pushedValues.remove(0);
+                                    }
+                                    pushedValues.add(value);
+                                }
+
+                                /**
+                                 * Models INVOKESPECIAL of a constructor: it pops
+                                 * the declared arguments and the duplicated
+                                 * object reference, leaving the one NEW pushed.
+                                 *
+                                 * <p>Modelled because javac compiles an anonymous
+                                 * SuccessCallback as NEW, DUP, INVOKESPECIAL, so
+                                 * clearing here discarded the boolean pushed
+                                 * before it and the call was reported as unknown.
+                                 * Ordinary calls stay conservative.</p>
+                                 */
+                                private void poppedConstructorArguments(String descriptor) {
+                                    int args = countArguments(descriptor);
+                                    if (args < 0 || pushedValues.size() < args + 1) {
+                                        pushedValues.clear();
+                                        return;
+                                    }
+                                    for (int i = 0; i <= args; i++) {
+                                        pushedValues.remove(pushedValues.size() - 1);
+                                    }
+                                }
+
+                                /**
+                                 * Argument 0 of a call whose descriptor
+                                 * declares {@code argCount} arguments, or
+                                 * null when the list does not reach back
+                                 * that far.
+                                 */
+                                private Boolean argumentZero(String descriptor) {
+                                    int argCount = countArguments(descriptor);
+                                    if (argCount < 1 || pushedValues.size() < argCount) {
+                                        return null;
+                                    }
+                                    return pushedValues.get(pushedValues.size() - argCount);
+                                }
+
+                                /** Arguments declared by a method descriptor. */
+                                private int countArguments(String descriptor) {
+                                    if (descriptor == null || descriptor.length() < 2
+                                            || descriptor.charAt(0) != '(') {
+                                        return -1;
+                                    }
+                                    int count = 0;
+                                    int i = 1;
+                                    while (i < descriptor.length()
+                                            && descriptor.charAt(i) != ')') {
+                                        char c = descriptor.charAt(i);
+                                        if (c == '[') {
+                                            i++;
+                                            continue;
+                                        }
+                                        if (c == 'L') {
+                                            int end = descriptor.indexOf(';', i);
+                                            if (end < 0) {
+                                                return -1;
+                                            }
+                                            i = end + 1;
+                                        } else {
+                                            i++;
+                                        }
+                                        count++;
+                                    }
+                                    return i < descriptor.length() ? count : -1;
+                                }
 
                                 @Override
                                 public void visitInsn(int i) {
-                                    pushedBoolean = i == Opcodes.ICONST_0
-                                            ? Boolean.FALSE
-                                            : i == Opcodes.ICONST_1
-                                                    ? Boolean.TRUE : null;
+                                    if (i == Opcodes.ICONST_0) {
+                                        pushed(Boolean.FALSE);
+                                    } else if (i == Opcodes.ICONST_1) {
+                                        pushed(Boolean.TRUE);
+                                    } else if (i == Opcodes.ACONST_NULL
+                                            || i == Opcodes.ICONST_M1
+                                            || i == Opcodes.ICONST_2 || i == Opcodes.ICONST_3
+                                            || i == Opcodes.ICONST_4 || i == Opcodes.ICONST_5
+                                            || i == Opcodes.LCONST_0 || i == Opcodes.LCONST_1
+                                            || i == Opcodes.FCONST_0 || i == Opcodes.FCONST_1
+                                            || i == Opcodes.FCONST_2
+                                            || i == Opcodes.DCONST_0 || i == Opcodes.DCONST_1) {
+                                        // Each pushes exactly one value that is
+                                        // not a boolean literal. Modelled rather
+                                        // than cleared: ACONST_NULL is what javac
+                                        // emits for the documented
+                                        // requestPermissions(false, null) form,
+                                        // so clearing here discarded the very
+                                        // flag this tracker exists to read and
+                                        // the call was reported as unknown.
+                                        pushed(null);
+                                    } else if (i == Opcodes.DUP) {
+                                        // Duplicates the top of stack. javac
+                                        // emits NEW, DUP, INVOKESPECIAL for an
+                                        // anonymous SuccessCallback, so this is
+                                        // the other half of the same problem.
+                                        pushed(pushedValues.isEmpty() ? null
+                                                : pushedValues.get(pushedValues.size() - 1));
+                                    } else if (i == Opcodes.POP) {
+                                        if (pushedValues.isEmpty()) {
+                                            pushedValues.clear();
+                                        } else {
+                                            pushedValues.remove(pushedValues.size() - 1);
+                                        }
+                                    } else {
+                                        // Still conservative for everything with
+                                        // a wider or less obvious stack effect --
+                                        // POP2, SWAP, the DUP_X and DUP2 family,
+                                        // arithmetic, array access. An unknown
+                                        // answer costs an entitlement that is not
+                                        // needed; a WRONG one costs a
+                                        // SecurityException on a user's device.
+                                        pushedValues.clear();
+                                    }
                                 }
 
                                 @Override
                                 public void visitIntInsn(int i, int i1) {
-                                    pushedBoolean = null;
+                                    // BIPUSH / SIPUSH / NEWARRAY each push one
+                                    // value, and none of them is a boolean
+                                    // literal this cares about.
+                                    pushed(null);
                                 }
 
                                 @Override
                                 public void visitVarInsn(int i, int i1) {
-                                    pushedBoolean = null;
+                                    // A load pushes exactly one value; a store
+                                    // pops one. Modelling only the loads and
+                                    // clearing otherwise keeps this honest.
+                                    if (i == Opcodes.ILOAD || i == Opcodes.LLOAD
+                                            || i == Opcodes.FLOAD || i == Opcodes.DLOAD
+                                            || i == Opcodes.ALOAD) {
+                                        pushed(null);
+                                    } else {
+                                        pushedValues.clear();
+                                    }
                                 }
 
                                 @Override
                                 public void visitTypeInsn(int i, String string) {
-                                    pushedBoolean = null;
+                                    // NEW / ANEWARRAY push one; CHECKCAST and
+                                    // INSTANCEOF replace the top. Only the
+                                    // pushes are modelled.
+                                    if (i == Opcodes.NEW || i == Opcodes.ANEWARRAY) {
+                                        pushed(null);
+                                    } else {
+                                        pushedValues.clear();
+                                    }
                                     scanner.usesClass(string);
                                 }
 
                                 @Override
                                 public void visitFieldInsn(int i, String string, String string1, String string2) {
-                                    pushedBoolean = null;
+                                    // GETSTATIC pushes one value out of
+                                    // nothing; the others pop or pop-and-push
+                                    // and are not modelled.
+                                    if (i == Opcodes.GETSTATIC) {
+                                        pushed(null);
+                                    } else {
+                                        pushedValues.clear();
+                                    }
                                 }
 
                                 @Override
                                 public void visitMethodInsn(int i, String owner, String name, String descriptor) {
-                                    Boolean arg = pushedBoolean;
-                                    pushedBoolean = null;
+                                    Boolean arg = argumentZero(descriptor);
+                                    // Conservative for an ordinary call: it
+                                    // consumed its arguments and may have pushed
+                                    // a result, and modelling that exactly is not
+                                    // worth the risk of a wrong answer. A
+                                    // constructor is the exception, because it is
+                                    // half of how javac spells an anonymous
+                                    // callback argument.
+                                    if (name != null && name.equals("<init>")) {
+                                        poppedConstructorArguments(descriptor);
+                                    } else {
+                                        pushedValues.clear();
+                                    }
                                     scanner.usesClass(owner);
                                     if (name != null && !name.equals("<init>")) {
                                         scanner.usesClassMethod(owner, name);
@@ -1406,8 +2172,19 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
-                                    Boolean arg = pushedBoolean;
-                                    pushedBoolean = null;
+                                    Boolean arg = argumentZero(descriptor);
+                                    // Conservative for an ordinary call: it
+                                    // consumed its arguments and may have pushed
+                                    // a result, and modelling that exactly is not
+                                    // worth the risk of a wrong answer. A
+                                    // constructor is the exception, because it is
+                                    // half of how javac spells an anonymous
+                                    // callback argument.
+                                    if (name != null && name.equals("<init>")) {
+                                        poppedConstructorArguments(descriptor);
+                                    } else {
+                                        pushedValues.clear();
+                                    }
                                     scanner.usesClass(owner);
                                     if (name != null && !name.equals("<init>")) {
                                         scanner.usesClassMethod(owner, name);
@@ -1422,7 +2199,29 @@ public abstract class Executor {
                                 public void visitInvokeDynamicInsn(String name,
                                         String descriptor, Handle bootstrap,
                                         Object... args) {
-                                    pushedBoolean = null;
+                                    // Modelled, not cleared. javac compiles
+                                    // requestPermissions(false, event -> ...)
+                                    // as ICONST_0, INVOKEDYNAMIC (building the
+                                    // lambda), then the call -- so clearing
+                                    // here threw away the very argument this
+                                    // tracker exists to read, and the lambda
+                                    // form is the common one. The call site's
+                                    // descriptor names the captured values as
+                                    // its arguments and the functional
+                                    // interface instance as its return, so it
+                                    // consumes and produces exactly like the
+                                    // ordinary call it resembles.
+                                    int captured = countArguments(descriptor);
+                                    if (captured < 0
+                                            || pushedValues.size() < captured) {
+                                        pushedValues.clear();
+                                    } else {
+                                        for (int i = 0; i < captured; i++) {
+                                            pushedValues.remove(
+                                                    pushedValues.size() - 1);
+                                        }
+                                    }
+                                    pushed(null);
                                     // A method reference -- store::readSamples,
                                     // or a lambda body -- is an invokedynamic
                                     // whose real target sits in the bootstrap
@@ -1479,17 +2278,17 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitJumpInsn(int i, Label label) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
                                 public void visitLabel(Label label) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
                                 public void visitLdcInsn(Object o) {
-                                    pushedBoolean = null;
+                                    pushed(null);
                                     if (o instanceof Type) {
                                         scanner.usesClass(((Type) o).getClassName());
                                     }
@@ -1497,22 +2296,22 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitIincInsn(int i, int i1) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
                                 public void visitTableSwitchInsn(int i, int i1, Label label, Label[] labels) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
                                 public void visitLookupSwitchInsn(Label label, int[] ints, Label[] labels) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
                                 public void visitMultiANewArrayInsn(String string, int i) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
@@ -1528,7 +2327,7 @@ public abstract class Executor {
 
                                 @Override
                                 public void visitLineNumber(int i, Label label) {
-                                    pushedBoolean = null;
+                                    pushedValues.clear();
                                 }
 
                                 @Override
@@ -1574,6 +2373,495 @@ public abstract class Executor {
                 result.add(f);
             }
         }
+    }
+
+    /**
+     * The {@code -source} / {@code -target} pair to compile the generated
+     * application stub with.
+     *
+     * <p>Shared by both Apple builders, which generate the same shape of stub.
+     * The default is 1.6 because ParparVM targets Java 5 with Java 8 syntax via
+     * retrolambda; a JDK 9 or later javac refuses 1.6 outright, so those compile
+     * the stub as 8 instead.</p>
+     */
+    /**
+     * The leading integer of a version string, or {@code defaultVal} when it has
+     * none.
+     */
+    protected int getMajorVersionInt(String versionStr, int defaultVal) {
+        if (versionStr == null) {
+            return defaultVal;
+        }
+        int pos = versionStr.indexOf(".");
+        try {
+            return Integer.parseInt(pos != -1 ? versionStr.substring(0, pos) : versionStr);
+        } catch (Throwable ex) {
+            return defaultVal;
+        }
+    }
+
+    protected String[] getStubCompileSourceTarget(String javacPath) {
+        String source = "1.6";
+        String target = "1.6";
+        int major = -1;
+        String version = null;
+        try {
+            String versionOutput = execString(getBuildDirectory() != null ? getBuildDirectory() : new File("."), javacPath, "-version");
+            if (versionOutput != null && versionOutput.trim().length() > 0) {
+                String[] parts = versionOutput.trim().split("\\s+");
+                version = parts[parts.length - 1];
+                major = getMajorVersionInt(version, -1);
+            }
+        } catch (Exception ex) {
+            debug("Failed to resolve the javac version for the stub compile: " + ex.getMessage());
+        }
+        if (major < 0) {
+            version = System.getProperty("java.version");
+            major = getMajorVersionInt(version, -1);
+        }
+        if (major >= 9) {
+            source = "8";
+            target = "8";
+            log("JDK " + version + " does not support -source/-target 1.6. Compiling the stubs with -source/-target 8.");
+        }
+        return new String[]{source, target};
+    }
+
+    /**
+     * The framework headers the generated native-interface bridge imports.
+     *
+     * <p>The bridge itself is platform neutral -- it moves a native peer pointer
+     * across the ParparVM boundary -- but the file it lands in is compiled
+     * alongside the port's own Objective-C, so it has to see the same UI
+     * framework.</p>
+     */
+    /*
+     * Type-name mapping for the generated native-interface bridge. Shared by
+     * both Apple builders because the mangling is ParparVM's, not any one
+     * platform's.
+     */
+
+    protected String convertToJavaMethod(Class type) {
+        if(type.isArray()) {
+            type = type.getComponentType();
+            if(Integer.class == type || Integer.TYPE == type) {
+                return "nsDataToIntArray(";
+            }
+            if(Long.class == type || Long.TYPE == type) {
+                return "nsDataToLongArray(";
+            }
+            if(Byte.class == type || Byte.TYPE == type) {
+                return "nsDataToByteArr(";
+            }
+            if(Short.class == type || Short.TYPE == type) {
+                return "nsDataToShortArray(";
+            }
+            if(Character.class == type || Character.TYPE == type) {
+                return "nsDataToCharArray(";
+            }
+            if(Boolean.class == type || Boolean.TYPE == type) {
+                return "nsDataToBooleanArray(";
+            }
+            if(Float.class == type || Float.TYPE == type) {
+                return "nsDataToFloatArray(";
+            }
+            if(Double.class == type || Double.TYPE == type) {
+                return "nsDataToDoubleArray(";
+            }
+        }
+        if(String.class == type) {
+            return "fromNSString(CN1_THREAD_GET_STATE_PASS_ARG ";
+        }
+        return "";
+    }
+
+    protected String getSimpleNameWithJavaLang(Class c) {
+        if(c.isPrimitive()) {
+            return c.getSimpleName();
+        }
+        if(c.isArray()) {
+            return getSimpleNameWithJavaLang(c.getComponentType()) + "[]";
+        }
+        if(c.getClass().getName().startsWith("java.lang.")) {
+            return c.getName();
+        }
+        return c.getSimpleName();
+    }
+
+    protected String typeToXMLVMJavaName(Class type) {
+        if(type.isArray()) {
+            return getSimpleNameWithJavaLang(type.getComponentType()).replace('.', '_') + "_1ARRAY";
+        }
+        return getSimpleNameWithJavaLang(type).replace('.', '_');
+    }
+
+    protected String typeToXMLVMName(Class type) {
+        if(type.getName().equals("com.codename1.ui.PeerComponent")) {
+            return "JAVA_LONG";
+        }
+        if(Integer.class == type || Integer.TYPE == type) {
+            return "JAVA_INT";
+        }
+        if(Long.class == type || Long.TYPE == type) {
+            return "JAVA_LONG";
+        }
+        if(Byte.class == type || Byte.TYPE == type) {
+            return "JAVA_BYTE";
+        }
+        if(Short.class == type || Short.TYPE == type) {
+            return "JAVA_SHORT";
+        }
+        if(Character.class == type || Character.TYPE == type) {
+            return "JAVA_CHAR";
+        }
+        if(Boolean.class == type || Boolean.TYPE == type) {
+            return "JAVA_BOOLEAN";
+        }
+        if(Void.class == type || Void.TYPE == type) {
+            return "void";
+        }
+        if(Float.class == type || Float.TYPE == type) {
+            return "JAVA_FLOAT";
+        }
+        if(Double.class == type || Double.TYPE == type) {
+            return "JAVA_DOUBLE";
+        }
+        // array/string
+        return "JAVA_OBJECT";
+    }
+
+    protected String convertToObjectiveCMethod(Class type) {
+        if(type.isArray()) {
+            return "arrayToData(";
+        }
+        if(String.class == type) {
+            return "toNSString(CN1_THREAD_GET_STATE_PASS_ARG ";
+        }
+        return "";
+    }
+
+    protected String convertToClosing(Class type) {
+        if(type.isArray()) {
+            return ")";
+        }
+        if(String.class == type) {
+            return ")";
+        }
+        return "";
+    }
+
+    /**
+     * The Objective-C type the generated bridge sends and receives for a Java
+     * type.
+     *
+     * <p>Derived the same way the bridge body is: an array crosses as
+     * {@code NSData}, a String as {@code NSString}, a PeerComponent as the
+     * native handle, and everything else keeps its ParparVM C typedef.</p>
+     */
+    /// The marker every generated placeholder header carries, so a later build
+    /// can tell its own file from one the developer wrote.
+    private static final String PLACEHOLDER_MARKER = "Auto-generated placeholder: the native interface";
+
+    private static boolean isGeneratedPlaceholderHeader(File header) {
+        try {
+            String body = new String(java.nio.file.Files.readAllBytes(header.toPath()), StandardCharsets.UTF_8);
+            return body.contains(PLACEHOLDER_MARKER);
+        } catch (IOException ex) {
+            // Unreadable means "not ours": overwriting a file we cannot inspect
+            // would be the one outcome worth avoiding here.
+            return false;
+        }
+    }
+
+    protected String objectiveCTypeFor(Class type) {
+        if (type.isArray()) {
+            return "NSData*";
+        }
+        if (String.class == type) {
+            return "NSString*";
+        }
+        return typeToXMLVMName(type);
+    }
+
+    protected String nativeInterfaceFrameworkImports() {
+        return "#import \"CodenameOne_GLViewController.h\"\n"
+                + "#import <UIKit/UIKit.h>\n";
+    }
+
+    /**
+     * Generates the Java and Objective-C halves of every {@code @NativeInterface}
+     * binding the application declares.
+     *
+     * <p>Shared by both Apple builders. The Java class carries the native methods
+     * ParparVM turns into C functions; the generated {@code .m} defines those
+     * functions and forwards each to the developer's own Objective-C class,
+     * reached through a peer pointer. A native interface with no implementation
+     * in the project gets a placeholder header rather than a build failure, and
+     * calls into it no-op -- which is what the runtime already does when the peer
+     * comes back nil.</p>
+     */
+    protected void generateNativeInterfaceBindings(File stubSource, File resDir) throws BuildException {
+            Class[] nativeInterfaces = getNativeInterfaces();
+            if(nativeInterfaces != null && nativeInterfaces.length > 0) {
+                for(Class currentNative : nativeInterfaces) {
+                    File folder = new File(stubSource, currentNative.getPackage().getName().replace('.', File.separatorChar));
+                    folder.mkdirs();
+                    File javaFile = new File(folder, currentNative.getSimpleName() + getImplSuffix() + ".java");
+                
+                    String javaImplSourceFile = "package " + currentNative.getPackage().getName() + ";\n\n"
+                            + "import com.codename1.ui.PeerComponent;\n\n"
+                            + "public class " + currentNative.getSimpleName() + getImplSuffix() + " {\n"
+                            + "    private long nativePeer;\n\n"
+                            + "    public " + currentNative.getSimpleName() + getImplSuffix() + "() {\n"
+                            + "        nativePeer = initializeNativePeer();\n"
+                            + "    }\n\n"
+                            + "    public void finalize() {\n"
+                            + "        releaseNativePeerInstance(nativePeer);\n"
+                            + "    }\n\n"
+                            + "    private static native long initializeNativePeer();\n\n"
+                            + "    private static native void releaseNativePeerInstance(long peer);\n\n";
+                
+                    String prefixForNewVM = "";
+                    String postfixForNewVM = "";
+                    String prefix2ForNewVM = "";
+                    String newVMEnterNativeCode = "";
+                    String newVMExitNativeCode = "";
+                    String newVMInclude = "";
+
+                    newVMInclude = "\n#include \"cn1_globals.h\"\n";
+                    newVMEnterNativeCode = "    POOL_BEGIN();\n    enteringNativeAllocations();\n";
+                    newVMExitNativeCode = "    finishedNativeAllocations();\n    POOL_END();\n";
+                    prefixForNewVM = "CODENAME_ONE_THREAD_STATE";
+                    prefix2ForNewVM = "CODENAME_ONE_THREAD_STATE, ";
+                    postfixForNewVM = "_R_long";
+
+                    String classNameWithUnderscores = currentNative.getName().replace('.', '_');
+                    String mSourceFile = "#include \"xmlvm.h\"\n"
+                            + "#include \"java_lang_String.h\"\n"
+                            + "#include <stdlib.h>\n"
+                            + nativeInterfaceFrameworkImports()
+                            + "#import <objc/runtime.h>\n"
+                            + "#import \"" + classNameWithUnderscores + "Impl.h\"\n"
+                            + newVMInclude
+                            + "#include \"" + classNameWithUnderscores + getImplSuffix() + ".h\"\n\n"
+                            + "static id cn1_createNativeInterfacePeer(NSString* className) {\n"
+                            + "    NSMutableArray* candidates = [NSMutableArray arrayWithObject:className];\n"
+                            + "    NSString* executableName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@\"CFBundleExecutable\"];\n"
+                            + "    NSString* bundleName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@\"CFBundleName\"];\n"
+                            + "    NSArray* moduleNames = @[executableName ?: @\"\", bundleName ?: @\"\"];\n"
+                            + "    for(NSString* moduleName in moduleNames) {\n"
+                            + "        if(moduleName.length == 0) {\n"
+                            + "            continue;\n"
+                            + "        }\n"
+                            + "        NSString* sanitized = [[moduleName stringByReplacingOccurrencesOfString:@\"-\" withString:@\"_\"] stringByReplacingOccurrencesOfString:@\" \" withString:@\"_\"];\n"
+                            + "        [candidates addObject:[sanitized stringByAppendingFormat:@\".%@\", className]];\n"
+                            + "        if(![sanitized isEqualToString:moduleName]) {\n"
+                            + "            [candidates addObject:[moduleName stringByAppendingFormat:@\".%@\", className]];\n"
+                            + "        }\n"
+                            + "    }\n"
+                            + "    Class cls = Nil;\n"
+                            + "    for(NSString* candidate in candidates) {\n"
+                            + "        cls = NSClassFromString(candidate);\n"
+                            + "        if(cls != Nil) {\n"
+                            + "            break;\n"
+                            + "        }\n"
+                            + "    }\n"
+                            + "    if(cls == Nil) {\n"
+                            + "        unsigned int classCount = 0;\n"
+                            + "        Class *classList = objc_copyClassList(&classCount);\n"
+                            + "        NSString* dottedSuffix = [@\".\" stringByAppendingString:className];\n"
+                            + "        for(unsigned int i = 0; i < classCount; i++) {\n"
+                            + "            NSString* runtimeName = [NSString stringWithUTF8String:class_getName(classList[i])];\n"
+                            + "            if([runtimeName isEqualToString:className] || [runtimeName hasSuffix:dottedSuffix] || [runtimeName hasSuffix:className]) {\n"
+                            + "                cls = classList[i];\n"
+                            + "                NSLog(@\"[CN1] Resolved native interface class %@ via runtime scan as %@\", className, runtimeName);\n"
+                            + "                break;\n"
+                            + "            }\n"
+                            + "        }\n"
+                            + "        if(classList != NULL) {\n"
+                            + "            free(classList);\n"
+                            + "        }\n"
+                            + "    }\n"
+                            + "    if(cls == Nil) {\n"
+                            + "        NSLog(@\"[CN1] Failed to find native interface class %@. Tried: %@\", className, candidates);\n"
+                            + "        return nil;\n"
+                            + "    }\n"
+                            + "    return [[cls alloc] init];\n"
+                            + "}\n\n"
+                            + "JAVA_LONG " + classNameWithUnderscores + getImplSuffix() + "_initializeNativePeer__" + postfixForNewVM + "(" + prefixForNewVM + ") {\n"
+                            + "    id i = cn1_createNativeInterfacePeer(@\"" + classNameWithUnderscores + "Impl\");\n"
+                            + "    return i;\n"
+                            + "}\n\n"
+                            + "void " + classNameWithUnderscores + getImplSuffix() + "_releaseNativePeerInstance___long(" + prefix2ForNewVM + "JAVA_LONG l) {\n"
+                            + "    id i = (id)l;\n"
+                            + "    [i release];\n"
+                            + "}\n\n"
+                            + "extern NSData* arrayToData(JAVA_OBJECT arr);\n"
+                            + "extern NSString* toNSString(" + prefix2ForNewVM + "JAVA_OBJECT str);\n"
+                            + "extern JAVA_OBJECT nsDataToByteArr(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToBooleanArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToCharArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToShortArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToIntArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToLongArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToFloatArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToDoubleArray(NSData *data);\n\n"
+                            + "void xmlvm_init_native_"+ classNameWithUnderscores + getImplSuffix() + "() {}\n\n";
+
+                    for(Method m : currentNative.getMethods()) {
+                        String name = m.getName();
+                        if(name.equals("hashCode") || name.equals("equals") || name.equals("toString")) {
+                            continue;
+                        }
+                    
+                        Class returnType = m.getReturnType();
+                    
+                        mSourceFile += typeToXMLVMName(returnType) + " " + currentNative.getName().replace('.', '_') + getImplSuffix() + "_" + 
+                                name + "__";
+                        String mFileArgs;
+                        String mFileBody;
+
+                        mFileArgs = "(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me";
+                        mFileBody = "    id ptr = (id)get_field_" + classNameWithUnderscores + getImplSuffix() + "_nativePeer(me);\n";
+
+                    
+                        if(!(returnType.equals(Void.class) || returnType.equals(Void.TYPE))) {
+                            mFileBody += "    " + typeToXMLVMName(returnType) + " returnValue = " + convertToJavaMethod(returnType);
+                        }
+                        mFileBody += "[((" + classNameWithUnderscores + "Impl*)ptr) " + name;
+                    
+                        if(returnType.getName().equals("com.codename1.ui.PeerComponent")) {
+                            javaImplSourceFile += "    public native long " + name + "(";
+                        } else {
+                            javaImplSourceFile += "    public native " + getSimpleNameWithJavaLang(returnType) + " " + name + "(";
+                        }
+                        Class[] params = m.getParameterTypes();
+                        if(params != null && params.length > 0) {
+                            for(int iter = 0 ; iter < params.length ; iter++) {
+                                if(params[iter].getName().equals("com.codename1.ui.PeerComponent")) {
+                                    params[iter] = Long.TYPE;
+                                }
+                            }
+                            javaImplSourceFile += getSimpleNameWithJavaLang(params[0]) + " param0";
+                            for(int iter = 1 ; iter < params.length ; iter++) {
+                                javaImplSourceFile += ", " + getSimpleNameWithJavaLang(params[iter]) + " param" + iter;
+                            }
+                                                
+                            for(int iter = 0 ; iter < params.length ; iter++) {
+                                mSourceFile += "_" + typeToXMLVMJavaName(params[iter]);
+                                mFileArgs += ", " + typeToXMLVMName(params[iter]) + " param" + iter;
+                                if(iter == 0) {
+                                    mFileBody += ":" + convertToObjectiveCMethod(params[iter]) + "param0" + convertToClosing(params[iter]); 
+                                } else {
+                                    mFileBody += " param" + iter + ":" + convertToObjectiveCMethod(params[iter]) + "param" + iter + convertToClosing(params[iter]); 
+                                }
+                            }
+                        }
+
+                        if(!(returnType.equals(Void.class) || returnType.equals(Void.TYPE))) {
+                            if(returnType.getName().endsWith("PeerComponent")) {
+                                mSourceFile += "_R_long";
+                            } else {
+                                mSourceFile += "_R_" + typeToXMLVMJavaName(returnType);
+                            }
+                        }
+
+                        if(!(returnType.equals(Void.class) || returnType.equals(Void.TYPE))) {
+                            mSourceFile += mFileArgs + ") {\n" + newVMEnterNativeCode +
+                                    mFileBody + "]" + convertToClosing(returnType) + ";\n" + newVMExitNativeCode 
+                                    + "    return returnValue;\n}\n\n";                        
+                        } else {
+                            mSourceFile += mFileArgs + ") {\n" + newVMEnterNativeCode +
+                                    mFileBody + "]" + convertToClosing(returnType) + ";\n" + newVMExitNativeCode 
+                                    + "}\n\n";                        
+                        }
+                        javaImplSourceFile += ");\n";
+                    }
+                
+                    javaImplSourceFile += "}\n";
+                
+                
+                    try (FileOutputStream out = new FileOutputStream(javaFile)) {
+                        out.write(javaImplSourceFile.getBytes(StandardCharsets.UTF_8));
+                    } catch (IOException ex) {
+                        throw new BuildException("Error while generating native interface stub for "+currentNative, ex);
+                    }
+                    File mFile = new File(resDir, "native_" + currentNative.getName().replace('.', '_') + getImplSuffix() + ".m");
+
+                    try (FileOutputStream out = new FileOutputStream(mFile)) {
+                        out.write(mSourceFile.getBytes(StandardCharsets.UTF_8));
+                    } catch (IOException ex) {
+                        throw new BuildException("Error while generating native interface stub for "+currentNative, ex);
+                    }
+
+                    // The generated .m imports "<X>Impl.h" -- the Objective-C
+                    // class the user is expected to provide as their native
+                    // implementation. When no such class exists for this app
+                    // (native interfaces pulled in transitively from a CN1
+                    // library, the app never instantiates them), the build
+                    // still needs an @interface in scope so the .m compiles.
+                    // Generate a tiny placeholder iff the user hasn't dropped
+                    // their own copy alongside the project sources. The peer
+                    // class itself stays absent at runtime, which is fine: any
+                    // call into this native interface from Java would have
+                    // failed to resolve a peer regardless.
+                    File implHeader = new File(resDir, classNameWithUnderscores + "Impl.h");
+                    // Rewritten when the file on disk is one of ours, not only
+                    // when it is missing. The build directory survives between
+                    // runs, so a placeholder written by an earlier build would
+                    // otherwise be kept forever -- including after the interface
+                    // gained a method, which is a stale declaration set standing
+                    // in front of the real one.
+                    if (!implHeader.exists() || isGeneratedPlaceholderHeader(implHeader)) {
+                        String guard = classNameWithUnderscores.toUpperCase() + "_IMPL_H";
+                        // The methods are declared, not just the class. The
+                        // generated bridge sends them to a receiver typed as this
+                        // class, so an empty @interface makes every one of those
+                        // an unchecked send -- and a build that treats an
+                        // unchecked send as an error, which the macOS one does
+                        // because that is how a UIKit-to-AppKit port crashes,
+                        // cannot tell this apart from a real mistake.
+                        StringBuilder decls = new StringBuilder();
+                        for (Method placeholderMethod : currentNative.getMethods()) {
+                            String placeholderName = placeholderMethod.getName();
+                            if (placeholderName.equals("hashCode") || placeholderName.equals("equals")
+                                    || placeholderName.equals("toString")) {
+                                continue;
+                            }
+                            decls.append("- (")
+                                 .append(objectiveCTypeFor(placeholderMethod.getReturnType()))
+                                 .append(")").append(placeholderName);
+                            Class[] placeholderParams = placeholderMethod.getParameterTypes();
+                            for (int iter = 0; iter < placeholderParams.length; iter++) {
+                                if (iter > 0) {
+                                    decls.append(" param").append(iter);
+                                }
+                                decls.append(":(").append(objectiveCTypeFor(placeholderParams[iter]))
+                                     .append(")param").append(iter);
+                            }
+                            decls.append(";\n");
+                        }
+                        String hStub = "#ifndef " + guard + "\n"
+                                + "#define " + guard + "\n"
+                                + "// " + PLACEHOLDER_MARKER + " "
+                                + currentNative.getName() + " has no user-provided\n"
+                                + "// Objective-C implementation in this project. The CN1\n"
+                                + "// runtime returns nil from cn1_createNativeInterfacePeer\n"
+                                + "// in that case; calls into the peer no-op silently.\n"
+                                + "#include \"cn1_globals.h\"\n"
+                                + "#import <Foundation/Foundation.h>\n"
+                                + "@interface " + classNameWithUnderscores + "Impl : NSObject\n"
+                                + decls
+                                + "@end\n"
+                                + "#endif\n";
+                        try (FileOutputStream out = new FileOutputStream(implHeader)) {
+                            out.write(hStub.getBytes(StandardCharsets.UTF_8));
+                        } catch (IOException ex) {
+                            throw new BuildException("Error while generating placeholder header for "+currentNative, ex);
+                        }
+                    }
+                }
+            }
     }
 
     public Class[] getNativeInterfaces() {
@@ -2506,11 +3794,95 @@ public abstract class Executor {
         return exec(dir, javaHome, timeout, (Map<String, String>) null, varArgs);
     }
 
+
+    /**
+     * Argument VALUES the next {@link #exec} must not print, or null.
+     *
+     * <p>By value rather than by position, deliberately. The first version of
+     * this took indices and the caller counted them wrong by one -- it redacted
+     * the {@code -P} flag and printed the password beside it, so the leak was
+     * "fixed" and still leaking, which is the worst state for a credential to be
+     * in. A value cannot be miscounted.</p>
+     *
+     * <p>An instance field rather than a parameter because the logging happens
+     * in one place at the bottom of five overloads. Always set and cleared
+     * around a single call -- see {@link #execRedacted}.</p>
+     */
+    private java.util.Set<String> redactedArgValues;
+
+    /**
+     * Runs a command whose arguments at {@code secretIndices} are credentials.
+     *
+     * <p>{@code exec} appends every argument to the build message that is handed
+     * back to the customer AND to the daemon's stdout, so a password on the
+     * command line is retained twice over: once in an error log the customer
+     * reads, once in host logging that outlives the build. This is the only way
+     * to run {@code security import} or {@code notarytool submit} without doing
+     * that.</p>
+     *
+     * <p>The process still receives the real argument -- this redacts the log,
+     * not the command. A command line is visible to other processes on the host
+     * while it runs, which is a smaller and much shorter-lived exposure than a
+     * log file, and neither tool accepts the secret any other way.</p>
+     */
+    public boolean execRedacted(File dir, int timeout, String[] secrets, String... varArgs)
+            throws Exception {
+        redactedArgValues = redactionSet(secrets);
+        try {
+            return exec(dir, timeout, varArgs);
+        } finally {
+            redactedArgValues = null;
+        }
+    }
+
+    /**
+     * The secrets worth redacting, dropping null and empty ones.
+     *
+     * <p>An empty secret would match every argument that happens to be empty and
+     * turn an ordinary command line into noise, which teaches whoever reads the
+     * log to stop trusting it.</p>
+     */
+    static java.util.Set<String> redactionSet(String[] secrets) {
+        java.util.Set<String> out = new java.util.HashSet<String>();
+        if (secrets != null) {
+            for (String s : secrets) {
+                if (s != null && s.length() > 0) {
+                    out.add(s);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** What {@link #exec} prints for one argument. Package-visible so it is testable. */
+    static String redactArg(java.util.Set<String> secrets, String arg) {
+        if (secrets == null || arg == null) {
+            return arg;
+        }
+        if (secrets.contains(arg)) {
+            return "***";
+        }
+        // Also the attached form: `security import` takes -P<password> in some
+        // invocations, and a secret glued to its flag is still a secret.
+        for (String secret : secrets) {
+            if (arg.length() > secret.length() && arg.endsWith(secret)) {
+                return arg.substring(0, arg.length() - secret.length()) + "***";
+            }
+        }
+        return arg;
+    }
+
     public boolean exec(File dir, File javaHome, int timeout, Map<String, String> env, String... varArgs) throws Exception {
         log("Executing: ");
         message.append("Executing: ");
         StringBuilder logSb = new StringBuilder();
-        for (String s : varArgs) {
+        for (int argIdx = 0; argIdx < varArgs.length; argIdx++) {
+            // Redacted arguments are replaced, not omitted, so the command still
+            // reads as the shape it was. Both sinks matter: `message` is returned
+            // to the customer in the build log, and log() goes to the daemon's
+            // own stdout, so a credential printed here outlives the build in
+            // operational logging as well.
+            String s = redactArg(redactedArgValues, varArgs[argIdx]);
             logSb.append(s + " ");
             message.append(s);
             message.append(" ");

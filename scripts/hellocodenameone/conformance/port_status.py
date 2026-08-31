@@ -372,8 +372,17 @@ def validate(manifest: dict) -> dict:
         )):
             problems.append(f"Deployment support row {item.get('id')} is incomplete")
     deployment_by_id = {item.get("id"): item for item in deployment_rows}
-    if "Catalyst" not in json.dumps(deployment_by_id.get("macos", {})):
-        problems.append("macOS support must disclose its Mac Catalyst scope")
+    macos_support = json.dumps(deployment_by_id.get("macos", {}))
+    # This guard exists so the site cannot claim "macOS" while shipping only a
+    # Mac Catalyst slice. It now requires BOTH scopes to be named rather than
+    # just Catalyst: the native AppKit build is the supported target and
+    # Catalyst is still buildable, and a reader deciding between them has to be
+    # able to see that both exist.
+    if "AppKit" not in macos_support or "Catalyst" not in macos_support:
+        problems.append(
+            "macOS support must disclose both the native AppKit build and the "
+            "legacy Mac Catalyst target"
+        )
     if "x64" not in json.dumps(deployment_by_id.get("linux", {})) or "ARM64" not in json.dumps(deployment_by_id.get("linux", {})):
         problems.append("Linux support must declare both x64 and ARM64 evidence")
     linux_contract = json.dumps(deployment_by_id.get("linux", {}))

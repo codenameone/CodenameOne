@@ -3,7 +3,7 @@
 The `com.codename1.gpu` package provides a portable, hardware accelerated 3D
 graphics API focused on games but useful anywhere you need GPU rendered content.
 It runs from one code base on the JavaSE simulator (OpenGL via JOGL), Android
-(OpenGL ES 2), iOS and Mac Catalyst (Metal), the native Windows port (Direct3D
+(OpenGL ES 2), iOS and macOS (Metal), the native Windows port (Direct3D
 11), and the JavaScript port (WebGL). The API integrates with the normal Codename
 One UI: a 3D scene lives inside a regular component that you add to a `Form` like
 any other.
@@ -149,7 +149,7 @@ https://www.codenameone.com/javadoc/com/codename1/gpu/Matrix4.html[Matrix4]
  missing or failing GL driver degrades to a built in software rasterizer instead
  of breaking the simulator. Lets you develop and debug 3D without a device.
 * *Android* - OpenGL ES 2 via a `GLSurfaceView` hosted as a native peer.
-* *iOS and Mac Catalyst* - Metal. Shaders are generated as Metal Shading Language
+* *iOS and macOS* - Metal. Shaders are generated as Metal Shading Language
  and compiled at runtime; vertex/index data is uploaded to `MTLBuffer`s,
  zero-copy where the SIMD allocation permits.
 * *Native Windows* - Direct3D 11. Shaders are generated as HLSL and compiled with

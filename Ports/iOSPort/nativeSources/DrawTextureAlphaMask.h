@@ -23,7 +23,10 @@
 #import "ExecutableOp.h"
 #import "xmlvm.h"
 #ifdef USE_ES2
+// OpenGL ES does not exist on macOS; this port is Metal-only.
+#if !TARGET_OS_OSX
 #import <OpenGLES/ES2/gl.h>
+#endif
 #else
 #import <OpenGLES/ES1/gl.h>
 #endif

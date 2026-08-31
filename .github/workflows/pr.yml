@@ -754,10 +754,20 @@ jobs:
         with:
           name: quality-report
           path: quality-report.md
+      # Guards the property that the step below cannot fail this build. It
+      # could, and did: a 504 publishing a green report failed the job.
+      - name: Check the quality comment publisher cannot fail a build
+        if: ${{ always() && matrix.java-version == 8 }}
+        run: node .github/scripts/test-publish-quality-comment.mjs
       - name: Publish quality report comment
         if: ${{ always() && github.event_name == 'pull_request' && matrix.java-version == 8 && hashFiles('quality-report.md') != '' }}
         uses: actions/github-script@v9
         with:
+          # Retried rather than fatal on a transient 5xx. The publisher
+          # already warns instead of throwing; this is the cheaper half of
+          # the same fix, so the comment usually still lands. 4xx codes the
+          # action treats as permanent are not retried.
+          retries: 3
           script: |
             const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
             await publishQualityComment({ github, context, core });

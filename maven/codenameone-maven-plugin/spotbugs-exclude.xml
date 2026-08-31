@@ -229,4 +229,23 @@
             <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NULL_VALUE" />
         </Or>
     </Match>
+    <!--
+    argumentZero answers a THREE state question: the argument was true, it was
+    false, or the scan could not resolve it. Boolean with null for the third is
+    the shape the ClassScanner hook already uses and documents
+    (usesClassMethodWithBooleanArgument takes a Boolean, and its javadoc says a
+    caller must treat null as the feature being on), so a consumer that reads
+    null as "unknown" is following the contract rather than tripping over it.
+
+    Returning false instead, which is what the pattern asks for, would be the
+    dangerous answer: unknown would become "the application did not ask for the
+    microphone", and the build would ship without the permission it needs. Over
+    declaring costs a permission that is not used; under declaring costs a
+    SecurityException on a user's device.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.builders\.Executor\$.*" />
+        <Method name="argumentZero" />
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
+    </Match>
 </FindBugsFilter>

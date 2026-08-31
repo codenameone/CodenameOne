@@ -77,6 +77,18 @@ final class GattOperationQueue {
                 advance(op);
             }
         });
+        // NOT advanced from a cancel observer. AsyncResource.cancel() cancels
+        // the CALLER's interest; it does not cancel the request the platform
+        // already has. Starting the next operation there put two of them in
+        // flight at once -- on Android the second overwrites the first's
+        // pending slot, so the first callback settles the second request with
+        // the wrong result, and the one-operation-at-a-time stacks simply
+        // reject it.
+        //
+        // The slot stays reserved until the platform answers, which still
+        // reaches the listener above because completing an already-done
+        // resource runs its callbacks again, or until the safety timeout
+        // below decides the answer is never coming.
         boolean startNow;
         synchronized (lock) {
             if (current == null) {
@@ -159,11 +171,23 @@ final class GattOperationQueue {
                 synchronized (lock) {
                     isCurrent = current == op; //NOPMD CompareObjectsWithEquals
                 }
-                if (isCurrent && !op.result.isDone()) {
-                    op.result.error(new BluetoothException(
-                            BluetoothError.TIMEOUT,
-                            "GATT operation timed out after " + t + "ms"));
+                if (!isCurrent) {
+                    return;
                 }
+                if (op.result.isDone()) {
+                    // Already answered, and still holding the slot: the
+                    // caller CANCELLED it. The platform was never told, so
+                    // the slot was kept until its callback arrived -- and
+                    // this is the case where it never did. Releasing it here
+                    // is the difference between one lost operation and a
+                    // peripheral that accepts nothing else for the life of
+                    // the connection.
+                    advance(op);
+                    return;
+                }
+                op.result.error(new BluetoothException(
+                        BluetoothError.TIMEOUT,
+                        "GATT operation timed out after " + t + "ms"));
             }
         };
         op.timeoutTask = task;

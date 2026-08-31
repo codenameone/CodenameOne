@@ -43,7 +43,7 @@
 
 #ifdef CN1_INCLUDE_WEBAUTHN
 
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import <AuthenticationServices/AuthenticationServices.h>
 
 #ifdef NEW_CODENAME_ONE_VM

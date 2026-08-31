@@ -26,7 +26,18 @@
 // UIWebViewDelegate / WebKit are unavailable on watchOS and tvOS; the browser
 // peer is dropped on those slices and this header is empty there.
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
-#import <UIKit/UIKit.h>
+// macOS has WebKit but never had UIWebView, so the browser peer there is the
+// WKWebView path and only that path. The iOS builder chooses between them with
+// these same two macros; on macOS there is nothing to choose.
+#if TARGET_OS_OSX
+#ifndef NO_UIWEBVIEW
+#define NO_UIWEBVIEW
+#endif
+#ifndef ENABLE_WKWEBVIEW
+#define ENABLE_WKWEBVIEW
+#endif
+#endif
+#import "CN1AppleUI.h"
 #import "CodenameOne_GLViewController.h"
 #ifdef ENABLE_WKWEBVIEW
 #import <WebKit/WebKit.h>
@@ -46,6 +57,16 @@ UIWebViewDelegate
 >{
     void *c;
 }
+
+/// The associated-object key recording whether a web view follows a
+/// target=_blank navigation.
+///
+/// Its own address rather than a selector. @selector(cn1FollowTargetBlank) is
+/// the common idiom for a unique key, but the selector is not declared
+/// anywhere, so it reads as a message to a method that does not exist -- and a
+/// build that treats that as an error, which the macOS one does because it is
+/// how a UIKit-to-AppKit port crashes, cannot tell this apart from a real one.
+extern const void *CN1FollowTargetBlankKey;
 
 - (id)initWithCallback:(void*)callback;
 #ifdef ENABLE_WKWEBVIEW

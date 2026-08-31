@@ -33,6 +33,7 @@ import java.io.OutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * The bundled SQLite engine, and its cipher, ship only for applications that use the database.
@@ -364,6 +365,284 @@ class DatabaseUsageScanTest {
         Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
         assertTrue(usage.usesDatabase(), "the archive uses the database");
         assertTrue(usage.usesDatabaseCipher(), "and encrypts it");
+    }
+
+    /// A nested archive is bounded even by the entries the scan does not want.
+    ///
+    /// Stepping over an entry is not free on a ZipInputStream: getNextEntry()
+    /// has to inflate whatever is left of the current one before it can find
+    /// the next. So a deflate bomb under a name that is not .class cost the
+    /// same CPU as one that is, while being charged nothing -- a small upload
+    /// could spin the shared build host for as long as it liked. The bomb here
+    /// is 32MB of zeroes, which deflates to a few kilobytes and is past the
+    /// 16MB per-entry ceiling.
+    ///
+    /// Asserted through a database class placed AFTER the bomb in the same
+    /// nested jar: it is not reported, which can only be true if the scan
+    /// stopped at the bomb rather than reading past it. A refused archive is
+    /// logged and skipped rather than failing the build, which is why the
+    /// assertion is on what was found and not on a thrown exception.
+    @Test
+    void aNestedArchiveIsBoundedByEntriesTheScanSkips() throws IOException {
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs() || lib.isDirectory());
+        java.io.ByteArrayOutputStream inner = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream innerZip = new java.util.zip.ZipOutputStream(inner);
+        try {
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("assets/bomb.bin"));
+            byte[] chunk = new byte[1024 * 1024];
+            for (int i = 0; i < 32; i++) {
+                innerZip.write(chunk);
+            }
+            innerZip.closeEntry();
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Plain.class"));
+            innerZip.write(classTouchingNothing());
+            innerZip.closeEntry();
+        } finally {
+            innerZip.close();
+        }
+        java.util.zip.ZipOutputStream aar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "bomb.aar")));
+        try {
+            aar.putNextEntry(new java.util.zip.ZipEntry("classes.jar"));
+            aar.write(inner.toByteArray());
+            aar.closeEntry();
+        } finally {
+            aar.close();
+        }
+
+        // Neither class in this archive touches the database, so a scan that
+        // read the whole thing answers no. It answers YES, which can only be
+        // the refusal talking -- and answering yes is the point: what the
+        // archive contains past the bomb is UNKNOWN, and reporting "no database
+        // use" for an unknown ships an application whose SQLite implementation
+        // was left out of the build and which fails on the device the first
+        // time it opens one.
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(),
+                "a budget refusal must be assumed to hide database use");
+        assertTrue(usage.usesDatabaseCipher(), "and to hide encryption with it");
+
+        // The same jar without the bomb answers no, so the assertion above is
+        // about the refusal and not about this scan saying yes to everything.
+        assertTrue(new File(lib, "bomb.aar").delete());
+        java.io.ByteArrayOutputStream plainInner = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream plainZip = new java.util.zip.ZipOutputStream(plainInner);
+        try {
+            plainZip.putNextEntry(new java.util.zip.ZipEntry("assets/small.bin"));
+            plainZip.write(new byte[16]);
+            plainZip.closeEntry();
+            plainZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Plain.class"));
+            plainZip.write(classTouchingNothing());
+            plainZip.closeEntry();
+        } finally {
+            plainZip.close();
+        }
+        java.util.zip.ZipOutputStream ok = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "ok.aar")));
+        try {
+            ok.putNextEntry(new java.util.zip.ZipEntry("classes.jar"));
+            ok.write(plainInner.toByteArray());
+            ok.closeEntry();
+        } finally {
+            ok.close();
+        }
+        assertFalse(executor.scanForDatabaseUsage(root).usesDatabase(),
+                "a nested archive read to its end reports what it actually contains");
+    }
+
+    /// A directory entry costs a header to step over and carries no payload, so
+    /// neither byte budget can ever reach it. Counting only the entries with
+    /// content let a small upload -- an AAR compresses near-identical headers to
+    /// almost nothing -- ask the builder to parse an unbounded number of them,
+    /// which is the case the entry counter exists for and the one it was not
+    /// being consulted about.
+    @Test
+    void directoryEntriesInANestedArchiveAreCountedToo() throws IOException {
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs() || lib.isDirectory());
+        java.io.ByteArrayOutputStream inner = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream innerZip = new java.util.zip.ZipOutputStream(inner);
+        try {
+            for (int i = 0; i <= Executor.PERM_SCAN_MAX_ENTRIES; i++) {
+                innerZip.putNextEntry(new java.util.zip.ZipEntry("d" + i + "/"));
+                innerZip.closeEntry();
+            }
+            // Past the count, so it is only reached by a scan that let every
+            // directory above it through uncharged.
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Plain.class"));
+            innerZip.write(classTouchingNothing());
+            innerZip.closeEntry();
+        } finally {
+            innerZip.close();
+        }
+        java.util.zip.ZipOutputStream aar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "dirs.aar")));
+        try {
+            aar.putNextEntry(new java.util.zip.ZipEntry("classes.jar"));
+            aar.write(inner.toByteArray());
+            aar.closeEntry();
+        } finally {
+            aar.close();
+        }
+
+        // Refused on the entry count, which is reported conservatively for the
+        // same reason any other refusal is: the rest is unknown.
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(),
+                "an archive refused on the entry count must not read as clean");
+    }
+
+    /// The OUTER archive is bounded by the entry count too. Skipping an entry
+    /// there is cheap -- ZipFile is random access -- but cheap per entry is not
+    /// bounded, and its central directory comes out of the same upload. Charging
+    /// only the entries the scan wanted left directories and nested archives
+    /// free to run past the limit, and a nested archive is not even cheap: each
+    /// one costs a whole recursive scan.
+    @Test
+    void theOuterArchiveIsCountedToo() throws IOException {
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs() || lib.isDirectory());
+        java.util.zip.ZipOutputStream jar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "wide.jar")));
+        try {
+            for (int i = 0; i <= Executor.PERM_SCAN_MAX_ENTRIES; i++) {
+                jar.putNextEntry(new java.util.zip.ZipEntry("d" + i + "/"));
+                jar.closeEntry();
+            }
+            jar.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Plain.class"));
+            jar.write(classTouchingNothing());
+            jar.closeEntry();
+        } finally {
+            jar.close();
+        }
+
+        assertTrue(executor.scanForDatabaseUsage(root).usesDatabase(),
+                "an outer archive refused on the entry count must not read as clean");
+    }
+
+    /// The permission scan must not report "no protected API" for an archive it
+    /// was refused. Both ways of guessing at what it did not read are harmful --
+    /// a missing permission is a denial on the device, an invented one is a
+    /// question from a store reviewer -- so the refusal is raised and every
+    /// builder turns it into a build failure naming the archive.
+    ///
+    /// It also has to keep what it DID extract: the scan of the temp directory
+    /// used to sit inside the same try, so an archive that failed on its last
+    /// entry threw away the answers from every entry before it.
+    @Test
+    void aRefusedPermissionScanFailsRatherThanReportingNothing() throws IOException {
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs() || lib.isDirectory());
+        java.util.zip.ZipOutputStream jar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "bomb.jar")));
+        try {
+            jar.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Seen.class"));
+            jar.write(classCalling("rawKey"));
+            jar.closeEntry();
+            jar.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Huge.class"));
+            byte[] chunk = new byte[1024 * 1024];
+            for (int i = 0; i < 32; i++) {
+                jar.write(chunk);
+            }
+            jar.closeEntry();
+        } finally {
+            jar.close();
+        }
+
+        final java.util.List<String> seen = new java.util.ArrayList<String>();
+        Executor.ClassScanner recording = new Executor.ClassScanner() {
+            @Override
+            public void usesClass(String cls) {
+                seen.add(cls);
+            }
+
+            @Override
+            public void usesClassMethod(String cls, String method) {
+                seen.add(cls + "." + method);
+            }
+
+            @Override
+            public void implementsInterface(String cls, String iface) {
+                seen.add(cls + " implements " + iface);
+            }
+        };
+
+        try {
+            executor.scanClassesForPermissions(lib, recording);
+            fail("a refused permission scan must not report success");
+        } catch (IOException refused) {
+            assertTrue(refused.getMessage().contains("bomb.jar"),
+                    "the failure has to name the archive: " + refused.getMessage());
+        }
+
+        // And the class extracted before the refusal was still handed to the
+        // scanner rather than dropped on the way out.
+        assertFalse(seen.isEmpty(), "what was extracted before the refusal is still scanned");
+    }
+
+    /// The permission budget spans the whole traversal, not one archive.
+    ///
+    /// A per-archive allowance is no cap at all when the number of archives is
+    /// chosen by whoever submitted them: each of these two stays comfortably
+    /// inside the per-entry and aggregate limits on its own, and together they
+    /// cross the entry count. The database scan was given a shared budget for
+    /// exactly this reason and this one was left behind.
+    @Test
+    void thePermissionBudgetSpansEveryArchiveInTheSubmission() throws IOException {
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs() || lib.isDirectory());
+        int half = Executor.PERM_SCAN_MAX_ENTRIES / 2 + 10;
+        for (String name : new String[] {"a.jar", "b.jar"}) {
+            java.util.zip.ZipOutputStream jar = new java.util.zip.ZipOutputStream(
+                    new FileOutputStream(new File(lib, name)));
+            try {
+                for (int i = 0; i < half; i++) {
+                    jar.putNextEntry(new java.util.zip.ZipEntry(name + "/d" + i + "/"));
+                    jar.closeEntry();
+                }
+            } finally {
+                jar.close();
+            }
+        }
+
+        Executor.ClassScanner ignoring = new Executor.ClassScanner() {
+            @Override
+            public void usesClass(String cls) {
+            }
+
+            @Override
+            public void usesClassMethod(String cls, String method) {
+            }
+
+            @Override
+            public void implementsInterface(String cls, String iface) {
+            }
+        };
+
+        try {
+            executor.scanClassesForPermissions(lib, ignoring);
+            fail("two archives sharing one budget must cross the entry count together");
+        } catch (IOException refused) {
+            assertTrue(refused.getMessage().contains("refusing to keep scanning")
+                            || refused.getMessage().contains("refused"),
+                    "expected the entry-count refusal, got: " + refused.getMessage());
+        }
+    }
+
+    /// A class that references nothing this scan looks for.
+    private byte[] classTouchingNothing() {
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "com/vendor/Plain", null, "java/lang/Object", null);
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "run", "()V", null, null);
+        m.visitCode();
+        m.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        m.visitMaxs(1, 1);
+        m.visitEnd();
+        w.visitEnd();
+        return w.toByteArray();
     }
 
     @Test

@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.hellocodenameone.tests.graphics;
 
 import com.codename1.ui.EncodedImage;
@@ -18,6 +40,53 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
     private FontImage fontImage;
     private Image scaled;
 
+    /// How many repaints are still allowed while waiting for an asynchronous
+    /// decode. Bounded so a picture that never decodes fails the comparison
+    /// instead of repainting for ever: a wedged suite reports nothing, a wrong
+    /// frame at least says what is wrong.
+    private int decodeRepaintsLeft = 60;
+
+    /// Whether the pictures whose decode is asynchronous are ready to draw.
+    ///
+    /// Image.createImage(byte[]) hands the browser encoded bytes and the
+    /// JavaScript port decodes them on an HTMLImageElement "load" event, so one
+    /// created during a paint cannot be drawn in that same paint. Until it is
+    /// ready the port answers a placeholder size, which is what this reads.
+    /// Every other port decodes synchronously and answers true on the first
+    /// call.
+    private boolean asyncImagesReady(int size) {
+        return fromBytes != null && encoded != null
+                && fromBytes.getWidth() == size && encoded.getWidth() == size;
+    }
+
+    /// Holds the capture until the asynchronously decoded pictures exist.
+    ///
+    /// The repaint request below can only ask for another paint; it cannot stop
+    /// the screenshot being taken before one arrives, and an outstanding decode
+    /// leaves the form perfectly idle, so the settle loop used to see nothing to
+    /// wait for. That is how this test failed intermittently with its top half
+    /// complete and its bottom half all but empty: the two lower variants
+    /// painted before the decode and nothing repainted them afterwards.
+    ///
+    /// Measured against the mutable image rather than the cell width, because
+    /// that is the size every picture here was built at and it needs no bounds
+    /// to read.
+    @Override
+    protected boolean captureBlockedByPendingContent() {
+        return mutable != null && !asyncImagesReady(mutable.getWidth());
+    }
+
+    /// One forced repaint after the decode lands, before the shot.
+    ///
+    /// The gate above says the pictures now exist; it does not say anything has
+    /// drawn them. Without this the capture can still take the frame painted
+    /// while they were missing, which is the same wrong picture arrived at one
+    /// step later.
+    @Override
+    protected long extraSettleBeforeCaptureMillis() {
+        return 150;
+    }
+
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
         int size = bounds.getWidth() / 4;
@@ -35,6 +104,21 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
             fromBytes = Image.createImage(encoded.getImageData(), 0, encoded.getImageData().length);
             fontImage = FontImage.createFixed("" + FontImage.MATERIAL_ALARM_ON, FontImage.getMaterialDesignFont(), 0xff0000, size, size, 2);
             scaled = mutable.scaled(size * 2, size * 2).scaled(size, size);
+        }
+        // The mutable-image variants render into a FRESH image on every paint so
+        // a first-paint transient can heal (see AbstractGraphicsScreenshotTest).
+        // That only helps if something repaints AFTER the decode finishes, and
+        // nothing else will: the form is settled and the capture is next. So ask
+        // for another paint while the asynchronous pictures are still not ready.
+        // This is what made graphics-draw-image-rect differ between runs -- the
+        // bottom half, which is the two mutable-image variants, captured
+        // whatever had decoded by the first paint.
+        if (!asyncImagesReady(size) && decodeRepaintsLeft > 0) {
+            decodeRepaintsLeft--;
+            com.codename1.ui.Form current = com.codename1.ui.Display.getInstance().getCurrent();
+            if (current != null) {
+                current.repaint();
+            }
         }
         int yBound = bounds.getY();
         g.drawImage(mutable, bounds.getX(), yBound);

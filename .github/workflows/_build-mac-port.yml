@@ -1,0 +1,254 @@
+name: _Build macOS port (reusable)
+
+# Reusable workflow that runs scripts/setup-workspace.sh + scripts/build-mac-port.sh
+# once per workflow run, and hands the built tree to scripts-macos.yml's test job
+# as both a cache and a workflow artifact.
+#
+# Separate from _build-ios-port.yml on purpose. That one is shared by
+# scripts-ios.yml, scripts-ios-native.yml and ios-packaging.yml through a single
+# cache key, so folding the mac port into its source hash would make an
+# AppKit-only change pay for four iOS rebuilds.
+#
+# The "cn1-built-mac" cache is keyed on the CN1 source hash with no restore-keys
+# (exact match only). On hit, the entire setup-workspace + build-mac-port
+# sequence is skipped -- the port artifacts in ~/.m2/repository/com/codenameone
+# are already correct for the current source state.
+
+on:
+  workflow_call:
+    outputs:
+      cn1_built_mac_cache_key:
+        description: "Cache key the build job used for the cn1-built-mac artifact bundle. Dependent jobs should reuse this exact key to avoid recomputing the hash and getting a spurious cache miss."
+        value: ${{ jobs.build.outputs.cn1_built_mac_cache_key }}
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    outputs:
+      cn1_built_mac_cache_key: ${{ steps.cn1_built_mac_key.outputs.key }}
+    concurrency:
+      group: mac-port-${{ github.workflow }}-${{ github.ref_name }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
+          fi
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: |
+          set -euo pipefail
+          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Compute CN1 source hash
+        id: src_hash
+        run: |
+          set -euo pipefail
+          # `maven/svg-transcoder/src/main` belongs in here: the cn1-built-mac
+          # cache contains ~/.m2/repository/com/codenameone, including the
+          # svg-transcoder JAR that the test-app build resolves at
+          # transcode-svg time. Without svg-transcoder in the source hash, a
+          # fix to SVGParser etc. doesn't change the cache key, the cn1-built-mac
+          # cache hit short-circuits setup-workspace, the test app keeps
+          # generating against the stale JAR, and the SVG render bug never
+          # gets fixed in CI (most visible on clipped_badge.svg, whose outer
+          # rect kept rendering as a square long after the clip-path
+          # forwarding fix landed in the transcoder source).
+          # Every file under these roots, with no extension allowlist. The list
+          # used to be .java/.m/.h/.xml/.properties/.css, which silently missed
+          # most of what the macOS build actually consumes: CN1MetalShaders.metal,
+          # the .c natives (Renderer.c, Stroker.c, Curve.c), both
+          # Ports/MacPort/shared-*.exclude manifests -- which decide WHICH files
+          # are compiled at all -- the macOS template's .plist and .pbxproj, the
+          # asset catalog's .json, and the bundled .res themes. A PR touching any
+          # of them produced the same key, so build-port skipped the rebuild and
+          # the consumer untarred the previous artifact over its checkout: the
+          # macOS tests then exercised the old binary and passed on a change they
+          # never ran.
+          #
+          # target/ is pruned so a local build cannot change the key; CI checks
+          # out clean, but this hash has to mean the same thing in both places.
+          # The whole of maven/, not two hand-picked modules of it. The rule is
+          # that this hash must cover at least what the CALLER's path filter
+          # triggers on, and scripts-macos.yml triggers on maven/** -- so naming
+          # codenameone-maven-plugin and svg-transcoder left every other module
+          # able to start this job and then hit an exact cache. build-mac-port.sh
+          # runs `-pl designer -am` and `-pl mac -am`, so the modules it actually
+          # rebuilds are the transitive dependencies of those two: core,
+          # css-compiler, javase, factory and the rest. A CSS compiler change is
+          # the concrete case -- the script rebuilds designer precisely so it
+          # reaches the test app, and the cache key was cancelling that rebuild.
+          # Listing them would be the same mistake one module later, so the
+          # subtree is hashed and the list is gone.
+          #
+          # core-unittests is excluded to match the caller's own exclusion; it
+          # builds nothing this port consumes. Over-invalidating costs a rebuild,
+          # under-invalidating costs a green run against code that was never
+          # compiled, so where the two disagree this errs at the former.
+          #
+          # -print0/-0 and sorting the shasum OUTPUT rather than the file list:
+          # widening the scope to maven/ brought in filenames containing spaces
+          # (the archetype's Eclipse .launch files), and `sort | xargs shasum`
+          # splits those on whitespace -- shasum then reports "No such file" for
+          # each fragment and the key is computed from an error message. Sorting
+          # the output keeps the result order-independent without needing a
+          # null-aware sort.
+          # CodenameOneDesigner/src is here because maven/designer is a pom and
+          # nothing else -- it sets <sourceDirectory>../../CodenameOneDesigner/src,
+          # so the module the build script rebuilds by name compiles a tree that
+          # lives outside maven/ entirely. Hashing maven/ alone would have looked
+          # complete and still missed it.
+          SRC_HASH=$(find CodenameOne/src Ports/MacPort Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
+              CodenameOneDesigner/src \
+              maven \
+              \( -name target -o -name .git -o -path 'maven/core-unittests' \) -prune -o -type f -print0 2>/dev/null \
+              | xargs -0 shasum -a 256 | sort | shasum -a 256 | awk '{print $1}')
+          POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
+              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          SCRIPT_HASH=$(shasum -a 256 \
+              scripts/setup-workspace.sh \
+              scripts/build-mac-port.sh \
+              scripts/build-native-themes.sh \
+              .github/workflows/_build-mac-port.yml \
+              | shasum -a 256 | awk '{print $1}')
+          echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        id: cn1_tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v5
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      # Built CN1 + mac port artifacts. Restored after the m2 cache so it
+      # overwrites any stale com/codenameone subtree pulled in by the broader
+      # m2 cache (whose key is keyed on POMs, not source).
+      - name: Compute cn1-built-mac cache key
+        id: cn1_built_mac_key
+        # Single source of truth for the cache key, exposed as a job output
+        # so the dependent build-macos job restores the EXACT key this job
+        # saved against. Computing the same hash again on each consumer
+        # job has been observed to produce a different value on some runners
+        # (suspected: the find -type f traversal picks up runner-specific
+        # filesystem metadata that survives between jobs). Sharing the key
+        # via an output sidesteps that.
+        run: echo "key=cn1-built-mac-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache built CN1 + mac port artifacts
+        id: cn1_built
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.m2/repository/com/codenameone
+            Themes
+            Ports/MacPort/nativeSources
+            Ports/iOSPort/nativeSources
+          key: ${{ steps.cn1_built_mac_key.outputs.key }}
+
+      - name: Setup workspace
+        # Run when the prebuilt CN1 jars are missing, OR when the
+        # codenameone-tools cache (keyed separately, on setup-workspace.sh) is
+        # missing. Without the second condition a jars-cache hit short-circuits
+        # setup-workspace and leaves tools/env.sh absent, which the dependent app
+        # job (build-macos) needs but only ever restores from cache -- so an
+        # evicted tools cache breaks it.
+        if: steps.cn1_built.outputs.cache-hit != 'true' || steps.cn1_tools.outputs.cache-hit != 'true'
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+        timeout-minutes: 40
+
+      - name: Build macOS port
+        if: steps.cn1_built.outputs.cache-hit != 'true'
+        run: ./scripts/build-mac-port.sh -q -DskipTests
+        timeout-minutes: 40
+
+      - name: Report cache outcome
+        run: |
+          if [ "${{ steps.cn1_built.outputs.cache-hit }}" = "true" ]; then
+            echo "cn1-built-mac cache HIT for key cn1-built-mac-${{ runner.os }}-${{ steps.src_hash.outputs.hash }} — setup-workspace and build-mac-port were skipped."
+          else
+            echo "cn1-built-mac cache MISS for key cn1-built-mac-${{ runner.os }}-${{ steps.src_hash.outputs.hash }} — built fresh."
+          fi
+
+      # Hand the built tree to dependent jobs as a workflow ARTIFACT, not only a
+      # cache. The cache above is kept for cross-run build-skip, but caches are
+      # LRU-evicted once the repo cache store exceeds quota -- which, during long
+      # runner-starvation queues, happened between this job and a dependent job's
+      # fail-on-cache-miss restore, hard-failing the dependent job at the
+      # restore step before any work. Artifacts are
+      # not evicted for the life of the run (and survive partial `--failed`
+      # re-runs), so the handoff is reliable. tar relative to / so the home
+      # (~/.m2) and workspace paths restore to identical absolute locations on
+      # the consumer (same macos-15 image -> same /Users/runner paths).
+      - name: Bundle built CN1 + mac port artifacts
+        run: |
+          set -euo pipefail
+          # Include codenameone-tools (the workspace tools dir holding
+          # tools/env.sh) alongside the built tree. It is produced by
+          # setup-workspace in this job and consumed by every dependent build
+          # script (build-macos-app.sh reads ${TMPDIR}/codenameone-tools/
+          # tools/env.sh, TMPDIR=runner.temp). It had its own evictable cache
+          # too; when that cache was evicted mid-queue the dependent builds
+          # failed with "Workspace tools not found" even after the cn1-built-mac
+          # restore succeeded. Bundling it into the same artifact makes the
+          # whole handoff eviction-proof.
+          tar -C / -cf "$RUNNER_TEMP/cn1-built-mac-bundle.tar" \
+            "${HOME#/}/.m2/repository/com/codenameone" \
+            "${GITHUB_WORKSPACE#/}/Themes" \
+            "${GITHUB_WORKSPACE#/}/Ports/MacPort/nativeSources" \
+            "${GITHUB_WORKSPACE#/}/Ports/iOSPort/nativeSources" \
+            "${RUNNER_TEMP#/}/codenameone-tools"
+          ls -la "$RUNNER_TEMP/cn1-built-mac-bundle.tar"
+
+      - name: Upload built CN1 + mac port bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: cn1-built-mac-bundle
+          path: ${{ runner.temp }}/cn1-built-mac-bundle.tar
+          retention-days: 1
+          if-no-files-found: error

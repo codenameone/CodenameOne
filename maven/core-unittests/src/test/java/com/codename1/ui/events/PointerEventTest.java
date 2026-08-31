@@ -96,6 +96,22 @@ class PointerEventTest {
         assertEquals(0, PointerEvent.MASK_MIDDLE & PointerEvent.MASK_BACK);
     }
 
+    /**
+     * The AppKit port passes these values from C, where it cannot see this
+     * class: METALView.m defines CN1_PE_BUTTON_PRIMARY, CN1_PE_BUTTON_SECONDARY,
+     * CN1_PE_MASK_PRIMARY and CN1_PE_MASK_SECONDARY to match. Renumbering them
+     * here would compile everywhere and turn a right click on macOS into a
+     * primary one, silently, so the exact values are pinned.
+     */
+    @Test
+    void buttonValuesTheAppKitPortHardCodesInC() {
+        assertEquals(0, PointerEvent.BUTTON_PRIMARY);
+        assertEquals(1, PointerEvent.BUTTON_SECONDARY);
+        assertEquals(1, PointerEvent.MASK_PRIMARY);
+        assertEquals(2, PointerEvent.MASK_SECONDARY);
+        assertEquals(2, PointerEvent.TYPE_MOUSE);
+    }
+
     private static PointerEvent touchEvent() {
         return typed(PointerEvent.TYPE_TOUCH);
     }

@@ -78,7 +78,7 @@ function validate() {
     if (/\bdata-port=(?:["']?javase["']?)(?:\s|>)/i.test(page)) {
         fail("JavaSE must not appear as a portability target");
     }
-    if (!/11 CI targets/i.test(pageText) || /11 port targets/i.test(pageText)) {
+    if (!/12 CI targets/i.test(pageText) || /12 port targets/i.test(pageText)) {
         fail("the compliance columns must be described as CI targets, not distinct platforms");
     }
 
@@ -86,7 +86,7 @@ function validate() {
     const browserResults = countMatches(page, /\bdata-browser-result(?:=|\s|>)/g);
     const performanceRows = countMatches(page, /\bdata-performance-row(?:=|\s|>)/g);
     const performanceCells = countMatches(page, /\bdata-performance-cell(?:=|\s|>)/g);
-    if (deploymentRows !== 8 || browserResults !== 3 || performanceRows !== 10 || performanceCells !== 10 * 11) {
+    if (deploymentRows !== 8 || browserResults !== 3 || performanceRows !== 10 || performanceCells !== 10 * 12) {
         fail("deployment, browser, or performance evidence is incomplete");
     }
     for (const required of [
@@ -106,8 +106,8 @@ function validate() {
     const featureRows = countMatches(page, /\bdata-feature-row(?:=|\s|>)/g);
     const featureCells = countMatches(page, /\bdata-feature-cell(?:=|\s|>)/g);
     const mappedTests = countMatches(page, /<li><code>[^<]+<\/code><\/li>/g);
-    if (portCards !== 11 || !/data-port-card=(?:["']?windows-arm64["']?)(?:\s|>)/i.test(page)) {
-        fail(`generated ${portCards} port cards or omitted Windows ARM64; expected 11 targets`);
+    if (portCards !== 12 || !/data-port-card=(?:["']?windows-arm64["']?)(?:\s|>)/i.test(page)) {
+        fail(`generated ${portCards} port cards or omitted Windows ARM64; expected 12 targets`);
     }
     if (featureRows < 51) {
         fail(`the generated table has only ${featureRows} feature rows`);
@@ -135,7 +135,8 @@ function validate() {
         "android": "Android",
         "ios-gl": "iOS (OpenGL)",
         "ios-metal": "iOS (Metal)",
-        "mac-native": "macOS native",
+        "macos": "macOS",
+        "mac-catalyst": "macOS (Mac Catalyst)",
         "javascript": "Web",
         "linux-x64": "Linux x64",
         "linux-arm64": "Linux ARM64",

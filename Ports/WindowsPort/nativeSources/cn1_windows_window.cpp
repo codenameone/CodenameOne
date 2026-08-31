@@ -622,6 +622,14 @@ int cn1WinHandleGesture(HWND hwnd, int windowId, LPARAM lParam) {
         double dist = (double) gi.ullArguments;
         if (gi.dwFlags & GF_BEGIN) {
             cn1WinZoomLast = dist;
+            /* Forwarded, not only used to reset the baseline. Without an end the
+             * component that zoomed stays mid-pinch: a touchpad produces no
+             * pointer events, so the two-pointer path in Component that normally
+             * calls pinchReleased() never runs on this port. */
+            cn1WinPushWindowEvent(windowId, CN1_EVENT_PINCH_BEGIN, pt.x, pt.y, 0);
+        } else if (gi.dwFlags & GF_END) {
+            cn1WinZoomLast = 0.0;
+            cn1WinPushWindowEvent(windowId, CN1_EVENT_PINCH_END, pt.x, pt.y, 0);
         } else if (cn1WinZoomLast > 0.0 && dist > 0.0) {
             double scale = dist / cn1WinZoomLast;
             cn1WinZoomLast = dist;

@@ -6,6 +6,19 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 #ifndef CN1GL3D_h
 #define CN1GL3D_h
@@ -18,15 +31,15 @@
 // hand rolled CAMetalLayer + CADisplayLink (the same primitives the 2D METALView
 // uses) rather than MTKView so we do not pull in the MetalKit framework.
 #ifdef CN1_USE_METAL
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import <QuartzCore/CAMetalLayer.h>
 @import Metal;
 @import simd;
 
-// A UIView backed by a CAMetalLayer plus a depth texture, hosting one 3D
+// A CN1View backed by a CAMetalLayer plus a depth texture, hosting one 3D
 // context. Hosted as a Codename One native peer. A CADisplayLink drives
 // continuous mode; render-on-demand renders one frame per requestRender.
-@interface CN1GL3DView : UIView
+@interface CN1GL3DView : CN1View
 
 @property (nonatomic, strong) id<MTLDevice> device;
 @property (nonatomic, strong) id<MTLCommandQueue> commandQueue;

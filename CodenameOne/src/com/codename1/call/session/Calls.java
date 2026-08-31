@@ -1,0 +1,1500 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.call.session;
+
+import com.codename1.call.CallAvailability;
+import com.codename1.call.CallDirection;
+import com.codename1.call.CallEndReason;
+import com.codename1.call.CallError;
+import com.codename1.io.Log;
+import com.codename1.call.CallException;
+import com.codename1.call.CallHandle;
+import com.codename1.call.CallId;
+import com.codename1.call.CallState;
+import com.codename1.call.spi.CallBridge;
+import com.codename1.impl.async.EdtResult;
+import com.codename1.impl.call.CallRequests;
+import com.codename1.impl.call.CallWire;
+import com.codename1.util.AsyncResource;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// System call integration: the entry point for reporting calls to the
+/// operating system and hearing what the user does with them.
+///
+/// ```java
+/// if (!Calls.isSupported()) {
+///     return;                      // fall back to an in-app call screen
+/// }
+/// Calls.configure(new CallConfiguration().displayName("Acme Talk"));
+/// Calls.addActionListener(new CallActionAdapter() {
+///     public void answerRequested(String callId, CallAction action) {
+///         signalling.accept(callId);
+///     }
+///     public void audioSessionActivated(CallAudioSession session) {
+///         media.start();           // here, not in answerRequested
+///     }
+///     public void providerReset() {
+///         media.stopEverything();
+///     }
+/// });
+/// ```
+///
+/// Everything here is static because there is one operating system and one
+/// call provider per app.
+///
+/// #### Order matters
+///
+/// [#configure] must run before any call is reported. On Android an
+/// unconfigured provider makes `TelecomManager` ignore reported calls
+/// silently.
+///
+/// #### Every callback arrives on the EDT
+///
+/// Unlike some other families in this framework, that is true here without
+/// exception: an action from the system is a user-interface event and there
+/// is nothing to gain by delivering it anywhere else.
+public final class Calls {
+
+    private static final List<CallActionListener> LISTENERS =
+            new ArrayList<CallActionListener>();
+
+    private static final Map<String, CallSession> SESSIONS =
+            new HashMap<String, CallSession>();
+
+    private Calls() {
+    }
+
+    // ------------------------------------------------------------------
+    // capability
+    // ------------------------------------------------------------------
+
+    /// Whether this platform can show a call in its own call UI.
+    ///
+    /// False on the ports that have no such concept, and on Android below
+    /// API 26. An app must have a fallback; there is no way to make a
+    /// desktop show a lock-screen call.
+    public static boolean isSupported() {
+        CallBridge b = CallRequests.bridge();
+        return b != null && b.isCallSupported();
+    }
+
+    /// The `CallBridge.CAPABILITY_*` mask this platform supports. Branch on
+    /// this rather than on the platform.
+    public static int getCapabilities() {
+        CallBridge b = CallRequests.bridge();
+        return b == null ? 0 : b.getCallCapabilities();
+    }
+
+    /// Whether a call could be rung **right now**.
+    ///
+    /// Different from [#isSupported()]: an emergency call, or another app's
+    /// call, makes this refuse on a platform that supports calling
+    /// perfectly. Check it before telling a caller their call is ringing.
+    public static CallAvailability getAvailability() {
+        CallBridge b = CallRequests.bridge();
+        if (b == null) {
+            return CallAvailability.UNSUPPORTED;
+        }
+        CallAvailability[] values = CallAvailability.values();
+        int o = b.getCallAvailability();
+        return o < 0 || o >= values.length ? CallAvailability.UNSUPPORTED : values[o];
+    }
+
+    /// The `CallBridge.PERMISSION_*` mask currently granted.
+    public static int getGrantedPermissions() {
+        CallBridge b = CallRequests.bridge();
+        return b == null ? 0 : b.getGrantedPermissions();
+    }
+
+    /// Asks for the `CallBridge.PERMISSION_*` bits in `permissions`,
+    /// resolving with the mask actually granted.
+    public static AsyncResource<Integer> requestPermissions(int permissions) {
+        CallBridge b = CallRequests.bridge();
+        if (b == null) {
+            EdtResult<Integer> r = new EdtResult<Integer>();
+            r.error(new CallException(CallError.NOT_SUPPORTED));
+            return r;
+        }
+        int id = CallRequests.nextId();
+        EdtResult<Integer> r = CallRequests.openPermissionRequest(id);
+        b.requestPermissions(id, permissions);
+        return r;
+    }
+
+    // ------------------------------------------------------------------
+    // configuration
+    // ------------------------------------------------------------------
+
+    /// Installs the calling identity. Must precede any reported call.
+    public static AsyncResource<Boolean> configure(CallConfiguration config) {
+        CallBridge b = CallRequests.bridge();
+        if (b == null) {
+            return unsupported();
+        }
+        int id = CallRequests.nextId();
+        EdtResult<Boolean> r = CallRequests.openAck(id);
+        b.configureProvider(id, (config == null
+                ? new CallConfiguration() : config).toWire());
+        return r;
+    }
+
+    // ------------------------------------------------------------------
+    // reporting
+    // ------------------------------------------------------------------
+
+    /// Rings an incoming call.
+    ///
+    /// `callId` must be a canonical [CallId] and must be the same identifier
+    /// the far end uses. Allocate one with [CallId#random()] for a call
+    /// learned over the app's own connection; a call that arrived as a VoIP
+    /// push already has one and must not be re-reported here -- see
+    /// `com.codename1.call.voip.VoipPush`.
+    public static AsyncResource<CallSession> reportIncoming(String callId,
+            CallHandle handle, String displayName, boolean video) {
+        return report(callId, handle, displayName, video, CallDirection.INCOMING);
+    }
+
+    /// Places an outgoing call in the system UI.
+    public static AsyncResource<CallSession> reportOutgoing(String callId,
+            CallHandle handle, String displayName, boolean video) {
+        return report(callId, handle, displayName, video, CallDirection.OUTGOING);
+    }
+
+    /// Orders an operation's validation against the native handoff after it.
+    ///
+    /// The registry says which session owns a call id, and every operation
+    /// that reaches a port hands off by id ALONE -- the SPI carries no
+    /// session identity, deliberately, because it crosses into Objective-C
+    /// through ParparVM. So a validation and the handoff it authorises have
+    /// to be one step with respect to the registry, or the id can change
+    /// hands in between and the port acts on whatever holds it now.
+    ///
+    /// end() is where that bit: it checked owns(), and by the time endCall
+    /// reached the port a replacement could have claimed the id -- so the
+    /// port finished the REPLACEMENT and acknowledged success, while the
+    /// replacement stayed registered in Java. reportEndedRemotely never had
+    /// the hole, because its check is an identity-checked forget() under the
+    /// registry monitor and it reports only when that said yes.
+    ///
+    /// NOT the SESSIONS monitor. That one is taken by getSession, which the
+    /// ports call while delivering, so holding it across a bridge call is a
+    /// deadlock rather than an ordering. This is held only by the operations
+    /// that register or retire an id and only for the length of one handoff,
+    /// which is the same trade CallSession's `reporting` lock makes and the
+    /// same shape as TunnelHost's `lifecycle`.
+    static final Object HANDOFF = new Object();
+
+    /// Bumped by every provider reset. Guarded by SESSIONS.
+    ///
+    /// A report inserts its session and only then opens the request the port
+    /// will answer. A reset landing between the two clears the session but
+    /// cannot fail a request that does not exist yet, so the report went on
+    /// against a provider that is gone and handed the app a live-looking
+    /// CallSession that Calls.getSession() knows nothing about. Comparing the
+    /// generation at handover is what closes a window that spans two
+    /// critical sections.
+    private static int resetGeneration;
+
+    /// START actions the system raised and Java has not answered, by call id.
+    ///
+    /// The documented answer to startCallRequested is a
+    /// [#reportOutgoing] with the id it was handed -- not a call to
+    /// [CallAction#fulfill]. Reporting IS handling the request, so it has to
+    /// answer the action; without that a listener following the contract
+    /// exactly had its own call destroyed the moment it returned.
+    private static final Map<String, CallAction> PENDING_STARTS =
+            new HashMap<String, CallAction>();
+
+    private static AsyncResource<CallSession> report(String callId,
+            CallHandle handle, String displayName, boolean video,
+            CallDirection direction) {
+        final EdtResult<CallSession> out = new EdtResult<CallSession>();
+        CallBridge b = CallRequests.bridge();
+        if (b == null) {
+            out.error(new CallException(CallError.NOT_SUPPORTED));
+            return out;
+        }
+        String id = CallId.normalize(callId);
+        if (id == null) {
+            out.error(new CallException(CallError.INVALID_ID,
+                    "Not a canonical call id: " + callId));
+            return out;
+        }
+        if (handle == null) {
+            out.error(new CallException(CallError.INVALID_ID,
+                    "A call handle is required"));
+            return out;
+        }
+        // Refused here rather than by the platform. The registration below
+        // replaces whatever is registered under this id, and the handover
+        // forgets the id when the platform answers DUPLICATE_CALL -- so a
+        // duplicate report used to take the ORIGINAL live call out of
+        // getSessions() with it, leaving a call the system is still showing
+        // that nothing in Java can address.
+        // ONE critical section for the test and the reservation. Split, two
+        // threads reporting the same id -- socket signalling racing a pushed
+        // call is the ordinary way -- both passed the test and both inserted,
+        // so two CallSession objects existed for one call with only the
+        // second reachable, and the port's request parked under that id was
+        // overwritten with one AsyncResource left unanswered.
+        CallSession session = new CallSession(id, direction, handle, displayName,
+                direction == CallDirection.INCOMING
+                        ? CallState.RINGING : CallState.DIALING);
+        int reportedGeneration;
+        // HANDOFF spans the reservation and the report. A registration that
+        // is visible to end()'s owns() check but has not yet reached the port
+        // is exactly the state that let an end authorised against the OLD
+        // session arrive at the port after the new one claimed the id.
+        synchronized (HANDOFF) {
+            synchronized (SESSIONS) {
+                // Only live calls are in the map; forget() removes an ended one,
+                // so presence is the whole test.
+                if (SESSIONS.containsKey(id)) {
+                    out.error(new CallException(CallError.DUPLICATE_CALL,
+                            "A call with this id is already live: " + id));
+                    return out;
+                }
+                SESSIONS.put(id, session);
+                reportedGeneration = resetGeneration;
+            }
+            // The app has answered the system's request by reporting the call,
+            // which is exactly what startCallRequested documents. Taken BEFORE
+            // the platform is asked, so the START arm's settle cannot fail an
+            // action this report is in the middle of honouring.
+            CallAction started;
+            synchronized (PENDING_STARTS) {
+                started = PENDING_STARTS.remove(id);
+            }
+            if (started != null && !started.isAnswered()) {
+                // CLAIMED here, ANSWERED from the handover. Answering true at
+                // this point told the system the call had been placed before the
+                // platform had accepted it -- and a report the port refuses (a
+                // cold start whose Calls.configure has not finished is the
+                // ordinary way) then left the Telecom connection dialing for ever
+                // with the failed handover having removed the Java session.
+                //
+                // defer() is exactly the "answer is coming later" primitive the
+                // listener contract already documents, so settleStart leaves it
+                // alone and the acknowledgement below decides.
+                started.defer();
+            }
+            int reqId = CallRequests.nextId();
+            EdtResult<Boolean> ack = CallRequests.openAck(reqId);
+            // The session is only handed over once the system has accepted it,
+            // so an app can never act on a call that was refused.
+            ack.onResult(new SessionHandover(out, session, id, reportedGeneration,
+                    started));
+            String wire = CallWire.encodeHandle(handle);
+            if (direction == CallDirection.INCOMING) {
+                b.reportIncomingCall(reqId, id, wire, displayName, -1, video);
+            } else {
+                b.reportOutgoingCall(reqId, id, wire, displayName, -1, video);
+            }
+        }
+        return out;
+    }
+
+    /// Tells one listener a call ended, without letting it stop the others.
+    ///
+    /// The action arms deliberately let a listener's exception propagate:
+    /// there is a request behind them, the caller is entitled to see the
+    /// failure, and the token is settled in a `finally` either way. This is a
+    /// notification -- nobody is waiting on an answer, every listener is
+    /// entitled to hear it, and on a port the thread carrying it is a native
+    /// callback thread that must not be taken down by application code. All
+    /// FOUR notification arms are handled this way: ended, providerReset and
+    /// both halves of the audio session.
+    private static void tell(CallActionListener l, String callId,
+            CallEndReason reason) {
+        try {
+            l.callEnded(callId, reason);
+        } catch (Throwable t) {
+            report(t);
+        }
+    }
+
+    /// Tells one listener the audio session is live. See [#tell]: this is the
+    /// notification an app starts its media from, so a listener that throws
+    /// must not leave the ones after it with a silent call.
+    private static void tellAudioOn(CallActionListener l, CallAudioSession s) {
+        try {
+            l.audioSessionActivated(s);
+        } catch (Throwable t) {
+            report(t);
+        }
+    }
+
+    /// Tells one listener the audio session is gone. See [#tellAudioOn]:
+    /// stopping early here leaves a media engine running.
+    private static void tellAudioOff(CallActionListener l, String callId) {
+        try {
+            l.audioSessionDeactivated(callId);
+        } catch (Throwable t) {
+            report(t);
+        }
+    }
+
+    /// Tells one listener the provider reset. See [#tell] for why this one
+    /// swallows.
+    private static void tellReset(CallActionListener l) {
+        try {
+            l.providerReset();
+        } catch (Throwable t) {
+            report(t);
+        }
+    }
+
+    /// Records a listener's exception without depending on a Display.
+    ///
+    /// Log.e goes through the platform implementation, which is null before
+    /// Display.init -- so logging a throw from a listener registered that
+    /// early replaced it with an NPE from the logger. There is no log to
+    /// write to at that point; the stack trace is all there is.
+    private static void report(Throwable t) {
+        if (Display.isInitialized()) {
+            Log.e(t);
+        } else {
+            t.printStackTrace(); //NOPMD AvoidPrintStackTrace
+        }
+    }
+
+    /// Completes the caller's resource once the system has accepted or
+    /// refused the call. A static class rather than an anonymous one so it
+    /// holds no synthetic reference to its enclosing scope.
+    private static final class SessionHandover
+            implements com.codename1.util.AsyncResult<Boolean> {
+        private final EdtResult<CallSession> out;
+        private final CallSession session;
+        private final String id;
+        private final int generation;
+        /// The system START this report answers, or null when it answers none.
+        private final CallAction started;
+
+        SessionHandover(EdtResult<CallSession> out, CallSession session,
+                String id, int generation, CallAction started) {
+            this.out = out;
+            this.session = session;
+            this.id = id;
+            this.generation = generation;
+            this.started = started;
+        }
+
+        /// Answers the system's request with what the platform said.
+        private void settleStarted(boolean placed) {
+            if (started != null && !started.isAnswered()) {
+                started.answer(placed);
+            }
+        }
+
+        @Override
+        public void onReady(Boolean value, Throwable error) {
+            if (error != null) {
+                // The platform refused the call, so the system's request was
+                // NOT carried out; saying otherwise strands the connection it
+                // created.
+                settleStarted(false);
+                boolean unclaimed = releaseUnclaimed(id, session);
+                // A refusal means the platform does not hold the call, with
+                // ONE exception: this failure may not have come from the
+                // platform at all. A reset between openAck and the bridge
+                // call is failed here by failAll, and the report still goes
+                // out afterwards -- the port reports it, the platform may
+                // well accept it, and the acknowledgement that says so is
+                // then ignored because its request is gone. Nothing would
+                // ever have told the platform otherwise.
+                if (unclaimed && isProviderReset(error)) {
+                    retire(id);
+                }
+                out.error(error);
+                return;
+            }
+            boolean reset;
+            synchronized (SESSIONS) {
+                reset = resetGeneration != generation;
+            }
+            if (reset) {
+                // A provider reset ran while this report was in flight. It
+                // could not fail the request -- the request did not exist
+                // when the reset swept them -- so the platform's acceptance
+                // refers to a provider that is gone. Handing the session over
+                // would give the app one that getSession() does not know and
+                // no operation can address.
+                settleStarted(false);
+                session.setStateInternal(CallState.ENDED);
+                // And the platform is TOLD. Failing the app's request was the
+                // whole of what happened here before, which left the system
+                // showing a call this facade had just disowned: ringing or
+                // dialing, addressable by nothing in Java, and outliving the
+                // reset that was supposed to have swept everything. Giving up
+                // on a call the platform accepted is not the same as ending
+                // it, and only one of the two is what the app asked for.
+                if (releaseUnclaimed(id, session)) {
+                    retire(id);
+                }
+                out.error(new CallException(CallError.PROVIDER_RESET,
+                        "The system's call provider was reset"));
+                return;
+            }
+            settleStarted(true);
+            out.complete(session);
+        }
+    }
+
+    /// Whether this failure is the provider reset failing everything in
+    /// flight, rather than the platform refusing one call.
+    ///
+    /// Tested with instanceof rather than caught: ParparVM does not check
+    /// CHECKCAST, so a cast whose failure this expected to handle would hand
+    /// the wrong object on and never reach a catch.
+    private static boolean isProviderReset(Throwable error) {
+        if (!(error instanceof CallException)) {
+            return false;
+        }
+        return ((CallException) error).getError() == CallError.PROVIDER_RESET;
+    }
+
+    /// Releases `callId` if `session` still holds it, and answers whether the
+    /// id is then held by nobody.
+    ///
+    /// Both questions under ONE lock, because the answer to the second is
+    /// what decides whether the platform gets told to end the call, and a
+    /// report landing between them would be hung up by an end that was
+    /// decided before it existed.
+    ///
+    /// "Nobody holds it" rather than "this session held it", which is the
+    /// guard reportEndedRemotely uses and the one this started with. It is
+    /// wrong here, and wrong in a way that made the fix inert rather than
+    /// unsafe: a provider reset CLEARS the map before it fails what is in
+    /// flight, so a handover reached through the reset can never claim to
+    /// have owned the id -- the reset already took it. The question worth
+    /// asking is not who used to hold it but whether ending it would hang up
+    /// somebody else's call, and an unclaimed id cannot.
+    private static boolean releaseUnclaimed(String callId,
+            CallSession session) {
+        synchronized (SESSIONS) {
+            if (SESSIONS.get(callId) == session) { //NOPMD CompareObjectsWithEquals
+                SESSIONS.remove(callId);
+            }
+            return !SESSIONS.containsKey(callId);
+        }
+    }
+
+    /// Ends on the PLATFORM a call this facade has given up on.
+    ///
+    /// Only ever called when releaseUnclaimed() said no session holds the id,
+    /// because both ports resolve an operation by call id alone: a call id is
+    /// reusable the moment the previous call is gone -- a provider reset
+    /// followed by an immediate retry is the ordinary way -- so an unguarded
+    /// end here would hang up whatever holds the id NOW.
+    ///
+    /// A report registering AFTER that check and before this call would still
+    /// be hung up. That sliver is left, on the same reasoning recorded at
+    /// reportEndedRemotely: closing it needs a tombstone or generation-tagged
+    /// native identity, and a tombstone adds a way for an id to become
+    /// permanently unusable. Ending a call nobody has claimed is the failure
+    /// worth preventing; this is the one that was actually reachable.
+    ///
+    /// FAILED rather than LOCAL_ENDED: nobody hung up. The app never saw
+    /// this call, and the system call log should not say that it did.
+    ///
+    /// The acknowledgement is opened and not read. Something has to answer
+    /// the port's request -- an operation that never answers is worse than
+    /// one that fails -- but there is no caller left to tell: the app has
+    /// already been given the reset failure, and whether the platform agreed
+    /// to end a call this facade no longer knows about is not a fact anyone
+    /// can act on.
+    private static void retire(String callId) {
+        CallBridge b = CallRequests.bridge();
+        if (b == null) {
+            return;
+        }
+        int reqId = CallRequests.nextId();
+        CallRequests.openAck(reqId);
+        b.endCall(reqId, callId, CallEndReason.FAILED.ordinal());
+    }
+
+    /// The session for a call id, or null when this app has none.
+    public static CallSession getSession(String callId) {
+        String id = CallId.normalize(callId);
+        if (id == null) {
+            return null;
+        }
+        synchronized (SESSIONS) {
+            return SESSIONS.get(id);
+        }
+    }
+
+    /// Every call this app currently has.
+    public static CallSession[] getSessions() {
+        synchronized (SESSIONS) {
+            return SESSIONS.values().toArray(new CallSession[SESSIONS.size()]);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // audio
+    // ------------------------------------------------------------------
+
+    /// Where call audio is going right now.
+    public static CallAudioRoute getAudioRoute() {
+        CallBridge b = CallRequests.bridge();
+        if (b == null) {
+            return CallAudioRoute.UNKNOWN;
+        }
+        return route(b.getAudioRoute());
+    }
+
+    /// Asks for a particular audio route.
+    public static AsyncResource<Boolean> setAudioRoute(CallAudioRoute r) {
+        CallBridge b = CallRequests.bridge();
+        if (b == null) {
+            return unsupported();
+        }
+        int id = CallRequests.nextId();
+        EdtResult<Boolean> res = CallRequests.openAck(id);
+        b.setAudioRoute(id, r == null ? CallAudioRoute.UNKNOWN.ordinal() : r.ordinal());
+        return res;
+    }
+
+    /// Shows the system's audio route picker for a call.
+    public static AsyncResource<Boolean> showAudioRoutePicker(String callId) {
+        CallBridge b = CallRequests.bridge();
+        if (b == null) {
+            return unsupported();
+        }
+        int id = CallRequests.nextId();
+        EdtResult<Boolean> res = CallRequests.openAck(id);
+        b.showAudioRoutePicker(id, callId);
+        return res;
+    }
+
+    // ------------------------------------------------------------------
+    // listeners
+    // ------------------------------------------------------------------
+
+    /// Adds a listener. Every method arrives on the EDT.
+    public static void addActionListener(CallActionListener l) {
+        if (l == null) {
+            return;
+        }
+        // The readiness update happens with the mutation that justifies it.
+        // Told afterwards, an add overlapping the removal of the last
+        // listener could see readiness already true and emit nothing, and
+        // the remover would then set it false -- leaving a registered
+        // listener while the port considers Java unready, which on iOS means
+        // every CallKit action is held until it times out.
+        synchronized (LISTENERS) {
+            if (!LISTENERS.contains(l)) {
+                LISTENERS.add(l);
+            }
+            // The port holds system-originated actions until Java says it is
+            // listening, and THIS is what listening means for an app that
+            // never uses VoipPush.
+            CallRequests.setActionsWanted(true);
+        }
+    }
+
+    /// Removes a listener.
+    public static void removeActionListener(CallActionListener l) {
+        synchronized (LISTENERS) {
+            LISTENERS.remove(l);
+            // Inside the lock; see addActionListener.
+            if (LISTENERS.isEmpty()) {
+                CallRequests.setActionsWanted(false);
+            }
+        }
+    }
+
+    private static CallActionListener[] listeners() {
+        synchronized (LISTENERS) {
+            return LISTENERS.toArray(new CallActionListener[LISTENERS.size()]);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // helpers shared with the rest of the family
+    // ------------------------------------------------------------------
+
+    /// A resource already failed with [CallError#NOT_SUPPORTED].
+    ///
+    /// @hidden not part of the public API.
+    public static EdtResult<Boolean> unsupported() {
+        EdtResult<Boolean> r = new EdtResult<Boolean>();
+        r.error(new CallException(CallError.NOT_SUPPORTED));
+        return r;
+    }
+
+    static CallAudioRoute route(int ordinal) {
+        CallAudioRoute[] values = CallAudioRoute.values();
+        return ordinal < 0 || ordinal >= values.length
+                ? CallAudioRoute.UNKNOWN : values[ordinal];
+    }
+
+    static void forget(String callId) {
+        synchronized (SESSIONS) {
+            SESSIONS.remove(callId);
+        }
+    }
+
+    /// Forgets `callId` only while it still names `session`.
+    ///
+    /// Every caller that HOLDS the session it is retiring goes through here.
+    /// A call id can be reused the moment the previous call is gone -- a
+    /// provider reset followed by an immediate retry is the ordinary way --
+    /// and a late answer belonging to the OLD report would otherwise remove
+    /// the new one: accepted, returned to its caller, and absent from
+    /// getSession() and getSessions() for the rest of its life.
+    static boolean forget(String callId, CallSession session) {
+        if (session == null) {
+            forget(callId);
+            return false;
+        }
+        synchronized (SESSIONS) {
+            if (SESSIONS.get(callId) == session) { //NOPMD CompareObjectsWithEquals
+                SESSIONS.remove(callId);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether `session` is still the one registered under `callId`.
+    ///
+    /// The ports resolve an operation by call id alone, so a session that no
+    /// longer owns its id must not reach them: after a provider reset and a
+    /// retry of the same id, a late callback on the RETAINED old session
+    /// would otherwise end the new live call. forget() is already
+    /// identity-checked for the same reason; this is the same question asked
+    /// before an operation rather than after it.
+    static boolean owns(String callId, CallSession session) {
+        if (session == null) {
+            return false;
+        }
+        synchronized (SESSIONS) {
+            return SESSIONS.get(callId) == session; //NOPMD CompareObjectsWithEquals
+        }
+    }
+
+    /// Registers a session the port created, used by the VoIP push facade for
+    /// a call the native side reported before this app was listening.
+    ///
+    /// @hidden not part of the public API.
+    public static CallSession adoptSession(String callId, CallHandle handle,
+            String displayName, CallState state) {
+        CallSession s = new CallSession(callId, CallDirection.INCOMING, handle,
+                displayName, state);
+        synchronized (SESSIONS) {
+            // Whatever is registered WINS. A drain running while socket
+            // signalling reports the same uuid could otherwise see nothing,
+            // let the report reserve, and then replace it -- so the report
+            // completed with one object while getSession() and every action
+            // used another, and ending either took the other out of the
+            // registry with it.
+            CallSession existing = SESSIONS.get(callId);
+            if (existing != null) {
+                return existing;
+            }
+            SESSIONS.put(callId, s);
+        }
+        return s;
+    }
+
+    // ------------------------------------------------------------------
+    // Entry points the ports call up into. Every one marshals to the EDT.
+    // ------------------------------------------------------------------
+
+    /// Answers an acknowledged operation.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverAck(int requestId, boolean ok, int errorOrdinal,
+            String message) {
+        EdtResult<Boolean> r = CallRequests.takeAck(requestId);
+        if (r == null) {
+            return;
+        }
+        if (ok) {
+            r.complete(Boolean.TRUE);
+        } else {
+            r.error(CallWire.decodeError(errorOrdinal, message));
+        }
+    }
+
+    /// Answers a permission request with the granted mask.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverPermissionResult(int requestId, int grantedMask) {
+        EdtResult<Integer> r = CallRequests.takePermissionRequest(requestId);
+        if (r != null) {
+            r.complete(Integer.valueOf(grantedMask));
+        }
+    }
+
+    /// The user answered a call through the system UI.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverAnswer(String callId, long actionToken) {
+        dispatch(new ActionEvent(ActionEvent.ANSWER, callId, actionToken, false,
+                null, null, false));
+    }
+
+    /// The user hung up through the system UI.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverEndRequest(String callId, long actionToken) {
+        dispatch(new ActionEvent(ActionEvent.END, callId, actionToken, false,
+                null, null, false));
+    }
+
+    /// The user or the system held or resumed a call.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverHold(String callId, boolean held, long actionToken) {
+        dispatch(new ActionEvent(ActionEvent.HOLD, callId, actionToken, held,
+                null, null, false));
+    }
+
+    /// The user muted or unmuted a call.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverMute(String callId, boolean muted, long actionToken) {
+        dispatch(new ActionEvent(ActionEvent.MUTE, callId, actionToken, muted,
+                null, null, false));
+    }
+
+    /// The system CHANGED the mute state, rather than asking whether it may.
+    ///
+    /// Telecom's `onCallAudioStateChanged` reports a mute the platform has
+    /// already applied, and a self-managed app cannot refuse it -- the port's
+    /// own `setMuted` says as much. Delivered as a refusable action it let a
+    /// listener "fail" a fact: the system went on showing muted, the app went
+    /// on transmitting, and `isMuted()` answered for neither. This applies
+    /// the state first and hands listeners an action that is already
+    /// fulfilled, so the same `muteRequested` callback serves both platforms
+    /// and only the one that can be refused ever is.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverMuteChanged(String callId, boolean muted) {
+        dispatch(new ActionEvent(ActionEvent.MUTE_CHANGED, callId, CallAction.NONE, muted,
+                null, null, false));
+    }
+
+    /// Digits the APP asked to send, handed back to its own listener.
+    ///
+    /// On iOS sendDigits() submits a CXPlayDTMFCallAction and CallKit hands
+    /// it straight back through `dtmfRequested`, which is where an app puts
+    /// the tone into its media. A port with no such round trip synthesizes
+    /// it here, the way the Android port synthesizes audioSessionActivated,
+    /// so one listener carries the tone on every platform.
+    ///
+    /// The action is unanswerable: the app asked for this itself, and there
+    /// is no system state to refuse.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverDtmfPlayed(String callId, String digits) {
+        dispatch(new ActionEvent(ActionEvent.DTMF, callId, CallAction.NONE,
+                false, digits, null, false));
+    }
+
+    /// The user typed on the system keypad.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverDtmf(String callId, String digits, long actionToken) {
+        dispatch(new ActionEvent(ActionEvent.DTMF, callId, actionToken, false,
+                digits, null, false));
+    }
+
+    /// The system is asking this app to place a call.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverStartCallRequest(String callId, String handleWire,
+            boolean video, long actionToken) {
+        dispatch(new ActionEvent(ActionEvent.START, callId, actionToken, false,
+                null, CallWire.decodeHandle(handleWire), video));
+    }
+
+    /// The operating system activated the audio session.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverAudioActivated(String callId, int routeOrdinal) {
+        dispatch(new ActionEvent(ActionEvent.AUDIO_ON, callId, 0L, false, null,
+                null, false, routeOrdinal));
+    }
+
+    /// The operating system took the audio session back.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverAudioDeactivated(String callId) {
+        dispatch(new ActionEvent(ActionEvent.AUDIO_OFF, callId, 0L, false, null,
+                null, false));
+    }
+
+    /// A call ended for a reason that did not come from this app.
+    ///
+    /// @hidden not part of the public API.
+    /// Answers a request whose contract is a boolean OUTCOME rather than
+    /// success or failure.
+    ///
+    /// deliverAck turns false into an error, which is right for an operation
+    /// that failed and wrong for one whose documented answer is "no". The
+    /// screening role is the latter: refused, or absent on this device,
+    /// resolves false.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverAckValue(int requestId, boolean value) {
+        EdtResult<Boolean> r = CallRequests.takeAck(requestId);
+        if (r != null) {
+            r.complete(Boolean.valueOf(value));
+        }
+    }
+
+    public static void deliverCallEnded(String callId, int reasonOrdinal) {
+        // The owning session is captured HERE, where the end was received,
+        // rather than looked up when the EDT gets to it. Off the EDT the two
+        // are not the same question: a call id is reusable the moment its
+        // call is gone, so between this line and the dispatch running, the
+        // old call can disappear and a replacement can claim the id -- and
+        // the lookup then resolved the REPLACEMENT, marked it ENDED and
+        // forgot it, for an end belonging to a call that was already over.
+        //
+        // A null capture stays null. "Nobody owned this id when the end
+        // arrived" is the honest answer, and re-asking later would adopt
+        // whichever session happened along.
+        //
+        // NOT COVERED BY A TEST, and the reason is worth writing down rather
+        // than leaving as an absence: reaching the defect needs the event to
+        // be QUEUED, and core-unittests initialises no Display, so dispatch
+        // runs every event inline and capture and lookup are the same
+        // instant there. A test written against the inline path asserts the
+        // opposite of the contract -- an end delivered while a replacement
+        // holds the id does belong to the replacement -- which is exactly
+        // what a first attempt at one did.
+        dispatch(new ActionEvent(ActionEvent.ENDED, callId, 0L, false, null,
+                null, false, reasonOrdinal,
+                callId == null ? null : getSession(callId)));
+    }
+
+    /// The system's call provider was reset and every call is gone.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverProviderReset() {
+        dispatch(new ActionEvent(ActionEvent.RESET, null, 0L, false, null,
+                null, false));
+    }
+
+    /// Records a mute flag once the action that asked for it is fulfilled.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class MuteChange implements Runnable {
+        private final CallSession session;
+        private final boolean muted;
+
+        MuteChange(CallSession session, boolean muted) {
+            this.session = session;
+            this.muted = muted;
+        }
+
+        @Override
+        public void run() {
+            if (session != null) {
+                session.setMutedInternal(muted);
+            }
+        }
+    }
+
+    /// Moves a session's state once the action that asked for it is
+    /// fulfilled.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class StateChange implements Runnable {
+        private final CallSession session;
+        private final CallState target;
+
+        StateChange(CallSession session, CallState target) {
+            this.session = session;
+            this.target = target;
+        }
+
+        @Override
+        public void run() {
+            // Never out of ENDED. An answer or hold the app DEFERRED runs
+            // this whenever the listener finally fulfils it, which can be
+            // after the call ended or after a provider reset discarded the
+            // native action entirely -- and the session is no longer even
+            // registered by then.
+            //
+            // Through the session's own atomic step rather than a check here
+            // and an assignment after it: the app fulfils from a worker
+            // thread while the end is delivered on the EDT, so those two
+            // statements are a window the end fits through, and the hook then
+            // resurrected a retained session as ACTIVE or HELD. Restating the
+            // test was what made this the third place it had to be said; now
+            // there is one place that decides.
+            if (session != null) {
+                session.moveUnlessOver(target);
+            }
+        }
+    }
+
+    /// Marks a call ended and forgets it, once the end action is fulfilled.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class EndCleanup implements Runnable {
+        private final String callId;
+        private final CallSession session;
+
+        EndCleanup(String callId, CallSession session) {
+            this.callId = callId;
+            this.session = session;
+        }
+
+        @Override
+        public void run() {
+            if (session == null) {
+                // NOTHING to retire. A cleanup with no captured session was
+                // built when the id already belonged to nobody, and
+                // forget(callId, null) removes unconditionally -- so if a
+                // replacement call claimed the id between then and now, this
+                // deleted it: accepted by the platform, returned to its
+                // caller, and absent from getSession for the rest of its
+                // life. An END action whose listener defers, or one that
+                // reports the replacement synchronously from endRequested,
+                // both land exactly there.
+                return;
+            }
+            session.setStateInternal(CallState.ENDED);
+            forget(callId, session);
+        }
+    }
+
+    private static void dispatch(ActionEvent e) {
+        if (Display.isInitialized() && !Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(e);
+        } else {
+            e.run();
+        }
+    }
+
+    /// One inbound event, carried to the EDT.
+    ///
+    /// A single class with a kind tag rather than ten anonymous `Runnable`s:
+    /// each of those would hold a synthetic reference to its enclosing scope,
+    /// which SpotBugs reports and which keeps a call alive after it ended.
+    private static final class ActionEvent implements Runnable {
+        static final int ANSWER = 0;
+        static final int END = 1;
+        static final int HOLD = 2;
+        static final int MUTE = 3;
+        static final int DTMF = 4;
+        static final int START = 5;
+        static final int AUDIO_ON = 6;
+        static final int AUDIO_OFF = 7;
+        static final int ENDED = 8;
+        static final int RESET = 9;
+        static final int MUTE_CHANGED = 10;
+
+        private final int kind;
+        private final String callId;
+        private final long token;
+        private final boolean flag;
+        private final String text;
+        private final CallHandle handle;
+        private final boolean video;
+        private final int ordinal;
+
+        ActionEvent(int kind, String callId, long token, boolean flag,
+                String text, CallHandle handle, boolean video) {
+            this(kind, callId, token, flag, text, handle, video, 0);
+        }
+
+        /// The session this event was received for, when the event is one
+        /// whose meaning is tied to a particular call rather than to whatever
+        /// holds its id by the time the EDT gets here. Null for every other
+        /// kind, which resolve by id on purpose.
+        private final CallSession owner;
+
+        ActionEvent(int kind, String callId, long token, boolean flag,
+                String text, CallHandle handle, boolean video,
+                int ordinal) {
+            this(kind, callId, token, flag, text, handle, video, ordinal,
+                    null);
+        }
+
+        ActionEvent(int kind, String callId, long token, boolean flag,
+                String text, CallHandle handle, boolean video,
+                int ordinal, CallSession owner) {
+            this.kind = kind;
+            this.callId = callId;
+            this.token = token;
+            this.flag = flag;
+            this.text = text;
+            this.handle = handle;
+            this.video = video;
+            this.ordinal = ordinal;
+            this.owner = owner;
+        }
+
+        @Override
+        public void run() {
+            CallActionListener[] ls = listeners();
+            // The CAPTURED session for an end, and a lookup for everything
+            // else. An end names the call it ended; every other event asks
+            // the platform to do something to whatever is live under that id
+            // now, which is a different question and is answered by the
+            // staleAction gate below rather than here.
+            CallSession session = kind == ENDED
+                    ? owner
+                    : (callId == null ? null : getSession(callId));
+            switch (kind) {
+                case ANSWER: {
+                    CallAction a = new CallAction(token, callId);
+                    // ACTIVE only once the answer is FULFILLED. Setting it
+                    // before dispatch left a listener that failed the action
+                    // -- directly, or through the deferred safety timer --
+                    // holding an active session over a call iOS had put back
+                    // to ringing and Android had destroyed.
+                    if (staleAction(session)) {
+                        // Over before this drained; see staleAction.
+                        settle(a);
+                        break;
+                    }
+                    a.whenFulfilled(new StateChange(session, CallState.ACTIVE));
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.answerRequested(callId, a);
+                        }
+                    } finally {
+                        settle(a);
+                    }
+                    break;
+                }
+                case END: {
+                    CallAction a = new CallAction(token, callId);
+                    // NOT dropped when the session has gone, unlike the
+                    // actions staleAction covers. Every one of those asks the
+                    // app to DO something to a live call; this one asks it to
+                    // stop, and stopping twice is what tearing down is
+                    // supposed to survive. Dropping it would also remove the
+                    // only teardown signal an app gets for a call this
+                    // facade never registered -- a replayed or duplicated
+                    // native end -- which is the case that most needs one.
+                    // Registered BEFORE dispatch, and deliberately a hook
+                    // rather than a check. Forgetting unconditionally left an
+                    // app that failed the action holding a live system call
+                    // getSession() could not address; checking isAnswered()
+                    // straight after dispatch instead missed the opposite
+                    // case, where a listener defers and fulfils later and the
+                    // ended call was never forgotten at all. Registering it
+                    // first also means a listener that THROWS still gets the
+                    // cleanup, because the finally below fulfils the action.
+                    a.whenFulfilled(new EndCleanup(callId, session));
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.endRequested(callId, a);
+                        }
+                    } finally {
+                        settle(a);
+                    }
+                    break;
+                }
+                case HOLD: {
+                    CallAction a = new CallAction(token, callId);
+                    if (staleAction(session)) {
+                        // See staleAction: holding or resuming a call that is
+                        // over restarts the media the end had stopped.
+                        settle(a);
+                        break;
+                    }
+                    // On fulfilment only, for the reason ANSWER gives.
+                    a.whenFulfilled(new StateChange(session,
+                            flag ? CallState.HELD : CallState.ACTIVE));
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.holdRequested(callId, flag, a);
+                        }
+                    } finally {
+                        // A listener that throws must not leave the action
+                        // unanswered: the platform then times it out, and the
+                        // system UI and the app disagree with nothing in the log.
+                        settle(a);
+                    }
+                    break;
+                }
+                case MUTE_CHANGED: {
+                    // Applied before anyone is told, because it already
+                    // happened. The action is handed over fulfilled so a
+                    // listener written against the iOS shape still compiles
+                    // and still runs -- fail() on it changes nothing, which
+                    // is exactly the truth on this platform.
+                    if (staleAction(session)) {
+                        // See staleAction. Skipping only setMutedInternal and
+                        // telling the app anyway was the half-measure: there
+                        // is no session to mute, and the listener still went
+                        // and muted media belonging to a finished call.
+                        break;
+                    }
+                    session.setMutedInternal(flag);
+                    CallAction done = new CallAction(CallAction.NONE, callId);
+                    done.fulfill();
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.muteRequested(callId, flag, done);
+                        }
+                    } finally {
+                        settle(done);
+                    }
+                    break;
+                }
+                case MUTE: {
+                    CallAction a = new CallAction(token, callId);
+                    if (staleAction(session)) {
+                        // See staleAction.
+                        settle(a);
+                        break;
+                    }
+                    // On fulfilment only, for the reason ANSWER gives: a
+                    // listener that fails this action leaves CallKit holding
+                    // the PREVIOUS mute state, and Java used to report the
+                    // one the system had just rejected.
+                    a.whenFulfilled(new MuteChange(session, flag));
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.muteRequested(callId, flag, a);
+                        }
+                    } finally {
+                        // A listener that throws must not leave the action
+                        // unanswered: the platform then times it out, and the
+                        // system UI and the app disagree with nothing in the log.
+                        settle(a);
+                    }
+                    break;
+                }
+                case DTMF: {
+                    CallAction a = new CallAction(token, callId);
+                    if (staleAction(session)) {
+                        // See staleAction: digits belong to a live call, and
+                        // an app that plays them into signalling that has
+                        // gone gets an exception or, worse, plays them into
+                        // whatever reused the channel.
+                        settle(a);
+                        break;
+                    }
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.dtmfRequested(callId, text, a);
+                        }
+                    } finally {
+                        // A listener that throws must not leave the action
+                        // unanswered: the platform then times it out, and the
+                        // system UI and the app disagree with nothing in the log.
+                        settle(a);
+                    }
+                    break;
+                }
+                case START: {
+                    CallAction a = new CallAction(token, callId);
+                    synchronized (PENDING_STARTS) {
+                        PENDING_STARTS.put(callId, a);
+                    }
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.startCallRequested(callId, handle, video, a);
+                        }
+                    } finally {
+                        // FAILED when unanswered, unlike every other action.
+                        //
+                        // Elsewhere silence means "done": the app was asked to
+                        // do something to a call that exists, and the platform
+                        // kills an action nobody answers. A START is the
+                        // opposite -- the system is asking this app to PLACE a
+                        // call, and the answer is a Calls.reportOutgoing that
+                        // only the app can make. An adapter subclassed for
+                        // other events, which is the ordinary way to write
+                        // one, does not override startCallRequested at all;
+                        // fulfilling for it claimed the call had been placed
+                        // when nothing had happened. iOS then closes the
+                        // adoption window and Android leaves the connection
+                        // dialing for ever, so a call from Recents or an
+                        // assistant is acknowledged and never placed.
+                        //
+                        // Failing ends the call instead, which is what the
+                        // user sees when an app cannot take their request.
+                        //
+                        // A listener that DID report the call has already
+                        // answered this action through report() above, so
+                        // this only fires for one that did nothing at all.
+                        //
+                        // A DEFERRED action keeps its entry: defer() says the
+                        // report is coming later, which is the documented way
+                        // to place a call asynchronously. Dropping the entry
+                        // when the listener returned meant that report could
+                        // no longer answer the action, and its own safety
+                        // timer then failed a request the app had honoured --
+                        // destroying the system-started connection after the
+                        // report had already succeeded. The entry is cleared
+                        // by that report, or by a provider reset.
+                        if (!a.isDeferred()) {
+                            synchronized (PENDING_STARTS) {
+                                PENDING_STARTS.remove(callId);
+                            }
+                        } else {
+                            // Deferred, so the entry STAYS for a later
+                            // reportOutgoing to claim -- but only a report or
+                            // a provider reset ever removed it, so an action
+                            // the app went on to reject, or that the safety
+                            // net failed, left its id and action in this
+                            // static map for the life of the process. A
+                            // calling app that declines system-placed calls
+                            // grows it without bound.
+                            a.whenAnswered(new PendingStartCleanup(callId, a));
+                        }
+                        settleStart(a);
+                    }
+                    break;
+                }
+                case AUDIO_ON: {
+                    if (staleAction(session)) {
+                        // See staleAction. The particular damage here: on
+                        // Android the deactivation is delivered
+                        // synchronously as the call ends, so it has already
+                        // gone by, leaving this late activation with no stop
+                        // event behind it and media running after the call
+                        // was over.
+                        break;
+                    }
+                    CallAudioSession s = new CallAudioSession(callId, route(ordinal));
+                    for (CallActionListener l : ls) {
+                        tellAudioOn(l, s);
+                    }
+                    break;
+                }
+                case AUDIO_OFF:
+                    // Not gated on the session either, and for END's reason:
+                    // this one STOPS media. An audio deactivation that
+                    // arrives after the call was forgotten is the last
+                    // chance the app has to release the device, and
+                    // withholding it is the one outcome worse than
+                    // delivering it twice.
+                    for (CallActionListener l : ls) {
+                        tellAudioOff(l, callId);
+                    }
+                    break;
+                case ENDED: {
+                    if (session != null) {
+                        session.setStateInternal(CallState.ENDED);
+                    }
+                    CallEndReason reason = CallWire.endReason(ordinal);
+                    try {
+                        for (CallActionListener l : ls) {
+                            tell(l, callId, reason);
+                        }
+                    } finally {
+                        // Mandatory, so a listener that throws cannot leave an
+                        // ended session in getSessions() addressing a native
+                        // call that no longer exists. The action arms settle
+                        // their tokens in a finally for the same reason.
+                        //
+                        // Identity-checked: this end belongs to the session
+                        // dispatched with it, and the id may already name a
+                        // newer one.
+                        forget(callId, session);
+                    }
+                    break;
+                }
+                case RESET:
+                    // Sessions go first: a listener that iterates getSessions()
+                    // during providerReset must not see calls the system has
+                    // already destroyed.
+                    //
+                    // MARKED ended, not merely dropped. An app holding the
+                    // CallSession a report handed it keeps that object after
+                    // the map is cleared, and leaving it RINGING or ACTIVE
+                    // contradicts both the reset -- which says every call is
+                    // gone -- and CallState's terminal-state contract. The
+                    // object would still accept a reportConnected for a call
+                    // the provider destroyed.
+                    synchronized (SESSIONS) {
+                        for (CallSession s : SESSIONS.values()) {
+                            s.setStateInternal(CallState.ENDED);
+                        }
+                        SESSIONS.clear();
+                        // Inside the same monitor the sessions are cleared
+                        // under, so a report that got its generation before
+                        // this cannot also have survived the clear.
+                        resetGeneration++;
+                    }
+                    // The provider that raised them is gone, so a report
+                    // arriving later must not answer an action belonging to
+                    // it.
+                    synchronized (PENDING_STARTS) {
+                        PENDING_STARTS.clear();
+                    }
+                    // Then everything in flight. The provider is gone and the
+                    // native side has dropped the request ids with it, so a
+                    // report, end, configure or permission request that raced
+                    // the reset would never be answered -- and this SPI calls
+                    // an operation that never answers worse than one that
+                    // fails. A late acknowledgement is ignored after this,
+                    // which is the point: it would otherwise hand back a
+                    // session RESET has already removed.
+                    CallRequests.failAll(new CallException(
+                            CallError.PROVIDER_RESET,
+                            "The system's call provider was reset"));
+                    for (CallActionListener l : ls) {
+                        tellReset(l);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        /// Whether an action arrived for a call this facade no longer holds.
+        ///
+        /// Native callbacks are queued onto the EDT rather than delivered
+        /// inline, so an action can drain AFTER the end that followed it.
+        /// Every event that asks the application to DO something to a live
+        /// call -- answer, hold, mute, dial digits, start media -- has to be
+        /// dropped in that window. The listener runs first and completeAction
+        /// refuses afterwards, which is too late: by then the app has
+        /// accepted signalling, restarted the media the end had stopped, or
+        /// played tones into a channel that is gone or has been reused.
+        ///
+        /// Three events deliberately do NOT consult this, and each is
+        /// commented where it sits. END and AUDIO_OFF ask the app to STOP,
+        /// which is idempotent and is the last signal it may ever get for
+        /// that call. START has no session by definition -- the system is
+        /// asking for a call to be placed.
+        ///
+        /// The check is trivial and the method is not: it exists so the rule
+        /// and its exceptions are written down once, because ANSWER and
+        /// AUDIO_ON carried it while HOLD, MUTE and DTMF did not, and the
+        /// difference was invisible.
+        private static boolean staleAction(CallSession session) {
+            return session == null;
+        }
+
+        /// Fulfills an action the application ignored.
+        ///
+        /// An action nobody deferred is one nobody intends to answer, and the
+        /// platform kills a call whose action goes unanswered -- so silence
+        /// has to mean "done", not "dropped".
+        private static void settle(CallAction a) {
+            if (!a.isDeferred() && !a.isAnswered()) {
+                a.answer(true);
+            }
+        }
+
+        /// Settles a system START request, which fails when unanswered.
+        /// See the START arm for why this one is not settle().
+        /// Drops a deferred start no report ever claimed.
+        ///
+        /// A named static class rather than an anonymous one so it holds no
+        /// synthetic reference to an enclosing scope.
+        private static final class PendingStartCleanup implements Runnable {
+            private final String callId;
+            private final CallAction action;
+
+            PendingStartCleanup(String callId, CallAction action) {
+                this.callId = callId;
+                this.action = action;
+            }
+
+            @Override
+            public void run() {
+                // IDENTITY-checked, like Calls.forget: a report may have
+                // claimed this entry and a newer start may already own the
+                // id, and removing that one would strand it.
+                synchronized (PENDING_STARTS) {
+                    if (PENDING_STARTS.get(callId) == action) { //NOPMD CompareObjectsWithEquals
+                        PENDING_STARTS.remove(callId);
+                    }
+                }
+            }
+        }
+
+        private static void settleStart(CallAction a) {
+            if (!a.isDeferred() && !a.isAnswered()) {
+                a.answer(false);
+            }
+        }
+    }
+
+    /// Builds a session for a call that is already over, WITHOUT registering
+    /// it.
+    ///
+    /// Used for a pushed call that ended before the app heard about it: the
+    /// app needs somewhere to read the handle and the id from, and
+    /// getSessions() must not start listing calls that are finished.
+    ///
+    /// @hidden not part of the public API.
+    public static CallSession detachedSession(String callId, CallHandle handle,
+            String displayName) {
+        return new CallSession(callId, CallDirection.INCOMING, handle,
+                displayName, CallState.ENDED);
+    }
+
+    /// Clears every listener and session.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public static void resetForTest() {
+        synchronized (LISTENERS) {
+            LISTENERS.clear();
+        }
+        synchronized (SESSIONS) {
+            SESSIONS.clear();
+        }
+        // PENDING_STARTS too, and answered rather than merely dropped.
+        //
+        // A test that defers a START action and resets without answering it
+        // used to leave the action in this map with its safety timer still
+        // running. Both outlive the reset, and both address a call by id or
+        // by token -- and the next test gets a fresh LocalCallBridge whose
+        // tokens restart at 1, so a stale report or a stale timer could
+        // claim or fail an action belonging to a test that had not started
+        // when it was created. That makes the suite order-dependent, which
+        // is the shape a "flaky" test usually turns out to have.
+        //
+        // Answered false because the start was not carried out: the action
+        // is settled, so its watchdog finds it answered and does nothing,
+        // and nothing is left for a later test to inherit.
+        CallAction[] stranded;
+        synchronized (PENDING_STARTS) {
+            stranded = PENDING_STARTS.values().toArray(
+                    new CallAction[PENDING_STARTS.size()]);
+            PENDING_STARTS.clear();
+        }
+        for (CallAction a : stranded) {
+            if (!a.isAnswered()) {
+                a.answer(false);
+            }
+        }
+    }
+}

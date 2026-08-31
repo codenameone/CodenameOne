@@ -36,7 +36,7 @@
 static BOOL firstTime=YES;
 extern float scaleValue;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
-extern UIView *editingComponent;
+extern CN1View *editingComponent;
 extern BOOL isVKBAlwaysOpen();
 extern void repaintUI();
 
@@ -92,13 +92,13 @@ extern int displayHeight;
 }
 
 // Adds a peer component to the view.  Peer components are added to the peerComponentsLayer subview
--(void) addPeerComponent:(UIView*) view {
+-(void) addPeerComponent:(CN1View*) view {
     if ([self isPaintPeersBehindEnabled]) {
         if (self.peerComponentsLayer == nil) {
-            UIView *newRoot = [[UIView alloc] initWithFrame:self.bounds];
+            CN1View *newRoot = [[CN1View alloc] initWithFrame:self.bounds];
             newRoot.autoresizesSubviews = YES;
             newRoot.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-            self.peerComponentsLayer = [[UIView alloc] initWithFrame:self.bounds];
+            self.peerComponentsLayer = [[CN1View alloc] initWithFrame:self.bounds];
             self.peerComponentsLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
             self.peerComponentsLayer.opaque = TRUE;
             self.peerComponentsLayer.userInteractionEnabled = TRUE;
@@ -106,7 +106,7 @@ extern int displayHeight;
             eaglLayer.opaque = FALSE;
             self.opaque = FALSE;
             self.backgroundColor = [UIColor clearColor];
-            UIView* parent = [self superview];
+            CN1View* parent = [self superview];
             [CodenameOne_GLViewController instance].view = newRoot;
             [self removeFromSuperview];
             [newRoot addSubview:self.peerComponentsLayer];

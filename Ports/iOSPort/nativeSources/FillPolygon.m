@@ -29,8 +29,11 @@
 //
 
 #import "FillPolygon.h"
+// OpenGL ES does not exist on macOS; this port is Metal-only.
+#if !TARGET_OS_OSX
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES1/gl.h>
+#endif
 #import "CN1ES2compat.h"
 #import "xmlvm.h"
 #ifdef CN1_USE_METAL

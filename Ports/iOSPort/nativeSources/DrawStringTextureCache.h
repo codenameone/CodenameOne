@@ -22,28 +22,31 @@
  */
 #import <Foundation/Foundation.h>
 
+// OpenGL ES does not exist on macOS; this port is Metal-only.
+#if !TARGET_OS_OSX
 #import <OpenGLES/EAGL.h>
 
 #import <OpenGLES/ES1/gl.h>
 #import <OpenGLES/ES1/glext.h>
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
-#import <UIKit/UIKit.h>
+#endif
+#import "CN1AppleUI.h"
 
 @interface DrawStringTextureCache : NSObject {
     NSDate *lastAccess;
     GLuint textureName;
     NSString *str;
-    UIFont *font;
+    CN1Font *font;
     int color;
     int alpha;
     int stringWidth;
 }
 
 -(BOOL)isEqual:(id)object;
--(id)initWithString:(NSString*)s f:(UIFont*)f t:(GLuint)t c:(int)c a:(int)a;
-+(void)cache:(NSString*)s f:(UIFont*)f t:(GLuint)t c:(int)c a:(int)a;
-+(DrawStringTextureCache*)checkCache:(NSString*)s f:(UIFont*)f c:(int)c a:(int)a;
+-(id)initWithString:(NSString*)s f:(CN1Font*)f t:(GLuint)t c:(int)c a:(int)a;
++(void)cache:(NSString*)s f:(CN1Font*)f t:(GLuint)t c:(int)c a:(int)a;
++(DrawStringTextureCache*)checkCache:(NSString*)s f:(CN1Font*)f c:(int)c a:(int)a;
 +(void)flushDeleted;
 -(int)stringWidth;
 -(GLuint)textureName;

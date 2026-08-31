@@ -116,6 +116,7 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.Transform;
 import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
+import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.util.AsyncResource;
@@ -141,6 +142,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     private boolean disableUIWebView=true;
     private static boolean gallerySelectMultiple;
     public static IOSNative nativeInstance = new IOSNative();
+    /// The Catalyst desktop-windowing natives. Separate from nativeInstance because
+    /// ParparVM mangles the declaring class into every C symbol, which makes the class
+    /// the unit at which a native can be kept out of a port -- and the native macOS
+    /// port shares IOSNative verbatim while implementing its windowing in AppKit.
+    /// See CatalystWindowNative.
+    static CatalystWindowNative catalystWindowNative = new CatalystWindowNative();
     private static LocalNotificationCallback localNotificationCallback;
     private static PurchaseCallback purchaseCallback;
     private static RestoreCallback restoreCallback;
@@ -387,6 +394,43 @@ public class IOSImplementation extends CodenameOneImplementation {
             homeBridge = IOSHomeCallbacks.getBridge(nativeInstance);
         }
         return homeBridge;
+    }
+
+    private IOSCallBridge callBridge;
+
+    private IOSVpnBridge vpnBridge;
+
+    /// The call bridge, on CallKit and PushKit.
+    ///
+    /// Only meaningful in builds that linked the call natives
+    /// (`CN1_INCLUDE_CALL`, flipped by the builder when the app references
+    /// `com.codename1.call`). Always returned rather than conditionally null,
+    /// for the same reason [#getNearbyBridge()] is: the bridge's own
+    /// `isCallSupported` / `isVoipPushSupported` / `isDirectorySupported`
+    /// answer honestly through the natives, which stub to unsupported when
+    /// the defines are off -- so an app built without any of it reports
+    /// NOT_SUPPORTED without this getter having to know how the app was
+    /// built. The three answer separately, which is what lets a build with
+    /// calls but no push report exactly that.
+    @Override
+    public com.codename1.call.spi.CallBridge getCallBridge() {
+        if (callBridge == null) {
+            callBridge = new IOSCallBridge(nativeInstance);
+        }
+        return callBridge;
+    }
+
+    /// The VPN bridge, on NEVPNManager.
+    ///
+    /// Distinct from `NetworkManager.isVPNActive()`, which is always
+    /// available and answers whether some VPN is carrying this device's
+    /// traffic rather than managing one.
+    @Override
+    public com.codename1.vpn.spi.VpnBridge getVpnBridge() {
+        if (vpnBridge == null) {
+            vpnBridge = new IOSVpnBridge(nativeInstance);
+        }
+        return vpnBridge;
     }
 
     private IOSNearbyBridge nearbyBridge;
@@ -1064,7 +1108,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         // The Info.plist key is the single source of truth: without multiple scenes
         // enabled the system refuses to activate a second one, so reporting supported
         // here would hand back windows that never appear.
-        if (!nativeInstance.macMultiWindowSupported()) {
+        if (!catalystWindowNative.macMultiWindowSupported()) {
             return null;
         }
         if (windowManager == null) {
@@ -1120,17 +1164,55 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.setWindowTitle(t == null ? "" : t);
     }
 
-    // Commands currently exposed in the Mac native menu, index-aligned with the labels pushed to
-    // native; fireMacMenuCommand(int) (invoked from the native menu action) resolves through this.
-    private static List<com.codename1.ui.Command> macNativeCommands;
+    // Commands currently exposed in the Mac native menu, keyed by the id carried in each native
+    // menu item; fireMacMenuCommand(int) (invoked from the native menu action) resolves through
+    // this.
+    //
+    // Keyed by id rather than by row number, and the superseded generation is kept, because the two
+    // sides do not change together: this map is published here on the EDT, while the menu whose
+    // items carry the keys is rebuilt later on the main queue. A row number identifies a position,
+    // so throughout that interval every item the user could still see and click resolved its
+    // position against a list that no longer described it, and selecting one ran whichever command
+    // now sat at that index. An id identifies the command itself, so a stale item runs the command
+    // whose label the user actually clicked, and an item older than one generation resolves to
+    // nothing rather than to something arbitrary.
+    private static volatile java.util.HashMap<Integer, com.codename1.ui.Command> macNativeCommands;
+    private static volatile java.util.HashMap<Integer, com.codename1.ui.Command> macSupersededCommands;
+    private static int nextMacCommandId = 1;
+
+    /**
+     * One menu field with the row and column delimiters taken out of it.
+     *
+     * <p>The rows are joined by newlines and the columns by tabs, and both the
+     * command label and the menu hint are user-facing strings a localization can
+     * put anything into. A newline in a label produced an extra native row while
+     * the Java list backing fireMacMenuCommand() still held one entry per
+     * command, so every later item carried a tag pointing at the wrong command
+     * and selecting one ran something else. A tab shifted the label and shortcut
+     * columns of its own row.</p>
+     *
+     * <p>Replaced rather than backslash-escaped: an escape needs the two native
+     * parsers -- the AppKit one and the Catalyst one -- to unescape in step with
+     * this, and neither a newline nor a tab means anything in a menu item, which
+     * renders on one line. Turning them into spaces costs nothing anyone can
+     * see and cannot desynchronize the two sides.</p>
+     */
+    private static String menuField(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
+    }
 
     @Override
     public void setNativeCommands(Vector commands) {
         if (!isDesktop()) {
             return;
         }
-        ArrayList<com.codename1.ui.Command> filtered = new ArrayList<com.codename1.ui.Command>();
-        // Encode one row per command as "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>",
+        java.util.HashMap<Integer, com.codename1.ui.Command> published =
+                new java.util.HashMap<Integer, com.codename1.ui.Command>();
+        // Encode one row per command as
+        // "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>",
         // rows separated by '\n'. The native side groups rows into the matching standard macOS menus
         // (App/File/Edit/View/Window/Help) or a top-level menu named by the hint; an empty hint means
         // the default commands menu. A non-zero shortcutKeyChar produces a UIKeyCommand so the menu
@@ -1154,26 +1236,35 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if (sb.length() > 0) {
                     sb.append('\n');
                 }
-                sb.append(hint).append('\t').append(name).append('\t')
+                int commandId = nextMacCommandId++;
+                sb.append(menuField(hint)).append('\t').append(menuField(name)).append('\t')
                         .append(c.getDesktopShortcutKeyChar()).append('\t')
-                        .append(c.getDesktopShortcutModifiers());
-                filtered.add(c);
+                        .append(c.getDesktopShortcutModifiers()).append('\t')
+                        .append(commandId);
+                published.put(Integer.valueOf(commandId), c);
             }
         }
-        macNativeCommands = filtered;
+        macSupersededCommands = macNativeCommands;
+        macNativeCommands = published;
         nativeInstance.setNativeMenuCommands(sb.toString());
     }
 
     /**
-     * Invoked from the native Mac menu action when the user selects the command at the given
-     * index. Dispatches the corresponding Codename One command on the EDT.
+     * Invoked from the native Mac menu action when the user selects a command, identified by the id
+     * the item carries. Dispatches the corresponding Codename One command on the EDT.
      */
-    public static void fireMacMenuCommand(final int index) {
-        final List<com.codename1.ui.Command> cmds = macNativeCommands;
-        if (cmds == null || index < 0 || index >= cmds.size()) {
+    public static void fireMacMenuCommand(final int commandId) {
+        java.util.HashMap<Integer, com.codename1.ui.Command> live = macNativeCommands;
+        java.util.HashMap<Integer, com.codename1.ui.Command> superseded = macSupersededCommands;
+        Integer key = Integer.valueOf(commandId);
+        com.codename1.ui.Command resolved = live == null ? null : live.get(key);
+        if (resolved == null && superseded != null) {
+            resolved = superseded.get(key);
+        }
+        if (resolved == null) {
             return;
         }
-        final com.codename1.ui.Command c = cmds.get(index);
+        final com.codename1.ui.Command c = resolved;
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
@@ -1285,7 +1376,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             // Tell the native side which window is being edited, so the editor is
             // added to that window's view rather than the main surface's. Cleared to
             // -1 for a field on the main form, since the slot is process wide.
-            nativeInstance.macWindowSetEditingSlot(
+            catalystWindowNative.macWindowSetEditingSlot(
                     parentTop instanceof Form ? -1 : MacWindowManager.slotForComponent(cmp));
             if (parentForm.getClientProperty("asyncEditing") != null) {
                 Object async = parentForm.getClientProperty("asyncEditing");
@@ -2031,8 +2122,142 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     /// Invoked when a display is attached, removed or changes mode.
+    ///
+    /// The whole topology, not one window moving between displays -- that is
+    /// `#windowMonitorChangedCallback(int)`. Reporting a drag onto a second
+    /// screen here would fire every application monitor listener and relayout
+    /// every window for something that changed one of them.
     public static void monitorsChangedCallback() {
         Desktop.getInstance().monitorsChanged();
+    }
+
+    /// Invoked when a trackpad magnify gesture ends.
+    ///
+    /// The AppKit port is the one that needs this: a trackpad pinch produces no
+    /// pointer events, so the two-pointer path that normally ends a pinch never
+    /// runs and a component that zoomed would stay in its pinching state.
+    /// Invoked when the platform reports that a magnify gesture BEGAN, before any
+    /// scale arrives. Scopes the gesture so its updates and its release all reach
+    /// one component, and discards a claim whose release never came.
+    /// Whether a magnify gesture was reported begun and not yet released.
+    ///
+    /// The gate below drops events while a modal file chooser is up, and the
+    /// terminating release of a gesture already in flight must not be one of
+    /// them: nothing else clears the component's pinching state.
+    private static boolean pinchGestureOpen;
+
+    public static void pinchBeginCallback() {
+        if (dropEvents || instance == null) {
+            return;
+        }
+        // Recorded so the release closing THIS gesture can be let through the
+        // same gate. A file chooser opened mid-pinch sets dropEvents, and a
+        // dropped release leaves the component pinching for good.
+        pinchGestureOpen = true;
+        // Marshalled for the same reason as pinchMagnifyCallback.
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                com.codename1.ui.Display.getInstance().firePinchBeginGesture();
+            }
+        });
+    }
+
+    public static void pinchReleaseCallback(final int x, final int y) {
+        // The release of a gesture already begun goes through even while events
+        // are being dropped. openFileChooser() sets dropEvents while a magnify is
+        // in flight, and discarding the Ended left ImageViewer pinching and never
+        // committing its zoom -- the same defect the native gate had, one layer
+        // up, so fixing only the native side left this half of the path broken.
+        // A release with no gesture open is still dropped, as are new begins and
+        // every update.
+        boolean closingOpenGesture = pinchGestureOpen;
+        pinchGestureOpen = false;
+        if ((dropEvents && !closingOpenGesture) || instance == null) {
+            return;
+        }
+        // Marshalled for the same reason as pinchMagnifyCallback.
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                com.codename1.ui.Display.getInstance().firePinchReleaseGesture(x, y);
+            }
+        });
+    }
+
+    /// Copies the current lightweight text selection, if there is one.
+    ///
+    /// The AppKit port's Edit menu and Command-C reach the rendering view, and
+    /// when no native text-input session is running the only thing that can own
+    /// a selection is the form's own TextSelection -- selectable Labels and
+    /// SpanLabels, which the desktop selects with a press rather than through
+    /// the portable floating Copy menu. Without this there was no way to copy
+    /// them at all.
+    ///
+    /// Queued rather than answered here: TextSelection walks the component
+    /// hierarchy, which belongs to the event dispatch thread, and this is called
+    /// from AppKit's main thread.
+    public static void macCopyTextSelection(final int windowId) {
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                // The window the keystroke arrived in, not Display.getCurrent().
+                // Every Window owns its own TextSelection, so resolving the
+                // current Form copied the main window's selection -- or nothing
+                // -- while the text the user had highlighted sat in another one.
+                // Window 0 IS the main form, which is why it falls through to
+                // getCurrent() rather than being looked up.
+                com.codename1.ui.TopLevelContainer top = null;
+                if (windowId > 0) {
+                    top = com.codename1.ui.Desktop.getInstance().windowById(windowId);
+                }
+                if (top == null) {
+                    top = com.codename1.ui.Display.getInstance().getCurrent();
+                }
+                if (top == null) {
+                    return;
+                }
+                com.codename1.ui.TextSelection sel = top.getTextSelection();
+                if (sel != null && sel.isEnabled()) {
+                    sel.copy();
+                }
+            }
+        });
+    }
+
+    /// Records which mouse button produced the pointer event about to be
+    /// dispatched.
+    ///
+    /// Called from the AppKit view immediately before the pointer callback, the
+    /// way the Linux and native Windows ports call setPointerEventMetadata from
+    /// their own input handlers. Without it every click looked primary, so
+    /// PointerEvent.isSecondaryButton() was false for a right click and the
+    /// framework's context-menu and selection logic could not tell the two
+    /// apart.
+    ///
+    /// `button`, `mask` and `modifiers` are PointerEvent constants; the type is
+    /// always a mouse here, since a Mac trackpad click arrives as one too.
+    ///
+    /// `mask` is the buttons still HELD, which is why a release passes what
+    /// AppKit reports after the release rather than the button that caused it --
+    /// getButtonMask() answers "what is down now", and staging the released
+    /// button there told a release listener the button was still pressed.
+    public static void pointerButtonCallback(int button, int mask, int modifiers) {
+        if (instance == null) {
+            return;
+        }
+        instance.setPointerEventMetadata(button, mask,
+                com.codename1.ui.events.PointerEvent.TYPE_MOUSE, 1f, 0, 0, 0,
+                modifiers, false);
+    }
+
+    /// Invoked when the user moves a native window.
+    public static void windowMovedCallback(int windowId) {
+        Desktop.getInstance().windowMoved(windowId);
+    }
+
+    /// Invoked when a window crosses onto a display with different
+    /// characteristics, so its scale and layout are recomputed. Only that
+    /// window's.
+    public static void windowMonitorChangedCallback(int windowId) {
+        Desktop.getInstance().windowMonitorChanged(windowId);
     }
 
     /// Invoked for a mouse or trackpad hover over a secondary window. Catalyst
@@ -2058,11 +2283,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     /// Invoked for an indirect scroll (wheel or trackpad) over a secondary window.
-    public static void windowWheelCallback(int windowId, int x, int y, int scrollX, int scrollY) {
+    ///
+    /// `precise` and `modifiers` are the event's own, not constants: a notched
+    /// wheel reported as a trackpad scrolls by the wrong unit, and a dropped
+    /// modifier mask is what stops a control-wheel-to-zoom listener from ever
+    /// seeing the held key. A producer that genuinely cannot tell -- the watch
+    /// crown, the UIKit pan recognizer -- passes what it knows and says so at
+    /// the call site.
+    public static void windowWheelCallback(int windowId, int x, int y, int scrollX, int scrollY,
+            boolean precise, int modifiers) {
         if (dropEvents) {
             return;
         }
-        instance.windowPointerWheelMoved(windowId, x, y, scrollX, scrollY, false, 0);
+        instance.windowPointerWheelMoved(windowId, x, y, scrollX, scrollY, precise, modifiers);
     }
 
     /// Invoked for a trackpad magnify over a secondary window.
@@ -2183,8 +2416,18 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Invoked for a pointer event inside a window. The type is 1 for a press,
     /// 2 for a release and 3 for a drag, matching CN1MacWindowView.
     public static void windowPointerCallback(int windowId, int type, int x, int y) {
-        if (dropEvents) {
+        // As pointerReleasedCallback: the release closing a press this window
+        // already received is not dropped, because nothing else would ever
+        // clear that press.
+        boolean closingOpenPress = type == 2 && openPointerPressSurface == windowId;
+        if (closingOpenPress) {
+            openPointerPressSurface = NO_OPEN_POINTER_PRESS;
+        }
+        if (dropEvents && !closingOpenPress) {
             return;
+        }
+        if (type == 1) {
+            openPointerPressSurface = windowId;
         }
         int[] xs = new int[]{x};
         int[] ys = new int[]{y};
@@ -2214,15 +2457,44 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// The surface whose pointer press is open, so the release closing THAT
+    /// press can be let through the drop gate the way a pinch's release is.
+    ///
+    /// Every caller that sets dropEvents -- capturePhoto, captureVideo,
+    /// openFileChooser -- puts a modal picker up, and a press can be open when
+    /// it does: opened from a key listener or a timer before the button came
+    /// back up. Dropping its release leaves the component pressed and dragging
+    /// with nothing left to clear it, because the release is the only thing
+    /// that ever would.
+    ///
+    /// Held per surface rather than as one flag, matching the native side,
+    /// where the press is tracked on the view that saw it.
+    private static final int NO_OPEN_POINTER_PRESS = Integer.MIN_VALUE;
+
+    /// The main surface, which has no window id of its own.
+    private static final int MAIN_SURFACE_PRESS = -1;
+
+    private static int openPointerPressSurface = NO_OPEN_POINTER_PRESS;
+
     public static void pointerPressedCallback(int x, int y) {
         if(dropEvents) {
             return;
         }
+        openPointerPressSurface = MAIN_SURFACE_PRESS;
         singleDimensionX[0] = x; singleDimensionY[0] = y;
         instance.pointerPressed(singleDimensionX, singleDimensionY);
     }
     public static void pointerReleasedCallback(int x, int y) {
-        if(dropEvents) {
+        // The release of a press already delivered goes through even while
+        // events are being dropped -- the same exception the native gate makes,
+        // which was ineffective on its own because this half discarded what it
+        // forwarded. A release with no press open is still dropped, as are new
+        // presses and every drag.
+        boolean closingOpenPress = openPointerPressSurface == MAIN_SURFACE_PRESS;
+        if (closingOpenPress) {
+            openPointerPressSurface = NO_OPEN_POINTER_PRESS;
+        }
+        if(dropEvents && !closingOpenPress) {
             return;
         }
         singleDimensionX[0] = x; singleDimensionY[0] = y;
@@ -2252,13 +2524,19 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// Invoked from the native trackpad / Magic Mouse / wheel scroll handler. Routes the scroll
     /// through the shared wheel pipeline so that `com.codename1.ui.events.WheelEvent` is a single
-    /// universal scroll-gesture API across desktop, Android and iOS. The deltas come from a high
-    /// resolution device so the event is flagged as precise.
-    public static void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY) {
+    /// universal scroll-gesture API across desktop, Android and iOS.
+    ///
+    /// `precise` and `modifiers` come from the event rather than being assumed.
+    /// Hard-coding precise=true reported every notched mouse wheel as a
+    /// trackpad, and hard-coding modifiers=0 meant a wheel listener could never
+    /// observe Control, Option, Shift or Command -- which is exactly the
+    /// control-wheel-to-zoom gesture the richer overload exists to enable.
+    public static void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY,
+            boolean precise, int modifiers) {
         if (dropEvents || instance == null) {
             return;
         }
-        instance.pointerWheelMoved(x, y, scrollX, scrollY, true, 0);
+        instance.pointerWheelMoved(x, y, scrollX, scrollY, precise, modifiers);
     }
 
     /// Invoked from the native magnify (pinch) gesture recognizer, used by the Mac Catalyst trackpad
@@ -2631,10 +2909,67 @@ public class IOSImplementation extends CodenameOneImplementation {
         if ("true".equalsIgnoreCase(Display.getInstance().getProperty("desktop.interactiveScrollbars", "false"))) {
             tp.put("@interactiveScrollBool", "true");
         }
+        injectListFocusStyle(tp);
     }
 
+    /*
+     * Gives "ListRendererFocus" a definition, because nothing else does.
+     *
+     * List.paintFocus() draws DefaultListCellRenderer's focus Label, and that
+     * Label's UIID is "ListRendererFocus" -- a name referenced exactly once in
+     * the whole framework (where it is set) and defined by no Codename One
+     * theme. With no definition it falls back to the default style, which is an
+     * OPAQUE WHITE fill, and UIManager.resetThemeProps additionally forces a
+     * global sel#transparency of 255.
+     *
+     * Every touch port escapes that because Display.shouldRenderSelection() is
+     * false there, so the overlay is never painted -- which is why the iOS
+     * themes could go without the UIID and why Mac Catalyst, also isDesktop()
+     * but still a touch device, is unaffected by this method. Windows and Linux
+     * escape it because their own native themes give the overlay a transparent
+     * fill and a ring. The native macOS port is the first DESKTOP port to run an
+     * iOS theme, so it is the first to paint the overlay -- and in dark mode the
+     * theme's selected foreground is white, so an opaque white bar landed under
+     * white text and the selected row's label vanished. Light mode only looked
+     * right by accident: there the selected foreground is black.
+     *
+     * So the overlay is made transparent (it can never hide a row again) and
+     * given a ring instead, which is what a desktop focus indicator is. The
+     * system accent is used rather than a colour invented here, and the guard
+     * leaves any theme that does define the UIID alone.
+     */
+    private void injectListFocusStyle(Hashtable tp) {
+        // Any entry at all under the UIID means the theme has an opinion; leave it.
+        for (Object key : tp.keySet()) {
+            if (key instanceof String && ((String) key).indexOf("ListRendererFocus") > -1) {
+                return;
+            }
+        }
+        int ring = 0x007aff;
+        int darkRing = 0x0a84ff;
+        int thickness = Math.max(1, Display.getInstance().convertToPixels(0.4f));
+        for (String prefix : new String[] {"", "sel#", "press#", "dis#"}) {
+            tp.put("ListRendererFocus." + prefix + Style.TRANSPARENCY, "0");
+            tp.put("ListRendererFocus." + prefix + Style.BORDER,
+                    Border.createLineBorder(thickness, ring));
+            tp.put("$DarkListRendererFocus." + prefix + Style.TRANSPARENCY, "0");
+            tp.put("$DarkListRendererFocus." + prefix + Style.BORDER,
+                    Border.createLineBorder(thickness, darkRing));
+        }
+    }
+
+    /// Reads a bundled resource by name, the way the rest of this port does.
+    ///
+    /// Class.getResourceAsStream() is a CLASSLOADER lookup, and a
+    /// ParparVM-translated application has no classpath to look in -- the file
+    /// lives in the app bundle and is reached through
+    /// nativeInstance.getResourceSize / NSFileInputStream. So the classloader
+    /// spelling answered null for a resource that was sitting in the bundle
+    /// the whole time, and installNativeTheme()'s modern branch read that null
+    /// as "the theme was never built" and fell back to iOS 7 -- silently, on
+    /// every target, which is why ios.themeMode=modern appeared to do nothing.
     private InputStream getResourceAsStream(String name) {
-        return IOSImplementation.class.getResourceAsStream(name);
+        return getResourceAsStream(IOSImplementation.class, name);
     }
 
     private long getNSData(InputStream i) {
@@ -4080,9 +4415,31 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
 
+    /// True everywhere the native shadow actually draws, which is not macOS.
+    ///
+    /// nativeDrawShadowMutable is a UIKit helper and its TARGET_OS_OSX branch is
+    /// empty -- AppKit's equivalent is a different API rather than a renamed
+    /// one, so it has not been ported. Answering true there sent
+    /// Component.useNativeShadowRendering() down the native path, which drew
+    /// nothing at all: an elevation shadow simply vanished, with no error and
+    /// nothing in Java able to notice. Answering false routes the caller to the
+    /// framework's own elevation rendering, which paints.
+    ///
+    /// Delete this override, not the capability, when the AppKit path lands.
     @Override
     public boolean isDrawShadowSupported() {
-        return true;
+        return !isMacPlatform();
+    }
+
+    /// Whether this is the native macOS port rather than an iOS or Mac Catalyst
+    /// build. Catalyst reports "ios" and is unaffected.
+    private boolean isMacPlatform() {
+        return isMacPlatformStatic();
+    }
+
+    /// The same test, reachable from the static native callbacks.
+    private static boolean isMacPlatformStatic() {
+        return instance != null && "mac".equals(instance.getPlatformName());
     }
 
     @Override
@@ -4862,7 +5219,10 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         @Override
         public boolean isGeofenceSupported() {
-            return true;
+            // Asked of the native layer rather than answered true: addGeofencing
+            // is an empty body on macOS, watchOS and tvOS, and a caller told yes
+            // there registers a fence the OS was never asked to monitor.
+            return nativeInstance.isGeofencingSupported();
         }
         
         @Override
@@ -5147,30 +5507,170 @@ public class IOSImplementation extends CodenameOneImplementation {
     /**
      * Callback for the native layer
      */
+    /**
+     * One result of a capture or a gallery pick, in the "file:&lt;path&gt;" form the callback
+     * documents.
+     *
+     * <p>A percent encoded file:// URL is what the macOS panels report: a filename there may
+     * legally contain the newline a multiple selection is separated by, so the native side encodes
+     * rather than hand over a raw path that would split into several. Decoding it here produces the
+     * plain path every other port produces, so nothing downstream sees the difference.</p>
+     *
+     * <p>Shared by both branches deliberately. The decode used to sit inside the multiple-selection
+     * loop, which left a single pick holding a URL that still spelled a space "%20" -- every file
+     * API downstream then looked for a name nothing on disk had. Nothing about the encoding depends
+     * on how many files were chosen.</p>
+     */
+    private static String capturedPath(String path) {
+        if (path.startsWith("file://")) {
+            return "file:" + Util.decode(path.substring("file://".length()), "UTF-8", false);
+        }
+        if (path.startsWith("file:")) {
+            return path;
+        }
+        return "file:" + path;
+    }
+
+    /**
+     * The framework id of the Window a peer lives in, or -1 when it is on the main surface.
+     *
+     * <p>Native peers are real views, and which view they are added to has to be decided when they
+     * are added. The native side has only the peer and a rectangle at that point -- the owning
+     * window is not something it can recover -- so a peer created in a secondary Window was added
+     * to the main one and then positioned there using coordinates measured against its own. It
+     * appeared over the main Form and took input there.</p>
+     *
+     * <p>Resolving it late, on a later positioning pass, was tried and reverted: the view is
+     * resolved on one thread and used from a deferred main-queue block, so a window torn down in
+     * between leaves it pointing into a dead window, which is a crash the next time anything draws.
+     * An id is an int -- it carries safely into that block and is looked up on the main thread, at
+     * the moment it is used.</p>
+     */
+    private static int peerWindowId(Component cmp) {
+        if (cmp == null) {
+            return -1;
+        }
+        com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+        if (top instanceof com.codename1.ui.Window) {
+            return ((com.codename1.ui.Window) top).getWindowId();
+        }
+        return -1;
+    }
+
+    /// The macOS entry points for the two picker results, which deliver the
+    /// application's listener ON THE EDT.
+    ///
+    /// Both natives run on AppKit's main queue. The shared methods below fire
+    /// the application's ActionListener synchronously, so the listener ran on
+    /// that queue rather than the EDT: ordinary UI work raced the framework,
+    /// and a listener calling BrowserComponent.setURL() reached the browser
+    /// native's dispatch_sync back onto the main queue it was already occupying
+    /// and deadlocked.
+    ///
+    /// dropEvents is cleared HERE, immediately, and only the listener is
+    /// marshalled. That flag suppresses input while a modal picker is up, and
+    /// deferring it to the EDT would leave events dropped for a turn after the
+    /// picker closed.
+    ///
+    /// New methods rather than a change to the shared ones, so the iOS document
+    /// picker and the Mac share callback keep the behaviour they have. Note
+    /// that means iOS still fires these listeners off the EDT and can still
+    /// deadlock the same way -- that is pre-existing, framework-wide, and wants
+    /// fixing inside fileChooserResult/capturePictureResult where every caller
+    /// benefits.
+    public static void macFileChooserResult(final String r) {
+        dropEvents = false;
+        // Bound to the request NOW, on the thread the native answered on,
+        // rather than read later from the shared slot: by the time the EDT runs
+        // the delivery a second openFileChooser() may have replaced it, and
+        // this result would then fire the wrong listener and orphan its own.
+        final EventDispatcher target = macDequeue(macFileChooserQueue);
+        if (target != null && target == fileChooserCallback) {
+            // Nothing else has claimed the slot, so keep it in step: the shared
+            // path clears it after delivering, and leaving a fired dispatcher
+            // there would let a later stray result fire it twice.
+            fileChooserCallback = null;
+        }
+        if (deliverPickerResultOnEdt(new Runnable() {
+            @Override
+            public void run() {
+                fileChooserResult(r, target);
+            }
+        })) {
+            return;
+        }
+        fileChooserResult(r, target);
+    }
+
+    /// @see #macFileChooserResult(String)
+    public static void macCapturePictureResult(final String r) {
+        dropEvents = false;
+        final MacCaptureRequest request = macDequeueCapture();
+        final EventDispatcher target = request == null ? null : request.dispatcher;
+        final boolean multiple = request != null && request.selectMultiple;
+        if (target != null && target == captureCallback) {
+            captureCallback = null;
+        }
+        if (deliverPickerResultOnEdt(new Runnable() {
+            @Override
+            public void run() {
+                capturePictureResult(r, target, multiple);
+            }
+        })) {
+            return;
+        }
+        capturePictureResult(r, target, multiple);
+    }
+
+    /// Queues the delivery on the EDT, answering whether it took it.
+    ///
+    /// callSerially, never callSeriallyAndWait: this runs on the thread AppKit
+    /// needs to keep servicing, and waiting for the EDT from it is the deadlock
+    /// these entry points exist to avoid. False when there is no EDT to queue
+    /// on -- Display not yet initialised, or we are already on it -- and the
+    /// caller then delivers inline exactly as before.
+    private static boolean deliverPickerResultOnEdt(Runnable delivery) {
+        if (!Display.isInitialized()) {
+            return false;
+        }
+        Display d = Display.getInstance();
+        if (d == null || d.isEdt()) {
+            return false;
+        }
+        d.callSerially(delivery);
+        return true;
+    }
+
     public static void capturePictureResult(String r) {
+        capturePictureResult(r, captureCallback, gallerySelectMultiple);
+        captureCallback = null;
+    }
+
+    /// Delivers to ONE dispatcher, in the shape THAT request asked for.
+    ///
+    /// The single-slot caller above keeps the old behaviour for iOS; the macOS
+    /// entry point passes the dispatcher and the multiplicity recorded when the
+    /// request was made. Both have to travel together: reading the process-wide
+    /// gallerySelectMultiple here would hand the first listener the second
+    /// request's shape.
+    private static void capturePictureResult(String r, EventDispatcher captureCallback,
+            boolean selectMultiple) {
         dropEvents = false;
         if(captureCallback != null) {
             if(r != null) {
-                if (gallerySelectMultiple) {
+                if (selectMultiple) {
                     String[] paths = Util.split(r, "\n");
                     int len = paths.length;
                     for (int i=0; i<len; i++) {
-                        if (!paths[i].startsWith("file:")) {
-                            paths[i] = "file:"+paths[i];
-                        }
+                        paths[i] = capturedPath(paths[i]);
                     }
                     captureCallback.fireActionEvent(new ActionEvent(paths));
                 } else {
-                    if(r.startsWith("file:")) {
-                        captureCallback.fireActionEvent(new ActionEvent(r));
-                    } else {
-                        captureCallback.fireActionEvent(new ActionEvent("file:" + r));
-                    }
+                    captureCallback.fireActionEvent(new ActionEvent(capturedPath(r)));
                 }
             } else {
                 captureCallback.fireActionEvent(new ActionEvent(null));
             }
-            captureCallback = null;
         }
     }
 
@@ -5178,6 +5678,12 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Callback for the native document picker.
      */
     public static void fileChooserResult(String r) {
+        fileChooserResult(r, fileChooserCallback);
+        fileChooserCallback = null;
+    }
+
+    /// @see #capturePictureResult(String, EventDispatcher)
+    private static void fileChooserResult(String r, EventDispatcher fileChooserCallback) {
         dropEvents = false;
         if(fileChooserCallback != null) {
             if(r != null) {
@@ -5189,7 +5695,6 @@ public class IOSImplementation extends CodenameOneImplementation {
             } else {
                 fileChooserCallback.fireActionEvent(new ActionEvent(null));
             }
-            fileChooserCallback = null;
         }
     }
     
@@ -5235,6 +5740,97 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private static EventDispatcher captureCallback;
     private static EventDispatcher fileChooserCallback;
+
+    /// The dispatchers of chooser requests the native has not answered yet,
+    /// oldest first. macOS only.
+    ///
+    /// The shared callbacks above are ONE slot read at DELIVERY time, which is
+    /// only sound while a request cannot be outstanding when the next is made.
+    /// It can here: openFileChooser() returns as soon as it has queued the
+    /// panel, so two calls in a single EDT turn overwrite the slot before
+    /// either answer arrives -- the first panel's selection is then delivered
+    /// to the SECOND listener and clears the slot, and the second selection
+    /// finds it null and is dropped. Neither listener hears its own result and
+    /// one hears nothing at all.
+    ///
+    /// A queue rather than a single slot, because pairing by ORDER is exactly
+    /// right on this port: the panel runs through -[NSOpenPanel runModal],
+    /// which is application modal on the main queue, so a second panel cannot
+    /// start until the first returns and the answers come back in the order the
+    /// requests were made.
+    ///
+    /// iOS keeps the single slot. Its pickers are presented rather than run
+    /// modally and its result path is the shared one; changing it belongs with
+    /// a fix to fileChooserResult/capturePictureResult where every caller
+    /// benefits, not smuggled in here.
+    private static final java.util.ArrayList<EventDispatcher> macFileChooserQueue =
+            new java.util.ArrayList<EventDispatcher>();
+
+    /// One outstanding capture request: who asked, and what SHAPE of answer it
+    /// asked for.
+    ///
+    /// gallerySelectMultiple is process-wide and read when the result arrives,
+    /// so binding only the dispatcher was half a fix: open a single-select and
+    /// a multi-select gallery before the first panel returns and the first
+    /// listener is handed the second request's shape -- a String[] where it
+    /// expects a String, or several paths collapsed into one newline-separated
+    /// one. The shape belongs to the request, like the dispatcher.
+    private static final class MacCaptureRequest {
+        final EventDispatcher dispatcher;
+        final boolean selectMultiple;
+
+        MacCaptureRequest(EventDispatcher dispatcher, boolean selectMultiple) {
+            this.dispatcher = dispatcher;
+            this.selectMultiple = selectMultiple;
+        }
+    }
+
+    private static final java.util.ArrayList<MacCaptureRequest> macCaptureQueue =
+            new java.util.ArrayList<MacCaptureRequest>();
+
+    /// Remembers a capture request, dispatcher and answer shape together.
+    private static void macEnqueueCapture(EventDispatcher dispatcher) {
+        if (!isMacPlatformStatic() || dispatcher == null) {
+            return;
+        }
+        synchronized (macCaptureQueue) {
+            macCaptureQueue.add(new MacCaptureRequest(dispatcher, gallerySelectMultiple));
+        }
+    }
+
+    /// The oldest unanswered capture request, or null when there is none.
+    private static MacCaptureRequest macDequeueCapture() {
+        synchronized (macCaptureQueue) {
+            if (macCaptureQueue.isEmpty()) {
+                return null;
+            }
+            return macCaptureQueue.remove(0);
+        }
+    }
+
+    /// Remembers a chooser request's dispatcher so its own result can find it.
+    private static void macEnqueue(java.util.ArrayList<EventDispatcher> queue,
+            EventDispatcher dispatcher) {
+        if (!isMacPlatformStatic() || dispatcher == null) {
+            return;
+        }
+        synchronized (queue) {
+            queue.add(dispatcher);
+        }
+    }
+
+    /// The dispatcher for the oldest unanswered request, or null when there is
+    /// none -- a result the framework never asked for, which is dropped exactly
+    /// as the single-slot path dropped it.
+    private static EventDispatcher macDequeue(
+            java.util.ArrayList<EventDispatcher> queue) {
+        synchronized (queue) {
+            if (queue.isEmpty()) {
+                return null;
+            }
+            return queue.remove(0);
+        }
+    }
     
     /**
      * Captures a photo and notifies with the image data when available
@@ -5247,6 +5843,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
+        macEnqueueCapture(captureCallback);
         nativeInstance.captureCamera(false, 0, 0);
         dropEvents = true;
     }
@@ -5578,6 +6175,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         gallerySelectMultiple = false;
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
+        macEnqueueCapture(captureCallback);
         nativeInstance.captureCamera(true, getUIPickerControllerQualityType(cnst), cnst != null ? cnst.getPreferredMaxLength() : 0);
         dropEvents = true;
     }
@@ -5656,6 +6254,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
+        macEnqueueCapture(captureCallback);
         nativeInstance.openGallery(type);
     }
 
@@ -5663,6 +6262,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void openFileChooser(ActionListener response, String accept) {
         fileChooserCallback = new EventDispatcher();
         fileChooserCallback.addListener(response);
+        macEnqueue(macFileChooserQueue, fileChooserCallback);
         nativeInstance.openFileChooser(accept);
         dropEvents = true;
     }
@@ -7326,7 +7926,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         boolean isDrawShadowSupported() {
-            return true;
+            // Same reason as the port-level answer above: this is the path that
+            // calls nativeDrawShadowMutable, whose macOS branch is empty.
+            return !isMacPlatform();
         }
 
         void nativeDrawShadow(long image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
@@ -8714,7 +9316,8 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         protected void initComponent() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                nativeInstance.peerInitialized(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                nativeInstance.peerInitialized(nativePeer[0], getAbsoluteX(), getAbsoluteY(),
+                        getWidth(), getHeight(), peerWindowId(this));
             }
         }
 
@@ -9018,6 +9621,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             return "iOS";
         }
         if(key.equalsIgnoreCase("os.gzip")) {
+            return "true";
+        }
+        // NSURLSession follows a redirect inside the native stack, so the
+        // framework never sees where a download actually came from. Answered
+        // here rather than inferred from the platform name because the native
+        // macOS port inherits this class -- and shares the behaviour -- while a
+        // skinless JavaSE build on a Mac reports the same platform name and does
+        // not. ModelCache reads it to decide whether a pinned digest is
+        // mandatory.
+        if(key.equalsIgnoreCase("cn1.nativeRedirects")) {
             return "true";
         }
         if(key.equalsIgnoreCase("OS")) {
@@ -9739,7 +10352,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         protected void initComponent() {
             super.initComponent();
             if(nativePeer != 0) {
-                nativeInstance.peerInitialized(nativePeer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                nativeInstance.peerInitialized(nativePeer, getAbsoluteX(), getAbsoluteY(),
+                        getWidth(), getHeight(), peerWindowId(this));
                 attachToOwningWindow();
             }
         }
@@ -9758,7 +10372,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 // in the same event dispatch turn as show(). The native side queues
                 // it in that case and scene adoption attaches it, so there is nothing
                 // to retry from here.
-                nativeInstance.macWindowAttachPeer(nativePeer, slot,
+                catalystWindowNative.macWindowAttachPeer(nativePeer, slot,
                         getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
         }
@@ -11012,6 +11626,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         PushCallback explicit = CodenameOneImplementation.getPushCallback();
         if (explicit != null) {
             pushCallback = explicit;
+            // Every path that installs a callback flushes: this one,
+            // setPushCallback and setMainClass. A held push released by only some
+            // of them would be a launch notification lost depending on how the
+            // application happens to register.
+            firePendingPush();
         }
         nativeInstance.registerPush();
     }
@@ -11030,11 +11649,135 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private static PushCallback pushCallback;
     
-    public static void pushReceived(final String message, final String type) {
+    /// Pushes that arrived before anything was registered to receive them.
+    ///
+    /// A managed notification can cold-launch the application, and the native
+    /// replay runs as soon as the framework is callable -- which is before the
+    /// main class's init() has installed the callback, because installing it is
+    /// queued on the EDT. Dropped there, the very notification that launched the
+    /// application was the one it never saw.
+    ///
+    /// A LIST, not one slot. A legacy type 3 payload carrying both an alert and
+    /// metadata reaches pushReceived TWICE -- both native routers send the alert
+    /// and then the metadata -- so a single slot kept the metadata and threw the
+    /// user-visible alert away. Every pair is held, in the order the native side
+    /// sent them, and replayed in that order.
+    ///
+    /// Bounded so a callback that never arrives cannot grow this without limit;
+    /// the oldest goes first, because the newest is the one the user just acted
+    /// on.
+    private static final int MAX_PENDING_PUSHES = 16;
+
+    /// One held push: the message, its type, and the id of the notification it came from.
+    ///
+    /// The id has to be held with the message rather than derived later. It names the completion
+    /// grant the operating system gave for THAT notification, and the whole point of holding a
+    /// message is that other notifications may arrive before it is delivered.
+    private static final class PendingPush {
+        final String message;
+        final String type;
+        final long completionId;
+        /// The PushContent that came with THIS notification, or null if it
+        /// carried none.
+        ///
+        /// Held with the message for the same reason the completion id is.
+        /// PushContent is a singleton the native layer resets and rewrites for
+        /// every notification, so by the time a held message is replayed it
+        /// describes whichever notification arrived LAST: two pushes before a
+        /// callback existed meant the first callback saw the second's image,
+        /// category and action, and the second saw nothing at all, because
+        /// PushContent.get() clears as it reads.
+        final PushContent content;
+
+        PendingPush(String message, String type, long completionId,
+                PushContent content) {
+            this.message = message;
+            this.type = type;
+            this.completionId = completionId;
+            this.content = content;
+        }
+    }
+
+    /// Puts a held notification's content back where PushContent.get() looks.
+    ///
+    /// Only the fields the native layer sets are restored, and only when the
+    /// notification had content: a push that carried none must leave
+    /// PushContent.exists() answering false rather than resurrect the previous
+    /// one's fields as empty strings.
+    private static void restorePushContent(PushContent c) {
+        PushContent.reset();
+        if (c == null) {
+            return;
+        }
+        PushContent.setTitle(c.getTitle());
+        PushContent.setBody(c.getBody());
+        PushContent.setImageUrl(c.getImageUrl());
+        PushContent.setCategory(c.getCategory());
+        PushContent.setMetaData(c.getMetaData());
+        PushContent.setActionId(c.getActionId());
+        PushContent.setActionTitle(c.getActionTitle());
+        PushContent.setTextResponse(c.getTextResponse());
+        PushContent.setType(c.getType());
+    }
+
+    private static final java.util.ArrayList<PendingPush> pendingPushes =
+            new java.util.ArrayList<PendingPush>();
+
+    /// Delivers every push held from before a callback existed, in order.
+    private static void firePendingPush() {
+        PendingPush[] held;
+        // The SAME lock the queueing path takes. A push arrives on the native UI
+        // thread while the callback is installed on the EDT, so without this the
+        // two interleave: pushReceived reads a null callback, this drains an
+        // empty queue, and only then does the message go in -- stranded, with
+        // its completion grant held, though a callback is installed and nothing
+        // will drain again.
+        synchronized (pendingPushes) {
+            if (pushCallback == null || pendingPushes.isEmpty()) {
+                return;
+            }
+            // Copied and cleared inside the lock: pushReceived is re-entered
+            // below and must not see the queue it is draining.
+            held = pendingPushes.toArray(new PendingPush[pendingPushes.size()]);
+            pendingPushes.clear();
+        }
+        // Delivered OUTSIDE the lock: pushReceived queues serially onto the EDT
+        // and calls into the native layer, and holding a lock across that invites
+        // the deadlock this is not worth.
+        for (PendingPush p : held) {
+            // The content travels WITH the delivery and is restored inside it.
+            // Restoring here instead would restore every snapshot before the
+            // first queued callback ran.
+            pushReceived(p.message, p.type, p.completionId, true, p.content);
+        }
+    }
+
+    public static void pushReceived(final String message, final String type,
+            final long completionId) {
+        pushReceived(message, type, completionId, false, null);
+    }
+
+    /// Delivers one push, optionally restoring the PushContent it arrived with.
+    ///
+    /// The restore has to happen INSIDE the queued delivery. pushReceived only
+    /// hands the callback to the EDT with callSerially, so a replay loop that
+    /// restored each snapshot before calling it had restored the LAST one
+    /// before the FIRST delivery ran -- every callback then read the final
+    /// notification's metadata, which is the bug the snapshot was added to fix,
+    /// moved one step along rather than removed.
+    ///
+    /// restore is false for a live push, where the native layer has already
+    /// written the singleton and rewriting it here would be wrong.
+    private static void pushReceived(final String message, final String type,
+            final long completionId, final boolean restore,
+            final PushContent content) {
         if(pushCallback != null) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
                     try {
+                        if (restore) {
+                            restorePushContent(content);
+                        }
                         if(type != null) {
                             Display.getInstance().setProperty("pushType", type);
                             PushContent.setType(Integer.parseInt(type));
@@ -11044,13 +11787,68 @@ public class IOSImplementation extends CodenameOneImplementation {
                     } finally {
                         if (!"true".equals(Display.getInstance().getProperty("delayPushCompletion", "false")) &&
                             !"true".equals(Display.getInstance().getProperty("ios.delayPushCompletion", "false"))) {
-                            nativeInstance.firePushCompletionHandler();
+                            nativeInstance.firePushCompletionHandler(completionId);
                         }
                     }
                 }
             });
         } else {
-            nativeInstance.firePushCompletionHandler();
+            // Held rather than dropped: registration is imminent on a cold
+            // launch, and firing the completion handler here told the system the
+            // notification had been handled when nothing had seen it.
+            //
+            // And the completion handler is NOT fired for a held message. It is
+            // the operating system's grant of execution time, so releasing it
+            // here says "done" before anything has run: iOS may suspend the
+            // process before the replay, and a content-available push that asked
+            // for background time through delayPushCompletion would lose it
+            // outright. The replay path fires it from the same finally every
+            // delivered push uses, so the grant is released exactly once, when
+            // the callback has actually had it.
+            //
+            // The one case this leaves is an application that registers no push
+            // callback at all, where a held grant is never released. That
+            // application is already misconfigured -- it asked the system for
+            // pushes and has nothing to receive them -- and the alternative,
+            // releasing the grant up front, breaks the case that does work.
+            boolean deliverNow = false;
+            boolean evicted = false;
+            long evictedCompletionId = 0;
+            synchronized (pendingPushes) {
+                // Rechecked under the lock. The callback may have been installed
+                // between the test above and here, in which case queueing would
+                // strand this message behind a drain that has already run.
+                if (pushCallback != null) {
+                    deliverNow = true;
+                } else {
+                    if (pendingPushes.size() >= MAX_PENDING_PUSHES) {
+                        evictedCompletionId = pendingPushes.remove(0).completionId;
+                        evicted = true;
+                    }
+                    // Taken NOW, while PushContent still describes this
+                    // notification. get() clears as it reads, which is what
+                    // makes the snapshot exclusive to this record; the next
+                    // notification resets the singleton anyway.
+                    // A replay that finds the callback gone again re-queues
+                    // the content it was handed, not the singleton: the restore
+                    // now happens inside the delivery, so the singleton does
+                    // not describe this push at this point.
+                    pendingPushes.add(new PendingPush(message, type, completionId,
+                            restore ? content : PushContent.get()));
+                }
+            }
+            if (deliverNow) {
+                pushReceived(message, type, completionId);
+                return;
+            }
+            if (evicted) {
+                // The evicted one will never be delivered, so ITS grant is
+                // released -- otherwise the queue cap would leak a background
+                // task the system is still waiting on. Its own id, not this
+                // message's: the two are different notifications, and releasing
+                // the wrong one is what the ids exist to prevent.
+                nativeInstance.firePushCompletionHandler(evictedCompletionId);
+            }
             /*
             // Removing this section because the race condition shouldn't happen
             // anymore as setMainClass() is now called before initialization.
@@ -11071,6 +11869,25 @@ public class IOSImplementation extends CodenameOneImplementation {
             */
         }
     }
+    /// @inheritDoc
+    ///
+    /// Releases the oldest completion grant the operating system is still waiting on.
+    ///
+    /// This is the other half of `ios.delayPushCompletion`. With that hint set, pushReceived()
+    /// deliberately does NOT release the grant when the callback returns, because the application
+    /// asked to keep running -- and until now nothing released it afterwards either: the base
+    /// implementation of this method does nothing, so the grant was simply held until the system
+    /// took the process down. An application following the documented pattern never actually got
+    /// its background time honoured.
+    ///
+    /// Oldest first, because the application cannot say which push it means -- it is handed a
+    /// message, not an id. An application that handles its pushes in order and calls this once per
+    /// push therefore releases each of them in turn.
+    @Override
+    public void notifyPushCompletion() {
+        nativeInstance.releaseOldestPushCompletionHandler();
+    }
+
     public static void pushRegistered(final String deviceKey) {
         if(instance != null) {
             instance.systemOut("Push handleRegistration() Sending registration to server: " + deviceKey);
@@ -11129,10 +11946,19 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     public static void setPushCallback(PushCallback callback) {
         pushCallback = callback;
+        // Anything that arrived before this point is delivered now.
+        firePendingPush();
     }
     
     public static void setLocalNotificationCallback(LocalNotificationCallback callback) {
         localNotificationCallback = callback;
+        // Releases any delivery waiting for exactly this, which is how a
+        // notification that cold-launched the application reaches a callback
+        // installed afterwards. setPushCallback drains its own backlog here for
+        // the same reason.
+        synchronized (macLocalNotifications) {
+            macLocalNotifications.notifyAll();
+        }
     }
     
     public static LocalNotificationCallback getLocalNotificationCallback() {
@@ -11140,6 +11966,102 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     
+    /// One queued local notification: which one, and the content it arrived
+    /// with.
+    private static final class MacLocalNotification {
+        final String notificationId;
+        final PushContent content;
+
+        MacLocalNotification(String notificationId, PushContent content) {
+            this.notificationId = notificationId;
+            this.content = content;
+        }
+    }
+
+    private static final java.util.ArrayList<MacLocalNotification> macLocalNotifications =
+            new java.util.ArrayList<MacLocalNotification>();
+    private static boolean macLocalNotificationWorkerRunning;
+
+    /// Delivers a local notification OFF the AppKit main thread.
+    ///
+    /// The macOS delegate pumps deliveries on the main queue, and
+    /// localNotificationReceived() runs the application's callback on whatever
+    /// thread calls it -- so the callback ran on the very queue AppKit was
+    /// executing. The callback is documented as off the EDT and may legitimately
+    /// call a non-UI API such as MediaManager.createMedia(), whose native side
+    /// dispatch_syncs to the main queue: that is a deadlock against the queue
+    /// already running it, and a cold-launch notification is exactly when an
+    /// application does that kind of setup.
+    ///
+    /// The content travels with the notification and is restored immediately
+    /// before its own callback, for the reason the held-push replay has to do
+    /// the same: PushContent is a singleton the native layer rewrites per
+    /// delivery, so a second notification would otherwise describe the first.
+    ///
+    /// ONE worker, draining in order. A thread per delivery would restore two
+    /// snapshots into the same singleton concurrently and hand both callbacks
+    /// whichever won.
+    public static void macLocalNotificationReceived(final String notificationId) {
+        // Taken here, on the thread the native layer set it on.
+        MacLocalNotification queued =
+                new MacLocalNotification(notificationId, PushContent.get());
+        synchronized (macLocalNotifications) {
+            macLocalNotifications.add(queued);
+            if (macLocalNotificationWorkerRunning) {
+                return;
+            }
+            macLocalNotificationWorkerRunning = true;
+        }
+        new Thread() {
+            public void run() {
+                for (;;) {
+                    MacLocalNotification next;
+                    synchronized (macLocalNotifications) {
+                        if (macLocalNotifications.isEmpty()) {
+                            macLocalNotificationWorkerRunning = false;
+                            return;
+                        }
+                        next = macLocalNotifications.remove(0);
+                    }
+                    // Wait for the callback, for as long as it takes.
+                    //
+                    // Not a timeout. A fixed wait means a cold launch slower
+                    // than the number loses its launch notification outright:
+                    // the shared method's retry is guarded by pushCallback, so
+                    // an application that handles local notifications and not
+                    // push gets no second chance, and the finally below would
+                    // already have advanced the native queue past it.
+                    //
+                    // Woken by setLocalNotificationCallback, the same way
+                    // setPushCallback drains what arrived before it. The wait
+                    // is unbounded and holds the native delivery barrier, which
+                    // matters only for an application that registers NO local
+                    // notification callback at all -- one that asked the system
+                    // for notifications with nothing to receive them, which is
+                    // the same case the push barrier already documents.
+                    synchronized (macLocalNotifications) {
+                        while (localNotificationCallback == null) {
+                            try {
+                                macLocalNotifications.wait();
+                            } catch (InterruptedException ignored) {
+                            }
+                        }
+                    }
+                    restorePushContent(next.content);
+                    try {
+                        localNotificationReceived(next.notificationId);
+                    } finally {
+                        // Releases the native delivery barrier: the callback has
+                        // had its content, so the next delivery may rewrite the
+                        // singleton. Without this the pump would stay blocked
+                        // after the first local notification.
+                        nativeInstance.macRunPendingDeliveries();
+                    }
+                }
+            }
+        }.start();
+    }
+
     public static void localNotificationReceived(final String notificationId) {
         if (localNotificationCallback != null) {
             // this should be invoked off the EDT...
@@ -11166,6 +12088,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         setCurrentApplicationInstance(main);
         if(main instanceof PushCallback) {
             pushCallback = (PushCallback)main;
+            firePendingPush();
         }
         if(main instanceof PurchaseCallback) {
             purchaseCallback = (PurchaseCallback)main;
@@ -11867,6 +12790,122 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Use this method to pause ongoing tasks, disable timers, and throttle down 
      * OpenGL ES frame rates. Games should use this method to pause the game.
      */
+    /// The macOS counterpart, which does NOT treat losing focus as being
+    /// minimized.
+    ///
+    /// On a Mac, resigning active means another application became frontmost.
+    /// The window is still on screen and still being painted, so setting the
+    /// minimized flag the iOS callback sets is wrong twice over: shouldEDTSleep()
+    /// parks the EDT for a minimized application, which stops the animations in a
+    /// form the user can see, and the network layer suppresses error dialogs for
+    /// one, which swallows them for as long as the user is in another app.
+    ///
+    /// Nothing is lost by leaving the flag alone here, because the events that
+    /// genuinely hide the surface are tracked separately: the AppKit delegate's
+    /// applicationDidHide: and its window miniaturization observers both route to
+    /// applicationDidEnterBackground, which is what owns the flag.
+    ///
+    /// The lifecycle notification still fires -- an application that wants to
+    /// pause on losing focus is entitled to -- and isActive still goes false.
+    // Camera authorization answers, keyed by the id handed to cn1CameraRequestAccess.
+    private static final java.util.HashMap<Integer, com.codename1.util.SuccessCallback<Boolean>>
+            pendingCameraAccess = new java.util.HashMap<Integer, com.codename1.util.SuccessCallback<Boolean>>();
+    private static int nextCameraAccessId = 1;
+
+    /// Asks the system for camera access, and optionally microphone access, reporting the real
+    /// answer.
+    ///
+    /// Camera.requestPermissions() cannot answer this: it probes by opening a session with a
+    /// sentinel id, and this port's back end returns success for that without asking anyone. So a
+    /// capture went ahead while access was undetermined or refused, and the user got a preview that
+    /// stayed black or a recording with no sound.
+    /// The CURRENT camera authorization, or the microphone's when `audio` is
+    /// set: 0 not determined, 1 restricted, 2 denied, 3 authorized.
+    ///
+    /// Reading the status AVFoundation already holds; it never prompts, which is
+    /// what makes it answerable synchronously and safe to call from
+    /// CameraImpl.open(). `#requestCameraAccess(boolean, SuccessCallback)` is
+    /// the one that shows a dialog.
+    ///
+    /// Here rather than on IOSNative because that class is package private, and
+    /// the macOS port -- which is where the answer is used -- is a different
+    /// package. Widening the native for one caller would make an internal
+    /// binding part of the surface.
+    public static int cameraAuthorizationStatus(boolean audio) {
+        return nativeInstance.cameraAuthorizationStatus(audio);
+    }
+
+    public static void requestCameraAccess(boolean audio,
+            com.codename1.util.SuccessCallback<Boolean> callback) {
+        int id;
+        synchronized (pendingCameraAccess) {
+            id = nextCameraAccessId++;
+            pendingCameraAccess.put(Integer.valueOf(id), callback);
+        }
+        nativeInstance.cn1CameraRequestAccess(audio, id);
+    }
+
+    /// Invoked from native with the outcome. Public so the VM-emitted symbol stays stable.
+    public static void cn1CameraAccessResult(int callbackId, final boolean granted) {
+        final com.codename1.util.SuccessCallback<Boolean> callback;
+        synchronized (pendingCameraAccess) {
+            callback = pendingCameraAccess.remove(Integer.valueOf(callbackId));
+        }
+        if (callback == null) {
+            return;
+        }
+        // On the EDT: this arrives from an AVFoundation completion handler, and
+        // the caller opens a camera and shows a Form with the answer.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                callback.onSucess(Boolean.valueOf(granted));
+            }
+        });
+    }
+
+    /// Runs the native side's next delivery step behind everything already queued on this
+    /// thread.
+    ///
+    /// The AppKit delegate holds a launch deep link, local notification or push until the Java
+    /// side exists -- and "the Java side exists" is not "the application has run". callback()
+    /// above only QUEUES the runnable that calls the application's init() and start(), so
+    /// anything delivered at that moment reaches URLCallback and LocalNotificationCallback code
+    /// belonging to an application that has not initialized: its services are unbuilt and its
+    /// fields are unset. The event dispatch thread is serial and that runnable is already on it,
+    /// so this one runs at the first moment after start() has returned.
+    ///
+    /// It hands straight back to the native side rather than delivering from here, because the
+    /// deliveries have to keep the threading they already have. Each notification and push is
+    /// preceded by PushContent state the native side sets immediately before it, and
+    /// localNotificationReceived() is deliberately called off this thread. The barrier is the only
+    /// thing being borrowed from the EDT.
+    ///
+    /// The same barrier paces the pushes afterwards. pushReceived() does not run the callback, it
+    /// QUEUES it here, so handing two pushes over in a row wrote PushContent twice before either
+    /// callback read it. Going back through this method between them means the runnable below sits
+    /// behind the callback for the push already handed over, and the next one cannot be written
+    /// until that callback has had what belongs to it.
+    public static void macDeliverAfterEdt() {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                nativeInstance.macRunPendingDeliveries();
+            }
+        });
+    }
+
+    public static void macApplicationWillResignActive() {
+        if(instance.life != null) {
+            safeCallSerially(new Runnable() {
+                public void run() {
+                    if(instance.life != null) {
+                        instance.life.applicationWillResignActive();
+                    }
+                }
+            });
+        }
+        instance.isActive = false;
+    }
+
     public static void applicationWillResignActive() {
         minimized = true;
         callInterruptionActive = true;
@@ -12057,7 +13096,31 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Called as part of the transition from the background to the inactive state; 
      * here you can undo many of the changes made on entering the background.
      */
+    /// The macOS twin of applicationDidBecomeActive(), which does everything it
+    /// does EXCEPT clear the minimized flag.
+    ///
+    /// Active and visible are different things on a Mac. Cmd-Tab back to an
+    /// application whose last window is still minimized and AppKit sends
+    /// didBecomeActive and no deminiaturize -- so clearing minimized there says
+    /// the application is on screen when every window is still in the Dock,
+    /// which restarts the EDT and the foreground-only behaviour like network
+    /// error dialogs for a window nobody can see. The native delegate already
+    /// declines to clear its own isAppSuspended for exactly this reason, and
+    /// this flag was contradicting it from the Java side.
+    ///
+    /// Visibility owns the flag: unhide and deminiaturize are what clear it,
+    /// the same two events the surface tracker uses. Pairs with
+    /// macApplicationWillResignActive(), which is here for the mirror-image
+    /// reason -- resigning active on a Mac does not minimize anything.
+    public static void macApplicationDidBecomeActive() {
+        applicationDidBecomeActive(false);
+    }
+
     public static void applicationDidBecomeActive() {
+        applicationDidBecomeActive(true);
+    }
+
+    private static void applicationDidBecomeActive(boolean clearMinimized) {
         callInterruptionActive = false;
         final ArrayList<Runnable> callbacks;
         synchronized(instance.onActiveListeners) {
@@ -12067,7 +13130,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             callbacks.addAll(instance.onActiveListeners);
             instance.onActiveListeners.clear();
         }
-        minimized = false;
+        if (clearMinimized) {
+            minimized = false;
+        }
         safeCallSerially(new Runnable() {
             @Override
             public void run() {
@@ -12220,7 +13285,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                 result = com.codename1.share.ShareResult.failed(errorMessage);
                 break;
         }
-        listener.onResult(result);
+        // On the EDT, because ShareResultListener says "Always invoked on the
+        // EDT" and this arrives from a UIKit/AppKit main-queue completion
+        // handler, which is not it. A listener that updates the UI -- which is
+        // most of the reason to have one -- was racing the painter.
+        final com.codename1.share.ShareResult delivered = result;
+        final com.codename1.share.ShareResultListener target = listener;
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                target.onResult(delivered);
+            }
+        });
     }
 
     @Override
@@ -12268,7 +13343,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                 result = com.codename1.printing.PrintResult.failed(errorMessage);
                 break;
         }
-        listener.onResult(result);
+        // On the EDT, for the same reason as the share callback above:
+        // PrintResultListener documents the same guarantee and this arrives from
+        // the same kind of main-queue completion handler.
+        final com.codename1.printing.PrintResult delivered = result;
+        final com.codename1.printing.PrintResultListener target = listener;
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                target.onResult(delivered);
+            }
+        });
     }
 
     private Purchase pur;
@@ -12519,6 +13603,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private static long datePickerResult;
     private static final Object PICKER_LOCK = new Object();
+    /// Whether a showNativePicker call is outstanding.
+    ///
+    /// datePickerResult is ONE slot and showNativePicker blocks on it, so two
+    /// overlapping calls cannot both be served by it -- the second's entry
+    /// reset alone republishes "pending" to the first, and any single answer
+    /// wakes both. Serialised here rather than in the native layer, because
+    /// this is the side that owns the slot and the only side that can decide
+    /// before it is reset.
+    private static boolean pickerInProgress;
     static void datePickerResult(long val) {
         synchronized(PICKER_LOCK) {
             datePickerResult = val;
@@ -12528,7 +13621,51 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public Object showNativePicker(final int type, final Component source, final Object currentValue, final Object data) {
-        datePickerResult = -2;
+        synchronized (PICKER_LOCK) {
+            if (pickerInProgress) {
+                // A picker is already up. Answering "cancelled" is the honest
+                // result for a request that cannot be shown, and it leaves the
+                // outstanding one alone: displacing it instead completed BOTH
+                // calls with the displacement's own -1, because they share the
+                // slot -- so the caller of the picker still on screen had
+                // already returned before the user touched it.
+                //
+                // invokeAndBlock keeps the event dispatch thread live while a
+                // picker is open, which is what makes a second call reachable
+                // at all.
+                return null;
+            }
+            pickerInProgress = true;
+            datePickerResult = -2;
+        }
+        try {
+            nativePickerAcquired(source);
+            return showNativePickerImpl(type, source, currentValue, data);
+        } finally {
+            synchronized (PICKER_LOCK) {
+                pickerInProgress = false;
+            }
+        }
+    }
+
+    /// Invoked once this call owns the picker slot and is certain to present,
+    /// and never for a request the gate above turned away.
+    ///
+    /// The distinction matters to a port that has to stage process-wide state
+    /// for the presentation to consume, because a rejected request that staged
+    /// anyway would overwrite what the picker still on screen is relying on.
+    /// Called outside PICKER_LOCK on purpose: an override reaches the native
+    /// layer, and only one thread can be here at a time anyway -- every other
+    /// one is turned away by the gate before reaching this point.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the component the picker was requested for, possibly null
+    protected void nativePickerAcquired(Component source) {
+    }
+
+    private Object showNativePickerImpl(final int type, final Component source,
+            final Object currentValue, final Object data) {
         int x = 0, y = 0, w = 20, h = 20, preferredHeight = 0, preferredWidth = 0;
         
         if(source != null) {
@@ -12557,7 +13694,20 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
             nativeInstance.openStringPicker(strs, offset, x, y, w, h, preferredWidth, preferredHeight);
-        } else if (type == Display.PICKER_TYPE_DURATION) {
+        } else if (type == Display.PICKER_TYPE_DURATION
+                || type == Display.PICKER_TYPE_DURATION_HOURS
+                || type == Display.PICKER_TYPE_DURATION_MINUTES) {
+            // All three duration types, matching the result conversion further
+            // down which has always handled the trio. Only PICKER_TYPE_DURATION
+            // was dispatched here, so the two variants fell into the date branch
+            // below and cast Picker's Long to a Date -- and on ParparVM a failed
+            // cast is not an exception but the next instruction reading a Long as
+            // a Date, which is a native crash rather than something to catch. The
+            // native takes the type, so it already knows which of the three to
+            // present.
+            //
+            // Inert on iOS, whose isNativePickerTypeSupported answers false for
+            // the two variants, so nothing reaches this with them there.
             long time;
             if (currentValue instanceof Long) {
                 time = (Long)currentValue;

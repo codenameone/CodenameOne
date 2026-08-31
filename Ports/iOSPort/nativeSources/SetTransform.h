@@ -22,7 +22,7 @@
  */
 #import "CN1ES2compat.h"
 #ifdef USE_ES2
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import <Foundation/Foundation.h>
 #import "ExecutableOp.h"
 #import <GLKit/GLKit.h>

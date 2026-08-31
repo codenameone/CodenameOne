@@ -45,7 +45,8 @@ extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
 extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 extern void CN1MacWindowDeliverHover(int windowId, int type, int x, int y);
-extern void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY);
+extern void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY,
+                                     int precise, int modifiers);
 extern void CN1MacWindowDeliverPinch(int windowId, float scale, int x, int y);
 extern void CN1MacWindowDeliverRotation(int windowId, float radians, int x, int y);
 extern void cn1CapturePointerMetadata(UITouch* touch);
@@ -60,7 +61,7 @@ extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
  * renders into its own raster and hands it here; setting layer.contents is the
  * cheapest way to get that on screen without standing up a second Metal surface.
  */
-@interface CN1MacWindowView : UIView
+@interface CN1MacWindowView : CN1View
 @property (nonatomic, assign) int windowId;
 @end
 
@@ -225,8 +226,11 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
     int dx = (int) (t.x * scale);
     int dy = (int) (t.y * scale);
     if (dx != 0 || dy != 0) {
+        /* Not precise and no modifiers: this is what the Catalyst path has
+           always reported, and UIKit gives the recognizer neither a device
+           class nor a key mask to say otherwise. */
         CN1MacWindowDeliverWheel(self.windowId, (int) (loc.x * scale),
-                (int) (loc.y * scale), dx, dy);
+                (int) (loc.y * scale), dx, dy, 0, 0);
         /* Reset so each callback carries an incremental delta. */
         [recognizer setTranslation:CGPointZero inView:self.view];
     }
@@ -382,7 +386,7 @@ static CN1MacWindow g_macWindows[CN1_MAC_MAX_WINDOWS];
 
 /* Defined further down, beside the main-window helpers that first needed it. */
 static void CN1MacRunOnMainSync(void (^block)(void));
-extern void CN1MacWindowReattachEditor(UIView* host);
+extern void CN1MacWindowReattachEditor(CN1View* host);
 extern void CN1MacWindowDeliverContentReady(int windowId);
 /* Defined below, beside the editing host lookup. */
 static int g_editingSlot;
@@ -559,7 +563,7 @@ static void CN1MacWindowRequestGeometry(UIWindowScene* scene, CGRect frame) {
 static CGSize CN1MacWindowContentSize(UIWindow* window) {
     /* The root view controller's view, because that is the same thing
      * viewDidLayoutSubviews reports to the framework as the window's size. */
-    UIView* rootView = window.rootViewController.view;
+    CN1View* rootView = window.rootViewController.view;
     return rootView != nil ? rootView.bounds.size : window.bounds.size;
 }
 
@@ -1583,14 +1587,14 @@ void CN1MacWindowSetState(int slot, int state) {
  * Returns NO when the slot has no content view yet, so the caller can leave the peer
  * where it is rather than lose it.
  */
-BOOL CN1MacWindowAttachPeer(int slot, UIView* peer, int x, int y, int width, int height) {
+BOOL CN1MacWindowAttachPeer(int slot, CN1View* peer, int x, int y, int width, int height) {
     __block BOOL attached = NO;
     if (peer == nil || slot < 0) {
         return NO;
     }
     CN1MacRunOnMainSync(^{
         CN1MacWindow* w;
-        UIView* host;
+        CN1View* host;
         CGFloat scale;
         pthread_mutex_lock(&g_slotLock);
         w = slotAt(slot);
@@ -1619,7 +1623,7 @@ BOOL CN1MacWindowAttachPeer(int slot, UIView* peer, int x, int y, int width, int
     return attached;
 }
 
-UIView* CN1MacWindowContentView(int slot) {
+CN1View* CN1MacWindowContentView(int slot) {
     CN1MacWindow* w = slotAt(slot);
     return w == NULL ? nil : w->content;
 }
@@ -2084,14 +2088,14 @@ UIViewController* CN1MacWindowPresentingController(void) {
  * or nil. The controller's own view, so the popover's source rectangle is in the
  * coordinate space of the window the sheet is appearing over.
  */
-UIView* CN1MacWindowPresentingView(void) {
+CN1View* CN1MacWindowPresentingView(void) {
     UIViewController* c = CN1MacWindowPresentingController();
     return c == nil ? nil : c.view;
 }
 
-UIView* CN1MacWindowContentViewForWindowId(int windowId) {
+CN1View* CN1MacWindowContentViewForWindowId(int windowId) {
     int i;
-    UIView* content = nil;
+    CN1View* content = nil;
     /* Under the lock like every other slot read: this runs on the event dispatch
      * thread while adoption can be replacing the content view. */
     pthread_mutex_lock(&g_slotLock);
@@ -2106,9 +2110,9 @@ UIView* CN1MacWindowContentViewForWindowId(int windowId) {
     return content;
 }
 
-UIView* CN1MacWindowEditingHostView(void) {
+CN1View* CN1MacWindowEditingHostView(void) {
     CN1MacWindow* w;
-    UIView* content;
+    CN1View* content;
     /* Under the lock like every other slot read: this runs on the event dispatch
      * thread while adoption can be replacing the content view. */
     pthread_mutex_lock(&g_slotLock);

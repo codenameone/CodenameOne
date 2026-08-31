@@ -89,8 +89,9 @@ public final class ModelCache {
         }
         if (sha256 == null && requiresPinnedModelDigest()) {
             throw new IllegalArgumentException(
-                    "iOS model downloads require a SHA-256 digest because "
-                    + "redirects are followed below the portable network layer");
+                    "Model downloads on this platform require a SHA-256 digest "
+                    + "because redirects are followed below the portable "
+                    + "network layer");
         }
 
         final String fileName = safeName(cacheKey) + ".tflite";
@@ -305,8 +306,29 @@ public final class ModelCache {
     }
 
     static boolean requiresPinnedModelDigest() {
-        return "ios".equals(Display.getInstance().getPlatformName());
+        // Asked as a CAPABILITY, not read off the platform label. The label
+        // cannot answer this: a skinless JavaSE desktop build on a Mac also
+        // reports "mac" (JavaSEPort.getPlatformName), and it uses the portable
+        // network layer, so keying on the name made a previously valid
+        // two-argument fetch() start throwing on JavaSE desktop.
+        //
+        // The property is answered by the ports whose platform follows the
+        // redirect underneath us -- the Apple ParparVM ports, where NSURLSession
+        // does it inside the native stack and the digest is the only thing that
+        // can say what was actually downloaded. Every other port leaves the
+        // default and needs no digest.
+        // isNativeRedirects(), not getProperty(NATIVE_REDIRECTS_PROPERTY): this
+        // decides whether a download must be digest-pinned, and getProperty
+        // would let CN.setProperty(NATIVE_REDIRECTS_PROPERTY, "false") turn the
+        // verification off from application or library code. A port states its
+        // own capability; nothing above it may mask that.
+        return Display.getInstance().isNativeRedirects();
     }
+
+    /// Set to {@code true} by a port whose platform follows HTTP redirects below
+    /// the portable network layer, so the framework cannot see where a download
+    /// actually came from.
+    static final String NATIVE_REDIRECTS_PROPERTY = "cn1.nativeRedirects";
 
     static FetchRegistration registerFetch(
             String fileName, String url, String sha256) {

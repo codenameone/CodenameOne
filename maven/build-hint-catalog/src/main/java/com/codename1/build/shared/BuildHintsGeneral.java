@@ -44,6 +44,14 @@ final class BuildHintsGeneral {
     }
 
     static void register(List<Hint> h) {
+        h.add(new Hint("call.video")
+                .group(HintGroup.GENERAL)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("general")
+                .doc("Whether video calls are offered, on both platforms. `ios.call.video` and "
+                        + "`android.call.video` override it per platform."));
+
         h.add(new Hint("KeepScreenOn")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)

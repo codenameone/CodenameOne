@@ -708,6 +708,110 @@ public final class PlatformFeatureCatalog {
                 .androidMinimumSdk(26)
                 .description("Companion-device association and presence"));
 
+        // System call integration. NOTE the Android permissions are
+        // deliberately NOT listed here: MANAGE_OWN_CALLS pairs with a
+        // <service> element carrying its own permission attribute and intent
+        // filter, and FOREGROUND_SERVICE_PHONE_CALL needs a minSdk-qualified
+        // <uses-permission> this table cannot express.
+        // CallManifestFragments injects all of it, exactly as
+        // NearbyManifestFragments does. The CN1_INCLUDE_CALL* define flips
+        // likewise happen in IPhoneBuilder, which is also where the voip
+        // background mode and the call provider's Info.plist block live.
+        //
+        // The three packages are separate entries rather than one prefix
+        // because this table matches on startsWith and cannot express an
+        // exclusion, and their costs genuinely differ -- see below.
+        e.add(new Entry("com/codename1/call/session/")
+                .iosFrameworks("CallKit", "AVFoundation")
+                .iosPlist("NSMicrophoneUsageDescription",
+                         "Carries the audio of a call.")
+                // 26, and for the platform rather than an artifact. A
+                // self-managed ConnectionService -- the whole point of this
+                // API, an app owning its own calls rather than managing the
+                // SIM's -- arrives exactly at API 26. Below it Telecom offers
+                // nothing to degrade to, so the port reports the capability
+                // absent and an app branches on Calls.isSupported().
+                //
+                // Which is why there is NO androidMinimumSdk here. Folding 26
+                // into the generated minSdk stopped the app installing on
+                // 19-25 at all, so the very fallback this comment describes
+                // could never run -- a calling app was simply unavailable to
+                // those devices instead of degrading on them. The bridge is
+                // guarded at runtime; that is the whole mechanism.
+                .description("System call integration (CallKit, Telecom)"));
+
+        // A superset of the above, and priced accordingly. The voip
+        // background mode is the expensive part: Apple rejects an app that
+        // carries it without a working call implementation, so it is bought
+        // only by an app that referenced this package.
+        e.add(new Entry("com/codename1/call/voip/")
+                .iosFrameworks("CallKit", "PushKit", "AVFoundation")
+                .iosPlist("NSMicrophoneUsageDescription",
+                         "Carries the audio of a call.")
+                .description("VoIP push wake-up for incoming calls"));
+
+        // Deliberately NOT a superset. An app that only labels or blocks
+        // somebody else's caller never owns a call, so it must not acquire
+        // MANAGE_OWN_CALLS -- Play Console flags gratuitous telephony
+        // permissions -- nor the voip background mode. Since the prefix match
+        // cannot express an exclusion, being a separate package is the only
+        // way to say so.
+        e.add(new Entry("com/codename1/call/directory/")
+                .iosFrameworks("CallKit")
+                // No minSdk, for the reason call/session and call/voip have
+                // none. CallDirectory.isSupported() is a runtime query, the
+                // Android bridge reports screening only from API 29, and an
+                // app that referenced the package to label callers on a
+                // modern device should still INSTALL on an old one and fall
+                // back to whatever it does without screening. Raising the
+                // whole app's floor to 24 to hold a class that only ever runs
+                // at 29 bought nothing and cost every pre-24 install.
+                //
+                // What that floor was really protecting is class LOADING:
+                // CN1CallScreeningService extends an API 24 type, so touching
+                // it below 24 is a NoClassDefFoundError. The role check that
+                // did touch it now lives in CallScreeningRole, which extends
+                // nothing -- see the note there. The manifest <service> is
+                // harmless on an old device: nothing binds it.
+                .description("Caller identification and call blocking"));
+
+        // VPN configuration management. The iOS entitlements are NOT listed
+        // here: com.apple.developer.networking.vpn.api is a single-element
+        // array, which the ios.entitlements.<key> namespace cannot encode,
+        // and the packet-tunnel entitlement must never be injected
+        // automatically because Apple grants it case by case and an App ID
+        // that lacks it fails codesigning with an error naming the
+        // entitlement and not the reason it appeared. IPhoneBuilder emits
+        // both explicitly.
+        e.add(new Entry("com/codename1/vpn/profile/")
+                .iosFrameworks("NetworkExtension")
+                // No minSdk. VpnManager and Ikev2VpnProfile are API 30, but
+                // they are platform classes reached reflectively, so the port
+                // compiles against an older SDK and reports the capability
+                // absent below 30. Raising the whole app's floor to 30 for a
+                // feature it can degrade out of would cost far more than the
+                // feature is worth.
+                .description("Managed VPN configurations (IKEv2, IPsec)"));
+
+        // A packet tunnel the app implements. NOT a superset of the profile
+        // entry: an app that writes its own tunnel does not need the managed
+        // IKEv2 client, and dragging in the Personal VPN entitlement for it
+        // would ask the App ID for a capability the feature never uses.
+        //
+        // No entitlement here either, and for a stronger reason than the
+        // profile package has: com.apple.developer.networking.networkextension
+        // is granted case by case, so injecting it from a class reference
+        // would fail codesigning for every project that has not been granted
+        // it. IPhoneBuilder generates the extension only when
+        // ios.vpn.tunnel says the grant is held.
+        //
+        // No androidMinimumSdk: VpnService is API 14, older than anything
+        // this framework targets, and the consent prompt is a runtime
+        // question rather than an install-time one.
+        e.add(new Entry("com/codename1/vpn/tunnel/")
+                .iosFrameworks("NetworkExtension")
+                .description("A packet tunnel the application implements"));
+
         e.add(new Entry("com/codename1/ar/")
                 .iosFrameworks("ARKit", "SceneKit")
                 .iosPlist("NSCameraUsageDescription",

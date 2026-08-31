@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 
 #if !TARGET_OS_WATCH
 
@@ -31,7 +31,7 @@
 /// the caret geometry Codename One reports. The view keeps a shadow mirror of the document text and
 /// selection (pushed down from Java) purely to answer UITextInput's text and position queries; Codename
 /// One renders the document itself and remains authoritative.
-@interface CN1TextInputView : UIView <UITextInput>
+@interface CN1TextInputView : CN1View <UITextInput>
 
 @property (nonatomic) UITextAutocorrectionType autocorrectionType;
 @property (nonatomic) UITextAutocapitalizationType autocapitalizationType;

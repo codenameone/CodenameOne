@@ -1,0 +1,379 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.vpn;
+
+import com.codename1.impl.vpn.LocalVpnBridge;
+import com.codename1.impl.vpn.VpnRequests;
+import com.codename1.vpn.profile.Vpn;
+import com.codename1.util.AsyncResource;
+import com.codename1.vpn.VpnError;
+import com.codename1.vpn.VpnStatus;
+import com.codename1.vpn.VpnProtocol;
+import com.codename1.vpn.profile.VpnProfile;
+import com.codename1.vpn.profile.VpnStatusListener;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** VPN configuration management, against the simulation. */
+public class LocalVpnTest {
+
+    private LocalVpnBridge bridge;
+
+    @BeforeEach
+    public void install() {
+        bridge = new LocalVpnBridge();
+        VpnRequests.resetForTest(bridge);
+    }
+
+    @AfterEach
+    public void clear() {
+        VpnRequests.resetForTest(null);
+    }
+
+    private static VpnProfile profile() {
+        return new VpnProfile("vpn.example.com")
+                .protocol(VpnProtocol.IKEV2)
+                .localIdentifier("alice")
+                .usernamePassword("alice", "hunter2");
+    }
+
+    @Test
+    public void nothingIsConfiguredToBeginWith() {
+        assertTrue(Vpn.isSupported());
+        assertSame(VpnStatus.NOT_CONFIGURED, Vpn.getStatus());
+    }
+
+    @Test
+    public void installingLeavesADisconnectedProfile() {
+        VpnAwait.value(Vpn.install(profile()));
+        assertSame(VpnStatus.DISCONNECTED, Vpn.getStatus());
+    }
+
+    @Test
+    public void aDeclinedPromptIsAnOrdinaryFailure() {
+        // Both platforms prompt and neither lets an app avoid it, so a
+        // decline is a normal outcome the app has to handle, not a bug.
+        bridge.setUserAccepts(false);
+        VpnAwait.assertFailedWith(VpnError.USER_DECLINED, Vpn.install(profile()));
+        assertSame(VpnStatus.NOT_CONFIGURED, Vpn.getStatus());
+    }
+
+    @Test
+    public void connectingPassesThroughConnecting() {
+        // An app that only watches for CONNECTED and never shows progress
+        // looks frozen for the length of a real negotiation.
+        VpnAwait.value(Vpn.install(profile()));
+        final List<VpnStatus> seen = new ArrayList<VpnStatus>();
+        Vpn.addStatusListener(new Collector(seen));
+        VpnAwait.value(Vpn.start());
+        waitFor(seen, 2);
+        assertTrue(seen.contains(VpnStatus.CONNECTING),
+                "CONNECTING must be observable, not skipped");
+        assertSame(VpnStatus.CONNECTED, Vpn.getStatus());
+    }
+
+    @Test
+    public void startingWithNoProfileIsRefused() {
+        VpnAwait.assertFailedWith(VpnError.NOT_CONFIGURED, Vpn.start());
+    }
+
+    @Test
+    public void badCredentialsFailAndLeaveTheTunnelDown() {
+        bridge.setAuthenticates(false);
+        VpnAwait.value(Vpn.install(profile()));
+        VpnAwait.assertFailedWith(VpnError.AUTHENTICATION_FAILED, Vpn.start());
+        assertSame(VpnStatus.DISCONNECTED, Vpn.getStatus());
+    }
+
+    @Test
+    public void aLoadedProfileNeverCarriesThePassword() {
+        // Both platforms keep the secret in their own keychain and do not
+        // hand it back. A simulation that returned it would let an app depend
+        // on something no device does.
+        VpnAwait.value(Vpn.install(profile()));
+        VpnProfile back = VpnAwait.value(Vpn.load());
+        assertNotNull(back);
+        assertEquals("vpn.example.com", back.getServerAddress());
+        assertEquals("alice", back.getUsername());
+        assertNull(back.getPassword(), "the platform does not return secrets");
+    }
+
+    @Test
+    public void aLoadedProfileCannotBeInstalledBackUnchanged() {
+        // Load, change a visible option, install: the obvious thing to try,
+        // and it used to succeed. iOS saved a configuration with a nil
+        // password reference -- or a PSK profile with authenticationMethod
+        // None -- and retired the keychain generation the working profile was
+        // using, so a VPN that had authenticated for months could not any
+        // more, with a successful acknowledgement to say all was well.
+        VpnAwait.value(Vpn.install(profile()));
+        VpnProfile back = VpnAwait.value(Vpn.load());
+        back.displayName("Renamed");
+
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(back));
+
+        // Supplying the credentials again makes it installable, which is the
+        // whole point of refusing rather than silently reusing the old one.
+        back.usernamePassword("alice", "hunter2");
+        assertEquals(Boolean.TRUE, VpnAwait.value(Vpn.install(back)));
+    }
+
+    @Test
+    public void anEmptySecretDoesNotMakeALoadedProfileInstallable() {
+        // load() never carries the secrets -- the platform holds them -- so a
+        // loaded description is marked withheld and refused until a real
+        // credential is supplied. Both setters cleared that marker whatever
+        // they were handed, so passing null or "" said "here are the secrets"
+        // while supplying none. iOS then read the zero-length key as
+        // authenticationMethod None, saved it as a success, and retired the
+        // keychain generation the working profile was using.
+        //
+        // A PSK profile has no username, so install()'s password gate cannot
+        // catch this one; the marker is the only thing standing in the way.
+        VpnProfile psk = new VpnProfile("vpn.example.com")
+                .protocol(VpnProtocol.IKEV2)
+                .sharedSecret("s3cret");
+        VpnAwait.value(Vpn.install(psk));
+        VpnProfile back = VpnAwait.value(Vpn.load());
+        // Asserted through install(), not the internal marker: the refusal
+        // IS the contract, and the marker is not public API.
+        back.sharedSecret("");
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(back));
+
+        back.sharedSecret("s3cret");
+        assertEquals(Boolean.TRUE, VpnAwait.value(Vpn.install(back)),
+                "a real secret is what makes it installable again");
+    }
+
+    @Test
+    public void aProfileWithNoCredentialsAtAllIsRefused() {
+        // There is no third way to authenticate: this API deliberately
+        // exposes no certificate credential, so a profile with neither a
+        // username/password pair nor a shared secret cannot authenticate at
+        // all. iOS chose NEVPNIKEAuthenticationMethodNone, disabled extended
+        // authentication, and saved and acknowledged it; Android reached the
+        // username/password builder with a pair of nulls. Neither existing
+        // guard caught it -- the withheld marker only fires for a loaded
+        // description, and the password check only when a username is there.
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(new VpnProfile("vpn.example.com")
+                        .protocol(VpnProtocol.IKEV2)));
+
+        // A password with no username is just as unusable: the iOS branch
+        // that stores it keys off the username, so it is never applied.
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(new VpnProfile("vpn.example.com")
+                        .protocol(VpnProtocol.IKEV2)
+                        .usernamePassword(null, "hunter2")));
+    }
+
+    @Test
+    public void aUsernameWithAnEmptyPasswordIsRefused() {
+        // An empty password is not a password, and it was the one credential
+        // that got all the way through. install()'s gate asked whether the
+        // password was KNOWN, which "" was, so the profile was stored and
+        // acknowledged as a success -- and on iOS the branch that turns
+        // extended authentication on keys off the USERNAME while the
+        // missing-secret check keyed off the password length, so the
+        // configuration was saved with extended authentication and no
+        // credential behind it. The app learned about it as a connection
+        // that would not authenticate, long after the successful install.
+        VpnProfile empty = new VpnProfile("vpn.example.com")
+                .protocol(VpnProtocol.IKEV2)
+                .usernamePassword("alice", "");
+        assertFalse(empty.isPasswordKnown(),
+                "an empty password must not count as a known one");
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(empty));
+    }
+
+    @Test
+    public void aLoadedPskProfileIsRefusedToo() {
+        // The password test alone missed this: a pre-shared-key profile has
+        // no username to notice, so a guard that asked only about the
+        // password let it through.
+        VpnProfile psk = new VpnProfile("vpn.example.com")
+                .protocol(VpnProtocol.IKEV2)
+                .sharedSecret("s3cret");
+        VpnAwait.value(Vpn.install(psk));
+        VpnProfile back = VpnAwait.value(Vpn.load());
+        back.onDemand(true);
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(back));
+    }
+
+    @Test
+    public void aReplacementBridgeIsToldTheListenerIsStillThere() {
+        // The cache remembered the VALUE, not who had been told it. A new
+        // bridge -- what a Display re-init produces -- starts with its own
+        // listening flag false, so "already delivered true" was true of a
+        // bridge that no longer exists and the replacement was never asked to
+        // watch. A listener registered the whole time then saw no status
+        // change at all.
+        Vpn.addStatusListener(new VpnStatusListener() {
+            public void vpnStatusChanged(VpnStatus status) {
+            }
+        });
+        assertTrue(bridge.isStatusListening(),
+                "the first bridge is watching");
+
+        LocalVpnBridge replacement = new LocalVpnBridge();
+        VpnRequests.resetForTest(replacement);
+        Vpn.addStatusListener(new VpnStatusListener() {
+            public void vpnStatusChanged(VpnStatus status) {
+            }
+        });
+        assertTrue(replacement.isStatusListening(),
+                "so is the one that replaced it");
+    }
+
+    @Test
+    public void removingDuringAStartDoesNotLeaveAConnectedTunnel() {
+        // The simulation moves state over time, which is its whole point --
+        // so a remove() landing inside a start's delay used to be OVERTAKEN
+        // by it: the profile was gone and NOT_CONFIGURED published, and the
+        // pending transition then announced CONNECTED and acknowledged
+        // success. A connected tunnel with no profile is a state no device
+        // can produce, which makes it exactly the wrong thing for a test to
+        // be able to depend on.
+        VpnAwait.value(Vpn.install(profile()));
+
+        // The start's answers are HELD so the removal can land inside its
+        // delay, which is the ordering the simulation exists to produce and
+        // the one a real tunnel takes.
+        List<Runnable> held = new ArrayList<Runnable>();
+        bridge.setDeferred(held);
+        AsyncResource<Boolean> starting = Vpn.start();
+        bridge.setDeferred(null);
+        VpnAwait.value(Vpn.remove());
+        for (Runnable r : held) {
+            r.run();
+        }
+
+        assertSame(VpnStatus.NOT_CONFIGURED, Vpn.getStatus(),
+                "the removal is the last word, not the start behind it");
+        assertNotNull(VpnAwait.errorOf(starting),
+                "a start whose profile was removed did not succeed");
+    }
+
+    @Test
+    public void loadingWithNothingInstalledAnswersNull() {
+        assertNull(VpnAwait.value(Vpn.load()));
+    }
+
+    @Test
+    public void removingClearsTheConfiguration() {
+        VpnAwait.value(Vpn.install(profile()));
+        VpnAwait.value(Vpn.remove());
+        assertSame(VpnStatus.NOT_CONFIGURED, Vpn.getStatus());
+        assertNull(VpnAwait.value(Vpn.load()));
+    }
+
+    @Test
+    public void aProfileWithNoServerIsRefusedBeforeInstalling() {
+        try {
+            new VpnProfile("");
+            throw new AssertionError("an empty server address must be refused");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("address"));
+        }
+    }
+
+    @Test
+    public void stoppingBringsTheTunnelDown() {
+        VpnAwait.value(Vpn.install(profile()));
+        VpnAwait.value(Vpn.start());
+        VpnAwait.value(Vpn.stop());
+        assertSame(VpnStatus.DISCONNECTED, Vpn.getStatus());
+    }
+
+    @Test
+    public void removingTheLastListenerStopsDelivery() {
+        VpnAwait.value(Vpn.install(profile()));
+        List<VpnStatus> seen = new ArrayList<VpnStatus>();
+        Collector c = new Collector(seen);
+        Vpn.addStatusListener(c);
+        Vpn.removeStatusListener(c);
+        seen.clear();
+        VpnAwait.value(Vpn.start());
+        assertEquals(0, seen.size(),
+                "a removed listener must stop hearing about the tunnel");
+    }
+
+    @Test
+    public void noPortClaimsACustomPacketTunnel() {
+        // com.codename1.vpn.tunnel is not shipped: on iOS the tunnel body
+        // would run in an extension with no Java virtual machine in it. The
+        // simulation must not be the one place it appears to work.
+        assertEquals(0, Vpn.getCapabilities()
+                & com.codename1.vpn.spi.VpnBridge.CAPABILITY_CUSTOM_TUNNEL);
+    }
+
+    @Test
+    public void noPortClaimsAlwaysOn() {
+        // Always-on needs a supervised device and MDM on iOS, and a Settings
+        // toggle or device-owner API on Android; an app cannot ask for it.
+        assertEquals(0, Vpn.getCapabilities()
+                & com.codename1.vpn.spi.VpnBridge.CAPABILITY_ALWAYS_ON);
+    }
+
+    /** Collects statuses. A named class so it holds no outer reference. */
+    private static final class Collector implements VpnStatusListener {
+        private final List<VpnStatus> sink;
+
+        Collector(List<VpnStatus> sink) {
+            this.sink = sink;
+        }
+
+        public void vpnStatusChanged(VpnStatus status) {
+            sink.add(status);
+        }
+    }
+
+    private static void waitFor(List<?> sink, int count) {
+        long limit = System.currentTimeMillis() + 5000;
+        while (sink.size() < count && System.currentTimeMillis() < limit) {
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        assertTrue(sink.size() >= count,
+                "expected " + count + " event(s) and saw " + sink.size());
+    }
+}

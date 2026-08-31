@@ -28,7 +28,10 @@
 #ifdef USE_ES2
 #import <GLKit/GLKit.h>
 #import <OpenGLES/ES2/gl.h>
+// OpenGL ES does not exist on macOS; this port is Metal-only.
+#if !TARGET_OS_OSX
 #import <OpenGLES/ES1/gl.h>
+#endif
 #import <Math.h>
 
 GLKMatrix4 CN1modelViewMatrix;

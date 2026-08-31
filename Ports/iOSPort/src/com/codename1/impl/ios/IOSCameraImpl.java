@@ -215,7 +215,22 @@ public class IOSCameraImpl extends CameraImpl {
 
     @Override
     public void resume() {
-        if (sessionPeer != 0) IOSImplementation.nativeInstance.cn1CameraResume(sessionPeer);
+        if (sessionPeer != 0) {
+            // The callback target comes back too, not just the capture session.
+            //
+            // ACTIVE is where the native frame callback looks, open() sets it
+            // and close() clears it -- and a session can now be opened while
+            // this one is paused, which is the documented pause / Capture /
+            // resume flow. That capture's close() cleared ACTIVE, so restarting
+            // the hardware here without claiming it back left the frame
+            // callback finding null: the session ran, the preview ran, and the
+            // application's FrameListener simply never fired again.
+            //
+            // Symmetric with open(), which is the other place this session
+            // takes the hardware.
+            ACTIVE = this;
+            IOSImplementation.nativeInstance.cn1CameraResume(sessionPeer);
+        }
     }
 
     @Override

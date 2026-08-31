@@ -79,12 +79,12 @@
     if (cgImage == NULL) {
         return NO;
     }
-    UIImage *frame = [UIImage imageWithCGImage:cgImage scale:scale orientation:UIImageOrientationUp];
+    CN1Image *frame = [CN1Image imageWithCGImage:cgImage scale:scale orientation:UIImageOrientationUp];
     CGImageRelease(cgImage);
     id<CN1WatchFramePresenter> p = self.presenter;
     if (p != nil) {
         // Hop to the main thread; the host surface (SpriteKit/SwiftUI) must be
-        // touched there. The frame UIImage is immutable + retained by the block.
+        // touched there. The frame CN1Image is immutable + retained by the block.
         dispatch_async(dispatch_get_main_queue(), ^{
             [p presentWatchFrame:frame];
         });
@@ -92,7 +92,7 @@
     return YES;
 }
 
-- (UIImage *)currentFrame {
+- (CN1Image *)currentFrame {
     if (bitmapContext == NULL) {
         return nil;
     }
@@ -100,7 +100,7 @@
     if (cgImage == NULL) {
         return nil;
     }
-    UIImage *frame = [UIImage imageWithCGImage:cgImage scale:scale orientation:UIImageOrientationUp];
+    CN1Image *frame = [CN1Image imageWithCGImage:cgImage scale:scale orientation:UIImageOrientationUp];
     CGImageRelease(cgImage);
     return frame;
 }

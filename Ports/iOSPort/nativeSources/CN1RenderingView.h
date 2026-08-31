@@ -22,7 +22,7 @@
  */
 #ifndef CN1RenderingView_h
 #define CN1RenderingView_h
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #include "TargetConditionals.h"
 
 // Shared method surface implemented by the rendering backends:
@@ -32,7 +32,7 @@
 // CodenameOne_GLViewController calls through this protocol so it can drive any
 // backend behind the CN1_USE_METAL / TARGET_OS_WATCH ifdefs.
 //
-// addPeerComponent takes a UIView* on iOS. watchOS has no UIView hierarchy and
+// addPeerComponent takes a CN1View* on iOS. watchOS has no CN1View hierarchy and
 // no native peer components, so the argument degrades to id there (callers on
 // the watch slice pass nil; the watch backend ignores it).
 @protocol CN1RenderingView <NSObject>
@@ -43,7 +43,9 @@
 #if TARGET_OS_WATCH
 - (void)addPeerComponent:(id)view;
 #else
-- (void)addPeerComponent:(UIView *)view;
+// CN1View is CN1View on the UIKit ports and NSView on the native macOS one.
+// watchOS keeps `id` because it has no view hierarchy at all to hang a peer off.
+- (void)addPeerComponent:(CN1View *)view;
 #endif
 - (void)keyboardDoneClicked;
 - (void)keyboardNextClicked;

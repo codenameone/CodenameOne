@@ -1,0 +1,573 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.vpn;
+
+import com.codename1.ui.Display;
+import com.codename1.vpn.VpnError;
+import com.codename1.vpn.VpnStatus;
+import com.codename1.vpn.profile.Vpn;
+import com.codename1.vpn.spi.VpnBridge;
+import com.codename1.vpn.tunnel.TunnelHost;
+import com.codename1.vpn.tunnel.TunnelStopReason;
+import com.codename1.vpn.tunnel.Tunnels;
+import com.codename1.vpn.tunnel.VpnTunnel;
+
+import java.util.List;
+
+/// A working VPN configuration store that tunnels nothing.
+///
+/// What the simulator, the desktop builds, the browser port and the unit
+/// tests run against. Like the call simulation this is a **simulation and not
+/// a stub**: installing asks a simulated user, connecting passes through
+/// `CONNECTING` before `CONNECTED`, and a profile read back has no password,
+/// because the real platforms keep the secret and an app written against a
+/// simulation that handed it back would break on a device.
+///
+/// @hidden not part of the public API.
+public class LocalVpnBridge implements VpnBridge {
+
+    private static final int LATENCY_MILLIS = 40;
+
+    private static final int CONNECT_MILLIS = 120;
+
+    private List<Runnable> deferred;
+
+    /// Set when the bridge is discarded; see [#retire()].
+    private boolean retired;
+
+    private boolean supported = true;
+    private boolean userAccepts = true;
+    private boolean authenticates = true;
+    private String profileWire;
+
+    /// Bumped by every profile mutation; see [Transition].
+    private int profileEpoch;
+    private VpnStatus status = VpnStatus.NOT_CONFIGURED;
+    private boolean listening;
+
+    /// Holds every scheduled answer in `sink` instead of running it.
+    public void setDeferred(List<Runnable> sink) {
+        this.deferred = sink;
+    }
+
+    /// Whether this bridge claims VPN support.
+    public void setSupported(boolean value) {
+        this.supported = value;
+    }
+
+    /// Whether the simulated user accepts the install prompt. Setting this
+    /// false reproduces the ordinary, non-exceptional decline both platforms
+    /// make it easy to forget about.
+    public void setUserAccepts(boolean value) {
+        this.userAccepts = value;
+    }
+
+    /// Whether the simulated server accepts the credentials.
+    public void setAuthenticates(boolean value) {
+        this.authenticates = value;
+    }
+
+    /// The current simulated status.
+    public VpnStatus getStatus() {
+        return status;
+    }
+
+    @Override
+    public boolean isVpnSupported() {
+        return supported;
+    }
+
+    @Override
+    public boolean isCustomTunnelSupported() {
+        // TRUE now that the ports host one. The simulation runs the app's
+        // tunnel over a loopback transport, which is what makes a packet
+        // loop testable and rehearsable off-device -- and it was written
+        // before anything could host it, which is exactly the gap this
+        // closes.
+        return true;
+    }
+
+    @Override
+    public void startCustomTunnel(int requestId, String setupWire) {
+        VpnTunnel tunnel = Tunnels.claim(requestId);
+        if (tunnel == null) {
+            Tunnels.deliverAck(requestId, false,
+                    VpnError.INVALID_CONFIGURATION.ordinal(),
+                    "No tunnel is registered");
+            return;
+        }
+        String[] fields = TunnelWire.split(setupWire);
+        // NOT validated here any more. The blocks were checked in this
+        // bridge, which made the simulation the only place that refused
+        // route("0/o") -- the divergence a simulation must not have works in
+        // both directions, and the two device ports were the ones getting it
+        // wrong. TunnelWire.validateSetup now runs in Tunnels.start(), above
+        // every bridge, so a malformed setup never reaches any of them.
+        //
+        // NON-BLOCKING: this bridge delivers packets by pumping, which is
+        // the iOS shape. Asking for the blocking one ran the host's loop to
+        // its end inside start().
+        LoopbackTunnelTransport t =
+                new LoopbackTunnelTransport(4, TunnelWire.mtu(fields), false);
+        TunnelHost h = new TunnelHost(tunnel, t);
+        synchronized (this) {
+            stopTunnelLocked(TunnelStopReason.REQUESTED);
+            tunnelHost = h;
+            tunnelTransport = t;
+        }
+        // On the CALLER's thread, unlike Android where a descriptor read
+        // needs one of its own: the loopback transport is not blocking, so
+        // start() arms the tunnel and returns.
+        h.start(TunnelWire.server(fields), TunnelWire.routes(fields),
+                TunnelWire.dnsServers(fields), TunnelWire.mtu(fields),
+                TunnelWire.data(fields));
+        // STILL OURS? start() runs the application's onStart on this thread,
+        // and a tunnel is allowed to call Tunnels.stop() from there --
+        // TunnelHost's lifecycle lock is reentrant precisely so it can. The
+        // stop retires this host and answers its own request successfully,
+        // and then control came back here and answered the START
+        // successfully too, so a caller was told its tunnel was up moments
+        // after being told the same tunnel was down.
+        //
+        // The same reading covers a stop from another thread that lands
+        // after publication: whoever retired the host owns the outcome, and
+        // this start is no longer describing anything.
+        boolean stillOurs;
+        synchronized (this) {
+            stillOurs = tunnelHost == h; //NOPMD CompareObjectsWithEquals
+        }
+        if (!stillOurs) {
+            Tunnels.deliverAck(requestId, false, VpnError.UNKNOWN.ordinal(),
+                    "The tunnel was stopped before the start completed");
+            return;
+        }
+        Tunnels.deliverAck(requestId, true, 0, null);
+    }
+
+    @Override
+    public void stopCustomTunnel(int requestId) {
+        synchronized (this) {
+            stopTunnelLocked(TunnelStopReason.REQUESTED);
+        }
+        Tunnels.clearRegistered();
+        Tunnels.deliverAck(requestId, true, 0, null);
+    }
+
+    /// Feeds a packet in from the simulated device side.
+    ///
+    /// @hidden not part of the public API; test and simulator only.
+    public void simulateInboundPacket(byte[] packet) {
+        LoopbackTunnelTransport t;
+        TunnelHost h;
+        synchronized (this) {
+            t = tunnelTransport;
+            h = tunnelHost;
+        }
+        if (t == null || h == null) {
+            return;
+        }
+        t.inject(packet);
+        h.pump();
+    }
+
+    /// What the tunnel forwarded back out.
+    ///
+    /// @hidden not part of the public API; test and simulator only.
+    public byte[][] forwardedPackets() {
+        LoopbackTunnelTransport t;
+        synchronized (this) {
+            t = tunnelTransport;
+        }
+        return t == null ? new byte[0][] : t.forwarded();
+    }
+
+    /// Makes the transport fail the way a dead descriptor does.
+    ///
+    /// @hidden not part of the public API; test and simulator only.
+    public void simulateTransportFailure() {
+        LoopbackTunnelTransport t;
+        TunnelHost h;
+        synchronized (this) {
+            t = tunnelTransport;
+            h = tunnelHost;
+        }
+        if (t == null || h == null) {
+            return;
+        }
+        // What a dead descriptor does to the port: the read fails, the
+        // host's loop retires the tunnel. This transport is pumped rather
+        // than looped, so the retirement is driven directly -- the point of
+        // the test is the tunnel hearing onStop with a reason, not the
+        // mechanics of which thread noticed.
+        t.close();
+        h.stop(TunnelStopReason.NETWORK_LOST.ordinal());
+        synchronized (this) {
+            tunnelHost = null;
+            tunnelTransport = null;
+        }
+    }
+
+    private void stopTunnelLocked(TunnelStopReason reason) {
+        if (tunnelHost == null) {
+            return;
+        }
+        TunnelHost h = tunnelHost;
+        tunnelHost = null;
+        tunnelTransport = null;
+        h.stop(reason.ordinal());
+    }
+
+    private TunnelHost tunnelHost;
+
+    private LoopbackTunnelTransport tunnelTransport;
+
+    @Override
+    public int getVpnCapabilities() {
+        if (!supported) {
+            return 0;
+        }
+        // No CAPABILITY_ALWAYS_ON: no ordinary app can ask either platform
+        // for it, so the simulation must not be the one place it works.
+        return CAPABILITY_IKEV2 | CAPABILITY_IPSEC | CAPABILITY_ON_DEMAND;
+    }
+
+    @Override
+    public int getVpnStatus() {
+        return status.ordinal();
+    }
+
+    @Override
+    public void installProfile(int requestId, String wire) {
+        if (!supported) {
+            fail(requestId, VpnError.NOT_SUPPORTED, null);
+            return;
+        }
+        if (VpnWire.decodeProfile(wire) == null) {
+            fail(requestId, VpnError.INVALID_CONFIGURATION,
+                    "The profile has no server address");
+            return;
+        }
+        if (!userAccepts) {
+            fail(requestId, VpnError.USER_DECLINED,
+                    "The user declined the VPN configuration prompt");
+            return;
+        }
+        this.profileWire = wire;
+        // Anything already scheduled belongs to the profile this replaces.
+        this.profileEpoch++;
+        setStatus(VpnStatus.DISCONNECTED);
+        ok(requestId);
+    }
+
+    @Override
+    public void removeProfile(int requestId) {
+        if (!supported) {
+            fail(requestId, VpnError.NOT_SUPPORTED, null);
+            return;
+        }
+        profileWire = null;
+        profileEpoch++;
+        setStatus(VpnStatus.NOT_CONFIGURED);
+        ok(requestId);
+    }
+
+    @Override
+    public void loadProfile(int requestId) {
+        if (!supported) {
+            later(LATENCY_MILLIS, new ProfileFailure(requestId,
+                    VpnError.NOT_SUPPORTED.ordinal(), null));
+            return;
+        }
+        // The password is stripped on the way out, because the platforms keep
+        // it in their own keychain and never hand it back. A simulation that
+        // returned it would let an app depend on something no device does.
+        later(LATENCY_MILLIS, new ProfileDelivery(requestId,
+                stripSecrets(profileWire)));
+    }
+
+    @Override
+    public void startVpn(int requestId) {
+        if (!supported) {
+            fail(requestId, VpnError.NOT_SUPPORTED, null);
+            return;
+        }
+        if (profileWire == null) {
+            fail(requestId, VpnError.NOT_CONFIGURED, null);
+            return;
+        }
+        setStatus(VpnStatus.CONNECTING);
+        if (!authenticates) {
+            later(CONNECT_MILLIS, new Transition(this, VpnStatus.DISCONNECTED));
+            later(CONNECT_MILLIS, new AckDelivery(requestId, false,
+                    VpnError.AUTHENTICATION_FAILED.ordinal(),
+                    "The server refused the credentials"));
+            return;
+        }
+        later(CONNECT_MILLIS, new Transition(this, VpnStatus.CONNECTED));
+        later(CONNECT_MILLIS, new EpochAck(this, profileEpoch, requestId));
+    }
+
+    @Override
+    public void stopVpn(int requestId) {
+        if (!supported) {
+            fail(requestId, VpnError.NOT_SUPPORTED, null);
+            return;
+        }
+        if (profileWire == null) {
+            fail(requestId, VpnError.NOT_CONFIGURED, null);
+            return;
+        }
+        setStatus(VpnStatus.DISCONNECTING);
+        later(CONNECT_MILLIS, new Transition(this, VpnStatus.DISCONNECTED));
+        later(CONNECT_MILLIS, new AckDelivery(requestId, true, 0, null));
+    }
+
+    @Override
+    public void setStatusListening(boolean value) {
+        this.listening = value;
+    }
+
+    /// Whether the facade has asked this bridge to watch the tunnel.
+    ///
+    /// A replacement bridge starts false, so a test can tell whether the
+    /// facade told the NEW one rather than only the one it replaced.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public boolean isStatusListening() {
+        return listening;
+    }
+
+    /// Moves to a new status, telling the facade when anyone is listening.
+    ///
+    /// Public because the simulator drives it directly: a tunnel dropping
+    /// underneath a running app is a state the app has to handle and cannot
+    /// otherwise be produced on a desktop.
+    public void setStatus(VpnStatus s) {
+        this.status = s;
+        if (listening) {
+            later(LATENCY_MILLIS, new StatusDelivery(s.ordinal()));
+        }
+    }
+
+    /// Removes the password and shared secret from a stored record.
+    private static String stripSecrets(String wire) {
+        if (wire == null || wire.length() == 0) {
+            return "";
+        }
+        String[] f = com.codename1.impl.call.CallWire.split(wire);
+        String[] out = new String[f.length];
+        System.arraycopy(f, 0, out, 0, f.length);
+        if (out.length > 5) {
+            out[5] = "";
+        }
+        if (out.length > 6) {
+            out[6] = "";
+        }
+        return com.codename1.impl.call.CallWire.join(out);
+    }
+
+    private void ok(int requestId) {
+        later(LATENCY_MILLIS, new AckDelivery(requestId, true, 0, null));
+    }
+
+    private void fail(int requestId, VpnError e, String message) {
+        later(LATENCY_MILLIS,
+                new AckDelivery(requestId, false, e.ordinal(), message));
+    }
+
+    private void later(int millis, Runnable delivery) {
+        List<Runnable> sink = deferred;
+        if (sink != null) {
+            sink.add(delivery);
+            return;
+        }
+        if (Display.isInitialized()) {
+            // Wrapped for the reason LocalCallBridge gives: setTimeout hands
+            // back nothing to cancel, so an answer scheduled by a finished
+            // test would otherwise fire into the next one.
+            Display.getInstance().setTimeout(millis, new Retired(this, delivery));
+            return;
+        }
+        delivery.run();
+    }
+
+    /// Drops every delivery this bridge has scheduled and refuses more.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public void retire() {
+        synchronized (this) {
+            retired = true;
+        }
+    }
+
+    /// Whether this bridge has been discarded.
+    boolean isRetired() {
+        synchronized (this) {
+            return retired;
+        }
+    }
+
+    /// A scheduled delivery that checks its bridge is still in use.
+    private static final class Retired implements Runnable {
+        private final LocalVpnBridge bridge;
+        private final Runnable delivery;
+
+        Retired(LocalVpnBridge bridge, Runnable delivery) {
+            this.bridge = bridge;
+            this.delivery = delivery;
+        }
+
+        @Override
+        public void run() {
+            if (bridge.isRetired()) {
+                return;
+            }
+            delivery.run();
+        }
+    }
+
+    private static final class AckDelivery implements Runnable {
+        private final int requestId;
+        private final boolean ok;
+        private final int error;
+        private final String message;
+
+        AckDelivery(int requestId, boolean ok, int error, String message) {
+            this.requestId = requestId;
+            this.ok = ok;
+            this.error = error;
+            this.message = message;
+        }
+
+        @Override
+        public void run() {
+            Vpn.deliverAck(requestId, ok, error, message);
+        }
+    }
+
+    private static final class ProfileDelivery implements Runnable {
+        private final int requestId;
+        private final String wire;
+
+        ProfileDelivery(int requestId, String wire) {
+            this.requestId = requestId;
+            this.wire = wire;
+        }
+
+        @Override
+        public void run() {
+            Vpn.deliverProfile(requestId, wire);
+        }
+    }
+
+    private static final class ProfileFailure implements Runnable {
+        private final int requestId;
+        private final int error;
+        private final String message;
+
+        ProfileFailure(int requestId, int error, String message) {
+            this.requestId = requestId;
+            this.error = error;
+            this.message = message;
+        }
+
+        @Override
+        public void run() {
+            Vpn.deliverProfileFailed(requestId, error, message);
+        }
+    }
+
+    private static final class StatusDelivery implements Runnable {
+        private final int ordinal;
+
+        StatusDelivery(int ordinal) {
+            this.ordinal = ordinal;
+        }
+
+        @Override
+        public void run() {
+            Vpn.deliverStatusChanged(ordinal);
+        }
+    }
+
+    /// A deferred move to a new status. Holds the bridge deliberately -- the
+    /// transition is the bridge's own state change, not a callback.
+    /// A delayed status change that a later profile mutation can invalidate.
+    ///
+    /// The simulation's whole point is that state moves over time, so a
+    /// remove() landing during a start's delay used to be overtaken by it:
+    /// the profile was gone and NOT_CONFIGURED published, and the pending
+    /// transition then announced CONNECTED and acknowledged success. A
+    /// simulated tunnel connected to a profile that does not exist is a state
+    /// no device can produce, which makes it exactly the wrong thing to let a
+    /// test depend on.
+    /// An acknowledgement a later profile mutation turns into a failure.
+    ///
+    /// Reporting success for a start whose profile was removed mid-flight
+    /// would have the caller believe it has a tunnel; the removal is the
+    /// answer the caller actually got.
+    private static final class EpochAck implements Runnable {
+        private final LocalVpnBridge bridge;
+        private final int epoch;
+        private final int requestId;
+
+        EpochAck(LocalVpnBridge bridge, int epoch, int requestId) {
+            this.bridge = bridge;
+            this.epoch = epoch;
+            this.requestId = requestId;
+        }
+
+        @Override
+        public void run() {
+            if (bridge.profileEpoch != epoch) {
+                Vpn.deliverAck(requestId, false,
+                        VpnError.NOT_CONFIGURED.ordinal(),
+                        "The profile was removed while the tunnel was coming"
+                        + " up");
+                return;
+            }
+            Vpn.deliverAck(requestId, true, 0, null);
+        }
+    }
+
+    private static final class Transition implements Runnable {
+        private final LocalVpnBridge bridge;
+        private final VpnStatus target;
+        private final int epoch;
+
+        Transition(LocalVpnBridge bridge, VpnStatus target) {
+            this.bridge = bridge;
+            this.target = target;
+            this.epoch = bridge.profileEpoch;
+        }
+
+        @Override
+        public void run() {
+            if (bridge.profileEpoch != epoch) {
+                // The profile this transition belongs to is gone.
+                return;
+            }
+            bridge.setStatus(target);
+        }
+    }
+}

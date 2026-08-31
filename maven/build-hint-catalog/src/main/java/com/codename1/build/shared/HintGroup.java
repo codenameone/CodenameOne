@@ -51,6 +51,10 @@ public enum HintGroup {
     // a source file -- so naming one that does not is how a hint would be
     // migrated to an annotation nobody can compile. Add the name when the
     // annotation is added; BuildHintAnnotationReaderTest holds the two together.
+    /// The native macOS build's canonical hints, and the only Mac group with an
+    /// annotation. MAC_NATIVE below keeps the macNative.* spelling the legacy
+    /// Catalyst target reads, which stays accepted but is not what new code writes.
+    MAC_OS("Mac", "macos."),
     MAC_NATIVE(null, "macNative."),
     WINDOWS(null, "windows."),
     LINUX(null, "linux."),

@@ -121,7 +121,7 @@ static GLuint getOGLProgram(){
 #endif
 
 @implementation DrawString
--(id)initWithArgs:(int)c a:(int)a xpos:(int)xpos ypos:(int)ypos s:(NSString*)s f:(UIFont*)f {
+-(id)initWithArgs:(int)c a:(int)a xpos:(int)xpos ypos:(int)ypos s:(NSString*)s f:(CN1Font*)f {
     color = c;
     alpha = a;
     x = xpos;

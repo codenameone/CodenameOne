@@ -30,6 +30,7 @@ import com.codename1.bluetooth.gatt.GattCharacteristic;
 import com.codename1.bluetooth.gatt.GattDescriptor;
 import com.codename1.bluetooth.gatt.GattNotificationListener;
 import com.codename1.bluetooth.gatt.GattService;
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
@@ -38,6 +39,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Observable;
+import java.util.Observer;
 import java.util.TimerTask;
 
 /// A remote BLE peripheral: connection lifecycle, GATT client operations
@@ -70,8 +73,8 @@ public abstract class BlePeripheral extends BluetoothDevice {
             new HashMap<GattCharacteristic, ArrayList<GattNotificationListener>>();
     private final HashSet<GattCharacteristic> armed =
             new HashSet<GattCharacteristic>();
-    private final HashMap<GattCharacteristic, AsyncResource<Boolean>> armOps =
-            new HashMap<GattCharacteristic, AsyncResource<Boolean>>();
+    private final HashMap<GattCharacteristic, Claiming<Boolean>> armOps =
+            new HashMap<GattCharacteristic, Claiming<Boolean>>();
     private int mtu = 23;
 
     /// Ports construct subclasses; application code receives instances
@@ -246,28 +249,210 @@ public abstract class BlePeripheral extends BluetoothDevice {
     /// (also cached -- see [#getServices()]) or fails with a
     /// [BluetoothException].
     public final AsyncResource<List<GattService>> discoverServices() {
-        final AsyncResource<List<GattService>> out =
-                new AsyncResource<List<GattService>>();
+        final Claiming<List<GattService>> out =
+                new Claiming<List<GattService>>();
         if (failIfNotConnected(out)) {
             return out;
         }
-        out.onResult(new AsyncResult<List<GattService>>() {
-            @Override
-            public void onReady(List<GattService> value, Throwable err) {
-                if (err == null && value != null) {
-                    synchronized (stateLock) {
-                        services = new ArrayList<GattService>(value);
+        final AsyncResource<List<GattService>> inner =
+                publishBeforeDone(out, new AsyncResult<List<GattService>>() {
+                    @Override
+                    public void onReady(List<GattService> value,
+                            Throwable err) {
+                        if (err == null && value != null) {
+                            synchronized (stateLock) {
+                                services =
+                                        new ArrayList<GattService>(value);
+                            }
+                        }
                     }
-                }
-            }
-        });
-        queue.enqueue(new GattOperationQueue.Op(out) {
+                });
+        // The queue watches INNER, not out. Its timeout and its failAll both
+        // complete whatever they are given, and with two writers the timer
+        // could fail `out` between publishBeforeDone's isDone() check and its
+        // completion -- overwriting the timeout and notifying observers again
+        // after the queue had moved on. One writer removes the race instead
+        // of narrowing it: a timeout fails `inner`, and the same listener
+        // that would have published the result turns it into out.error.
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doDiscoverServices(out);
+                doDiscoverServices(inner);
             }
         });
         return out;
+    }
+
+    /// Returns the resource the platform layer should complete, arranging
+    /// for `apply` to run -- and therefore for whatever state it publishes to
+    /// be visible -- strictly before `out` is marked done.
+    ///
+    /// AsyncResource sets its done flag inside the monitor and only then
+    /// notifies observers and callbacks, so state written from an ordinary
+    /// `onResult` listener lands a moment after a waiter has already woken.
+    /// A caller doing the natural `discoverServices().await()` followed by
+    /// `getService(...)` could therefore read the previous operation's cache
+    /// -- which is exactly how a passing test turned intermittent under load.
+    /// A resource whose CANCELLATION competes with its publication for one
+    /// claim, so exactly one of them takes effect.
+    ///
+    /// AsyncResource.complete() does not refuse a second settlement: it sets
+    /// the value, marks itself done and fires the success callback whatever
+    /// the resource already was. So a cancel() that returned TRUE -- having
+    /// marked the resource cancelled -- could still be followed by the
+    /// in-flight platform answer completing it, and the caller got a success
+    /// callback for an operation it had successfully cancelled.
+    ///
+    /// Claiming inside cancel() closes that: whoever claims first decides.
+    /// When the publication got there already, cancel() answers FALSE, which
+    /// is the honest report -- the operation could not be cancelled, because
+    /// its answer was on the way out.
+    private static final class Claiming<T> extends AsyncResource<T> {
+        private boolean taken;
+
+        /// Claims the right to settle this resource, once.
+        synchronized boolean claim() {
+            if (taken) {
+                return false;
+            }
+            taken = true;
+            return true;
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            if (!claim()) {
+                return false;
+            }
+            return super.cancel(mayInterruptIfRunning);
+        }
+    }
+
+    /// The resource the platform should settle for an operation with no
+    /// cache to publish.
+    ///
+    /// The wrapper is not only about ordering. The queue watches what it is
+    /// given, and its TIMEOUT settles that -- so an operation handed the
+    /// caller's own resource had two writers with nothing between them: the
+    /// platform callback could complete it after the timeout task read
+    /// isDone() as false and before the task called error(), and
+    /// AsyncResource accepts both, so one operation ran the caller's success
+    /// AND failure callbacks. Discovery and MTU already avoided that by
+    /// giving the queue an inner resource and publishing once, under a claim;
+    /// every other queued operation now does the same.
+    private static <T> AsyncResource<T> publishOnly(Claiming<T> out) {
+        return publishBeforeDone(out, new NoApply<T>());
+    }
+
+    /// Hands one resource's outcome to another, but only if it can claim it.
+    ///
+    /// A named class rather than addListener, which settles the target
+    /// without asking, and rather than an anonymous one so it holds no
+    /// synthetic outer reference.
+    private static final class Forward<T> implements AsyncResult<T> {
+        private final Claiming<T> target;
+
+        Forward(Claiming<T> target) {
+            this.target = target;
+        }
+
+        @Override
+        public void onReady(T value, Throwable err) {
+            if (!target.claim()) {
+                return;
+            }
+            if (err == null) {
+                target.complete(value);
+            } else {
+                target.error(err instanceof Exception ? (Exception) err
+                        : new RuntimeException(err));
+            }
+        }
+    }
+
+    /// Publishes nothing of its own; see [#publishOnly].
+    private static final class NoApply<T> implements AsyncResult<T> {
+        @Override
+        public void onReady(T value, Throwable err) {
+        }
+    }
+
+    private static <T> AsyncResource<T> publishBeforeDone(
+            final Claiming<T> out, final AsyncResult<T> apply) {
+        final AsyncResource<T> inner = new AsyncResource<T>();
+        // One publication, whatever happens to `inner`.
+        //
+        // AsyncResource runs its callbacks once per completion and does not
+        // refuse a second one, and TWO things write to inner: the queue's
+        // timeout and the platform. Testing out.isDone() was not enough --
+        // both listeners could read it false before either completed -- so
+        // the transition itself is the thing that has to be exclusive. A
+        // late success then publishes nothing and cannot overwrite the
+        // timeout that a LATER operation has already moved past.
+
+        // Cancelling the caller's resource has to reach the QUEUED one, which
+        // is inner since the queue watches it. Otherwise a cancel left inner
+        // pending, startOp did not skip it, and its eventual answer published
+        // state and completed a resource the caller had already given up on.
+        //
+        // An OBSERVER, not onResult. AsyncResource.cancel() marks itself done
+        // and notifies observers, but never runs the callback chain -- so an
+        // onResult listener here was dead code for the one event it existed
+        // to catch, and cancelling a discoverServices() or requestMtu() still
+        // started the operation and let it write the service or MTU cache
+        // afterwards.
+        out.addObserver(new Observer() {
+            @Override
+            public void update(Observable o, Object arg) {
+                if (!out.isCancelled()) {
+                    return;
+                }
+                // PROPAGATION only -- the claim was taken by cancel()
+                // itself before it marked the resource, which is what makes
+                // cancellation and publication exclusive. Claiming again
+                // here would always fail, and this observer would then stop
+                // telling the queue about a cancel it had just accepted:
+                // the queued operation started anyway, which is what
+                // BluetoothOpQueueTest caught.
+                inner.cancel(true);
+            }
+        });
+        inner.onResult(new AsyncResult<T>() {
+            @Override
+            public void onReady(T value, Throwable err) {
+                // The claim IS the cancel test now. A separate isCancelled()
+                // read after it could only ever be a snapshot, and the cancel
+                // it was meant to catch can land in the statement after the
+                // one that read it; the observer above claims this same slot
+                // instead, so reaching here means cancellation did not get
+                // there first.
+                if (!out.claim()) {
+                    return;
+                }
+                // CONTAINED. Both the state update and the caller's own
+                // callbacks run inside this listener, and the queue's
+                // advancement listener is registered on inner AFTER it -- so
+                // an app callback that threw came out here, skipped the
+                // advancement, and wedged the peripheral for good: every
+                // later read, write and notify sat in a queue nothing would
+                // ever start again. One badly behaved callback is a logged
+                // error, not a dead connection.
+                try {
+                    try {
+                        apply.onReady(value, err);
+                    } finally {
+                        if (err == null) {
+                            out.complete(value);
+                        } else {
+                            out.error(err);
+                        }
+                    }
+                } catch (Throwable t) { //NOPMD - see above
+                    Log.e(t);
+                }
+            }
+        });
+        return inner;
     }
 
     /// The cached service list from the last [#discoverServices()] call;
@@ -305,14 +490,15 @@ public abstract class BlePeripheral extends BluetoothDevice {
     /// [GattCharacteristic#read()].
     public final AsyncResource<byte[]> readCharacteristic(
             final GattCharacteristic c) {
-        final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
+        final Claiming<byte[]> out = new Claiming<byte[]>();
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<byte[]> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doReadCharacteristic(c, out);
+                doReadCharacteristic(c, inner);
             }
         });
         return out;
@@ -324,14 +510,15 @@ public abstract class BlePeripheral extends BluetoothDevice {
     public final AsyncResource<Boolean> writeCharacteristic(
             final GattCharacteristic c, final byte[] value,
             final boolean withResponse) {
-        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        final Claiming<Boolean> out = new Claiming<Boolean>();
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Boolean> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doWriteCharacteristic(c, value, withResponse, out);
+                doWriteCharacteristic(c, value, withResponse, inner);
             }
         });
         return out;
@@ -340,14 +527,15 @@ public abstract class BlePeripheral extends BluetoothDevice {
     /// Reads a descriptor value; prefer the convenience
     /// [GattDescriptor#read()].
     public final AsyncResource<byte[]> readDescriptor(final GattDescriptor d) {
-        final AsyncResource<byte[]> out = new AsyncResource<byte[]>();
+        final Claiming<byte[]> out = new Claiming<byte[]>();
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<byte[]> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doReadDescriptor(d, out);
+                doReadDescriptor(d, inner);
             }
         });
         return out;
@@ -357,14 +545,15 @@ public abstract class BlePeripheral extends BluetoothDevice {
     /// [GattDescriptor#write(byte[])].
     public final AsyncResource<Boolean> writeDescriptor(final GattDescriptor d,
             final byte[] value) {
-        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        final Claiming<Boolean> out = new Claiming<Boolean>();
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Boolean> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doWriteDescriptor(d, value, out);
+                doWriteDescriptor(d, value, inner);
             }
         });
         return out;
@@ -376,7 +565,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
     /// is written only on the transition from zero to one listener.
     public final AsyncResource<Boolean> subscribe(final GattCharacteristic c,
             GattNotificationListener l) {
-        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        final Claiming<Boolean> out = new Claiming<Boolean>();
         if (l == null) {
             out.error(new BluetoothException(BluetoothError.UNKNOWN,
                     "subscribe requires a listener"));
@@ -385,7 +574,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
         if (failIfNotConnected(out)) {
             return out;
         }
-        AsyncResource<Boolean> arm = null;
+        Claiming<Boolean> arm = null;
         boolean startArm = false;
         synchronized (subscriptions) {
             ArrayList<GattNotificationListener> list = subscriptions.get(c);
@@ -402,14 +591,18 @@ public abstract class BlePeripheral extends BluetoothDevice {
             }
             arm = armOps.get(c);
             if (arm == null) {
-                arm = new AsyncResource<Boolean>();
+                arm = new Claiming<Boolean>();
                 armOps.put(c, arm);
                 startArm = true;
             }
         }
-        arm.addListener(out);
+        // registered AFTER the bookkeeping listener below, because
+        // AsyncResource runs its callbacks in registration order and
+        // completing `out` first would let the caller observe the
+        // subscription before `armed` records it.
+        final AsyncResource<Boolean> joined = arm;
         if (startArm) {
-            final AsyncResource<Boolean> armRes = arm;
+            final Claiming<Boolean> armRes = arm;
             arm.onResult(new AsyncResult<Boolean>() {
                 @Override
                 public void onReady(Boolean value, Throwable err) {
@@ -423,13 +616,21 @@ public abstract class BlePeripheral extends BluetoothDevice {
                 }
             });
             final boolean indication = !c.canNotify() && c.canIndicate();
-            queue.enqueue(new GattOperationQueue.Op(armRes) {
+            final AsyncResource<Boolean> armInner = publishOnly(armRes);
+            queue.enqueue(new GattOperationQueue.Op(armInner) {
                 @Override
                 void start() {
-                    doSetNotifications(c, true, indication, armRes);
+                    doSetNotifications(c, true, indication, armInner);
                 }
             });
         }
+        // Through the CLAIM, not addListener. The inherited forwarder tests
+        // isDone() and then calls complete(), which are two steps: a cancel
+        // landing between them returns true, and the joined arm then
+        // overwrites the cancelled resource and runs its success callbacks.
+        // Every other publication in this class goes through the claim; this
+        // one was reaching AsyncResource directly.
+        joined.onResult(new Forward<Boolean>(out));
         return out;
     }
 
@@ -458,7 +659,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
     }
 
     private AsyncResource<Boolean> checkDisarm(final GattCharacteristic c) {
-        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        final Claiming<Boolean> out = new Claiming<Boolean>();
         boolean needDisarm;
         synchronized (subscriptions) {
             boolean hasListeners = subscriptions.containsKey(c);
@@ -477,10 +678,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
             return out;
         }
         final boolean indication = !c.canNotify() && c.canIndicate();
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Boolean> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doSetNotifications(c, false, indication, out);
+                doSetNotifications(c, false, indication, inner);
             }
         });
         return out;
@@ -488,14 +690,15 @@ public abstract class BlePeripheral extends BluetoothDevice {
 
     /// Reads the current RSSI of the connection.
     public final AsyncResource<Integer> readRssi() {
-        final AsyncResource<Integer> out = new AsyncResource<Integer>();
+        final Claiming<Integer> out = new Claiming<Integer>();
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Integer> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doReadRssi(out);
+                doReadRssi(inner);
             }
         });
         return out;
@@ -505,22 +708,24 @@ public abstract class BlePeripheral extends BluetoothDevice {
     /// smaller). iOS negotiates the MTU itself -- there the request
     /// resolves immediately with the current value.
     public final AsyncResource<Integer> requestMtu(final int mtu) {
-        final AsyncResource<Integer> out = new AsyncResource<Integer>();
+        final Claiming<Integer> out = new Claiming<Integer>();
         if (failIfNotConnected(out)) {
             return out;
         }
-        out.onResult(new AsyncResult<Integer>() {
-            @Override
-            public void onReady(Integer value, Throwable err) {
-                if (err == null && value != null) {
-                    BlePeripheral.this.mtu = value.intValue();
-                }
-            }
-        });
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Integer> inner =
+                publishBeforeDone(out, new AsyncResult<Integer>() {
+                    @Override
+                    public void onReady(Integer value, Throwable err) {
+                        if (err == null && value != null) {
+                            BlePeripheral.this.mtu = value.intValue();
+                        }
+                    }
+                });
+        // The queue watches INNER; see discoverServices for why.
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doRequestMtu(mtu, out);
+                doRequestMtu(mtu, inner);
             }
         });
         return out;
@@ -536,14 +741,15 @@ public abstract class BlePeripheral extends BluetoothDevice {
     /// platforms that manage intervals themselves (iOS).
     public final AsyncResource<Boolean> requestConnectionPriority(
             final ConnectionPriority priority) {
-        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        final Claiming<Boolean> out = new Claiming<Boolean>();
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Boolean> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doRequestConnectionPriority(priority, out);
+                doRequestConnectionPriority(priority, inner);
             }
         });
         return out;
@@ -553,11 +759,12 @@ public abstract class BlePeripheral extends BluetoothDevice {
     /// by encrypted characteristics), so the request resolves `true`
     /// without user interaction.
     public final AsyncResource<Boolean> createBond() {
-        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final Claiming<Boolean> out = new Claiming<Boolean>();
+        final AsyncResource<Boolean> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doCreateBond(out);
+                doCreateBond(inner);
             }
         });
         return out;

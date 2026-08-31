@@ -1,0 +1,1043 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android.call;
+
+import android.Manifest;
+import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.telecom.PhoneAccount;
+import android.telecom.PhoneAccountHandle;
+import android.telecom.TelecomManager;
+
+import com.codename1.call.CallAvailability;
+import com.codename1.call.CallError;
+import com.codename1.call.CallHandle;
+import com.codename1.call.CallHandleType;
+import com.codename1.call.session.CallAudioRoute;
+import com.codename1.call.session.Calls;
+import com.codename1.call.spi.CallBridge;
+import com.codename1.impl.call.CallWire;
+import com.codename1.ui.Display;
+
+/// The Android half of `com.codename1.call`, on Telecom.
+///
+/// #### Everything here is guarded on API 26
+///
+/// A **self-managed** `ConnectionService` -- an app owning its own calls
+/// rather than managing the SIM's -- arrives exactly at API 26, and below it
+/// Telecom offers nothing to degrade to. So the port reports the capability
+/// absent rather than the app's minimum being raised, and application code
+/// branches on `Calls.isSupported()`.
+///
+/// #### Configuring is not optional and its absence is silent
+///
+/// `TelecomManager.addNewIncomingCall` **does nothing at all** if no
+/// `PhoneAccount` has been registered, or if one was registered without
+/// `CAPABILITY_SELF_MANAGED`: no exception, no log line, no call. That is why
+/// [#configureProvider] exists as its own step and why every report checks it
+/// first -- an answer of `CALL_REFUSED` is a great deal more use than the
+/// silence the platform offers.
+public class AndroidCallBridge implements CallBridge {
+
+    private static final int MIN_SELF_MANAGED_SDK = 26;
+
+    private final Context context;
+    private PhoneAccountHandle handle;
+    private boolean configured;
+
+    public AndroidCallBridge(Context context) {
+        this.context = context;
+    }
+
+    private TelecomManager telecom() {
+        return (TelecomManager) context.getSystemService(Context.TELECOM_SERVICE);
+    }
+
+    private static boolean selfManagedAvailable() {
+        return Build.VERSION.SDK_INT >= MIN_SELF_MANAGED_SDK;
+    }
+
+    @Override
+    public boolean isCallSupported() {
+        return selfManagedAvailable() && telecom() != null;
+    }
+
+    @Override
+    public boolean isVoipPushSupported() {
+        // FALSE, deliberately, and it is not a gap.
+        //
+        // com.codename1.call.voip exists for one reason: iOS reports a pushed
+        // call to the system BEFORE any of the app's code runs, and kills the
+        // app when it does not, so the framework has to own that path.
+        // Android imposes no such deadline -- a high-priority FCM message
+        // arrives in Java like any other -- so the natural Android answer is
+        // for the app to call Calls.reportIncoming from its own push
+        // callback, which works today and needs nothing from this facade.
+        //
+        // Saying true here handed apps a register() that resolved with an
+        // empty token and a listener nothing ever called. Reporting the truth
+        // sends them to the path that works.
+        return false;
+    }
+
+    @Override
+    public boolean isDirectorySupported() {
+        // CallScreeningService is API 24, but the role that makes it fire is
+        // API 29; below that an app can be granted screening only through a
+        // dialog this API does not expose.
+        return Build.VERSION.SDK_INT >= 29;
+    }
+
+    @Override
+    public int getCallCapabilities() {
+        if (!isCallSupported()) {
+            return 0;
+        }
+        // MUTE is absent, and it is the bit most likely to be missed.
+        // Telecom OFFERS a mute control and this port reports what the user
+        // does with it, through onCallAudioStateChanged -> deliverMuteChanged
+        // -> muteRequested, which no capability bit gates. What is missing is
+        // the other direction, which is what CallSession.setMuted is: a
+        // self-managed ConnectionService has no way to tell Telecom what the
+        // mute button should read. Advertising the bit and then answering a
+        // set with success left isMuted() -- documented as the state "as far
+        // as the system is concerned" -- holding a value the system never
+        // held, until the next genuine audio-state report quietly flipped it
+        // back.
+        int caps = CAPABILITY_SYSTEM_UI | CAPABILITY_OUTGOING | CAPABILITY_HOLD
+                | CAPABILITY_DTMF;
+        // VIDEO only when the build can actually reach a camera. The manifest
+        // permission comes from the call.video build hint at build time,
+        // while videoSupported(true) is a RUNTIME decision the scanner cannot
+        // see -- so an app that set the configuration and not the hint
+        // advertised video, and requestPermissions(PERMISSION_CAMERA) then
+        // resolved denied for ever because Android will not grant a
+        // permission the manifest does not declare. Reporting the capability
+        // honestly is what turns that into something the app can branch on.
+        if (declaresPermission(Manifest.permission.CAMERA)) {
+            caps |= CAPABILITY_VIDEO;
+        }
+        if (isDirectorySupported()) {
+            // SCREENING only, not DIRECTORY. A CallScreeningService may allow,
+            // reject or silence a call; Android offers a third-party app no
+            // way to put a LABEL on an incoming call, which is what
+            // CAPABILITY_DIRECTORY promises. Blocking entries work here and
+            // labels are ignored, so claiming identification meant a
+            // label-only list was accepted and then did nothing at all.
+            caps |= CAPABILITY_SCREENING;
+        }
+        // No CAPABILITY_VOIP_PUSH: see isVoipPushSupported.
+        // Deliberately no CAPABILITY_GROUPING or CAPABILITY_ROUTE_PICKER:
+        // Telecom conferences self-managed calls only through a
+        // ConnectionService conference this port does not build, and there is
+        // no system route picker to show.
+        return caps;
+    }
+
+    @Override
+    public int getCallAvailability() {
+        if (!isCallSupported()) {
+            return CallAvailability.UNSUPPORTED.ordinal();
+        }
+        if (!configured || handle == null) {
+            // The SAME predicate ready() refuses on, in the same order, so
+            // the answer here and the outcome of the report cannot disagree.
+            // Answering AVAILABLE while ready() was about to refuse with
+            // CALL_REFUSED defeated the one thing this call is documented
+            // for: deciding whether to tell the far end to stop retrying.
+            return CallAvailability.NOT_CONFIGURED.ordinal();
+        }
+        int granted = getGrantedPermissions();
+        if ((granted & PERMISSION_MANAGE_CALLS) == 0) {
+            return CallAvailability.NOT_PERMITTED.ordinal();
+        }
+        // NOTIFICATIONS TOO, on the versions that ask for them. A
+        // self-managed call has no system call UI on Android -- this port
+        // rings with its own full-screen notification -- so without the
+        // permission the OS suppresses it and the user gets no ringing
+        // screen and no Answer or Decline. Telecom would still accept the
+        // call, leaving the app believing it is ringing while nothing is.
+        //
+        // Reported as NOT_PERMITTED, which is what it is: an app that asks
+        // can recover by requesting it, and one that has been refused should
+        // not be reporting incoming calls at all.
+        if ((granted & PERMISSION_NOTIFICATIONS) == 0
+                || !notificationsWillShow()) {
+            return CallAvailability.NOT_PERMITTED.ordinal();
+        }
+        TelecomManager tm = telecom();
+        // hasOwnCalls() FIRST: it costs nothing and needs no permission,
+        // and when one of ours is up the answer does not depend on Telecom.
+        if (tm != null && Build.VERSION.SDK_INT >= 26
+                && !CN1ConnectionService.hasOwnCalls()
+                && systemSaysInCall(tm)) {
+            // isInCall() is true for THIS app's own self-managed call too,
+            // and OTHER_APP_IN_CALL means another application -- so reporting
+            // it while the app was in its own call told that app not to
+            // report a second one, which Telecom would have accepted from the
+            // same account. Checking our own connections is the only way to
+            // tell the two apart; with none of ours up, somebody else's is
+            // the honest reading.
+            return CallAvailability.OTHER_APP_IN_CALL.ordinal();
+        }
+        return CallAvailability.AVAILABLE.ordinal();
+    }
+
+    /// Whether a ringing notification would actually appear.
+    ///
+    /// The runtime permission is not the whole answer and is not even asked
+    /// for below API 33, so it reads as granted on every older device. A user
+    /// who turns notifications off for the app, or sets this port's incoming
+    /// call channel to IMPORTANCE_NONE, suppresses the ringing UI just as
+    /// completely -- Telecom accepts the call and nothing appears, leaving no
+    /// Answer and no Decline while the app believes it is ringing.
+    ///
+    /// Reflective because NotificationChannel is API 26 and this port
+    /// compiles against an older SDK. Anything it cannot determine is treated
+    /// as showable: refusing calls on a device this cannot interrogate would
+    /// be worse than the failure it is guarding. The catches are the four
+    /// reflection can raise rather than a bare Exception, which the
+    /// SpotBugs gate reports for this package.
+    /// A reflective answer as an `int`, or the fallback.
+    ///
+    /// Guarded with `instanceof` rather than cast-and-catch: ParparVM does
+    /// not check CHECKCAST, so a cast that fails under a handler does not
+    /// throw and the handler never runs. Kept out of the reflective `try`
+    /// for the same reason, as [CallScreeningRole] does with its Intents.
+    private static int asInt(Object o, int fallback) {
+        if (o instanceof Integer) {
+            return ((Integer) o).intValue();
+        }
+        return fallback;
+    }
+
+    private boolean notificationsWillShow() {
+        try {
+            Object nm = context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) {
+                return true;
+            }
+            if (Build.VERSION.SDK_INT >= 24) {
+                Object enabled = nm.getClass()
+                        .getMethod("areNotificationsEnabled").invoke(nm);
+                if (Boolean.FALSE.equals(enabled)) {
+                    return false;
+                }
+            }
+            if (Build.VERSION.SDK_INT >= 26) {
+                Object channel = nm.getClass()
+                        .getMethod("getNotificationChannel", String.class)
+                        .invoke(nm, CN1CallNotifications.CHANNEL_ID);
+                if (channel == null) {
+                    // Not created yet, which is the state before the first
+                    // call; showIncoming creates it.
+                    return true;
+                }
+                Object importance = channel.getClass()
+                        .getMethod("getImportance").invoke(channel);
+                // HIGH or better, not merely "not silenced".
+                //
+                // The channel is created IMPORTANCE_HIGH because that is
+                // what a heads-up notification and a full-screen intent
+                // need, and the user can lower it afterwards. Testing only
+                // for IMPORTANCE_NONE accepted LOW and MIN, where the
+                // notification is posted and shown in the shade and the
+                // phone never visibly rings -- so getAvailability answered
+                // AVAILABLE, the report succeeded, and the call arrived
+                // somewhere the user was not looking.
+                //
+                // A ringing UI the user cannot see is the same failure as no
+                // UI at all, which is the argument the POST_NOTIFICATIONS
+                // check beside this one already makes.
+                return asInt(importance, 0) >= 4;
+            }
+            return true;
+        } catch (NoSuchMethodException notOnThisPlatform) {
+            return true;
+        } catch (IllegalAccessException notReachable) {
+            return true;
+        } catch (java.lang.reflect.InvocationTargetException threw) {
+            return true;
+        } catch (RuntimeException cannotTell) {
+            return true;
+        }
+    }
+
+    @Override
+    public int getGrantedPermissions() {
+        int mask = 0;
+        if (granted("android.permission.MANAGE_OWN_CALLS")) {
+            mask |= PERMISSION_MANAGE_CALLS;
+        }
+        if (granted(Manifest.permission.RECORD_AUDIO)) {
+            mask |= PERMISSION_MICROPHONE;
+        }
+        if (granted(Manifest.permission.CAMERA)) {
+            mask |= PERMISSION_CAMERA;
+        }
+        if (Build.VERSION.SDK_INT < 33
+                || granted("android.permission.POST_NOTIFICATIONS")) {
+            mask |= PERMISSION_NOTIFICATIONS;
+        }
+        // The role is not an Android permission, but it IS one of this SPI's
+        // permission bits -- and reporting it absent while the user held it
+        // made requestPermissions look like it had been refused something
+        // the app already had.
+        if (CallScreeningRole.isRoleHeld(context)) {
+            mask |= PERMISSION_SCREENING_ROLE;
+        }
+        return mask;
+    }
+
+    private boolean granted(String permission) {
+        if (Build.VERSION.SDK_INT < 23) {
+            // checkSelfPermission arrived in API 23, and calling it below that
+            // is a NoSuchMethodError rather than a false. The Android
+            // builder's default minimum is still 19, so an app that merely
+            // REFERENCES the call API and asks for the permission mask on a
+            // KitKat device crashed instead of being told what it had. The
+            // manifest IS the answer before Marshmallow: everything declared
+            // is granted at install time, there being nothing to revoke.
+            return declaresPermission(permission);
+        }
+        return context.checkSelfPermission(permission)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    @Override
+    public void requestPermissions(final int requestId, final int permissionBits) {
+        // Actually asks. Reporting the current mask and stopping there meant
+        // an app calling the method whose contract says it REQUESTS the bits
+        // always saw a denial, and had to reach for another permission API to
+        // get call audio at all.
+        //
+        // MANAGE_OWN_CALLS is exempt: it is a normal permission granted at
+        // install time, so there is nothing to prompt for and asking would
+        // show the user a dialog that cannot change anything.
+        //
+        // Off the EDT because checkForPermission blocks on the dialog, and
+        // the answer is delivered through the facade, which marshals back.
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            @Override
+            public void run() {
+                // One sequence at a time. checkForPermission blocks on a
+                // dialog behind an activity-wide flag and request code, so two
+                // workers running at once share them: the first result clears
+                // the flag for both, and the second returned the mask as it
+                // stood with its OWN dialog still on screen -- reporting a
+                // denial the user was in the middle of granting.
+                synchronized (PERMISSION_LOCK) {
+                    requestPermissionsLocked(permissionBits, requestId);
+                }
+            }
+        });
+    }
+
+    /// The permission sequence itself; the caller holds PERMISSION_LOCK.
+    private void requestPermissionsLocked(int permissionBits,
+            final int requestId) {
+        if ((permissionBits & PERMISSION_MICROPHONE) != 0) {
+            com.codename1.impl.android.AndroidImplementation
+                    .checkForPermission(Manifest.permission.RECORD_AUDIO,
+                            "This is required to carry the audio of a call");
+        }
+        if ((permissionBits & PERMISSION_CAMERA) != 0) {
+            com.codename1.impl.android.AndroidImplementation
+                    .checkForPermission(Manifest.permission.CAMERA,
+                            "This is required for video calls");
+        }
+        if ((permissionBits & PERMISSION_NOTIFICATIONS) != 0
+                && Build.VERSION.SDK_INT >= 33) {
+            com.codename1.impl.android.AndroidImplementation
+                    .checkForPermission("android.permission.POST_NOTIFICATIONS",
+                            "This is required to show an incoming call");
+        }
+        if ((permissionBits & PERMISSION_SCREENING_ROLE) != 0
+                && (getGrantedPermissions() & PERMISSION_SCREENING_ROLE) == 0) {
+            // The role has its own prompt rather than a permission dialog, so
+            // the mask cannot be answered until the user has decided.
+            // Ignoring the bit reported an immediate denial for something the
+            // user was never asked about.
+            Activity a = currentActivity();
+            if (a != null) {
+                CallScreeningRole.requestRole(a, new Runnable() {
+                    @Override
+                    public void run() {
+                        Calls.deliverPermissionResult(requestId,
+                                getGrantedPermissions());
+                    }
+                });
+                return;
+            }
+        }
+        Calls.deliverPermissionResult(requestId, getGrantedPermissions());
+    }
+
+    /// Serialises the permission sequence; see requestPermissions.
+    private static final Object PERMISSION_LOCK = new Object();
+
+    @Override
+    public void configureProvider(int requestId, String configWire) {
+        if (!isCallSupported()) {
+            Calls.deliverAck(requestId, false,
+                    CallError.NOT_SUPPORTED.ordinal(),
+                    "Self-managed calls need Android 8.0 or newer");
+            return;
+        }
+        String[] f = CallWire.split(configWire);
+        String label = CallWire.field(f, 0);
+        if (label.length() == 0) {
+            label = context.getApplicationInfo()
+                    .loadLabel(context.getPackageManager()).toString();
+        }
+        boolean video = CallWire.flag(f, 1);
+        // Field 2, which used to be read by iOS alone. Android does NOT log
+        // self-managed calls unless the phone account asks for it, so a call
+        // app that left CallConfiguration.includesCallsInRecents at its
+        // documented default of true was still absent from Recents on this
+        // platform -- with nothing to say the setting had been ignored.
+        boolean inRecents = CallWire.flag(f, 2);
+        try {
+            handle = new PhoneAccountHandle(
+                    new ComponentName(context, CN1ConnectionService.class), "cn1");
+            int caps = PhoneAccount.CAPABILITY_SELF_MANAGED;
+            // CLAMPED to what the build can actually do, exactly as
+            // getCallCapabilities clamps CAPABILITY_VIDEO. The manifest
+            // permission comes from the call.video build hint at build time
+            // and videoSupported(true) is a runtime decision the scanner
+            // cannot see, so an audio-only build could advertise video
+            // calling to Telecom -- which would then route and present video
+            // calls the app can never capture for, while the capability
+            // query the app is told to branch on says video is unavailable.
+            // Two answers to one question is worse than the restrictive one.
+            if (video && declaresPermission(Manifest.permission.CAMERA)) {
+                caps |= PhoneAccount.CAPABILITY_SUPPORTS_VIDEO_CALLING
+                        | PhoneAccount.CAPABILITY_VIDEO_CALLING;
+            }
+            PhoneAccount.Builder builder = PhoneAccount.builder(handle, label)
+                    .setCapabilities(caps);
+            // The SCHEMES the app said it handles, as iOS registers the
+            // matching supportedHandleTypes. Registering both regardless let
+            // Telecom route a system-originated SIP call to an app that had
+            // explicitly said it takes phone numbers only -- and gave an
+            // app that wanted neither no way to say so.
+            //
+            // tel carries PHONE_NUMBER; sip carries the two address-shaped
+            // kinds, because Telecom has no scheme of its own for either and
+            // a SIP URI is what both arrive as.
+            boolean tel = false;
+            boolean sip = false;
+            for (CallHandleType t : CallWire.handleTypes(f, 5)) {
+                if (t == CallHandleType.PHONE_NUMBER) {
+                    tel = true;
+                } else {
+                    sip = true;
+                }
+            }
+            if (!tel && !sip) {
+                // Nothing named means nothing was SET: CallConfiguration
+                // .handleTypes refuses an empty replacement, so an empty
+                // wire field is an app that never called it, and the
+                // defaults are phone-number and generic. Reading it as "the
+                // app wants none" would leave the account unreachable, which
+                // is why that refusal is at the setter rather than here --
+                // the ports cannot tell the two apart from the wire.
+                tel = true;
+                sip = true;
+            }
+            if (tel) {
+                builder.addSupportedUriScheme(PhoneAccount.SCHEME_TEL);
+            }
+            if (sip) {
+                builder.addSupportedUriScheme(PhoneAccount.SCHEME_SIP);
+            }
+            if (inRecents) {
+                // An EXTRA rather than a capability, and the string is
+                // spelled out rather than named: PhoneAccount
+                // .EXTRA_LOG_SELF_MANAGED_CALLS is API 30 and the port
+                // compiles against an older SDK. The value is the constant's,
+                // and an extra a platform does not know is ignored rather
+                // than rejected -- which is exactly the pre-30 behaviour
+                // wanted here, since self-managed call logging did not exist
+                // before it.
+                Bundle extras = new Bundle();
+                extras.putBoolean(
+                        "android.telecom.extra.LOG_SELF_MANAGED_CALLS", true);
+                builder.setExtras(extras);
+            }
+            PhoneAccount account = builder.build();
+            telecom().registerPhoneAccount(account);
+            configured = true;
+            Calls.deliverAck(requestId, true, 0, null);
+        } catch (SecurityException e) {
+            configured = false;
+            Calls.deliverAck(requestId, false, CallError.UNAUTHORIZED.ordinal(),
+                    "MANAGE_OWN_CALLS is required to own calls: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void reportIncomingCall(int requestId, String callId,
+            String handleWire, String displayName, int capabilityBits,
+            boolean hasVideo) {
+        if (!ready(requestId, true)) {
+            return;
+        }
+        Bundle extras = extrasFor(callId, handleWire, displayName, hasVideo);
+        CN1ConnectionService.expectReport(requestId, callId,
+                String.valueOf(uriFor(handleWire)), true);
+        try {
+            telecom().addNewIncomingCall(handle, extras);
+        } catch (SecurityException e) {
+            CN1ConnectionService.failParkedReport(callId,
+                    CallError.UNAUTHORIZED.ordinal(), e.getMessage());
+        }
+    }
+
+    @Override
+    public void reportOutgoingCall(int requestId, String callId,
+            String handleWire, String displayName, int capabilityBits,
+            boolean hasVideo) {
+        if (!ready(requestId, false)) {
+            return;
+        }
+        // A call the SYSTEM asked this app to place is already in Telecom.
+        // The listener contract has the app answer startCallRequested with
+        // reportOutgoing, and placing it again would create a SECOND
+        // connection for the same id -- the new one replacing the original in
+        // CONNECTIONS while the original stayed alive in Telecom, so the user
+        // would see two calls and the app could address only one.
+        if (CN1ConnectionService.adoptSystemStarted(requestId, callId)) {
+            return;
+        }
+        Bundle extras = extrasFor(callId, handleWire, displayName, hasVideo);
+        Bundle outer = new Bundle();
+        outer.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle);
+        outer.putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, extras);
+        CN1ConnectionService.expectReport(requestId, callId,
+                String.valueOf(uriFor(handleWire)), false);
+        try {
+            telecom().placeCall(uriFor(handleWire), outer);
+        } catch (SecurityException e) {
+            CN1ConnectionService.failParkedReport(callId,
+                    CallError.UNAUTHORIZED.ordinal(), e.getMessage());
+        }
+    }
+
+    /// Whether a report can proceed, answering the request when it cannot.
+    /// Whether Telecom says a call is up, or false when it cannot be asked.
+    ///
+    /// TelecomManager.isInCall() is annotated READ_PHONE_STATE, and
+    /// CallManifestFragments deliberately does not declare it: that is a
+    /// DANGEROUS permission, a self-managed calling app has no business
+    /// asking for the right to read phone state, and Play scrutinises apps
+    /// that do. Calling it regardless threw SecurityException straight out of
+    /// getAvailability() -- a crash in a public query that an app is told to
+    /// call before every incoming call.
+    ///
+    /// False when the question cannot be asked, which is the honest
+    /// degradation: a foreign call goes unnoticed and the report that follows
+    /// fails on its own terms, which beats throwing. Checked AND caught,
+    /// because the permission can also be revoked between the two.
+    private boolean systemSaysInCall(TelecomManager tm) {
+        if (!granted("android.permission.READ_PHONE_STATE")) {
+            return false;
+        }
+        try {
+            return tm.isInCall();
+        } catch (SecurityException notAllowed) {
+            return false;
+        }
+    }
+
+    /// Whether the MANIFEST declares a permission, granted or not.
+    ///
+    /// Different question from checkSelfPermission, which answers whether the
+    /// user has granted one: Android refuses to grant a permission the
+    /// manifest never asked for, and does it silently.
+    private boolean declaresPermission(String permission) {
+        try {
+            String[] declared = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(),
+                            PackageManager.GET_PERMISSIONS)
+                    .requestedPermissions;
+            if (declared == null) {
+                return false;
+            }
+            for (String d : declared) {
+                if (permission.equals(d)) {
+                    return true;
+                }
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            // The app asking about its own package; cannot happen in practice.
+        }
+        return false;
+    }
+
+    /// @param incoming whether the call being reported will have to RING,
+    /// which is the only case that needs a notification to be showable
+    private boolean ready(int requestId, boolean incoming) {
+        if (!isCallSupported()) {
+            Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
+                    "Self-managed calls need Android 8.0 or newer");
+            return false;
+        }
+        if (!configured || handle == null) {
+            // The silent case, made loud. Without this Telecom drops the call
+            // and says nothing at all.
+            Calls.deliverAck(requestId, false, CallError.CALL_REFUSED.ordinal(),
+                    "Calls.configure() must run before a call is reported:"
+                    + " Telecom ignores calls from an unregistered account");
+            return false;
+        }
+        // The last predicate getCallAvailability refuses on, and it was
+        // missing here. That method's own comment says why it matters -- a
+        // self-managed call has no system call UI on Android, this port rings
+        // with a full-screen notification, and without the permission the OS
+        // suppresses it -- and then says that Telecom would still accept the
+        // call, leaving the app believing it is ringing while nothing is.
+        // Which is precisely what this method did: the availability query
+        // answered NOT_PERMITTED and the report went through and was
+        // acknowledged as a success.
+        //
+        // Only for an INCOMING call. An outgoing one never rings, so it needs
+        // no notification and refusing it would take away a call the user
+        // themselves started.
+        if (incoming
+                && ((getGrantedPermissions() & PERMISSION_NOTIFICATIONS) == 0
+                        || !notificationsWillShow())) {
+            Calls.deliverAck(requestId, false,
+                    CallError.UNAUTHORIZED.ordinal(),
+                    "An incoming self-managed call rings through a"
+                    + " notification, and this app cannot show one: grant"
+                    + " POST_NOTIFICATIONS and set the incoming call channel"
+                    + " to high importance -- at anything lower the system"
+                    + " files the notification in the shade instead of"
+                    + " ringing. Calls.getAvailability() reports this as"
+                    + " NOT_PERMITTED before a call is reported.");
+            return false;
+        }
+        return true;
+    }
+
+    private Bundle extrasFor(String callId, String handleWire, String name,
+            boolean hasVideo) {
+        Bundle b = new Bundle();
+        b.putString(CN1ConnectionService.EXTRA_CALL_ID, callId);
+        b.putParcelable(TelecomManager.EXTRA_INCOMING_CALL_ADDRESS,
+                uriFor(handleWire));
+        if (name != null) {
+            b.putString(TelecomManager.EXTRA_CALL_SUBJECT, name);
+        }
+        // Carried to the connection, which is the only place it can be
+        // applied: dropping it here left Telecom treating every call as
+        // audio-only while the bridge advertised CAPABILITY_VIDEO.
+        //
+        // CLAMPED by the same predicate that clamps the account's
+        // CAPABILITY_VIDEO_CALLING, and clamped HERE because this is the one
+        // funnel both report paths pass through. Clamping the registration
+        // alone left the per-call flag unguarded: an audio-only build could
+        // still report video=true, CN1ConnectionService.adopt() would call
+        // CN1Connection.setVideo(true), and Telecom would present a video
+        // call against an account with no video capability and a manifest
+        // with no CAMERA permission -- a call the app can never capture for.
+        //
+        // The restrictive answer for the same reason the registration gives:
+        // Calls.getCapabilities() tells the app video is unavailable, and a
+        // port that then reported one anyway would be giving two answers to
+        // one question.
+        b.putBoolean(CN1ConnectionService.EXTRA_VIDEO,
+                hasVideo && declaresPermission(Manifest.permission.CAMERA));
+        return b;
+    }
+
+    /// The address Telecom shows and dials.
+    ///
+    /// The scheme matters: a `tel:` address is matched against the address
+    /// book and can be called back from Recents, while a username sent as
+    /// `tel:` produces a call log entry the user cannot use.
+    private static Uri uriFor(String handleWire) {
+        CallHandle h = CallWire.decodeHandle(handleWire);
+        if (h == null) {
+            return Uri.fromParts(PhoneAccount.SCHEME_TEL, "", null);
+        }
+        String scheme = h.getType() == CallHandleType.PHONE_NUMBER
+                ? PhoneAccount.SCHEME_TEL : PhoneAccount.SCHEME_SIP;
+        return Uri.fromParts(scheme, h.getValue(), null);
+    }
+
+    @Override
+    public void reportOutgoingStartedConnecting(String callId, long timestampMs) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c != null) {
+            c.setDialing();
+        }
+    }
+
+    @Override
+    public void reportOutgoingConnected(String callId, long timestampMs) {
+        activate(callId);
+    }
+
+    @Override
+    public void reportIncomingConnected(String callId, long timestampMs) {
+        activate(callId);
+    }
+
+    private static void activate(String callId) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c != null) {
+            c.setActive();
+        }
+    }
+
+    @Override
+    public void updateCall(String callId, String handleWire, String displayName,
+            int capabilityBits, boolean hasVideo) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c == null) {
+            return;
+        }
+        if (handleWire != null && handleWire.length() > 0) {
+            c.setAddress(uriFor(handleWire), TelecomManager.PRESENTATION_ALLOWED);
+        }
+        if (displayName != null) {
+            c.setCallerDisplayName(displayName,
+                    TelecomManager.PRESENTATION_ALLOWED);
+        }
+        // Only when the update actually carries capability information.
+        // CallSession.update() has no video parameter and passes -1 and
+        // false, so applying the flag here turned every rename of a video
+        // call into a downgrade -- and onAnswer(videoState) then skipped the
+        // state the user had answered with, leaving Telecom showing the
+        // original bidirectional video. iOS never had this: CXCallUpdate
+        // leaves the fields an update does not set alone.
+        if (capabilityBits >= 0) {
+            c.setVideo(hasVideo);
+        }
+    }
+
+    @Override
+    public void reportCallEnded(String callId, int endReasonOrdinal,
+            long timestampMs) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c != null) {
+            c.finish(CallWire.endReason(endReasonOrdinal));
+            CN1ConnectionService.forget(callId);
+        }
+    }
+
+    @Override
+    public void endCall(int requestId, String callId, int endReasonOrdinal) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c == null) {
+            Calls.deliverAck(requestId, false, CallError.INVALID_ID.ordinal(),
+                    "No such call: " + callId);
+            return;
+        }
+        c.finish(CallWire.endReason(endReasonOrdinal));
+        CN1ConnectionService.forget(callId);
+        Calls.deliverAck(requestId, true, 0, null);
+    }
+
+    @Override
+    public void setHeld(int requestId, String callId, boolean held) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c == null) {
+            Calls.deliverAck(requestId, false, CallError.INVALID_ID.ordinal(),
+                    "No such call: " + callId);
+            return;
+        }
+        if (held) {
+            c.setOnHold();
+        } else {
+            c.setActive();
+        }
+        Calls.deliverAck(requestId, true, 0, null);
+    }
+
+    @Override
+    public void setMuted(int requestId, String callId, boolean muted) {
+        // Refused, not acknowledged. Telecom owns the mute control for a
+        // self-managed call and takes no instruction about it from the app,
+        // so there is nothing here that could make the system UI read muted.
+        //
+        // Answering true was meant to keep a portable app from treating a
+        // platform difference as an error, and it did the opposite: the ack
+        // is what applies the value to CallSession.isMuted(), so the session
+        // claimed a system mute state that did not exist, while the system UI
+        // and the app's own media both disagreed with it. NOT_SUPPORTED is
+        // the difference the app can actually branch on -- and it agrees with
+        // getCallCapabilities, which no longer offers CAPABILITY_MUTE here.
+        //
+        // Unlike sendDtmf below, this cannot be synthesized. A DTMF tone is
+        // carried by the app's own media, so the port can hand the request
+        // back for the app to play; a mute button belongs to a system UI this
+        // process cannot draw on.
+        Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
+                "Telecom does not let a self-managed call set its own mute"
+                + " state; mute the app's media and watch muteRequested for"
+                + " what the user does with the system control");
+    }
+
+    @Override
+    public void sendDtmf(int requestId, String callId, String digits) {
+        // Outbound DTMF is carried by the app's own media, not by Telecom:
+        // there is no self-managed API that emits a tone.
+        //
+        // Acknowledging and stopping there was still wrong. On iOS the same
+        // call submits a CXPlayDTMFCallAction and CallKit hands it straight
+        // back through dtmfRequested, which is where an app puts the tone
+        // into its media -- so an app written once did nothing at all here.
+        // The round trip is synthesized instead, the way this port
+        // synthesizes audioSessionActivated.
+        if (CN1ConnectionService.find(callId) == null) {
+            Calls.deliverAck(requestId, false,
+                    CallError.INVALID_ID.ordinal(), "No such call: " + callId);
+            return;
+        }
+        Calls.deliverAck(requestId, true, 0, null);
+        Calls.deliverDtmfPlayed(callId, digits);
+    }
+
+    @Override
+    public void setCallGroup(int requestId, String callId, String otherCallId) {
+        Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
+                "Telecom does not conference self-managed calls");
+    }
+
+    @Override
+    public int getAudioRoute() {
+        return CN1ConnectionService.getRoute();
+    }
+
+    @Override
+    public void setAudioRoute(int requestId, int routeOrdinal) {
+        CN1Connection c = null;
+        for (com.codename1.call.session.CallSession s : Calls.getSessions()) {
+            c = CN1ConnectionService.find(s.getCallId());
+            if (c != null) {
+                break;
+            }
+        }
+        if (c == null) {
+            Calls.deliverAck(requestId, false, CallError.INVALID_ID.ordinal(),
+                    "There is no call to route audio for");
+            return;
+        }
+        // Asked whether Telecom will take it. setAudioRoute answers nothing,
+        // so caching the REQUESTED ordinal and acknowledging meant asking for
+        // BLUETOOTH with no device paired reported success -- and
+        // getAudioRoute() then claimed Bluetooth while audio stayed on the
+        // earpiece. This is the same correction the iOS route setter needed.
+        int androidRoute = androidRouteOf(routeOrdinal);
+        if (!c.routeIsAvailable(androidRoute)) {
+            Calls.deliverAck(requestId, false,
+                    CallError.NOT_SUPPORTED.ordinal(),
+                    "That audio route is not available for this call");
+            return;
+        }
+        c.setAudioRoute(androidRoute);
+        // The route itself is recorded by onCallAudioStateChanged when
+        // Telecom actually moves it, which is the only report that means it
+        // happened.
+        Calls.deliverAck(requestId, true, 0, null);
+    }
+
+    /// The activity a prompt can be shown from, or null when there is none.
+    ///
+    /// The cached context is for system work and may be a Service; only the
+    /// prompt paths need an activity, and only at the moment they show one.
+    private Activity currentActivity() {
+        Activity current = com.codename1.impl.android.AndroidImplementation
+                .getActivity();
+        if (current != null) {
+            return current;
+        }
+        return context instanceof Activity ? (Activity) context : null;
+    }
+
+    private static int androidRouteOf(int ordinal) {
+        CallAudioRoute[] values = CallAudioRoute.values();
+        CallAudioRoute r = ordinal < 0 || ordinal >= values.length
+                ? CallAudioRoute.UNKNOWN : values[ordinal];
+        switch (r) {
+            case SPEAKER:
+                return android.telecom.CallAudioState.ROUTE_SPEAKER;
+            case BLUETOOTH:
+                return android.telecom.CallAudioState.ROUTE_BLUETOOTH;
+            case WIRED_HEADSET:
+                return android.telecom.CallAudioState.ROUTE_WIRED_HEADSET;
+            default:
+                return android.telecom.CallAudioState.ROUTE_EARPIECE;
+        }
+    }
+
+    @Override
+    public void showAudioRoutePicker(int requestId, String callId) {
+        Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
+                "Android has no system audio route picker to show");
+    }
+
+    @Override
+    public boolean completeAction(long actionToken, boolean fulfilled) {
+        return CN1ConnectionService.completeAction(actionToken, fulfilled);
+    }
+
+    @Override
+    public void registerVoipPush(int requestId) {
+        // Refused, because isVoipPushSupported() says false and an operation
+        // may not contradict its own capability query.
+        //
+        // This used to answer with an empty token on the reasoning that a
+        // non-failure keeps portable code simple. It does the opposite. The
+        // wake-up here is an ordinary high-priority FCM message, so there is
+        // no VoIP token to hand back and "" is not one: an app that shares its
+        // registration code across platforms took the success, sent "" to its
+        // server as this device's push address, and only found out that no
+        // call could ever be delivered when none was. A refusal names the
+        // problem at the point the app can still do something about it.
+        //
+        // The capability query is the supported way to branch, but it cannot
+        // be the ONLY guard -- a shared code path that registers first, or one
+        // written against the iOS behaviour, still arrives here.
+        com.codename1.call.voip.VoipPush.deliverRegistrationFailed(requestId,
+                CallError.NOT_SUPPORTED.ordinal(),
+                "Android has no separate VoIP push registration. Wake the app"
+                + " with a high-priority FCM message and call"
+                + " Calls.reportIncoming from the push callback; see"
+                + " CallBridge.isVoipPushSupported.");
+    }
+
+    @Override
+    public void unregisterVoipPush(int requestId) {
+    }
+
+    @Override
+    public void setJavaReady(boolean ready) {
+        // There IS a queue, and the comment that used to sit here said there
+        // was not. It was right about incoming calls -- an FCM message
+        // arrives in Java first, so nothing is reported to the system ahead
+        // of the app's code -- and wrong about a call the SYSTEM places. From
+        // Recents, Contacts or an assistant, Telecom binds
+        // CN1ConnectionService in a process where Codename One has not
+        // initialised and no listener is registered, so the start request was
+        // delivered to nobody and the connection destroyed before the app
+        // could see it.
+        CN1ConnectionService.setJavaReady(ready);
+    }
+
+    @Override
+    public void drainPendingCalls(int requestId) {
+        com.codename1.call.voip.VoipPush.deliverPendingCallsDrained(requestId, 0);
+    }
+
+    @Override
+    public void setDirectorySource(int requestId, String filePath) {
+        if (!isDirectorySupported()) {
+            Calls.deliverAck(requestId, false,
+                    CallError.NOT_SUPPORTED.ordinal(),
+                    "Call screening needs Android 10 or newer");
+            return;
+        }
+        // The screening service reads the path CallDirectory wrote, so
+        // nothing needs copying here -- but its cache has to be dropped or
+        // the new list is ignored until the process dies.
+        CN1CallScreeningService.invalidate();
+        Calls.deliverAck(requestId, true, 0, null);
+    }
+
+    @Override
+    public void reloadDirectory(int requestId) {
+        if (!isDirectorySupported()) {
+            Calls.deliverAck(requestId, false,
+                    CallError.NOT_SUPPORTED.ordinal(),
+                    "Call screening needs Android 10 or newer");
+            return;
+        }
+        // The screening service caches the file the first time it screens a
+        // call, and it lives in a process this one does not control. Without
+        // this, setEntries replaced the file and every later call was still
+        // screened against the list loaded at startup.
+        CN1CallScreeningService.invalidate();
+        Calls.deliverAck(requestId, true, 0, null);
+    }
+
+    @Override
+    public void getDirectoryStatus(int requestId) {
+        // Asks the platform rather than trusting the static flag: the role
+        // may have been granted in a previous process, or from Settings, and
+        // the flag defaults to false either way -- so status reported
+        // "disabled" while Android was actively binding the service.
+        com.codename1.call.directory.CallDirectory.deliverStatus(requestId,
+                CallWire.join(new String[]{
+                    CallWire.flagOf(CallScreeningRole.isRoleHeld(context)),
+                    "-1", "android"}));
+    }
+
+    @Override
+    public void requestScreeningRole(int requestId) {
+        // Asked for NOW rather than taken from the cached context. That
+        // context is deliberately allowed to be a Service -- a push can wake
+        // this process with no activity at all -- and testing it here meant a
+        // bridge first obtained from that service could never prompt again,
+        // even once the app was in the foreground.
+        Activity a = currentActivity();
+        // Split, because the two halves are different answers and only one of
+        // them is a failure. requestScreeningRole documents "Resolves false
+        // where the role was refused or does not exist", and below API 29 the
+        // role DOES NOT EXIST -- there is nothing to ask for and nothing that
+        // could change, so an error told an app to retry what can never
+        // succeed. The same reading is why iOS answers false rather than
+        // NOT_SUPPORTED. Folding both into one refusal made the older-Android
+        // answer disagree with the documented contract that the simulation
+        // and the newer-Android path both keep.
+        if (!isDirectorySupported()) {
+            Calls.deliverAckValue(requestId, false);
+            return;
+        }
+        // No foreground activity is the other half, and it IS a failure: the
+        // role exists and could be granted, this process simply cannot raise
+        // the dialog right now. Saying false there would tell an app the user
+        // declined when nobody was asked.
+        if (a == null) {
+            Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
+                    "Requesting the call screening role needs a foreground"
+                    + " activity");
+            return;
+        }
+        CallScreeningRole.requestRole(a, requestId);
+    }
+
+    /// Clears every call this port knows about, for a provider reset.
+    public static void resetProvider() {
+        CN1ConnectionService.reset();
+        Calls.deliverProviderReset();
+    }
+}

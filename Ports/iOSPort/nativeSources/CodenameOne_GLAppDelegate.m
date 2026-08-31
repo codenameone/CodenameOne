@@ -32,6 +32,9 @@
 #import <objc/message.h>
 #import "EAGLView.h"
 #import "CodenameOne_GLViewController.h"
+#ifdef CN1_INCLUDE_CALL
+#import "CN1Call.h"
+#endif
 #ifdef CN1_USE_INTENTS
 // Core Spotlight is Objective-C and needs no Swift; it carries the indexing half of
 // com.codename1.intents. Imported under the define so an app that never references the
@@ -66,7 +69,7 @@ static BOOL cn1IsHiddenInBackground = NO;
 //GL_APP_DELEGATE_IMPORT
 //GL_APP_DELEGATE_INCLUDE
 
-extern UIView *editingComponent;
+extern CN1View *editingComponent;
 
 #define INCLUDE_CN1_PUSH
 
@@ -154,7 +157,7 @@ static void installSignalHandlers() {
         // view-controller XIBs, so the file is excluded from the Mac
         // slice via EXCLUDED_SOURCE_FILE_NAMES[sdk=macosx*]. Pass nil as
         // the NIB name on Mac so UIViewController synthesises a plain
-        // UIView; the Metal layer is attached programmatically further
+        // CN1View; the Metal layer is attached programmatically further
         // down the init chain, so the XIB's IBOutlet wiring isn't needed.
         // tvOS excludes the iOS XIBs from its bundle too (TvNativeBuilder's
         // EXCLUDED_SOURCE_FILE_NAMES), so loading 'CodenameOne_GLViewController'
@@ -399,7 +402,7 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
         // issue #5349: iOS may have discarded the contents of our private-storage
         // image/glyph textures while suspended. Bump the texture-validate
         // generation so every cached read-only image texture re-decodes from its
-        // retained UIImage on next sample instead of rendering the discarded
+        // retained CN1Image on next sample instead of rendering the discarded
         // garbage (a violet/magenta fill) on surfaces the diff-painter does not
         // fully repaint this frame. Pairs with the screenTexture clear above.
         extern void CN1MetalBumpTextureValidateGeneration(void);
@@ -663,6 +666,13 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
         NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
         [self cn1StoreAppArgForURL:url];
     }
+#ifdef CN1_INCLUDE_CALL
+    // HERE and not in didFinishLaunching: a VoIP push can be delivered during
+    // launch, and a PKPushRegistry that does not exist yet loses it -- which
+    // is the case iOS terminates the process for. A no-op in builds without
+    // CN1_CALL_VOIP.
+    cn1CallInstallPushRegistry();
+#endif
     return YES;
 }
 
@@ -868,16 +878,24 @@ id currentNotificationResponse = nil;
 -(void)cn1RoutePush:(NSDictionary*)userInfo withAction:(NSString*)actionId {
     [self cn1RoutePush:userInfo withAction:actionId withCompletionHandler:nil];
 }
-typedef void (^CN1PushCompletionHandlerType)();
-CN1PushCompletionHandlerType cn1PushCompletionHandler = 0;
-int pushReceivedCount=0;
+typedef void (^CN1PushCompletionHandlerType)(void);
+// The completion grant is tracked per notification, in IOSNative.m, because a
+// single global cannot describe two notifications at once -- see the comment
+// there. Routing registers the block once, counts the messages it emits, and
+// carries the id into Java with each of them.
+extern long long CN1PushCompletionBegin(CN1PushCompletionHandlerType handler);
+extern void CN1PushCompletionRetain(long long cid);
+extern void CN1PushCompletionFinishRouting(long long cid);
 -(void)cn1RoutePush:(NSDictionary*)userInfo withAction:(NSString*)actionId withCompletionHandler:(void (^)())completionHandler{
+    // Registered once for the whole notification, before anything is emitted.
+    // It used to be Block_copy'd at each emit site, which overwrote the global
+    // even WITHIN one notification: a type 3 payload emits twice and leaked the
+    // first copy every time.
+    long long cn1PushCid = CN1PushCompletionBegin(completionHandler);
     NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
     if(apsInfo == nil) {
         //afterDidFinishLaunchingWithOptionsMarkerEntry
-        if (completionHandler != nil) {
-            completionHandler();
-        }
+        CN1PushCompletionFinishRouting(cn1PushCid);
         return;
     }
     // Managed push carries the canonical typed envelope as a JSON object. Route it
@@ -888,12 +906,10 @@ int pushReceivedCount=0;
         NSData *jsonData = [NSJSONSerialization dataWithJSONObject:cn1Envelope options:0 error:&jsonError];
         if (jsonData != nil && jsonError == nil) {
             NSString *jsonString = [[[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding] autorelease];
-            pushReceivedCount = 1;
-            if (completionHandler != nil) {
-                cn1PushCompletionHandler = Block_copy(completionHandler);
-            }
-            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
-                    CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG jsonString), JAVA_NULL);
+            CN1PushCompletionRetain(cn1PushCid);
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(
+                    CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG jsonString), JAVA_NULL,
+                    (JAVA_LONG)cn1PushCid);
             return;
         }
     }
@@ -921,7 +937,6 @@ int pushReceivedCount=0;
         }
 #endif
     }
-    pushReceivedCount=0;
     if( [apsInfo valueForKey:@"alert"] != NULL)
     {
         pushIncludedBody = YES;
@@ -934,11 +949,8 @@ int pushReceivedCount=0;
                 com_codename1_push_PushContent_setTitle___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [alertValueD valueForKey:@"title"]));
                 com_codename1_push_PushContent_setBody___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [alertValueD valueForKey:@"body"]));
                 alertValue = [NSString stringWithFormat:@"%@;%@", [alertValueD valueForKey:@"title"], [alertValueD valueForKey:@"body"]];
-                if (completionHandler != nil) {
-                    cn1PushCompletionHandler = Block_copy(completionHandler);
-                }
-                pushReceivedCount++;
-                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"4"));
+                CN1PushCompletionRetain(cn1PushCid);
+                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"4"), (JAVA_LONG)cn1PushCid);
             } else {
                 CN1Log(@"Received push type 4 but missing either title or body");
             }
@@ -950,18 +962,12 @@ int pushReceivedCount=0;
             com_codename1_push_PushContent_setBody___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue));
             if ([userInfo valueForKey:@"meta"] != NULL) {
                 // If there was a meta argument, then this is a type 3 push
-                if (completionHandler != nil) {
-                    cn1PushCompletionHandler = Block_copy(completionHandler);
-                }
-                pushReceivedCount++;
-                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"3"));
+                CN1PushCompletionRetain(cn1PushCid);
+                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"3"), (JAVA_LONG)cn1PushCid);
             } else {
                 // If there was no meta argument, then this is a type 1
-                if (completionHandler != nil) {
-                    cn1PushCompletionHandler = Block_copy(completionHandler);
-                }
-                pushReceivedCount++;
-                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"1"));
+                CN1PushCompletionRetain(cn1PushCid);
+                com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"1"), (JAVA_LONG)cn1PushCid);
             }
         }
     }
@@ -969,24 +975,18 @@ int pushReceivedCount=0;
     {
         NSString* alertValue = [userInfo valueForKey:@"meta"];
         if (pushIncludedBody) {
-            if (completionHandler != nil) {
-                cn1PushCompletionHandler = Block_copy(completionHandler);
-            }
-            pushReceivedCount++;
+            CN1PushCompletionRetain(cn1PushCid);
             // If the push included a body, then this is a type 3 push (we don't need to set type here because it was set when the body was sent to the push callback)
-            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), nil);
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), nil, (JAVA_LONG)cn1PushCid);
         } else {
             // If the push did not include a body, then it is a type 2 push
-            if (completionHandler != nil) {
-                cn1PushCompletionHandler = Block_copy(completionHandler);
-            }
-            pushReceivedCount++;
-            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"2"));
+            CN1PushCompletionRetain(cn1PushCid);
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String_long(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"2"), (JAVA_LONG)cn1PushCid);
         }
     }
-    if (pushReceivedCount == 0 && completionHandler != nil) {
-        completionHandler();
-    }
+    // A notification that produced no message for the application still holds a
+    // grant, and nothing downstream will ever release it.
+    CN1PushCompletionFinishRouting(cn1PushCid);
 }
 
 
@@ -1142,9 +1142,10 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
     if (cn1MacMenuLabels == nil || cn1MacMenuLabels.count == 0) {
         return;
     }
-    // Group the "<hint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>" rows by hint, preserving
-    // first-seen order. The row index is the command index passed back to Java, so it must match
-    // IOSImplementation's filtered list.
+    // Group the "<hint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>" rows by hint,
+    // preserving first-seen order. Column 4 is what gets passed back to Java: an id naming one
+    // command, rather than a row number, because Java publishes its map before this menu is rebuilt
+    // and a row number outlives the list that gave it meaning. See IOSImplementation.
     NSMutableArray<NSString *> *groupOrder = [NSMutableArray array];
     NSMutableDictionary<NSString *, NSMutableArray<UICommand *> *> *groups = [NSMutableDictionary dictionary];
     for (NSUInteger i = 0; i < cn1MacMenuLabels.count; i++) {
@@ -1154,6 +1155,7 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
         NSString *label = (cols.count > 1) ? cols[1] : row;
         int shortcutKeyChar = (cols.count > 2) ? [cols[2] intValue] : 0;
         int shortcutModifiers = (cols.count > 3) ? [cols[3] intValue] : 0;
+        NSNumber *commandId = (cols.count > 4) ? @([cols[4] intValue]) : @(i);
         UICommand *cmd;
         if (shortcutKeyChar != 0) {
             // Java Command modifier flags: PRIMARY=1 (Command on mac), SHIFT=2, ALT=4
@@ -1161,18 +1163,21 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
             if (shortcutModifiers & 1) { flags |= UIKeyModifierCommand; }
             if (shortcutModifiers & 2) { flags |= UIKeyModifierShift; }
             if (shortcutModifiers & 4) { flags |= UIKeyModifierAlternate; }
-            NSString *input = [[NSString stringWithFormat:@"%c", (char)shortcutKeyChar] lowercaseString];
+            // %C and unichar: the column carries a Java char, so narrowing it to
+            // a byte rewrites any accelerator outside Latin-1 into an unrelated
+            // control character. See cn1MakeCommandItem in CN1MacChrome.m.
+            NSString *input = [[NSString stringWithFormat:@"%C", (unichar)shortcutKeyChar] lowercaseString];
             cmd = [UIKeyCommand commandWithTitle:label
                                            image:nil
                                           action:@selector(cn1MenuAction:)
                                            input:input
                                    modifierFlags:flags
-                                    propertyList:@(i)];
+                                    propertyList:commandId];
         } else {
             cmd = [UICommand commandWithTitle:label
                                         image:nil
                                        action:@selector(cn1MenuAction:)
-                                 propertyList:@(i)];
+                                 propertyList:commandId];
         }
         NSMutableArray<UICommand *> *bucket = groups[hint];
         if (bucket == nil) {

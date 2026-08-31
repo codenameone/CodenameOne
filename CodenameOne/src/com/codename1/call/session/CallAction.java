@@ -1,0 +1,291 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.call.session;
+
+import com.codename1.call.spi.CallBridge;
+import com.codename1.impl.call.CallRequests;
+
+import java.util.Timer;
+import java.util.TimerTask;
+
+/// Something the **system** is asking the app to do to a call: the user
+/// pressed answer on the lock screen, hung up from the car, or tapped the
+/// keypad.
+///
+/// #### Why this is an object and not just a callback
+///
+/// Both platforms require the app to say whether it managed to do what was
+/// asked, and to say so within a few seconds. On iOS an unanswered
+/// `CXAction` times out and the system call UI and the app then disagree
+/// about the state of the call, permanently and with nothing in the log.
+///
+/// Most apps should ignore all of this: **doing nothing is correct**. If the
+/// listener returns without touching the action, it is fulfilled
+/// automatically. Only an app that has to do slow asynchronous work before it
+/// knows whether it can answer -- renegotiating a session, say -- needs to
+/// call [#defer()] and then [#fulfill()] or [#fail()] itself.
+///
+/// An action that is deferred and then forgotten is failed by a safety timer
+/// rather than left to time out, because a failed action puts the system UI
+/// back in a state the user can act on, and a timed-out one does not.
+public final class CallAction {
+    /// The token of an action that was never issued -- see [#answer].
+    static final long NONE = -1L;
+
+    private final long token;
+    private final String callId;
+    private boolean deferred;
+    private boolean answered;
+    private boolean fulfilled;
+    private Timer safety;
+    private TimerTask safetyTask;
+    private Runnable onFulfilled;
+
+    /// Runs on ANY answer, whatever the outcome; see [#whenAnswered].
+    private Runnable onAnswered;
+
+    CallAction(long token, String callId) {
+        this.token = token;
+        this.callId = callId;
+    }
+
+    /// The call this action is about.
+    public String getCallId() {
+        return callId;
+    }
+
+    /// Takes responsibility for answering this action later.
+    ///
+    /// After calling this the listener **must** call [#fulfill()] or
+    /// [#fail()], and should do it within about three seconds. A deferred
+    /// action that is never answered is failed automatically, by the timer
+    /// this starts.
+    public void defer() {
+        deferred = true;
+        // The timer is the whole reason defer() is worth calling rather than
+        // simply not answering. Both platforms time an unanswered action out
+        // on their own, and a timed-out action leaves the system UI and the
+        // app disagreeing about the call with nothing in the log; a FAILED
+        // one puts the UI back into a state the user can act on. Failing
+        // slightly early is the better of the two outcomes.
+        //
+        // java.util.Timer rather than Display.setTimeout, following the same
+        // reasoning as com.codename1.bluetooth's operation queue: this has to
+        // work before Display.init as well as after, and the device Timer has
+        // no daemon constructor -- so the timer is cancelled alongside the
+        // task in answer(), or its thread would keep a desktop JVM alive.
+        synchronized (this) {
+            if (answered) {
+                return;
+            }
+            if (safety != null) {
+                // ALREADY deferred, and one timer is enough. A second defer
+                // -- two listeners registered on the same action, or one
+                // listener calling twice -- used to build another Timer and
+                // overwrite the field, so answer() could only ever cancel the
+                // newest. The first went on running: its task fires, answers
+                // an action that is already answered, and its NON-DAEMON
+                // thread keeps a desktop JVM alive. That is precisely what
+                // cancelSafetyNet cancels the timer as well as the task to
+                // avoid, undone by the field no longer naming it.
+                return;
+            }
+            safety = new Timer();
+            safetyTask = new SafetyNet(this);
+            try {
+                safety.schedule(safetyTask, SAFETY_MILLIS);
+            } catch (IllegalStateException alreadyGone) {
+                safety = null;
+                safetyTask = null;
+            }
+        }
+    }
+
+    /// Stops the safety net, whether or not it has run.
+    private void cancelSafetyNet() {
+        Timer t;
+        TimerTask task;
+        synchronized (this) {
+            t = safety;
+            task = safetyTask;
+            safety = null;
+            safetyTask = null;
+        }
+        if (task != null) {
+            task.cancel();
+        }
+        if (t != null) {
+            // Both, deliberately: cancelling only the task leaves the timer's
+            // non-daemon thread running.
+            t.cancel();
+        }
+    }
+
+    /// How long a deferred action has before it is failed for the app.
+    ///
+    /// Under CallKit's own timeout, so the app gets a definite answer rather
+    /// than the platform's silent one.
+    private static final int SAFETY_MILLIS = 3500;
+
+    /// Fails a deferred action nobody answered.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class SafetyNet extends TimerTask {
+        private final CallAction action;
+
+        SafetyNet(CallAction action) {
+            this.action = action;
+        }
+
+        @Override
+        public void run() {
+            action.answer(false);
+        }
+    }
+
+    /// Reports that the app did what was asked.
+    public void fulfill() {
+        answer(true);
+    }
+
+    /// Reports that the app could not do what was asked, putting the system
+    /// UI back into a state the user can act on.
+    public void fail() {
+        answer(false);
+    }
+
+    /// Whether the listener took responsibility for answering.
+    boolean isDeferred() {
+        return deferred;
+    }
+
+    /// Runs `hook` if and when this action is fulfilled.
+    ///
+    /// The dispatch path uses it to forget an ended call. Checking
+    /// [#isAnswered()] straight after the listener returns is not enough: a
+    /// listener that defers and fulfils later was still unanswered at that
+    /// moment, so the call was never forgotten.
+    ///
+    /// Runs immediately when the action has already been fulfilled.
+    /// Runs `hook` once this action is answered, whatever the outcome and
+    /// whether or not the platform still held it.
+    ///
+    /// Separate from [#whenFulfilled], which is the local EFFECT of a
+    /// successful answer and is skipped when the platform has given up. This
+    /// is bookkeeping: whoever registered it has state keyed on an action
+    /// that is now over, and it has to go whether the answer was a fulfil, a
+    /// failure, or the safety net firing.
+    void whenAnswered(Runnable hook) {
+        boolean now;
+        synchronized (this) {
+            if (!answered) {
+                onAnswered = hook;
+            }
+            now = answered;
+        }
+        if (now) {
+            hook.run();
+        }
+    }
+
+    void whenFulfilled(Runnable hook) {
+        boolean now;
+        synchronized (this) {
+            if (!answered) {
+                onFulfilled = hook;
+                return;
+            }
+            now = fulfilled;
+        }
+        if (now) {
+            hook.run();
+        }
+    }
+
+    /// Whether the answer, if one has been given, was a fulfilment.
+    ///
+    /// Meaningless until [#isAnswered()] is true.
+    synchronized boolean wasFulfilled() {
+        return fulfilled;
+    }
+
+    /// Whether this has already been answered.
+    ///
+    /// Synchronized because the safety net and the application can answer
+    /// from different threads, and a read that saw a stale `false` would send
+    /// a second answer for the same token.
+    synchronized boolean isAnswered() {
+        return answered;
+    }
+
+    /// Answers unless the application already has.
+    ///
+    /// The port ignores a second answer for the same token, so the race
+    /// between the safety net and a slow application is harmless; this flag
+    /// only keeps the common case off the bridge.
+    void answer(boolean fulfilled) {
+        Runnable hook;
+        Runnable cleanup;
+        synchronized (this) {
+            if (answered) {
+                return;
+            }
+            answered = true;
+            this.fulfilled = fulfilled;
+            hook = fulfilled ? onFulfilled : null;
+            onFulfilled = null;
+            cleanup = onAnswered;
+            onAnswered = null;
+        }
+        cancelSafetyNet();
+        // The PLATFORM IS ASKED FIRST, and its answer decides whether the
+        // local effect happens at all.
+        //
+        // Running the hook first and telling the platform afterwards made the
+        // two disagree whenever the platform had already given up: with the
+        // EDT blocked past CallKit's ~5s deadline the action is timed out
+        // natively, yet the queued event still ran, so a delayed end removed
+        // the session and a delayed answer or hold moved it -- to a state the
+        // system call UI was never in. `token == NONE` is the case where
+        // nothing was ever pending (the platform reported what it had already
+        // done rather than asking), so there is nothing to be refused by.
+        boolean stillHeld = true;
+        if (token != NONE) {
+            CallBridge b = CallRequests.bridge();
+            if (b != null) {
+                stillHeld = b.completeAction(token, fulfilled);
+            }
+        }
+        if (hook != null && stillHeld) {
+            // Outside the lock: the hook ends up in Calls, which takes its own.
+            hook.run();
+        }
+        if (cleanup != null) {
+            // UNCONDITIONAL, unlike the hook above. This one exists to drop
+            // state keyed on an action that is now over, and the action is
+            // over whether the platform still held it or not.
+            cleanup.run();
+        }
+    }
+}

@@ -71,6 +71,91 @@ final class BuildHintsIos {
                 .doc("Objective-C code that can be injected into the iOS app delegate at the bottom of the "
                         + "body of the didFinishLaunchingWithOptions callback method"));
 
+        h.add(new Hint("ios.call.providerName")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("The name shown above a call in the system call UI. Defaults to the app's display name. "
+                        + "Baked into `Info.plist` because CallKit needs it during launch, before any of your "
+                        + "code has run."));
+
+        h.add(new Hint("ios.call.ringtone")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("A sound file in the bundle to ring incoming calls with. Defaults to the system ringtone."));
+
+        h.add(new Hint("ios.call.icon")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("A template image in the bundle shown beside the call in the system UI."));
+
+        h.add(new Hint("ios.call.unknownCaller")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("The name shown when a VoIP push carries no `displayName`."));
+
+        h.add(new Hint("ios.call.pushTTL")
+                .group(HintGroup.IOS)
+                .type(HintType.INT)
+                .def("30")
+                .platform("ios")
+                .doc("Seconds a pushed call waits for your code before the system ends it as unanswered."));
+
+        h.add(new Hint("ios.call.video")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("ios")
+                .doc("Whether the provider offers video calls. Overrides `call.video` on iOS."));
+
+        h.add(new Hint("ios.call.recents")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("ios")
+                .doc("Whether calls appear in the system call log."));
+
+        h.add(new Hint("ios.vpn.tunnel")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("ios")
+                .doc("NOT SUPPORTED YET: setting this fails the build. A packet tunnel on iOS runs in a "
+                        + "Network Extension that has to carry a virtual machine, and the translation that "
+                        + "would give it one without the application shell -- which uses UIKit APIs an "
+                        + "extension may not call -- remains unwritten. `com.codename1.vpn.tunnel` runs on "
+                        + "Android; on iOS `Tunnels.isSupported()` answers false. When the iOS half lands, two "
+                        + "things have to be true for a tunnel to be built: the app references the package, "
+                        + "and this hint says the App ID holds "
+                        + "`com.apple.developer.networking.networkextension`, which Apple grants case by case "
+                        + "rather than self-serve. Generating the target without the grant fails codesigning "
+                        + "with an error naming an entitlement nobody asked for, so referencing the package "
+                        + "alone doesn't produce one. Left false, the build produces no extension and "
+                        + "`Tunnels.isSupported()` answers false."));
+
+        h.add(new Hint("ios.vpn.tunnel.class")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("Which `VpnTunnel` subclass the generated packet tunnel extension runs, fully "
+                        + "qualified -- for example `com.example.MyTunnel`. Required when "
+                        + "`ios.vpn.tunnel` is true. It has to be named rather than discovered: "
+                        + "`VpnTunnel` is a class rather than an interface, so the shared class scanner "
+                        + "skips it, and an app may have several subclasses while an extension "
+                        + "runs exactly one. A wrong guess would build the wrong tunnel into the "
+                        + "extension and fail at link on a symbol nobody wrote."));
+
+        h.add(new Hint("ios.call.appGroup")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("The App Group the call directory extension shares with the app. The extension runs in its "
+                        + "own process, so the blocked-number list is handed over through the group rather than "
+                        + "passed in. Defaults to `group.<packageName>`."));
+
         h.add(new Hint("ios.appAttest")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)

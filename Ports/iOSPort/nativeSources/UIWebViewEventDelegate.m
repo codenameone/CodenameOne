@@ -41,6 +41,26 @@
 #endif
 extern int connections;
 
+const void *CN1FollowTargetBlankKey = &CN1FollowTargetBlankKey;
+
+// Threading, because it looks macOS-specific and is not.
+//
+// Every fireWebView* call below runs the Java listener on whatever thread
+// WebKit invoked the delegate on -- the native main thread -- rather than on
+// the EDT, and neither IOSImplementation.fireWebView*() nor
+// IOSImplementation.setBrowserURL() marshals. So a listener that calls
+// BrowserComponent.setURL() reaches setBrowserURL's unconditional
+// dispatch_sync(dispatch_get_main_queue(), ...) while already on the main
+// thread, which is a deadlock.
+//
+// That is worth knowing and it is NOT introduced by the macOS port: master
+// carries the identical dispatch_sync and the identical unmarshalled
+// fireWebViewDidFinishLoad, and the iOS delegate reaches them the same way.
+// Marshalling only the macOS branch would make the two platforms disagree
+// about which thread a browser listener runs on, and doing it properly means
+// keeping decidePolicyForNavigationAction synchronous because WebKit needs its
+// answer inline. That is a framework-wide change to browser callback
+// threading, and it is not this change.
 @implementation UIWebViewEventDelegate
 
 - (id)initWithCallback:(void*)callback {
@@ -59,13 +79,19 @@ extern int connections;
      }
      connections--;
      if(connections < 1) {
+        // No status bar on macOS, and the API is UIKit-only.
+#if !TARGET_OS_OSX
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+#endif
      }
 }
 
 - (void)webViewDidStartLoad:(UIWebView *)webView {
      connections++;
+     // No status bar on macOS, and the API is UIKit-only.
+#if !TARGET_OS_OSX
      [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
+#endif
 }
 
 
@@ -82,7 +108,10 @@ extern int connections;
 - (void)webViewDidFinishLoad:(UIWebView *)webView {
      connections--;
      if(connections < 1) {
+        // No status bar on macOS, and the API is UIKit-only.
+#if !TARGET_OS_OSX
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+#endif
      }
 #ifdef CN1_USE_JAVASCRIPTCORE
     JSContext *context =  [webView valueForKeyPath:@"documentView.webView.mainFrame.javaScriptContext"];
@@ -100,7 +129,7 @@ extern int connections;
 
 #ifdef ENABLE_WKWEBVIEW
 - (BOOL)shouldFollowTargetBlank:(id)webView {
-    NSNumber *value = objc_getAssociatedObject(webView, @selector(cn1FollowTargetBlank));
+    NSNumber *value = objc_getAssociatedObject(webView, CN1FollowTargetBlankKey);
     if (value == nil) {
         return YES;
     }
@@ -110,7 +139,10 @@ extern int connections;
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
          connections--;
      if(connections < 1) {
+        // No status bar on macOS, and the API is UIKit-only.
+#if !TARGET_OS_OSX
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+#endif
      }
 #ifdef CN1_USE_JAVASCRIPTCORE
          // SUCKS!!  WKWebView is out of process so we can't access Javascript context directly anymore.
@@ -141,7 +173,10 @@ extern int connections;
 
 - (void)webView:(WKWebView *)webView didCommitNavigation:(WKNavigation *)navigation {
     connections++;
+    // No status bar on macOS, and the API is UIKit-only.
+#if !TARGET_OS_OSX
     [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
+#endif
 }
 
 - (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error {
@@ -150,7 +185,10 @@ extern int connections;
     }
     connections--;
     if(connections < 1) {
+        // No status bar on macOS, and the API is UIKit-only.
+#if !TARGET_OS_OSX
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+#endif
     }
 }
 

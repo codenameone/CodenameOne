@@ -71,7 +71,8 @@
         {
           "prefix": "webview-not-captured-on-desktop",
           "ports": [
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "javascript"
           ]
         },
@@ -108,7 +109,8 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "tvos"
           ]
         },
@@ -160,7 +162,8 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "tvos",
             "watchos",
             "linux-x64",
@@ -254,7 +257,8 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -264,7 +268,8 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -274,7 +279,8 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -284,7 +290,8 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -313,11 +320,19 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native"
+            "mac-catalyst"
           ],
           "state": "supported",
           "label": "AVFoundation",
           "detail": "Native AVFoundation backend; signed build, entitlement, permission, and camera hardware required."
+        },
+        {
+          "ports": [
+            "macos"
+          ],
+          "state": "conditional",
+          "label": "AVFoundation capture",
+          "detail": "The modal Capture API is served by driving the portable camera session, so it needs a camera attached and the system prompt granted; hasCamera() answers AVFoundation rather than a constant. Permission and its usage description are emitted when the application calls capturePhoto or captureVideo."
         },
         {
           "ports": [
@@ -369,7 +384,8 @@
             "android",
             "ios-gl",
             "ios-metal",
-            "mac-native"
+            "macos",
+            "mac-catalyst"
           ],
           "state": "supported",
           "label": "Native recorder",
@@ -448,7 +464,8 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -481,12 +498,20 @@
         },
         {
           "ports": [
-            "mac-native",
+            "mac-catalyst",
             "watchos"
           ],
           "state": "conditional",
           "label": "Apple location",
           "detail": "Available where the target and entitlement expose Core Location behavior."
+        },
+        {
+          "ports": [
+            "macos"
+          ],
+          "state": "conditional",
+          "label": "Core Location",
+          "detail": "Foreground fixes, significant-change monitoring and geofencing all run on the shared Core Location bridge, which the AppKit build compiles: the delegate callbacks are outside the UIKit-only sources. Needs the location usage prompt granted, and the build emits it when the application uses the API."
         },
         {
           "ports": [
@@ -545,7 +570,8 @@
         },
         {
           "ports": [
-            "mac-native"
+            "macos",
+            "mac-catalyst"
           ],
           "state": "conditional",
           "label": "Apple entitlement",
@@ -593,11 +619,19 @@
         },
         {
           "ports": [
-            "mac-native"
+            "mac-catalyst"
           ],
           "state": "conditional",
           "label": "StoreKit",
           "detail": "Requires a signed Mac App Store configuration and matching products."
+        },
+        {
+          "ports": [
+            "macos"
+          ],
+          "state": "unavailable",
+          "label": "No AppKit StoreKit backend",
+          "detail": "Only the iOS builder defines CN1_USE_STOREKIT, and the product and transaction delegate bodies compile out under TARGET_OS_OSX, so canMakePayments() answers false and no amount of signing or product configuration makes a purchase flow run."
         },
         {
           "ports": [
@@ -635,11 +669,19 @@
         },
         {
           "ports": [
-            "mac-native"
+            "macos"
+          ],
+          "state": "conditional",
+          "label": "Calendar only",
+          "detail": "EventKit calendar access is available once the application references it, which is what links the framework and requests the entitlement. Contacts are not: the legacy AddressBook C API the shared implementation uses does not exist on macOS and no Contacts.framework backend has been written, so isContactsPermissionGranted() reports false."
+        },
+        {
+          "ports": [
+            "mac-catalyst"
           ],
           "state": "conditional",
           "label": "Apple services",
-          "detail": "Availability depends on the macOS target, entitlement, and user account."
+          "detail": "Availability depends on the Catalyst target, entitlement, and user account."
         },
         {
           "ports": [
@@ -684,7 +726,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -696,6 +738,14 @@
           "state": "unavailable",
           "label": "NOT_AVAILABLE",
           "detail": "The portable API returns its documented non-supporting fallback."
+        },
+        {
+          "ports": [
+            "macos"
+          ],
+          "state": "conditional",
+          "label": "LocalAuthentication",
+          "detail": "Touch ID through LocalAuthentication and Keychain, on a Mac that has it. The framework reports it unsupported on one that does not, which is the same answer an iPhone with no enrolled sensor gives."
         }
       ]
     },
@@ -726,7 +776,8 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -761,7 +812,8 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -803,7 +855,8 @@
         },
         {
           "ports": [
-            "mac-native"
+            "macos",
+            "mac-catalyst"
           ],
           "state": "conditional",
           "label": "Target-dependent",
@@ -852,7 +905,8 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -880,7 +934,8 @@
             "android",
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -922,7 +977,8 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -971,7 +1027,8 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -1014,7 +1071,8 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -1056,7 +1114,8 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -1097,7 +1156,8 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "linux-x64",
             "linux-arm64"
           ],
@@ -1146,7 +1206,8 @@
             "android",
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "mac-catalyst",
+            "macos",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -1181,7 +1242,8 @@
             "android",
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos",
+            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",

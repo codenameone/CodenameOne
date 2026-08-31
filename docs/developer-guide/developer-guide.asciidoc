@@ -159,6 +159,10 @@ include::Bluetooth.asciidoc[]
 
 include::Nearby-Devices.asciidoc[]
 
+include::Call-Management.asciidoc[]
+
+include::VPN.asciidoc[]
+
 include::Health.asciidoc[]
 
 include::Smart-Home.asciidoc[]
@@ -178,6 +182,8 @@ include::On-Device-Debugging-Android.asciidoc[]
 include::Working-With-Javascript.asciidoc[]
 
 include::Working-with-Mac-OS-X.asciidoc[]
+
+include::Working-with-Mac-Catalyst.asciidoc[]
 
 include::App-Store-Submission.asciidoc[]
 

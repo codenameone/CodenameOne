@@ -3906,7 +3906,115 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 com.codename1.ui.events.PointerEvent.TYPE_TOUCH, 1f, 0, 0, 0, 0, false);
     }
 
+    /// How long without a ctrl+wheel event before the pinch is treated as
+    /// finished. Long enough not to cut a slow gesture in half, short enough
+    /// that the zoom commits while the user still associates it with what they
+    /// did.
+    private static final int PINCH_IDLE_MS = 200;
+
+    /// Whether a wheel-reported pinch is in progress, so begin fires once per
+    /// gesture rather than once per event.
+    private boolean pinchGestureOpen;
+
+    /// Bumped by every pinch event so only the last one's idle timer ends the
+    /// gesture.
+    private int pinchGestureGeneration;
+
+    /// The magnify factor since the gesture began, which is what
+    /// Component.pinch() is specified to receive.
+    private float pinchScale = 1f;
+
+    /// Trackpad pinch, which a desktop browser reports as a wheel event with
+    /// ctrlKey set rather than as a gesture of its own. Chrome, Firefox and Edge
+    /// all synthesise it that way, and Safari sends it in addition to its own
+    /// non-standard gesture events, so this one path covers every desktop
+    /// browser without a browser sniff.
+    ///
+    /// Touch pinch does NOT come through here and must not: two fingers on a
+    /// touchscreen arrive as a multi-touch touchmove, and onTouchMove already
+    /// hands both pointers to pointerDragged(int[], int[]) where Component
+    /// derives the scale from the distance between them. This is only the
+    /// desktop case that path cannot see, because a trackpad delivers no
+    /// pointers at all.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the wheel event to classify
+    ///
+    /// #### Returns
+    ///
+    /// true when the event was a pinch and has been dispatched as one, so the
+    /// caller must not also scroll on it
+    private boolean isTrackpadPinch(WheelEvent e) {
+        if (!e.isCtrlKey()) {
+            return false;
+        }
+        final int x = getClientX(e);
+        final int y = getClientY(e);
+        if (!pinchGestureOpen) {
+            pinchGestureOpen = true;
+            pinchScale = 1f;
+            nativeCallSerially(new Runnable() {
+                @Override
+                public void run() {
+                    Display.getInstance().firePinchBeginGesture();
+                }
+            });
+        }
+        // A wheel-reported pinch has no end event -- the browser simply stops
+        // sending, because ctrl+wheel is a scroll being reinterpreted rather
+        // than a gesture with phases. So the end is inferred from a quiet
+        // period. Without one the component that zoomed is never told the
+        // gesture finished: a trackpad produces no pointers, so the
+        // two-pointer path in Component that normally calls pinchReleased()
+        // cannot run here.
+        //
+        // The generation counter is what makes the timer safe. Every event
+        // bumps it and schedules its own timeout, so only the LAST event's
+        // timer finds a matching generation and closes the gesture; the
+        // earlier ones fire into a stale generation and do nothing.
+        pinchGestureGeneration++;
+        final int generation = pinchGestureGeneration;
+        Window.setTimeout(new TimerHandler() {
+            @Override
+            public void onTimer() {
+                if (generation != pinchGestureGeneration || !pinchGestureOpen) {
+                    return;
+                }
+                pinchGestureOpen = false;
+                nativeCallSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        Display.getInstance().firePinchReleaseGesture(x, y);
+                    }
+                });
+            }
+        }, PINCH_IDLE_MS);
+        // exp() rather than a linear factor: scale is a RATIO, so equal and
+        // opposite deltas have to compose back to 1.0 or a pinch out followed by
+        // an identical pinch in would not return to where it started. The
+        // divisor sets sensitivity only; 100 matches what the deltas a trackpad
+        // produces per notch feel like against the native ports.
+        // Accumulated, not per event. Component.pinch() is specified as the
+        // factor since the gesture BEGAN -- ImageViewer computes
+        // currentZoom * scale and only moves currentZoom in pinchReleased() --
+        // so handing it each wheel notch's own increment would end a long
+        // gesture on its last tiny step instead of where the user dragged to.
+        pinchScale *= (float)Math.exp(-e.getDeltaY() / 100.0);
+        final float scale = pinchScale;
+        nativeCallSerially(new Runnable() {
+            @Override
+            public void run() {
+                Display.getInstance().fireMagnifyGesture(x, y, scale);
+            }
+        });
+        return true;
+    }
+
     public void mouseWheelMoved(WheelEvent e) {
+        if (isTrackpadPinch(e)) {
+            return;
+        }
         NormalizedWheelEvent ne = normalizeWheelEvent(e);
         
         //e.preventDefault();

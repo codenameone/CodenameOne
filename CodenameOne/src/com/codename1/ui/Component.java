@@ -9169,6 +9169,15 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// accessibility description or `null` if none
     public String getAccessibilityText() {
+        // A password field is excluded from the text fallback below. The
+        // fallback exists so that an unlabelled field still announces
+        // something, and the only thing an obscured field has to offer is the
+        // secret itself: focusGainedInternal() would have VoiceOver speak it
+        // aloud on every port with no accessibility tree, and
+        // AccessibilityManager would carry it into the snapshot as the node's
+        // label on every port that has one. An explicit label, an
+        // accessibilityText, or an associated componentLabel all still win --
+        // those are strings the developer chose.
         if (semantics != null && semantics.getLabel() != null) {
             return semantics.getLabel();
         }
@@ -9181,13 +9190,23 @@ public class Component implements Animation, StyleListener, Editable {
                 return t;
             }
         }
-        if (this instanceof TextHolder) {
+        if (this instanceof TextHolder && !isObscuredText()) {
             String t = ((TextHolder) this).getText();
             if (t != null && t.length() > 0) {
                 return t;
             }
         }
         return null;
+    }
+
+    /// Whether this component's text is a secret the platform must not read out.
+    ///
+    /// The PASSWORD constraint, which is the same signal
+    /// `AccessibilityManager` already reports to a port as the node's obscured
+    /// state -- so the two cannot disagree about which fields are secret.
+    private boolean isObscuredText() {
+        return this instanceof TextArea
+                && (((TextArea) this).getConstraint() & TextArea.PASSWORD) != 0;
     }
 
     /// Sets the text that describes this component to assistive technologies.

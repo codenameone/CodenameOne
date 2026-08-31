@@ -21,7 +21,7 @@
  * need additional information or have any questions.
  */
 #import <Foundation/Foundation.h>
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import <AVFoundation/AVFoundation.h>
 #include "TargetConditionals.h"
 #if !TARGET_OS_WATCH
@@ -52,5 +52,9 @@
 + (float)getVolume;
 + (void)setVolume:(float)vol;
 + (void)stop;
+/// Stops this player. Declared because only the class method was, so every
+/// caller sending it to an instance compiled on a warning and resolved at
+/// runtime -- which happens to work, and hides the next such mistake.
+- (void)stop;
 
 @end

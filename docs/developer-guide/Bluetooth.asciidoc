@@ -6,7 +6,7 @@ Codename One ships a first-class Bluetooth API under `com.codename1.bluetooth` t
 
 [options="header"]
 |===
-| Capability | Android | iOS / Mac Catalyst | Simulator (mock) | Simulator (native backend) | JavaScript
+| Capability | Android | iOS / macOS | Simulator (mock) | Simulator (native backend) | JavaScript
 | BLE central (scan, GATT client) | yes | yes | yes | yes | browser chooser only
 | BLE peripheral (GATT server + advertising) | yes | yes (not tvOS/watchOS) | yes | -- | --
 | L2CAP channels | yes (Android 10+) | yes (iOS 11+) | yes | -- | --
@@ -181,7 +181,7 @@ For fully deterministic unit tests the JavaSE port also allows constructing a pr
 |===
 | Platform | Address semantics | MTU | Bonding | Notes
 | Android | Real MAC address | `requestMtu(...)` negotiates, default 23 | `createBond()` prompts the user | Background scanning is throttled by the OS; use filtered scans and expect slower sightings
-| iOS / Mac Catalyst | Per-app CoreBluetooth identifier UUID | Negotiated by the OS; `requestMtu(...)` resolves with the current value | OS-managed, triggered by encrypted characteristics; `getBondedPeripherals()` is empty | Background operation needs `ios.bluetooth.background` plus service-UUID scan filters; advertisements carry only name and service UUIDs
+| iOS / macOS | Per-app CoreBluetooth identifier UUID | Negotiated by the OS; `requestMtu(...)` resolves with the current value | OS-managed, triggered by encrypted characteristics; `getBondedPeripherals()` is empty | Background operation needs `ios.bluetooth.background` plus service-UUID scan filters; advertisements carry only name and service UUIDs
 | Simulator (mock) | Synthetic (`AA:BB:CC:DD:EE:01`) | Simulated negotiation | Simulated | Timestamps come from a monotonic counter -- treat them as ordered, not as wall-clock times
 | Simulator (native backend) | Host-OS device identifier | Real negotiation | Not supported | Central role only; requires the bundled `libcn1ble` library and OS Bluetooth permission for the terminal/IDE
 | JavaScript | Per-origin Web Bluetooth identifier | Fixed at 512 | Browser-managed | One user-picked device per chooser; `startScan` requires a user gesture (call it from a button handler); RSSI unavailable

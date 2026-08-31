@@ -195,9 +195,15 @@ public final class IOSNative {
     native void setWindowTitle(String title);
 
     // Mac native (Catalyst): replace the application menu's CN1 command items. namesNewlineJoined
-    // holds the visible command labels separated by '\n'; selecting item i calls back into
-    // IOSImplementation.fireMacMenuCommand(i).
+    // holds one row per command separated by '\n'; selecting an item calls back into
+    // IOSImplementation.fireMacMenuCommand() with the id the row's last column carries.
     native void setNativeMenuCommands(String namesNewlineJoined);
+
+    // Mac native: run the next step of the delivery queue -- releasing what cold-launching the
+    // application held (a deep link, a local notification, a push) the first time, and handing over
+    // the next push after that. Called from the far side of an EDT barrier, which is what paces it.
+    // Nothing to run on any other platform, where the delegate holds nothing.
+    native void macRunPendingDeliveries();
 
     // Mac native: propagate the current form's brightness to the host
     // NSWindow's appearance so the Mac titlebar (rendered by AppKit, not
@@ -210,88 +216,6 @@ public final class IOSNative {
     // toolbar drags it. Passing false restores the standard titled window. A no-op on iOS/iPadOS.
     native void setMacWindowUndecorated(boolean undecorated);
 
-    // ---- Mac Catalyst desktop windows (CN1MacWindows.m) ---------------------
-    //
-    // A window is addressed by the slot returned from macWindowCreate. The
-    // windowId passed in is the framework's own id, stored natively and echoed
-    // back on every callback so events route without a lookup. Every one of these
-    // is a no-op on iOS proper, where the implementation is compiled out.
-
-    native int macWindowCreate(int windowId, String title, int x, int y, int width, int height,
-            boolean decorated, boolean resizable, boolean positionSet);
-
-    native void macWindowDestroy(int slot);
-
-    native void macWindowShow(int slot, boolean visible);
-
-    /** The token of the scene request currently outstanding for this window, or 0. */
-    native int macWindowRequestSeq(int slot);
-
-    native void macWindowSetTitle(int slot, String title);
-
-    native void macWindowSetBounds(int slot, int x, int y, int width, int height);
-
-    native void macWindowGetBounds(int slot, int[] out);
-
-    native boolean macMainWindowGetBounds(int[] out);
-
-    native int macWindowGetWidth(int slot);
-
-    native int macWindowGetHeight(int slot);
-
-    native void macWindowSetState(int slot, int state);
-
-    /** Requests a scene again after one was destroyed without the app getting a say. */
-    /// Applies a resizability change to a window that may already have a scene.
-    /// Records which window is being edited, so the native editor lands in its view.
-    native void macWindowSetEditingSlot(int slot);
-
-    native void macWindowSetResizable(int slot, boolean resizable);
-
-    /// Applies a decoration change to a window that may already have a scene.
-    native void macWindowSetDecorated(int slot, boolean decorated);
-
-    /// Records a minimum size and applies it to an existing scene.
-    native void macWindowSetMinimumSize(int slot, int width, int height);
-
-    native boolean macWindowReopen(int slot);
-
-    /** Enables or disables touch input, used while a modal window blocks this one. */
-    native void macWindowSetInputEnabled(int slot, boolean enabled);
-
-    native void macMainWindowSetInputEnabled(boolean enabled);
-
-    /** Starts reporting display attach/remove/mode changes; idempotent. */
-    native void macWindowWatchScreens();
-
-    /**
-     * Presents one rendered frame. The pixels are the window's own raster; the
-     * native side wraps them in a CGImage and assigns it to the view's layer.
-     */
-    native void macWindowPresent(int slot, int[] argb, int width, int height);
-
-    /**
-     * True when the app's Info.plist actually enables multiple scenes. Without it
-     * the system refuses to activate a second scene, so this is what decides
-     * whether the windowing API reports itself supported.
-     */
-    native boolean macMultiWindowSupported();
-
-    native int macMonitorCount();
-
-    native int macPrimaryMonitor();
-
-    native void macMonitorBounds(int monitor, boolean workArea, int[] out);
-
-    native int macMonitorDpi(int monitor);
-
-    native int macMonitorScaleTimes100(int monitor);
-
-    native int macMonitorForWindow(int slot);
-
-    /// The monitor the application's own Catalyst scene is on. The main window has
-    /// no slot, so `#macMonitorForWindow(int)` cannot answer for it.
-    native int macMonitorForMainWindow();
     
     native void setImageName(long nativeImage, String name);
     
@@ -387,11 +311,11 @@ public final class IOSNative {
 
     native void updatePeerPositionSize(long peer, int x, int y, int w, int h);
     
-    native void peerInitialized(long peer, int x, int y, int w, int h);
-
-    /// Attaches a peer to the Catalyst window that owns it. Returns false when the
-    /// window has no content view yet, so the caller keeps the peer where it is.
-    native boolean macWindowAttachPeer(long peer, int slot, int x, int y, int w, int h);
+    // windowId is the framework id of the Window the peer lives in, or -1 for the main surface.
+    // The native side cannot work it out: it sees a view and a rectangle, and on macOS every peer
+    // whose window could not be named landed on the main window and drew there at another window's
+    // coordinates.
+    native void peerInitialized(long peer, int x, int y, int w, int h, int windowId);
 
     native void peerDeinitialized(long peer);
     native void peerSetVisible(long peer, boolean v);
@@ -619,6 +543,13 @@ public final class IOSNative {
     native void startUpdatingBackgroundLocation(long clLocation);
     native void stopUpdatingBackgroundLocation(long clLocation);
     
+    /// Whether this platform actually monitors a region.
+    ///
+    /// addGeofencing below is an empty body on macOS, watchOS and tvOS, and a
+    /// caller that cannot tell persists a listener and waits for a callback that
+    /// nothing will ever send.
+    native boolean isGeofencingSupported();
+
     native void addGeofencing(long clLocation, double lat, double lng, double radius, long expiration, String id);
     native void removeGeofencing(long clLocation, String id);
     
@@ -630,6 +561,12 @@ public final class IOSNative {
     // Low-level camera API (com.codename1.camera). Backed by CN1Camera.m
     // which wraps AVCaptureSession. The IOSCameraImpl class on the Java side
     // routes static callbacks delivered from the capture queue.
+    // Asks the system for camera (and optionally microphone) access and reports the answer to
+    // IOSImplementation.cn1CameraAccessResult with this id. Asking is the only way to know: the
+    // status may be undetermined, in which case the answer does not exist until the user has been
+    // shown the prompt.
+    native void cn1CameraRequestAccess(boolean audio, int callbackId);
+
     native String cn1CameraEnumerate();
     native long cn1CameraOpen(String cameraId, int previewW, int previewH, boolean captureAudio);
     native long cn1CameraCreatePreviewView(long sessionPeer);
@@ -1979,6 +1916,15 @@ public final class IOSNative {
     native boolean checkContactsUsage();
     native boolean checkCalendarsUsage();
     native boolean checkCameraUsage();
+
+    /// The CURRENT authorization for the camera, or for the microphone when
+    /// `audio` is set: 0 not determined, 1 restricted, 2 denied, 3 authorized.
+    ///
+    /// Synchronous, unlike cn1CameraRequestAccess, because the caller is
+    /// CameraImpl.open() and that returns a value. Asking is not prompting: this
+    /// reads the status AVFoundation already holds and never shows a dialog, so
+    /// it is safe on any thread and at any time.
+    native int cameraAuthorizationStatus(boolean audio);
     native boolean checkFaceIDUsage();
     native boolean checkLocationUsage();
     /// Whether ios.NSHealthShareUsageDescription was declared. Lives here
@@ -2025,7 +1971,15 @@ public final class IOSNative {
 
     native void registerPushCategories();
     
-    native void firePushCompletionHandler();
+    // completionId names the notification whose grant is being released -- see the registry in
+    // IOSNative.m. 0 means the notification carried no grant, which is every platform that does not
+    // wake an app for a push, and is a no-op.
+    native void firePushCompletionHandler(long completionId);
+
+    // Releases the OLDEST outstanding grant. This is what Display.notifyPushCompletion() asks for:
+    // the application says its background work is finished without naming a push, because it has no
+    // id with which to name one.
+    native void releaseOldestPushCompletionHandler();
 
     native boolean isMultiGallerySelectSupported();
 
@@ -2098,6 +2052,151 @@ public final class IOSNative {
     // IOSNearbyCallbacks.
 
     /** True when this build linked Nearby Interaction and the device has the radio. */
+    // ------------------------------------------------------------------
+    // com.codename1.call -- CallKit, PushKit and the Call Directory store.
+    // ------------------------------------------------------------------
+
+    /** True when this build linked CallKit and the OS provides it. */
+    native boolean callSupported();
+
+    /** True when this build linked PushKit. */
+    native boolean callVoipSupported();
+
+    /** True when this build generated a Call Directory extension. */
+    native boolean callDirectorySupported();
+
+    /** The CallBridge.CAPABILITY_* mask this platform offers. */
+    native int callCapabilities();
+
+    /** The CallAvailability ordinal describing whether a call could ring now. */
+    native int callAvailability();
+
+    /** The CallBridge.PERMISSION_* mask currently granted. */
+    native int callGrantedPermissions();
+
+    /** Asks for the permission bits, answering deliverPermissionResult. */
+    native void callRequestPermissions(int requestId, int permissionBits);
+
+    /** Installs the CXProvider configuration from a CallWire record. */
+    native void callConfigureProvider(int requestId, String configWire);
+
+    /** Reports a new incoming call to CallKit. */
+    native void callReportIncoming(int requestId, String callId,
+            String handleWire, String displayName, boolean hasVideo);
+
+    /** Reports a new outgoing call to CallKit. */
+    native void callReportOutgoing(int requestId, String callId,
+            String handleWire, String displayName, boolean hasVideo);
+
+    /** The outgoing call has begun connecting. */
+    native void callStartedConnecting(String callId, long timestampMs);
+
+    /** The outgoing call is connected. */
+    native void callOutgoingConnected(String callId, long timestampMs);
+
+    /** The incoming call is connected. */
+    native void callIncomingConnected(String callId, long timestampMs);
+
+    /** Updates what CallKit shows for a call already reported. */
+    native void callUpdate(String callId, String handleWire,
+            String displayName, boolean hasVideo);
+
+    /** The far end ended the call. */
+    native void callReportEnded(String callId, int endReasonOrdinal,
+            long timestampMs);
+
+    /** This side is ending the call. */
+    native void callEnd(int requestId, String callId, int endReasonOrdinal);
+
+    /** Holds or resumes a call. */
+    native void callSetHeld(int requestId, String callId, boolean held);
+
+    /** Mutes or unmutes a call. */
+    native void callSetMuted(int requestId, String callId, boolean muted);
+
+    /** Sends DTMF digits through CallKit. */
+    native void callSendDtmf(int requestId, String callId, String digits);
+
+    /** Groups or ungroups a call. */
+    native void callSetGroup(int requestId, String callId, String otherCallId);
+
+    /** The CallAudioRoute ordinal of the current output. */
+    native int callAudioRoute();
+
+    /** Asks for a particular audio route. */
+    native void callSetAudioRoute(int requestId, int routeOrdinal);
+
+    /** Shows the system audio route picker. */
+    native void callShowRoutePicker(int requestId, String callId);
+
+    /** Answers a CXAction delivered with this token. */
+    native boolean callCompleteAction(long actionToken, boolean fulfilled);
+
+    /** Registers for VoIP pushes. */
+    native void callRegisterVoipPush(int requestId);
+
+    /** Stops VoIP push delivery. */
+    native void callUnregisterVoipPush(int requestId);
+
+    /** Tells the native side whether application code is listening yet. */
+    native void callSetJavaReady(boolean ready);
+
+    /** Delivers every call reported natively but not yet seen by Java. */
+    native void callDrainPendingCalls(int requestId);
+
+    /** Installs the caller-identification data at this path. */
+    native void callSetDirectorySource(int requestId, String filePath);
+
+    /** Asks the system to re-read the directory extension. */
+    native void callReloadDirectory(int requestId);
+
+    /** Answers with a CallWire-encoded directory status record. */
+    native void callDirectoryStatus(int requestId);
+
+    // ------------------------------------------------------------------
+    // com.codename1.vpn -- NEVPNManager.
+    //
+    // Distinct from isVPNActive() above, which is always compiled in, needs
+    // no entitlement, and answers whether SOME VPN is carrying this device's
+    // traffic rather than managing one.
+    // ------------------------------------------------------------------
+
+    /** True when this build linked NetworkExtension for VPN management. */
+    native boolean vpnSupported();
+
+    /** True when this build generated a packet tunnel extension. */
+    native boolean vpnTunnelSupported();
+
+    /** The VpnBridge.CAPABILITY_* mask this platform offers. */
+    native int vpnCapabilities();
+
+    /// Asks the packet-tunnel extension to start, with the setup record.
+    native void vpnStartTunnel(int requestId, String setupWire);
+
+    /// Asks the packet-tunnel extension to stop.
+    native void vpnStopTunnel(int requestId);
+
+    /** The VpnStatus ordinal of the managed connection. */
+    native int vpnStatus();
+
+    /** Installs or replaces the configuration from a VpnWire record. */
+    native void vpnInstallProfile(int requestId, String profileWire);
+
+    /** Removes the installed configuration. */
+    native void vpnRemoveProfile(int requestId);
+
+    /** Answers with the installed configuration as a VpnWire record. */
+    native void vpnLoadProfile(int requestId);
+
+    /** Brings the tunnel up. */
+    native void vpnStart(int requestId);
+
+    /** Takes the tunnel down. */
+    native void vpnStop(int requestId);
+
+    /** Starts or stops status-change delivery. */
+    native void vpnSetStatusListening(boolean listening);
+
     native boolean nearbyRangingSupported();
 
     /** True when this build linked AccessorySetupKit and the OS is new enough. */

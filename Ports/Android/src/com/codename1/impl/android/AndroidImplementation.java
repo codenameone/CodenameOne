@@ -13533,6 +13533,74 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return nearbyBridge;
     }
 
+    private com.codename1.impl.android.call.AndroidCallBridge callBridge;
+
+    private com.codename1.impl.android.vpn.AndroidVpnBridge vpnBridge;
+
+    /// The call bridge, on Telecom.
+    ///
+    /// Always returned rather than conditionally null: the bridge answers
+    /// every capability query honestly, including reporting no support at all
+    /// below API 26 where a self-managed ConnectionService does not exist, so
+    /// the public API degrades without this getter having to know the OS
+    /// version.
+    ///
+    /// Synchronized for the reason the nearby getter is: the bridge holds the
+    /// registered PhoneAccount, and two threads racing this would each build
+    /// one, with the loser's registration unreachable.
+    @Override
+    public synchronized com.codename1.call.spi.CallBridge getCallBridge() {
+        if (callBridge == null) {
+            callBridge = new com.codename1.impl.android.call.AndroidCallBridge(
+                    callServiceContext());
+        }
+        return callBridge;
+    }
+
+    /// The context the call and VPN bridges do their system work through.
+    ///
+    /// NOT getActivity(): Codename One can be initialised from a Service --
+    /// which is what happens when a push wakes the app to report an incoming
+    /// call -- and getActivity() is null there. The bridge cached that null
+    /// for the life of the process, so even isSupported() threw on the
+    /// TelecomManager lookup, and foregrounding later did not repair it.
+    ///
+    /// An activity is only needed to SHOW something, and the two places that
+    /// need one look for it when they get there.
+    private Context callServiceContext() {
+        Context any = getActivity();
+        if (any == null) {
+            any = getContext();
+        }
+        if (any == null) {
+            return null;
+        }
+        // The APPLICATION context, never the Activity. Both bridges keep
+        // what they are given in a final field and are never cleared, so
+        // caching an Activity here held that Activity and its whole view
+        // hierarchy reachable for the rest of the process -- a leak renewed
+        // by every rotation. Nothing the bridges do with it needs an
+        // Activity: they look up system services, the package manager and
+        // the application label, and the two places that must SHOW
+        // something ask getActivity() at the point of showing, which is
+        // what the comment above already promised and what
+        // currentActivity() implements.
+        Context app = any.getApplicationContext();
+        return app != null ? app : any;
+    }
+
+    /// The VPN bridge, on the platform's managed IKEv2 client.
+    ///
+    /// Reports no support below API 30, where `VpnManager` does not exist.
+    @Override
+    public synchronized com.codename1.vpn.spi.VpnBridge getVpnBridge() {
+        if (vpnBridge == null) {
+            vpnBridge = new com.codename1.impl.android.vpn.AndroidVpnBridge(
+                    callServiceContext());
+        }
+        return vpnBridge;
+    }
+
     @Override
     public com.codename1.impl.VisionImpl createVisionImpl() {
         return (com.codename1.impl.VisionImpl) createOptionalAiBackend(

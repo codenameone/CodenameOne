@@ -153,7 +153,7 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     if (width <= 0 || height <= 0) {
         return;
     }
-    UIImage *src = [img getImage];
+    CN1Image *src = [img getImage];
     if (src == nil || src.CGImage == NULL) {
         return;
     }
@@ -166,7 +166,7 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     }
 #ifdef CN1_USE_METAL
     {
-        UIImage *src = [img getImage];
+        CN1Image *src = [img getImage];
         int imageWidth = (int)src.size.width;
         int imageHeight = (int)src.size.height;
         if (imageWidth > 0 && imageHeight > 0) {

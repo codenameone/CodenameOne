@@ -111,7 +111,11 @@ typedef enum {
     CN1_EVENT_WINDOW_SHOWN = 16,
     CN1_EVENT_WINDOW_HIDDEN = 17,
     CN1_EVENT_WINDOW_MOVED = 18,
-    CN1_EVENT_MONITORS_CHANGED = 19
+    CN1_EVENT_MONITORS_CHANGED = 19,
+    /* Touchpad pinch phases, kept on the same numbers the Linux port uses so the
+     * two desktop wire protocols do not drift apart. */
+    CN1_EVENT_PINCH_BEGIN = 20,
+    CN1_EVENT_PINCH_END = 21
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */

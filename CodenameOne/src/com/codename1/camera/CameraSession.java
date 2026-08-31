@@ -44,6 +44,10 @@ public final class CameraSession implements AutoCloseable {
     private FrameListener frameListener;
     private CameraView view;
     private boolean closed;
+    /// Whether pause() has released the hardware and resume() has not taken it
+    /// back. Read by Camera.open, which must let a modal Capture through while
+    /// a session is holding nothing.
+    private boolean paused;
 
     CameraSession(CameraImpl impl, CameraInfo info, CameraSessionOptions options) {
         this.impl = impl;
@@ -139,13 +143,48 @@ public final class CameraSession implements AutoCloseable {
     /// Release the hardware but keep this session object alive. Pair with
     /// `#resume()`.
     public void pause() {
+        Camera.pauseSession(this);
+    }
+
+    /// The pause itself, run by Camera while it holds ACTIVE_LOCK.
+    ///
+    /// Package private and lock-bound on purpose: open() decides whether to let
+    /// a capture past by reading isPaused(), so the release of the hardware and
+    /// the flag that advertises it have to become visible together. Setting the
+    /// flag outside the lock let an opener miss it and refuse the very handoff
+    /// the application had just paused for.
+    void pauseUnderLock() {
         impl.pause();
+        paused = true;
+    }
+
+    /// Whether the hardware is currently released by `#pause()`.
+    ///
+    /// Package private on purpose. Camera.open is the only caller that needs
+    /// it -- to let a modal Capture past a paused session -- and a new public
+    /// method is easy to add later and impossible to take back.
+    boolean isPaused() {
+        return paused && !closed;
     }
 
     /// Re-acquire the hardware after `#pause()`. No-op if the session is
     /// already running.
     public void resume() {
+        Camera.resumeSession(this);
+    }
+
+    /// The resume itself, run by Camera while it holds ACTIVE_LOCK.
+    ///
+    /// The check and the reacquisition have to be ONE step. Checking under the
+    /// lock and then resuming outside it left a window where an opener saw this
+    /// session still paused, installed a successor and started it, while this
+    /// thread went on to take the hardware back anyway -- two consumers, and on
+    /// the Apple backend the successor's frame-callback target replaced. That
+    /// is the check-then-act open() already refuses to ship, which is why it
+    /// holds this same lock across its own native call.
+    void resumeUnderLock() {
         impl.resume();
+        paused = false;
     }
 
     /// Release the session. Idempotent.

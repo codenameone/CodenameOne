@@ -173,6 +173,7 @@ public class AndroidGradleBuilder extends Executor {
             "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
             "android.permission.BIND_PRINT_SERVICE",
             "android.permission.BIND_REMOTEVIEWS",
+            "android.permission.BIND_SCREENING_SERVICE",
             "android.permission.BIND_TELECOM_CONNECTION_SERVICE",
             "android.permission.BIND_TEXT_SERVICE",
             "android.permission.BIND_TV_INPUT",
@@ -231,6 +232,7 @@ public class AndroidGradleBuilder extends Executor {
             "android.permission.MOUNT_UNMOUNT_FILESYSTEMS",
             "android.permission.NFC",
             "android.permission.PACKAGE_USAGE_STATS",
+            "android.permission.MANAGE_OWN_CALLS",
             "android.permission.PERSISTENT_ACTIVITY",
             "android.permission.PROCESS_OUTGOING_CALLS",
             "android.permission.QUERY_ALL_PACKAGES",
@@ -289,7 +291,8 @@ public class AndroidGradleBuilder extends Executor {
             "android.permission.WRITE_SETTINGS",
             "android.permission.WRITE_SYNC_SETTINGS",
             "com.android.voicemail.permission.WRITE_VOICEMAIL",
-            "android.permission.FOREGROUND_SERVICE"
+            "android.permission.FOREGROUND_SERVICE",
+            "android.permission.FOREGROUND_SERVICE_PHONE_CALL"
     };
 
 
@@ -744,6 +747,57 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesNearbyTransport;
     private boolean usesNearbyCompanion;
     private boolean usesNearbyPresence;
+
+    // The three call packages are tracked separately for the reason the
+    // nearby ones are: they buy different things and the expensive halves
+    // must not ride along with the cheap one. Owning a call costs
+    // MANAGE_OWN_CALLS and an API 26 floor; ringing while backgrounded adds a
+    // foreground service; labelling somebody else's caller buys neither and
+    // must not, because Play Console flags gratuitous telephony permissions.
+
+    /// Class-name prefixes whose presence in a submitted library counts the
+    /// same as presence in the application's own classes.
+    ///
+    /// The builder's scanner reads only the app's compiled classes, so a
+    /// feature used exclusively by a cn1lib was invisible to it: no
+    /// permissions, no services, no native defines, and a library calling an
+    /// API that was never switched on.
+    private static final String[] CALL_VPN_LIB_PREFIXES = {
+        "com/codename1/call/session/",
+        "com/codename1/call/voip/",
+        "com/codename1/call/directory/",
+        "com/codename1/vpn/profile/",
+        "com/codename1/vpn/tunnel/",
+    };
+
+    /// Folds call and VPN usage found inside submitted libraries into the
+    /// scanner's flags.
+    ///
+    /// @param libsDir the submitted-libraries folder
+    private java.util.Set<String> foldInCallAndVpnLibraryUsage(
+            java.io.File libsDir) {
+        java.util.Set<String> found =
+                LibraryClassPrefixScan.prefixesFound(libsDir,
+                        CALL_VPN_LIB_PREFIXES);
+        if (found.isEmpty()) {
+            return found;
+        }
+        debug("Call/VPN usage found inside a submitted library: " + found);
+        usesCallSession |= found.contains("com/codename1/call/session/");
+        usesCallVoip |= found.contains("com/codename1/call/voip/");
+        usesCallDirectory |= found.contains("com/codename1/call/directory/");
+        usesManagedVpn |= found.contains("com/codename1/vpn/profile/");
+        usesCustomTunnel |= found.contains("com/codename1/vpn/tunnel/");
+        return found;
+    }
+
+    private boolean usesCallSession;
+    private boolean usesCallVoip;
+    private boolean usesCallDirectory;
+    private boolean usesManagedVpn;
+
+    /// Whether the app referenced com.codename1.vpn.tunnel.
+    private boolean usesCustomTunnel;
 
     private boolean integrateMoPub = false;
 
@@ -2177,6 +2231,30 @@ public class AndroidGradleBuilder extends Executor {
                             usesHealthWrite = true;
                         }
                     }
+                    if (cls.indexOf("com/codename1/call/session/") == 0) {
+                        usesCallSession = true;
+                    }
+                    if (cls.indexOf("com/codename1/call/voip/") == 0) {
+                        usesCallVoip = true;
+                    }
+                    if (cls.indexOf("com/codename1/call/directory/") == 0) {
+                        usesCallDirectory = true;
+                    }
+                    // Only .profile. There is no com.codename1.vpn.tunnel
+                    // to scan for: a tunnel needs a bound VpnService and a
+                    // packet API this framework does not have, and on iOS its
+                    // body would run in an extension with no Java virtual
+                    // machine in it. So no <service> guarded by
+                    // BIND_VPN_SERVICE is emitted anywhere, deliberately --
+                    // declaring one for a package nobody can import would
+                    // put a VPN permission on the manifest of an app that
+                    // cannot tunnel anything.
+                    if (cls.indexOf("com/codename1/vpn/profile/") == 0) {
+                        usesManagedVpn = true;
+                    }
+                    if (cls.indexOf("com/codename1/vpn/tunnel/") == 0) {
+                        usesCustomTunnel = true;
+                    }
                     if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
                         usesNearbyRanging = true;
                     }
@@ -2525,6 +2603,21 @@ public class AndroidGradleBuilder extends Executor {
         // trees for exactly that reason; this is the same fix for the same
         // hazard, kept to the feature whose implementation gets deleted
         // rather than turned on for every flag the scanner carries.
+        java.util.Set<String> callVpnFromLibraries =
+                foldInCallAndVpnLibraryUsage(libsDir);
+        // Consumed into the catalog as well as folded into the flags. The
+        // flags decide the defines and the extension targets; the CATALOG is
+        // what adds CallKit, PushKit, AVFoundation, NetworkExtension and the
+        // microphone privacy string. Setting only the flags left a
+        // library-only app with the defines enabled and the frameworks
+        // unlinked -- a build that fails late for a reason nothing in it
+        // names, exactly as the nearby comment below describes.
+        //
+        // The entry prefix IS the key: the catalog matches a consumed class
+        // by startsWith, and a prefix starts with itself.
+        for (String callVpnPrefix : callVpnFromLibraries) {
+            aiAcc.consume(callVpnPrefix);
+        }
         NearbyManifestFragments.NearbyUsage libraryNearby =
                 NearbyManifestFragments.scanForNearbyUsage(libsDir);
         if (!libraryNearby.isEmpty()) {
@@ -2775,6 +2868,77 @@ public class AndroidGradleBuilder extends Executor {
                                 + presenceService);
             }
         }
+
+        // System call integration (com.codename1.call.*).
+        //
+        // The permissions and the <service> elements both come from
+        // CallManifestFragments rather than PlatformFeatureCatalog: the
+        // catalog can name a permission but cannot qualify it and cannot emit
+        // a <service> at all, and a self-managed ConnectionService needs one
+        // carrying its own permission attribute and intent filter.
+        if (usesCallSession || usesCallVoip || usesCallDirectory) {
+            log("Call fragments version "
+                    + CallManifestFragments.FRAGMENT_VERSION
+                    + (usesCallSession ? " session" : "")
+                    + (usesCallVoip ? " voip" : "")
+                    + (usesCallDirectory ? " directory" : ""));
+            xPermissions = CallManifestFragments.injectPermissions(
+                    xPermissions, usesCallSession, usesCallVoip,
+                    usesCallDirectory,
+                    CallManifestFragments.videoRequested(
+                            request.getArg("android.call.video", null),
+                            request.getArg("call.video", null)),
+                    targetSDKVersionInt);
+            // Suppression is per service, inside services(): an app that
+            // hand-declared one of the two used to suppress both.
+            String existingApplication = request.getArg("android.xapplication", "");
+            // The COMPILE sdk, not the target: AAPT rejects a manifest that
+            // names an enum value the platform it compiles against does not
+            // know, and android:foregroundServiceType="phoneCall" arrived in
+            // API 29. The legacy android.useGradle8=false with
+            // android.buildToolsVersion=28 configuration is still supported
+            // and compiles against 28.
+            String callServices = CallManifestFragments.services(
+                    usesCallSession, usesCallVoip, usesCallDirectory,
+                    existingApplication,
+                    compileSdkInt(maxPlatformVersion, buildToolsVersion,
+                            targetNumber, usesNearbyRanging,
+                            usesNearbyRanging || usesNearbyTransport
+                                    || usesNearbyCompanion, usesCallVoip,
+                            usesCustomTunnel));
+            if (callServices.length() > 0) {
+                request.putArgument("android.xapplication",
+                        existingApplication + callServices);
+            }
+        }
+
+        // A packet tunnel the app implements (com.codename1.vpn.tunnel).
+        //
+        // AFTER the class scan, beside the call fragments, because the flag
+        // it reads is set BY that scan. Placed earlier -- which is where it
+        // was -- it ran with usesCustomTunnel still false, nothing revisited
+        // it, and the manifest shipped without CN1VpnService or the
+        // foreground-service permissions: the whole Android half silently
+        // absent from an app that had asked for it.
+        //
+        // Separate from the managed-profile flag: a profile asks the OS to
+        // run its own IKEv2 client and needs no component of ours, while a
+        // tunnel is a VpnService the system binds.
+        if (usesCustomTunnel) {
+            log("VPN tunnel fragments version "
+                    + VpnManifestFragments.FRAGMENT_VERSION);
+            xPermissions = VpnManifestFragments.injectPermissions(true,
+                    xPermissions);
+            String existingTunnelApplication =
+                    request.getArg("android.xapplication", "");
+            String tunnelService = VpnManifestFragments.services(true,
+                    existingTunnelApplication);
+            if (tunnelService.length() > 0) {
+                request.putArgument("android.xapplication",
+                        existingTunnelApplication + tunnelService);
+            }
+        }
+
 
         // Smart home (com.codename1.home.*).
         //
@@ -6980,45 +7144,24 @@ public class AndroidGradleBuilder extends Executor {
 
         String supportV4Default;
 
-        compileSdkVersion = maxPlatformVersion;
+        // Through the shared helper, so the manifest fragments generated
+        // thousands of lines earlier cannot disagree with what this actually
+        // compiles against -- a fragment naming an attribute value newer than
+        // the compile SDK is an AAPT failure, not a runtime one. The
+        // support-lib ladder is NOT the same mapping and stays as it is.
+        compileSdkVersion = String.valueOf(compileSdkInt(maxPlatformVersion,
+                buildToolsVersion, targetNumber, usesNearbyRanging,
+                usesNearbyRanging || usesNearbyTransport
+                        || usesNearbyCompanion, usesCallVoip,
+                usesCustomTunnel));
         String supportLibVersion = maxPlatformVersion;
-        if (buildToolsVersion.startsWith("28")) {
-            compileSdkVersion = "28";
-            supportLibVersion = "28";
+        String[] supportLadder = {"28", "29", "30", "31", "32", "33", "34",
+            "35", "36"};
+        for (int i = 0; i < supportLadder.length; i++) {
+            if (buildToolsVersion.startsWith(supportLadder[i])) {
+                supportLibVersion = "28";
+            }
         }
-        if (buildToolsVersion.startsWith("29")) {
-            compileSdkVersion = "29";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("30")) {
-            compileSdkVersion = "30";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("31")) {
-            compileSdkVersion = "31";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("32")) {
-            compileSdkVersion = "32";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("33")) {
-            compileSdkVersion = "33";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("34")) {
-            compileSdkVersion = "34";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("35")) {
-            compileSdkVersion = "35";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("36")) {
-            compileSdkVersion = "36";
-            supportLibVersion = "28";
-        }
-        compileSdkVersion = ensureCompileSdkAtLeastTarget(compileSdkVersion, targetNumber);
         if (usesNearbyRanging) {
             // androidx.core.uwb declares minCompileSdk=36 in its AAR metadata,
             // and Gradle rejects the project outright rather than compiling
@@ -7028,8 +7171,9 @@ public class AndroidGradleBuilder extends Executor {
             // ranging is supported on a target-30 app and that app still has
             // to COMPILE against 36. (The AAR also wants AGP 8.9.1 or newer;
             // ANDROID_GRADLE_PLUGIN_8_VERSION is well past that.)
+            // compileSdkInt applies this too; a no-op wherever it wrote.
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
-                    compileSdkVersion, "36");
+                    compileSdkVersion, String.valueOf(RANGING_MIN_COMPILE_SDK));
         }
         if (usesNearbyRanging || usesNearbyTransport || usesNearbyCompanion) {
             // 33, and for ANY of the three clusters, not just the one whose
@@ -7054,8 +7198,9 @@ public class AndroidGradleBuilder extends Executor {
             // runtime SDK_INT check, exactly so this floor does not have to
             // move for a hint that costs the app nothing at compile time.
             // Raising it to 34 would raise it for every companion build.
+            // compileSdkInt applies this too; a no-op wherever it wrote.
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
-                    compileSdkVersion, "33");
+                    compileSdkVersion, String.valueOf(NEARBY_MIN_COMPILE_SDK));
         }
         jcenter =
                 "      google()\n" +
@@ -10254,6 +10399,99 @@ public class AndroidGradleBuilder extends Executor {
                 log("Deleting directory " + directory);
                 delTree(directory, true);
             }
+        }
+    }
+
+
+    /**
+     * The API level this build compiles against.
+     *
+     * <p>Extracted so the manifest fragments and the generated
+     * {@code compileSdkVersion} cannot disagree: a fragment naming an
+     * attribute value newer than the compile SDK is rejected by AAPT before
+     * anything is compiled, and the two decisions live thousands of lines
+     * apart. This mirrors the ladder in the gradle-file generation below and
+     * is the only other place that decides it.</p>
+     *
+     * @param maxPlatformVersion the newest installed platform
+     * @param buildToolsVersion  the effective build-tools version
+     * @param targetNumber       the {@code android.targetSDKVersion} in force
+     * @return the API level, or 0 when it cannot be determined
+     */
+    /** The compile SDK androidx.core.uwb's AAR metadata demands. */
+    static final int RANGING_MIN_COMPILE_SDK = 36;
+
+    /** The compile SDK any nearby cluster demands; see the block below. */
+    static final int NEARBY_MIN_COMPILE_SDK = 33;
+
+    /**
+     * The compile SDK {@code android:foregroundServiceType} needs.
+     *
+     * <p>The attribute arrived in API 29 and AAPT rejects an enum value the
+     * compile SDK does not know, so a VoIP app has to compile against at
+     * least this to declare {@code phoneCall} -- which from API 34 Android
+     * requires before it will start the service at all.</p>
+     */
+    static final int FOREGROUND_SERVICE_TYPE_COMPILE_SDK = 29;
+
+    /// The compile SDK a packet tunnel needs.
+    ///
+    /// 34, where FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED and the
+    /// systemExempted manifest enum arrive. AAPT rejects an enum value the
+    /// compile SDK has never heard of, so the legacy configuration -- which
+    /// is still supported and can sit at 28 -- failed on the generated
+    /// manifest before anything was compiled.
+    static final int TUNNEL_MIN_COMPILE_SDK = 34;
+
+    static int compileSdkInt(String maxPlatformVersion, String buildToolsVersion,
+            String targetNumber, boolean usesNearbyRanging,
+            boolean usesAnyNearby, boolean usesCallVoip,
+            boolean usesCustomTunnel) {
+        String compileSdkVersion = maxPlatformVersion;
+        String[] ladder = {"28", "29", "30", "31", "32", "33", "34", "35", "36"};
+        for (int i = 0; i < ladder.length; i++) {
+            if (buildToolsVersion != null
+                    && buildToolsVersion.startsWith(ladder[i])) {
+                compileSdkVersion = ladder[i];
+            }
+        }
+        compileSdkVersion =
+                ensureCompileSdkAtLeastTarget(compileSdkVersion, targetNumber);
+        // EVERY feature raise, in the same order the generation below applies
+        // them. Leaving one out gave the manifest fragments a preliminary
+        // answer: a VoIP app that also used nearby dropped
+        // android:foregroundServiceType="phoneCall" and then compiled against
+        // 33 or 36, where startForeground refuses a type the manifest never
+        // declared. A new raise belongs here, and the block that applies it
+        // below becomes a no-op once it is.
+        if (usesNearbyRanging) {
+            compileSdkVersion = ensureCompileSdkAtLeastTarget(
+                    compileSdkVersion, String.valueOf(RANGING_MIN_COMPILE_SDK));
+        }
+        if (usesAnyNearby) {
+            compileSdkVersion = ensureCompileSdkAtLeastTarget(
+                    compileSdkVersion, String.valueOf(NEARBY_MIN_COMPILE_SDK));
+        }
+        if (usesCustomTunnel) {
+            // See TUNNEL_MIN_COMPILE_SDK. Unlike the VoIP attribute below,
+            // this one is not covered by the raise-to-target above: the
+            // VALUE is what needs the newer SDK, and a tunnel app may
+            // legitimately target something older than 34.
+            compileSdkVersion = ensureCompileSdkAtLeastTarget(
+                    compileSdkVersion, String.valueOf(TUNNEL_MIN_COMPILE_SDK));
+        }
+        // NO VoIP raise here, deliberately, and this is where the daemon
+        // twin has one. A VoIP app targeting 29 or later must declare
+        // android:foregroundServiceType="phoneCall", which needs a compile
+        // SDK of at least 29 -- but this copy has already raised the compile
+        // SDK to the target above, unconditionally, so any target that
+        // requires the attribute has already made it writable. The daemon
+        // copy raises to the target only inside its container path, which is
+        // why it needs the rule stated separately.
+        try {
+            return Integer.parseInt(compileSdkVersion.trim());
+        } catch (NumberFormatException notANumber) {
+            return 0;
         }
     }
 

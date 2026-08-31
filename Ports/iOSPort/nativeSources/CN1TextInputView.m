@@ -176,7 +176,7 @@ static CN1TextInputView* cn1TextInputView = nil;
 }
 
 - (BOOL)canBecomeFirstResponder { return YES; }
-- (UIView *)textInputView { return self; }
+- (CN1View *)textInputView { return self; }
 
 // While the native text interaction (system loupe/handles) is active we OWN touches inside the editor's
 // bounds so its gesture recognizers fire there; everywhere else (and when no interaction is attached)

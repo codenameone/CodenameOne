@@ -1,0 +1,339 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.call;
+
+import com.codename1.call.spi.CallBridge;
+import com.codename1.impl.async.EdtResult;
+import com.codename1.impl.async.PendingMap;
+import com.codename1.ui.Display;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+/// The bits every `com.codename1.call` facade needs and none of them owns:
+/// the bridge lookup, one request-id counter for the whole family, and the
+/// maps that pair a native answer with the caller waiting for it.
+///
+/// @hidden not part of the public API.
+public final class CallRequests {
+
+    private static final AtomicInteger NEXT_ID = new AtomicInteger(1);
+
+    private static CallBridge testBridge;
+
+    /// Operations whose answer is just "it worked" or an exception:
+    /// reporting a call, ending one, holding, muting, sending digits.
+    private static final PendingMap<Boolean> ACKS = new PendingMap<Boolean>();
+
+    /// Permission requests in flight, from every facade.
+    ///
+    /// One map rather than one per facade, because there is one answer path:
+    /// a port reports the outcome through
+    /// `com.codename1.call.session.Calls#deliverPermissionResult` whichever
+    /// entry point asked. A per-facade map would leave a request opened by
+    /// the directory facade unfindable, and the caller would hold a resource
+    /// that never settled -- the failure the SPI documentation calls worse
+    /// than an outright error.
+    ///
+    /// Safe to share because request ids come from one counter, so an id is
+    /// in at most one map and an answer cannot be matched to the wrong
+    /// operation.
+    private static final PendingMap<Integer> PERMISSIONS =
+            new PendingMap<Integer>();
+
+    /// Operations answering with a string: the VoIP push token, a
+    /// directory status record.
+    private static final PendingMap<String> STRINGS = new PendingMap<String>();
+
+    /// Operations answering with a count -- currently only the pending-call
+    /// drain.
+    private static final PendingMap<Integer> COUNTS = new PendingMap<Integer>();
+
+    private CallRequests() {
+    }
+
+    /// The active port's bridge, or `null` where no port implements one.
+    ///
+    /// Guarded on `Display.isInitialized()` rather than on the instance
+    /// being non-null: `Display.getInstance()` hands back its singleton long
+    /// before `Display.init` has given it an implementation, and asking that
+    /// for a bridge throws. A unit test and an app that touches a facade
+    /// from a static initializer both reach this that way.
+    ///
+    /// #### Returns
+    ///
+    /// the bridge, or null
+    public static CallBridge bridge() {
+        // NOT synchronized on this class around the calls below: the facades
+        // hold their own monitors and call this, so taking this class's lock
+        // and then reaching for theirs is the two orders of one pair. The
+        // resolution and the readiness bookkeeping each take it briefly and
+        // separately.
+        CallBridge b = resolveBridge();
+        if (b != null) {
+            // The first moment there is anywhere to send it. A listener
+            // registered before Display.init moved the flags with no port to
+            // tell, and every later registration then saw no transition and
+            // said nothing either -- so iOS held every CallKit action until
+            // it timed out while a listener sat registered.
+            boolean deliver = false;
+            boolean wanted = false;
+            synchronized (CallRequests.class) {
+                wanted = actionsWanted || pushesWanted;
+                if (deliveredTo != b //NOPMD CompareObjectsWithEquals
+                        || deliveredReady == null
+                        || deliveredReady.booleanValue() != wanted) {
+                    deliveredReady = Boolean.valueOf(wanted);
+                    deliveredTo = b;
+                    deliver = true;
+                }
+            }
+            if (deliver) {
+                b.setJavaReady(wanted);
+            }
+            // And the calls the port is already holding, for a push listener
+            // that was registered before there was a port to ask.
+            com.codename1.call.voip.VoipPush.drainIfWanted(b);
+        }
+        return b;
+    }
+
+    /// The port's bridge, with no side effects.
+    private static synchronized CallBridge resolveBridge() {
+        if (testBridge != null) {
+            return testBridge;
+        }
+        if (!Display.isInitialized()) {
+            return null;
+        }
+        return Display.getInstance().getCallBridge();
+    }
+
+    /// Installs a bridge and clears every facade's static state, so one test
+    /// cannot see the calls, listeners or in-flight requests of the test
+    /// that ran before it.
+    ///
+    /// The facades are static -- there is no instance for a test to throw
+    /// away -- which makes shared state order-dependent: a listener a
+    /// previous test forgot to remove fires during this one, and the failure
+    /// looks like a bug in whichever test happened to run second.
+    ///
+    /// Passing `null` gives a bridgeless framework without waiting for
+    /// `Display` to be absent, which is what the degradation tests need.
+    ///
+    /// @hidden not part of the public API; test-only.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bridge`: the bridge to install, or null for none
+    public static void resetForTest(CallBridge bridge) {
+        CallBridge previous;
+        synchronized (CallRequests.class) {
+            previous = testBridge;
+            testBridge = bridge;
+        }
+        // The simulation schedules its answers through Display.setTimeout,
+        // which hands back nothing to cancel -- so a bridge left behind by a
+        // finished test goes on delivering into the next one. Told to stop
+        // instead. Tested with instanceof rather than cast for the reason
+        // check-cast-semantics.sh gives.
+        if (previous instanceof LocalCallBridge) {
+            ((LocalCallBridge) previous).retire();
+        }
+        ACKS.failAll(new IllegalStateException("reset"));
+        PERMISSIONS.failAll(new IllegalStateException("reset"));
+        STRINGS.failAll(new IllegalStateException("reset"));
+        COUNTS.failAll(new IllegalStateException("reset"));
+        synchronized (CallRequests.class) {
+            actionsWanted = false;
+            pushesWanted = false;
+            deliveredReady = null;
+            deliveredTo = null;
+        }
+        com.codename1.call.session.Calls.resetForTest();
+        com.codename1.call.voip.VoipPush.resetForTest();
+        com.codename1.call.directory.CallDirectory.resetForTest();
+    }
+
+    /// Whether a call action listener is registered.
+    private static boolean actionsWanted;
+
+    /// Whether a VoIP push listener is registered.
+    private static boolean pushesWanted;
+
+    /// Tells the port whether Java can receive callbacks at all.
+    ///
+    /// The port holds system-originated actions until this is true, so it has
+    /// to mean "somebody is listening", not "somebody is listening for
+    /// PUSHES". Driven only by VoipPush, an app that used Calls without ever
+    /// touching VoipPush -- a foreground signalling call, or an outgoing
+    /// request from Recents -- had every action held until CallKit timed it
+    /// out, with a CallActionListener registered the whole time.
+    ///
+    /// @hidden not part of the public API.
+    public static void setActionsWanted(boolean wanted) {
+        updateReadiness(true, wanted);
+    }
+
+    /// Records that a VoIP push listener is or is not registered.
+    ///
+    /// @hidden not part of the public API.
+    public static void setPushesWanted(boolean wanted) {
+        updateReadiness(false, wanted);
+    }
+
+    /// Sets ONE of the two flags and recomputes readiness from both.
+    ///
+    /// The other flag is read inside the lock rather than passed in: reading
+    /// it at the call site let two threads registering different listener
+    /// types each carry a stale copy of the other's, so one update overwrote
+    /// the other. Removing the surviving listener then told the port Java had
+    /// stopped listening while the other listener was still installed -- and
+    /// on iOS that means every CallKit action is held until it times out.
+    private static void updateReadiness(boolean isActions, boolean wanted) {
+        // The DELIVERY is inside the lock too, not just the computation.
+        // Released in between, two transitions could be computed in one order
+        // and delivered in the other: a push listener leaving computes false
+        // and pauses, an action listener arriving computes and delivers true,
+        // and the stale false lands last -- leaving the port holding CallKit
+        // actions until they time out while a live action listener waits for
+        // them.
+        //
+        // This holds only while every setJavaReady is a SETTER. Android's
+        // grew a queue of system-started calls to hand over, and draining it
+        // inline would run application code under this monitor and under
+        // Calls.LISTENERS -- so that port posts the drain to a later EDT
+        // pass instead. A port that answers setJavaReady by calling back
+        // into application code has to do the same; there is no lock this
+        // side can take that would make it safe.
+        synchronized (CallRequests.class) {
+            boolean before = actionsWanted || pushesWanted;
+            if (isActions) {
+                actionsWanted = wanted;
+            } else {
+                pushesWanted = wanted;
+            }
+            boolean after = actionsWanted || pushesWanted;
+            CallBridge b = resolveBridge();
+            if (b == null) {
+                // No port yet -- a listener registered before Display.init.
+                // The flags still moved, so the state is remembered and
+                // delivered by whoever next finds a bridge; without that, iOS
+                // held every CallKit action until it timed out because
+                // nothing ever told it Java was listening.
+                deliveredReady = null;
+                return;
+            }
+            // The BRIDGE as well as the value, for the reason
+            // Vpn.publishListening gives: a Display re-init builds a new
+            // bridge whose own readiness starts false, and a value-only cache
+            // said "already told it true" about the bridge that is gone -- so
+            // the replacement was never told Java was listening, and on iOS
+            // that means every CallKit action is held until it times out.
+            if (deliveredTo == b && before == after //NOPMD CompareObjectsWithEquals
+                    && deliveredReady != null
+                    && deliveredReady.booleanValue() == after) {
+                return;
+            }
+            deliveredReady = Boolean.valueOf(after);
+            deliveredTo = b;
+            b.setJavaReady(after);
+        }
+    }
+
+    /// The bridge deliveredReady was told, so a replacement is told again
+    /// even when the value has not changed.
+    private static CallBridge deliveredTo;
+
+    /// What the port was last told, or null when it has not been told.
+    ///
+    /// Comparing only the computed transition was not enough: a listener
+    /// installed before the port existed changed the flags without reaching
+    /// anyone, and every later registration then saw no transition and said
+    /// nothing either.
+    private static Boolean deliveredReady;
+
+    /// The next request id.
+    ///
+    /// Ids come from one counter shared by every facade so that an id lives
+    /// in exactly one map and an answer can never be matched against the
+    /// wrong operation.
+    ///
+    /// #### Returns
+    ///
+    /// a request id no other in-flight operation is using
+    public static int nextId() {
+        return NEXT_ID.getAndIncrement();
+    }
+
+    /// Registers an acknowledgement request.
+    public static EdtResult<Boolean> openAck(int requestId) {
+        return ACKS.open(requestId);
+    }
+
+    /// Claims an acknowledgement request, or null when nothing waits on it.
+    public static EdtResult<Boolean> takeAck(int requestId) {
+        return ACKS.take(requestId);
+    }
+
+    /// Registers a permission request.
+    public static EdtResult<Integer> openPermissionRequest(int requestId) {
+        return PERMISSIONS.open(requestId);
+    }
+
+    /// Claims a permission request, or null when nothing waits on it.
+    public static EdtResult<Integer> takePermissionRequest(int requestId) {
+        return PERMISSIONS.take(requestId);
+    }
+
+    /// Registers a request answering with a string.
+    public static EdtResult<String> openString(int requestId) {
+        return STRINGS.open(requestId);
+    }
+
+    /// Claims a string request, or null when nothing waits on it.
+    public static EdtResult<String> takeString(int requestId) {
+        return STRINGS.take(requestId);
+    }
+
+    /// Registers a request answering with a count.
+    public static EdtResult<Integer> openCount(int requestId) {
+        return COUNTS.open(requestId);
+    }
+
+    /// Claims a count request, or null when nothing waits on it.
+    public static EdtResult<Integer> takeCount(int requestId) {
+        return COUNTS.take(requestId);
+    }
+
+    /// Fails everything in flight, for a port that has lost its provider.
+    ///
+    /// #### Parameters
+    ///
+    /// - `failure`: what to fail them with
+    public static void failAll(Throwable failure) {
+        ACKS.failAll(failure);
+        PERMISSIONS.failAll(failure);
+        STRINGS.failAll(failure);
+        COUNTS.failAll(failure);
+    }
+}

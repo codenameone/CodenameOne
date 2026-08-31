@@ -57,6 +57,32 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 + (NSString *)enumerateCameras {
     NSMutableArray *parts = [NSMutableArray array];
     NSArray<AVCaptureDevice *> *devs;
+#if TARGET_OS_OSX
+    // Plenty of Macs have no built-in wide-angle camera at all: the only
+    // device is an external USB camera or an iPhone acting as a Continuity
+    // Camera. hasCameraSupport answers from defaultDeviceWithMediaType, which
+    // DOES see those, so enumerating the built-in type alone reports support
+    // while Camera.getCameras() comes back empty and Camera.getDefault()
+    // returns null.
+    NSMutableArray<AVCaptureDeviceType> *macTypes =
+        [NSMutableArray arrayWithObject:AVCaptureDeviceTypeBuiltInWideAngleCamera];
+    if (@available(macOS 14.0, *)) {
+        [macTypes addObject:AVCaptureDeviceTypeExternal];
+        [macTypes addObject:AVCaptureDeviceTypeContinuityCamera];
+    } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        // Superseded by AVCaptureDeviceTypeExternal above; still the only
+        // spelling that exists before macOS 14.
+        [macTypes addObject:AVCaptureDeviceTypeExternalUnknown];
+#pragma clang diagnostic pop
+    }
+    AVCaptureDeviceDiscoverySession *macSess =
+        [AVCaptureDeviceDiscoverySession discoverySessionWithDeviceTypes:macTypes
+                                                             mediaType:AVMediaTypeVideo
+                                                              position:AVCaptureDevicePositionUnspecified];
+    devs = macSess.devices;
+#else
     if (@available(iOS 10.0, *)) {
         AVCaptureDeviceDiscoverySession *sess =
             [AVCaptureDeviceDiscoverySession discoverySessionWithDeviceTypes:
@@ -67,6 +93,7 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
     } else {
         devs = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
     }
+#endif
     for (AVCaptureDevice *d in devs) {
         NSString *facing = (d.position == AVCaptureDevicePositionFront) ? @"front"
                          : (d.position == AVCaptureDevicePositionBack)  ? @"back"
@@ -80,7 +107,15 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 }
 
 + (BOOL)hasCameraSupport {
+#if TARGET_OS_OSX
+    // UIImagePickerController is the UIKit MODAL capture UI, and asking it
+    // whether a camera exists is an iOS idiom rather than the question itself.
+    // The question is whether AVFoundation can see a capture device, which is
+    // what the rest of this class uses on both platforms.
+    return [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo] != nil;
+#else
     return [UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypeCamera];
+#endif
 }
 
 #pragma mark - Open / close
@@ -159,10 +194,28 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
     return YES;
 }
 
-- (UIView *)createPreviewView {
+- (CN1View *)createPreviewView {
     if (self.previewView) return self.previewView;
-    UIView *v = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 480)];
+    CN1View *v = [[CN1View alloc] initWithFrame:CGRectMake(0, 0, 320, 480)];
+#ifndef CN1_USE_ARC
+    // Autoreleased so the previewView property below is the only owner. The
+    // alloc's +1 was never balanced here either: this method does not begin
+    // with alloc, new, copy or mutableCopy, so its caller is entitled to treat
+    // the result as +0 -- and cn1CameraCreatePreviewView does, retaining it for
+    // the Java peer. Found while fixing the camera handle above; same leak,
+    // same file, one view per session.
+    [v autorelease];
+#endif
+#if TARGET_OS_OSX
+    // NSView has no backgroundColor; the colour belongs to its layer, and the
+    // view has to be told to have one. Black because the preview layer below
+    // fills it and anything showing through before the first frame should not
+    // flash white.
+    v.wantsLayer = YES;
+    v.layer.backgroundColor = [[NSColor blackColor] CGColor];
+#else
     v.backgroundColor = [UIColor blackColor];
+#endif
     AVCaptureVideoPreviewLayer *layer =
         [[AVCaptureVideoPreviewLayer alloc] initWithSession:self.session];
     layer.videoGravity = AVLayerVideoGravityResizeAspectFill;
@@ -224,7 +277,7 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
         [self firePhotoFailed:cbId withMessage:@"No data from AVCapturePhoto"];
         return;
     }
-    UIImage *img = [UIImage imageWithData:jpeg];
+    CN1Image *img = [CN1Image imageWithData:jpeg];
     int w = (int)img.size.width;
     int h = (int)img.size.height;
     NSString *path = self.pendingPhotoFilePath;
@@ -301,11 +354,24 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     int w = (int)rect.size.width;
     int h = (int)rect.size.height;
 
+    // Retained, because this cache outlives the pool. contextWithOptions:
+    // returns an AUTORELEASED context and this port compiles without ARC, so
+    // the static kept a pointer to an object the next pool drain freed; the
+    // frame after that sent createCGImage:fromRect: to whatever had since been
+    // allocated in those bytes and the app died on an unrecognized selector
+    // (seen as -[__NSSingleObjectSetI createCGImage:fromRect:]). Intermittent
+    // by nature -- it needs a second delivered frame -- which is why it read as
+    // a flaky camera test rather than as the dangling pointer it is.
     static CIContext *ctx;
-    if (!ctx) ctx = [CIContext contextWithOptions:nil];
+    if (!ctx) {
+        ctx = [CIContext contextWithOptions:nil];
+#ifndef CN1_USE_ARC
+        [ctx retain];
+#endif
+    }
     CGImageRef cg = [ctx createCGImage:ci fromRect:rect];
     if (!cg) return;
-    UIImage *img = [UIImage imageWithCGImage:cg];
+    CN1Image *img = [CN1Image imageWithCGImage:cg];
     CGImageRelease(cg);
     NSData *jpeg = UIImageJPEGRepresentation(img, 0.8);
     if (!jpeg) return;
@@ -345,11 +411,18 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 }
 
 - (void)setZoomRatio:(float)ratio {
+#if TARGET_OS_OSX
+    // videoZoomFactor and videoMaxZoomFactor are iOS-only: AVFoundation on macOS
+    // exposes no zoom on a capture device. Ignored rather than faked, and
+    // CameraSession reports the range so an application can tell.
+    (void)ratio;
+#else
     if (!self.device) return;
     if (![self.device lockForConfiguration:nil]) return;
     CGFloat r = MAX(1.0, MIN((CGFloat)ratio, self.device.activeFormat.videoMaxZoomFactor));
     self.device.videoZoomFactor = r;
     [self.device unlockForConfiguration];
+#endif
 }
 
 - (void)focusAtX:(float)xNorm y:(float)yNorm {
@@ -413,6 +486,73 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 // still exist so ParparVM links cleanly -- they just return null/0 and
 // the Java side reports the platform as unsupported.
 
+/// Reports an authorization answer back to Java, on the main queue.
+///
+/// Declared here rather than by including the generated header: this file
+/// includes none of them, and one extern is a smaller dependency than the whole
+/// class header.
+extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_cn1CameraAccessResult___int_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT callbackId, JAVA_BOOLEAN granted);
+
+static void cn1CameraReportAccess(int callbackId, BOOL granted) {
+    struct ThreadLocalData *threadStateData = getThreadLocalData();
+    com_codename1_impl_ios_IOSImplementation_cn1CameraAccessResult___int_boolean(
+            threadStateData, (JAVA_INT)callbackId, granted ? JAVA_TRUE : JAVA_FALSE);
+}
+
+/// The authorization AVFoundation already holds, without prompting for it.
+///
+/// AVAuthorizationStatus is documented as notDetermined 0, restricted 1, denied 2,
+/// authorized 3, and the Java side reads those numbers directly rather than
+/// through a second enum that could drift from Apple's.
+JAVA_INT com_codename1_impl_ios_IOSNative_cameraAuthorizationStatus___boolean_R_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_BOOLEAN audio) {
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
+    POOL_BEGIN();
+    AVMediaType type = audio ? AVMediaTypeAudio : AVMediaTypeVideo;
+    JAVA_INT status = (JAVA_INT)[AVCaptureDevice authorizationStatusForMediaType:type];
+    POOL_END();
+    return status;
+#else
+    // Guarded like cn1CameraRequestAccess beside it, and answering "not
+    // determined" rather than "denied": with no camera backend compiled in there
+    // is nothing to be authorized for, and reporting a denial would make the
+    // caller say the user refused something never asked.
+    return 0;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_cn1CameraRequestAccess___boolean_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN audio, JAVA_INT callbackId) {
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
+    int cb = (int)callbackId;
+    BOOL wantsAudio = audio != 0;
+    // Asked rather than inspected. The status can be undetermined, and there is
+    // no answer to report until the user has actually been shown the prompt --
+    // requestAccessForMediaType is what shows it, and calls back with the real
+    // result whether or not it had to.
+    [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
+                             completionHandler:^(BOOL videoGranted) {
+        if (!videoGranted || !wantsAudio) {
+            // Audio is not asked for when video was refused: the capture cannot
+            // happen either way, and a second prompt for a session that will not
+            // run is a prompt the user has to dismiss for nothing.
+            cn1CameraReportAccess(cb, videoGranted);
+            return;
+        }
+        [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio
+                                 completionHandler:^(BOOL audioGranted) {
+            // Both, for a video recording. A denied microphone produced a
+            // silent movie reported as a success, which is worse than declining:
+            // the file looks right until it is played.
+            cn1CameraReportAccess(cb, audioGranted);
+        }];
+    }];
+#else
+    cn1CameraReportAccess((int)callbackId, NO);
+#endif
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1CameraEnumerate___R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
@@ -432,9 +572,21 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraOpen___java_lang_String_int_
     CN1Camera *cam = [[CN1Camera alloc] init];
     BOOL ok = [cam openWithCameraId:idStr previewW:previewW previewH:previewH
                        captureAudio:captureAudio];
-    if (!ok) return 0;
+    if (!ok) {
+        // The allocation was leaked outright on this path: nothing else ever
+        // sees this camera, so nothing else can release it.
 #ifndef CN1_USE_ARC
-    return (JAVA_LONG)[cam retain];
+        [cam release];
+#endif
+        return 0;
+    }
+#ifndef CN1_USE_ARC
+    // The alloc's +1 IS the reference handed to Java, transferred rather than
+    // added to. Retaining again made it +2 against the single release
+    // cn1CameraClose does, so every camera session opened kept its
+    // AVCaptureSession and its inputs alive for the life of the process --
+    // a capture at a time, never given back.
+    return (JAVA_LONG)cam;
 #else
     return (JAVA_LONG)(__bridge_retained void *)cam;
 #endif
@@ -451,7 +603,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraCreatePreviewView___long_R_l
 #else
     CN1Camera *cam = (__bridge CN1Camera *)(void *)sessionPeer;
 #endif
-    UIView *v = [cam createPreviewView];
+    CN1View *v = [cam createPreviewView];
 #ifndef CN1_USE_ARC
     return (JAVA_LONG)[v retain];
 #else

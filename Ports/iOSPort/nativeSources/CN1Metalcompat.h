@@ -28,7 +28,7 @@
 
 @import Metal;
 @import simd;
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import <GLKit/GLKit.h>
 
 // Metal rendering backend for Codename One iOS.
@@ -220,7 +220,7 @@ void CN1MetalTileImage(id<MTLTexture> texture, int alpha,
 // approach) and then rendered as a textured quad with alpha modulation.
 // A small LRU cache keyed on (str, font, color) avoids re-rasterising per
 // frame. Phase 4 will replace this with a CoreText glyph atlas.
-void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y);
+void CN1MetalDrawString(NSString *str, CN1Font *font, int color, int alpha, int x, int y);
 
 // Build an MTLTexture from a single-channel (R8/alpha-only) bitmap. The
 // alpha bytes are produced by Renderer.c (Renderer_produceAlphas) when
@@ -288,7 +288,7 @@ void CN1MetalFillGradient(int kind,
 
 // Lazily build an MTLTexture from a UIImage. Cached on the GLUIImage.
 // Returns nil on failure. Caller does not own the texture.
-id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image);
+id<MTLTexture> CN1MetalTextureFromUIImage(CN1Image *image);
 
 // Global Metal device (from METALView's command queue); shared by anyone
 // who needs to allocate Metal resources.
@@ -301,7 +301,7 @@ id<MTLCommandQueue> CN1MetalCommandQueue(void);
 
 // Called once by METALView.initWithCoder (main thread) to publish the
 // view's MTLDevice + MTLCommandQueue. CN1MetalDevice / CN1MetalCommandQueue
-// then return these without touching any UIView property. Keeping the
+// then return these without touching any CN1View property. Keeping the
 // queue identity stable with METALView is required: mutable-image setup
 // commits share-and-FIFO with the screen render command buffer, so
 // drawImage of a mutable can rely on its prior writes being ordered.
@@ -368,7 +368,7 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
 // so the GPU work is finalised. Returns nil if there's no mutable texture
 // or read fails. Used by gausianBlurImage / toBase64* / etc. that consume
 // the mutable's pixels through CG / CIImage on Metal builds.
-UIImage * _Nullable CN1MetalReadMutableImageAsUIImage(GLUIImage *image);
+CN1Image * _Nullable CN1MetalReadMutableImageAsUIImage(GLUIImage *image);
 
 // -------- Mutable-image suspend/resume backup (issue #5153) --------
 //

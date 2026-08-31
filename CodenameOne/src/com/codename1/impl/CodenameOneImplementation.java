@@ -139,7 +139,7 @@ import java.util.Vector;
 /// Display specifically for key, pointer events and screen resolution.
 ///
 /// @author Shai Almog
-@Concrete(name = "com.codename1.impl.ios.IOSImplementation", win = "com.codename1.impl.windows.WindowsImplementation", linux = "com.codename1.impl.linux.LinuxImplementation")
+@Concrete(name = "com.codename1.impl.ios.IOSImplementation", win = "com.codename1.impl.windows.WindowsImplementation", linux = "com.codename1.impl.linux.LinuxImplementation", mac = "com.codename1.impl.mac.MacImplementation")
 public abstract class CodenameOneImplementation {
     /// Indicates the range of "hard" RTL bidi characters in unicode
     private static final int RTL_RANGE_BEGIN = 0x590;
@@ -6394,6 +6394,36 @@ public abstract class CodenameOneImplementation {
     ///
     /// the nearby bridge, or null when unsupported
     public com.codename1.nearby.spi.NearbyBridge getNearbyBridge() {
+        return null;
+    }
+
+    /// Returns the platform bridge used by the `com.codename1.call` API to reach the system call
+    /// stack. Ports supporting system call integration override this; the default answers `null`.
+    ///
+    /// A `null` return **is** the capability query -- there is deliberately no separate supported
+    /// flag that could drift out of step with it.
+    ///
+    /// A port may implement one cluster and not the others: the bridge answers `isCallSupported`,
+    /// `isVoipPushSupported` and `isDirectorySupported` independently, because ringing a call,
+    /// being woken to ring one, and naming somebody else's caller are three different capabilities
+    /// with three different costs.
+    ///
+    /// #### Returns
+    ///
+    /// the call bridge, or null when unsupported
+    public com.codename1.call.spi.CallBridge getCallBridge() {
+        return null;
+    }
+
+    /// Returns the platform bridge used by the `com.codename1.vpn` API to install and control VPN
+    /// configurations. Ports supporting VPN management override this; the default answers `null`.
+    ///
+    /// A `null` return **is** the capability query.
+    ///
+    /// #### Returns
+    ///
+    /// the VPN bridge, or null when unsupported
+    public com.codename1.vpn.spi.VpnBridge getVpnBridge() {
         return null;
     }
 

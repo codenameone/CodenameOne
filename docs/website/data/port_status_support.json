@@ -22,11 +22,11 @@
     {
       "id": "macos",
       "platform": "macOS",
-      "architectures": "Apple silicon and Intel through Mac Catalyst",
-      "declared_range": "macOS 10.15 and newer",
-      "ci_evidence": "Full native compliance suite on macOS 15 using the Mac Catalyst target",
-      "floor_evidence": "The macOS 10.15 and Catalyst 13.1 deployment floors are compiled; the oldest runtime is not available on hosted CI",
-      "support": "Supported, Catalyst scope"
+      "architectures": "Apple silicon and Intel, on the native AppKit build and on the legacy Mac Catalyst target",
+      "declared_range": "macOS 11 and newer on the native AppKit build; macOS 10.15 and newer on the legacy Mac Catalyst target",
+      "ci_evidence": "Full native compliance suite on macOS 15, run separately against the native AppKit build and the legacy Mac Catalyst target",
+      "floor_evidence": "The macOS 11 AppKit floor and the macOS 10.15 / Catalyst 13.1 floors are compiled; the oldest runtimes are not available on hosted CI",
+      "support": "Supported; the native AppKit build is the supported target and Mac Catalyst remains buildable"
     },
     {
       "id": "web",

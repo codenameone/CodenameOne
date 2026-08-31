@@ -1,0 +1,167 @@
+# Clang syntax check for the call and VPN iOS natives.
+#
+# It lives in its own workflow rather than beside the identity clang step it
+# was cloned from, because a workflow only runs when its own path filter
+# matches: parked inside identity-stack.yml, a PR that touched nothing but
+# CN1Call.m skipped the one check written for CN1Call.m.
+name: Call and VPN natives
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'Ports/iOSPort/nativeSources/CN1Call.*'
+      - 'Ports/iOSPort/nativeSources/CN1Vpn.*'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.h'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLAppDelegate.m'
+      # The header this job compiles against is DERIVED from these two, so a
+      # change to either can break the check while touching no native source.
+      # A pull request that renames an upcall, or breaks the generator, would
+      # otherwise skip the job that exists to catch exactly that.
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCallCallbacks.java'
+      - 'scripts/gen-ios-callback-stub.py'
+      - '.github/workflows/call-vpn-native.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'Ports/iOSPort/nativeSources/CN1Call.*'
+      - 'Ports/iOSPort/nativeSources/CN1Vpn.*'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.h'
+      - 'Ports/iOSPort/nativeSources/CodenameOne_GLAppDelegate.m'
+      # The header this job compiles against is DERIVED from these two, so a
+      # change to either can break the check while touching no native source.
+      # A pull request that renames an upcall, or breaks the generator, would
+      # otherwise skip the job that exists to catch exactly that.
+      - 'Ports/iOSPort/src/com/codename1/impl/ios/IOSCallCallbacks.java'
+      - 'scripts/gen-ios-callback-stub.py'
+      - '.github/workflows/call-vpn-native.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: call-vpn-native-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  macos-clang:
+    name: Clang syntax check for the call and VPN natives
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Show Xcode toolchain
+        run: |
+          xcodebuild -version
+          xcrun --show-sdk-path --sdk iphoneos
+
+      - name: Clang -fsyntax-only on the call and VPN native impls
+        run: |
+          set -euo pipefail
+          ROOT="$PWD"
+          cd Ports/iOSPort/nativeSources
+          SDK="$(xcrun --show-sdk-path --sdk iphoneos)"
+          # A separate step from the one above because these files need two
+          # more things in the shim: getThreadLocalData(), and the generated
+          # IOSCallCallbacks header they call up through. Both exist in the
+          # real ParparVM pipeline and neither is in this checkout.
+          #
+          # This step exists at all because CN1Call.m is the one file in the
+          # tree whose correctness cannot be checked any other way. It is
+          # ~1500 lines of Objective-C, no Java test can reach it, and the
+          # only other gate -- check-native-signatures.sh -- reads names and
+          # not bodies.
+          STUB="$(mktemp -d)"
+          cat > "$STUB/xmlvm.h" <<'EOF'
+          struct ThreadLocalData;
+          typedef void* JAVA_OBJECT;
+          typedef int   JAVA_BOOLEAN;
+          typedef int   JAVA_INT;
+          typedef long long JAVA_LONG;
+          typedef void  JAVA_VOID;
+          #define JAVA_TRUE  1
+          #define JAVA_FALSE 0
+          #define JAVA_NULL  0
+          #define POOL_BEGIN()
+          #define POOL_END()
+          // Matches vm/ByteCodeTranslator/src/cn1_globals.h: the macro is a
+          // full parameter declaration INCLUDING the name, which is why every
+          // native body can refer to threadStateData.
+          #define CODENAME_ONE_THREAD_STATE struct ThreadLocalData* threadStateData
+          extern struct ThreadLocalData* getThreadLocalData(void);
+          #define CN1_THREAD_STATE_SINGLE_ARG
+          #define CN1_THREAD_STATE_MULTI_ARG struct ThreadLocalData* threadStateData,
+          #define CN1_THREAD_STATE_PASS_ARG threadStateData,
+          #define CN1_THREAD_STATE_PASS_SINGLE_ARG threadStateData
+          #define CN1_THREAD_GET_STATE_PASS_ARG threadStateData,
+          #define CN1_THREAD_GET_STATE_PASS_SINGLE_ARG threadStateData
+          EOF
+          cat > "$STUB/java_lang_String.h" <<'EOF'
+          #import "xmlvm.h"
+          EOF
+          # The upcall header, GENERATED from IOSCallCallbacks.java.
+          #
+          # It used to be spelled out here, with a comment arguing that a
+          # generator would be one more thing to be wrong about. Then a
+          # callback was added, this copy was not, and the check failed on a
+          # symbol that exists -- which is the failure the hand-written list
+          # was supposed to prevent. The generator also verifies that every
+          # IOSCallCallbacks symbol the native sources CALL is declared, so
+          # drift in the direction that matters is a build error rather than
+          # a mystery about implicit declarations.
+          #
+          # Run from $ROOT, because this step has already cd'd into the
+          # native sources: repository-relative paths from here resolve
+          # under Ports/iOSPort/nativeSources and none of them exist. With
+          # set -e that aborts the step before either clang configuration
+          # runs, which disables the whole check rather than failing it --
+          # the quietest way a gate can stop gating.
+          python3 "$ROOT/scripts/gen-ios-callback-stub.py" \
+            "$ROOT/Ports/iOSPort/src/com/codename1/impl/ios/IOSCallCallbacks.java" \
+            "$STUB/com_codename1_impl_ios_IOSCallCallbacks.h" \
+            "$ROOT/Ports/iOSPort/nativeSources/CN1Call.m" \
+            "$ROOT/Ports/iOSPort/nativeSources/CN1Vpn.m"
+          # Both configurations: the halves an app that never referenced the
+          # packages links, and the halves one that did links.
+          for label in off on; do
+            extra=""
+            if [ "$label" = on ]; then
+              extra="-DCN1_INCLUDE_CALL -DCN1_CALL_VOIP -DCN1_CALL_DIRECTORY -DCN1_INCLUDE_VPN"
+            fi
+            echo "::group::clang call/vpn $label"
+            # NO -fobjc-arc. The production iOS target sets
+            # CLANG_ENABLE_OBJC_ARC = NO, so these sources are manual
+            # reference counting: compiling them under ARC checked a memory
+            # model the app never builds with, hid every leak this gate
+            # exists to catch, and rejected the explicit release that fixes
+            # one. The flag has to match the target or the check is theatre.
+            #
+            # arc-bridge-casts-disallowed-in-nonarc is promoted for the same
+            # reason: a __bridge cast is a NO-OP here, so an ownership
+            # transfer written that way silently leaks. It did --
+            # SecItemAdd's +1 persistent ref was "consumed" by a
+            # __bridge_transfer that does nothing without ARC -- and as a
+            # plain warning it scrolled past a green step.
+            #
+            # No comments inside the invocation below: a backslash-continued
+            # line joins to the next one, so a "#" among the arguments
+            # comments out every argument after it and the check keeps
+            # passing while testing less.
+            xcrun --sdk iphoneos clang \
+                -fsyntax-only \
+                -arch arm64 \
+                -Werror=incompatible-pointer-types \
+                -Werror=objc-method-access \
+                -Werror=arc-bridge-casts-disallowed-in-nonarc \
+                -Wno-unused-parameter \
+                -Wno-deprecated-declarations \
+                -Wno-macro-redefined \
+                -I"$STUB" \
+                -DNEW_CODENAME_ONE_VM=1 \
+                $extra \
+                CN1Call.m \
+                CN1Vpn.m
+            echo "::endgroup::"
+          done

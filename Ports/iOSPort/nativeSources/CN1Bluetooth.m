@@ -69,7 +69,7 @@
 // there and isBlePeripheralSupported reports false.
 #if !TARGET_OS_TV && !TARGET_OS_WATCH
 #define CN1_BT_PERIPHERAL_ROLE 1
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #endif
 
 extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);
@@ -1445,7 +1445,15 @@ static CN1BluetoothController *cn1btGetController(void) {
     if (name != nil) {
         NSString *resolved = name;
         if ([resolved length] == 0) {
+            // The device's own name, as the advertised local name when the
+            // caller supplied none. UIDevice is the iOS spelling and does not
+            // exist on macOS -- the only UIKit reference in this file, and it is
+            // what stopped a Bluetooth-enabled macOS build compiling at all.
+#if TARGET_OS_OSX
+            resolved = [[NSHost currentHost] localizedName];
+#else
             resolved = [UIDevice currentDevice].name;
+#endif
         }
         if (resolved != nil) {
             [ad setObject:resolved forKey:CBAdvertisementDataLocalNameKey];

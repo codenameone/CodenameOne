@@ -36,7 +36,7 @@
 
 #if defined(INCLUDE_CN1_AR) && !TARGET_OS_TV && !TARGET_OS_WATCH
 
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import <ARKit/ARKit.h>
 #import <SceneKit/SceneKit.h>
 
@@ -61,7 +61,7 @@
 - (void)addReferenceImage:(NSData *)encoded name:(NSString *)name width:(float)widthMeters;
 - (BOOL)startWithConfigType:(int)configType planeMask:(int)planeMask
             lightEstimation:(BOOL)lightEstimation;
-- (UIView *)createView;
+- (CN1View *)createView;
 - (NSString *)hitTestX:(float)xNorm y:(float)yNorm;
 - (NSString *)createAnchorTx:(float)tx ty:(float)ty tz:(float)tz
                           qx:(float)qx qy:(float)qy qz:(float)qz qw:(float)qw;

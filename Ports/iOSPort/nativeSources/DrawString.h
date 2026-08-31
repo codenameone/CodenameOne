@@ -22,13 +22,16 @@
  */
 #import <Foundation/Foundation.h>
 #import "ExecutableOp.h"
+// OpenGL ES does not exist on macOS; this port is Metal-only.
+#if !TARGET_OS_OSX
 #import <OpenGLES/EAGL.h>
 
 #import <OpenGLES/ES1/gl.h>
 #import <OpenGLES/ES1/glext.h>
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
-#import <UIKit/UIKit.h>
+#endif
+#import "CN1AppleUI.h"
 
 @interface DrawString : ExecutableOp {
     int color;
@@ -36,10 +39,10 @@
     int x;
     int y;
     NSString* str;
-    UIFont* font;
+    CN1Font* font;
     
 }
--(id)initWithArgs:(int)c a:(int)a xpos:(int)xpos ypos:(int)ypos s:(NSString*)s f:(UIFont*)f;
+-(id)initWithArgs:(int)c a:(int)a xpos:(int)xpos ypos:(int)ypos s:(NSString*)s f:(CN1Font*)f;
 -(void)execute;
 
 @end

@@ -21,14 +21,19 @@
  * need additional information or have any questions.
  */
 #import "CN1ES2compat.h"
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 
+// OpenGL ES does not exist on macOS, and the native macOS port is Metal-only,
+// so none of this is reachable there. Mac Catalyst gets to the same place via
+// fabricated stub headers; here the imports are simply skipped.
+#if !TARGET_OS_OSX
 #import <OpenGLES/EAGL.h>
 #import "EAGLView.h"
 #import <OpenGLES/ES1/gl.h>
 #import <OpenGLES/ES1/glext.h>
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
+#endif
 #import "ExecutableOp.h"
 #import "PaintOp.h"
 #import "GLUIImage.h"
@@ -39,8 +44,11 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 // guarded the same way in IOSNative.m, and the matching delegate conformances
 // below are likewise dropped on those slices.
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MessageUI/MFMailComposeViewController.h>
 #import <MessageUI/MFMessageComposeViewController.h>
+#endif
 #endif
 #import <CoreLocation/CoreLocation.h>
 //#define CN1_USE_STOREKIT
@@ -336,6 +344,71 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 #undef CN1_NEARBY_TRANSPORT
 #endif
 
+// CN1_INCLUDE_CALL gates the com.codename1.call native bridge (CN1Call.{h,m}:
+// CallKit's provider and call controller, PushKit's VoIP registry, and the
+// Call Directory data store). IPhoneBuilder uncomments this only when the
+// classpath scanner saw com.codename1.call.*, so an app that never rings
+// anything ships without CallKit symbols -- which matters here more than for
+// most features, because CallKit is one of the frameworks App Store review
+// looks at and an app carrying it with no calling feature invites questions.
+//#define CN1_INCLUDE_CALL
+
+// The two expensive halves are gated separately, because each costs something
+// an ordinary calling app must not pay. CN1_CALL_VOIP links PushKit and earns
+// the voip background mode, which Apple rejects an app for carrying without a
+// working call implementation. CN1_CALL_DIRECTORY generates a Call Directory
+// app extension and its App Group. IPhoneBuilder uncomments each from its own
+// scanner flag.
+//#define CN1_CALL_VOIP
+//#define CN1_CALL_DIRECTORY
+
+// CallKit does not exist on tvOS or watchOS, and PushKit does not exist on
+// watchOS. Undoing the defines here, in the header every call translation unit
+// includes first, compiles those halves out rather than leaving each function
+// to guard itself -- and the public API then reports them unsupported, which
+// is the answer an app on an Apple TV should get.
+//
+// Mac Catalyst DOES have CallKit and is deliberately left alone.
+#if TARGET_OS_TV || TARGET_OS_WATCH
+#undef CN1_INCLUDE_CALL
+#undef CN1_CALL_VOIP
+#undef CN1_CALL_DIRECTORY
+#endif
+
+// CN1_INCLUDE_VPN gates the com.codename1.vpn native bridge (CN1Vpn.{h,m}:
+// NEVPNManager and the IKEv2/IPsec protocol configuration). Note this is a
+// different thing from the VPN DETECTION in IOSNative.m, which is always
+// compiled in, needs no entitlement, and answers whether some VPN is carrying
+// this device's traffic.
+//#define CN1_INCLUDE_VPN
+
+// CN1_VPN_TUNNEL gates com.codename1.vpn.tunnel: a packet tunnel the app
+// writes, which runs in a generated Network Extension target.
+//
+// This comment used to say the capability could not exist, because the
+// extension is a separate process "with no ParparVM in it". That was wrong
+// about the only part that mattered: the extension is a target THIS BUILD
+// generates, so it carries a translated VM exactly as the app target does,
+// and the app's VpnTunnel subclass is translated into it. What is true is
+// that it shares nothing else with the app -- no statics, no Display, no
+// open connections -- which is why the setup travels as data.
+//
+// Its entitlement, com.apple.developer.networking.networkextension, is one
+// Apple grants case by case rather than one a paid account switches on, so
+// the builder never injects it automatically.
+//#define CN1_VPN_TUNNEL
+
+// NetworkExtension's VPN manager is unavailable on tvOS and watchOS.
+#if TARGET_OS_TV || TARGET_OS_WATCH
+#undef CN1_INCLUDE_VPN
+#undef CN1_VPN_TUNNEL
+#endif
+
+// A packet tunnel needs the VPN bridge that starts it.
+#ifndef CN1_INCLUDE_VPN
+#undef CN1_VPN_TUNNEL
+#endif
+
 // CN1_INCLUDE_MATTER_SETUP gates the MatterSupport add-device flow, which is
 // much more expensive than the rest: it needs its own app-extension target,
 // the com.apple.developer.matter.allow-setup-payload entitlement, an app group
@@ -451,19 +524,27 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 // and the first EDT-painted frame; see CodenameOne_GLViewController.m. UIWindow
 // is unavailable on watchOS and the launch placeholder is iOS-only.
 #if !TARGET_OS_WATCH
+#if !TARGET_OS_OSX
 void CN1ShowLaunchPlaceholder(UIWindow *window);
+#endif
 void CN1DismissLaunchPlaceholder(void);
 #endif
 
 //ADD_INCLUDE
 
-#if TARGET_OS_WATCH
-// watchOS has no UIViewController/UIView/CADisplayLink (the SDK marks them
+#if TARGET_OS_WATCH || TARGET_OS_OSX
+// watchOS has no UIViewController/CN1View/CADisplayLink (the SDK marks them
 // API_UNAVAILABLE(watchos)). The watch slice replaces the GL view controller
 // with a plain NSObject render-driver (CN1WatchViewController.m) that owns the
 // same ExecutableOp queue and drives drawFrame into the Core Graphics surface
 // (CN1WatchRenderingView). Same class name so the ~10 callers + the translated
 // runtime resolve unchanged.
+//
+// The native macOS port takes the same shape for a different reason: AppKit has
+// no UIViewController either, and its render driver (CN1MacViewController.m)
+// owns the same queue and drives it into a CN1AppKitMetalView. Sharing the watch
+// arm rather than adding a third is deliberate -- the declaration these two need
+// is identical, and the alternative is two copies that drift.
 @interface CodenameOne_GLViewController : NSObject {
 @private
     GLUIImage* currentMutableImage;
@@ -484,11 +565,16 @@ void CN1DismissLaunchPlaceholder(void);
 -(void)upcomingAdd:(ExecutableOp*)op;
 -(void)upcomingAddClip:(ExecutableOp*)op;
 -(BOOL)isPaintFinished;
--(void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height;
--(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y;
+-(void)flushBuffer:(CN1Image *)buff x:(int)x y:(int)y width:(int)width height:(int)height;
+-(void)drawString:(int)color alpha:(int)alpha font:(CN1Font*)font str:(NSString*)str x:(int)x y:(int)y;
 -(void)drawScreen;
 -(void)drawFrame:(CGRect)rect;
 -(void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive;
+/// Drains the queue and draws even when the application is not frontmost.
+/// Display.screenshot() calls this: a capture must not wait for the normal
+/// paint cycle, which may never come while the window is not key -- and the
+/// screenshot suite runs exactly there.
+-(void)flushBufferForReadback:(int)x y:(int)y width:(int)width height:(int)height;
 @end
 #else
 @interface CodenameOne_GLViewController : UIViewController<
@@ -577,9 +663,9 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 +(void)upcoming:(ExecutableOp*)op;
 -(void)upcomingAdd:(ExecutableOp*)op;
 -(BOOL)isPaintFinished;
--(void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height;
+-(void)flushBuffer:(CN1Image *)buff x:(int)x y:(int)y width:(int)width height:(int)height;
 
--(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y;
+-(void)drawString:(int)color alpha:(int)alpha font:(CN1Font*)font str:(NSString*)str x:(int)x y:(int)y;
 - (void)drawScreen;
 - (void)drawFrame:(CGRect)rect;
 - (void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive;

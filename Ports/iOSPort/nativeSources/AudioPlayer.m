@@ -156,6 +156,12 @@ AudioPlayer* currentlyPlaying = nil;
     //UInt32 audioRouteOverride = kAudioSessionOverrideAudioRoute_Speaker;
     //AudioSessionSetProperty (kAudioSessionProperty_OverrideAudioRoute,sizeof (audioRouteOverride),&audioRouteOverride);
 
+    // AVAudioSession does not exist on macOS, and nothing replaces it: routing,
+    // ducking and interruption are the system's business there rather than the
+    // application's, so a Mac app simply plays and the OS mixes it. The category
+    // and activation calls below are what an iOS app must do to be audible at
+    // all; skipping them on macOS is correct, not a gap.
+#if !TARGET_OS_OSX
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
     NSError *setCategoryError = nil;
     BOOL success = [audioSession setCategory:AVAudioSessionCategoryPlayback error:&setCategoryError];
@@ -167,8 +173,10 @@ AudioPlayer* currentlyPlaying = nil;
     if (!success) {
         CN1Log(@"ERROR");
     }
-#if !TARGET_OS_WATCH
-    // UIApplication is unavailable on watchOS.
+#endif
+#if !TARGET_OS_WATCH && !TARGET_OS_OSX
+    // UIApplication is unavailable on watchOS, and remote-control events are a
+    // UIKit responder-chain concept; macOS delivers media keys differently.
     [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
 #endif
 

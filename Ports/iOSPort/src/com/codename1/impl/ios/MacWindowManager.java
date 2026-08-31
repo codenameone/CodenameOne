@@ -71,7 +71,7 @@ public class MacWindowManager extends WindowManager {
         // UIScreen notifications are the only way a Catalyst app learns that a
         // display was attached, removed or changed mode, so a monitor listener
         // depends entirely on this being installed.
-        IOSImplementation.nativeInstance.macWindowWatchScreens();
+        IOSImplementation.catalystWindowNative.macWindowWatchScreens();
     }
 
     /** One native window: its slot, and the raster it is rendered through. */
@@ -145,7 +145,7 @@ public class MacWindowManager extends WindowManager {
         // the main scene take its owned windows down with it. positionSet matters too:
         // inferring it from the coordinates makes a window explicitly placed at 0,0
         // look unplaced, and the window server then puts it wherever it likes.
-        int s = IOSImplementation.nativeInstance.macWindowCreate(windowId,
+        int s = IOSImplementation.catalystWindowNative.macWindowCreate(windowId,
                 title == null ? "" : title, x, y, width, height, decorated, resizable,
                 positionSet);
         if (s < 0) {
@@ -154,7 +154,7 @@ public class MacWindowManager extends WindowManager {
         Peer created = new Peer(s, windowId);
         // Creation asks for the first scene, so the window already has a request
         // outstanding before anything calls show().
-        created.requestSeq = IOSImplementation.nativeInstance.macWindowRequestSeq(s);
+        created.requestSeq = IOSImplementation.catalystWindowNative.macWindowRequestSeq(s);
         created.owner = ownedByMainWindow ? MAIN_WINDOW : parentPeer;
         synchronized (peers) {
             peers.add(created);
@@ -175,10 +175,10 @@ public class MacWindowManager extends WindowManager {
         // up and there is deliberately no second mechanism doing it again.
         w.visible = true;
         w.hiddenByOwner = false;
-        IOSImplementation.nativeInstance.macWindowShow(w.slot, true);
+        IOSImplementation.catalystWindowNative.macWindowShow(w.slot, true);
         // Read back rather than counted here: the port bumps its own token when the
         // call above actually asks for a scene, and only it knows whether it did.
-        w.requestSeq = IOSImplementation.nativeInstance.macWindowRequestSeq(w.slot);
+        w.requestSeq = IOSImplementation.catalystWindowNative.macWindowRequestSeq(w.slot);
         // Only the ones this owner took down. A child hidden by the application stays
         // hidden, exactly as AWT and GTK behave when an owner is shown again.
         cascadeFrom(w, true);
@@ -293,7 +293,7 @@ public class MacWindowManager extends WindowManager {
                 if (child.hiddenByOwner) {
                     child.hiddenByOwner = false;
                     child.visible = true;
-                    IOSImplementation.nativeInstance.macWindowShow(child.slot, true);
+                    IOSImplementation.catalystWindowNative.macWindowShow(child.slot, true);
                     changed = true;
                 }
             } else if (child.visible) {
@@ -307,7 +307,7 @@ public class MacWindowManager extends WindowManager {
                 // through its own show(), which runs the whole lifecycle.
                 child.hiddenByOwner = !activationFailed;
                 child.visible = false;
-                IOSImplementation.nativeInstance.macWindowShow(child.slot, false);
+                IOSImplementation.catalystWindowNative.macWindowShow(child.slot, false);
                 changed = true;
             }
             if (changed) {
@@ -343,7 +343,7 @@ public class MacWindowManager extends WindowManager {
         // deliberately hidden, and report it restored while its component hierarchy is
         // still invisible.
         w.hiddenByOwner = false;
-        IOSImplementation.nativeInstance.macWindowShow(w.slot, false);
+        IOSImplementation.catalystWindowNative.macWindowShow(w.slot, false);
         // An owned window cannot stay on screen without its owner. Recorded as
         // hidden-by-owner so showing the owner again brings back exactly the children
         // it took down, and not ones the application hid itself.
@@ -372,7 +372,7 @@ public class MacWindowManager extends WindowManager {
         // Released with the raster it belongs to; a disposed window has no frames left
         // to present, and on a large display this is a few tens of megabytes.
         w.frameBuffer = null;
-        IOSImplementation.nativeInstance.macWindowDestroy(w.slot);
+        IOSImplementation.catalystWindowNative.macWindowDestroy(w.slot);
     }
 
     // ---- attributes ------------------------------------------------------------
@@ -381,7 +381,7 @@ public class MacWindowManager extends WindowManager {
     public void setTitle(Object p, String title) {
         int s = slot(p);
         if (s >= 0) {
-            IOSImplementation.nativeInstance.macWindowSetTitle(s, title == null ? "" : title);
+            IOSImplementation.catalystWindowNative.macWindowSetTitle(s, title == null ? "" : title);
         }
     }
 
@@ -389,7 +389,7 @@ public class MacWindowManager extends WindowManager {
     public void setBounds(Object p, int x, int y, int width, int height) {
         int s = slot(p);
         if (s >= 0) {
-            IOSImplementation.nativeInstance.macWindowSetBounds(s, x, y, width, height);
+            IOSImplementation.catalystWindowNative.macWindowSetBounds(s, x, y, width, height);
         }
     }
 
@@ -397,7 +397,7 @@ public class MacWindowManager extends WindowManager {
     public int[] getBounds(Object p, int[] out) {
         int s = slot(p);
         if (s >= 0) {
-            IOSImplementation.nativeInstance.macWindowGetBounds(s, out);
+            IOSImplementation.catalystWindowNative.macWindowGetBounds(s, out);
         }
         return out;
     }
@@ -405,13 +405,13 @@ public class MacWindowManager extends WindowManager {
     @Override
     public int getWidth(Object p) {
         int s = slot(p);
-        return s < 0 ? 0 : IOSImplementation.nativeInstance.macWindowGetWidth(s);
+        return s < 0 ? 0 : IOSImplementation.catalystWindowNative.macWindowGetWidth(s);
     }
 
     @Override
     public int getHeight(Object p) {
         int s = slot(p);
-        return s < 0 ? 0 : IOSImplementation.nativeInstance.macWindowGetHeight(s);
+        return s < 0 ? 0 : IOSImplementation.catalystWindowNative.macWindowGetHeight(s);
     }
 
     @Override
@@ -420,7 +420,7 @@ public class MacWindowManager extends WindowManager {
         if (s >= 0) {
             // 3 == present, the one window-state operation Catalyst exposes to a
             // UIKit app; minimize and zoom belong to the window manager there.
-            IOSImplementation.nativeInstance.macWindowSetState(s, 3);
+            IOSImplementation.catalystWindowNative.macWindowSetState(s, 3);
         }
     }
 
@@ -432,7 +432,7 @@ public class MacWindowManager extends WindowManager {
     @Override
     public boolean reopen(Object p) {
         int s = slot(p);
-        return s >= 0 && IOSImplementation.nativeInstance.macWindowReopen(s);
+        return s >= 0 && IOSImplementation.catalystWindowNative.macWindowReopen(s);
     }
 
     /// {@inheritDoc}
@@ -453,12 +453,12 @@ public class MacWindowManager extends WindowManager {
         if (out == null || out.length < 4) {
             return null;
         }
-        return IOSImplementation.nativeInstance.macMainWindowGetBounds(out) ? out : null;
+        return IOSImplementation.catalystWindowNative.macMainWindowGetBounds(out) ? out : null;
     }
 
     @Override
     public void setMainWindowInputEnabled(boolean enabled) {
-        IOSImplementation.nativeInstance.macMainWindowSetInputEnabled(enabled);
+        IOSImplementation.catalystWindowNative.macMainWindowSetInputEnabled(enabled);
     }
 
     @Override
@@ -469,7 +469,7 @@ public class MacWindowManager extends WindowManager {
             // AppKit rather than to the application, so its close button stays live
             // even while the window is blocked -- Catalyst offers no way to disable
             // it, and a close there is reported after the fact as a disposal.
-            IOSImplementation.nativeInstance.macWindowSetInputEnabled(s, enabled);
+            IOSImplementation.catalystWindowNative.macWindowSetInputEnabled(s, enabled);
         }
     }
 
@@ -514,7 +514,7 @@ public class MacWindowManager extends WindowManager {
         }
         int[] argb = w.frameBuffer;
         impl.getRGB(w.mutableImage, argb, 0, 0, 0, w.rasterWidth, w.rasterHeight);
-        IOSImplementation.nativeInstance.macWindowPresent(w.slot, argb,
+        IOSImplementation.catalystWindowNative.macWindowPresent(w.slot, argb,
                 w.rasterWidth, w.rasterHeight);
     }
 
@@ -547,18 +547,18 @@ public class MacWindowManager extends WindowManager {
 
     @Override
     public int getMonitorCount() {
-        return Math.max(1, IOSImplementation.nativeInstance.macMonitorCount());
+        return Math.max(1, IOSImplementation.catalystWindowNative.macMonitorCount());
     }
 
     @Override
     public int[] getMonitorBounds(int monitor, int[] out) {
-        IOSImplementation.nativeInstance.macMonitorBounds(monitor, false, out);
+        IOSImplementation.catalystWindowNative.macMonitorBounds(monitor, false, out);
         return out;
     }
 
     @Override
     public int[] getMonitorWorkArea(int monitor, int[] out) {
-        IOSImplementation.nativeInstance.macMonitorBounds(monitor, true, out);
+        IOSImplementation.catalystWindowNative.macMonitorBounds(monitor, true, out);
         return out;
     }
 
@@ -580,12 +580,12 @@ public class MacWindowManager extends WindowManager {
     @Override
     public double getMonitorScale(int monitor) {
         // Carried across the bridge as an int, so scaled by a hundred.
-        return IOSImplementation.nativeInstance.macMonitorScaleTimes100(monitor) / 100.0;
+        return IOSImplementation.catalystWindowNative.macMonitorScaleTimes100(monitor) / 100.0;
     }
 
     @Override
     public int getMonitorDotsPerInch(int monitor) {
-        int dpi = IOSImplementation.nativeInstance.macMonitorDpi(monitor);
+        int dpi = IOSImplementation.catalystWindowNative.macMonitorDpi(monitor);
         return dpi > 0 ? dpi : 96;
     }
 
@@ -596,7 +596,7 @@ public class MacWindowManager extends WindowManager {
 
     @Override
     public int getPrimaryMonitor() {
-        return Math.max(0, IOSImplementation.nativeInstance.macPrimaryMonitor());
+        return Math.max(0, IOSImplementation.catalystWindowNative.macPrimaryMonitor());
     }
 
     @Override
@@ -605,7 +605,7 @@ public class MacWindowManager extends WindowManager {
         if (s < 0) {
             return getPrimaryMonitor();
         }
-        return Math.max(0, IOSImplementation.nativeInstance.macMonitorForWindow(s));
+        return Math.max(0, IOSImplementation.catalystWindowNative.macMonitorForWindow(s));
     }
 
     @Override
@@ -614,7 +614,7 @@ public class MacWindowManager extends WindowManager {
         // non-resizable stayed draggable while the framework reported it fixed.
         int s = slot(p);
         if (s >= 0) {
-            IOSImplementation.nativeInstance.macWindowSetResizable(s, resizable);
+            IOSImplementation.catalystWindowNative.macWindowSetResizable(s, resizable);
         }
     }
 
@@ -627,7 +627,7 @@ public class MacWindowManager extends WindowManager {
         // title bar -- and could show two sets of chrome at once.
         int s = slot(p);
         if (s >= 0) {
-            IOSImplementation.nativeInstance.macWindowSetDecorated(s, decorated);
+            IOSImplementation.catalystWindowNative.macWindowSetDecorated(s, decorated);
         }
     }
 
@@ -638,7 +638,7 @@ public class MacWindowManager extends WindowManager {
         // it.
         int s = slot(p);
         if (s >= 0) {
-            IOSImplementation.nativeInstance.macWindowSetMinimumSize(s, width, height);
+            IOSImplementation.catalystWindowNative.macWindowSetMinimumSize(s, width, height);
         }
     }
 
@@ -648,6 +648,6 @@ public class MacWindowManager extends WindowManager {
         // application's own scene moves between displays like any other window, so a
         // Form positioned against reported the wrong work area, scale and density
         // once it had been dragged to an external screen.
-        return Math.max(0, IOSImplementation.nativeInstance.macMonitorForMainWindow());
+        return Math.max(0, IOSImplementation.catalystWindowNative.macMonitorForMainWindow());
     }
 }
