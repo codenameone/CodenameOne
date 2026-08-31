@@ -353,6 +353,26 @@ class PhoneNumberFieldTest extends UITestBase {
     }
 
     @FormTest
+    void selectingACountryTheFieldDoesNotOfferIsRefused() {
+        // otherwise the selector shows a country its own list does not contain, and the
+        // field submits a calling code the user was never offered
+        PhoneNumberField f = new PhoneNumberField();
+        f.setCountries(new Country[]{PhoneNumberField.findCountry("US")});
+        assertThrows(IllegalArgumentException.class,
+                () -> f.setCountry(PhoneNumberField.findCountry("IL")));
+        assertEquals("US", f.getCountry().getIsoCode(), "and the selection is untouched");
+    }
+
+    @FormTest
+    void anApplicationsOwnEntryForAnOfferedCountryIsKeptAsPassed() {
+        // countries are equal by ISO code, so this one counts as offered -- and what the
+        // application passed is what it gets back, overridden calling code and all
+        PhoneNumberField f = new PhoneNumberField();
+        f.setCountry(new Country("US", "999", "Somewhere else"));
+        assertEquals("999", f.getCountry().getDialCode());
+    }
+
+    @FormTest
     void anEmptyListIsRefused() {
         PhoneNumberField f = new PhoneNumberField();
         assertThrows(IllegalArgumentException.class, () -> f.setCountries(new Country[0]));

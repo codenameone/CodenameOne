@@ -330,15 +330,46 @@ public class PhoneNumberField extends Container {
     /// Selects a country, which changes the calling code the value is built
     /// from without touching the number that was typed.
     ///
+    /// The country has to be one this field offers. Selecting one that is not
+    /// leaves the selector showing a country the list it opens does not contain,
+    /// and the field submitting a calling code the user was never given the
+    /// chance to choose -- a mistake worth hearing about where it is made rather
+    /// than in a support ticket about numbers from the wrong country.
+    ///
+    /// The object itself is kept rather than replaced by the equal one from the
+    /// list. Countries are equal by ISO code, so an application that supplies its
+    /// own entry for a country -- a different name, or a calling code it has
+    /// reason to override -- keeps what it passed.
+    ///
     /// #### Parameters
     ///
     /// - `c`: the country; ignored when null
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the country is not one this field
+    ///   offers; narrow or widen the list with `#setCountries(Country[])` first
     public void setCountry(Country c) {
         if (c == null) {
             return;
         }
+        if (!isOffered(c)) {
+            throw new IllegalArgumentException("Country " + c.getIsoCode()
+                    + " is not one this field offers; pass it to setCountries first");
+        }
         country = c;
         countryButton.setText("+" + c.getDialCode());
+    }
+
+    /// True when the country is one the selector would list.
+    private boolean isOffered(Country c) {
+        Country[] list = countries == null ? allCountries() : countries;
+        for (Country candidate : list) {
+            if (candidate.equals(c)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The national part as typed, digits only.

@@ -531,13 +531,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// across that boundary; a value one edit out of date is the correct trade against a crash
     /// inside somebody else's autofill query.
     static android.view.autofill.AutofillValue editorAutofillValue() {
-        com.codename1.ui.TextInputState state = activeInputState;
+        // Read the state AFTER the guards and confirm the session did not move under it.
+        // The three fields are assigned separately on the EDT, so taking the state first
+        // and validating afterwards can pair one field's text with the next field's
+        // configuration -- and the pairing that matters is a password field's text with a
+        // code field's hint. One session snapshot would express this better than three
+        // fields and a re-check, but that is the whole input bridge's shape rather than
+        // this method's, and the property needed here is only that nothing is returned
+        // for a session other than the one that was checked.
+        //
         // Gated the same way the write path is, and for a sharper reason: between the EDT
         // moving to another field and the UI thread taking the hint off the view, the
         // surface still looks like a code field over a session that is something else --
         // and answering this query then would hand that field's text to an SMS autofill
         // service. The field after a code field is as likely to be a password as anything.
-        if (activeInputClient == null || state == null || editorAutofillHints() == null) {
+        com.codename1.ui.TextInputClient client = activeInputClient;
+        if (client == null || editorAutofillHints() == null) {
+            return null;
+        }
+        com.codename1.ui.TextInputState state = activeInputState;
+        if (state == null || client != activeInputClient) {
             return null;
         }
         String text = state.getText();
