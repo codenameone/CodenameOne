@@ -21,6 +21,7 @@ on:
       - 'scripts/run-javascript-screenshot-tests.sh'
       - 'scripts/run-javascript-headless-browser.mjs'
       - 'scripts/run-javascript-lifecycle-tests.mjs'
+      - 'scripts/test-javascript-surface-replay.mjs'
       - 'scripts/run-javascript-lifecycle-tests.sh'
       - 'scripts/verify-javascript-lens-parity.mjs'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
@@ -45,6 +46,7 @@ on:
       - 'scripts/run-javascript-screenshot-tests.sh'
       - 'scripts/run-javascript-headless-browser.mjs'
       - 'scripts/run-javascript-lifecycle-tests.mjs'
+      - 'scripts/test-javascript-surface-replay.mjs'
       - 'scripts/run-javascript-lifecycle-tests.sh'
       - 'scripts/verify-javascript-lens-parity.mjs'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
@@ -123,6 +125,19 @@ jobs:
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      # Milliseconds, no browser and no bundle, so it runs before the build
+      # rather than after a 20-minute suite. Guards the surface command replay:
+      # one undrawable image source used to throw and take every op behind it
+      # in that batch with it, which is what truncated graphics-draw-image-rect
+      # intermittently.
+      #
+      # Deliberately ahead of "Set up Node 20": it uses only node: builtins
+      # (fs/path/url/vm), so the runner image's preinstalled Node runs it, and
+      # placing it here means a broken guard fails in seconds instead of after
+      # the ParparVM build.
+      - name: Surface command replay guards
+        run: node scripts/test-javascript-surface-replay.mjs
 
       - name: Cache codenameone-tools
         uses: actions/cache@v5
