@@ -2811,8 +2811,24 @@ public class Dialog extends Form implements AbstractDialog {
             // window, where Hidden is terminal only for a modal one: that window is
             // the application's and may be hidden precisely so it can be shown again.
             // This one is not.
-            if (type == WindowEvent.Type.Disposed || type == WindowEvent.Type.Hidden) {
+            if (type == WindowEvent.Type.Disposed) {
                 dlg.finishNativeShowing();
+                return;
+            }
+            if (type == WindowEvent.Type.Hidden) {
+                // Taken before the showing ends, because that clears the reference.
+                Window closing = dlg.getNativeWindow();
+                dlg.finishNativeShowing();
+                if (closing != null) {
+                    // The window is this showing's own, and hide() deliberately keeps
+                    // its peer and its place in the desktop registry so it can be shown
+                    // again. This dialog never will: the showing is over and the next
+                    // show() builds a window of its own, so leaving it would be an
+                    // allocated window nothing can reach, one per hide. Disposing it
+                    // re-enters here with Disposed, which finds the showing already
+                    // ended and does nothing.
+                    closing.dispose();
+                }
             }
         }
     }

@@ -3557,8 +3557,9 @@ class DialogInWindowTest extends UITestBase {
         DisplayTest.flushEdt();
         assertNull(hidden.getNativeWindow(),
                 "a window that is not on screen is not showing the dialog any more");
-        hw.dispose();
-        DisplayTest.flushEdt();
+        assertTrue(hw.isWindowDisposed(),
+                "and the window that showing owned is released rather than left"
+                        + " allocated with nothing able to reach it");
     }
 
     /// A window disposed from outside ends the showing, so it stops the clock.

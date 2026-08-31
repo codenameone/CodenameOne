@@ -964,8 +964,11 @@ class InteractionDialogTest extends UITestBase {
                 "a dialog in a window that is not on screen is not showing");
         assertNull(dialog.getNativeWindow(),
                 "and getNativeWindow() is documented as non-null only while showing");
-        w.dispose();
-        DisplayTest.flushEdt();
+        // hide() keeps the peer and the desktop registration so a window can be shown
+        // again; this one never will be, so ending the showing has to release it or it
+        // is an allocated window nothing can reach, one per hide.
+        assertTrue(w.isWindowDisposed(),
+                "the window belonged to that showing, so it goes with it");
     }
 
 
