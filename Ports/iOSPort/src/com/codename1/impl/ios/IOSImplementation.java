@@ -2378,8 +2378,18 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Invoked for a pointer event inside a window. The type is 1 for a press,
     /// 2 for a release and 3 for a drag, matching CN1MacWindowView.
     public static void windowPointerCallback(int windowId, int type, int x, int y) {
-        if (dropEvents) {
+        // As pointerReleasedCallback: the release closing a press this window
+        // already received is not dropped, because nothing else would ever
+        // clear that press.
+        boolean closingOpenPress = type == 2 && openPointerPressSurface == windowId;
+        if (closingOpenPress) {
+            openPointerPressSurface = NO_OPEN_POINTER_PRESS;
+        }
+        if (dropEvents && !closingOpenPress) {
             return;
+        }
+        if (type == 1) {
+            openPointerPressSurface = windowId;
         }
         int[] xs = new int[]{x};
         int[] ys = new int[]{y};
@@ -2409,15 +2419,44 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// The surface whose pointer press is open, so the release closing THAT
+    /// press can be let through the drop gate the way a pinch's release is.
+    ///
+    /// Every caller that sets dropEvents -- capturePhoto, captureVideo,
+    /// openFileChooser -- puts a modal picker up, and a press can be open when
+    /// it does: opened from a key listener or a timer before the button came
+    /// back up. Dropping its release leaves the component pressed and dragging
+    /// with nothing left to clear it, because the release is the only thing
+    /// that ever would.
+    ///
+    /// Held per surface rather than as one flag, matching the native side,
+    /// where the press is tracked on the view that saw it.
+    private static final int NO_OPEN_POINTER_PRESS = Integer.MIN_VALUE;
+
+    /// The main surface, which has no window id of its own.
+    private static final int MAIN_SURFACE_PRESS = -1;
+
+    private static int openPointerPressSurface = NO_OPEN_POINTER_PRESS;
+
     public static void pointerPressedCallback(int x, int y) {
         if(dropEvents) {
             return;
         }
+        openPointerPressSurface = MAIN_SURFACE_PRESS;
         singleDimensionX[0] = x; singleDimensionY[0] = y;
         instance.pointerPressed(singleDimensionX, singleDimensionY);
     }
     public static void pointerReleasedCallback(int x, int y) {
-        if(dropEvents) {
+        // The release of a press already delivered goes through even while
+        // events are being dropped -- the same exception the native gate makes,
+        // which was ineffective on its own because this half discarded what it
+        // forwarded. A release with no press open is still dropped, as are new
+        // presses and every drag.
+        boolean closingOpenPress = openPointerPressSurface == MAIN_SURFACE_PRESS;
+        if (closingOpenPress) {
+            openPointerPressSurface = NO_OPEN_POINTER_PRESS;
+        }
+        if(dropEvents && !closingOpenPress) {
             return;
         }
         singleDimensionX[0] = x; singleDimensionY[0] = y;
