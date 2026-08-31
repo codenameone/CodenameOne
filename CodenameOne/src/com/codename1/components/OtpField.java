@@ -145,6 +145,14 @@ public class OtpField extends Container {
         for (int i = 0; i < length; i++) {
             boxes[i].setText(i < text.length() ? text.substring(i, i + 1) : "");
         }
+        if (input.isProvisional()) {
+            // The boxes show what is being composed -- an IME, handwriting or dictation
+            // builds text before committing it -- but a provisional value is not an
+            // answer. Firing here submits a code the input method is still editing, and
+            // the flow that acts on it is busy by the time the real one arrives. The
+            // completion flag is deliberately left alone, so finalizing fires it.
+            return;
+        }
         boolean full = text.length() == length;
         if (full && !complete) {
             complete = true;
@@ -271,6 +279,7 @@ public class OtpField extends Container {
     ///
     /// - `code`: the value, or null to clear
     public void setText(String code) {
+        input.clearProvisional();
         String accepted = accept(code, length);
         input.setText(accepted);
         // setText resets the caret to the start; entry continues after the last
@@ -378,6 +387,7 @@ public class OtpField extends Container {
         private final OtpField owner;
         private boolean caretOn = true;
         private long lastBlink;
+        private boolean provisional;
 
         OtpInput(OtpField owner) {
             super("");
@@ -428,7 +438,11 @@ public class OtpField extends Container {
         /// that can never be complete and a verification that never fires.
         @Override
         public void commitText(String text) {
+            // a commit is the input method's final answer, whatever it left the composing
+            // range saying
+            provisional = false;
             super.commitText(limit(text));
+            owner.valueChanged();
         }
 
         /// The in-progress composition an IME, handwriting or dictation builds before it
@@ -437,7 +451,30 @@ public class OtpField extends Container {
         /// and dictation into a code field is composition from the first syllable.
         @Override
         public void setComposingText(String text, int relativeCaret) {
+            provisional = true;
             super.setComposingText(limit(text), relativeCaret);
+        }
+
+        /// The end of a composition with no commit behind it, which is a final answer
+        /// too. It changes no text, so nothing else would tell the field to look again.
+        @Override
+        public void finishComposing() {
+            provisional = false;
+            super.finishComposing();
+            owner.valueChanged();
+        }
+
+        /// True while an input method is still building the value.
+        ///
+        /// Tracked here rather than read from the editor's composing range because that
+        /// range says what the platform last marked, and a commit does not necessarily
+        /// clear it; what matters is whether the value has been finalized.
+        boolean isProvisional() {
+            return provisional;
+        }
+
+        void clearProvisional() {
+            provisional = false;
         }
 
         /// Where a tap puts the caret. The inherited hit test measures the field's own

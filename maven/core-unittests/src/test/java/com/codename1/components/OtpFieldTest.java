@@ -438,6 +438,49 @@ class OtpFieldTest extends UITestBase {
     }
 
     @FormTest
+    void aCompositionDoesNotCompleteUntilItIsFinal() {
+        // An input method builds text before committing it. Firing on the provisional
+        // value submits a code it is still editing, and the flow that acts on it is
+        // busy by the time the corrected one arrives.
+        OtpField f = new OtpField(6);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        EditField input = f.getInputField();
+
+        input.setComposingText("123456", 0);
+        assertEquals("123456", f.getText(), "the boxes still show what is being composed");
+        assertEquals(0, fired.get(), "but a provisional value is not an answer");
+
+        input.setComposingText("123457", 0);
+        assertEquals(0, fired.get());
+
+        input.commitText("123457");
+        assertEquals("123457", f.getText());
+        assertEquals(1, fired.get(), "the committed value completes it, once");
+    }
+
+    @FormTest
+    void aCompositionFinishedWithoutACommitStillCompletes() {
+        // finishComposing changes no text, so nothing else would tell the field to look
+        OtpField f = new OtpField(6);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        EditField input = f.getInputField();
+        input.setComposingText("123456", 0);
+        assertEquals(0, fired.get());
+        input.finishComposing();
+        assertEquals(1, fired.get());
+    }
+
+    @FormTest
     void removedListenerStopsFiring() {
         OtpField f = new OtpField(3);
         AtomicInteger fired = new AtomicInteger();
