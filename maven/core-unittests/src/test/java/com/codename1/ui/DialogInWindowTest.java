@@ -3799,4 +3799,56 @@ class DialogInWindowTest extends UITestBase {
         }
     }
 
+    /// The transferred pointer listeners go by equality too.
+    ///
+    /// A listener is removed by equality everywhere else -- the dispatcher hands it to
+    /// a list, which matches on equals -- so a caller passing a distinct but equal one
+    /// has its registration taken off. Finding what was handed to the host by identity
+    /// left that behind: still firing the listener just removed, and handed back to the
+    /// form again at teardown.
+    @FormTest
+    void removingAnEqualPointerListenerAlsoTakesItsTransferredWrapperOff() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            Dialog dlg = new Dialog("hosted");
+            dlg.setTopLevelHost(w);
+            dlg.showModeless();
+            DisplayTest.flushEdt();
+            assertSame(w, dlg.getTopLevelContainer(), "precondition: hosted in the window");
+
+            dlg.addPointerPressedListener(new NamedListener("tap"));
+            assertEquals(1, transferredPointerCountOf(dlg),
+                    "precondition: the listener was handed to the host");
+
+            // Equal, not the same object -- which is all the dispatcher needs.
+            dlg.removePointerPressedListener(new NamedListener("tap"));
+
+            assertEquals(0, transferredPointerCountOf(dlg),
+                    "removing by equality has to take what was handed to the host off"
+                            + " too, or it keeps firing a listener that was removed");
+            dlg.dispose();
+            DisplayTest.flushEdt();
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    /// How many pointer-pressed registrations this form handed to its host.
+    private static int transferredPointerCountOf(Form f) {
+        try {
+            java.lang.reflect.Field fld =
+                    Form.class.getDeclaredField("transferredPointerPressed");
+            fld.setAccessible(true);
+            java.util.List<?> handed = (java.util.List<?>) fld.get(f);
+            return handed == null ? 0 : handed.size();
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
 }

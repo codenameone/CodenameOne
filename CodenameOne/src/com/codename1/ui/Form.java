@@ -3084,7 +3084,7 @@ public class Form extends Container implements TopLevelContainer {
             if (tracked != null) {
                 for (int iter = 0; iter < tracked.size(); iter++) {
                     TransferredListener entry = tracked.get(iter);
-                    if (entry.listener == l) { //NOPMD CompareObjectsWithEquals
+                    if (sameListener(entry.listener, l)) {
                         removeTransferred(host, kind, entry);
                         tracked.remove(iter);
                         break;
@@ -3093,6 +3093,31 @@ public class Form extends Container implements TopLevelContainer {
             }
         }
         return true;
+    }
+
+    /// Whether a wrapper handed to a host stands for the listener a caller is removing.
+    ///
+    /// By equality, because that is how a listener is removed everywhere else: both
+    /// EventDispatcher and removeKeyListener hand it to a list, which matches on
+    /// equals. A caller passing a distinct but equal listener therefore has its
+    /// registration taken off -- and comparing by identity when looking for what was
+    /// handed to the host left that behind, still firing the listener that was just
+    /// removed, and restored to this form again at teardown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `published`: the listener a wrapper was made for
+    ///
+    /// - `removed`: the listener the caller is removing
+    ///
+    /// #### Returns
+    ///
+    /// true when the wrapper stands for that listener
+    static boolean sameListener(ActionListener published, ActionListener removed) {
+        if (removed == null) {
+            return published == null;
+        }
+        return removed.equals(published);
     }
 
     private ArrayList<TransferredListener> trackedFor(int kind) {

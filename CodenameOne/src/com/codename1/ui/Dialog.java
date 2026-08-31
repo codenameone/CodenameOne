@@ -2588,30 +2588,6 @@ public class Dialog extends Form implements AbstractDialog {
         }
     }
 
-    /// Whether a published wrapper stands for the listener a caller is removing.
-    ///
-    /// By equality, because that is how the form removes it: removeKeyListener hands
-    /// the listener to a list, which matches on equals. A caller passing a distinct but
-    /// equal listener therefore has its registration taken off the form, and comparing
-    /// by identity here left the wrapper published for it on the host -- still firing
-    /// the listener that was just removed, until the dialog was torn down.
-    ///
-    /// #### Parameters
-    ///
-    /// - `published`: the listener a wrapper was published for
-    ///
-    /// - `removed`: the listener the caller is removing
-    ///
-    /// #### Returns
-    ///
-    /// true when the wrapper stands for that listener
-    private static boolean sameListener(ActionListener published, ActionListener removed) {
-        if (removed == null) {
-            return published == null;
-        }
-        return removed.equals(published);
-    }
-
     /// One of a hosted dialog's key listeners, as the host window sees it.
     ///
     /// The wrapper exists for the scoping: every hosted dialog publishes onto the same
