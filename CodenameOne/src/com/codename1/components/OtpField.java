@@ -77,7 +77,9 @@ public class OtpField extends Container {
     private final TextField[] boxes;
     private final OtpInput input;
     private final ArrayList<ActionListener> completeListeners = new ArrayList<ActionListener>();
-    private boolean complete;
+    /// The value the completion listener last fired for, so the same full value does not
+    /// fire twice and a different one does.
+    private String completedValue;
 
     /// Builds a 6-digit numeric field -- the common case.
     public OtpField() {
@@ -152,19 +154,27 @@ public class OtpField extends Container {
             // completion flag is deliberately left alone, so finalizing fires it.
             return;
         }
+        // Fired for a value, not for a transition. A full field that becomes a DIFFERENT
+        // full field in one edit -- an offered code accepted over a wrong one that was
+        // typed, a select-all paste, a second setText -- is a new attempt and the flow
+        // that submits from here has to hear about it; a boolean "already complete" would
+        // swallow exactly the case the platform's own offer produces.
         boolean full = text.length() == length;
-        if (full && !complete) {
-            complete = true;
-            ActionEvent evt = new ActionEvent(this);
-            for (ActionListener listener : new ArrayList<ActionListener>(completeListeners)) {
-                listener.actionPerformed(evt);
-                if (evt.isConsumed()) {
-                    break;
-                }
-            }
+        if (!full) {
+            completedValue = null;
             return;
         }
-        complete = full;
+        if (text.equals(completedValue)) {
+            return;
+        }
+        completedValue = text;
+        ActionEvent evt = new ActionEvent(this);
+        for (ActionListener listener : new ArrayList<ActionListener>(completeListeners)) {
+            listener.actionPerformed(evt);
+            if (evt.isConsumed()) {
+                break;
+            }
+        }
     }
 
     /// Drops everything this field will not accept: characters outside the
@@ -468,6 +478,11 @@ public class OtpField extends Container {
         /// boxes, which shows as a code that can never be complete.
         @Override
         public void replaceRange(int start, int end, String text) {
+            // Final, not provisional. iOS reaches here for an edit that ends its marked
+            // text -- the view clears its own marked range and sends this with no
+            // finishComposing behind it -- so a provisional flag left standing would
+            // suppress completion for the rest of the session.
+            provisional = false;
             int replaced = Math.abs(end - start);
             int used = getText().length() - replaced;
             super.replaceRange(start, end, owner.accept(text, owner.length - used));

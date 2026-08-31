@@ -519,6 +519,45 @@ class OtpFieldTest extends UITestBase {
     }
 
     @FormTest
+    void replacingOneFullCodeWithAnotherIsANewAttempt() {
+        // The offered code accepted over a wrong one that was typed: full to full in a
+        // single edit, with no partial value in between. A flow that submits from this
+        // listener has to hear about the second one.
+        OtpField f = new OtpField(6);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        f.setText("123456");
+        assertEquals(1, fired.get());
+        f.setText("654321");
+        assertEquals(2, fired.get(), "a different full code is a new attempt");
+        f.setText("654321");
+        assertEquals(2, fired.get(), "the same one is not");
+    }
+
+    @FormTest
+    void aRangeReplacementEndingACompositionDoesNotSuppressCompletionForever() {
+        // iOS sends a range replacement that ends its marked text with no finishComposing
+        // behind it, so a provisional flag left standing would silence the field
+        OtpField f = new OtpField(6);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        EditField input = f.getInputField();
+        input.setComposingText("12", 0);
+        assertEquals(0, fired.get());
+        input.replaceRange(2, 2, "3456");
+        assertEquals("123456", f.getText());
+        assertEquals(1, fired.get(), "the field has to speak again after a range edit");
+    }
+
+    @FormTest
     void removedListenerStopsFiring() {
         OtpField f = new OtpField(3);
         AtomicInteger fired = new AtomicInteger();
