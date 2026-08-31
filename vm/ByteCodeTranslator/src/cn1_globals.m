@@ -2610,18 +2610,6 @@ void codenameOneGCMark() {
                 cn1GcStackNs += cn1GcNowNs();
 #endif
 #ifdef CN1_GC_CAN_FORCE_STOP
-                // Release the forced freeze the moment this thread's roots are captured,
-                // which is HERE and not at the threadBlockedByGC clear further down. A
-                // cooperatively parked thread waits out the mark drain in a usleep; a
-                // signal-frozen one waits in an async-signal-safe BUSY spin, so holding it
-                // across the drain would burn a core for the length of a full mark. What
-                // the drain-before-unblock is protecting -- snapshot-at-the-beginning --
-                // is supplied for a released mutator by the SATB deletion barrier, which
-                // is armed for the whole mark and is already the only thing keeping
-                // genuine native threads honest; they are never blocked at all, and
-                // cn1GcScanThreadNativeStack releases its own signal stops at exactly this
-                // point for the same reason. threadBlockedByGC stays set, so if this
-                // thread does reach a safepoint it still parks.
 #if !defined(CN1_DISABLE_SATB)
                 // Released as soon as this thread's roots are captured, which is HERE and
                 // not at the threadBlockedByGC clear below. A cooperatively parked thread
