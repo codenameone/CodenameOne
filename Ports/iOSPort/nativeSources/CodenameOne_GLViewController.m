@@ -1108,6 +1108,16 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                     }
                 }
             }
+
+            // ONE_TIME_CODE, applied after the base type so it wins: it says what the
+            // value IS, where the others say how it is typed. iOS offers the code from
+            // the incoming message in the suggestion bar for a field that declares it,
+            // and offers nothing for a field that does not.
+            if((constraint & 0x1000000) == 0x1000000) {
+                if (@available(iOS 12, *)) {
+                    utf.textContentType = UITextContentTypeOneTimeCode;
+                }
+            }
             if(scale != 1) {
                 float s = ((BRIDGE_CAST CN1Font*)font).pointSize / scale;
                 utf.font = [((BRIDGE_CAST CN1Font*)font) fontWithSize:s];
@@ -1331,7 +1341,17 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                     }
                 }
             }
-            
+
+            // ONE_TIME_CODE, applied after the base type so it wins: it says what the
+            // value IS, where the others say how it is typed. iOS offers the code from
+            // the incoming message in the suggestion bar for a field that declares it,
+            // and offers nothing for a field that does not.
+            if((constraint & 0x1000000) == 0x1000000) {
+                if (@available(iOS 12, *)) {
+                    utv.textContentType = UITextContentTypeOneTimeCode;
+                }
+            }
+
 #if !TARGET_OS_TV
             if(showToolbar) {
                 //add navigation toolbar to the top of the keyboard

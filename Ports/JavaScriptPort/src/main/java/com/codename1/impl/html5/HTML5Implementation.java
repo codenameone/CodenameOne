@@ -3367,7 +3367,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (config == null || lightweightTextInputElement == null) {
             return;
         }
-        lightweightTextInputElement.setAttribute("autocomplete", config.isAutoCorrect() ? "on" : "off");
+        // ONE_TIME_CODE: "one-time-code" is what a browser and a password manager match on to
+        // offer the code out of an arriving message, and on iOS Safari it is what puts the code in
+        // the keyboard's suggestion bar. It is a value of autocomplete rather than a flag beside
+        // it, so it replaces the plain on/off the rest of the fields get.
+        boolean oneTimeCode = (config.getConstraint() & TextArea.ONE_TIME_CODE) != 0;
+        lightweightTextInputElement.setAttribute("autocomplete",
+                oneTimeCode ? "one-time-code" : config.isAutoCorrect() ? "on" : "off");
         lightweightTextInputElement.setAttribute("autocorrect", config.isAutoCorrect() ? "on" : "off");
         lightweightTextInputElement.setAttribute("spellcheck", config.isAutoCorrect() ? "true" : "false");
         lightweightTextInputElement.setAttribute("autocapitalize", config.isAutoCapitalize() ? "sentences" : "off");
@@ -3388,6 +3394,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 break;
             default:
                 break;
+        }
+        if (oneTimeCode && "text".equals(inputMode)) {
+            // a code with no numeric constraint of its own still wants the numeric keypad far more
+            // often than the full keyboard, and "numeric" leaves letters reachable
+            inputMode = "numeric";
         }
         lightweightTextInputElement.setAttribute("inputmode", inputMode);
         switch (config.getActionType()) {
@@ -6186,6 +6197,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 inputMode = "url";
             }
         }
+        if (inputMode == null && (constraint & TextArea.ONE_TIME_CODE) != 0 && !password) {
+            inputMode = "numeric";
+        }
         if (inputMode == null) {
             inputEl.removeAttribute("inputmode");
         } else {
@@ -6196,6 +6210,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String autocomplete;
         if (override != null) {
             autocomplete = override.toString();
+        } else if ((constraint & TextArea.ONE_TIME_CODE) != 0) {
+            // Ahead of every other case including SENSITIVE: a one-time code is exactly the value
+            // a browser should offer out of an arriving message, and it is worthless to a
+            // dictionary afterwards, so the token that invites the offer is the right one here.
+            autocomplete = "one-time-code";
         } else if (sensitive) {
             // Checked ahead of the password case on purpose: SENSITIVE asks that the value is
             // never retained for predictive or completing schemes, and "current-password" is an

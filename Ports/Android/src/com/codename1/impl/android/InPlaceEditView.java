@@ -192,6 +192,33 @@ public class InPlaceEditView extends FrameLayout{
     private boolean hasConstraint(int inputType, int constraint) {
         return ((inputType & constraint) == constraint);
     }
+
+    /// The Android autofill hint for a one-time code. Spelled out rather than referenced as
+    /// `View.AUTOFILL_HINT_SMS_OTP`, which is newer than the SDK this port compiles against; the
+    /// string is the contract an autofill service matches on.
+    private static final String AUTOFILL_HINT_SMS_OTP = "smsOTPCode";
+
+    /// Tells the platform that this field holds a code that arrived by message, which is what makes
+    /// an autofill service offer that code on it. A field without the hint is offered nothing, and
+    /// the application would be left reading SMS itself to fill it -- with the permission that
+    /// implies. Suggestions are turned off with it: a code is not a word, and predictive input has
+    /// no business learning one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `edit`: the native field being opened
+    ///
+    /// - `codenameOneInputType`: the Codename One constraint the field carries
+    private void applyOneTimeCodeHint(AutoCompleteTextView edit, int codenameOneInputType) {
+        if (!hasConstraint(codenameOneInputType, TextArea.ONE_TIME_CODE)) {
+            return;
+        }
+        edit.setInputType(edit.getInputType() | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            edit.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_YES);
+            edit.setAutofillHints(new String[]{AUTOFILL_HINT_SMS_OTP});
+        }
+    }
     private boolean isNonPredictive(int inputType) {
         return hasConstraint(inputType, TextArea.NON_PREDICTIVE) || hasConstraint(inputType, TextArea.SENSITIVE);
     }
@@ -997,6 +1024,8 @@ public class InPlaceEditView extends FrameLayout{
             mEditText.setInputType(type | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
             mEditText.setTransformationMethod(new MyPasswordTransformationMethod());
         }
+
+        applyOneTimeCodeHint(mEditText, codenameOneInputType);
 
         int maxLength = textArea.maxSize;
         InputFilter[] FilterArray = new InputFilter[1];

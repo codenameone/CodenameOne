@@ -731,6 +731,23 @@ void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boole
                 default:
                     break;
             }
+            // ONE_TIME_CODE: the field says it holds a code that arrived by message, which is
+            // what makes iOS offer that code above the keyboard. Cleared otherwise, because the
+            // view outlives one editing session and a stale content type would follow the caret
+            // into the next field.
+            if ((constraint & 0x1000000) != 0) {
+                if (@available(iOS 12, *)) {
+                    cn1TextInputView.textContentType = UITextContentTypeOneTimeCode;
+                } else {
+                    cn1TextInputView.textContentType = nil;
+                }
+                // a digit code belongs on the number pad; the offered code is shown above it
+                if (kt == UIKeyboardTypeNumbersAndPunctuation) {
+                    kt = UIKeyboardTypeNumberPad;
+                }
+            } else {
+                cn1TextInputView.textContentType = nil;
+            }
             cn1TextInputView.keyboardType = kt;
             cn1TextInputView.secureTextEntry = secure;
             if (secure) {

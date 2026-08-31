@@ -402,6 +402,107 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return activeInputClient != null;
     }
 
+    /// The Android autofill hint for a one-time code, spelled out rather than referenced as
+    /// `View.AUTOFILL_HINT_SMS_OTP` because the constant is newer than the SDK this port
+    /// compiles against. The string is the contract: it is what an autofill service matches on.
+    private static final String AUTOFILL_HINT_SMS_OTP = "smsOTPCode";
+
+    /// What the platform may fill into the currently bound field, or null when it is not a field
+    /// the platform can fill.
+    ///
+    /// Only the one-time code is offered. The rendering surface is a single view standing in for
+    /// whichever field is being edited, so claiming a hint puts the whole surface forward as that
+    /// kind of field -- true only while the code field holds the session, which is why the hint is
+    /// applied when a session starts and dropped when it ends.
+    private static String[] editorAutofillHints() {
+        com.codename1.ui.TextInputConfig cfg = activeInputConfig;
+        if (cfg != null && (cfg.getConstraint() & com.codename1.ui.TextArea.ONE_TIME_CODE) != 0) {
+            return new String[]{AUTOFILL_HINT_SMS_OTP};
+        }
+        return null;
+    }
+
+    /// Puts the surface forward as an autofillable field, or withdraws it, to match the field the
+    /// input session is bound to. Called on the UI thread as a session starts and stops.
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the rendering view
+    ///
+    /// - `sessionActive`: true while a client is bound
+    static void updateEditorAutofill(android.view.View v, boolean sessionActive) {
+        if (v == null || android.os.Build.VERSION.SDK_INT < 26) {
+            return;
+        }
+        android.view.autofill.AutofillManager afm =
+                (android.view.autofill.AutofillManager) v.getContext()
+                        .getSystemService(android.view.autofill.AutofillManager.class);
+        String[] hints = sessionActive ? editorAutofillHints() : null;
+        if (hints == null) {
+            v.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_NO);
+            v.setAutofillHints((String[]) null);
+            if (afm != null) {
+                afm.notifyViewExited(v);
+            }
+            return;
+        }
+        v.setAutofillHints(hints);
+        v.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_YES);
+        if (afm != null) {
+            // the session only starts once the framework is told the view was entered; a view
+            // that merely carries hints is never offered anything
+            afm.notifyViewEntered(v);
+        }
+    }
+
+    /// Applies a value the platform filled in, replacing whatever the field held. Called by the
+    /// rendering view on the UI thread; the edit itself belongs to the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value the autofill service supplied
+    ///
+    /// #### Returns
+    ///
+    /// true when the value was taken
+    static boolean autofillEditor(android.view.autofill.AutofillValue value) {
+        final com.codename1.ui.TextInputClient client = activeInputClient;
+        if (client == null || value == null || !value.isText()) {
+            return false;
+        }
+        com.codename1.ui.Display.getInstance().callSerially(
+                new ApplyAutofilledText(client, value.getTextValue().toString()));
+        return true;
+    }
+
+    /// Named rather than anonymous on purpose. An anonymous class here takes a number from the
+    /// same sequence as every other one in this file, so adding one renumbers the ones below it
+    /// and the cast-semantics baseline stops matching methods nobody touched.
+    private static final class ApplyAutofilledText implements Runnable {
+        private final com.codename1.ui.TextInputClient client;
+        private final String text;
+
+        ApplyAutofilledText(com.codename1.ui.TextInputClient client, String text) {
+            this.client = client;
+            this.text = text;
+        }
+
+        public void run() {
+            // a filled code replaces the field rather than being inserted at the caret: the
+            // platform is answering "the value is this", not typing into what is there
+            client.replaceRange(0, client.getTextLength(), text);
+        }
+    }
+
+    /// The value the platform should see for the bound field, or null when nothing is bound.
+    static android.view.autofill.AutofillValue editorAutofillValue() {
+        com.codename1.ui.TextInputClient client = activeInputClient;
+        if (client == null) {
+            return null;
+        }
+        return android.view.autofill.AutofillValue.forText(client.getTextRange(0, client.getTextLength()));
+    }
+
     private static void configureEditorInfo(android.view.inputmethod.EditorInfo editorInfo, com.codename1.ui.TextInputConfig cfg) {
         int constraint = cfg == null ? 0 : cfg.getConstraint();
         int inputType;
@@ -449,6 +550,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (!password && cfg != null && cfg.isAutoCapitalize()) {
                 inputType |= android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;
             }
+        }
+        if ((constraint & com.codename1.ui.TextArea.ONE_TIME_CODE) != 0 && text) {
+            // a code is not a word: prediction would offer completions for it and, worse, learn it
+            inputType |= android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
         }
         editorInfo.inputType = inputType;
         editorInfo.imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI;
@@ -521,6 +626,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     imm.restartInput(v);
                     imm.showSoftInput(v, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
                 }
+                updateEditorAutofill(v, true);
             }
         });
         return client;
@@ -579,6 +685,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     imm.hideSoftInputFromWindow(view.getAndroidView().getWindowToken(), 0);
                     imm.restartInput(view.getAndroidView());
                 }
+                updateEditorAutofill(view.getAndroidView(), false);
             }
         });
     }
