@@ -3719,4 +3719,84 @@ class DialogInWindowTest extends UITestBase {
         }
     }
 
+    /// A component that closes its dialog from keyRepeated must not be read past.
+    ///
+    /// The repeat handler runs application code, and that code is entitled to end the
+    /// showing the repeat belongs to. Doing so retargets the focus and takes the input
+    /// scope with it, so continuing to read the focus field afterwards either
+    /// dereferences a null or asks whatever the closed overlay uncovered whether it
+    /// wants an arrow key -- and synthesizes one into a surface that never saw the
+    /// press that started the repeat.
+    @FormTest
+    void aRepeatHandlerThatClosesItsDialogStopsTheRepeat() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        CountingButton underneath = new CountingButton();
+        w.add(BorderLayout.CENTER, underneath);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            final Dialog dlg = new Dialog("hosted");
+            dlg.setTopLevelHost(w);
+            dlg.setLayout(new BorderLayout());
+            ClosesOnRepeat closer = new ClosesOnRepeat(dlg);
+            dlg.add(BorderLayout.CENTER, closer);
+            dlg.showModeless();
+            DisplayTest.flushEdt();
+            closer.requestFocus();
+            DisplayTest.flushEdt();
+            assertTrue(closer.hasFocus(), "precondition: the dialog's component has focus");
+
+            int downKey = Display.getInstance().getKeyCode(Display.GAME_DOWN);
+            w.keyPressed(downKey);
+            w.keyRepeated(downKey);
+            DisplayTest.flushEdt();
+
+            assertTrue(closer.closed, "precondition: the handler really did close it");
+            assertEquals(0, underneath.pressedCount,
+                    "the repeat belongs to the press the closed dialog owned, so nothing"
+                            + " may be synthesized into what it uncovered");
+            w.keyReleased(downKey);
+            DisplayTest.flushEdt();
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    /// Counts the key presses delivered to it.
+    private static final class CountingButton extends Button {
+        private int pressedCount;
+
+        CountingButton() {
+            super("underneath");
+        }
+
+        @Override
+        public void keyPressed(int keyCode) {
+            pressedCount++;
+            super.keyPressed(keyCode);
+        }
+    }
+
+    /// Closes the dialog it belongs to the first time it is repeated on.
+    private static final class ClosesOnRepeat extends Button {
+        private final Dialog dlg;
+        private boolean closed;
+
+        ClosesOnRepeat(Dialog dlg) {
+            super("closes");
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void keyRepeated(int keyCode) {
+            if (!closed) {
+                closed = true;
+                dlg.dispose();
+            }
+        }
+    }
+
 }

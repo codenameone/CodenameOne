@@ -4532,15 +4532,29 @@ public class Window extends Container implements TopLevelContainer {
                 && keyPressScopes.get(repeating) != keyInputScope) { //NOPMD CompareObjectsWithEquals
             return;
         }
-        if (focused == null) {
+        // Held across the callback below, because both can move while it runs.
+        Component target = focused;
+        Container scope = keyInputScope;
+        if (target == null) {
             synthesizeRepeat(keyCode);
             return;
         }
-        if (focused.isEnabled()) {
-            focused.keyRepeated(keyCode);
+        if (target.isEnabled()) {
+            target.keyRepeated(keyCode);
+        }
+        // A handler is entitled to end the showing this repeat belongs to -- closing
+        // its own dialog from keyRepeated does exactly that -- and doing so retargets
+        // the focus and takes the input scope with it. What is left below belongs to
+        // the press that started the repeat: read from the field again it would either
+        // dereference a focus that is now null, or ask whatever the closed overlay
+        // uncovered whether it wants an arrow key, and synthesize one into a surface
+        // that never saw the press.
+        if (focused != target //NOPMD CompareObjectsWithEquals
+                || keyInputScope != scope) { //NOPMD CompareObjectsWithEquals
+            return;
         }
         int game = Display.getInstance().getGameAction(keyCode);
-        if (!focused.handlesInput()
+        if (!target.handlesInput()
                 && (game == Display.GAME_DOWN || game == Display.GAME_UP
                     || game == Display.GAME_LEFT || game == Display.GAME_RIGHT)) {
             synthesizeRepeat(keyCode);

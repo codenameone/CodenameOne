@@ -965,7 +965,11 @@ public class Sheet extends Container {
         // The host's safe area and height, not the display's. A window has no notch to
         // avoid and its own height is what the sheet has to fit, so measuring the main
         // display padded a sheet in a window for a cutout that is not in front of it.
-        TopLevelContainer safeHost = resolveHost();
+        // The same surface the attachment below uses, resolved once. A deferred retry
+        // carries the surface its show resolved, and asking again here answered with
+        // whatever has focus now -- so a sheet on its way into a window could be laid
+        // out against the main form's chrome and then attached to the window anyway.
+        final TopLevelContainer safeHost = captured != null ? captured : resolveHost();
         Rectangle displaySafeArea = new Rectangle();
         if (safeHost != null) {
             Rectangle hostSafe = safeHost.getSafeArea();
@@ -1010,7 +1014,7 @@ public class Sheet extends Container {
 
         // END Deal with iPhoneX notch
 
-        final TopLevelContainer f = captured != null ? captured : resolveHost();
+        final TopLevelContainer f = safeHost;
         if (f == null) {
             throw new IllegalStateException(
                     "Sheet.show() has no top level to show on: no window is focused and "
