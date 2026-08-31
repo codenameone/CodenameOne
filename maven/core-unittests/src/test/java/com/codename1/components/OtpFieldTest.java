@@ -249,6 +249,35 @@ class OtpFieldTest extends UITestBase {
         assertEquals("123456", f.getText());
     }
 
+    @FormTest
+    void composedTextIsFilteredWhileItIsStillBeingComposed() {
+        // Dictation, handwriting and an IME all build text as a composition before
+        // committing it, and a composition writes to the document directly rather
+        // than through the typed-text path. Unfiltered, a numeric code field would
+        // hold letters for as long as the composition lasted.
+        OtpField f = new OtpField(6);
+        f.getInputField().setComposingText("12a3", 0);
+        assertEquals("123", f.getText());
+    }
+
+    @FormTest
+    void aCommitThatFinalizesACompositionIsFilteredToo() {
+        // the commit that ends a composition replaces the composed range directly,
+        // which is the one commit that never reaches the typed-text hook
+        OtpField f = new OtpField(6);
+        EditField input = f.getInputField();
+        input.setComposingText("12", 0);
+        input.commitText("12b345");
+        assertEquals("12345", f.getText());
+    }
+
+    @FormTest
+    void composedTextCannotOverfillTheField() {
+        OtpField f = new OtpField(4);
+        f.getInputField().setComposingText("123456789", 0);
+        assertEquals("1234", f.getText());
+    }
+
     // ---- completion ---------------------------------------------------
 
     @FormTest

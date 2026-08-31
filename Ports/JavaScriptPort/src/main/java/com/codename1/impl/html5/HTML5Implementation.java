@@ -3395,11 +3395,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             default:
                 break;
         }
-        if (oneTimeCode && "text".equals(inputMode)) {
-            // a code with no numeric constraint of its own still wants the numeric keypad far more
-            // often than the full keyboard, and "numeric" leaves letters reachable
-            inputMode = "numeric";
-        }
+        // Deliberately NOT forcing inputmode to numeric for a one-time code. The hint says what
+        // the value IS; the constraint beside it says how it is typed, and a code field that did
+        // not ask for NUMERIC can hold letters -- OtpField(length, false) exists for exactly
+        // that. A numeric inputmode gives a mobile browser a keypad with no route to a letter,
+        // which would make those codes impossible to enter rather than merely awkward.
         lightweightTextInputElement.setAttribute("inputmode", inputMode);
         switch (config.getActionType()) {
             case TextInputConfig.ACTION_DONE:
@@ -6197,9 +6197,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 inputMode = "url";
             }
         }
-        if (inputMode == null && (constraint & TextArea.ONE_TIME_CODE) != 0 && !password) {
-            inputMode = "numeric";
-        }
+        // As in configureLightweightTextInputElement: ONE_TIME_CODE contributes the autocomplete
+        // token and nothing about the keyboard, so an alphanumeric code keeps a keyboard that can
+        // type one.
         if (inputMode == null) {
             inputEl.removeAttribute("inputmode");
         } else {

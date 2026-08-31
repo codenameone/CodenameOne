@@ -24,9 +24,12 @@ package com.codename1.impl.javase;
 
 import com.codename1.components.OtpField;
 import com.codename1.testing.junit.CodenameOneTest;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.EditField;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 
@@ -127,6 +130,58 @@ public class OtpFieldRenderingTest {
                 "a filled field must carry more ink than an empty one -- the digits are "
                         + "drawn by the boxes, and if the value only lived in the editor above "
                         + "them nothing would change");
+    }
+
+    @Test
+    public void theCaretLandsInsideTheActiveBoxWhenTheFieldIsNotAtTheOrigin() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+
+        // The field is deliberately given ancestors with offsets of their own. Painting runs
+        // with those offsets already applied to the Graphics, so a caret drawn at an absolute
+        // coordinate lands twice as far down the form as it should -- or outside the clip and
+        // nowhere at all -- and neither shows up when the field is at the origin.
+        final AtomicReference<long[]> inkRef = new AtomicReference<long[]>();
+        runOnCn1AndWait(new Runnable() {
+            public void run() {
+                Form f = new Form("Otp", BoxLayout.y());
+                f.add(new Label("a heading, so the field does not start at the top"));
+                Container padded = new Container(BoxLayout.y());
+                padded.getAllStyles().setPadding(40, 10, 30, 30);
+                padded.getAllStyles().setMargin(20, 10, 25, 25);
+                OtpField otp = new OtpField(6);
+                padded.add(otp);
+                f.add(padded);
+                f.show();
+                f.revalidate();
+
+                // showing the form already focuses the only focusable thing in it, so
+                // focus is dropped and retaken rather than assumed to start off
+                EditField input = otp.getInputField();
+                input.setFocus(false);
+                f.revalidate();
+                long unfocused = boxInk(f, otp, 0);
+                input.setFocus(true);
+                f.revalidate();
+                long focused = boxInk(f, otp, 0);
+                inkRef.set(new long[]{unfocused, focused, input.hasFocus() ? 1 : 0});
+            }
+        });
+
+        long[] measured = inkRef.get();
+        assertEquals(1, measured[2], "the input has to hold focus for a caret to be drawn");
+        assertTrue(measured[1] > measured[0],
+                "the caret must be drawn inside the first box; empty box ink went from "
+                        + measured[0] + " to " + measured[1]);
+    }
+
+    /// Ink inside one box of the field, painted through the whole form so every
+    /// ancestor translation the real hierarchy applies is in force.
+    private static long boxInk(Form f, OtpField otp, int index) {
+        Image img = Image.createImage(f.getWidth(), f.getHeight(), 0xffffffff);
+        f.paintComponent(img.getGraphics(), true);
+        TextField box = otp.getBox(index);
+        return ink(img.getRGB(), box.getAbsoluteX(), box.getAbsoluteY(),
+                box.getWidth(), box.getHeight(), f.getWidth());
     }
 
     private static long totalInk(Form f, OtpField otp) {

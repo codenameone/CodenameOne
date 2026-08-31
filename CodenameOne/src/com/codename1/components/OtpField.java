@@ -27,6 +27,7 @@ import com.codename1.ui.EditField;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.TextInputState;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
@@ -333,8 +334,7 @@ public class OtpField extends Container {
 
         @Override
         protected boolean handleTypedText(String text) {
-            int used = getText().length() - (getSelectionEnd() - getSelectionStart());
-            String accepted = owner.accept(text, owner.length - used);
+            String accepted = limit(text);
             if (accepted.equals(text)) {
                 return false;
             }
@@ -342,6 +342,43 @@ public class OtpField extends Container {
                 insertText(accepted);
             }
             return true;
+        }
+
+        /// Text arriving from a platform input source, which is the path a committed
+        /// autocorrection, a pasted value, dictation and an offered code all take.
+        ///
+        /// Filtered here as well as in `#handleTypedText(String)` because the two do not
+        /// meet: a commit that finalizes an IME composition replaces the composed range
+        /// directly and never reaches the typed-text hook. An unfiltered value there would
+        /// leave the field holding something it would refuse from the keyboard -- letters in
+        /// a numeric code, or more characters than there are boxes -- which shows as a code
+        /// that can never be complete and a verification that never fires.
+        @Override
+        public void commitText(String text) {
+            super.commitText(limit(text));
+        }
+
+        /// The in-progress composition an IME, handwriting or dictation builds before it
+        /// commits. It writes to the document directly, so it needs the same limit; without
+        /// it the field can hold an unacceptable value for as long as the composition lasts,
+        /// and dictation into a code field is composition from the first syllable.
+        @Override
+        public void setComposingText(String text, int relativeCaret) {
+            super.setComposingText(limit(text), relativeCaret);
+        }
+
+        /// Drops what this field will not take: characters outside the allowed set, and
+        /// anything beyond the last box once the range this text replaces is accounted for.
+        private String limit(String text) {
+            TextInputState state = getEditingState();
+            int replacedStart = state.getComposingStart();
+            int replacedEnd = state.getComposingEnd();
+            if (replacedStart < 0 || replacedEnd <= replacedStart) {
+                replacedStart = getSelectionStart();
+                replacedEnd = getSelectionEnd();
+            }
+            int used = getText().length() - (replacedEnd - replacedStart);
+            return owner.accept(text, owner.length - used);
         }
 
         @Override
@@ -357,13 +394,24 @@ public class OtpField extends Container {
             }
             int caret = getCaretOffset();
             TextField box = owner.caretBox(caret);
+            // The caret belongs to a box that is a cousin rather than a child, so its position
+            // has to cross coordinate spaces. Painting happens with the ancestors' offsets
+            // already applied to the Graphics -- which is why every component here draws at its
+            // own getX() rather than its absolute position -- so an absolute coordinate would
+            // add those offsets a second time and land the caret somewhere else, or outside the
+            // clip and nowhere at all. The difference between this component's absolute and
+            // local origin is exactly the translation in force, so subtracting it puts the box
+            // in the space this Graphics is drawing in.
+            int dx = getAbsoluteX() - getX();
+            int dy = getAbsoluteY() - getY();
             int h = box.getHeight() / 2;
             int w = Math.max(1, box.getWidth() / 16);
+            int boxX = box.getAbsoluteX() - dx;
             int x = owner.caretPastEnd(caret)
-                    ? box.getAbsoluteX() + box.getWidth() - box.getStyle().getPaddingRight(isRTL()) - w
-                    : box.getAbsoluteX() + (box.getWidth() - w) / 2;
+                    ? boxX + box.getWidth() - box.getStyle().getPaddingRight(isRTL()) - w
+                    : boxX + (box.getWidth() - w) / 2;
             g.setColor(box.getStyle().getFgColor());
-            g.fillRect(x, box.getAbsoluteY() + (box.getHeight() - h) / 2, w, h);
+            g.fillRect(x, box.getAbsoluteY() - dy + (box.getHeight() - h) / 2, w, h);
         }
 
         @Override
