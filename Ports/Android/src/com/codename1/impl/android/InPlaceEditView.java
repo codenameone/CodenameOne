@@ -198,6 +198,11 @@ public class InPlaceEditView extends FrameLayout{
     /// string is the contract an autofill service matches on.
     private static final String AUTOFILL_HINT_SMS_OTP = "smsOTPCode";
 
+    /// Whether the field this editor last opened was a one-time code, so that a change of
+    /// purpose on a reused native field can be told to the autofill framework and an
+    /// unchanged one can be left alone.
+    private boolean lastWasOneTimeCode;
+
     /// Tells the platform whether this field holds a code that arrived by message, which is what
     /// makes an autofill service offer that code on it. A field without the hint is offered
     /// nothing, and the application would be left reading SMS itself to fill it -- with the
@@ -236,6 +241,29 @@ public class InPlaceEditView extends FrameLayout{
             edit.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_AUTO);
             edit.setAutofillHints((String[]) null);
         }
+        // And tell the autofill framework, because setting the hints does not.
+        //
+        // The session is opened when the view is entered, which is the focus call further
+        // down this method -- before this point on a new field, and not at all on a reused
+        // one, since tapping from one Codename One field straight into another keeps the
+        // same EditText and merely re-points it. Either way the session was opened while
+        // the view described the previous field, so a code field would be offered nothing
+        // and the field after a code field would be offered the code. Leaving and
+        // re-entering re-opens it against what the view says now.
+        //
+        // Only when the purpose actually changed: re-entering on every field open would
+        // restart sessions that are working, which is how a password manager loses track
+        // of the pair it was filling.
+        if (lastWasOneTimeCode != oneTimeCode) {
+            android.view.autofill.AutofillManager afm =
+                    (android.view.autofill.AutofillManager) edit.getContext()
+                            .getSystemService(android.view.autofill.AutofillManager.class);
+            if (afm != null) {
+                afm.notifyViewExited(edit);
+                afm.notifyViewEntered(edit);
+            }
+        }
+        lastWasOneTimeCode = oneTimeCode;
     }
     private boolean isNonPredictive(int inputType) {
         return hasConstraint(inputType, TextArea.NON_PREDICTIVE) || hasConstraint(inputType, TextArea.SENSITIVE);
