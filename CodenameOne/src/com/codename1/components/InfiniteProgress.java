@@ -192,17 +192,6 @@ public class InfiniteProgress extends Component {
         // carries the marker. A hosted dialog never becomes the current top level, so
         // on a window the marker could not be found however many spinners were up, and
         // each new one re-tinted the window over the first one's choice.
-        boolean alreadyTinted = hostCnt.getClientProperty("isInfiniteProgress") != null;
-        Integer held = (Integer) hostCnt.getClientProperty(PROGRESS_DEPTH);
-        int depth = held == null ? 0 : held.intValue();
-        if (!alreadyTinted && depth == 0) {
-            f.setTintColor(tintColor);
-        }
-        hostCnt.putClientProperty(PROGRESS_DEPTH, Integer.valueOf(depth + 1));
-        // Released when this spinner leaves the hierarchy, which is what disposing the
-        // dialog does to it. Held per spinner rather than per host: each one is in
-        // exactly one dialog, so each releases exactly the count it took.
-        progressHost = hostCnt;
         Dialog d = new Dialog();
         // Never a window of its own, whatever the application asked for globally. This
         // one is shown modeless and does its blocking with the scrim the hosted path
@@ -217,6 +206,23 @@ public class InfiniteProgress extends Component {
         d.setDialogUIID("Container");
         d.setLayout(new BorderLayout());
         d.addComponent(BorderLayout.CENTER, this);
+        // Claimed only once the spinner is actually in the dialog. addComponent throws
+        // if this spinner is already parented -- showInfiniteBlocking() called twice
+        // over, before the first dialog was disposed -- and the claim is given back when
+        // the spinner leaves a hierarchy, so one taken before it ever entered would
+        // never be given back: the host would keep a depth above zero for good and
+        // every later spinner on it would skip its tint.
+        boolean alreadyTinted = hostCnt.getClientProperty("isInfiniteProgress") != null;
+        Integer held = (Integer) hostCnt.getClientProperty(PROGRESS_DEPTH);
+        int depth = held == null ? 0 : held.intValue();
+        if (!alreadyTinted && depth == 0) {
+            f.setTintColor(tintColor);
+        }
+        hostCnt.putClientProperty(PROGRESS_DEPTH, Integer.valueOf(depth + 1));
+        // Released when this spinner leaves the hierarchy, which is what disposing the
+        // dialog does to it. Held per spinner rather than per host: each one is in
+        // exactly one dialog, so each releases exactly the count it took.
+        progressHost = hostCnt;
         d.setTransitionInAnimator(CommonTransitions.createEmpty());
         d.setTransitionOutAnimator(CommonTransitions.createEmpty());
         d.setTopLevelHost(f);

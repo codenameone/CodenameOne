@@ -167,6 +167,68 @@ public class BrowserComponentCoverageTest extends UITestBase {
         }
     }
 
+    /// The callback ids currently registered, oldest first.
+    private static java.util.List<Integer> callbackIdsOf(BrowserComponent bc) {
+        try {
+            java.lang.reflect.Field f =
+                    BrowserComponent.class.getDeclaredField("returnValueCallbacks");
+            f.setAccessible(true);
+            java.util.Hashtable<?, ?> callbacks = (java.util.Hashtable<?, ?>) f.get(bc);
+            java.util.List<Integer> ids = new java.util.ArrayList<Integer>();
+            for (Object k : callbacks.keySet()) {
+                ids.add((Integer) k);
+            }
+            java.util.Collections.sort(ids);
+            return ids;
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// Delivers the answer registered under one id, the way the message listener does.
+    private static void deliverAnswerById(BrowserComponent bc, int id) {
+        try {
+            java.lang.reflect.Method m = BrowserComponent.class.getDeclaredMethod(
+                    "popReturnValueCallback", int.class);
+            m.setAccessible(true);
+            m.invoke(bc, id);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// One callback, two calls in flight: each clock belongs to its own call.
+    ///
+    /// Keying the clocks by the callback made the second call displace the first, so
+    /// the first clock could never be cancelled -- and when it fired it looked the
+    /// callback up by value, found the second call's registration and reported a
+    /// timeout against it at the first call's deadline.
+    @FormTest
+    public void twoCallsSharingACallbackKeepSeparateClocks() {
+        BrowserComponent bc = new BrowserComponent();
+        SuccessCallback<JSRef> shared = new SuccessCallback<JSRef>() {
+            @Override
+            public void onSucess(JSRef value) {
+            }
+        };
+
+        bc.execute(600000, "eval('1')", shared);
+        bc.execute(600000, "eval('2')", shared);
+        Assertions.assertEquals(2, timeoutsOf(bc).size(),
+                "two calls in flight are two clocks, whatever they share");
+
+        java.util.List<Integer> ids = callbackIdsOf(bc);
+        Assertions.assertEquals(2, ids.size(), "precondition: both calls registered");
+
+        deliverAnswerById(bc, ids.get(0).intValue());
+        Assertions.assertEquals(1, timeoutsOf(bc).size(),
+                "answering the first call stops the first call's clock, and only that");
+
+        deliverAnswerById(bc, ids.get(1).intValue());
+        Assertions.assertEquals(0, timeoutsOf(bc).size(),
+                "and answering the second stops the other");
+    }
+
     /// Delivers the answer the way the message listener does.
     private static void deliverAnswer(BrowserComponent bc, SuccessCallback<JSRef> cb) {
         try {

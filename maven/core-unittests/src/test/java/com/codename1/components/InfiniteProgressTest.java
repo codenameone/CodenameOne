@@ -336,4 +336,40 @@ class InfiniteProgressTest extends UITestBase {
         assertNull(host.getClientProperty("cn1$infiniteProgressDepth"),
                 "a spinner that was never installed must not keep a claim on its host");
     }
+    /// A refused attachment must not leave a claim behind.
+    ///
+    /// showInfiniteBlocking() on a spinner that is already in a dialog throws out of
+    /// addComponent. The claim is given back when the spinner leaves a hierarchy, so one
+    /// taken before it ever entered is never given back: the host keeps a depth above
+    /// zero for good, and every later spinner on that surface skips its tint.
+    @FormTest
+    void aRefusedAttachmentLeavesNoProgressClaim() {
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InfiniteProgress ip = new InfiniteProgress();
+        Dialog first = ip.showInfiniteBlocking();
+        DisplayTest.flushEdt();
+        Object afterFirst = f.getClientProperty("cn1$infiniteProgressDepth");
+        assertNotNull(afterFirst, "precondition: the first showing claimed the host");
+
+        // The same spinner again, still parented to the first dialog.
+        try {
+            ip.showInfiniteBlocking();
+            DisplayTest.flushEdt();
+        } catch (RuntimeException expected) {
+            // The attachment is what refuses; the claim is the thing under test.
+        }
+
+        assertEquals(afterFirst, f.getClientProperty("cn1$infiniteProgressDepth"),
+                "a showing that never attached must not have counted itself, or the"
+                        + " host stays claimed and later spinners skip their tint");
+
+        first.dispose();
+        DisplayTest.flushEdt();
+        assertNull(f.getClientProperty("cn1$infiniteProgressDepth"),
+                "and disposing the one that did attach gives the host back");
+    }
+
 }

@@ -870,21 +870,28 @@ public final class ToastBar {
                         : Display.getInstance().getDisplayHeight())
                     - safeArea.getY()
                     - safeArea.getHeight();
-            if (position == Component.BOTTOM && safeBottomMargin > 0) {
+            // Entered when there is an inset to apply OR one already applied, in the
+            // shape the keyboard margin above already uses. Gated on the new value
+            // alone, an inset that went away -- a rotation out of a notched edge -- left
+            // the last one in the style: applyPositionTo clears these only when the
+            // toast changes edge, so a cached toast staying at the bottom kept a blank
+            // gap under it for as long as it lived.
+            if (position == Component.BOTTOM
+                    && (safeBottomMargin > 0 || c.safeAreaPaddingBottom > 0)) {
+                int applied = Math.max(0, safeBottomMargin);
                 Style s = c.getAllStyles();
                 s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-                s.setPaddingBottom(safeBottomMargin);
-                c.safeAreaPaddingBottom = safeBottomMargin;
-            } else if (position == Component.TOP && safeArea.getY() > 0) {
+                s.setPaddingBottom(applied);
+                c.safeAreaPaddingBottom = applied;
+            } else if (position == Component.TOP
+                    && (safeArea.getY() > 0 || c.safeAreaPaddingTop > 0)) {
                 Container parent = c.getParent();
                 if (parent != null) {
-                    int neededPadding = safeArea.getY() - parent.getAbsoluteY();
-                    if (neededPadding > 0) {
-                        Style s = c.getAllStyles();
-                        s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-                        s.setPaddingTop(neededPadding);
-                        c.safeAreaPaddingTop = neededPadding;
-                    }
+                    int applied = Math.max(0, safeArea.getY() - parent.getAbsoluteY());
+                    Style s = c.getAllStyles();
+                    s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+                    s.setPaddingTop(applied);
+                    c.safeAreaPaddingTop = applied;
                 }
             }
 

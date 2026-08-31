@@ -324,4 +324,43 @@ class ToastBarTest extends UITestBase {
         cleanupToastBar(c);
         DisplayTest.flushEdt();
     }
+    /**
+     * An inset that goes away has to take its padding with it.
+     *
+     * The same toast component is reused across safe-area changes, and the padding it
+     * carries is cleared only when the toast changes edge. Applying the inset only when
+     * the new one is positive therefore left the previous value in the style: a toast
+     * staying at the bottom across a rotation out of a notched edge kept a blank gap
+     * under it for as long as it lived.
+     */
+    @FormTest
+    void testBottomSafeAreaPaddingIsClearedWhenTheInsetDisappears() throws Exception {
+        int safeTop = 50;
+        int safeHeight = 1820;  // leaves 50px at the bottom
+        implementation.setDisplaySafeArea(new Rectangle(0, safeTop, 1080, safeHeight));
+
+        ToastBar tb = ToastBar.getInstance();
+        tb.setPosition(Component.BOTTOM);
+
+        Form f = Display.getInstance().getCurrent();
+        f.revalidate();
+
+        Container c = invokeGetToastBarComponent(tb);
+        assertNotNull(c, "ToastBarComponent should be created");
+        assertEquals(1920 - safeTop - safeHeight, c.getStyle().getPaddingBottom(),
+                "precondition: the inset was applied");
+
+        // The rotation: same toast, same edge, no bottom inset any more. Re-resolved
+        // rather than merely revalidated, because that is where the insets are applied.
+        implementation.setDisplaySafeArea(new Rectangle(0, 0, 1080, 1920));
+        f.revalidate();
+        assertSame(c, invokeGetToastBarComponent(tb), "precondition: the same toast");
+
+        assertEquals(0, c.getStyle().getPaddingBottom(),
+                "an inset that is gone must not leave its padding behind, or the toast"
+                        + " keeps a blank gap under it for as long as it lives");
+
+        cleanupToastBar(c);
+    }
+
 }

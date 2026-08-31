@@ -155,8 +155,12 @@ public class BrowserComponent extends Container {
     /// needed -- once per execute(), which a page calling in a loop turns into a pile of
     /// threads that can also keep a JavaSE process from exiting.
     ///
-    /// Keyed by callback, which is how the timeout task already finds its own entry.
-    private Hashtable<SuccessCallback<JSRef>, Timer> returnValueTimeouts;
+    /// Keyed by the id of the call it belongs to, not by the callback: one callback
+    /// object can be handed to two overlapping calls, and keying by it made the second
+    /// displace the first -- leaving that first clock uncancellable, and letting it
+    /// later find the second call's registration and report a timeout against it at the
+    /// wrong deadline.
+    private Hashtable<Integer, Timer> returnValueTimeouts;
     private int nextReturnValueCallbackId = 0;
     private String tmpUrl;
     /// Sets of callbacks that are registered to persist for multiple calls.
@@ -580,7 +584,7 @@ public class BrowserComponent extends Container {
             if (callback != null) {
                 // The answer arrived, so the clock waiting for it has nothing left to
                 // report. Stopping it is what lets its thread end and this component go.
-                cancelReturnValueTimeout(callback);
+                cancelReturnValueTimeout(id);
             }
             return callback;
         }
@@ -588,11 +592,11 @@ public class BrowserComponent extends Container {
     }
 
     /// Stops and forgets the clock armed for one scripted call, if there is one.
-    private void cancelReturnValueTimeout(SuccessCallback<JSRef> callback) {
+    private void cancelReturnValueTimeout(int callbackId) {
         if (returnValueTimeouts == null) {
             return;
         }
-        Timer clock = returnValueTimeouts.remove(callback);
+        Timer clock = returnValueTimeouts.remove(Integer.valueOf(callbackId));
         if (clock != null) {
             clock.cancel();
         }
@@ -1404,12 +1408,25 @@ public class BrowserComponent extends Container {
     ///
     /// - `callback`: The callback.  You should call this directly from Javascript.  You can call either `callback.onSuccess(value)` or `callback.onError(message,code)`.
     public void execute(String js, SuccessCallback<JSRef> callback) {
+        SuccessCallback<JSRef> target = callback == null
+                ? new CallbackAdapter<JSRef>() : callback;
+        executeWithCallbackId(js, addReturnValueCallback(target));
+    }
+
+    /// Sends a scripted call whose reply is already registered under `callbackId`.
+    ///
+    /// Split out so that a caller which needs to know the id before the call goes out
+    /// can reserve it first. A timeout is one: its clock has to be armed before the
+    /// script can answer, and it has to be able to name the execution it belongs to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `js`: the javascript expression
+    ///
+    /// - `callbackId`: the id the reply will arrive under
+    private void executeWithCallbackId(String js, int callbackId) {
         StringBuilder fullJs = new StringBuilder();
         String isSimulator = Display.getInstance().isSimulator() ? "true" : "false";
-        if (callback == null) {
-            callback = new CallbackAdapter<JSRef>();
-        }
-        int callbackId = addReturnValueCallback(callback);
         fullJs
                 .append("(function(){")
                 //.append("cn1application.log('we are here');")
@@ -1446,53 +1463,55 @@ public class BrowserComponent extends Container {
     ///
     /// - `callback`: The callback
     public void execute(int timeout, final String js, final SuccessCallback<JSRef> callback) {
-        if (callback != null && timeout > 0) {
-            // Not tied to a surface at all. A UITimer is driven by the painting of the
-            // top level it is registered on, so binding it to the browser's own window
-            // -- which is the only surface that could be right -- stopped the clock the
-            // moment that window was hidden or minimized: the timeout this method
-            // documents then arrived when the window came back, or never. This one is a
-            // plain timer that hands the callback to the event thread when it fires,
-            // whatever is on screen by then.
-            Timer clock = Display.getInstance().setTimeout(timeout, new Runnable() {
-
-                @Override
-                public void run() {
-                    // This clock has fired, so it is spent whatever it decides below.
-                    cancelReturnValueTimeout(callback);
-                    if (returnValueCallbacks().contains(callback)) {
-                        Object key = null;
-                        for (Map.Entry e : returnValueCallbacks.entrySet()) {
-                            if (callback.equals(e.getValue())) {
-                                key = e.getKey();
-                                break;
-                            }
-                        }
-                        if (key != null) {
-                            if (jsCallbacks == null || !jsCallbacks.contains(callback)) {
-                                returnValueCallbacks.remove(key);
-                            }
-                            if (callback instanceof Callback) {
-                                ((Callback) callback).onError(BrowserComponent.this, new RuntimeException("Javascript execution timeout"), 1, "Javascript execution timeout");
-                            } else {
-                                Log.e(new RuntimeException("Javascript execution timeout while running " + js));
-                                callback.onSucess(null);
-                            }
-                        }
-                    }
-                }
-
-            });
-            // Kept so an answer can stop it -- see returnValueTimeouts. Registered
-            // before the call goes out, because the answer can come back before this
-            // method returns and would then have nothing to cancel.
-            if (returnValueTimeouts == null) {
-                returnValueTimeouts = new Hashtable<SuccessCallback<JSRef>, Timer>();
-            }
-            returnValueTimeouts.put(callback, clock);
+        if (callback == null || timeout <= 0) {
+            execute(js, callback);
+            return;
         }
-        execute(js, callback);
+        // Reserved before the call goes out, so the clock can name the execution it
+        // belongs to. Arming afterwards would be a race in the other direction: a reply
+        // that arrives first retires the callback, and the clock armed after it would
+        // have nothing left to cancel it.
+        final int callbackId = addReturnValueCallback(callback);
+        // Not tied to a surface at all. A UITimer is driven by the painting of the
+        // top level it is registered on, so binding it to the browser's own window
+        // -- which is the only surface that could be right -- stopped the clock the
+        // moment that window was hidden or minimized: the timeout this method
+        // documents then arrived when the window came back, or never. This one is a
+        // plain timer that hands the callback to the event thread when it fires,
+        // whatever is on screen by then.
+        Timer clock = Display.getInstance().setTimeout(timeout, new Runnable() {
 
+            @Override
+            public void run() {
+                // This clock has fired, so it is spent whatever it decides below.
+                cancelReturnValueTimeout(callbackId);
+                // This execution's own registration, by id. Looking the callback up by
+                // value found whichever execution happened to hold it, which for a
+                // callback handed to two overlapping calls was the wrong one -- and it
+                // then reported a timeout against that one at this one's deadline.
+                SuccessCallback<JSRef> pending =
+                        returnValueCallbacks().get(Integer.valueOf(callbackId));
+                if (pending == null) {
+                    return;
+                }
+                if (jsCallbacks == null || !jsCallbacks.contains(pending)) {
+                    returnValueCallbacks.remove(Integer.valueOf(callbackId));
+                }
+                if (pending instanceof Callback) {
+                    ((Callback) pending).onError(BrowserComponent.this, new RuntimeException("Javascript execution timeout"), 1, "Javascript execution timeout");
+                } else {
+                    Log.e(new RuntimeException("Javascript execution timeout while running " + js));
+                    pending.onSucess(null);
+                }
+            }
+
+        });
+        // Kept so an answer can stop it -- see returnValueTimeouts.
+        if (returnValueTimeouts == null) {
+            returnValueTimeouts = new Hashtable<Integer, Timer>();
+        }
+        returnValueTimeouts.put(Integer.valueOf(callbackId), clock);
+        executeWithCallbackId(js, callbackId);
     }
 
     /// Executes Javascript expression.
