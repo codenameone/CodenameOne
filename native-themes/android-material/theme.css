@@ -738,6 +738,34 @@ PopupContent {
     border-radius: 7mm;
 }
 
+/* Phone number verification: the number field, and the code entry that renders
+   one box per digit. The boxes are field-shaped cells so the code reads as a row
+   of slots; the field that actually holds the code sits over them and draws only
+   the caret, which is why OtpFieldInput contributes no chrome of its own. */
+OtpField { background-color: transparent; padding: 1mm 0; margin: 0; }
+OtpDigit {
+    cn1-derive: TextField;
+    text-align: center;
+    font-size: 4mm;
+    padding: 2mm 1mm;
+    margin: 0.5mm;
+}
+OtpFieldInput { background-color: transparent; padding: 0; margin: 0; }
+PhoneNumberField { background-color: transparent; padding: 0; margin: 0; }
+PhoneNumberCountry { cn1-derive: FlatButton; margin: 1mm 0 1mm 2mm; }
+PhoneNumberText { cn1-derive: TextField; }
+PhoneVerification { background-color: transparent; padding: 1mm 2mm; margin: 0; }
+PhoneVerificationText { cn1-derive: Label; text-align: center; }
+PhoneVerificationError { cn1-derive: Label; color: #b3261e; text-align: center; }
+PhoneVerificationButton { cn1-derive: Button; text-align: center; }
+PhoneVerificationLink {
+    cn1-derive: Label;
+    color: var(--accent-color, #6750a4);
+    background-color: transparent;
+    text-align: center;
+    padding: 1.5mm;
+}
+
 @media (prefers-color-scheme: dark) {
     Component { color: #e6e0e9; background-color: #141218; }
     Form { background-color: #141218; padding: 0; margin: 0; }
@@ -875,4 +903,10 @@ PopupContent {
     ChatInputField { background-color: #1d1b20; color: #e6e0e9; border-radius: 3mm; }
 
     Separator { background-color: #49454f; }
+
+    OtpDigit { color: #e6e0e9; }
+    PhoneNumberText { color: #e6e0e9; }
+    PhoneVerificationText { color: #cac4d0; }
+    PhoneVerificationError { color: #f2b8b5; }
+    PhoneVerificationLink { color: var(--accent-color-dark, #d0bcff); }
 }

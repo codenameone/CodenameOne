@@ -132,6 +132,35 @@ Fluent builder methods: `label(String)`, `descriptionMessage(String)`, `errorMes
 
 `getField()` returns the underlying `TextField` if you need to set keyboard constraints or hook value listeners; `getText()` / `setText(String)` work directly on the wrapper.
 
+## Phone number verification — `PhoneVerification`, `OtpField`, `PhoneNumberField`
+
+Verifying a phone number is two calls to YOUR server (send a code, check a code). Codename One does not send the SMS. `com.codename1.components.PhoneVerification` owns everything on the device: the number entry, the code entry, the resend countdown, the way back to a mistyped number, and the errors either call reports.
+
+```java
+import com.codename1.components.PhoneVerification;
+
+PhoneVerification verify = new PhoneVerification();
+verify.setCodeSender((number, response) -> myServer.sendSms(number, response));
+verify.setCodeVerifier((number, code, response) -> myServer.check(number, code, response));
+verify.addVerifiedListener(e -> showMainScreen());
+form.add(verify);
+```
+
+Each server call is handed a `PhoneVerification.Response` and calls `succeeded()` or `failed(String)` once, from any thread. Until it answers, the button that started the request is disabled, and an answer to a request the user has already moved past is dropped.
+
+The two halves are usable on their own:
+
+- `OtpField(int length)` — the code, one box per digit, with `addCompleteListener` firing when the last box fills and `getText()` returning the code.
+- `PhoneNumberField` — a country selector plus a number field, producing `getE164()` ("+972501234567"). Narrow the country list with `setCountries`.
+
+**The code fills itself in.** `OtpField` carries `TextArea.ONE_TIME_CODE`, so iOS offers the code from Messages above the keyboard and Android's autofill offers it from the SMS. Set the same constraint on any field of your own that holds a code:
+
+```java
+TextField code = new TextField("", "Code", 6, TextArea.NUMERIC | TextArea.ONE_TIME_CODE);
+```
+
+Never read the SMS yourself to fill a code field. On Android that means `READ_SMS`, which Google Play restricts to messaging apps; the hint gets you the same result with no permission at all.
+
 ## Sticky headers — `StickyHeaderContainer`
 
 CN1 has `com.codename1.components.StickyHeaderContainer`. It wraps a scrolling content pane and pins one or more header containers to the top: while you scroll, the header stays glued in place and can morph (color shift, height change, fade) using a transition you supply.

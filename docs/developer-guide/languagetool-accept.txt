@@ -715,3 +715,10 @@ IPsec
 # Android's density-independent pixel, the unit its safe-area insets are
 # published in. Spelled the way Google spells it, alongside the iOS "pt".
 dp
+
+# -----------------------------------------------------------------------------
+# Phone verification (Authentication-And-Identity.asciidoc).
+# -----------------------------------------------------------------------------
+# One of the SMS services an application's own server might send the code
+# through, named alongside Twilio and AWS SNS.
+Vonage
