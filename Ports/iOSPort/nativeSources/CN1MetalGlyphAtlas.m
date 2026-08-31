@@ -94,10 +94,10 @@ static uint64_t                atlasCacheTick = 0;
 
 @implementation CN1MetalGlyphAtlas
 
-+ (nullable instancetype)atlasForFont:(nonnull UIFont *)font {
-    // Build a CTFont from the UIFont's descriptor (system fonts have private
++ (nullable instancetype)atlasForFont:(nonnull CN1Font *)font {
+    // Build a CTFont from the CN1Font's descriptor (system fonts have private
     // names like ".SFUI-Regular" that CTFontCreateWithName can't resolve) and
-    // route through the CTFont path so the UIFont entry point and the per-run
+    // route through the CTFont path so the CN1Font entry point and the per-run
     // CoreText path share one cache entry per (PostScript name, size).
     CTFontDescriptorRef ctDesc = (__bridge CTFontDescriptorRef)font.fontDescriptor;
     CTFontRef ctFont = CTFontCreateWithFontDescriptor(ctDesc, font.pointSize, NULL);

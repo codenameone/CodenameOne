@@ -15,7 +15,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/calendar/C
 ----
 
 `LocalCalendarSource` is implemented with Android's Calendar Provider and
-Apple EventKit on iOS and Mac Catalyst. The simulator supplies an isolated,
+Apple EventKit on iOS and macOS. The simulator supplies an isolated,
 in-memory source so tests never modify the developer's real calendar. A port
 that has no local calendar service returns an empty capability set. Online
 sources and `.ics` import/export remain available on every port, including
@@ -29,7 +29,7 @@ JavaScript and Linux.
 |Calendar Provider events
 |Google, Microsoft, CalDAV, and `.ics`
 
-|iOS and Mac Catalyst
+|iOS and macOS
 |EventKit events and reminders
 |Google, Microsoft, CalDAV, and `.ics`
 
@@ -133,7 +133,7 @@ Calling `LocalCalendarSource.getInstance()`,
 `CalendarManager.getLocalSource()`, `CalendarManager.getSources()`, or
 `Display.getLocalCalendarSource()` is the builder signal for local calendar
 integration. Android builds add
-`READ_CALENDAR` and `WRITE_CALENDAR`; iOS and Mac Catalyst builds add EventKit
+`READ_CALENDAR` and `WRITE_CALENDAR`; iOS and macOS builds add EventKit
 and calendar/reminder privacy strings. You can replace the default user-facing
 strings with:
 

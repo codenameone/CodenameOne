@@ -11,7 +11,8 @@ on:
     workflows:
       - Test Android build scripts
       - Test iOS UI build scripts
-      - Test Mac native UI build scripts
+      - Test macOS UI build scripts
+      - Test Mac Catalyst UI build scripts
       - Test JavaScript screenshot scripts
       - Linux native build + run (GTK3, x64 + arm64)
       - Windows cross-build + run (Linux build -> Windows run)

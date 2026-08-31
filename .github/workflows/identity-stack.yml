@@ -213,9 +213,23 @@ jobs:
   sample-secrets:
     name: Scan demo sample for accidental credentials
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    # 10 rather than 3. The scan itself is one grep over ten paths and takes
+    # under a second; the three minutes went entirely to checking out a
+    # repository this size, and the job was cancelled mid-checkout having done
+    # no work at all. The sparse checkout below is what makes the budget
+    # generous rather than marginal, and the larger timeout is so a slow runner
+    # cannot fail a job that greps ten directories.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Only the trees the scan reads. Cone mode takes directories, so the
+          # individual social/*.java targets below arrive with their package.
+          sparse-checkout: |
+            Samples/samples/UniversalSignInDemo
+            CodenameOne/src/com/codename1/io/oidc
+            CodenameOne/src/com/codename1/io/webauthn
+            CodenameOne/src/com/codename1/social
       - name: Reject real-looking secrets in identity sources & demo
         run: |
           set -euo pipefail
@@ -235,6 +249,23 @@ jobs:
             CodenameOne/src/com/codename1/social/MicrosoftConnect.java
             CodenameOne/src/com/codename1/io/webauthn
           )
+          # Every target must exist before anything is scanned. The grep below
+          # sends its errors to /dev/null and swallows its exit code, so a
+          # target that is not on disk -- a file renamed, or a path the sparse
+          # checkout above stopped fetching -- would scan nothing and report
+          # success. A gate that passes because it read no files is worse than
+          # no gate.
+          MISSING=0
+          for t in "${TARGETS[@]}"; do
+            if [ ! -e "$t" ]; then
+              echo "::error::Credential scan target is missing: $t"
+              MISSING=1
+            fi
+          done
+          if [ "$MISSING" -ne 0 ]; then
+            echo "::error::Refusing to report success on a partial scan."
+            exit 1
+          fi
           # `|| true` is intentional: grep -E exits 1 when there are zero
           # matches, which is the success case.
           HITS=$(grep -rEn "$PATTERN" "${TARGETS[@]}" 2>/dev/null || true)

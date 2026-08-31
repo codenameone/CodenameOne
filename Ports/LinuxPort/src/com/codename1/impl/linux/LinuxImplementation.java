@@ -109,6 +109,16 @@ public class LinuxImplementation extends CodenameOneImplementation {
     private static final int EVENT_MOUSE_WHEEL = 8;
     private static final int EVENT_MOUSE_HWHEEL = 9;
     private static final int EVENT_PINCH = 10;
+    // The pinch phases, forwarded so a component that zoomed learns the gesture
+    // ended. A touchpad emits no pointer events, so the two-pointer path in
+    // Component that normally calls pinchReleased() never runs on this port.
+    /// The magnify factor since the gesture began, which is what
+    /// Component.pinch() is specified to receive. Reset by both phases so a
+    /// gesture cannot inherit the previous one's zoom.
+    private float pinchScale = 1f;
+
+    private static final int EVENT_PINCH_BEGIN = 20;
+    private static final int EVENT_PINCH_END = 21;
     private static final int EVENT_ROTATE = 11;
     private static final int EVENT_ACCESSIBILITY_ACTION = 12;
     // Additional desktop windows. These always carry a non-zero window id.
@@ -856,9 +866,23 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     // left), i.e. drags the finger left -> negative scrollX.
                     windowPointerWheelMoved(windowId, x, y, -wheelUnits(key), 0, false, 0);
                     break;
+                case EVENT_PINCH_BEGIN:
+                    pinchScale = 1f;
+                    Display.getInstance().firePinchBeginGesture();
+                    break;
+                case EVENT_PINCH_END:
+                    pinchScale = 1f;
+                    Display.getInstance().firePinchReleaseGesture(x, y);
+                    break;
                 case EVENT_PINCH:
-                    // key is the incremental scale multiplier in 1/10000 units.
-                    com.codename1.ui.Desktop.getInstance().windowMagnifyGesture(windowId, x, y, key / GESTURE_FIXED);
+                    // The native reports the change SINCE THE LAST EVENT, and
+                    // Component.pinch() is specified as the factor since the
+                    // gesture began: ImageViewer computes currentZoom * scale
+                    // and only moves currentZoom in pinchReleased(). Forwarding
+                    // the increment made a whole gesture land on its last tiny
+                    // step, so a pinch barely zoomed at all.
+                    pinchScale *= key / GESTURE_FIXED;
+                    com.codename1.ui.Desktop.getInstance().windowMagnifyGesture(windowId, x, y, pinchScale);
                     break;
                 case EVENT_ROTATE:
                     // key is the incremental rotation in 1/10000 radians.

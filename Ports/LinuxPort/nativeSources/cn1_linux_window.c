@@ -595,6 +595,18 @@ static gboolean cn1OnGenericEvent(GtkWidget* widget, GdkEvent* e, gpointer data)
     GdkEventTouchpadPinch* pe = (GdkEventTouchpadPinch*) e;
     if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_BEGIN) {
         cn1PinchLastScale = pe->scale > 0 ? pe->scale : 1.0;
+        /* Forwarded, not just consumed. The phase is what lets the Java side
+         * deliver the whole gesture to one component and, more importantly,
+         * end it: a touchpad emits no pointer events, so the two-pointer path
+         * that normally calls pinchReleased() never runs here. */
+        cn1LinuxPushEvent(CN1_EVENT_PINCH_BEGIN, (int) pe->x, (int) pe->y, 0);
+    } else if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_END
+            || pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_CANCEL) {
+        /* CANCEL as well as END: a cancelled gesture leaves the component
+         * mid-pinch exactly as a dropped END would, and the Java side treats
+         * both as "the fingers left the touchpad". */
+        cn1PinchLastScale = 1.0;
+        cn1LinuxPushEvent(CN1_EVENT_PINCH_END, (int) pe->x, (int) pe->y, 0);
     } else if (pe->phase == GDK_TOUCHPAD_GESTURE_PHASE_UPDATE) {
         int x = (int) pe->x;
         int y = (int) pe->y;

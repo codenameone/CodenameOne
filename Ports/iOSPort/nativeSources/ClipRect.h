@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import <Foundation/Foundation.h>
 #import "ExecutableOp.h"
 #import "xmlvm.h"

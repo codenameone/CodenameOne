@@ -326,6 +326,10 @@ class PortStatusTest(unittest.TestCase):
                 source = port_status.REPO_ROOT / original_directory / (
                     port["id"] + ".json"
                 )
+                # A port with no published report has nothing to stage; the
+                # fixture is about the ports that do have one.
+                if not source.exists():
+                    continue
                 (report_root / source.name).write_text(
                     source.read_text(encoding="utf-8"), encoding="utf-8"
                 )
@@ -347,11 +351,24 @@ class PortStatusTest(unittest.TestCase):
                 port_status.validate(manifest)
 
     def stored_reports(self):
+        """The checked-in fallback report of every port that has one.
+
+        A port that has never published has no file here, and that is a state
+        the contract supports rather than an error: validate() reports it as
+        "no stored report yet" and provenance_problems explicitly declines to
+        ask for a copy of something that does not exist yet. A newly registered
+        port is in exactly that state until its first run on master publishes,
+        so reading these eagerly would make adding a port impossible without
+        hand-authoring the very snapshot the provenance gate exists to forbid.
+        """
         directory = port_status.REPO_ROOT / self.manifest["report_directory"]
-        return {
-            port["id"]: port_status.read_json(directory / (port["id"] + ".json"))
-            for port in self.manifest["ports"]
-        }
+        reports = {}
+        for port in self.manifest["ports"]:
+            path = directory / (port["id"] + ".json")
+            if not path.exists():
+                continue
+            reports[port["id"]] = port_status.read_json(path)
+        return reports
 
     def test_coverage_rejects_a_test_that_never_ran(self):
         # A registered test left at "not-run" reads on the page exactly like one that runs and
@@ -732,6 +749,10 @@ class PortStatusTest(unittest.TestCase):
             report_root = Path(tmp)
             for port in self.manifest["ports"]:
                 source = port_status.REPO_ROOT / original_directory / (port["id"] + ".json")
+                # A port with no published report has nothing to stage; the
+                # fixture is about the ports that do have one.
+                if not source.exists():
+                    continue
                 (report_root / source.name).write_text(
                     source.read_text(encoding="utf-8"), encoding="utf-8"
                 )
@@ -928,6 +949,11 @@ class PortStatusTest(unittest.TestCase):
                 if port["id"] == "tvos":
                     continue
                 source = port_status.REPO_ROOT / original_directory / (port["id"] + ".json")
+                # Ports that have not published yet have nothing to copy. The
+                # fixture only needs tvos to be the absent one for the assertion
+                # below to mean something.
+                if not source.exists():
+                    continue
                 (report_root / source.name).write_text(
                     source.read_text(encoding="utf-8"), encoding="utf-8"
                 )
@@ -1368,6 +1394,49 @@ class PortStatusTest(unittest.TestCase):
         self.assertTrue(
             any("performance status is" in item for item in malformed), malformed)
 
+    def test_the_two_macos_ports_are_registered_separately(self):
+        # The native AppKit build and the legacy Mac Catalyst target are
+        # different ports, not two builds of one, and the site has to be able to
+        # say so. They were one id ("mac-native") for as long as Catalyst was the
+        # only Mac build there was.
+        ids = {port["id"] for port in self.manifest["ports"]}
+        self.assertIn("macos", ids)
+        self.assertIn("mac-catalyst", ids)
+        self.assertNotIn(
+            "mac-native",
+            ids,
+            "mac-native was retired rather than re-pointed: its published report "
+            "measured a Catalyst binary, and re-using the id would have rendered "
+            "those numbers under an AppKit label until the first AppKit run",
+        )
+
+        by_id = {port["id"]: port for port in self.manifest["ports"]}
+        # Each has its own workflow, because backfill attributes reports by the
+        # workflow file name.
+        self.assertEqual("scripts-macos.yml", by_id["macos"]["workflow"])
+        self.assertEqual("scripts-mac-catalyst.yml", by_id["mac-catalyst"]["workflow"])
+
+        # And its own goldens. A Catalyst window is a UIWindowScene fed an
+        # off-screen raster and an AppKit one owns a real CAMetalLayer, so the
+        # two baselines can never converge into one set with a loose tolerance.
+        goldens = self.manifest["golden_directories"]
+        self.assertIn("scripts/macos/screenshots", goldens)
+        self.assertIn("scripts/mac-catalyst/screenshots", goldens)
+
+    def test_macos_support_row_discloses_both_targets(self):
+        rows = {
+            item.get("id"): item
+            for item in port_status.read_json(
+                port_status.REPO_ROOT / "docs/website/data/port_status_support.json"
+            )["deployment_support"]
+        }
+        blob = json.dumps(rows.get("macos", {}))
+        # The guard this pins exists so the site cannot claim "macOS" while
+        # shipping only a Catalyst slice. It now has to name both, because a
+        # reader choosing between them needs to know both exist.
+        self.assertIn("AppKit", blob)
+        self.assertIn("Catalyst", blob)
+
     def test_every_report_the_site_serves_is_renderable(self):
         # Only malformed. Drift is asserted against deliberately: a checked-in snapshot is a
         # copy of a real run, and a branch that registers a test makes every one of them
@@ -1378,6 +1447,12 @@ class PortStatusTest(unittest.TestCase):
             report_path = port_status.REPO_ROOT / self.manifest["report_directory"] / (
                 port["id"] + ".json"
             )
+            # A port that has never published has no fallback, which is a
+            # supported state rather than an unrenderable one -- the site shows
+            # it as "No stored report". There is nothing here for Hugo to fail
+            # to render.
+            if not report_path.exists():
+                continue
             with self.subTest(port=port["id"]):
                 _, malformed = port_status.publishable_report_problems(
                     self.manifest, port["id"], port_status.read_json(report_path)

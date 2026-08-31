@@ -22,7 +22,7 @@
  */
 #import "GLUIImage.h"
 #import "CodenameOne_GLViewController.h"
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #include "xmlvm.h"
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
@@ -31,7 +31,7 @@
 extern int nextPowerOf2(int val);
 
 @implementation GLUIImage
--(id)initWithImage:(UIImage*)i {
+-(id)initWithImage:(CN1Image*)i {
     img = i;
     name = nil;
 #ifndef CN1_USE_ARC
@@ -43,7 +43,7 @@ extern int nextPowerOf2(int val);
     return self;
 }
 
--(UIImage*)getImage {
+-(CN1Image*)getImage {
     return img;
 }
 
@@ -59,7 +59,7 @@ extern int nextPowerOf2(int val);
 #if defined(CN1_USE_METAL) || TARGET_OS_WATCH
     // Metal builds never sample via GL texture handles; DrawImage / TileImage
     // route through getMTLTexture instead. watchOS has no GL at all and renders
-    // images directly from the UIImage via the Core Graphics backend. Return 0
+    // images directly from the CN1Image via the Core Graphics backend. Return 0
     // so the GL helpers are preprocessed away and the slice links without GL
     // function symbols.
     return 0;
@@ -134,7 +134,7 @@ extern int nextPowerOf2(int val);
 #endif // !CN1_USE_METAL
 }
 
--(void)setImage:(UIImage*)i {
+-(void)setImage:(CN1Image*)i {
     if(img != nil) {
 #ifndef CN1_USE_ARC
         [img release];
@@ -146,9 +146,9 @@ extern int nextPowerOf2(int val);
 #endif
 #ifdef CN1_USE_METAL
     // Invalidate the cached MTLTexture — it was built from the previous
-    // UIImage's pixels. The CN1MetalTextureFromUIImage assignment
+    // CN1Image's pixels. The CN1MetalTextureFromUIImage assignment
     // transferred a +1 retain; release it explicitly so swapping the
-    // backing UIImage doesn't leak the old GPU texture.
+    // backing CN1Image doesn't leak the old GPU texture.
     [mtlTexture release];
     mtlTexture = nil;
 #endif
@@ -181,15 +181,15 @@ extern int nextPowerOf2(int val);
 #ifdef CN1_USE_METAL
 -(id<MTLTexture>)getMTLTexture {
     // Phase 3 v2: a mutable-image render target, if present, is the freshest
-    // pixel source. Screen-side DrawImage samples this; the cached UIImage-
+    // pixel source. Screen-side DrawImage samples this; the cached CN1Image-
     // derived mtlTexture is only relevant for never-drawn-into images.
     if (mtlMutableTexture != nil) return mtlMutableTexture;
     if (mtlTexture != nil) {
         // issue #5349: the first time this cached read-only texture is sampled
         // after a foreground/resume (or a memory warning), re-decode it from the
-        // retained UIImage. iOS can discard a private-storage texture's contents
+        // retained CN1Image. iOS can discard a private-storage texture's contents
         // while the app is suspended, and the leftover bytes render as a
-        // violet/magenta fill; re-decoding from the CPU-side UIImage is cheap and
+        // violet/magenta fill; re-decoding from the CPU-side CN1Image is cheap and
         // always correct. A plain generation compare is used (no OS purgeable
         // probe) -- setPurgeableState on a texture already referenced by an
         // in-flight command buffer trips Metal's commit-time validation.
@@ -214,7 +214,7 @@ extern int nextPowerOf2(int val);
 
 -(void)dropReadOnlyCachedTexture {
     // issue #5349: release the cached read-only texture; getMTLTexture rebuilds
-    // it from the retained UIImage on next use. Bumping the generation match is
+    // it from the retained CN1Image on next use. Bumping the generation match is
     // unnecessary -- a nil texture is unconditionally rebuilt.
     [mtlTexture release];
     mtlTexture = nil;
@@ -241,7 +241,7 @@ extern int nextPowerOf2(int val);
         CN1MetalRegisterMutableImage(self);
     }
     // Stale cached read-only texture: future getMTLTexture should sample
-    // mtlMutableTexture instead of the UIImage-derived one. Release the
+    // mtlMutableTexture instead of the CN1Image-derived one. Release the
     // +1 retain transferred in by getMTLTexture's CN1MetalTextureFromUIImage
     // assignment; without this the read-only texture leaks.
     [mtlTexture release];

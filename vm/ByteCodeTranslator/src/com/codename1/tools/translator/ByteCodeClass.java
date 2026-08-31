@@ -106,7 +106,9 @@ public class ByteCodeClass {
     }
 
     /// Selects which {@code @Concrete} attribute the parser honours: {@code "win"}
-    /// for the native Windows build (use {@code Concrete.win()}), {@code null}/
+    /// for the native Windows build (use {@code Concrete.win()}), {@code "linux"}
+    /// for the native Linux build (use {@code Concrete.linux()}), {@code "mac"}
+    /// for the native macOS build (use {@code Concrete.mac()}), {@code null}/
     /// anything else for the default iOS pipeline (use {@code Concrete.name()}).
     /// Set once per translation run from the app type (see ByteCodeTranslator).
     private static String concreteTarget;
@@ -383,6 +385,31 @@ public class ByteCodeClass {
     /** any declaration (abstract or not) of the given method in THIS class. */
     public boolean hasDeclaredMethod(String name, String desc) {
         return findDeclaredMethod(name, desc) != null;
+    }
+
+    /// Walks {@code concrete} and then its superclass chain and returns the first
+    /// class that declares a non-abstract {@code name}/{@code desc}, or null when
+    /// none does.
+    ///
+    /// This is the method the runtime would dispatch to for an instance of
+    /// {@code concrete}, which is precisely what a {@code @Concrete}
+    /// devirtualization is allowed to bind directly. Looking only at
+    /// {@code concrete}'s own declarations -- which is what this replaced -- gave
+    /// up on every method the concrete class inherits rather than overrides. That
+    /// was harmless while every {@code @Concrete} target derived straight from the
+    /// annotated base, and stopped being harmless once a port's implementation
+    /// subclassed another port's (MacImplementation extends IOSImplementation),
+    /// because the ~1,200 inherited methods -- Graphics primitives among them --
+    /// silently fell back to full virtual dispatch.
+    public static ByteCodeClass findConcreteDeclaringClass(ByteCodeClass concrete, String name, String desc) {
+        ByteCodeClass c = concrete;
+        while (c != null) {
+            if (c.hasDeclaredNonAbstractMethod(name, desc)) {
+                return c;
+            }
+            c = c.getBaseClassObject();
+        }
+        return null;
     }
 
     public void unmark() {
@@ -1179,10 +1206,81 @@ public class ByteCodeClass {
                     // the concurrent GC's stop-the-world pause (so the GC never scans its
                     // nursery while a minor collection runs). Lightweight threads are the
                     // ones the GC pauses; mark the main thread lightweight too.
-                    b.append("#ifdef CN1_NURSERY\n    getThreadLocalData()->lightweightThread = JAVA_TRUE;\n#endif\n");
-                    b.append("    ");
-                    b.append(clsName);
-                    b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n}\n\n");
+                    // NOT on the macOS target, where this thread goes on to
+                    // become AppKit's event loop rather than the thread that
+                    // runs Java. "Lightweight" is a promise to the collector
+                    // that the thread parks: cn1_globals.m waits for
+                    // threadActive to drop and then migrates
+                    // pendingHeapAllocations WITHOUT taking threadHeapMutex,
+                    // which is the mutex it does take for a native thread. The
+                    // unlocked append in cn1AddPending is safe only under that
+                    // pause -- its own comment says so -- so a thread that
+                    // never parks and still claims to be lightweight lets a
+                    // grow inside cn1AddPending free the array while the
+                    // collector is reading it. The event loop reaches Java only
+                    // through AppKit callbacks and brackets nothing, so it must
+                    // stay native; the flag is set below on the dispatched
+                    // thread that actually runs the application.
+                    if (ByteCodeTranslator.output != ByteCodeTranslator.OutputType.OUTPUT_TYPE_MACOS) {
+                        b.append("#ifdef CN1_NURSERY\n    getThreadLocalData()->lightweightThread = JAVA_TRUE;\n#endif\n");
+                    }
+                    // On the native macOS target the application's main method
+                    // runs on a background thread and AppKit owns the main one.
+                    // That is not a preference: the main thread has to be free to
+                    // run the event loop, and Codename One's own code marshals to
+                    // it synchronously to touch the UI -- so calling the app's
+                    // main directly here deadlocks the first time it does, in
+                    // dispatch_sync waiting for a queue that is waiting for it.
+                    // The generated main becoming the AppKit main is what puts
+                    // each on the right thread.
+                    if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_MACOS) {
+                        b.append("    [NSApplication sharedApplication];\n");
+                        b.append("    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];\n");
+                        b.append("    CN1MacInstallMainMenu();\n");
+                        b.append("    CN1MacInstallAppDelegate();\n");
+                        b.append("    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{\n");
+                        // The dispatched block runs on a DIFFERENT thread from
+                        // the one flagged above, with its own thread-local state
+                        // whose flags all default to false, and the application's
+                        // main allocates from the nursery on it. So it is a Java
+                        // thread and has to be registered as one, which means
+                        // BOTH flags and not just the first: the collector reads
+                        // a lightweight thread that is not active as parked, and
+                        // a parked thread is precisely the one it may scan and
+                        // migrate the nursery and pendingHeapAllocations of
+                        // without taking the heap mutex. Setting lightweight
+                        // alone was therefore worse than setting neither -- it
+                        // invited the collector into the arena this thread was
+                        // still filling. threadRunner sets the same pair, and
+                        // retires with markDeadThread, for every thread it
+                        // starts; this block is that sequence written by hand.
+                        b.append("#ifdef CN1_NURSERY\n"
+                                + "        getThreadLocalData()->lightweightThread = JAVA_TRUE;\n"
+                                + "        getThreadLocalData()->threadActive = JAVA_TRUE;\n"
+                                + "#endif\n");
+                        b.append("        ");
+                        b.append(clsName);
+                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n");
+                        // main returning does not end the process here -- AppKit
+                        // owns the main thread and keeps running -- so leaving
+                        // the worker registered would leave the collector
+                        // waiting at every safepoint for a thread that no longer
+                        // exists. markDeadThread is declared inline because it
+                        // is defined in nativeMethods.m and appears in no
+                        // header; without that it is an implicit declaration.
+                        b.append("#ifdef CN1_NURSERY\n"
+                                + "        {\n"
+                                + "            extern void markDeadThread(struct ThreadLocalData *d);\n"
+                                + "            markDeadThread(getThreadLocalData());\n"
+                                + "        }\n"
+                                + "#endif\n");
+                        b.append("    });\n");
+                        b.append("    [NSApp run];\n}\n\n");
+                    } else {
+                        b.append("    ");
+                        b.append(clsName);
+                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n}\n\n");
+                    }
                 }
             }
         }

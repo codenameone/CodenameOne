@@ -22,6 +22,7 @@
  */
 package com.codename1.maven;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -202,5 +203,42 @@ public class HardeningPreflightTest {
         tvOnly.setProperty("codename1.arg.harden.tv.enabled", "false");
         assertFalse(CN1BuildMojo.allAppleHardeningSlicesOptedOut(tvOnly),
                 "iOS is still enabled and no tvOS slice ships, so hardening runs");
+    }
+
+    /**
+     * A native macOS target is not a slice of an iOS build.
+     *
+     * <p>allAppleHardeningSlicesOptedOut() starts by reading harden.ios.enabled,
+     * which defaults to true -- correct for a combined Apple build, which
+     * hardens one shared jar, and wrong for these three, which run their own
+     * builder whose hardening platform list is "mac" alone. Asking it about a
+     * mac-only build let a default it never set overrule harden.mac.enabled=false,
+     * and the build was refused as a hardened local/source one when the builder
+     * would have hardened nothing.</p>
+     *
+     * <p>Mac Catalyst is deliberately absent: it really is an iOS build with a
+     * hint set, it ships the shared jar, and the all-slice rule is right for
+     * it.</p>
+     */
+    @Test
+    public void theNativeMacTargetsAreTheOnesWithTheirOwnBuilder() {
+        assertTrue(CN1BuildMojo.isNativeMacOsTarget(CN1BuildMojo.BUILD_TARGET_MAC_NATIVE));
+        assertTrue(CN1BuildMojo.isNativeMacOsTarget(CN1BuildMojo.BUILD_TARGET_MAC_NATIVE_PROJECT));
+        assertTrue(CN1BuildMojo.isNativeMacOsTarget(CN1BuildMojo.BUILD_TARGET_MAC_NATIVE_LOCAL));
+
+        assertFalse(CN1BuildMojo.isNativeMacOsTarget("ios"),
+                "Catalyst is an iOS build and keeps the all-slice rule");
+        assertFalse(CN1BuildMojo.isNativeMacOsTarget("iphone"));
+        assertFalse(CN1BuildMojo.isNativeMacOsTarget(null));
+
+        // The two answers have to agree about which targets those are: one says
+        // the opt-out key is harden.mac.enabled, the other says that key is the
+        // whole decision.
+        for (String t : new String[] {CN1BuildMojo.BUILD_TARGET_MAC_NATIVE,
+                CN1BuildMojo.BUILD_TARGET_MAC_NATIVE_PROJECT,
+                CN1BuildMojo.BUILD_TARGET_MAC_NATIVE_LOCAL}) {
+            assertEquals("mac", CN1BuildMojo.hardenPlatformForBuildTarget(t),
+                    "the two answers must agree about which targets are natively macOS");
+        }
     }
 }

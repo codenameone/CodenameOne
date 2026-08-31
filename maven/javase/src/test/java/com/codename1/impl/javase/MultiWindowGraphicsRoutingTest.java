@@ -533,6 +533,30 @@ class MultiWindowGraphicsRoutingTest {
         return out;
     }
 
+    /// Waits for AWT to DELIVER the events a visibility change produced, which is
+    /// not what runOnAwtAndWait waits for.
+    ///
+    /// JavaSEWindowManager.show()/hide() bump selfInflictedVisibilityEvents and
+    /// then call setVisible under runOnAwtAndWait -- that returns once the CALL
+    /// has run, while the componentShown/componentHidden it causes is delivered
+    /// later on the AWT queue, and delivering it is what decrements the counter
+    /// back to zero. A synthetic event fired before that delivery finds the
+    /// counter still raised and is swallowed by consumeSelfInflicted as though
+    /// the framework had caused it, so the assertion sees no change at all.
+    /// callSeriallyAndWait does not help: it flushes the Codename One EDT, not
+    /// the AWT one.
+    ///
+    /// Twice, because delivering a queued event can queue another behind it.
+    private static void drainAwtEvents() throws Exception {
+        for (int iter = 0; iter < 2; iter++) {
+            java.awt.EventQueue.invokeAndWait(new Runnable() {
+                @Override
+                public void run() {
+                }
+            });
+        }
+    }
+
     @Test
     void aFrameReportsAutomaticVisibilityChangesToTheFramework() throws Exception {
         assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
@@ -546,6 +570,10 @@ class MultiWindowGraphicsRoutingTest {
             public void run() {
             }
         });
+        // Before any synthetic event: the show's own componentShown has to have
+        // been delivered and consumed, or the synthetic one below is mistaken
+        // for it.
+        drainAwtEvents();
         try {
             java.awt.Window frame = findAwtWindowTitled("owned visibility");
             assertNotNull(frame, "the window manager should have created a native frame");

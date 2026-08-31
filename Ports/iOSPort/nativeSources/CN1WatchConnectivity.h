@@ -45,7 +45,10 @@
 #if defined(CN1_USE_WATCHCONNECTIVITY) && !TARGET_OS_TV && !TARGET_OS_MACCATALYST
 
 #import <Foundation/Foundation.h>
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <WatchConnectivity/WatchConnectivity.h>
+#endif
 
 @interface CN1WatchConnectivity : NSObject <WCSessionDelegate>
 

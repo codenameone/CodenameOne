@@ -44,7 +44,10 @@
 
 #if defined(CN1_NEARBY_COMPANION) \
         && __has_include(<AccessorySetupKit/AccessorySetupKit.h>)
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <AccessorySetupKit/AccessorySetupKit.h>
+#endif
 // ASDiscoveryDescriptor.bluetoothServiceUUID is a CBUUID, so the companion
 // half links CoreBluetooth. That is only the type -- no scanning happens here,
 // and the point of AccessorySetupKit is precisely that the app does not need
@@ -2573,7 +2576,7 @@ void com_codename1_impl_ios_IOSNative_nearbyAssociate___int_int_boolean_java_lan
                 }
                 ASPickerDisplayItem *item = [[[ASPickerDisplayItem alloc]
                         initWithName:value
-                        productImage:[[[UIImage alloc] init] autorelease]
+                        productImage:[[[CN1Image alloc] init] autorelease]
                           descriptor:descriptor] autorelease];
                 [items addObject:item];
             }
@@ -2624,7 +2627,7 @@ void com_codename1_impl_ios_IOSNative_nearbyAssociate___int_int_boolean_java_lan
                         }
                         [items addObject:[[[ASPickerDisplayItem alloc]
                                 initWithName:(NSString *)entry
-                                productImage:[[[UIImage alloc] init]
+                                productImage:[[[CN1Image alloc] init]
                                         autorelease]
                                   descriptor:d] autorelease]];
                     }

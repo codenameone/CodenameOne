@@ -44,22 +44,23 @@ final class BuildHintsApple {
     }
 
     static void register(List<Hint> h) {
-        h.add(new Hint("macNative.appCategory")
-                .group(HintGroup.MAC_NATIVE)
-                .type(HintType.STRING)
-                .def("public.app-category.utilities")
-                .platform("mac")
-                .doc("Mac Native builds only. `LSApplicationCategoryType` in the generated Info.plist. Default "
-                        + "`public.app-category.utilities`. See "
-                        + "https://developer.apple.com/documentation/bundleresources/information_property_list/lsapplicationcategorytype[Apple's "
-                        + "category list]."));
-
+        // The native macOS port's macos.* hints are NOT here: they are attributes
+        // on the @Mac annotation, which is the source for hints that have one.
+        // macNative.* below is the spelling the legacy Catalyst target reads and
+        // stays hand written, because no annotation offers it.
         h.add(new Hint("macNative.bundleId")
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
                 .platform("mac")
                 .doc("Mac Native builds only. Used only when `macNative.deriveBundleId=false`. Default: "
                         + "`<packageName>.mac`."));
+
+        h.add(new Hint("macNative.appCategory")
+                .group(HintGroup.MAC_NATIVE)
+                .type(HintType.STRING)
+                .platform("mac")
+                .doc("Mac Native builds only. `LSApplicationCategoryType` in the generated "
+                        + "Info.plist. Default `public.app-category.utilities`."));
 
         h.add(new Hint("macNative.copyright")
                 .group(HintGroup.MAC_NATIVE)
@@ -124,7 +125,7 @@ final class BuildHintsApple {
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
                 .platform("mac")
-                .doc("Mac Native builds only. Free-form XML inserted verbatim inside the `<dict>…</dict>` of "
+                .doc("Mac Native builds only. Free-form XML inserted verbatim inside the `<dict>...</dict>` of "
                         + "the generated entitlements plist. Use for entitlements Codename One doesn't expose "
                         + "individually."));
 
@@ -140,7 +141,7 @@ final class BuildHintsApple {
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
                 .platform("mac")
-                .doc("Mac Native builds only. Opt-in. Format `<width>x<height>` — for example `1024x685`. When "
+                .doc("Mac Native builds only. Opt-in. Format `<width>x<height>` -- for example `1024x685`. When "
                         + "set, the Catalyst window's `UISceneSession.sizeRestrictions` minimum and maximum are "
                         + "pinned to the requested size so every launch produces a byte-identical window. Default "
                         + "unset, in which case the window is resizable. The CI screenshot pipeline turns this on "
@@ -161,7 +162,7 @@ final class BuildHintsApple {
                 .def("10.15")
                 .platform("mac")
                 .doc("Mac Native builds only. Minimum macOS version (`MACOSX_DEPLOYMENT_TARGET`). Default "
-                        + "`10.15` — earlier versions don't support Mac Catalyst."));
+                        + "`10.15` -- earlier versions don't support Mac Catalyst."));
 
         h.add(new Hint("macNative.multiWindow")
                 .group(HintGroup.MAC_NATIVE)
@@ -232,7 +233,7 @@ final class BuildHintsApple {
                 .type(HintType.STRING)
                 .platform("mac")
                 .doc("Mac Native builds only. Apple Developer Team ID (alphanumeric). Falls back to "
-                        + "`ios.release.teamId` → `ios.teamId` → `ios.debug.teamId` since most apps share a single "
+                        + "`ios.release.teamId` -> `ios.teamId` -> `ios.debug.teamId` since most apps share a single "
                         + "Apple Developer Team for iOS and Mac."));
 
         h.add(new Hint("tvNative.bundleId")

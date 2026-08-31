@@ -207,7 +207,15 @@ static CGRect drawingRect;
         // (target == nil): mutable-image draws run against their own encoder
         // with their own framebuffer bounds, where drawingRect (the screen
         // flush rect) does not apply.
-        if ([self target] == nil) {
+        // A degenerate drawingRect means "no flush region known", not "clip
+        // everything away" -- the watch branch above and the ES2 branch below
+        // both test it before clamping and this one did not. Without the test a
+        // flush issued with a zero or negative size silently discards every
+        // screen op in that drain, which is a whole frame lost with nothing
+        // logged. Cheap to guard, and it keeps the three branches saying the
+        // same thing.
+        if ([self target] == nil
+                && drawingRect.size.width > 0 && drawingRect.size.height > 0) {
             int sx2 = sx + sw;
             int sy2 = sy + sh;
             int orX = (int)drawingRect.origin.x;

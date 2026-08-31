@@ -81,7 +81,7 @@ On any successful build the console shows a *Submit* action for each store the
 build can go to:
 
 * *Submit to App Store* -- when the build produced an iOS `.ipa`.
-* *Submit to Mac App Store* -- when the build produced a native/Catalyst `.pkg`
+* *Submit to Mac App Store* -- when the build produced a native macOS `.pkg`
   (see the *Working with macOS* chapter). An iOS build that also produced a
   `.pkg` offers both.
 * *Submit to Google Play* -- for an Android build.

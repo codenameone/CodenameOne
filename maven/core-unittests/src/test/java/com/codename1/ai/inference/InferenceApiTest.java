@@ -87,13 +87,51 @@ class InferenceApiTest extends UITestBase {
 
     @Test
     void modelCacheRequiresDigestWhenIosHidesRedirects() {
-        implementation.setPlatformName("ios");
+        implementation.putProperty(ModelCache.NATIVE_REDIRECTS_PROPERTY, "true");
         assertTrue(ModelCache.requiresPinnedModelDigest());
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,
                 () -> ModelCache.fetch(
                         "https://example.com/model.tflite", "ios-model"));
         assertTrue(error.getMessage().contains("SHA-256"));
+    }
+
+    /**
+     * The native macOS port shares the Apple networking stack, so the redirect
+     * is followed below the portable layer there for the same reason -- and it
+     * declares the same capability, which is what this reads. It must not be
+     * inferred from the platform name: a skinless JavaSE desktop build on a Mac
+     * reports "mac" too and uses the portable stack.
+     */
+    @Test
+    void modelCacheRequiresDigestWhenMacHidesRedirects() {
+        implementation.setPlatformName("mac");
+        implementation.putProperty(ModelCache.NATIVE_REDIRECTS_PROPERTY, "true");
+        assertTrue(ModelCache.requiresPinnedModelDigest());
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> ModelCache.fetch(
+                        "https://example.com/model.tflite", "mac-model"));
+        assertTrue(error.getMessage().contains("SHA-256"));
+    }
+
+    /** A platform whose networking is the portable stack needs no digest. */
+    @Test
+    void modelCacheNeedsNoDigestWhereRedirectsAreVisible() {
+        implementation.setPlatformName("and");
+        assertFalse(ModelCache.requiresPinnedModelDigest());
+    }
+
+    /**
+     * A JavaSE desktop build on a Mac reports the platform name "mac" and uses
+     * the portable network layer, so it must NOT be made to require a digest --
+     * keying the decision on the name alone turned a valid two-argument fetch()
+     * into a throw for every such build.
+     */
+    @Test
+    void modelCacheNeedsNoDigestOnJavaSEDesktopMac() {
+        implementation.setPlatformName("mac");
+        assertFalse(ModelCache.requiresPinnedModelDigest());
     }
 
     @Test

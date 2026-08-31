@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.translator;
 import com.codename1.tools.translator.bytecodes.ArithmeticExpression;
 import com.codename1.tools.translator.bytecodes.ArrayLengthExpression;
@@ -1051,6 +1073,93 @@ class BytecodeInstructionIntegrationTest {
             assertTrue(Files.exists(srcRoot.resolve("test.bundle")));
             assertTrue(Files.exists(srcRoot.resolve("test.bundle/info.txt")));
 
+        } finally {
+            ByteCodeTranslator.output = originalOutput;
+            Parser.cleanup();
+            resetByteCodeClass();
+        }
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("provideCompilerConfigs")
+    void handleMacOsOutputGeneratesNativeAppKitProject(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+        resetByteCodeClass();
+        Path sourceDir = Files.createTempDirectory("macos-output-source");
+        Path outputDir = Files.createTempDirectory("macos-output-dest");
+
+        Files.write(sourceDir.resolve("resource.txt"), "data".getBytes(StandardCharsets.UTF_8));
+        compileDummyMainClass(sourceDir, "com.example", "MyAppMac", config);
+
+        String[] args = new String[] {
+                "macos",
+                sourceDir.toAbsolutePath().toString(),
+                outputDir.toAbsolutePath().toString(),
+                "MyAppMac", "com.example", "My App", "1.0", "mac", "none"
+        };
+
+        ByteCodeTranslator.OutputType originalOutput = ByteCodeTranslator.output;
+        try {
+            ByteCodeTranslator.main(args);
+
+            Path dist = outputDir.resolve("dist");
+            Path srcRoot = dist.resolve("MyAppMac-src");
+            assertTrue(Files.exists(srcRoot), "the macOS target still emits a <app>-src tree");
+            assertTrue(Files.exists(srcRoot.resolve("resource.txt")));
+            assertTrue(Files.exists(dist.resolve("MyAppMac.xcodeproj")));
+
+            String pbxproj = new String(Files.readAllBytes(
+                    dist.resolve("MyAppMac.xcodeproj/project.pbxproj")), StandardCharsets.UTF_8);
+            assertTrue(pbxproj.contains("SDKROOT = macosx;"),
+                    "the macOS project must build against the macOS SDK");
+            assertTrue(pbxproj.contains("MACOSX_DEPLOYMENT_TARGET"),
+                    "the macOS project must carry a macOS deployment target");
+            assertTrue(pbxproj.contains("AppKit.framework"),
+                    "a native macOS app links AppKit");
+            assertTrue(pbxproj.contains("Metal.framework"),
+                    "the renderer is Metal-only on this port");
+            // The three things that would silently make this an iOS-shaped
+            // project again. Each is a real failure mode: an iOS SDKROOT does
+            // not link AppKit, a device family makes Xcode treat the target as
+            // "Designed for iPad", and OpenGL ES does not exist on macOS.
+            assertFalse(pbxproj.contains("SDKROOT = iphoneos;"),
+                    "the macOS project must not target the iOS SDK");
+            assertFalse(pbxproj.contains("TARGETED_DEVICE_FAMILY"),
+                    "a Mac app has no device family");
+            assertFalse(pbxproj.contains("OpenGLES.framework"),
+                    "OpenGL ES does not exist on macOS");
+            assertFalse(pbxproj.contains("UIKit.framework"),
+                    "the whole point of this target is that it is not UIKit");
+
+            String plist = new String(Files.readAllBytes(
+                    srcRoot.resolve("MyAppMac-Info.plist")), StandardCharsets.UTF_8);
+            assertTrue(plist.contains("<key>NSPrincipalClass</key>"),
+                    "an AppKit bundle is launched through NSPrincipalClass");
+            assertTrue(plist.contains("com.example"),
+                    "the bundle identifier placeholder must still be substituted");
+            // No scene manifest and no main nib: the menu bar is built in code,
+            // which is what keeps Interface Builder out of the build entirely.
+            assertFalse(plist.contains("UIApplicationSceneManifest"),
+                    "scene manifests are a Catalyst concern, not an AppKit one");
+            assertFalse(plist.contains("NSMainNibFile"),
+                    "the macOS shell builds its menu bar programmatically");
+            assertFalse(plist.contains("LSRequiresIPhoneOS"),
+                    "a Mac app is not an iPhone app");
+
+            String pch = new String(Files.readAllBytes(
+                    srcRoot.resolve("MyAppMac-Prefix.pch")), StandardCharsets.UTF_8);
+            assertTrue(pch.contains("<AppKit/AppKit.h>"));
+            assertFalse(pch.contains("<UIKit/UIKit.h>"));
+
+            // The asset catalog exists but carries the mac icon idiom and no
+            // launch image, which is iOS-only.
+            assertTrue(Files.exists(srcRoot.resolve("Images.xcassets/AppIcon.appiconset/Contents.json")));
+            assertFalse(Files.exists(srcRoot.resolve("Images.xcassets/LaunchImage.launchimage")),
+                    "launch images are an iOS concept");
+            String icons = new String(Files.readAllBytes(
+                    srcRoot.resolve("Images.xcassets/AppIcon.appiconset/Contents.json")), StandardCharsets.UTF_8);
+            assertTrue(icons.contains("\"idiom\" : \"mac\""),
+                    "the icon catalog must use the mac idiom");
         } finally {
             ByteCodeTranslator.output = originalOutput;
             Parser.cleanup();

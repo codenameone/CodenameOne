@@ -448,7 +448,23 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // local-build/on-device-debug refusal while the engine goes on to harden the shared jar locally
         // and orphan its mapping. A non-Apple target has a single slice, so its own opt-out still applies.
         boolean platformOptedOut;
-        if (isAppleHardenPlatform(hardenPlatform)) {
+        if (isNativeMacOsTarget(buildTarget)) {
+            // A native macOS target is not a slice of an iOS build. It runs its
+            // own builder against the macosx SDK, and that builder's hardening
+            // platform list is "mac" alone -- there is no shared jar and no iOS
+            // app. The all-slice rule below starts by reading harden.ios.enabled,
+            // which defaults to true and is answering about a slice this build
+            // does not ship, so harden.mac.enabled=false was overruled by it and
+            // the build was refused as a hardened local/source one that the
+            // builder would in fact have hardened nothing for.
+            //
+            // Mac Catalyst is deliberately NOT here: it really is an iOS build
+            // with a hint set, it does ship the shared jar, and the all-slice
+            // rule is right for it. hardenPlatformForBuildTarget draws the same
+            // line for the same reason.
+            platformOptedOut = isHardenFalse(
+                    settings.getProperty("codename1.arg.harden.mac.enabled", "true"));
+        } else if (isAppleHardenPlatform(hardenPlatform)) {
             platformOptedOut = allAppleHardeningSlicesOptedOut(settings);
         } else {
             platformOptedOut = hardenPlatform != null && isHardenFalse(
@@ -517,15 +533,34 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     /**
-     * The {@code harden.<platform>.enabled} opt-out key implied by the build target, for targets
-     * whose {@code codename1.platform} does not name their real hardening platform. The native-Mac
-     * targets (mac-source / mac-os-x-native) run with platform=ios but harden as "mac", so their
-     * opt-out is {@code harden.mac.enabled}. Returns {@code null} when the target carries no such
-     * override and the platform value should be used.
+     * True for the targets that run the standalone macOS builder rather than a
+     * slice of an iOS build.
+     *
+     * <p>The same three {@link #hardenPlatformForBuildTarget(String)} maps to
+     * "mac", kept beside it so the two cannot come to disagree about which
+     * targets are natively macOS.</p>
      */
-    private static String hardenPlatformForBuildTarget(String buildTarget) {
+    // Package-visible so a test can pin which targets are natively macOS; the
+    // hardening preflight's answer turns on it.
+    static boolean isNativeMacOsTarget(String buildTarget) {
+        return BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget);
+    }
+
+    /**
+     * The {@code harden.<platform>.enabled} opt-out key implied by the build target, for targets
+     * whose {@code codename1.platform} does not name their real hardening platform. The macOS
+     * targets run with {@code platform=ios} but harden as "mac", so their opt-out is
+     * {@code harden.mac.enabled}. Mac Catalyst needs no entry: it has no target of its own and
+     * really is an iOS build, so {@code harden.ios.enabled} is the correct key for it.
+     * Returns {@code null} when the target carries no such override and the platform value
+     * should be used.
+     */
+    static String hardenPlatformForBuildTarget(String buildTarget) {
         if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
-                || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)) {
+                || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget)) {
             return "mac";
         }
         return null;
@@ -1187,6 +1222,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     public static final String BUILD_TARGET_MAC_NATIVE_PROJECT = Executor.BUILD_TARGET_MAC_NATIVE_PROJECT;
     public static final String BUILD_TARGET_MAC_NATIVE = Executor.BUILD_TARGET_MAC_NATIVE;
+    public static final String BUILD_TARGET_MAC_NATIVE_LOCAL = Executor.BUILD_TARGET_MAC_NATIVE_LOCAL;
     public static final String BUILD_TARGET_LINUX_NATIVE = Executor.BUILD_TARGET_LINUX_NATIVE;
 
     /**
@@ -1693,12 +1729,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     doLinuxNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                     doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
-                } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
-                    // mac-source rides the iOS pipeline with the macNative.enabled
-                    // build hint forced on. The IPhoneBuilder delegates Mac-specific
-                    // emission to MacNativeBuilder when that hint is set.
-                    cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
-                    doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                        || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget)) {
+                    // The native AppKit build. mac-source stops once the Xcode
+                    // project exists; local-mac-device goes on to build it, and
+                    // both run the same builder, so what a developer opens in
+                    // Xcode is what the device target compiles. mac-os-x-native
+                    // is the cloud target and is not handled here -- it has its
+                    // own queue rather than riding the iOS one.
+                    if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                        cn1SettingsProps.setProperty("codename1.arg.macos.sourceOnly", "true");
+                    }
+                    doMacOSNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("ios") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
                     doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("javascript")) {
@@ -1707,15 +1749,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     throw new MojoExecutionException("Build target not supported "+buildTarget);
                 }
             } else {
-                // Cloud-builds route through a remote build server; for the Mac
-                // native targets we set the same macNative.enabled hint here so the
-                // server-side IPhoneBuilder takes the Mac branch. Both the source
-                // project (mac-source) and the device build (mac-os-x-native) need it
-                // -- previously only mac-source did, so the cloud mac-os-x-native
-                // target rode the plain iOS pipeline instead of emitting a Mac app.
-                if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
-                        || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)) {
-                    cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
+                // Cloud builds route through a remote build server. Nothing is
+                // injected for Mac Catalyst here: it is an iOS build that the
+                // user turns on with macNative.enabled, and the server-side
+                // IPhoneBuilder reads that hint directly.
+                if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                    cn1SettingsProps.setProperty("codename1.arg.macos.sourceOnly", "true");
                 }
                 if (automated) {
                     getLog().debug("Attempting to start hyper beam stream the build log to the console");
@@ -2274,6 +2313,134 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * wiring. The native compile only succeeds on Windows with the MSVC/clang-cl
      * toolchain present; elsewhere the builder fails fast with a clear message.
      */
+    /**
+     * Builds the native macOS (AppKit) application locally.
+     *
+     * <p>Unlike Mac Catalyst, which is the iOS build with one hint set, this
+     * runs its own builder against the macosx SDK. Both {@code mac-source} and
+     * {@code mac-os-x-native} come here; the former sets
+     * {@code macos.sourceOnly} so the builder stops once the Xcode project
+     * exists.</p>
+     */
+    private void doMacOSNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
+        File codenameOneJar = getJar("com.codenameone", "codenameone-core");
+        MacOSNativeBuilder e = new MacOSNativeBuilder();
+        e.setLogger(getLog());
+        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "macos-build");
+        e.setBuildDirectory(buildDirectory);
+        e.setCodenameOneJar(codenameOneJar);
+
+        BuildRequest r = new BuildRequest();
+        r.setDisplayName(props.getProperty("codename1.displayName"));
+        r.setPackageName(props.getProperty("codename1.packageName"));
+        r.setMainClass(props.getProperty("codename1.mainName"));
+        putSecondaryEntryPointArguments(r, props);
+        r.setVersion(props.getProperty("codename1.version"));
+        r.setVendor(props.getProperty("codename1.vendor"));
+        // The icon rides the request rather than the source archive, exactly as
+        // it does for iOS and Windows, and the builder renders the asset catalog
+        // from it. Omitted here, the generated AppIcon.appiconset references ten
+        // PNGs that are never written: a generic icon in the Dock, and an App
+        // Store validation failure for having none.
+        String iconPath = props.getProperty("codename1.icon");
+        if (iconPath != null && iconPath.length() > 0) {
+            File iconFile = new File(iconPath);
+            if (!iconFile.isAbsolute()) {
+                iconFile = new File(getCN1ProjectDir(), iconPath);
+            }
+            try {
+                r.setIcon(iconFile.getAbsolutePath());
+            } catch (IOException ex) {
+                throw new MojoExecutionException("Error reading the icon at "
+                        + iconFile.getAbsolutePath()
+                        + ": it must be a 512x512 pixel PNG, which is scaled to the sizes the "
+                        + "macOS asset catalog asks for.", ex);
+            }
+        }
+        r.setType("macos");
+        for (Object k : props.keySet()) {
+            String key = (String) k;
+            if (key.startsWith("codename1.arg.")) {
+                String currentKey = key.substring("codename1.arg.".length());
+                if (currentKey.indexOf(' ') > -1) {
+                    throw new MojoExecutionException("The build argument contains a space in the key: '" + currentKey + "'");
+                }
+                r.putArgument(currentKey, props.getProperty(key));
+            }
+        }
+        applyHardeningRequestArgs(r);
+        r.setIncludeSource(true);
+
+        try {
+            boolean result = e.runBuild(distJar, r);
+            if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("macOS builder log:\n" + builderLog);
+                }
+                throw new MojoExecutionException("Native macOS build failed");
+            }
+            if (e.getXcodeProjectDir() != null && BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                // Collected under the same <finalName>-mac-source name the
+                // Catalyst path used, so a project that switches between the
+                // two ports finds its Xcode project in the same place.
+                File output = getGeneratedMacProjectSourceDirectory();
+                output.getParentFile().mkdirs();
+                try {
+                    // Replaced rather than merged: a stale source file from a
+                    // previous build is still compiled by the regenerated
+                    // project, and the resulting failure names a file the
+                    // developer never wrote.
+                    if (output.exists()) {
+                        FileUtils.deleteDirectory(output);
+                    }
+                    getLog().info("Copying macOS Xcode project to " + output);
+                    FileUtils.copyDirectory(e.getXcodeProjectDir(), output);
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to collect the generated macOS Xcode project", ex);
+                }
+                // Opened, as the iOS project path beside this one does. The
+                // Mac Native Project IDE shortcut and a plain mac-source build
+                // both default to open=true, and without this they completed
+                // with no Xcode window and no indication that the documented
+                // option had been ignored.
+                //
+                // getWorkspaceOrProject rather than the .xcodeproj directly:
+                // it prefers a workspace when the generated project has one,
+                // which is the thing Xcode should be handed.
+                if (open) {
+                    File projectToOpen = getWorkspaceOrProject(props, output);
+                    getLog().info("Opening macOS Xcode project " + projectToOpen);
+                    openWorkspace(projectToOpen);
+                }
+            }
+            if (e.getAppBundle() != null) {
+                getLog().info("Built native macOS application: " + e.getAppBundle().getAbsolutePath());
+                // Every artifact, not just the first bundle: with
+                // macos.distribution=both there are two, each with its own
+                // container, and a dmg or pkg nobody is told about is a dmg
+                // nobody ships.
+                for (java.io.File artifact : e.getArtifacts()) {
+                    if (!artifact.equals(e.getAppBundle())) {
+                        getLog().info("  also produced: " + artifact.getAbsolutePath());
+                    }
+                }
+            } else if (e.getXcodeProjectDir() != null) {
+                getLog().info("Generated macOS Xcode project: " + e.getXcodeProjectDir().getAbsolutePath());
+            }
+        } catch (com.codename1.builders.BuildException hardeningEx) {
+            throw new MojoExecutionException(hardeningEx.getMessage(), hardeningEx);
+        } catch (org.apache.tools.ant.BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("macOS builder log:\n" + builderLog);
+            }
+            throw new MojoExecutionException("Failed to build the macOS app", ex);
+        } finally {
+            e.cleanup();
+        }
+    }
+
     private void doWindowsNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
         File codenameOneJar = getJar("com.codenameone", "codenameone-core");
         WindowsNativeBuilder e = new WindowsNativeBuilder();

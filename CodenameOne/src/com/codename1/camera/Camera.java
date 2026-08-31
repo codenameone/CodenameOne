@@ -71,6 +71,15 @@ import java.io.IOException;
 public final class Camera {
     private static final Object ACTIVE_LOCK = new Object();
     private static CameraSession active;
+    /// Paused sessions a later open() was let past, oldest first.
+    ///
+    /// A STACK rather than one slot, because the handoffs nest: pause A, open
+    /// and pause B, open C. A single slot held only the most recent, so closing
+    /// C restored B and closing B then left no active session at all -- A was
+    /// forgotten while still holding the hardware it was about to resume, and
+    /// the next open() was accepted alongside it.
+    private static final java.util.ArrayList<CameraSession> preempted =
+            new java.util.ArrayList<CameraSession>();
 
     private Camera() { }
 
@@ -128,7 +137,17 @@ public final class Camera {
         // user kicked off, contention is essentially zero, and we'd rather
         // serialise the rare race than ship a TOCTOU bug.
         synchronized (ACTIVE_LOCK) {
-            if (active != null && !active.isClosed()) {
+            // A PAUSED session is holding nothing, and letting it through is
+            // the documented coexistence flow: pause the session, run
+            // Capture.capturePhoto/captureVideo, resume. Refusing here made
+            // that flow throw -- the modal capture then answered its listener
+            // with null having shown no UI at all -- so the API promised a
+            // handoff its own exclusivity gate forbade.
+            //
+            // The gate still means what it says: it exists to stop two
+            // consumers HOLDING the device, and pause() is documented as
+            // releasing the hardware while keeping the session object alive.
+            if (active != null && !active.isClosed() && !active.isPaused()) {
                 throw new IllegalStateException(
                     "Only one CameraSession may be open at a time. Close the existing session first.");
             }
@@ -145,6 +164,28 @@ public final class Camera {
                     Log.e(t);
                 }
                 throw new RuntimeException("Could not open camera " + info.getId(), e);
+            }
+            // Remembered so exclusivity survives the handoff. Without this the
+            // capture's own close() would leave no active session at all, and
+            // the paused one -- which the application is about to resume --
+            // would no longer stop a third open().
+            //
+            // Recorded only once the successor has actually opened, and it has
+            // to be this way round. Nothing is preempted by an open that
+            // failed: the paused session never lost the camera, and it stays
+            // the active one. Recording it before the attempt meant every
+            // unsuccessful retry -- a camera briefly busy is the ordinary case
+            // -- left another entry that no path removed, because the throw
+            // leaves through neither close(). The list only drains through
+            // clearActive(), which the successor that never existed can never
+            // call, so a long-lived paused session accumulated one entry per
+            // retry for as long as it lived.
+            //
+            // Nothing between the exclusivity check and here can have changed
+            // what is being preempted: ACTIVE_LOCK is held across the whole
+            // method, and active is only ever reassigned under it.
+            if (active != null && !active.isClosed() && active.isPaused()) {
+                preempted.add(active);
             }
             active = new CameraSession(impl, info, opts);
             return active;
@@ -193,12 +234,85 @@ public final class Camera {
 
     // Identity comparison is intentional: only the exact CameraSession
     // instance we returned from open() may clear the active slot, so
-    // PMD.CompareObjectsWithEquals doesn't apply.
+    /// Releases a session's hardware, under the lock open() reads.
+    ///
+    /// The flag and the release become visible together, so an opener cannot
+    /// see a session that is still "running" while its hardware is already
+    /// gone -- which would refuse the very handoff the application paused for.
+    static void pauseSession(CameraSession s) {
+        synchronized (ACTIVE_LOCK) {
+            s.pauseUnderLock();
+        }
+    }
+
+    /// Takes the hardware back, refusing if another session holds the slot.
+    ///
+    /// pause() and resume() never had to consult anything while sessions could
+    /// not overlap. They can now -- that is the documented pause / Capture /
+    /// resume handoff -- and resume() reacquires the hardware immediately, so a
+    /// session resumed while the capture that was let past is still open puts
+    /// two consumers on the device. On the Apple backend resume() also takes
+    /// the singleton frame-callback target back, so the running capture's
+    /// frames start arriving at the resumed session's listener.
+    ///
+    /// The invariant is the one open() already enforces: only the ACTIVE
+    /// session may hold the camera. In the documented flow the capture's
+    /// close() has handed the slot back by the time the application resumes, so
+    /// that flow is unaffected; resuming before then is the misuse this names.
+    ///
+    /// Check and reacquisition are ONE step, under the same lock open() takes.
+    /// Checking and then resuming outside the lock left a window where an
+    /// opener saw this session paused, installed a successor and started it,
+    /// while this thread took the hardware back anyway. open() holds this lock
+    /// across its own native call for exactly that reason, and says so.
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
+    static void resumeSession(CameraSession s) {
+        synchronized (ACTIVE_LOCK) {
+            if (active != null && active != s && !active.isClosed()) {
+                throw new IllegalStateException(
+                    "Another CameraSession is using the camera. Close it before resuming this one.");
+            }
+            s.resumeUnderLock();
+        }
+    }
+
+    // PMD.CompareObjectsWithEquals doesn't apply: these are identity tests on
+    // session objects, which is the whole point of them.
+    //
+    // PMD.CloseResource does not apply either, and following it would be a bug.
+    // The session taken off the stack here is being handed BACK as the active
+    // one, because the application paused it around a capture and is about to
+    // resume it. This method does not own it and must not close it; closing it
+    // would destroy a live session at the moment it regains the camera. The
+    // only session being closed anywhere near here is the caller's own, which
+    // is why it is calling.
+    @SuppressWarnings({"PMD.CompareObjectsWithEquals", "PMD.CloseResource"})
     static void clearActive(CameraSession s) {
         synchronized (ACTIVE_LOCK) {
             if (active == s) {
+                // Hand back to the most recent session this one was let past,
+                // if there is still one to hand back to: the application paused
+                // it around a modal capture and is about to resume it, and it
+                // has to be the active session again for the next open() to be
+                // refused. Sessions the application closed while they waited
+                // are discarded on the way.
                 active = null;
+                while (!preempted.isEmpty()) {
+                    CameraSession candidate = preempted.remove(preempted.size() - 1);
+                    if (!candidate.isClosed()) {
+                        active = candidate;
+                        break;
+                    }
+                }
+            } else {
+                // Closed while preempted -- the application closed the paused
+                // session instead of resuming it -- so there is nothing to hand
+                // back to for that one.
+                for (int i = preempted.size() - 1; i >= 0; i--) {
+                    if (preempted.get(i) == s) {
+                        preempted.remove(i);
+                    }
+                }
             }
         }
     }

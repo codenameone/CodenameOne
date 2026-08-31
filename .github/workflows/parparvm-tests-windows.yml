@@ -334,7 +334,25 @@ jobs:
         shell: pwsh
         # Single-quote the dotted -D arg: PowerShell otherwise splits it at the
         # dots and treats ".javadoc.skip=true" as a (bogus) lifecycle phase.
-        run: mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+        #
+        # Retried on the same backoff the clean-target job uses, and for the same
+        # reason: a Maven Central fetch that resets the connection takes the whole
+        # job down before a line of this repository's code has been compiled. It
+        # reached the build EXTENSION here -- central-publishing-maven-plugin,
+        # resolved while the POM is still being read -- so not even a module was
+        # built. This step only downloads and builds, so a blanket loop cannot
+        # turn a failing test green.
+        run: |
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            if ($delay -gt 0) {
+              Write-Host "mvn failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+          }
+          if (-not $ok) { throw "mvn install failed after all retries" }
 
       # Build the hellocodenameone screenshot app into common/target/classes, which
       # the capture test translates into the native exe. This is a plain Maven build
@@ -357,8 +375,17 @@ jobs:
           if (!(Test-Path "$env:USERPROFILE/.codenameone/guibuilder.jar")) {
             New-Item -ItemType File -Force "$env:USERPROFILE/.codenameone/guibuilder.jar" | Out-Null
           }
-          mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
-          if ($LASTEXITCODE -ne 0) { throw "hellocodenameone-common Maven build failed" }
+          # Same retry as the port build above: this reaches Maven Central too.
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            if ($delay -gt 0) {
+              Write-Host "mvn failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+          }
+          if (-not $ok) { throw "hellocodenameone-common Maven build failed after all retries" }
           $out = "scripts/hellocodenameone/common/target/classes"
           if (!(Test-Path "$out/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class")) { throw "common classes missing" }
           if (!(Test-Path "$out/com/codename1/generated/svg/SVGRegistry.class")) { throw "transcode-svg did not produce SVGRegistry" }
@@ -419,8 +446,36 @@ jobs:
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
           CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
         run: |
-          mvn -B clean package -pl JavaAPI -am -DskipTests
-          mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
+          # Both retried the way the clean-target job does. The package is a
+          # download-and-build, so a blanket loop is safe; the test is restricted
+          # to the resolution failure shape, because a blanket loop there would
+          # let an intermittent product regression pass on attempt two and turn a
+          # blocking gate green.
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            if ($delay -gt 0) {
+              Write-Host "mvn failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B clean package -pl JavaAPI -am -DskipTests
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+          }
+          if (-not $ok) { throw "mvn clean package failed after all retries" }
+          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            if ($delay -gt 0) {
+              Write-Host "mvn failed on a dependency-resolution error; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false' 2>&1 |
+              Tee-Object -Variable mvnOutput
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            if (-not ($mvnOutput -match $resolutionFailure)) {
+              throw "mvn test failed for a reason that is not a transient dependency-resolution error; not retrying"
+            }
+          }
+          if (-not $ok) { throw "mvn test failed after all retries" }
 
       # Preserve the native cn1WindowsLog output so the offscreen-capture path is
       # confirmable on the green x64 gate too (compare against the arm64 leg).
@@ -548,8 +603,36 @@ jobs:
           # PR screenshot jobs may still stop after the visual set stabilizes.
           CN1_REQUIRE_SUITE: ${{ github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         run: |
-          mvn -B clean package -pl JavaAPI -am -DskipTests
-          mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
+          # Both retried the way the clean-target job does. The package is a
+          # download-and-build, so a blanket loop is safe; the test is restricted
+          # to the resolution failure shape, because a blanket loop there would
+          # let an intermittent product regression pass on attempt two and turn a
+          # blocking gate green.
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            if ($delay -gt 0) {
+              Write-Host "mvn failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B clean package -pl JavaAPI -am -DskipTests
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+          }
+          if (-not $ok) { throw "mvn clean package failed after all retries" }
+          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            if ($delay -gt 0) {
+              Write-Host "mvn failed on a dependency-resolution error; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false' 2>&1 |
+              Tee-Object -Variable mvnOutput
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            if (-not ($mvnOutput -match $resolutionFailure)) {
+              throw "mvn test failed for a reason that is not a transient dependency-resolution error; not retrying"
+            }
+          }
+          if (-not $ok) { throw "mvn test failed after all retries" }
 
       # Preserve the native cn1WindowsLog output (%TEMP%\cn1windows.log) so an
       # offscreen-target / capture failure is diagnosable from the artifact, and

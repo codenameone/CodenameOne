@@ -14,3 +14,14 @@ xcodebuild -exportArchive \
   -exportOptionsPlist dist/ExportOptions-AppStore-Mac.plist \
   -exportPath build/export
 // end::working-with-mac-os-x-shell-003[]
+
+// tag::working-with-mac-os-x-shell-004[]
+# Catalyst is an iOS build. Turn it on with the hint, in
+# codenameone_settings.properties, and build the iOS project target:
+#   codename1.arg.macNative.enabled=true
+mvn -B -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source package
+// end::working-with-mac-os-x-shell-004[]
+
+// tag::working-with-mac-os-x-shell-005[]
+mvn -B -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device package
+// end::working-with-mac-os-x-shell-005[]

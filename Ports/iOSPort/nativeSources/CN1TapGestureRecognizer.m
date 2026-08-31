@@ -22,7 +22,7 @@
  */
 #import "CN1TapGestureRecognizer.h"
 #include "TargetConditionals.h"
-// The tap gesture peer is UIGestureRecognizer/UIView based; both are
+// The tap gesture peer is UIGestureRecognizer/CN1View based; both are
 // unavailable on watchOS. The whole implementation is compiled out there
 // (watch input is delivered through CN1WatchHost crown/tap instead).
 #if !TARGET_OS_WATCH
@@ -38,7 +38,7 @@ extern int CN1lastTouchX;
 extern int CN1lastTouchY;
 extern float scaleValue;
 extern BOOL skipNextTouch;
-extern UIView *editingComponent;
+extern CN1View *editingComponent;
 extern BOOL isVKBAlwaysOpen();
 extern BOOL CN1useTapGestureRecognizer;
 
@@ -96,7 +96,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     // We DO want to process touches from peer components
     // We DO NOT want to process touches from popovers like datepickers and openGallery.
     // See the OpenGalleryTest2793 sample to test events for openGallery.
-    UIView *v = ctrl.view;
+    CN1View *v = ctrl.view;
 
     // Sometimes we receive an event from a view that has already been removed from
     // the view hierarchy.  The call to [pressedView isDescendantOfView:xxx] will throw

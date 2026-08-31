@@ -52,7 +52,27 @@
 #include "cn1_globals.h"
 #endif
 #import "CN1AudioUnit.h"
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
+
+#if TARGET_OS_OSX
+/*
+ * Headers from Ports/MacPort. They are only reachable on a macOS build, where
+ * both ports' native sources are staged into one directory, and the iOS build
+ * never sees this branch. Importing them here is what lets the shared natives
+ * whose macOS arm is genuinely AppKit -- the screen capture, the share sheet,
+ * the window chrome -- live beside their iOS bodies instead of being split into
+ * a parallel file that would drift.
+ */
+#import "CN1MacHost.h"
+#import "CN1AppKitCompat.h"
+#import "CN1MacShare.h"
+#import "METALView.h"
+#endif
+
+/// Holds the idle-sleep assertion between lockScreen and unlockScreen.
+#if TARGET_OS_OSX
+static id<NSObject> cn1MacIdleActivity = nil;
+#endif
 #include <sys/sysctl.h>
 #import "CodenameOne_GLViewController.h"
 #import <QuartzCore/QuartzCore.h>
@@ -88,7 +108,10 @@
 #if !TARGET_OS_TV
 #import <CoreMotion/CoreMotion.h>
 #endif
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MobileCoreServices/UTCoreTypes.h>
+#endif
 #import <Foundation/Foundation.h>
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
 //#define CN1_USE_CALENDAR
@@ -112,21 +135,33 @@
 // and AddressBookUI is absent. The native methods that use them are guarded to
 // no-ops on those slices.
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MessageUI/MFMailComposeViewController.h>
+#endif
 #endif
 #if !TARGET_OS_MACCATALYST && !TARGET_OS_WATCH && !TARGET_OS_TV
 // AddressBookUI and the legacy AddressBook C API are unavailable on Mac
 // Catalyst and tvOS. Skip the import; the contacts path falls back to
 // Contacts.framework (handled via INCLUDE_CONTACTS_USAGE undef below).
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <AddressBookUI/AddressBookUI.h>
 #endif
+#endif
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MessageUI/MFMessageComposeViewController.h>
 #endif
+#endif
 
-#if TARGET_OS_MACCATALYST
+#if TARGET_OS_MACCATALYST || TARGET_OS_OSX
 // AddressBook.framework (the C ABAddressBookRef API) is unavailable on Mac
-// Catalyst. Suppress the legacy contacts code path on Mac so the build links.
+// Catalyst AND on native macOS. Suppress the legacy contacts code path on both
+// so the build links -- the native macOS port never sets this define either,
+// and this is what keeps a project that supplies the iOS usage-description hint
+// from turning on code that cannot compile here.
 #ifdef INCLUDE_CONTACTS_USAGE
 #undef INCLUDE_CONTACTS_USAGE
 #endif
@@ -144,7 +179,10 @@
 #include "com_codename1_util_SuccessCallback.h"
 #import "SocketImpl.h"
 #import "com_codename1_ui_geom_Rectangle.h"
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MobileCoreServices/MobileCoreServices.h>
+#endif
 #include "com_codename1_ui_plaf_Style.h"
 #import "RadialGradientPaint.h"
 #include "java_io_IOException.h"
@@ -171,6 +209,13 @@
 #endif
 #import "Rotate.h"
 //#define CN1_USE_AVKIT
+// The native macOS port has no MPMoviePlayerController to fall back to, so AVKit
+// is not an option there -- it is the only video backend. IPhoneBuilder
+// uncomments the define above for the targets it builds; macOS is not one of
+// them, so it is defined here instead.
+#if TARGET_OS_OSX
+#define CN1_USE_AVKIT
+#endif
 // AVKit / AVPlayerViewController are unavailable on watchOS. IPhoneBuilder
 // uncomments the define above for all targets; undo it on the watch slice so
 // the AVKit video paths compile out (the watch video stubs return defaults).
@@ -178,8 +223,25 @@
 #undef CN1_USE_AVKIT
 #endif
 #ifdef CN1_USE_AVKIT
-#if (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
 #import <AVKit/AVKit.h>
+#if TARGET_OS_OSX
+/*
+ * AppKit's AVKit has no AVPlayerViewController. AVPlayerView is the whole of
+ * it: a view that owns a player and draws its own transport controls, where
+ * iOS splits that between a controller and the view it vends. Everything below
+ * that says "player controller" therefore means an AVPlayerView on this port,
+ * and getVideoViewPeer hands back the same object rather than reaching for a
+ * .view inside it.
+ */
+#define CN1_AVPLAYERVIEWCONTROLLER AVPlayerView*
+// The video factories differ only in this one class name -- they allocate it,
+// hand it a player and return it -- so the name is aliased rather than each of
+// the five being restated with one word changed. The places where the two types
+// genuinely differ (the transport controls, the full-screen mode, and the fact
+// that the view has no .view inside it) are written out with their own macOS
+// arms above.
+#define AVPlayerViewController AVPlayerView
+#elif (__MAC_OS_X_VERSION_MAX_ALLOWED > __MAC_10_9 || __IPHONE_OS_VERSION_MAX_ALLOWED > __IPHONE_7_1)
 #define CN1_AVPLAYERVIEWCONTROLLER AVPlayerViewController*
 #else
 #define CN1_AVPLAYERVIEWCONTROLLER id
@@ -216,13 +278,18 @@ extern int popoverSupported();
 // use that signal to temporarily cover the app view with a black overlay.
 static BOOL cn1_disableScreenshots = NO;
 #if !TARGET_OS_WATCH
-static UIView *cn1ScreenCaptureView = nil;
+static CN1View *cn1ScreenCaptureView = nil;
 static id cn1ScreenCaptureObserver = nil;
 
-static UIView *cn1_screenCaptureContainer() {
+static CN1View *cn1_screenCaptureContainer() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     // Prefer the GL view controller's view. Fall back to the key window so
     // we can still cover the app if the controller isn't ready yet.
-    UIView *container = [[CodenameOne_GLViewController instance] view];
+    CN1View *container = [[CodenameOne_GLViewController instance] view];
     if (container == nil) {
         container = [UIApplication sharedApplication].keyWindow;
         if (container == nil && [[UIApplication sharedApplication].windows count] > 0) {
@@ -230,6 +297,7 @@ static UIView *cn1_screenCaptureContainer() {
         }
     }
     return container;
+#endif
 }
 
 static void cn1_updateScreenCaptureBlocker() {
@@ -253,12 +321,12 @@ static void cn1_updateScreenCaptureBlocker() {
     }
     if (captured) {
         // If screen capture is active, hide the UI behind an overlay view.
-        UIView *container = cn1_screenCaptureContainer();
+        CN1View *container = cn1_screenCaptureContainer();
         if (container == nil) {
             return;
         }
         if (cn1ScreenCaptureView == nil) {
-            cn1ScreenCaptureView = [[UIView alloc] initWithFrame:container.bounds];
+            cn1ScreenCaptureView = [[CN1View alloc] initWithFrame:container.bounds];
             cn1ScreenCaptureView.backgroundColor = [UIColor blackColor];
             cn1ScreenCaptureView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
             cn1ScreenCaptureView.userInteractionEnabled = NO;
@@ -281,7 +349,7 @@ static void cn1_updateScreenCaptureBlocker() {
     }
 #endif
 }
-#else // TARGET_OS_WATCH: no UIView/UIApplication/UIScreen overlay on the watch.
+#else // TARGET_OS_WATCH: no CN1View/UIApplication/UIScreen overlay on the watch.
 static void cn1_updateScreenCaptureBlocker() {}
 #endif // !TARGET_OS_WATCH
 
@@ -305,7 +373,7 @@ static void cn1_updateScreenCaptureBlocker() {}
  }*/
 
 #if !TARGET_OS_WATCH
-extern UIView *editingComponent;
+extern CN1View *editingComponent;
 #endif // !TARGET_OS_WATCH
 
 extern void initVMImpl();
@@ -436,6 +504,12 @@ extern int isPainted();
 extern int displayWidth;
 extern int displayHeight;
 
+/// A media or document URL from an application-supplied string; defined further
+/// down, beside the media creators. Declared here because callers appear
+/// earlier in the file than the definition -- Display.execute(), canExecute()
+/// and the share sheet all build their URL through it.
+static NSURL *cn1URLForMediaString(NSString *s);
+
 extern void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
 
@@ -536,6 +610,32 @@ const char* stringToUTF8(JAVA_OBJECT str) {
 
 void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
+#if TARGET_OS_OSX
+    // There is no UIApplicationMain here: the generated main already owns the
+    // main thread with [NSApp run], and this runs on the bootstrap thread. What
+    // has to be mirrored is UIApplicationMain's two effects rather than its
+    // shape -- publish the lifecycle callback, which sets
+    // IOSImplementation.initialized and serial dispatches the application start
+    // onto the event dispatch thread, and then never return.
+    //
+    // Never returning is not a detail. UIApplicationMain does not return either,
+    // and that is what stops Display.init -> postInit falling through into
+    // super.postInit()'s initDefaultUserAgent, whose blocking AsyncResource.get
+    // no Apple port ever reaches. Returning from here deadlocks the start.
+    extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_callback__(struct ThreadLocalData* threadStateData);
+    com_codename1_impl_ios_IOSImplementation_callback__(threadStateData);
+    // HERE, exactly as on the watch. The generated main installs the app
+    // delegate and enters [NSApp run] without waiting for this thread, so AppKit
+    // can activate the application and deliver applicationDidBecomeActive before
+    // IOSImplementation exists -- and that callback dereferences the static
+    // instance with no null guard. The delegate holds those transitions until
+    // this line and then replays the state they left behind.
+    extern void cn1_mac_runtime_markJavaReady(void);
+    cn1_mac_runtime_markJavaReady();
+    while (1) {
+        [NSThread sleepForTimeInterval:3600];
+    }
+#else
 #if !TARGET_OS_WATCH
     POOL_BEGIN();
     int retVal = UIApplicationMain(0, nil, nil, @"CodenameOne_GLAppDelegate");
@@ -568,6 +668,7 @@ void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_O
         [NSThread sleepForTimeInterval:3600];
     }
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMetalRendering__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
@@ -708,7 +809,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_calendarRequestAccess___int_boolea
 #if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
     __block BOOL granted = NO; dispatch_semaphore_t semaphore = dispatch_semaphore_create(0); EKEventStore *store = cn1CalendarStore();
     void (^completion)(BOOL,NSError*) = ^(BOOL value, NSError *error){ granted = value; dispatch_semaphore_signal(semaphore); };
-    if (@available(iOS 17.0, macCatalyst 17.0, *)) {
+    // macOS 14.0 named explicitly. The `*` means "every platform not listed",
+    // so on native macOS this branch was ALWAYS taken -- and the three
+    // request*Access* selectors arrived in macOS 14, while this target deploys
+    // to 11.0. On a Mac running 11, 12 or 13 that is an unrecognised selector
+    // sent to EKEventStore, which terminates the application rather than falling
+    // back to requestAccessToEntityType: below.
+    if (@available(iOS 17.0, macCatalyst 17.0, macOS 14.0, *)) {
         if (entityType == 1) [store requestFullAccessToRemindersWithCompletion:completion];
         else if (writeOnly) [store requestWriteOnlyAccessToEventsWithCompletion:completion];
         else [store requestFullAccessToEventsWithCompletion:completion];
@@ -822,6 +929,13 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__(CN1_THREAD_STATE_MU
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    POOL_BEGIN();
+    NSString *value = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
+    JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG value);
+    POOL_END();
+    return str;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
@@ -832,9 +946,24 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString___R_java_lang_St
     // watchOS/tvOS have no UIPasteboard.
     return JAVA_NULL;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
+#if TARGET_OS_OSX
+    POOL_BEGIN();
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG str);
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    // An NSPasteboard has to be cleared before it is written to, unlike
+    // UIPasteboard where assigning the string is the whole operation. Skipping
+    // it leaves the previous owner's other representations in place, so a paste
+    // into a rich target gets the old content.
+    [pasteboard clearContents];
+    if (ns != nil) {
+        [pasteboard setString:ns forType:NSPasteboardTypeString];
+    }
+    POOL_END();
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG str);
@@ -844,12 +973,26 @@ void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_
 #else
     // watchOS/tvOS have no UIPasteboard.
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 static NSString* cn1PasteboardTypeForMime(NSString* mimeType) {
     if ([mimeType isEqualToString:@"text/plain"]) return @"public.utf8-plain-text";
     if ([mimeType isEqualToString:@"text/html"]) return @"public.html";
     if ([mimeType isEqualToString:@"text/rtf"]) return @"public.rtf";
+#if TARGET_OS_OSX
+    // macOS ONLY, because only the AppKit writer uses the UTI. The reader has to
+    // name the same type the writer used, or a Markdown-only copy reads back with
+    // no Markdown representation inside the very application that wrote it -- but
+    // the UIKit writer below still puts Markdown under text/markdown, and mapping
+    // it here for every platform broke iOS in exactly the direction this fixes on
+    // macOS. Aligning the two writers is a change to what an iOS application
+    // already reads and writes, so it is not made here.
+    //
+    // text/asciidoc has no UTI and is written under its MIME type on both, so it
+    // needs no entry either way.
+    if ([mimeType isEqualToString:@"text/markdown"]) return @"net.daringfireball.markdown";
+#endif
     return mimeType;
 }
 
@@ -885,6 +1028,15 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_realPath___java_lang_String_R_java_
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
+#if TARGET_OS_OSX
+    POOL_BEGIN();
+    NSString* type = cn1PasteboardTypeForMime(toNSString(CN1_THREAD_STATE_PASS_ARG mimeType));
+    NSData* data = [[NSPasteboard generalPasteboard] dataForType:type];
+    NSString* value = data == nil ? nil : [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG value);
+    POOL_END();
+    return result;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     NSString* type = cn1PasteboardTypeForMime(toNSString(CN1_THREAD_STATE_PASS_ARG mimeType));
@@ -896,12 +1048,112 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_Str
 #else
     return JAVA_NULL;
 #endif
+#endif
 }
 
 extern NSData* arrayToData(JAVA_OBJECT arr);
 extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 
+#if TARGET_OS_OSX
+/// The pasteboard type the bytes actually are, by magic number, or nil when
+/// they are none of the three the Java side can hand us.
+///
+/// IOSImplementation.clipboardImageBytes() takes ClipboardContent's MIME_PNG
+/// representation if it has one, else MIME_JPEG, else MIME_GIF -- so the bytes
+/// arriving here are frequently not PNG, and declaring them PNG makes every
+/// other application decode JPEG or GIF data as PNG.
+static NSString* cn1MacPasteboardImageType(NSData* data) {
+    if (data.length < 4) {
+        return nil;
+    }
+    const unsigned char* b = (const unsigned char*)data.bytes;
+    if (b[0] == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
+        return NSPasteboardTypePNG;
+    }
+    if (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) {
+        return @"public.jpeg";
+    }
+    if (b[0] == 'G' && b[1] == 'I' && b[2] == 'F' && b[3] == '8') {
+        return @"com.compuserve.gif";
+    }
+    return nil;
+}
+#endif
+
 void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT plain, JAVA_OBJECT html, JAVA_OBJECT rtf, JAVA_OBJECT markdown, JAVA_OBJECT asciidoc, JAVA_OBJECT image, JAVA_OBJECT fileUris) {
+#if TARGET_OS_OSX
+    POOL_BEGIN();
+    NSPasteboard* pb = [NSPasteboard generalPasteboard];
+    [pb clearContents];
+    JAVA_OBJECT values[] = { plain, html, rtf, markdown, asciidoc };
+    NSString* types[] = { NSPasteboardTypeString, NSPasteboardTypeHTML, NSPasteboardTypeRTF,
+                          @"net.daringfireball.markdown", @"text/asciidoc" };
+    for (int i = 0; i < 5; i++) {
+        if (values[i] != JAVA_NULL) {
+            NSString* value = toNSString(CN1_THREAD_STATE_PASS_ARG values[i]);
+            NSData* data = [value dataUsingEncoding:NSUTF8StringEncoding];
+            if (data != nil) [pb setData:data forType:types[i]];
+        }
+    }
+    if (image != JAVA_NULL) {
+        NSData* imgData = arrayToData(image);
+        if (imgData != nil && imgData.length > 0) {
+            NSString* trueType = cn1MacPasteboardImageType(imgData);
+            if (trueType != nil) {
+                [pb setData:imgData forType:trueType];
+            }
+            if (trueType == nil || ![trueType isEqualToString:NSPasteboardTypePNG]) {
+                // getClipboardImage() is specified to hand Java PNG back, so
+                // publish a real PNG rendition beside the original rather than
+                // relabelling non-PNG bytes as PNG. If the bytes decode as
+                // nothing, publishing nothing is better than publishing them
+                // under a type they are not.
+                NSBitmapImageRep* rep = [NSBitmapImageRep imageRepWithData:imgData];
+                NSData* png = [rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+                if (png != nil) {
+                    [pb setData:png forType:NSPasteboardTypePNG];
+                }
+            }
+        }
+    }
+    if (fileUris != JAVA_NULL) {
+        NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG fileUris);
+        NSMutableArray* urls = [NSMutableArray array];
+        for (NSString* u in [joined componentsSeparatedByString:@"\n"]) {
+            if (u.length == 0) continue;
+            // A filename containing a newline splits into two entries here and
+            // there is no fix for that on this side: clipboardFileUris() joins
+            // the paths with \n in shared Java, the iOS branch below splits on
+            // the same character, and macOS permits a newline in a filename
+            // (only / and NUL are forbidden). Copying /tmp/a\nb publishes
+            // /tmp/a and a relative b. Pre-existing and shared -- the wire
+            // format is on master and predates this port -- so changing it
+            // means changing the bridge for both platforms rather than making
+            // macOS disagree with iOS about what the separator means.
+            //
+            // ClipboardContent.MIME_FILE's contract explicitly permits a raw
+            // local path, and URLWithString: turns one into a scheme-less
+            // relative URL whose isFileURL is NO. The Finder then gets no
+            // usable file reference, and getClipboardFileUris() -- which asks
+            // for file URLs only -- cannot read back what this just wrote.
+            NSURL* url;
+            if ([u hasPrefix:@"/"] || [u hasPrefix:@"~"]) {
+                url = [NSURL fileURLWithPath:[u stringByExpandingTildeInPath]];
+            } else {
+                url = [NSURL URLWithString:u];
+                if (url != nil && url.scheme == nil) {
+                    url = [NSURL fileURLWithPath:u];
+                }
+            }
+            if (url != nil) [urls addObject:url];
+        }
+        // Written as objects rather than as a type, which is what makes the
+        // files show up to the Finder and to every other application's file
+        // paste -- a URL string on the pasteboard is only text.
+        if (urls.count > 0) [pb writeObjects:urls];
+    }
+    POOL_END();
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     NSMutableDictionary* item = [NSMutableDictionary dictionary];
@@ -931,15 +1183,48 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
     [UIPasteboard generalPasteboard].items = items;
     POOL_END();
 #endif
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardImage___R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    POOL_BEGIN();
+    NSPasteboard* pb = [NSPasteboard generalPasteboard];
+    NSData* data = [pb dataForType:NSPasteboardTypePNG];
+    if (data == nil) {
+        // Every image type the pasteboard might carry, transcoded to the PNG
+        // the Java side is specified in.
+        //
+        // TIFF first because a Mac application that copies an image usually
+        // offers it, so this is the branch that actually fires most of the
+        // time. JPEG and GIF matter because an external owner is under no
+        // obligation to publish anything else: this port's own writer adds a
+        // PNG rendition beside its JPEG or GIF bytes, but another application
+        // will not, and asking only for PNG and TIFF then reported an empty
+        // clipboard for an image that was plainly on it.
+        NSArray *fallbacks = @[ NSPasteboardTypeTIFF, @"public.jpeg", @"com.compuserve.gif" ];
+        for (NSString *type in fallbacks) {
+            NSData* raw = [pb dataForType:type];
+            if (raw == nil) {
+                continue;
+            }
+            NSBitmapImageRep* rep = [NSBitmapImageRep imageRepWithData:raw];
+            data = [rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+            if (data != nil) {
+                break;
+            }
+        }
+    }
+    JAVA_OBJECT result = (data == nil || data.length == 0) ? JAVA_NULL : nsDataToByteArr(data);
+    POOL_END();
+    return result;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     UIPasteboard* pb = [UIPasteboard generalPasteboard];
     NSData* data = [pb dataForPasteboardType:@"public.png"];
     if (data == nil && pb.hasImages) {
-        UIImage* img = pb.image;
+        CN1Image* img = pb.image;
         if (img != nil) data = UIImagePNGRepresentation(img);
     }
     JAVA_OBJECT result = (data == nil || data.length == 0) ? JAVA_NULL : nsDataToByteArr(data);
@@ -948,9 +1233,27 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardImage___R_byte_1ARRAY(C
 #else
     return JAVA_NULL;
 #endif
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardFileUris___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    POOL_BEGIN();
+    NSPasteboard* pb = [NSPasteboard generalPasteboard];
+    NSArray<NSURL *>* urls = [pb readObjectsForClasses:@[[NSURL class]]
+                                               options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+    NSString* joined = nil;
+    if (urls.count > 0) {
+        NSMutableArray* parts = [NSMutableArray array];
+        for (NSURL* u in urls) {
+            if (u != nil) [parts addObject:[u absoluteString]];
+        }
+        if (parts.count > 0) joined = [parts componentsJoinedByString:@"\n"];
+    }
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG joined);
+    POOL_END();
+    return result;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     UIPasteboard* pb = [UIPasteboard generalPasteboard];
@@ -967,6 +1270,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardFileUris___R_java_lang_
     return result;
 #else
     return JAVA_NULL;
+#endif
 #endif
 }
 
@@ -986,6 +1290,8 @@ JAVA_OBJECT getClientProperty(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o, NSString
     );
 }
 
+// Reads a Java client property. Nothing platform-specific about it -- guarding
+// it out made every client property read false on macOS.
 BOOL getBooleanClientProperty(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o, NSString* key){
     JAVA_OBJECT val = getClientProperty(CN1_THREAD_STATE_PASS_ARG o, key);
     if(val == JAVA_NULL){
@@ -1036,6 +1342,42 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
                                                                                                                                                                          JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_INT hintColor, JAVA_BOOLEAN showToolbar, JAVA_BOOLEAN blockCopyPaste,
                                                                                                                                                                          JAVA_INT alignment, JAVA_INT verticalAlignment, JAVA_BOOLEAN returnExitsEditing)
 {
+#if TARGET_OS_OSX
+    // Routed into the rendering view's NSTextInputClient rather than into a
+    // second editor view floating over the surface.
+    //
+    // The UIKit ports put a real UITextField or UITextView on top of the
+    // component and let it draw itself, which is why so many of these arguments
+    // exist: the colour, the padding, the alignment and the hint are there to
+    // make that separate control look like the component underneath it. AppKit
+    // needs none of them here, because the component keeps drawing itself and
+    // only the keystrokes are handled natively -- which is the standard pattern
+    // for a custom-drawn surface, and what buys input methods, dead keys and
+    // dictation.
+    //
+    // So the geometry is recorded, because the input method's candidate window
+    // needs somewhere to appear, and the rest is deliberately ignored.
+    POOL_BEGIN();
+    NSString *initial = n10 != JAVA_NULL
+        ? toNSString(CN1_THREAD_STATE_PASS_ARG n10)
+        : @"";
+    extern void CN1MacTextInputBegin(NSString *text, BOOL multiline, CGRect bounds, int maxSize,
+                                     BOOL blockCopyPaste);
+    // n6 is "single line", so a multi-line field is its negation; n8 is the
+    // field's maxSize, which the session enforces because TextArea.setText()
+    // raises the limit to fit rather than refusing an over-long value.
+    CN1MacTextInputBegin(initial, n6 == 0,
+                         CGRectMake(n1 + padLeft, n2 + padTop,
+                                    n3 - padLeft - padRight,
+                                    n4 - padTop - padBottom),
+                         n8,
+                         // Carried through at last: the macOS branch used to
+                         // drop this argument, so a field opened with clipboard
+                         // access disabled still copied and pasted through the
+                         // Edit menu and its shortcuts.
+                         blockCopyPaste != JAVA_FALSE);
+    POOL_END();
+#else
     POOL_BEGIN();
     const char* chr = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n10);
     int l = strlen(chr) + 1;
@@ -1044,11 +1386,20 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
     Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(CN1_THREAD_STATE_PASS_ARG n1, n2, n3, n4, n5, n6, n7, n8, n9, cc, 0, forceSlide, color, imagePeer,
                                                                    padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), hintColor, showToolbar, blockCopyPaste, alignment, verticalAlignment, returnExitsEditing);
     POOL_END();
+#endif
 }
 extern float scaleValue;
 extern int editComponentPadTop, editComponentPadLeft;
 extern float editCompoentX, editCompoentY, editCompoentW, editCompoentH;
 void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT padTop, JAVA_INT padRight, JAVA_INT padBottom, JAVA_INT padLeft) {
+#if TARGET_OS_OSX
+    // Nothing to resize: the editor is the rendering view itself, so the
+    // framework's own layout already put the text where it belongs. The bounds
+    // still matter for where the input method's candidate window appears, and
+    // that arrives through setTextInputBounds.
+    (void)x; (void)y; (void)w; (void)h;
+    (void)padTop; (void)padBottom; (void)padLeft; (void)padRight;
+#else
 #if !TARGET_OS_WATCH
     POOL_BEGIN();
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -1091,25 +1442,146 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
 #else
     // watchOS has no inline native text editing peer.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 #ifdef INCLUDE_CN1_PUSH_2
-typedef void (^CN1PushCompletionHandlerType)();
+typedef void (^CN1PushCompletionHandlerType)(void);
 
-extern CN1PushCompletionHandlerType cn1PushCompletionHandler;
-int pushReceivedCount=0;
+// One record per notification rather than one global.
+//
+// The system hands over a completion block with each notification: its grant of
+// execution time, to be called exactly once, after which the process may be
+// suspended. A single global could only ever describe the most recent
+// notification, so a second one arriving before the first had been handled
+// overwrote it -- the first grant was leaked and never called, the shared count
+// no longer described either notification, and whichever callback finished first
+// released the OTHER one early. Both halves of that are what the grant exists to
+// prevent, and an application that keeps failing to call these gets its
+// background delivery throttled.
+//
+// The id travels with each message into Java and comes back with the completion,
+// so a grant is released by the notification it belongs to. Everything here runs
+// on the main queue: the routing calls come from the delegate, and the Java-facing
+// entry points below hop over.
+static NSMutableDictionary *cn1PushCompletions = nil;
+// Oldest first, and only for notifyPushCompletion(), which an application calls
+// with no way of saying which push it means.
+static NSMutableArray *cn1PushCompletionOrder = nil;
+static long long cn1NextPushCompletionId = 1;
+static NSString * const CN1PushHandlerKey = @"handler";
+static NSString * const CN1PushCountKey = @"count";
+
+/// Registers a notification's completion block and returns the id to carry with
+/// every message that notification produces. 0 when there is no block, which is
+/// every platform that does not grant background time for a push.
+long long CN1PushCompletionBegin(CN1PushCompletionHandlerType handler) {
+    if (handler == nil) {
+        return 0;
+    }
+    if (cn1PushCompletions == nil) {
+        cn1PushCompletions = [[NSMutableDictionary alloc] init];
+        cn1PushCompletionOrder = [[NSMutableArray alloc] init];
+    }
+    long long cid = cn1NextPushCompletionId++;
+    NSNumber *key = [NSNumber numberWithLongLong:cid];
+    CN1PushCompletionHandlerType copied = [handler copy];
+    [cn1PushCompletions setObject:[NSMutableDictionary dictionaryWithObjectsAndKeys:
+            copied, CN1PushHandlerKey,
+            [NSNumber numberWithInt:0], CN1PushCountKey, nil] forKey:key];
+    [copied release];
+    [cn1PushCompletionOrder addObject:key];
+    return cid;
+}
+
+static void cn1FirePushCompletion(NSNumber *key) {
+    NSMutableDictionary *record = [cn1PushCompletions objectForKey:key];
+    if (record == nil) {
+        return;
+    }
+    CN1PushCompletionHandlerType handler =
+            [[[record objectForKey:CN1PushHandlerKey] retain] autorelease];
+    // Removed BEFORE the block runs: a handler that routes another push must not
+    // find this record still outstanding.
+    [cn1PushCompletions removeObjectForKey:key];
+    [cn1PushCompletionOrder removeObject:key];
+    if (handler != nil) {
+        handler();
+    }
+}
+
+/// One more message from this notification is on its way to the application.
+void CN1PushCompletionRetain(long long cid) {
+    NSMutableDictionary *record = cid == 0 ? nil
+            : [cn1PushCompletions objectForKey:[NSNumber numberWithLongLong:cid]];
+    if (record == nil) {
+        return;
+    }
+    [record setObject:[NSNumber numberWithInt:
+            [[record objectForKey:CN1PushCountKey] intValue] + 1] forKey:CN1PushCountKey];
+}
+
+/// One message has been handled. The grant is released when the last one has.
+void CN1PushCompletionRelease(long long cid) {
+    NSNumber *key = [NSNumber numberWithLongLong:cid];
+    NSMutableDictionary *record = cid == 0 ? nil : [cn1PushCompletions objectForKey:key];
+    if (record == nil) {
+        return;
+    }
+    int count = [[record objectForKey:CN1PushCountKey] intValue] - 1;
+    [record setObject:[NSNumber numberWithInt:count] forKey:CN1PushCountKey];
+    if (count <= 0) {
+        cn1FirePushCompletion(key);
+    }
+}
+
+/// Routing has emitted every message this notification will produce. One that
+/// produced none has nothing that will ever release it, so it is released here.
+void CN1PushCompletionFinishRouting(long long cid) {
+    NSNumber *key = [NSNumber numberWithLongLong:cid];
+    NSMutableDictionary *record = cid == 0 ? nil : [cn1PushCompletions objectForKey:key];
+    if (record != nil && [[record objectForKey:CN1PushCountKey] intValue] <= 0) {
+        cn1FirePushCompletion(key);
+    }
+}
+
+/// Releases the oldest outstanding grant. This is what an application asks for
+/// through Display.notifyPushCompletion(), which says "the background work is
+/// done" without naming a push -- it has no id to name one with. Oldest first,
+/// so an application that finishes its pushes in order and calls this once per
+/// push releases each of them.
+void CN1PushCompletionReleaseOldest(void) {
+    if ([cn1PushCompletionOrder count] == 0) {
+        return;
+    }
+    NSNumber *key = [[[cn1PushCompletionOrder objectAtIndex:0] retain] autorelease];
+    // ONE grant, not the whole record -- which is what the count exists for and
+    // what the named path above does. A legacy type-3 notification emits an
+    // alert message and a metadata message, so its record is retained twice and
+    // an application using ios.delayPushCompletion calls notifyPushCompletion()
+    // once per push() callback. Firing the record on the first of those told iOS
+    // the background work was finished while the second callback was still
+    // running, and the app could be suspended in the middle of it.
+    //
+    // The oldest key only advances once its record reaches zero and is removed,
+    // so a caller that finishes its pushes in order still releases them in
+    // order.
+    CN1PushCompletionRelease([key longLongValue]);
+}
 #endif
 
-void com_codename1_impl_ios_IOSNative_firePushCompletionHandler__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+void com_codename1_impl_ios_IOSNative_firePushCompletionHandler___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG completionId) {
+#ifdef INCLUDE_CN1_PUSH_2
+    long long cid = (long long)completionId;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1PushCompletionRelease(cid);
+    });
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_releaseOldestPushCompletionHandler__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CN1_PUSH_2
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (cn1PushCompletionHandler != nil) {
-            pushReceivedCount--;
-            if (pushReceivedCount <= 0) {
-                cn1PushCompletionHandler();
-                Block_release(cn1PushCompletionHandler);
-                cn1PushCompletionHandler = nil;
-            }
-        }
+        CN1PushCompletionReleaseOldest();
     });
 #endif
 }
@@ -1204,7 +1676,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFromARGB___int_1ARRAY_int_
 #else
     JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n1)->data;
 #endif
-    JAVA_ARRAY_LONG i = Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl((void *)data, n2, n3);
+    JAVA_ARRAY_LONG i = (JAVA_ARRAY_LONG)(uintptr_t)Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl((void *)data, n2, n3);
     POOL_END();
     return i;
 }
@@ -1235,7 +1707,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(C
     POOL_BEGIN();
     
     NSData* nd = (BRIDGE_CAST NSData*) ((void*)nsData);
-    UIImage* img = [UIImage imageWithData:nd];
+    CN1Image* img = CN1AppleImageWithDataCompat(nd);
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* intArray = n2;
     JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -1251,12 +1723,82 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(C
     return (JAVA_LONG) ((BRIDGE_CAST void*)glu);
 }
 
-// Renders an Apple SF Symbol (iOS 13+) into a tinted UIImage and wraps it in a
+// Renders an Apple SF Symbol (iOS 13+) into a tinted CN1Image and wraps it in a
 // GLUIImage peer, mirroring createImageNSData. Returns 0 when SF Symbols are
 // unavailable or the named symbol does not exist; the caller falls back to the
 // Material icon font. widthHeight[0/1] receive the image size in PIXELS.
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_String_int_float_int_int_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name, JAVA_INT color, JAVA_FLOAT size, JAVA_INT weight, JAVA_OBJECT n2)
 {
+#if TARGET_OS_OSX
+    POOL_BEGIN();
+    NSString* nameStr = toNSString(CN1_THREAD_STATE_PASS_ARG name);
+    if (nameStr == nil) {
+        POOL_END();
+        return 0;
+    }
+    // `size` arrives in Codename One device pixels; a symbol configuration is in
+    // points, so it is divided by the backing scale and the rendered bitmap
+    // comes back at about `size` pixels tall.
+    CGFloat scale = scaleValue > 0 ? scaleValue : 1;
+    CGFloat pointSize = size / scale;
+    NSImageSymbolConfiguration* cfg = [NSImageSymbolConfiguration
+        configurationWithPointSize:pointSize
+                            weight:(weight >= 1 ? NSFontWeightBold : NSFontWeightRegular)];
+    NSImage* base = [NSImage imageWithSystemSymbolName:nameStr accessibilityDescription:nil];
+    NSImage* sym = base == nil ? nil : [base imageWithSymbolConfiguration:cfg];
+    if (sym == nil) {
+        POOL_END();
+        return 0;
+    }
+    NSSize pointBounds = sym.size;
+    int pw = (int)ceil(pointBounds.width * scale);
+    int ph = (int)ceil(pointBounds.height * scale);
+    if (pw <= 0 || ph <= 0) {
+        POOL_END();
+        return 0;
+    }
+    NSBitmapImageRep* rep = [[NSBitmapImageRep alloc]
+        initWithBitmapDataPlanes:NULL pixelsWide:pw pixelsHigh:ph
+                    bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO
+                  colorSpaceName:NSDeviceRGBColorSpace
+                     bytesPerRow:pw * 4 bitsPerPixel:32];
+    if (rep == nil) {
+        POOL_END();
+        return 0;
+    }
+    rep.size = pointBounds;
+    NSGraphicsContext* gc = [NSGraphicsContext graphicsContextWithBitmapImageRep:rep];
+    [NSGraphicsContext saveGraphicsState];
+    [NSGraphicsContext setCurrentContext:gc];
+    // The symbol is a template, so it is drawn as a mask and the colour is
+    // filled through it -- tinting the drawn bitmap afterwards would colour the
+    // transparent pixels too.
+    NSRect full = NSMakeRect(0, 0, pointBounds.width, pointBounds.height);
+    [sym drawInRect:full fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1.0];
+    [[NSColor colorWithSRGBRed:((color >> 16) & 0xff) / 255.0
+                         green:((color >> 8) & 0xff) / 255.0
+                          blue:(color & 0xff) / 255.0
+                         alpha:1.0] set];
+    NSRectFillUsingOperation(full, NSCompositingOperationSourceIn);
+    [NSGraphicsContext restoreGraphicsState];
+
+    NSImage* rendered = [[NSImage alloc] initWithSize:pointBounds];
+    [rendered addRepresentation:rep];
+    GLUIImage* g = [[GLUIImage alloc] initWithImage:rendered];
+    if (n2 != JAVA_NULL) {
+        JAVA_ARRAY_INT* dims = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
+        if (((JAVA_ARRAY)n2)->length >= 2) {
+            dims[0] = pw;
+            dims[1] = ph;
+        }
+    }
+#ifndef CN1_USE_ARC
+    [rep release];
+    [rendered release];
+#endif
+    POOL_END();
+    return (JAVA_LONG)(uintptr_t)((BRIDGE_CAST void*)g);
+#else
 #if TARGET_OS_WATCH
     // watchOS marks UIScreen and UIGraphicsImageRenderer unavailable; returning
     // 0 makes FontImage fall back to the Material icon font, same as pre-iOS-13.
@@ -1270,13 +1812,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_Stri
             return 0;
         }
         // `size` arrives in CN1 device pixels (the same units as the Material glyph
-        // it replaces). UIImage symbol point size is in POINTS, so divide by the
+        // it replaces). CN1Image symbol point size is in POINTS, so divide by the
         // screen scale; the rendered bitmap is then ~`size` pixels tall, matching.
         CGFloat scale = [UIScreen mainScreen].scale;
         if (scale < 1) { scale = 1; }
         CGFloat pointSize = size / scale;
         UIImageSymbolConfiguration* cfg = [UIImageSymbolConfiguration configurationWithPointSize:pointSize weight:(weight >= 1 ? UIImageSymbolWeightBold : UIImageSymbolWeightRegular)];
-        UIImage* sym = [UIImage systemImageNamed:nameStr withConfiguration:cfg];
+        CN1Image* sym = [CN1Image systemImageNamed:nameStr withConfiguration:cfg];
         if (sym == nil) {
             POOL_END();
             return 0;
@@ -1324,9 +1866,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_Stri
         rfmt.scale = scale;
         rfmt.opaque = NO;
         UIGraphicsImageRenderer* rndr = [[UIGraphicsImageRenderer alloc] initWithSize:szPt format:rfmt];
-        UIImage* flat = [rndr imageWithActions:^(UIGraphicsImageRendererContext* _Nonnull rc) {
+        CN1Image* flat = [rndr imageWithActions:^(UIGraphicsImageRendererContext* _Nonnull rc) {
             [c set];
-            UIImage* templ = [sym imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+            CN1Image* templ = [sym imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
             [templ drawInRect:CGRectMake(0, glyphYpt, glyphWpt, glyphHpt)];
         }];
         data2[0] = (int)(flat.size.width * flat.scale);
@@ -1340,13 +1882,14 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_Stri
         return 0;
     }
 #endif
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_scale___long_int_int]
     POOL_BEGIN();
-    JAVA_LONG i = (JAVA_LONG)Java_com_codename1_impl_ios_IOSImplementation_scaleImpl(n1, n2, n3);
+    JAVA_LONG i = (JAVA_LONG)(uintptr_t)Java_com_codename1_impl_ios_IOSImplementation_scaleImpl((void *)(uintptr_t)n1, n2, n3);
     POOL_END();
     return i;
     //XMLVM_END_WRAPPER
@@ -1372,7 +1915,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     // CIFilter path is already correct and the read-back cost is paid
     // once per blur invocation (not per frame).
 
-    UIImage* original = nil;
+    CN1Image* original = nil;
 #ifdef CN1_USE_METAL
     if ([glu mtlMutableTexture] != nil) {
         extern int displayWidth;
@@ -1390,7 +1933,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     // taken from: http://stackoverflow.com/a/19433086/756809
     CIFilter *gaussianBlurFilter = [CIFilter filterWithName:@"CIGaussianBlur"];
     [gaussianBlurFilter setDefaults];
+#if TARGET_OS_OSX
+    CIImage *inputImage = [CIImage imageWithCGImage:CN1AppleCGImageOf(original)];
+#else
     CIImage *inputImage = [CIImage imageWithCGImage:[original CGImage]];
+#endif
     [gaussianBlurFilter setValue:inputImage forKey:kCIInputImageKey];
     NSNumber *radiusNumber = [NSNumber numberWithFloat:radius];
     [gaussianBlurFilter setValue:radiusNumber forKey:kCIInputRadiusKey];
@@ -1398,12 +1945,16 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     CIImage *outputImage = [gaussianBlurFilter outputImage];
     CIContext *context   = [CIContext contextWithOptions:nil];
     CGImageRef cgimg     = [context createCGImage:outputImage fromRect:[inputImage extent]];
-    UIImage *image       = [UIImage imageWithCGImage:cgimg];
+#if TARGET_OS_OSX
+    CN1Image *image       = CN1AppleImageWithCGImage(cgimg);
+#else
+    CN1Image *image       = [CN1Image imageWithCGImage:cgimg];
+#endif
     CGImageRelease(cgimg);
     GLUIImage* gl = [[GLUIImage alloc] initWithImage:image];
 
     POOL_END();
-    return (BRIDGE_CAST void*)gl;
+    return (JAVA_LONG)(uintptr_t)(BRIDGE_CAST void*)gl;
 #else
     // watchOS has no CoreImage/CIFilter; approximate CIGaussianBlur with a
     // 3-pass vImage box convolve (Accelerate, available on watchOS).
@@ -1412,7 +1963,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == glu) {
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
-    UIImage *original = [glu getImage];
+    CN1Image *original = [glu getImage];
     if (original == nil || original.CGImage == NULL) { POOL_END(); return n1; }
     CGImageRef cg = original.CGImage;
     size_t w = CGImageGetWidth(cg), h = CGImageGetHeight(cg);
@@ -1438,7 +1989,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
         if (outCtx != NULL) {
             CGImageRef outImg = CGBitmapContextCreateImage(outCtx);
             if (outImg != NULL) {
-                resultGl = [[GLUIImage alloc] initWithImage:[UIImage imageWithCGImage:outImg]];
+                resultGl = [[GLUIImage alloc] initWithImage:[CN1Image imageWithCGImage:outImg]];
                 CGImageRelease(outImg);
             }
             CGContextRelease(outCtx);
@@ -1794,7 +2345,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_jav
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_java_lang_String_int_int]
     POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl(n1, n2, n3, toNSString(CN1_THREAD_STATE_PASS_ARG n4), n5, n6);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl(n1, n2, (void *)(uintptr_t)n3, toNSString(CN1_THREAD_STATE_PASS_ARG n4), n5, n6);
     POOL_END();
     //XMLVM_END_WRAPPER
 }
@@ -1803,7 +2354,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java_lang_String_int_int]
     POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl(n1, n2, n3, toNSString(CN1_THREAD_STATE_PASS_ARG n4), n5, n6);
+    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl(n1, n2, (void *)(uintptr_t)n3, toNSString(CN1_THREAD_STATE_PASS_ARG n4), n5, n6);
     POOL_END();
     //XMLVM_END_WRAPPER
 }
@@ -1891,7 +2442,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createSystemFont___int_int_int(CN1_TH
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_createSystemFont___int_int_int]
     POOL_BEGIN();
-    JAVA_LONG i = Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl((void *)n1, n2, n3);
+    JAVA_LONG i = (JAVA_LONG)(uintptr_t)Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl(n1, n2, n3);
     POOL_END();
     return i;
     //XMLVM_END_WRAPPER
@@ -1954,7 +2505,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeMutableImage___int_int_in
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_createNativeMutableImage___int_int_int]
     POOL_BEGIN();
-    JAVA_LONG i = Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl((void *)n1, n2, n3);
+    JAVA_LONG i = (JAVA_LONG)(uintptr_t)Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl(n1, n2, n3);
     POOL_END();
     return i;
     //XMLVM_END_WRAPPER
@@ -1973,7 +2524,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_finishDrawingOnImage__(CN1_THREAD_STA
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_finishDrawingOnImage__]
     POOL_BEGIN();
-    JAVA_LONG i = (void *)Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+    JAVA_LONG i = (JAVA_LONG)(uintptr_t)Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     POOL_END();
     return i;
     //XMLVM_END_WRAPPER
@@ -2049,7 +2600,15 @@ void com_codename1_impl_ios_IOSNative_shearGlobal___float_float(CN1_THREAD_STATE
 // touch handlers and the CN1TapGestureRecognizer. UITouch is unavailable on
 // watchOS, so the helper (and its callers) are compiled out there.
 #if !TARGET_OS_WATCH
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 void cn1CapturePointerMetadata(UITouch* touch) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (touch == nil) {
         return;
     }
@@ -2083,14 +2642,21 @@ void cn1CapturePointerMetadata(UITouch* touch) {
         contactSize = (float)touch.majorRadius;
     }
     com_codename1_impl_ios_IOSImplementation_pointerMetadataCallback___int_float_float_float_float(CN1_THREAD_GET_STATE_PASS_ARG pointerType, pressure, tiltX, tiltY, contactSize);
+#endif
 }
+#endif
 #endif // !TARGET_OS_WATCH
 
-#if TARGET_OS_MACCATALYST
+#if TARGET_OS_MACCATALYST || TARGET_OS_OSX
 /*
- * Mac Catalyst desktop windows. These marshal a window's own events into the
- * framework, mirroring the pointerPressed / screenSizeChanged bridges below so
- * all the ParparVM thread-state handling stays in one file.
+ * Desktop windows. These marshal a window's own events into the framework,
+ * mirroring the pointerPressed / screenSizeChanged bridges below so all the
+ * ParparVM thread-state handling stays in one file.
+ *
+ * Shared by both Mac ports on purpose: the Java side of desktop windowing is
+ * identical, and only the producer differs -- UIWindowScene callbacks on Mac
+ * Catalyst, NSWindow delegate callbacks on the native macOS port. Compiling
+ * one copy is what keeps the two from drifting.
  */
 void CN1MacWindowDeliverClose(int windowId) {
     com_codename1_impl_ios_IOSImplementation_windowCloseCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
@@ -2103,6 +2669,34 @@ void CN1MacWindowDeliverClosed(int windowId) {
 
 void CN1MacWindowDeliverMonitorsChanged(void) {
     com_codename1_impl_ios_IOSImplementation_monitorsChangedCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1MacPinchBegin(void) {
+    com_codename1_impl_ios_IOSImplementation_pinchBeginCallback__(
+        CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1MacPinchRelease(int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_pinchReleaseCallback___int_int(
+        CN1_THREAD_GET_STATE_PASS_ARG x, y);
+}
+
+void CN1MacCopyTextSelection(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_macCopyTextSelection___int(
+        CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
+void CN1MacPointerButton(int button, int mask, int modifiers) {
+    com_codename1_impl_ios_IOSImplementation_pointerButtonCallback___int_int_int(
+        CN1_THREAD_GET_STATE_PASS_ARG button, mask, modifiers);
+}
+
+void CN1MacWindowDeliverMoved(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowMovedCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
+void CN1MacWindowDeliverWindowMonitorChanged(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowMonitorChangedCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
 }
 
 void CN1MacWindowDeliverFocus(int windowId, BOOL gained) {
@@ -2133,8 +2727,9 @@ void CN1MacWindowDeliverHover(int windowId, int type, int x, int y) {
     com_codename1_impl_ios_IOSImplementation_windowHoverCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, type, x, y);
 }
 
-void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY) {
-    com_codename1_impl_ios_IOSImplementation_windowWheelCallback___int_int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, x, y, scrollX, scrollY);
+void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY,
+                              int precise, int modifiers) {
+    com_codename1_impl_ios_IOSImplementation_windowWheelCallback___int_int_int_int_int_boolean_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, x, y, scrollX, scrollY, precise ? JAVA_TRUE : JAVA_FALSE, modifiers);
 }
 
 void CN1MacWindowDeliverPinch(int windowId, float scale, int x, int y) {
@@ -2148,7 +2743,7 @@ void CN1MacWindowDeliverRotation(int windowId, float radians, int x, int y) {
 void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed) {
     com_codename1_impl_ios_IOSImplementation_windowKeyCallback___int_int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, keyCode, pressed ? JAVA_TRUE : JAVA_FALSE);
 }
-#endif
+#endif // TARGET_OS_MACCATALYST || TARGET_OS_OSX
 
 void pointerPressed(int* x, int* y, int length) {
     if(length == 1) {
@@ -2245,8 +2840,9 @@ void pointerHoverReleasedNative(int x, int y) {
     com_codename1_impl_ios_IOSImplementation_pointerHoverReleasedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y);
 }
 
-void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY) {
-    com_codename1_impl_ios_IOSImplementation_pointerWheelMovedCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y, scrollX, scrollY);
+void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY,
+                               int precise, int modifiers) {
+    com_codename1_impl_ios_IOSImplementation_pointerWheelMovedCallback___int_int_int_int_boolean_int(CN1_THREAD_GET_STATE_PASS_ARG x, y, scrollX, scrollY, precise ? JAVA_TRUE : JAVA_FALSE, modifiers);
 }
 
 void pinchMagnifyCallback(float scale, int x, int y) {
@@ -2307,8 +2903,24 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRunningOnTV__(CN1_THREAD_STATE_M
 #endif
 }
 
+#if TARGET_OS_OSX
+/*
+ * Desktop chrome on the native macOS port. Implemented in CN1MacChrome.m, which
+ * ships only with that port -- the title bar, the menu bar and the appearance
+ * are the parts of the shell that are genuinely AppKit rather than shared, and
+ * on Mac Catalyst the same four entry points reach UIKit instead.
+ */
+extern void CN1MacHostSetWindowTitle(NSString *title);
+extern void CN1MacHostSetMenuCommands(NSArray *rows);
+extern void CN1MacHostSetWindowUndecorated(BOOL undecorated);
+extern void CN1MacHostSetDarkAppearance(BOOL dark);
+extern BOOL CN1MacHostIsDarkMode(void);
+#endif
+
 void com_codename1_impl_ios_IOSNative_setMacWindowDarkAppearance___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN dark) {
-#if TARGET_OS_MACCATALYST
+#if TARGET_OS_OSX
+    CN1MacHostSetDarkAppearance(dark ? YES : NO);
+#elif TARGET_OS_MACCATALYST
     if (@available(iOS 13.0, *)) {
         dispatch_async(dispatch_get_main_queue(), ^{
             // Step 1: trait-collection override on the UIWindow. This
@@ -2389,14 +3001,24 @@ extern void CN1SetMacWindowTitle(NSString* title);
 extern void CN1SetMacMenuLabels(NSArray* labels);
 extern void CN1SetMacWindowUndecorated(BOOL undecorated);
 #endif
+
 void com_codename1_impl_ios_IOSNative_setWindowTitle___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT title) {
-#if TARGET_OS_MACCATALYST
+#if TARGET_OS_OSX
+    NSString* t = toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    CN1MacHostSetWindowTitle(t == nil ? @"" : t);
+#elif TARGET_OS_MACCATALYST
     NSString* t = toNSString(CN1_THREAD_STATE_PASS_ARG title);
     CN1SetMacWindowTitle(t == nil ? @"" : t);
 #endif
 }
 void com_codename1_impl_ios_IOSNative_setNativeMenuCommands___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT namesNewlineJoined) {
-#if TARGET_OS_MACCATALYST
+#if TARGET_OS_OSX
+    NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG namesNewlineJoined);
+    NSArray* rows = (joined == nil || joined.length == 0) ? @[] : [joined componentsSeparatedByString:@"\n"];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1MacHostSetMenuCommands(rows);
+    });
+#elif TARGET_OS_MACCATALYST
     NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG namesNewlineJoined);
     NSArray* labels = (joined == nil || joined.length == 0) ? @[] : [joined componentsSeparatedByString:@"\n"];
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -2404,8 +3026,16 @@ void com_codename1_impl_ios_IOSNative_setNativeMenuCommands___java_lang_String(C
     });
 #endif
 }
+void com_codename1_impl_ios_IOSNative_macRunPendingDeliveries__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    extern void CN1MacRunPendingDeliveries(void);
+    CN1MacRunPendingDeliveries();
+#endif
+}
 void com_codename1_impl_ios_IOSNative_setMacWindowUndecorated___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN undecorated) {
-#if TARGET_OS_MACCATALYST
+#if TARGET_OS_OSX
+    CN1MacHostSetWindowUndecorated(undecorated ? YES : NO);
+#elif TARGET_OS_MACCATALYST
     CN1SetMacWindowUndecorated(undecorated ? YES : NO);
 #endif
 }
@@ -2415,7 +3045,7 @@ void com_codename1_impl_ios_IOSNative_setMacWindowUndecorated___boolean(CN1_THRE
 #import "CN1MacWindows.h"
 #endif
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_boolean_R_int(
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_boolean_R_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT windowId, JAVA_OBJECT title,
         JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
         JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_BOOLEAN positionSet) {
@@ -2431,13 +3061,13 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macWindowCreate___int_java_lang_String
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowDestroy___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowDestroy___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowDestroy(slot);
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macWindowRequestSeq___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macWindowRequestSeq___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     return CN1MacWindowRequestSeq(slot);
 #else
@@ -2445,37 +3075,37 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macWindowRequestSeq___int_R_int(CN1_TH
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowShow___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN visible) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowShow___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN visible) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowShow(slot, visible ? YES : NO);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetDecorated___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN decorated) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetDecorated___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN decorated) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetDecorated(slot, decorated == JAVA_TRUE ? YES : NO);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetMinimumSize___int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT width, JAVA_INT height) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetMinimumSize___int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT width, JAVA_INT height) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetMinimumSize(slot, width, height);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetEditingSlot___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetEditingSlot___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetEditingSlot(slot);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetResizable___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN resizable) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetResizable___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN resizable) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetResizable(slot, resizable == JAVA_TRUE ? YES : NO);
 #endif
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowReopen___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+JAVA_BOOLEAN com_codename1_impl_ios_CatalystWindowNative_macWindowReopen___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     return CN1MacWindowReopen(slot) ? JAVA_TRUE : JAVA_FALSE;
 #else
@@ -2483,34 +3113,34 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowReopen___int_R_boolean(CN
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetInputEnabled___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN enabled) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetInputEnabled___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN enabled) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetInputEnabled(slot, enabled == JAVA_TRUE);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macMainWindowSetInputEnabled___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN enabled) {
+void com_codename1_impl_ios_CatalystWindowNative_macMainWindowSetInputEnabled___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN enabled) {
 #if TARGET_OS_MACCATALYST
     CN1MacMainWindowSetInputEnabled(enabled == JAVA_TRUE);
 #endif
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowAttachPeer___long_int_int_int_int_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+JAVA_BOOLEAN com_codename1_impl_ios_CatalystWindowNative_macWindowAttachPeer___long_int_int_int_int_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
 #if TARGET_OS_MACCATALYST
-    UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+    CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
     return CN1MacWindowAttachPeer(slot, v, x, y, w, h) ? JAVA_TRUE : JAVA_FALSE;
 #else
     return JAVA_FALSE;
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowWatchScreens__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowWatchScreens__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowWatchScreens();
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetTitle___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT title) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetTitle___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT title) {
 #if TARGET_OS_MACCATALYST
     POOL_BEGIN();
     NSString* t = toNSString(CN1_THREAD_STATE_PASS_ARG title);
@@ -2519,13 +3149,13 @@ void com_codename1_impl_ios_IOSNative_macWindowSetTitle___int_java_lang_String(C
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetBounds___int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetBounds___int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetBounds(slot, x, y, width, height);
 #endif
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMainWindowGetBounds___int_1ARRAY_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+JAVA_BOOLEAN com_codename1_impl_ios_CatalystWindowNative_macMainWindowGetBounds___int_1ARRAY_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
 #if TARGET_OS_MACCATALYST
     if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
         return JAVA_FALSE;
@@ -2536,7 +3166,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMainWindowGetBounds___int_1ARRA
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowGetBounds___int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT out) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowGetBounds___int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT out) {
 #if TARGET_OS_MACCATALYST
     if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
         return;
@@ -2545,7 +3175,7 @@ void com_codename1_impl_ios_IOSNative_macWindowGetBounds___int_int_1ARRAY(CN1_TH
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetWidth___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macWindowGetWidth___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     return CN1MacWindowGetWidth(slot);
 #else
@@ -2553,7 +3183,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetWidth___int_R_int(CN1_THRE
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetHeight___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macWindowGetHeight___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     return CN1MacWindowGetHeight(slot);
 #else
@@ -2561,13 +3191,13 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetHeight___int_R_int(CN1_THR
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetState___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT state) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetState___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT state) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetState(slot, state);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowPresent___int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT argb, JAVA_INT width, JAVA_INT height) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowPresent___int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT argb, JAVA_INT width, JAVA_INT height) {
 #if TARGET_OS_MACCATALYST
     if (argb == JAVA_NULL) {
         return;
@@ -2576,7 +3206,7 @@ void com_codename1_impl_ios_IOSNative_macWindowPresent___int_int_1ARRAY_int_int(
 #endif
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMultiWindowSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+JAVA_BOOLEAN com_codename1_impl_ios_CatalystWindowNative_macMultiWindowSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     return CN1MacMultiWindowSupported() ? JAVA_TRUE : JAVA_FALSE;
 #else
@@ -2584,7 +3214,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMultiWindowSupported___R_boolea
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macMonitorCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     return CN1MacMonitorCount();
 #else
@@ -2592,7 +3222,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorCount___R_int(CN1_THREAD_STA
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macPrimaryMonitor___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macPrimaryMonitor___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     return CN1MacPrimaryMonitor();
 #else
@@ -2600,7 +3230,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macPrimaryMonitor___R_int(CN1_THREAD_S
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macMonitorBounds___int_boolean_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor, JAVA_BOOLEAN workArea, JAVA_OBJECT out) {
+void com_codename1_impl_ios_CatalystWindowNative_macMonitorBounds___int_boolean_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor, JAVA_BOOLEAN workArea, JAVA_OBJECT out) {
 #if TARGET_OS_MACCATALYST
     if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
         return;
@@ -2609,7 +3239,7 @@ void com_codename1_impl_ios_IOSNative_macMonitorBounds___int_boolean_int_1ARRAY(
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorDpi___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macMonitorDpi___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
 #if TARGET_OS_MACCATALYST
     return CN1MacMonitorDpi(monitor);
 #else
@@ -2617,7 +3247,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorDpi___int_R_int(CN1_THREAD_S
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorScaleTimes100___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macMonitorScaleTimes100___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
 #if TARGET_OS_MACCATALYST
     /* Scaled by a hundred because the bridge carries ints; the Java side divides
      * it back out. */
@@ -2627,7 +3257,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorScaleTimes100___int_R_int(CN
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForWindow___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macMonitorForWindow___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     return CN1MacMonitorForWindow(slot);
 #else
@@ -2635,7 +3265,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForWindow___int_R_int(CN1_TH
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForMainWindow___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macMonitorForMainWindow___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     return CN1MacMonitorForMainWindow();
 #else
@@ -2936,8 +3566,16 @@ void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(CN1_THR
     POOL_BEGIN();
     NSFileManager* fm = [[NSFileManager alloc] init];
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG dir);
-    if (![fm createDirectoryAtPath:ns attributes:nil]) {
-        CN1Log(@"Failed to create directory %@", ns);
+    NSError *mkdirError = nil;
+    // withIntermediateDirectories:error: rather than the deprecated two-argument
+    // form, which macOS marks deprecated and clang rejects under the port's
+    // warning settings. Intermediate directories are created because every
+    // caller here is materialising a storage path that may not have a parent
+    // yet, which is what the old call did by accident of the caller always
+    // having made the parent first.
+    if (![fm createDirectoryAtPath:ns withIntermediateDirectories:YES
+                        attributes:nil error:&mkdirError]) {
+        CN1Log(@"Failed to create directory %@: %@", ns, mkdirError);
     }
 #ifndef CN1_USE_ARC
     [fm release];
@@ -3166,9 +3804,13 @@ void connectionReceivedData(void* peer, NSData* data) {
 
 }
 
+// Platform-neutral despite living among the UIKit helpers: the whole body is a
+// string conversion and a Java callback. It was guarded out of the macOS build
+// during bring-up by mistake, and because ensureConnection() blocks until either
+// this or a success callback fires, every failed request -- offline host, DNS
+// failure, timeout, rejected TLS -- hung its thread forever instead of throwing.
 void connectionError(void* peer, NSString* message) {
     POOL_BEGIN();
-    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
     JAVA_OBJECT str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG message);
     com_codename1_impl_ios_IOSImplementation_networkError___long_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG peer, str);
     POOL_END();
@@ -3189,10 +3831,28 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
         POOL_BEGIN();
 
         NSString* ns = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
-        if([ns hasPrefix:@"file:"]) {
-            ns = [NSURL fileURLWithPath:[ns substringFromIndex:5]];
+        // Kept as an NSURL from here on. The file: branch used to assign the
+        // NSURL back over the NSString variable and both platforms then handed
+        // that to URLWithString:, which reads it as a string -- so asking
+        // whether a local file could be opened called string methods on an
+        // NSURL. It compiled with an incompatible-pointer warning and answered
+        // with whatever that produced.
+        // Same reading as every other URL built from an application string;
+        // see cn1URLForMediaString.
+        NSURL *target = cn1URLForMediaString(ns);
+        if (target == nil) {
+            result = JAVA_FALSE;
+        } else {
+#if TARGET_OS_OSX
+        // NSWorkspace answers with the application that would open it, so a nil
+        // result is the same "nothing handles this scheme" that canOpenURL:
+        // reports -- and unlike iOS it needs no LSApplicationQueriesSchemes
+        // declaration to be allowed to ask.
+        result = [[NSWorkspace sharedWorkspace] URLForApplicationToOpenURL:target] != nil;
+#else
+        result = [[UIApplication sharedApplication] canOpenURL:target];
+#endif
         }
-        result = [[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:ns]];
         POOL_END();
     });
     return result;
@@ -3204,6 +3864,31 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
 
 void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1)
 {
+#if TARGET_OS_OSX
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG n1);
+    if (ns == nil) {
+        return;
+    }
+#ifndef CN1_USE_ARC
+    [ns retain];
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        // No preview controller: a Mac opens a file in whichever application
+        // owns it, which is what the user expects and what
+        // UIDocumentInteractionController was standing in for on iOS.
+        // Same reading as every media URL: see cn1URLForMediaString, which
+        // this shares so the two cannot drift.
+        NSURL* url = cn1URLForMediaString(ns);
+        if (url != nil) {
+            [[NSWorkspace sharedWorkspace] openURL:url];
+        }
+        POOL_END();
+#ifndef CN1_USE_ARC
+        [ns release];
+#endif
+    });
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG n1);
 #ifdef CN1_USE_ARC
@@ -3238,6 +3923,7 @@ void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STAT
 #else
     // watchOS/tvOS have no UIDocumentInteractionController.
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_flashBacklight___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1)
@@ -3271,6 +3957,16 @@ void com_codename1_impl_ios_IOSNative_restoreMinimizedApplication__(CN1_THREAD_S
 extern int orientationLock;
 void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN n1)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_lockOrientation___boolean]
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if(n1) {
@@ -3299,6 +3995,7 @@ void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(CN1_THREAD_STATE
     orientationLock = n1 ? 1 : 2;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
     //XMLVM_END_WRAPPER
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_unlockOrientation__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
@@ -3308,27 +4005,52 @@ void com_codename1_impl_ios_IOSNative_unlockOrientation__(CN1_THREAD_STATE_MULTI
 
 void com_codename1_impl_ios_IOSNative_lockScreen__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
+#if TARGET_OS_OSX
+    // NSProcessInfo's activity assertion is the macOS equivalent of disabling
+    // the idle timer. The token is held in a file static because the matching
+    // unlock has no argument to carry it back.
+    if (cn1MacIdleActivity == nil) {
+        cn1MacIdleActivity = [[NSProcessInfo processInfo]
+            beginActivityWithOptions:NSActivityIdleDisplaySleepDisabled
+                                    | NSActivityIdleSystemSleepDisabled
+                              reason:@"Codename One application requested the display stay awake"];
+#ifndef CN1_USE_ARC
+        [cn1MacIdleActivity retain];
+#endif
+    }
+#else
 #if !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         [UIApplication sharedApplication].idleTimerDisabled = YES;
     });
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_unlockScreen__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
+#if TARGET_OS_OSX
+    if (cn1MacIdleActivity != nil) {
+        [[NSProcessInfo processInfo] endActivity:cn1MacIdleActivity];
+#ifndef CN1_USE_ARC
+        [cn1MacIdleActivity release];
+#endif
+        cn1MacIdleActivity = nil;
+    }
+#else
 #if !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         [UIApplication sharedApplication].idleTimerDisabled = NO;
     });
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setDisableScreenshots___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN disable)
 {
     BOOL shouldDisable = disable ? YES : NO;
 #if TARGET_OS_WATCH
-    // No screen-capture overlay on watchOS (no UIView/UIScreen capture APIs).
+    // No screen-capture overlay on watchOS (no CN1View/UIScreen capture APIs).
     cn1_disableScreenshots = shouldDisable;
 #else
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -3375,16 +4097,43 @@ void com_codename1_impl_ios_IOSNative_vibrate___int(CN1_THREAD_STATE_MULTI_ARG J
 #define CN1_MOTION_G 9.80665
 
 #if !TARGET_OS_TV
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 static CMMotionManager *cn1MotionManager = nil;
+#endif
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 static CMMotionManager *cn1GetMotionManager() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     if(cn1MotionManager == nil) {
         cn1MotionManager = [[CMMotionManager alloc] init];
     }
     return cn1MotionManager;
+#endif
 }
+#endif
 #endif
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
 #if TARGET_OS_TV
     return JAVA_FALSE;
 #else
@@ -3400,12 +4149,23 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int(CN1_
             return JAVA_FALSE;
     }
 #endif
+#endif
 }
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
     return com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int(CN1_THREAD_STATE_PASS_ARG instanceObject, type);
 }
 
 void com_codename1_impl_ios_IOSNative_startMotionSensor___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_INT rateMillis) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_TV
     CMMotionManager *m = cn1GetMotionManager();
     NSTimeInterval interval = ((double)rateMillis) / 1000.0;
@@ -3426,9 +4186,20 @@ void com_codename1_impl_ios_IOSNative_startMotionSensor___int_int(CN1_THREAD_STA
             break;
     }
 #endif
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_stopMotionSensor___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_TV
     CMMotionManager *m = cn1GetMotionManager();
     switch(type) {
@@ -3445,9 +4216,21 @@ void com_codename1_impl_ios_IOSNative_stopMotionSensor___int(CN1_THREAD_STATE_MU
             break;
     }
 #endif
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
 #if TARGET_OS_TV
     return JAVA_FALSE;
 #else
@@ -3463,6 +4246,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int(CN1_THREAD_STA
             return JAVA_FALSE;
     }
 #endif
+#endif
 }
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
     return com_codename1_impl_ios_IOSNative_hasMotionData___int(CN1_THREAD_STATE_PASS_ARG instanceObject, type);
@@ -3471,6 +4255,11 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int_R_boolean(CN1_
 #if !TARGET_OS_TV
 // axis: 0 = x, 1 = y, 2 = z
 static JAVA_FLOAT cn1ReadMotionAxis(JAVA_INT type, int axis) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
     CMMotionManager *m = cn1GetMotionManager();
     switch(type) {
         case CN1_MOTION_ACCELEROMETER: {
@@ -3506,6 +4295,7 @@ static JAVA_FLOAT cn1ReadMotionAxis(JAVA_INT type, int axis) {
         default:
             return 0;
     }
+#endif
 }
 #else
 static JAVA_FLOAT cn1ReadMotionAxis(JAVA_INT type, int axis) {
@@ -3536,11 +4326,53 @@ JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorZ___int_R_float(CN1_T
 
 // Peer Component methods
 
+#if TARGET_OS_OSX
+/// The scale a peer's own window uses, falling back to the process-wide one.
+///
+/// scaleValue tracks the MAIN window, and a peer in a secondary window on a
+/// display of a different density is laid out in ITS window's pixels -- so
+/// dividing by the main window's scale sized and placed it wrongly, at half or
+/// double, while the pointer coordinates and the drawable for that same window
+/// used the right one.
+static CGFloat cn1MacPeerScale(NSView *peerView) {
+    extern float scaleValue;
+    CGFloat scale = (peerView != nil && peerView.window != nil)
+        ? peerView.window.backingScaleFactor : 0;
+    if (scale <= 0) {
+        scale = scaleValue > 0 ? scaleValue : 1;
+    }
+    return scale;
+}
+#endif
+
 void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT w, JAVA_INT h, JAVA_OBJECT response) {
+#if TARGET_OS_OSX
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)(uintptr_t)peer);
+        // NSView answers with fittingSize rather than sizeThatFits:, and it takes
+        // no proposal -- an AppKit view's preferred size comes from its content
+        // and its constraints, not from a size offered to it.
+        CGSize s = [v fittingSize];
+        if (s.width <= 0 || s.height <= 0) {
+            s = v.bounds.size;
+        }
+        // The peer's own window, not scaleValue: a peer in a secondary window
+        // on a display of a different density is measured in ITS window's
+        // pixels, exactly as updatePeerPositionSize places it. Using the main
+        // window's scale reported a peer on a 1x display beside a Retina main
+        // window at twice its size, and layout then allocated those bounds.
+        CGFloat prefScale = cn1MacPeerScale(v);
+        JAVA_ARRAY_INT* data = (JAVA_INT*)((JAVA_ARRAY)response)->data;
+        data[0] = (JAVA_INT)(s.width * prefScale);
+        data[1] = (JAVA_INT)(s.height * prefScale);
+        POOL_END();
+    });
+#else
 #if !TARGET_OS_WATCH
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         CGSize s = [v sizeThatFits:CGSizeMake(w, h)];
 #ifndef NEW_CODENAME_ONE_VM
         org_xmlvm_runtime_XMLVMArray* intArray = response;
@@ -3553,17 +4385,29 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
         POOL_END();
     });
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 extern float scaleValue;
 
+
 void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+#if TARGET_OS_OSX
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)(uintptr_t)peer);
+        CGFloat scale = cn1MacPeerScale(v);
+        [v setFrame:CGRectMake(x / scale, y / scale, w / scale, h / scale)];
+        [v setNeedsDisplay:YES];
+        POOL_END();
+    });
+#else
 #if !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         float scale = scaleValue;
         float xpos = x / scale;
         float ypos = y / scale;
@@ -3574,32 +4418,89 @@ void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_
         POOL_END();
     });
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN b) {
 #if !TARGET_OS_WATCH
+#if TARGET_OS_OSX
+    extern NSView *CN1MacPeerHostView(void);
+    // Typed as the rendering view it actually is: addPeerComponent: is declared
+    // on METALView, not on NSView, and an id-typed receiver would take a bad
+    // selector to runtime instead of to the compiler.
+    METALView *peerHost = (METALView *)CN1MacPeerHostView();
+#endif
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         if(!b) {
             if([v superview] != nil) {
                 [v removeFromSuperview];
             }
         } else {
             if([v superview] == nil) {
+#if TARGET_OS_OSX
+                // Back into the window it was placed in, which the peer itself
+                // remembers. Resolving the host from what is painting instead
+                // put a peer returning from lightweight mode -- a transition, a
+                // form change -- onto the main surface, undoing the placement
+                // peerInitialized got right, and the Java attachToOwningWindow()
+                // cannot correct it because that path knows only Catalyst slots.
+                extern NSView *CN1MacPeerOwnerHostView(NSView *peer);
+                METALView *owner = (METALView *)CN1MacPeerOwnerHostView((NSView *)v);
+                [(owner != nil ? owner
+                     : (peerHost != nil ? peerHost
+                        : (METALView *)[[CodenameOne_GLViewController instance] eaglView]))
+                        addPeerComponent:v];
+#else
                 [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
+#endif
             }
         }
         POOL_END();
     });
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
 #endif // !TARGET_OS_WATCH
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT arr) {
+#if TARGET_OS_OSX
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)arr)->data;
+    __block GLUIImage* g = nil;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)(uintptr_t)peer);
+        NSRect bounds = v.bounds;
+        if(bounds.size.width > 0 && bounds.size.height > 0) {
+            // bitmapImageRepForCachingDisplayInRect: rather than rendering the
+            // layer into an image context: an NSView is not guaranteed to be
+            // layer backed, so its layer may be nil and the render a no-op.
+            NSBitmapImageRep* rep = [v bitmapImageRepForCachingDisplayInRect:bounds];
+            if (rep != nil) {
+                [v cacheDisplayInRect:bounds toBitmapImageRep:rep];
+                NSImage* image = [[NSImage alloc] initWithSize:bounds.size];
+                [image addRepresentation:rep];
+                g = [[GLUIImage alloc] initWithImage:image];
+                // The peer's own window again, not scaleValue: the same
+                // mismatch calcPreferredSize had. A peer captured on a display
+                // of a different density than the main window reported its
+                // image at the wrong size, and the caller sizes the image it
+                // just received from these two numbers.
+                CGFloat captureScale = cn1MacPeerScale(v);
+                data[0] = (JAVA_INT)(bounds.size.width * captureScale);
+                data[1] = (JAVA_INT)(bounds.size.height * captureScale);
+#ifndef CN1_USE_ARC
+                [image release];
+#endif
+            }
+        }
+        POOL_END();
+    });
+    return (JAVA_LONG)(uintptr_t)((BRIDGE_CAST void*)g);
+#else
 #if !TARGET_OS_WATCH
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* intArray = arr;
@@ -3610,12 +4511,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1
     __block GLUIImage* g = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         if(v.bounds.size.width > 0 && v.bounds.size.height > 0) {
             UIGraphicsBeginImageContextWithOptions(v.bounds.size, v.opaque, 0.0);
             [v.layer renderInContext:UIGraphicsGetCurrentContext()];
 
-            UIImage* image = UIGraphicsGetImageFromCurrentImageContext();
+            CN1Image* image = UIGraphicsGetImageFromCurrentImageContext();
 
             UIGraphicsEndImageContext();
             g = [[GLUIImage alloc] initWithImage:image];
@@ -3626,16 +4527,73 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1
     });
     return (JAVA_LONG)((BRIDGE_CAST void*)g);
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
     return 0;
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
-void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, int x, int y, int w, int h) {
+void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, int x, int y, int w, int h, int windowId) {
+#if TARGET_OS_OSX
+    // Resolved here, on the calling thread, rather than inside the block: the
+    // window manager marks the active rendering view only for the duration of a
+    // window's paint, and this dispatch runs after that bracket has been
+    // cleared. eaglView answers the MAIN window's view unconditionally on this
+    // port, so without this a peer belonging to a secondary Window was added to
+    // the main one and drawn there at coordinates meant for its own.
+    extern NSView *CN1MacPeerHostView(void);
+    // Typed as the rendering view it actually is: addPeerComponent: is declared
+    // on METALView, not on NSView, and an id-typed receiver would take a bad
+    // selector to runtime instead of to the compiler.
+    METALView *peerHost = (METALView *)CN1MacPeerHostView();
+    // The owning window travels WITH the peer, as an id. peerHost above answers
+    // the ACTIVE surface, which is the right view only when the peer happens to
+    // be created inside its own window's paint bracket; a peer created during
+    // initComponentImpl, before its window has ever painted, landed on the main
+    // window and was then positioned there using coordinates measured against
+    // its own -- it appeared over the main Form and took input there.
+    //
+    // An id rather than a view, and looked up inside the block rather than out
+    // here. Re-parenting later on a positioning pass was tried and reverted: it
+    // crashed the screenshot suite immediately after WindowModalTest, because a
+    // view resolved on this thread and used from the deferred block points into
+    // a window that may have been torn down in between, and moving a live peer
+    // into a dead window is a segfault the next time anything draws it. An int
+    // cannot dangle, and the lookup happens on the main thread at the moment the
+    // view is used, so the window is either still there or the peer falls back.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)(uintptr_t)peer);
+        if([v superview] == nil) {
+            extern NSView *CN1MacPeerHostViewForWindowId(int windowId);
+            METALView *owner = (METALView *)CN1MacPeerHostViewForWindowId(windowId);
+            [(owner != nil ? owner
+                 : (peerHost != nil ? peerHost
+                    : (METALView *)[[CodenameOne_GLViewController instance] eaglView]))
+                    addPeerComponent:v];
+        }
+        // Remembered on the peer whether or not it was used just now: a peer is
+        // attached again every time it returns from lightweight mode, and those
+        // later attaches are not told which window it belongs to.
+        extern void CN1MacPeerSetOwnerWindowId(NSView *peer, int windowId);
+        CN1MacPeerSetOwnerWindowId((NSView *)v, windowId);
+        if(w > 0 && h > 0) {
+            CGFloat scale = cn1MacPeerScale(v);
+            [v setFrame:CGRectMake(x / scale, y / scale, w / scale, h / scale)];
+            [v setNeedsDisplay:YES];
+        } else {
+            // Parked off screen rather than hidden, matching the UIKit path: a
+            // peer with no bounds yet still has to be in a window for its own
+            // layout to run.
+            [v setFrame:CGRectMake(3000, 0, 300, 300)];
+        }
+        POOL_END();
+    });
+#else
 #if !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         if([v superview] == nil) {
             [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
         }
@@ -3653,8 +4611,9 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
         POOL_END();
     });
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 extern JAVA_OBJECT com_codename1_ui_Display_getInstance__(CN1_THREAD_STATE_SINGLE_ARG);
@@ -3679,7 +4638,7 @@ void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(CN1_THREAD_STATE_
 #if !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         if(v.superview != nil) {
             [v removeFromSuperview];
             repaintUI();
@@ -3687,7 +4646,7 @@ void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(CN1_THREAD_STATE_
         POOL_END();
     });
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
 #endif // !TARGET_OS_WATCH
 }
 
@@ -3752,6 +4711,19 @@ void com_codename1_impl_ios_IOSNative_setAudioTime___long_int(CN1_THREAD_STATE_M
 }
 
 void com_codename1_impl_ios_IOSNative_cleanupAudio___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#if TARGET_OS_OSX
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        AudioPlayer* pl = (BRIDGE_CAST AudioPlayer*)((void *)(uintptr_t)peer);
+        if([pl isPlaying]) {
+            [pl stop];
+        }
+#ifndef CN1_USE_ARC
+        [pl release];
+#endif
+        POOL_END();
+    });
+#else
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         AudioPlayer* pl = (BRIDGE_CAST AudioPlayer*)((void *)peer);
@@ -3763,6 +4735,7 @@ void com_codename1_impl_ios_IOSNative_cleanupAudio___long(CN1_THREAD_STATE_MULTI
 #endif
         POOL_END();
     });
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio = 0;
@@ -4254,12 +5227,27 @@ void com_codename1_impl_ios_IOSNative_retainPeer___long(CN1_THREAD_STATE_MULTI_A
 #ifndef NO_UIWEBVIEW
 UIWebView* com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
 #endif
+#if TARGET_OS_WATCH || TARGET_OS_TV
+/// The watch and TV slices get their own key.
+///
+/// UIWebViewEventDelegate.h -- which declares the shared one -- is wrapped in
+/// `#if !TARGET_OS_WATCH && !TARGET_OS_TV`, and UIWebViewEventDelegate.m is not
+/// compiled here either, so on these slices the shared key is neither declared
+/// nor linked. The helpers below need nothing from it but a unique address, and
+/// there is no web view on either slice for a value to travel between, so a
+/// local key is exactly equivalent.
+///
+/// The helpers themselves stay outside the NO_UIWEBVIEW guard because the
+/// WKWebView paths call them too, and those compile on every slice.
+static const void *CN1FollowTargetBlankKey = &CN1FollowTargetBlankKey;
+#endif
+
 static void cn1_setBrowserFollowTargetBlank(id webView, BOOL follow) {
-    objc_setAssociatedObject(webView, @selector(cn1FollowTargetBlank), [NSNumber numberWithBool:follow], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(webView, CN1FollowTargetBlankKey, [NSNumber numberWithBool:follow], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 static BOOL cn1_shouldFollowTargetBlank(id webView) {
-    NSNumber *value = objc_getAssociatedObject(webView, @selector(cn1FollowTargetBlank));
+    NSNumber *value = objc_getAssociatedObject(webView, CN1FollowTargetBlankKey);
     if (value == nil) {
         return YES;
     }
@@ -4268,7 +5256,7 @@ static BOOL cn1_shouldFollowTargetBlank(id webView) {
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
 #ifndef NO_UIWEBVIEW
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         com_codename1_impl_ios_IOSNative_createBrowserComponent = [[UIWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200)];
         com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor clearColor];
         com_codename1_impl_ios_IOSNative_createBrowserComponent.opaque = NO;
@@ -4297,9 +5285,57 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Ob
 WKWebView* com_codename1_impl_ios_IOSNative_createWKBrowserComponent = nil;
 #endif
 JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_Object_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
+#if TARGET_OS_OSX
+    cn1RunSyncOnMainQueue(^{
+        POOL_BEGIN();
+        WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
+        // allowsInlineMediaPlayback has no macOS counterpart: a Mac has no
+        // full-screen-only playback mode to opt out of.
+        config.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeNone;
+        config.suppressesIncrementalRendering = YES;
+        UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
+        WKUserContentController* userContentController = [[WKUserContentController alloc] init];
+        NSString *bootstrapSource = @"window.cn1application = window.cn1application || {};\
+        window.cn1application.shouldNavigate = function(url) {\
+            window.webkit.messageHandlers.cn1.postMessage({'shouldNavigate' : url});\
+        };";
+        WKUserScript *bootstrapScript = [[WKUserScript alloc] initWithSource:bootstrapSource injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES];
+        [userContentController addUserScript:bootstrapScript];
+        [bootstrapScript release];
+        [userContentController addScriptMessageHandler:del name:@"cn1"];
+        [del release];
+        config.userContentController = userContentController;
+        [userContentController release];
+        com_codename1_impl_ios_IOSNative_createWKBrowserComponent = [[WKWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200) configuration:config];
+        [config release];
+        // No backgroundColor / opaque and no scrollView: an NSView has neither,
+        // and there is no status-bar tap proxy on a Mac to keep out of the way
+        // of. Transparency instead comes from the web content itself.
+        com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizesSubviews = YES;
+        cn1_setBrowserFollowTargetBlank(com_codename1_impl_ios_IOSNative_createWKBrowserComponent, YES);
+
+        if (getBooleanClientProperty(CN1_THREAD_GET_STATE_PASS_ARG obj, @"BrowserComponent.ios.debug")) {
+            // inspectable arrived in macOS 13.3 and this target deploys to 11.0,
+            // so on an older Mac this is an unrecognised selector and the
+            // application is terminated -- for a debugging flag. The web view
+            // simply is not inspectable there, which is the honest answer.
+            if (@available(macOS 13.3, *)) {
+                com_codename1_impl_ios_IOSNative_createWKBrowserComponent.inspectable = YES;
+            }
+        }
+
+        com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
+        com_codename1_impl_ios_IOSNative_createWKBrowserComponent.autoresizingMask =
+            (NSViewHeightSizable | NSViewWidthSizable);
+        POOL_END();
+    });
+    id r = com_codename1_impl_ios_IOSNative_createWKBrowserComponent;
+    com_codename1_impl_ios_IOSNative_createWKBrowserComponent = nil;
+    return (JAVA_LONG)(uintptr_t)((BRIDGE_CAST void*)r);
+#else
 #ifdef supportsWKWebKit
     if (@available(iOS 8, *)) {
-        dispatch_sync(dispatch_get_main_queue(), ^{
+        cn1RunSyncOnMainQueue(^{
             POOL_BEGIN();
             WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
             config.allowsInlineMediaPlayback = YES;
@@ -4349,6 +5385,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
 #else
     return com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(threadStateData, instanceObject, obj);
 #endif
+#endif
 }
 
 BOOL isWKWebView(JAVA_LONG peer) {
@@ -4361,7 +5398,7 @@ BOOL isWKWebView(JAVA_LONG peer) {
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserPage___long_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT html, JAVA_OBJECT baseUrl) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4393,7 +5430,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserUserAgent___long_java_lang_Strin
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserFollowTargetBlank___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN follow) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4417,11 +5454,28 @@ void com_codename1_impl_ios_IOSNative_setBrowserFollowTargetBlank___long_boolean
 // default backgrounds / form controls, so a page that adapts to dark mode can be
 // kept light (or dark) regardless of the user's system appearance.
 void com_codename1_impl_ios_IOSNative_setBrowserInterfaceStyle___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT style) {
+#if TARGET_OS_OSX
+    cn1RunSyncOnMainQueue(^{
+        POOL_BEGIN();
+        CN1View* w = (BRIDGE_CAST CN1View*)((void *)(uintptr_t)peer);
+        // AppKit expresses this as an appearance on the view rather than as an
+        // interface-style override, and nil means "inherit from the window",
+        // which is what UIUserInterfaceStyleUnspecified means on iOS.
+        NSAppearance* appearance = nil;
+        if (style == 1) {
+            appearance = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
+        } else if (style == 2) {
+            appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+        }
+        w.appearance = appearance;
+        POOL_END();
+    });
+#else
 #if !TARGET_OS_WATCH
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (@available(iOS 13.0, *)) {
-            UIView* w = (BRIDGE_CAST UIView*)((void *)peer);
+            CN1View* w = (BRIDGE_CAST CN1View*)((void *)peer);
             UIUserInterfaceStyle uiStyle = UIUserInterfaceStyleUnspecified;
             if (style == 1) {
                 uiStyle = UIUserInterfaceStyleLight;
@@ -4433,8 +5487,9 @@ void com_codename1_impl_ios_IOSNative_setBrowserInterfaceStyle___long_int(CN1_TH
         POOL_END();
     });
 #else
-    // watchOS has no UIView / UIUserInterfaceStyle.
+    // watchOS has no CN1View / UIUserInterfaceStyle.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 
@@ -4460,7 +5515,15 @@ void com_codename1_impl_ios_IOSNative_setPinchToZoomEnabled___long_boolean(CN1_T
 }
 
 void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN enabled) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+#if TARGET_OS_OSX
+    // A WKWebView on macOS has no scrollView to disable -- scrolling belongs to
+    // the web content's own scrollers. Turning it off would mean injecting CSS,
+    // which would fight the page rather than configure the view, so the setting
+    // is accepted and has no effect here.
+    (void)peer;
+    (void)enabled;
+#else
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4480,10 +5543,25 @@ void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_bo
         
         POOL_END();
     });
+#endif
 }
 
+/// Every BrowserComponent native runs through cn1RunSyncOnMainQueue rather
+/// than dispatch_sync, because a browser listener is called ON the main queue.
+///
+/// WebKit invokes onLoad, onStart and the navigation policy decision
+/// synchronously on the main queue, and those listeners are documented to be
+/// able to drive the component -- redirecting after a load is the obvious case.
+/// A raw dispatch_sync to the main queue from there is a deadlock against the
+/// queue already running it, and the application hangs with no output.
+///
+/// cn1RunSyncOnMainQueue runs the block inline when it is already on the main
+/// queue and dispatches otherwise, so the synchronous policy decision keeps its
+/// timing. Applied to the whole BrowserComponent surface rather than the one
+/// entry point that was reported: a listener can call any of them, and setURL
+/// is simply the one people reach for first.
 void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT url) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4534,7 +5612,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT url, JAVA_OBJECT keys, JAVA_OBJECT values) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4579,7 +5657,7 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java
 }
 
 void com_codename1_impl_ios_IOSNative_browserBack___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4597,7 +5675,7 @@ void com_codename1_impl_ios_IOSNative_browserBack___long(CN1_THREAD_STATE_MULTI_
 }
 
 void com_codename1_impl_ios_IOSNative_browserStop___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4727,7 +5805,7 @@ void com_codename1_impl_ios_IOSNative_browserExecuteAndReturnStringCallback___lo
 }
 
 void com_codename1_impl_ios_IOSNative_browserForward___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4746,7 +5824,7 @@ void com_codename1_impl_ios_IOSNative_browserForward___long(CN1_THREAD_STATE_MUL
 
 JAVA_BOOLEAN booleanResponse = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4765,7 +5843,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasBack___long(CN1_THREAD_S
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasForward___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4784,7 +5862,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_browserHasForward___long(CN1_THREA
 }
 
 void com_codename1_impl_ios_IOSNative_browserReload___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4803,7 +5881,7 @@ void com_codename1_impl_ios_IOSNative_browserReload___long(CN1_THREAD_STATE_MULT
 
 JAVA_OBJECT returnString;
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4823,7 +5901,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserTitle___long(CN1_THREAD_S
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
-    dispatch_sync(dispatch_get_main_queue(), ^{
+    cn1RunSyncOnMainQueue(^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
 #ifdef supportsWKWebKit
@@ -4842,7 +5920,15 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(CN1_THREAD_STA
 }
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *moviePlayer, JAVA_INT callbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     id observer = [[NSNotificationCenter defaultCenter] addObserverForName:MPMoviePlayerPlaybackDidFinishNotification object:moviePlayer
     queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
         /*
@@ -4860,7 +5946,9 @@ void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *m
         com_codename1_impl_ios_IOSImplementation_fireMediaCallback___int(CN1_THREAD_GET_STATE_PASS_ARG callbackId);
     }];
     com_codename1_impl_ios_IOSImplementation_bindNSObserverPeerToMediaCallback___long_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)((BRIDGE_CAST void*)observer), callbackId);
+#endif
 }
+#endif
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (registerVideoCallback / MPMoviePlayerController)
 
 void registerVideoCallbackAV(CN1_THREAD_STATE_MULTI_ARG AVPlayer *moviePlayer, JAVA_INT callbackId) {
@@ -4913,6 +6001,11 @@ BOOL cn1UseApplicationAudioSessionForMedia(CN1_THREAD_STATE_SINGLE_ARG) {
     return YES;
 }
 BOOL useAVKit() {
+#if TARGET_OS_OSX
+    // MediaPlayer's MPMoviePlayerController does not exist on macOS, so AVKit
+    // is not a preference here -- it is the only path.
+    return YES;
+#endif
     if (@available(iOS 13.0, *)) {
         return YES;
     }
@@ -4926,18 +6019,57 @@ BOOL useAVKit() {
     
     return NO;
 }
+/// A media or document URL from the string an application handed us.
+///
+/// Two conventions arrive here and both have to work. Codename One's own is
+/// "file:" followed by a RAW path -- FileSystemStorage builds it and unfile()
+/// takes it apart again without percent decoding -- and an application calling
+/// MediaManager.createMedia() or Display.execute() may equally pass a proper,
+/// percent-ENCODED file URI.
+///
+/// Chopping the scheme off and handing the rest to fileURLWithPath: served only
+/// the first: fileURLWithPath: takes its argument literally, so the %20 in
+/// file:///tmp/My%20Video.mp4 became three characters of the filename and was
+/// re-encoded to %2520, and the player had nothing to load. URLWithString: is
+/// what understands the escaping, and it returns nil for the raw form -- an
+/// unencoded space is not a legal URL -- which is exactly the signal to fall
+/// back to the path reading.
+static NSURL *cn1URLForMediaString(NSString *s) {
+    if (s == nil) {
+        return nil;
+    }
+    if ([s hasPrefix:@"file:"]) {
+        NSURL *encoded = [NSURL URLWithString:s];
+        if (encoded != nil) {
+            return encoded;
+        }
+        NSString *path = [s substringFromIndex:5];
+        while ([path hasPrefix:@"//"]) {
+            path = [path substringFromIndex:1];
+        }
+        return [NSURL fileURLWithPath:path];
+    }
+    NSURL *url = [NSURL URLWithString:s];
+    if (url == nil || [url scheme] == nil) {
+        // A bare path with no scheme at all, which URLWithString: hands back
+        // schemeless and no player can open.
+        return [NSURL fileURLWithPath:s];
+    }
+    return url;
+}
+
 JAVA_LONG createVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
      __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
             NSString* s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
-            NSURL* u;
-            if([s hasPrefix:@"file:"]) {
-                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
-            } else {
-                u = [NSURL URLWithString:s];
-            }
+            NSURL* u = cn1URLForMediaString(s);
             moviePlayerInstance = [[MPMoviePlayerController alloc] initWithContentURL:u];
             registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance, onCompletionCallbackId);
             moviePlayerInstance.useApplicationAudioSession = cn1UseApplicationAudioSessionForMedia(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
@@ -4957,8 +6089,13 @@ JAVA_LONG createVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletio
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 void addPlaybackToAudioSession() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     AVAudioSessionCategory cat = [[AVAudioSession sharedInstance] category];
     if (cat == AVAudioSessionCategoryPlayback) {
         return;
@@ -4968,22 +6105,49 @@ void addPlaybackToAudioSession() {
         return;
     }
     [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:nil];
+#endif
 }
 
 JAVA_LONG createVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
-#ifdef CN1_USE_AVKIT
+#if TARGET_OS_OSX
+    __block AVPlayerView* moviePlayerInstance;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSString* s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
+        NSURL* u = cn1URLForMediaString(s);
+        // Parked off screen at a nominal size, like every other peer, until the
+        // framework gives it real bounds.
+        moviePlayerInstance = [[AVPlayerView alloc] initWithFrame:NSMakeRect(3000, 0, 200, 200)];
+        // MRC ownership: alloc is +1 to us and the player property retains it
+        // again, so releasing the view later drops only the property's reference
+        // and the allocation outlives it -- with its player item and media
+        // buffers. Every create/clean-up cycle leaked one player.
+        AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+        moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+        [cn1Player release];
+#endif
+        registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
+        moviePlayerInstance.controlsStyle = AVPlayerViewControlsStyleInline;
+        POOL_END();
+    });
+    return (JAVA_LONG)(uintptr_t)((BRIDGE_CAST void*)moviePlayerInstance);
+#elif defined(CN1_USE_AVKIT)
      __block AVPlayerViewController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
             NSString* s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
-            NSURL* u;
-            if([s hasPrefix:@"file:"]) {
-                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
-            } else {
-                u = [NSURL URLWithString:s];
-            }
+            NSURL* u = cn1URLForMediaString(s);
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
-            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            // MRC ownership: alloc is +1 to us and the player property retains it
+            // again, so releasing the view later drops only the property's reference
+            // and the allocation outlives it -- with its player item and media
+            // buffers. Every create/clean-up cycle leaked one player.
+            AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+            moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+            [cn1Player release];
+#endif
             
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
         
@@ -5018,17 +6182,17 @@ void com_codename1_impl_ios_IOSNative_removeNotificationCenterObserver___long(CN
 
 
 JAVA_LONG createNativeVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN()
             NSString *s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
-            NSURL *u = nil;
-            if([s hasPrefix:@"file:"]) {
-                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
-            } else {
-                u = [NSURL URLWithString:s];
-            }
+            NSURL *u = cn1URLForMediaString(s);
             moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
             registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
     #ifndef AUTO_PLAY_VIDEO
@@ -5040,6 +6204,7 @@ JAVA_LONG createNativeVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCom
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 JAVA_LONG createNativeVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
 #ifdef CN1_USE_AVKIT
@@ -5047,14 +6212,17 @@ JAVA_LONG createNativeVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCom
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN()
             NSString *s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
-            NSURL *u = nil;
-            if([s hasPrefix:@"file:"]) {
-                u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
-            } else {
-                u = [NSURL URLWithString:s];
-            }
+            NSURL *u = cn1URLForMediaString(s);
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
-            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            // MRC ownership: alloc is +1 to us and the player property retains it
+            // again, so releasing the view later drops only the property's reference
+            // and the allocation outlives it -- with its player item and media
+            // buffers. Every create/clean-up cycle leaked one player.
+            AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+            moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+            [cn1Player release];
+#endif
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
             POOL_END();
         });
@@ -5078,7 +6246,33 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lan
 #endif
 }
 
+/// A temporary file for one data-backed media item, unique per item.
+///
+/// Every one of these used to write Documents/temp_movie.mp4 -- ONE name for
+/// every video created from a byte array or a stream. AVPlayer loads a URL
+/// asset asynchronously, so creating a second such media before the first had
+/// loaded replaced the first player's backing file underneath it: the first
+/// player then showed the second video, or failed to decode. macOS is where
+/// this bites hardest because it always takes the AVKit route.
+///
+/// Also moved out of Documents. That directory is the user's, and on iOS it is
+/// backed up to iCloud -- a scratch copy of every video an application ever
+/// played had no business in either. The system reclaims the temporary
+/// directory, which is what makes unique names affordable: naming them
+/// uniquely in a directory nothing ever clears would trade a correctness bug
+/// for an unbounded one.
+static NSString *cn1TempMediaPath(void) {
+    NSString *name = [NSString stringWithFormat:@"cn1-media-%@.mp4",
+                      [[NSUUID UUID] UUIDString]];
+    return [NSTemporaryDirectory() stringByAppendingPathComponent:name];
+}
+
 JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5093,9 +6287,7 @@ JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
     #endif
             NSData* d = [NSData dataWithBytes:data length:len];
 
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
 
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
@@ -5118,6 +6310,7 @@ JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 JAVA_LONG createVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
 #ifdef CN1_USE_AVKIT
@@ -5130,14 +6323,20 @@ JAVA_LONG createVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
 
             NSData* d = [NSData dataWithBytes:data length:len];
             
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
             
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
-            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            // MRC ownership: alloc is +1 to us and the player property retains it
+            // again, so releasing the view later drops only the property's reference
+            // and the allocation outlives it -- with its player item and media
+            // buffers. Every create/clean-up cycle leaked one player.
+            AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+            moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+            [cn1Player release];
+#endif
 
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
             
@@ -5147,7 +6346,12 @@ JAVA_LONG createVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
             //[moviePlayerInstance prepareToPlay];
     #ifdef AUTO_PLAY_VIDEO
             addPlaybackToAudioSession();
+#if TARGET_OS_OSX
+            // An AVPlayerView has no play of its own; it is the player that plays.
+            [moviePlayerInstance.player play];
+#else
             [moviePlayerInstance play];
+#endif
     #endif
             POOL_END();
         });
@@ -5178,15 +6382,18 @@ JAVA_LONG createNativeVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onComple
 
             NSData* d = [NSData dataWithBytes:data length:len];
             
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
             
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
+            // Same MRC ownership as the sites above: this one already used a
+            // temporary but never gave up the allocation's reference.
             AVPlayer* player = [[AVPlayer alloc] initWithURL:u];
             moviePlayerInstance.player = player;
+#ifndef CN1_USE_ARC
+            [player release];
+#endif
             
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
 
@@ -5198,6 +6405,11 @@ JAVA_LONG createNativeVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onComple
 #endif
 }
 JAVA_LONG createNativeVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5212,9 +6424,7 @@ JAVA_LONG createNativeVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onComple
     #endif
             NSData* d = [NSData dataWithBytes:data length:len];
 
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
 
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
@@ -5233,6 +6443,7 @@ JAVA_LONG createNativeVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onComple
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
@@ -5248,15 +6459,18 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1AR
 }
 
 JAVA_LONG createVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
             NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
 
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
 
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
@@ -5282,6 +6496,7 @@ JAVA_LONG createVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCa
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 JAVA_LONG createVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
@@ -5291,21 +6506,32 @@ JAVA_LONG createVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCa
             POOL_BEGIN();
             NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
             
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
             
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
-            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            // MRC ownership: alloc is +1 to us and the player property retains it
+            // again, so releasing the view later drops only the property's reference
+            // and the allocation outlives it -- with its player item and media
+            // buffers. Every create/clean-up cycle leaked one player.
+            AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+            moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+            [cn1Player release];
+#endif
             
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
 
             
     #ifdef AUTO_PLAY_VIDEO
             addPlaybackToAudioSession();
+#if TARGET_OS_OSX
+            // An AVPlayerView has no play of its own; it is the player that plays.
+            [moviePlayerInstance.player play];
+#else
             [moviePlayerInstance play];
+#endif
     #endif
             POOL_END();
         });
@@ -5324,15 +6550,18 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int
 }
 
 JAVA_LONG createNativeVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
             POOL_BEGIN();
             NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
 
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
 
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
@@ -5352,6 +6581,7 @@ JAVA_LONG createNativeVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onComple
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 JAVA_LONG createNativeVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
@@ -5361,15 +6591,21 @@ JAVA_LONG createNativeVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onComple
             POOL_BEGIN();
             NSData* d = (BRIDGE_CAST NSData*)((void*)nsData);
             
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_movie.mp4"];
+            NSString *path = cn1TempMediaPath();
             
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
             
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
-            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            // MRC ownership: alloc is +1 to us and the player property retains it
+            // again, so releasing the view later drops only the property's reference
+            // and the allocation outlives it -- with its player item and media
+            // buffers. Every create/clean-up cycle leaked one player.
+            AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+            moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+            [cn1Player release];
+#endif
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
 
             POOL_END();
@@ -5381,7 +6617,18 @@ JAVA_LONG createNativeVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onComple
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
-#if TARGET_OS_MACCATALYST
+// The native macOS port takes the AV helper directly, alongside Catalyst.
+// This is the ONE wrapper of the four whose useAVKit() branches are inverted
+// -- the other three send AVKit to the AV helper and this one sends it to MP
+// -- so macOS, where useAVKit() is always true, landed on
+// createNativeVideoComponentNSDataMP, whose macOS arm returns 0. IOSMedia then
+// reported the media as Playing with no player behind it: data-backed video
+// was silently dead while the URL-backed overload beside it worked.
+//
+// The inversion itself is left alone for iOS. It predates this port and the
+// comment below records why; correcting it there would change which backend an
+// existing iOS app gets, which is not this port's business.
+#if TARGET_OS_MACCATALYST || TARGET_OS_OSX
     return createNativeVideoComponentNSDataAV(nsData, onCompletionCallbackId);
 #else
     if (useAVKit()) {
@@ -5395,7 +6642,78 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___lo
 }
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+#if TARGET_OS_OSX
+/// Runs an AppKit block on the main thread and waits for it.
+///
+/// The guard is not decoration: dispatch_sync to the main queue FROM the main
+/// thread deadlocks outright, and a native here can be reached from a callback
+/// that already runs there.
+static void cn1RunOnMainSync(void (^block)(void)) {
+    if ([NSThread isMainThread]) {
+        block();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
+}
+#endif
+
 void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJECT content){
+#if TARGET_OS_OSX
+    // AppKit has no in-process mail composer, so the message goes to the user's
+    // mail application as a mailto: URL through NSWorkspace. sendEmailMessage's
+    // macOS branch calls straight into here, so an empty body meant every
+    // sendMessage on this port opened nothing and failed silently.
+    NSMutableArray *recipientsArray = [NSMutableArray array];
+    if (recipients != JAVA_NULL) {
+        JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)((JAVA_ARRAY)recipients)->data;
+        int recipientCount = ((JAVA_ARRAY)recipients)->length;
+        for (int iter = 0; iter < recipientCount; iter++) {
+            NSString *r = toNSString(CN1_THREAD_GET_STATE_PASS_ARG data[iter]);
+            if (r != nil) {
+                [recipientsArray addObject:r];
+            }
+        }
+    }
+    NSString *nSubject = subject != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG subject) : @"";
+    NSString *nBody = content != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG content) : @"";
+    // Each part escaped on its own, with the separators added afterwards.
+    // Escaping the assembled string would encode the '?' and '&' that make it a
+    // query, and Mail then reads the whole tail as one address.
+    //
+    // NOT URLQueryAllowedCharacterSet: that is the set legal in a whole query,
+    // so it leaves '&', '=' and '+' alone -- and these are individual parameter
+    // VALUES, where an '&' in the body starts a parameter and everything after
+    // it is lost, and a '+' is read back as a space. The sub-delimiters are
+    // removed so only the unreserved characters survive unescaped.
+    NSMutableCharacterSet *allowedValue =
+        [[NSCharacterSet URLQueryAllowedCharacterSet] mutableCopy];
+    [allowedValue removeCharactersInString:@"&=+?#/;,:$@!*'()[]"];
+#ifndef CN1_USE_ARC
+    [allowedValue autorelease];
+#endif
+    // The recipients are escaped one at a time and joined afterwards, because
+    // the comma between them is a separator rather than part of an address.
+    NSMutableArray *escapedRecipients = [NSMutableArray array];
+    for (NSString *r in recipientsArray) {
+        NSString *e = [r stringByAddingPercentEncodingWithAllowedCharacters:allowedValue];
+        if (e != nil) {
+            [escapedRecipients addObject:e];
+        }
+    }
+    NSString *to = [escapedRecipients componentsJoinedByString:@","];
+    NSString *email = [NSString stringWithFormat:@"mailto:%@?subject=%@&body=%@",
+        to == nil ? @"" : to,
+        [nSubject stringByAddingPercentEncodingWithAllowedCharacters:allowedValue],
+        [nBody stringByAddingPercentEncodingWithAllowedCharacters:allowedValue]];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSURL *url = [NSURL URLWithString:email];
+        if (url != nil) {
+            [[NSWorkspace sharedWorkspace] openURL:url];
+        }
+    });
+#else
     // Recipient.
     NSMutableArray * recipientsArray = [[NSMutableArray alloc] init];
 
@@ -5419,11 +6737,110 @@ void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJ
         [[UIApplication sharedApplication] openURL:[NSURL URLWithString:email]];
     });
 
+#endif
 }
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (launchMailAppOnDevice)
 
 void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY_java_lang_String_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                                                                                                            JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
+#if TARGET_OS_OSX
+    // AppKit has no in-process mail composer, so the message is handed to the
+    // user's mail application. Through the sharing service rather than a mailto
+    // URL, because a mailto cannot carry a file: attachments were being dropped
+    // silently, and Message.getAttachments() documents that they are sent.
+    NSMutableArray *items = [NSMutableArray array];
+    NSString *nBody = content != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG content) : @"";
+    [items addObject:nBody];
+    if (attachment != JAVA_NULL) {
+        JAVA_ARRAY_OBJECT *attData = (JAVA_ARRAY_OBJECT *)((JAVA_ARRAY)attachment)->data;
+        int attCount = ((JAVA_ARRAY)attachment)->length;
+        for (int iter = 0; iter < attCount; iter++) {
+            NSString *path = toNSString(CN1_THREAD_GET_STATE_PASS_ARG attData[iter]);
+            if (path == nil || path.length == 0) {
+                continue;
+            }
+            // The framework hands these over as file: URLs on this port, and a
+            // plain path is accepted too rather than assuming one shape.
+            NSURL *fileURL = [path hasPrefix:@"file:"]
+                ? [NSURL URLWithString:path]
+                : [NSURL fileURLWithPath:path];
+            if (fileURL != nil) {
+                [items addObject:fileURL];
+            }
+        }
+    }
+    NSMutableArray *toList = [NSMutableArray array];
+    if (recipients != JAVA_NULL) {
+        JAVA_ARRAY_OBJECT *recData = (JAVA_ARRAY_OBJECT *)((JAVA_ARRAY)recipients)->data;
+        int recCount = ((JAVA_ARRAY)recipients)->length;
+        for (int iter = 0; iter < recCount; iter++) {
+            NSString *r = toNSString(CN1_THREAD_GET_STATE_PASS_ARG recData[iter]);
+            if (r != nil) {
+                [toList addObject:r];
+            }
+        }
+    }
+    NSString *nSubject = subject != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG subject) : @"";
+    BOOL hasAttachments = items.count > 1;
+    // The whole sharing service, not just the presentation. NSSharingService is
+    // AppKit: sharingServiceNamed:, canPerformWithItems: and the recipients /
+    // subject mutations are all main-thread work, and this native runs on the
+    // EDT. Dispatching only performWithItems: left the lookup, the capability
+    // check and the configuration off the main thread, which is the part that
+    // trips main-thread assertions before the queued block is ever reached.
+    //
+    // Synchronously, and the Java marshalling stays out here: items, toList and
+    // nSubject are already plain Foundation objects by this point, while the
+    // fallback below needs the JAVA_OBJECT arguments and a thread state, so it
+    // must run on the calling thread. Waiting is what lets it.
+    __block BOOL composed = NO;
+    cn1RunOnMainSync(^{
+        // The HTML body, if the caller asked for one. Message.MIME_HTML reaches
+        // this native as htmlMail, and the branch ignored it: the markup went
+        // into the composer as an NSString and Mail showed the tags rather than
+        // the formatting, where the iOS branch uses setMessageBody:isHTML:.
+        //
+        // Built HERE rather than beside the plain string above, because
+        // NSAttributedString's HTML importer is documented main-thread only --
+        // it runs the WebKit parser -- and this block is already on the main
+        // queue. A body that fails to parse keeps the plain string rather than
+        // sending nothing.
+        if (htmlMail && items.count > 0) {
+            NSData *htmlData = [nBody dataUsingEncoding:NSUTF8StringEncoding];
+            if (htmlData != nil) {
+                NSAttributedString *rich = [[NSAttributedString alloc]
+                    initWithHTML:htmlData documentAttributes:nil];
+                if (rich != nil) {
+                    [items replaceObjectAtIndex:0 withObject:rich];
+                }
+#ifndef CN1_USE_ARC
+                [rich release];
+#endif
+            }
+        }
+        NSSharingService *mail =
+            [NSSharingService sharingServiceNamed:NSSharingServiceNameComposeEmail];
+        if (mail != nil && [mail canPerformWithItems:items]) {
+            mail.recipients = toList;
+            mail.subject = nSubject;
+            [mail performWithItems:items];
+            composed = YES;
+        }
+    });
+    if (!composed) {
+        // No mail service configured. A mailto still opens whatever handles it,
+        // which is better than nothing -- but it cannot carry a file, so say so
+        // rather than let the attachments disappear without a trace.
+        if (hasAttachments) {
+            CN1Log(@"No mail service is available to compose with attachments; opening a "
+                   @"plain mailto and the %d attachment(s) are NOT included.",
+                   (int)(items.count - 1));
+        }
+        launchMailAppOnDevice(recipients, subject, content);
+    }
+#else
 #if TARGET_OS_WATCH || TARGET_OS_TV
     // No MessageUI on watchOS/tvOS; email composition is a no-op.
     return;
@@ -5515,10 +6932,20 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
         POOL_END();
     });
 #endif // !(TARGET_OS_WATCH || TARGET_OS_TV) (sendEmailMessage)
+#endif
 }
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 MPMoviePlayerController* getMPPlayer(JAVA_LONG peer) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
     MPMoviePlayerController* m = nil;;
     if([obj isKindOfClass:[MPMoviePlayerController class]]) {
@@ -5528,9 +6955,21 @@ MPMoviePlayerController* getMPPlayer(JAVA_LONG peer) {
         m = mv.moviePlayer;
     }
     return m;
+#endif
 }
+#endif
 
 AVPlayer* getAVPlayer(JAVA_LONG peer) {
+#if TARGET_OS_OSX
+    NSObject* obj = (BRIDGE_CAST NSObject*)((void *)(uintptr_t)peer);
+    if([obj isKindOfClass:[AVPlayer class]]) {
+        return (AVPlayer*)obj;
+    }
+    if([obj isKindOfClass:[AVPlayerView class]]) {
+        return ((AVPlayerView*)obj).player;
+    }
+    return nil;
+#else
 #ifdef CN1_USE_AVKIT
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
     AVPlayer* m = nil;;
@@ -5544,10 +6983,14 @@ AVPlayer* getAVPlayer(JAVA_LONG peer) {
 #else
     return nil;
 #endif
+#endif
 }
 
 CN1_AVPLAYERVIEWCONTROLLER getAVPlayerController(JAVA_LONG peer) {
-#ifdef CN1_USE_AVKIT
+#if TARGET_OS_OSX
+    NSObject* obj = (BRIDGE_CAST NSObject*)((void *)(uintptr_t)peer);
+    return [obj isKindOfClass:[AVPlayerView class]] ? (AVPlayerView*)obj : nil;
+#elif defined(CN1_USE_AVKIT)
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
     AVPlayerViewController* m = nil;;
     if([obj isKindOfClass:[AVPlayer class]]) {
@@ -5565,12 +7008,17 @@ CN1_AVPLAYERVIEWCONTROLLER getAVPlayerController(JAVA_LONG peer) {
 
 
 void startVideoComponentMP(JAVA_LONG peer) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         
         [getMPPlayer(peer) play];
         POOL_END();
     });
+#endif
 }
 
 void startVideoComponentAV(JAVA_LONG peer) {
@@ -5595,6 +7043,10 @@ void com_codename1_impl_ios_IOSNative_startVideoComponent___long(CN1_THREAD_STAT
 }
 
 void stopVideoComponentMP(JAVA_LONG peer) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -5602,6 +7054,7 @@ void stopVideoComponentMP(JAVA_LONG peer) {
         [getMPPlayer(peer) stop];
         POOL_END();
     });
+#endif
 }
 void stopVideoComponentAV(JAVA_LONG peer) {
 #ifdef CN1_USE_AVKIT
@@ -5623,6 +7076,10 @@ void com_codename1_impl_ios_IOSNative_stopVideoComponent___long(CN1_THREAD_STATE
 }
 
 void pauseVideoComponentMP(JAVA_LONG peer) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSObject* obj = (BRIDGE_CAST NSObject*)peer;
@@ -5639,6 +7096,7 @@ void pauseVideoComponentMP(JAVA_LONG peer) {
         [m pause];
         POOL_END();
     });
+#endif
 }
 void pauseVideoComponentAV(JAVA_LONG peer) {
 #ifdef CN1_USE_AVKIT
@@ -5659,6 +7117,11 @@ void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STAT
     }
 }
 void com_codename1_impl_ios_IOSNative_prepareVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#if TARGET_OS_OSX
+    // AVPlayer has no prepareToPlay: it buffers when its item is set, so there
+    // is nothing to ask for. Same as the AVKit branch on iOS.
+    (void)peer;
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
@@ -5668,9 +7131,17 @@ void com_codename1_impl_ios_IOSNative_prepareVideoComponent___long(CN1_THREAD_ST
         }
         POOL_END();
     });
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#if TARGET_OS_OSX
+    AVPlayer* m = getAVPlayer(peer);
+    if (m == nil) {
+        return 0;
+    }
+    return CMTimeGetSeconds(m.currentTime) * 1000;
+#else
     if (useAVKit()) {
 #ifdef CN1_USE_AVKIT
         AVPlayer* m = getAVPlayer(peer);
@@ -5686,9 +7157,27 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE
     }
     
 
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT time) {
+#if TARGET_OS_OSX
+    AVPlayer* m = getAVPlayer(peer);
+    if (m == nil) {
+        return 0;
+    }
+    // Floating point, and milliseconds out. Both operands were ints, so 1500ms
+    // truncated to 1 second before the seek and sub-second positioning was
+    // impossible; and the result came back in SECONDS from a method whose name,
+    // argument and Java return type are all milliseconds.
+    //
+    // The iOS branch below has the same shape and is deliberately left alone:
+    // it predates this port, it is what every iOS build has shipped, and
+    // changing playback behaviour there belongs in its own change with the iOS
+    // media goldens behind it.
+    [m seekToTime:CMTimeMakeWithSeconds(time / 1000.0, 1000)];
+    return (JAVA_INT)(CMTimeGetSeconds([m currentTime]) * 1000.0);
+#else
     if (useAVKit()) {
 #ifdef CN1_USE_AVKIT
         [getAVPlayer(peer) seekToTime:CMTimeMakeWithSeconds(time/1000, 1000)];
@@ -5702,10 +7191,27 @@ JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(CN1_THREAD_S
     }
     
     return 0;
+#endif
 }
 
 int responseGetMediaDuration = 0;
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#if TARGET_OS_OSX
+    // A __block LOCAL, not the file-scope response global the iOS branch below
+    // uses. The blocks run serially on the main queue, but the read happens
+    // after dispatch_sync returns: a second caller's block can land in that
+    // window and overwrite the global, so one media object reported another's
+    // duration. Per invocation, the value cannot be shared.
+    __block JAVA_INT durationMillis = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        AVPlayer* m = getAVPlayer(peer);
+        durationMillis = m == nil ? 0
+            : CMTimeGetSeconds(m.currentItem.asset.duration) * 1000;
+        POOL_END();
+    });
+    return durationMillis;
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
@@ -5720,6 +7226,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(CN1_THREAD_STA
         POOL_END();
     });
     return responseGetMediaDuration;
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setMediaBgArtist___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT artist) {
@@ -5817,6 +7324,16 @@ void com_codename1_impl_ios_IOSNative_setMediaBgPosition___long(CN1_THREAD_STATE
 }
 
 void com_codename1_impl_ios_IOSNative_setNativeVideoControlsEmbedded___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN value) {
+#if TARGET_OS_OSX
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        AVPlayerView* v = getAVPlayerController(peer);
+        // A Mac player hides its transport by style rather than by a flag.
+        v.controlsStyle = value ? AVPlayerViewControlsStyleInline
+                                : AVPlayerViewControlsStyleNone;
+        POOL_END();
+    });
+#else
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
@@ -5845,15 +7362,27 @@ void com_codename1_impl_ios_IOSNative_setNativeVideoControlsEmbedded___long_bool
         
         POOL_END();
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#if TARGET_OS_OSX
+    // MPNowPlayingInfoCenter belongs to MediaPlayer, which this port does not
+    // link -- the rest of MediaPlayer is the iOS movie player the AVKit path
+    // replaced. Now-playing artwork stays unset rather than pulling in a
+    // framework for one call.
+    (void)peer;
+#else
+    // Hoisted for the same reason as the share natives: the block captured peer,
+    // a scalar, so nothing retained the artwork across the dispatch and a
+    // collection between the queue and the run freed it. Predates the macOS port
+    // and is fixed alongside it because it is the same defect.
+    GLUIImage* glll = peer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)peer) : nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
        
         if ([MPNowPlayingInfoCenter class])  {
-            GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)peer);
-            UIImage* i = [glll getImage];
+            CN1Image* i = [glll getImage];
             MPMediaItemArtwork *artwork = [[MPMediaItemArtwork alloc] initWithImage:i];
             NSArray *keys = [NSArray arrayWithObjects:
                              MPMediaItemPropertyArtwork,
@@ -5870,11 +7399,26 @@ void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STA
         
         POOL_END();
     });
+#endif
 }
 
 
 JAVA_BOOLEAN responseIsVideoPlaying = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#if TARGET_OS_OSX
+    if (peer == 0) {
+        return JAVA_FALSE;
+    }
+    // Per invocation, for the reason getMediaDuration gives above.
+    __block JAVA_BOOLEAN playing = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        AVPlayer* m = getAVPlayer(peer);
+        playing = m != nil && m.rate != 0 && m.error == nil;
+        POOL_END();
+    });
+    return playing;
+#else
     if (peer == 0) {
         return JAVA_FALSE;
     }
@@ -5904,9 +7448,40 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(CN1_THREAD_S
         POOL_END();
     });
     return responseIsVideoPlaying;
+#endif
 }
 
+#if TARGET_OS_OSX
+/// The screen the view is actually on, falling back to the main one.
+///
+/// [NSScreen mainScreen] is the screen with the KEY window, not the screen
+/// showing this view. A player inside a secondary window on a second monitor,
+/// full-screened while some other window held focus, jumped to the focused
+/// window's monitor instead of growing where it already was.
+static NSScreen *cn1MacScreenFor(NSView *v) {
+    NSScreen *s = v.window.screen;
+    return s != nil ? s : [NSScreen mainScreen];
+}
+#endif
+
 void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN fullscreen) {
+#if TARGET_OS_OSX
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        AVPlayerView* v = getAVPlayerController(peer);
+        if (v != nil) {
+            // NSView's own full-screen mode rather than the window's: it is the
+            // player that goes full screen, which is what the caller asked for
+            // and what leaves the rest of the application where it was.
+            if (fullscreen && !v.isInFullScreenMode) {
+                [v enterFullScreenMode:cn1MacScreenFor(v) withOptions:nil];
+            } else if (!fullscreen && v.isInFullScreenMode) {
+                [v exitFullScreenModeWithOptions:nil];
+            }
+        }
+        POOL_END();
+    });
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
@@ -5930,10 +7505,22 @@ void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(CN1_THRE
         
         POOL_END();
     });
+#endif
 }
 
 JAVA_BOOLEAN responseIsVideoFullScreen = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#if TARGET_OS_OSX
+    // Per invocation, for the reason getMediaDuration gives above.
+    __block JAVA_BOOLEAN fullScreen = 0;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        AVPlayerView* v = getAVPlayerController(peer);
+        fullScreen = v != nil && v.isInFullScreenMode;
+        POOL_END();
+    });
+    return fullScreen;
+#else
     responseIsVideoFullScreen = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -5958,9 +7545,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(CN1_THREA
         POOL_END();
     });
     return responseIsVideoFullScreen;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#if TARGET_OS_OSX
+    // The player view is itself the view, so there is no .view to reach into.
+    return (JAVA_LONG)(uintptr_t)((BRIDGE_CAST void*)getAVPlayerController(peer));
+#else
     if (useAVKit()) {
 #ifdef CN1_USE_AVKIT
         AVPlayerViewController *m = getAVPlayerController(peer);
@@ -5973,9 +7565,23 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(CN1_THREAD_ST
         return (JAVA_LONG)((BRIDGE_CAST void*)m.view);
     }
     
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#if TARGET_OS_OSX
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        AVPlayerView* v = getAVPlayerController(peer);
+        if (v != nil && !v.isInFullScreenMode) {
+            // There is no modal presentation to make here. A Mac shows a video
+            // "as the player" by going full screen, which is the closest thing
+            // to what presentViewController: does on iOS.
+            [v enterFullScreenMode:cn1MacScreenFor(v) withOptions:nil];
+        }
+        POOL_END();
+    });
+#else
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
@@ -5992,6 +7598,7 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
 
         POOL_END();
     });
+#endif
 }
 #else // TARGET_OS_WATCH: no MPMoviePlayer / AVKit video playback peers on the watch.
 void com_codename1_impl_ios_IOSNative_startVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {}
@@ -6015,6 +7622,13 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (MPMoviePlayer / AVKit video peer functions)
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    // Asked of the system rather than inferred. The Catalyst path derives dark
+    // mode from the content pane's luma because it has no reliable way to read
+    // the host appearance; AppKit just answers, including when the user changes
+    // it while the application is running.
+    return CN1MacHostIsDarkMode() ? JAVA_TRUE : JAVA_FALSE;
+#else
 #if !TARGET_OS_WATCH
     if (@available(iOS 13.0, *)) {
         return [UIScreen mainScreen].traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
@@ -6025,6 +7639,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean(CN1_THREAD_
     // watchOS has no UIScreen trait-collection capture here.
     return JAVA_FALSE;
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkModeDetectionSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -6118,10 +7733,15 @@ static int cn1NetworkTypeFromFlags(SCNetworkReachabilityFlags flags) {
     if (!(flags & kSCNetworkReachabilityFlagsReachable)) {
         return 0; // NETWORK_TYPE_NONE
     }
+    // Only the WWAN flag is iOS-only; SystemConfiguration reachability itself is
+    // the same API on macOS. Reporting NONE there made every connectivity check
+    // on the desktop answer "offline".
+#if !TARGET_OS_OSX
     if (flags & kSCNetworkReachabilityFlagsIsWWAN) {
         return 2; // NETWORK_TYPE_CELLULAR
     }
-    return 1; // NETWORK_TYPE_WIFI -- iOS treats everything non-WWAN as wifi
+#endif
+    return 1; // NETWORK_TYPE_WIFI -- everything non-WWAN counts as wifi
 }
 
 static int cn1ReadNetworkType() {
@@ -6496,14 +8116,18 @@ void com_codename1_impl_ios_IOSNative_bonjourPublishStop___long(CN1_THREAD_STATE
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
-        CGFloat baseSize = [UIFont systemFontSize];
-        UIFont *preferred = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
+        CGFloat baseSize = [CN1Font systemFontSize];
+#if TARGET_OS_OSX
+        CN1Font *preferred = CN1ApplePreferredFontForTextStyle(UIFontTextStyleBody);
+#else
+        CN1Font *preferred = [CN1Font preferredFontForTextStyle:UIFontTextStyleBody];
+#endif
         return preferred.pointSize > (baseSize + 0.5f);
     } else {
         return JAVA_FALSE;
     }
 #else
-    // watchOS/tvOS have no UIFont systemFontSize.
+    // watchOS/tvOS have no CN1Font systemFontSize.
     return JAVA_FALSE;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 }
@@ -6511,8 +8135,12 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
-        CGFloat baseSize = [UIFont systemFontSize];
-        UIFont *preferred = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
+        CGFloat baseSize = [CN1Font systemFontSize];
+#if TARGET_OS_OSX
+        CN1Font *preferred = CN1ApplePreferredFontForTextStyle(UIFontTextStyleBody);
+#else
+        CN1Font *preferred = [CN1Font preferredFontForTextStyle:UIFontTextStyleBody];
+#endif
         if (baseSize <= 0.0f) {
             return 1.0f;
         }
@@ -6521,7 +8149,7 @@ JAVA_FLOAT com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(CN1_THR
         return 1.0f;
     }
 #else
-    // watchOS/tvOS have no UIFont systemFontSize.
+    // watchOS/tvOS have no CN1Font systemFontSize.
     return 1.0f;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 }
@@ -6567,45 +8195,98 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isScreenReaderEnabled___R_boolean(
 #else
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isHighContrastEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    return [[NSWorkspace sharedWorkspace] accessibilityDisplayShouldIncreaseContrast] ? 1 : 0;
+#else
     return UIAccessibilityDarkerSystemColorsEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDifferentiateWithoutColorEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    return [[NSWorkspace sharedWorkspace] accessibilityDisplayShouldDifferentiateWithoutColor] ? 1 : 0;
+#else
     if (@available(iOS 13.0, macCatalyst 13.1, *)) {
         return UIAccessibilityShouldDifferentiateWithoutColor() ? 1 : 0;
     }
     return 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isReduceMotionEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    return [[NSWorkspace sharedWorkspace] accessibilityDisplayShouldReduceMotion] ? 1 : 0;
+#else
     return UIAccessibilityIsReduceMotionEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isReduceTransparencyEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    return [[NSWorkspace sharedWorkspace] accessibilityDisplayShouldReduceTransparency] ? 1 : 0;
+#else
     return UIAccessibilityIsReduceTransparencyEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBoldTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    // macOS has no bold-text accessibility setting to report. The nearest
+    // thing, increase contrast, is a different preference and answering with it
+    // would make the application bold itself for a user who asked for something
+    // else.
+    return 0;
+#else
     return UIAccessibilityIsBoldTextEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isInvertColorsEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    return [[NSWorkspace sharedWorkspace] accessibilityDisplayShouldInvertColors] ? 1 : 0;
+#else
     return UIAccessibilityIsInvertColorsEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGrayscaleEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    // macOS exposes no grayscale-filter query. Reporting the nearest thing --
+    // increase contrast -- would tell the application the display is
+    // monochrome when it is not, so the honest answer is that it is unknown.
+    return 0;
+#else
     return UIAccessibilityIsGrayscaleEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isOnOffSwitchLabelsEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    // An iOS switch can be asked to draw I/O labels; a Mac switch has no such
+    // setting, so there is nothing to report.
+    return 0;
+#else
     if (@available(iOS 13.0, macCatalyst 13.1, *)) {
         return UIAccessibilityIsOnOffSwitchLabelsEnabled() ? 1 : 0;
     }
     return 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isScreenReaderEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    // VoiceOver's own preference domain, which is where macOS records it.
+    // NSWorkspace has no equivalent of UIAccessibilityIsVoiceOverRunning.
+    NSUserDefaults *voiceOver = [[NSUserDefaults alloc]
+        initWithSuiteName:@"com.apple.universalaccess"];
+    BOOL running = [voiceOver boolForKey:@"voiceOverOnOffKey"];
+#ifndef CN1_USE_ARC
+    [voiceOver release];
+#endif
+    return running ? 1 : 0;
+#else
     return UIAccessibilityIsVoiceOverRunning() ? 1 : 0;
+#endif
 }
 
 #endif // TARGET_OS_WATCH
@@ -6730,7 +8411,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getLocationTimeStamp___long(CN1_THREA
 // UIPopoverController is unavailable on tvOS; hold it as id (the pickers/popovers it backs are tvOS-absent).
 id popoverController;
 #else
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 UIPopoverController* popoverController;
+#endif
 #endif
 #endif // !TARGET_OS_WATCH
 void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN movie, JAVA_INT quality, JAVA_INT duration) {
@@ -6838,6 +8524,63 @@ static NSArray *cn1FileChooserDocumentTypes(NSString *accept) {
 #endif
 
 void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT accept) {
+#if TARGET_OS_OSX
+    NSString *nsAccept = accept == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG accept);
+    NSArray *documentTypes = cn1FileChooserDocumentTypes(nsAccept);
+#ifndef CN1_USE_ARC
+    [documentTypes retain];
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        // A panel rather than a document picker: a Mac has direct file system
+        // access, so there is nothing to import and no copy to make.
+        NSOpenPanel *panel = [NSOpenPanel openPanel];
+        panel.allowsMultipleSelection = NO;
+        panel.canChooseDirectories = NO;
+        panel.canChooseFiles = YES;
+        if (documentTypes.count > 0) {
+            panel.allowedFileTypes = documentTypes;
+        }
+        NSInteger response = [panel runModal];
+        NSURL *picked = response == NSModalResponseOK ? panel.URL : nil;
+        // Called from the AppKit main queue, not the EDT -- the same thread
+        // contract the UIKit twin of this callback has always had:
+        // -documentPicker:didPickDocumentsAtURLs: in
+        // CodenameOne_GLViewController.m calls this very method straight from a
+        // UIKit main thread delegate, and the EDT is a separate thread on both
+        // platforms. The share callback in CN1MacShare.m does the same.
+        //
+        // An application listener that dispatch_syncs to the main queue from
+        // here deadlocks on itself, and setURL() does exactly that through the
+        // shared browser native -- so these two call sites go through
+        // macFileChooserResult / macCapturePictureResult, which clear
+        // dropEvents immediately and hand the listener to the EDT.
+        //
+        // This used to argue the opposite: that marshalling macOS alone would
+        // put the port out of step with the iOS twin and the mac share
+        // callback. Consistency is worth something, but not a deadlock, and
+        // running an application listener on the EDT is the framework's
+        // contract rather than a local preference. The iOS twin still fires off
+        // the EDT and can still deadlock the same way; that is pre-existing and
+        // wants fixing where every caller benefits.
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+        com_codename1_impl_ios_IOSImplementation_macFileChooserResult___java_lang_String(
+            threadStateData,
+            // path, not absoluteString. fileChooserResult prefixes "file:" and
+            // unfile() strips it again WITHOUT percent decoding, so an encoded
+            // URL reached FileSystemStorage.openInputStream() as a literal
+            // "My%20File.txt" and the documented workflow simply failed on any
+            // name with a space, a '#' or a non-ASCII character. A single path
+            // needs no encoding: unlike the multi-select gallery beside it,
+            // there is no separator here for a filename to collide with.
+            picked == nil ? JAVA_NULL
+                          : fromNSString(threadStateData, [picked path]));
+        POOL_END();
+#ifndef CN1_USE_ARC
+        [documentTypes release];
+#endif
+    });
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     NSString *nsAccept = accept == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG accept);
     NSArray *documentTypes = cn1FileChooserDocumentTypes(nsAccept);
@@ -6860,6 +8603,7 @@ void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THR
     });
 #else
     com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
+#endif
 #endif
 }
 
@@ -6977,14 +8721,96 @@ void openGalleryMultiple(JAVA_INT type) {
 #endif
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMultiGallerySelectSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#ifdef ENABLE_GALLERY_MULTISELECT
+#if TARGET_OS_OSX
+    // An open panel selects as many files as it is asked to, so there is no
+    // multiselect build flag to gate on here.
+    return JAVA_TRUE;
+#elif defined(ENABLE_GALLERY_MULTISELECT)
     return JAVA_TRUE;
 #else
     return JAVA_FALSE;
 #endif
 }
 
+#if TARGET_OS_OSX
+/// The file types an open panel offers for a gallery type.
+///
+/// Nil means everything, which is what GALLERY_ALL asks for.
+static NSArray *cn1MacGalleryFileTypes(int type) {
+    // GALLERY_IMAGE / GALLERY_IMAGE_MULTI, then GALLERY_VIDEO / GALLERY_VIDEO_MULTI.
+    if (type == 0 || type == 3) {
+        return @[@"png", @"jpg", @"jpeg", @"gif", @"bmp", @"tiff", @"tif", @"heic", @"heif", @"webp"];
+    }
+    if (type == 1 || type == 4) {
+        return @[@"mov", @"mp4", @"m4v", @"avi", @"mpg", @"mpeg", @"mkv", @"webm"];
+    }
+    return nil;
+}
+#endif
+
 void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+#if TARGET_OS_OSX
+    // An open panel IS the gallery on a Mac. There is no photo-library picker
+    // and no library permission to ask for: under the App Sandbox the user
+    // choosing a file is itself the grant, which is what the powerbox does.
+    //
+    // Deliberately outside the INCLUDE_PHOTOLIBRARY_USAGE guard below. That
+    // define is set from an iOS usage-description build hint that a macOS build
+    // has no reason to carry, and gating on it left openGallery inert.
+    // -9998 is grouped with the MULTI types by IOSImplementation, so it is one
+    // here too; -9999 is a single unfiltered pick.
+    BOOL multiple = (type == 3 || type == 4 || type == 5 || type == -9998);
+    NSArray *fileTypes = cn1MacGalleryFileTypes((int)type);
+#ifndef CN1_USE_ARC
+    [fileTypes retain];
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSOpenPanel *panel = [NSOpenPanel openPanel];
+        panel.allowsMultipleSelection = multiple;
+        panel.canChooseDirectories = NO;
+        panel.canChooseFiles = YES;
+        if (fileTypes != nil) {
+            panel.allowedFileTypes = fileTypes;
+        }
+        NSInteger response = [panel runModal];
+        NSString *result = nil;
+        if (response == NSModalResponseOK) {
+            NSMutableArray *paths = [NSMutableArray array];
+            for (NSURL *url in panel.URLs) {
+                // absoluteString, not path: a macOS filename may legally contain
+                // a newline, and a raw path joined by newlines split that one
+                // file into several truncated ones on the Java side -- and threw
+                // off every selection after it. A file:// URL is percent encoded,
+                // so the separator cannot occur inside an element. There is no
+                // separator that raw paths could safely use: only '/' and NUL are
+                // impossible in a name, and NUL cannot survive the trip through
+                // a C string.
+                //
+                // capturePictureResult percent decodes the file:// form back to
+                // an ordinary path, so what the application finally receives is
+                // unchanged.
+                NSString *encoded = url.absoluteString;
+                if (encoded != nil) {
+                    [paths addObject:encoded];
+                }
+            }
+            if ([paths count] > 0) {
+                result = [paths componentsJoinedByString:@"\n"];
+            }
+        }
+        // Same thread contract as the file chooser above; see the note there.
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+        com_codename1_impl_ios_IOSImplementation_macCapturePictureResult___java_lang_String(
+            threadStateData,
+            result == nil ? JAVA_NULL : fromNSString(threadStateData, result));
+        POOL_END();
+#ifndef CN1_USE_ARC
+        [fileTypes release];
+#endif
+    });
+    return;
+#endif
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
     BOOL multiple = false;
     if (type == 3 || type == 4 || type == 5) {  // GALLERY_TYPE_IMAGE_MULTI, GALLERY_TYPE_VIDEO_MULTI, GALLERY_TYPE_ALL_MULTI
@@ -7051,12 +8877,18 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
 }
 int popoverSupported()
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH
     return ( NSClassFromString(@"UIPopoverController") != nil) &&  (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
 #else
     // watchOS has no UIPopoverController / interface idiom.
     return 0;
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -7065,7 +8897,14 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__(CN1_THREAD_STATE_MULTI_AR
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if !TARGET_OS_WATCH
+#if TARGET_OS_OSX
+    NSOperatingSystemVersion v = [[NSProcessInfo processInfo] operatingSystemVersion];
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG
+            [NSString stringWithFormat:@"%ld.%ld.%ld", (long)v.majorVersion,
+                                       (long)v.minorVersion, (long)v.patchVersion]);
+#else
     return fromNSString(CN1_THREAD_STATE_PASS_ARG [[UIDevice currentDevice] systemVersion]);
+#endif
 #else
     return JAVA_NULL;
 #endif // !TARGET_OS_WATCH
@@ -7073,7 +8912,11 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion__(CN1_THREAD_STATE_MUL
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if !TARGET_OS_WATCH
+#if TARGET_OS_OSX
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG [[NSHost currentHost] localizedName]);
+#else
     return fromNSString(CN1_THREAD_STATE_PASS_ARG [[UIDevice currentDevice] name]);
+#endif
 #else
     return JAVA_NULL;
 #endif // !TARGET_OS_WATCH
@@ -7243,6 +9086,12 @@ void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(CN1_THREAD_STA
 }
 
 void com_codename1_impl_ios_IOSNative_startUpdatingBackgroundLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Compiled on macOS too. The body is CoreLocation, not UIKit -- the blanket
+// comment that used to sit here listed pickers and action sheets, none of which
+// appear below -- and startMonitoringSignificantLocationChanges is the same call
+// on both platforms. Its stopUpdating counterpart was never guarded, so stopping
+// worked on macOS while starting quietly did nothing, and the application waited
+// for callbacks nobody had asked for.
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
     l.delegate = [CodenameOne_GLViewController instance];
@@ -7259,8 +9108,34 @@ void com_codename1_impl_ios_IOSNative_stopUpdatingBackgroundLocation___long(CN1_
 }
 
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGeofencingSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObj) {
+// The platforms whose addGeofencing below is an empty body. Saying yes there
+// left the application persisting a listener and waiting on a region the OS was
+// never asked to monitor -- indistinguishable, from the app's side, from a fence
+// that simply never triggers.
+//
+// macOS is not among them any more. CoreLocation region monitoring is the same
+// API there, and the delegate that receives didEnterRegion is compiled on macOS
+// -- the claim that it lives in the UIKit half of the view controller was simply
+// wrong, which is what kept this answering no. watchOS and tvOS have no region
+// monitoring at all.
+#if TARGET_OS_WATCH || TARGET_OS_TV
+    return JAVA_FALSE;
+#else
+    return JAVA_TRUE;
+#endif
+}
+
 //native void addGeofencing(long peer, double lat, double lng, double radius, long expiration, String id);
 void com_codename1_impl_ios_IOSNative_addGeofencing___long_double_double_double_long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObj, JAVA_LONG peer, JAVA_DOUBLE lat, JAVA_DOUBLE lng, JAVA_DOUBLE radius, JAVA_LONG expires, JAVA_OBJECT geoId) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// Compiled on macOS too, for the same reason as the background monitoring above:
+// CLCircularRegion and startMonitoringForRegion: are CoreLocation on both
+// platforms, and the didEnterRegion delegate that reports a crossing is compiled
+// here. removeGeofencing was never guarded, so a fence could be removed on macOS
+// but never added.
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
     l.delegate = [CodenameOne_GLViewController instance];
@@ -7670,7 +9545,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(CN1_THR
     ABRecordRef i = (ABRecordRef)peer;
     GLUIImage* g = nil;
     if(ABPersonHasImageData(i)){
-        UIImage* img = [UIImage imageWithData:(BRIDGE_CAST NSData *)ABPersonCopyImageData(i)];
+        CN1Image* img = [CN1Image imageWithData:(BRIDGE_CAST NSData *)ABPersonCopyImageData(i)];
         g = [[GLUIImage alloc] initWithImage:img];
     }
     POOL_END();
@@ -7857,7 +9732,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
     if(includesPicture) {
         GLUIImage* g = nil;
         if(ABPersonHasImageData(i)){
-            UIImage* img = [UIImage imageWithData:(BRIDGE_CAST NSData *)ABPersonCopyImageDataWithFormat(i, kABPersonImageFormatThumbnail)];
+            CN1Image* img = [CN1Image imageWithData:(BRIDGE_CAST NSData *)ABPersonCopyImageDataWithFormat(i, kABPersonImageFormatThumbnail)];
             g = [[GLUIImage alloc] initWithImage:img];
 #ifndef NEW_CODENAME_ONE_VM
             com_codename1_impl_ios_IOSImplementation_NativeImage* nativeImage = (com_codename1_impl_ios_IOSImplementation_NativeImage*)__NEW_com_codename1_impl_ios_IOSImplementation_NativeImage();
@@ -7997,7 +9872,12 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
 #endif
 
 #if !TARGET_OS_WATCH
-static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGContextRef ctx) {
+static BOOL cn1_renderViewIntoContext(CN1View *renderView, CN1View *rootView, CGContextRef ctx) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     if (renderView == nil || rootView == nil || ctx == NULL) {
         return NO;
     }
@@ -8048,9 +9928,9 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
 #endif
                 }
 #endif
-                __block UIImage *snapshotImage = nil;
+                __block CN1Image *snapshotImage = nil;
                 __block BOOL snapshotComplete = NO;
-                [webView takeSnapshotWithConfiguration:config completionHandler:^(UIImage * _Nullable image, NSError * _Nullable error) {
+                [webView takeSnapshotWithConfiguration:config completionHandler:^(CN1Image * _Nullable image, NSError * _Nullable error) {
                     if (image != nil) {
                         snapshotImage = image;
                     } else if (error != nil) {
@@ -8090,7 +9970,7 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
         }
 #endif
         if (!drawn) {
-            UIView *snapshotView = [renderView snapshotViewAfterScreenUpdates:YES];
+            CN1View *snapshotView = [renderView snapshotViewAfterScreenUpdates:YES];
             if (snapshotView != nil) {
                 BOOL snapshotDrawn = NO;
                 if ([snapshotView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
@@ -8159,17 +10039,22 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
     }
     CGContextRestoreGState(ctx);
     return drawn;
+#endif
 }
 
-static void cn1_renderPeerComponents(UIView *rootView, CGContextRef ctx) {
+static void cn1_renderPeerComponents(CN1View *rootView, CGContextRef ctx) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
     EAGLView *glView = [controller eaglView];
     if (glView == nil || rootView == nil || ctx == NULL) {
         return;
     }
 
-    UIView *peerLayer = glView.peerComponentsLayer;
-    NSArray<UIView *> *peerCandidates = nil;
+    CN1View *peerLayer = glView.peerComponentsLayer;
+    NSArray<CN1View *> *peerCandidates = nil;
     if (peerLayer != nil) {
         [peerLayer layoutIfNeeded];
         peerCandidates = peerLayer.subviews;
@@ -8182,20 +10067,26 @@ static void cn1_renderPeerComponents(UIView *rootView, CGContextRef ctx) {
         return;
     }
 
-    for (UIView *peerView in peerCandidates) {
-        if (![peerView isKindOfClass:[UIView class]]) {
+    for (CN1View *peerView in peerCandidates) {
+        if (![peerView isKindOfClass:[CN1View class]]) {
             continue;
         }
         cn1_renderViewIntoContext(peerView, rootView, ctx);
     }
+#endif
 }
 
-static UIView* cn1_rootViewForCapture(UIView *view) {
+static CN1View* cn1_rootViewForCapture(CN1View *view) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     if (view == nil) {
         return nil;
     }
 
-    UIView *rootView = view;
+    CN1View *rootView = view;
     UIWindow *window = view.window;
 
     if (window == nil) {
@@ -8244,7 +10135,7 @@ static UIView* cn1_rootViewForCapture(UIView *view) {
     if (window != nil) {
         rootView = window;
     } else {
-        UIView *candidate = view;
+        CN1View *candidate = view;
         while (candidate.superview != nil) {
             candidate = candidate.superview;
         }
@@ -8252,10 +10143,54 @@ static UIView* cn1_rootViewForCapture(UIView *view) {
     }
 
     return rootView;
+#endif
 }
 
-static UIImage* cn1_captureView(UIView *view) {
-    UIView *rootView = cn1_rootViewForCapture(view);
+static CN1Image* cn1_captureView(CN1View *view) {
+#if TARGET_OS_OSX
+    // The Metal surface is read back directly rather than asked to draw itself
+    // into an image context. An NSView renders through its layer, and a
+    // layer-hosted CAMetalLayer has no drawRect: to invoke -- asking it to
+    // cache its display returns an empty bitmap, which is how a screenshot pass
+    // silently produces blank frames.
+    if (![view isKindOfClass:[METALView class]]) {
+        return nil;
+    }
+    METALView *metal = (METALView *)view;
+    int w = metal.framebufferWidth;
+    int h = metal.framebufferHeight;
+    if (w <= 0 || h <= 0) {
+        return nil;
+    }
+    unsigned int *argb = (unsigned int *)malloc((size_t)w * h * 4);
+    if (argb == NULL) {
+        return nil;
+    }
+    if (![metal readbackInto:argb width:w height:h]) {
+        free(argb);
+        return nil;
+    }
+    NSImage *image = CN1AppKitNSImageFromARGB(argb, w, h);
+    free(argb);
+    // Peer components live in a sibling view above the Metal layer and are not
+    // in that texture, so they are composited on top the way the UIKit path
+    // walks the peer hierarchy.
+    NSView *peers = metal.peerComponentsLayer;
+    if (image != nil && peers != nil && peers.subviews.count > 0) {
+        NSRect bounds = peers.bounds;
+        if (bounds.size.width > 0 && bounds.size.height > 0) {
+            NSBitmapImageRep *rep = [peers bitmapImageRepForCachingDisplayInRect:bounds];
+            if (rep != nil) {
+                [peers cacheDisplayInRect:bounds toBitmapImageRep:rep];
+                [image lockFocus];
+                [rep drawInRect:NSMakeRect(0, 0, image.size.width, image.size.height)];
+                [image unlockFocus];
+            }
+        }
+    }
+    return image;
+#else
+    CN1View *rootView = cn1_rootViewForCapture(view);
     if (rootView == nil) {
         return nil;
     }
@@ -8284,7 +10219,7 @@ static UIImage* cn1_captureView(UIView *view) {
 
     cn1_renderPeerComponents(rootView, ctx);
 
-    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    CN1Image *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
 
     if (rootView != view) {
@@ -8298,7 +10233,7 @@ static UIImage* cn1_captureView(UIView *view) {
                                           integralTarget.size.height * image.scale);
             CGImageRef cropped = CGImageCreateWithImageInRect(image.CGImage, pixelRect);
             if (cropped != nil) {
-                UIImage *croppedImage = [UIImage imageWithCGImage:cropped scale:image.scale orientation:image.imageOrientation];
+                CN1Image *croppedImage = [CN1Image imageWithCGImage:cropped scale:image.scale orientation:image.imageOrientation];
                 CGImageRelease(cropped);
                 image = croppedImage;
             }
@@ -8306,8 +10241,9 @@ static UIImage* cn1_captureView(UIView *view) {
     }
 
     return image;
+#endif
 }
-#endif // !TARGET_OS_WATCH (UIView screen-capture helpers)
+#endif // !TARGET_OS_WATCH (CN1View screen-capture helpers)
 
 void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_WATCH
@@ -8321,7 +10257,7 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
     // main-queue dispatch only starves the render pump and every frame comes
     // back nil -- 1x1 placeholders for the whole suite.
     __block CN1WatchRenderingView *wv = nil;
-    __block UIImage *wimg = nil;
+    __block CN1Image *wimg = nil;
     __block NSData *wpng = nil;
     void (^captureWatchFrame)(void) = ^{
         // Use master's default drawFrame: (allowInactive:NO). During a headless
@@ -8391,8 +10327,8 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
         // display-link/active-state path would skip a frame during synchronous
         // test capture.
         [controller flushBufferForReadback:0 y:0 width:displayWidth height:displayHeight];
-        UIView *view = controller.view;
-        UIImage *img = cn1_captureView(view);
+        CN1View *view = controller.view;
+        CN1Image *img = cn1_captureView(view);
         if (img != nil) {
             NSData *png = UIImagePNGRepresentation(img);
             if (png != nil) {
@@ -8530,7 +10466,12 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkPhotoLibraryAddUsage___R_bool
 }
 //native boolean checkPhotoLibraryUsage();
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkPhotoLibraryUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+#if TARGET_OS_OSX
+    // There is no photo library to hold a usage description for. openGallery
+    // presents an open panel, and under the App Sandbox the user's choice in
+    // that panel is the access grant.
+    return JAVA_TRUE;
+#elif defined(INCLUDE_PHOTOLIBRARY_USAGE)
     return JAVA_TRUE;
 #else
     return JAVA_FALSE;
@@ -8570,6 +10511,18 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkNFCReaderUsage___R_boolean(CN
 }
 
 void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT phone) {
+#if TARGET_OS_OSX
+    POOL_BEGIN();
+    NSString *ns = toNSString(CN1_THREAD_STATE_PASS_ARG phone);
+    NSURL *url = ns == nil ? nil : [NSURL URLWithString:ns];
+    if (url != nil) {
+        // A Mac has no dialer of its own, but a tel: URL is handled by FaceTime
+        // or by a paired iPhone through Handoff, which is the platform's answer
+        // to placing a call.
+        [[NSWorkspace sharedWorkspace] openURL:url];
+    }
+    POOL_END();
+#else
 #if !TARGET_OS_WATCH
     POOL_BEGIN();
     [[UIApplication sharedApplication] openURL:[NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG phone)] options:@{} completionHandler:nil];
@@ -8577,6 +10530,7 @@ void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_M
 #else
     // watchOS has no UIApplication openURL dialer.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_requestAppStoreReview__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -8599,6 +10553,16 @@ void com_codename1_impl_ios_IOSNative_requestAppStoreReview__(CN1_THREAD_STATE_M
 
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  number, JAVA_OBJECT  text) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if TARGET_OS_MACCATALYST || TARGET_OS_WATCH || TARGET_OS_TV
     // SMS hardware is absent on Mac / watchOS (no MessageUI on watch);
     // MFMessageComposeViewController canSendText returns NO. Short-circuit.
@@ -8631,11 +10595,42 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
         POOL_END();
     });
 #endif // !TARGET_OS_MACCATALYST
+#endif
 }
 
 extern int pendingRemoteNotificationRegistrations;
 
 void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    dispatch_async(dispatch_get_main_queue(), ^{
+        pendingRemoteNotificationRegistrations++;
+        UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+        [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert + UNAuthorizationOptionSound + UNAuthorizationOptionBadge)
+            completionHandler:^(BOOL granted, NSError * _Nullable error) {
+            // requestAuthorizationWithOptions calls back on an arbitrary queue,
+            // and everything below is main-thread-owned: NSApp is AppKit, and
+            // pendingRemoteNotificationRegistrations is read on the main thread
+            // by the registration callbacks. The outer dispatch_async covers
+            // the REQUEST, not this completion, so the hop has to be here.
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (granted) {
+                    // NSApplication rather than UIApplication; the APNs handshake
+                    // and the delegate callbacks are otherwise identical.
+                    [NSApp registerForRemoteNotifications];
+                } else {
+                    pendingRemoteNotificationRegistrations--;
+                    NSString *msg = @"Permission to receive notifications is not granted";
+                    if (error != nil) {
+                        msg = [error localizedDescription];
+                    }
+                    struct ThreadLocalData* threadStateData = getThreadLocalData();
+                    com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(
+                        threadStateData, fromNSString(threadStateData, msg));
+                }
+            });
+        }];
+    });
+#else
 #if defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         if (@available(iOS 10, *)) {
@@ -8702,17 +10697,31 @@ void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG 
         }
     });
 #endif
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_deregisterPush__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [NSApp unregisterForRemoteNotifications];
+    });
+#else
 #if defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         [[UIApplication sharedApplication] unregisterForRemoteNotifications];
     });
 #endif
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setBadgeNumber___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT number) {
+#if TARGET_OS_OSX
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // The Dock tile is where a Mac shows this. A zero clears the badge
+        // rather than drawing "0", which is what every Mac application does.
+        [[NSApp dockTile] setBadgeLabel:number > 0 ? [NSString stringWithFormat:@"%d", (int)number] : nil];
+    });
+#else
 // Removed this ifdef because we may need to badge the application even if push isn't supported.
 //#ifdef INCLUDE_CN1_PUSH2
 #if !TARGET_OS_WATCH
@@ -8725,12 +10734,17 @@ void com_codename1_impl_ios_IOSNative_setBadgeNumber___int(CN1_THREAD_STATE_MULT
     });
 #endif // !TARGET_OS_WATCH
 //#endif
+#endif
 }
 
 #if defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH && !TARGET_OS_TV
 static NSMutableArray<UNNotificationAction *>* pushActions;
 static NSMutableArray<UNNotificationAction *>* currentCategoryActions;
-static NSSet<UNNotificationCategory *>* pushCategories;
+// Mutable: endPushActionCategory adds to it as each category is closed.
+// Declared immutable it compiled anyway -- addObject: is only a warning on an
+// NSSet -- and would have thrown the first time an application registered a
+// push action.
+static NSMutableSet<UNNotificationCategory *>* pushCategories;
 static NSString* currentCategoryId;
 #endif
 void com_codename1_impl_ios_IOSNative_registerPushAction___java_lang_String_java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT identifier, JAVA_OBJECT title, JAVA_OBJECT placeholderText, JAVA_OBJECT replyButtonText) {
@@ -8768,6 +10782,13 @@ void com_codename1_impl_ios_IOSNative_startPushActionCategory___java_lang_String
 }
 
 void com_codename1_impl_ios_IOSNative_endPushActionCategory__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:currentCategoryId actions:currentCategoryActions intentIdentifiers:@[] options:UNNotificationCategoryOptionNone];
+    if (pushCategories == nil) {
+        pushCategories = [[NSMutableSet alloc] init];
+    }
+    [pushCategories addObject:category];
+#else
 #if defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 10, *)) {
         UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
@@ -8777,6 +10798,7 @@ void com_codename1_impl_ios_IOSNative_endPushActionCategory__(CN1_THREAD_STATE_M
         }
         [pushCategories addObject:category];
     }
+#endif
 #endif
 }
 
@@ -8811,8 +10833,35 @@ void com_codename1_impl_ios_IOSNative_registerPushCategories__(CN1_THREAD_STATE_
 #endif
 }
 
-UIImage* scaleImage(int destWidth, int destHeight, UIImage *img) {
-    UIImage* scaledInstance = nil;
+CN1Image* scaleImage(int destWidth, int destHeight, CN1Image *img) {
+#if TARGET_OS_OSX
+    // Only the orientation fixup above is UIKit -- an NSImage carries no
+    // imageOrientation, because a source that has one has already been resolved
+    // by the time it becomes a representation. Everything else is CoreGraphics
+    // and identical. Returning nil here made every scaled encode (the resizing
+    // overload of createImageFile) hand back no data at all.
+    CGImageRef src = CN1AppKitCGImageFromNSImage(img);
+    if (src == NULL) {
+        return nil;
+    }
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    CGContextRef bmContext = CGBitmapContextCreate(NULL, destWidth, destHeight, 8, destWidth * 4,
+            space, kCGBitmapByteOrderDefault | kCGImageAlphaPremultipliedFirst);
+    CGColorSpaceRelease(space);
+    if (bmContext == NULL) {
+        return nil;
+    }
+    CGContextSetShouldAntialias(bmContext, true);
+    CGContextSetAllowsAntialiasing(bmContext, true);
+    CGContextSetInterpolationQuality(bmContext, kCGInterpolationHigh);
+    CGContextDrawImage(bmContext, CGRectMake(0, 0, destWidth, destHeight), src);
+    CGImageRef scaledImageRef = CGBitmapContextCreateImage(bmContext);
+    CGContextRelease(bmContext);
+    CN1Image *scaled = CN1AppKitNSImageFromCGImage(scaledImageRef);
+    CGImageRelease(scaledImageRef);
+    return scaled;
+#else
+    CN1Image* scaledInstance = nil;
     const size_t originalWidth = img.size.width;
     const size_t originalHeight = img.size.height;
     
@@ -8838,14 +10887,15 @@ UIImage* scaleImage(int destWidth, int destHeight, UIImage *img) {
         CGContextDrawImage(bmContext, CGRectMake(0, 0, destWidth, destHeight), img.CGImage);
         
         CGImageRef scaledImageRef = CGBitmapContextCreateImage(bmContext);
-        scaledInstance = [UIImage imageWithCGImage:scaledImageRef];
+        scaledInstance = [CN1Image imageWithCGImage:scaledImageRef];
         
         CGImageRelease(scaledImageRef);
         CGContextRelease(bmContext);
     }
-    UIImage* scaled = scaledInstance;
+    CN1Image* scaled = scaledInstance;
     scaledInstance = nil;
     return scaled;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG imagePeer, JAVA_BOOLEAN jpeg, int width, int height, JAVA_FLOAT quality) {
@@ -8857,10 +10907,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
 #endif
 #ifdef CN1_USE_METAL
     // Phase 3 v2: PNG/JPEG encoding sources from [GLUIImage getImage] which
-    // is the original UIImage backing — initial-fill colour for any mutable
+    // is the original CN1Image backing — initial-fill colour for any mutable
     // that's been drawn into via Metal. Drain the op queue first so the
     // mutable's MTLTexture has the latest pixels, then read those pixels
-    // into a fresh UIImage and encode that. flushBuffer already dispatches
+    // into a fresh CN1Image and encode that. flushBuffer already dispatches
     // sync to the main thread and runs drawFrame; doing it OUTSIDE the
     // dispatch_sync block below avoids the nested-dispatch_sync deadlock
     // that would otherwise occur (we'd be waiting on main to run drawFrame
@@ -8886,11 +10936,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
-        UIImage* i = nil;
+        CN1Image* i = nil;
 #ifdef CN1_USE_METAL
         // If the image has live Metal pixels, blit-and-read into a fresh
-        // UIImage so PNG/JPEG encoding sees post-draw content rather than
-        // the stale UIImage initial-fill backing.
+        // CN1Image so PNG/JPEG encoding sees post-draw content rather than
+        // the stale CN1Image initial-fill backing.
         if ([glll mtlMutableTexture] != nil) {
             int srcW = [glll mtlMutableWidth];
             int srcH = [glll mtlMutableHeight];
@@ -8910,7 +10960,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
                             CGImageRef cgImg = CGBitmapContextCreateImage(ctx);
                             CGContextRelease(ctx);
                             if (cgImg != NULL) {
-                                i = [UIImage imageWithCGImage:cgImg scale:1.0 orientation:UIImageOrientationUp];
+#if TARGET_OS_OSX
+                                i = [[NSImage alloc] initWithCGImage:cgImg
+                                                                size:NSMakeSize(CGImageGetWidth(cgImg),
+                                                                                CGImageGetHeight(cgImg))];
+#else
+                                i = [CN1Image imageWithCGImage:cgImg scale:1.0 orientation:UIImageOrientationUp];
+#endif
                                 CGImageRelease(cgImg);
                             }
                         }
@@ -8972,7 +11028,26 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_T
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_int_float_float_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
     JAVA_OBJECT path, JAVA_INT audioChannels, JAVA_FLOAT sampleRate, JAVA_OBJECT sampleBuffer) {
-#if defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV && !TARGET_OS_WATCH
+#if defined(INCLUDE_MICROPHONE_USAGE) && TARGET_OS_OSX
+        // No AVAudioSession on a Mac: there is no shared session category to
+        // set and no per-session permission to request. Microphone access is
+        // granted per application by TCC the first time one is opened, from the
+        // NSMicrophoneUsageDescription the builder writes into the bundle.
+        //
+        // The recorder itself is the same AVFoundation object as on iOS; only
+        // the session ceremony around it is iOS-only, and referencing it here at
+        // all makes the file uncompilable for the macOS SDK.
+        __block CN1AudioUnit* recorder = nil;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            recorder = [[CN1AudioUnit alloc] initWithPath:toNSString(CN1_THREAD_STATE_PASS_ARG path)
+                                                 channels:audioChannels
+                                               sampleRate:sampleRate
+                                             sampleBuffer:(JAVA_ARRAY)sampleBuffer];
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)recorder);
+#elif defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV && !TARGET_OS_WATCH
         __block CN1AudioUnit* recorder = nil;
          
         __block NSString *exStr = nil;
@@ -9031,6 +11106,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_in
 
 
 void com_codename1_impl_ios_IOSNative_startAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+#if TARGET_OS_OSX
+    // No AVAudioSession to configure: a Mac has no shared session category, and
+    // recording permission is granted per application rather than per session.
+    CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)(uintptr_t)peer);
+    [audioUnit start];
+#else
 #if !TARGET_OS_WATCH
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -9042,6 +11123,7 @@ void com_codename1_impl_ios_IOSNative_startAudioUnit___long(CN1_THREAD_STATE_MUL
     CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
     [audioUnit start];
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 
@@ -9062,7 +11144,50 @@ void com_codename1_impl_ios_IOSNative_destroyAudioUnit___long(CN1_THREAD_STATE_M
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String_java_lang_String_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  destinationFile, JAVA_OBJECT mimeType, JAVA_INT sampleRate, JAVA_INT bitRate, JAVA_INT channels, JAVA_INT maxDuration) {
-#if defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV
+#if defined(INCLUDE_MICROPHONE_USAGE) && TARGET_OS_OSX
+    // As in createAudioUnit above: a Mac has no audio session, and the recorder
+    // is the same AVFoundation object once that ceremony is removed.
+    __block AVAudioRecorder* recorder = nil;
+    __block NSString *exStr = nil;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSString *filePath = toNSString(CN1_THREAD_GET_STATE_PASS_ARG destinationFile);
+        NSFileManager *fm = [[NSFileManager alloc] init];
+        NSString *ns = fixFilePath(filePath);
+        if ([fm fileExistsAtPath:ns]) {
+            [fm removeItemAtPath:ns error:nil];
+        }
+#ifndef CN1_USE_ARC
+        [fm release];
+#endif
+        NSDictionary *recordSettings = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        [NSNumber numberWithFloat:(JAVA_FLOAT)sampleRate], AVSampleRateKey,
+                                        [NSNumber numberWithInt:kAudioFormatMPEG4AAC], AVFormatIDKey,
+                                        [NSNumber numberWithInt:channels], AVNumberOfChannelsKey,
+                                        nil];
+        NSError *error = nil;
+        recorder = [[AVAudioRecorder alloc] initWithURL:[NSURL fileURLWithPath:ns]
+                                               settings:recordSettings
+                                                  error:&error];
+        if (error != nil) {
+            CN1Log(@"Error in recording: %@", [error localizedDescription]);
+            exStr = [error localizedDescription];
+            POOL_END();
+            return;
+        }
+        com_codename1_impl_ios_IOSImplementation_finishedCreatingAudioRecorder___java_io_IOException(
+            CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL);
+        POOL_END();
+    });
+    if (exStr != nil) {
+        JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex,
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG exStr));
+        throwException(threadStateData, ex);
+        return (JAVA_LONG)0;
+    }
+    return (JAVA_LONG)((BRIDGE_CAST void*)recorder);
+#elif defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV
     __block AVAudioRecorder* recorder = nil;
      
     __block NSString *exStr = nil;
@@ -9184,9 +11309,13 @@ void com_codename1_impl_ios_IOSNative_startAudioRecord___long(CN1_THREAD_STATE_M
         if(![recorder record]) {
             CN1Log(@"Error in recording record returned false for some reason?");
         }
-#ifndef CN1_USE_ARC
-        [recorder retain];
-#endif
+        // No retain here. createAudioRecorder hands back an alloc/init recorder,
+        // so its +1 is already the reference held on Java's behalf until
+        // cleanupAudioRecord releases it; retaining again made that release
+        // leave the recorder alive and leaked one per recording. Balancing it in
+        // cleanup instead would over-release a recorder that was created and
+        // cleaned up without ever being started, which is why the extra claim
+        // goes rather than a second release arriving.
         POOL_END();
     });
 #endif
@@ -10411,7 +12540,7 @@ JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
 #endif // NEW_CODENAME_ONE_VM
 
 // Register every .ttf bundled in the app (notably material-design-font.ttf for
-// FontImage glyphs) with the process font manager so [UIFont fontWithName:] and
+// FontImage glyphs) with the process font manager so [CN1Font fontWithName:] and
 // CTFontCreateWithName can resolve them by name. The iOS app also lists these in
 // UIAppFonts, but the Metal/tvOS and Core-Graphics/watchOS slices do not reliably
 // register fonts from the Info.plist, so without this the Material font fails to
@@ -10469,32 +12598,32 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
     cn1RegisterBundledFontsOnce();
     NSString* str = toNSString(CN1_THREAD_STATE_PASS_ARG name);
 
-    UIFont* fnt;
+    CN1Font* fnt;
     if(isIOS8_2() && [str hasPrefix:@"HelveticaNeue"]) {
         if([str isEqualToString:@"HelveticaNeue-UltraLight"]) {
-            fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightUltraLight];
+            fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightUltraLight];
         } else {
             if([str isEqualToString:@"HelveticaNeue-Light"]) {
-                fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightLight];
+                fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightLight];
             } else {
                 if([str isEqualToString:@"HelveticaNeue-Medium"]) {
-                    fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightMedium];
+                    fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightMedium];
                 } else {
                     if([str isEqualToString:@"HelveticaNeue-Bold"]) {
-                        fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightBold];
+                        fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightBold];
                     } else {
                         if([str isEqualToString:@"HelveticaNeue-CondensedBlack"]) {
-                            fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightHeavy];
+                            fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightHeavy];
                         } else {
                             // this is probably an italic font, fallback to regular code...
-                            fnt = [UIFont fontWithName:str size:pSize];
+                            fnt = [CN1Font fontWithName:str size:pSize];
                         }
                     }
                 }
             }
         }
     } else {
-        fnt = [UIFont fontWithName:str size:pSize];
+        fnt = [CN1Font fontWithName:str size:pSize];
     }
     
 #ifndef CN1_USE_ARC
@@ -10506,8 +12635,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_deriveTruetypeFont___long_boolean_boolean_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG uiFont, JAVA_BOOLEAN bold, JAVA_BOOLEAN italic, JAVA_FLOAT size) {
     POOL_BEGIN();
-    UIFont* original = (BRIDGE_CAST UIFont*)((void *)uiFont);
-    UIFont* fnt = [original fontWithSize:size];
+    CN1Font* original = (BRIDGE_CAST CN1Font*)((void *)uiFont);
+    CN1Font* fnt = [original fontWithSize:size];
 #ifndef CN1_USE_ARC
     [fnt retain];
 #endif
@@ -10624,7 +12753,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_browserExecuteAndReturnString___lon
             return out;
         } else {
             __block JAVA_OBJECT out;
-            dispatch_sync(dispatch_get_main_queue(), ^{
+            cn1RunSyncOnMainQueue(^{
                 POOL_BEGIN();
                 UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
                 out = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [w stringByEvaluatingJavaScriptFromString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG javaScript)]);
@@ -10753,16 +12882,25 @@ int stringPickerSelection;
 NSDate* currentDatePickerDate;
 JAVA_LONG currentDatePickerDuration=-1;
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 extern UIPopoverController* popoverControllerInstance;
-extern UIView *currentActionSheet;
+#endif
+extern CN1View *currentActionSheet;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 JAVA_LONG defaultDatePickerDate;
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
-void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
+void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG CN1View *pickerView) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
     int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
-    UIView* fakeActionSheet = [[UIView alloc] initWithFrame:CGRectMake(0, SCREEN_HEIGHT-246, SCREEN_WIDTH, 246)];
+    CN1View* fakeActionSheet = [[CN1View alloc] initWithFrame:CGRectMake(0, SCREEN_HEIGHT-246, SCREEN_WIDTH, 246)];
     [fakeActionSheet setBackgroundColor:[UIColor colorWithRed:240/255.0 green:240/255.0 blue:240/255.0 alpha:1.0]];
     [fakeActionSheet setAutoresizesSubviews:YES];
     UIToolbar *pickerToolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, [CodenameOne_GLViewController instance].view.frame.size.width, 64)];
@@ -10831,8 +12969,14 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
         [(UIPickerView*)pickerView selectRow: stringPickerSelection inComponent:0 animated: NO];
     }
     repaintUI();
+#endif
 }
 void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {
+#if TARGET_OS_OSX
+    extern void CN1MacOpenStringPicker(JAVA_OBJECT stringArray, int selection, int x, int y, int w, int h);
+    com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    CN1MacOpenStringPicker(stringArray, selection, x, y, w, h);
+#else
 
     if (preferredWidth == 0) {
         preferredWidth = 320 * scaleValue;
@@ -10878,7 +13022,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             datepickerPopover = YES;
             stringPickerSelection = -1;
             UIViewController *vc = [[UIViewController alloc] init];
-            UIView *popoverView = [[UIView alloc] init];
+            CN1View *popoverView = [[CN1View alloc] init];
             [vc setView:popoverView];
             
 #ifndef CN1_USE_ARC
@@ -10974,10 +13118,19 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
         POOL_END();
         repaintUI();
     });
+#endif
 }
 
 
 void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeightArg, JAVA_INT minuteStep) {
+#if TARGET_OS_OSX
+    extern void CN1MacOpenDatePicker(int type, long long time, int x, int y, int w, int h, int minuteStep);
+    com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    // The preferred width and height are ignored: they exist to size a UIKit
+    // picker sliding up from the bottom of a phone screen, and a popover sizes
+    // itself to its content.
+    CN1MacOpenDatePicker(type, time, x, y, w, h, minuteStep);
+#else
     __block JAVA_INT preferredHeight = preferredHeightArg;
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     pickerStringArray = nil;
@@ -11064,7 +13217,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
             stringPickerSelection = 0;
             UIViewController *vc = [[UIViewController alloc] init];
             
-            UIView *popoverView = [[UIView alloc] init];
+            CN1View *popoverView = [[CN1View alloc] init];
             [vc setView:popoverView];
             [vc setContentSizeForViewInPopover:CGSizeMake(320, 260)];
             
@@ -11154,6 +13307,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
         POOL_END();
         repaintUI();
     });
+#endif
 }
 
 
@@ -11176,6 +13330,51 @@ CGRect cn1RectToCGRect(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT rect){
 }
 
 void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_codename1_ui_geom_Rectangle(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer, JAVA_OBJECT rectangle) {
+#if TARGET_OS_OSX
+    NSString* someText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
+    BOOL useRect = rectangle ? YES : NO;
+    __block CGRect cgrect = CGRectMake(0, 0, 0, 0);
+    if (useRect) {
+        // Left in Codename One pixels: the sheet is anchored against the scale of
+        // the window it opens in, which is not the process-wide one when that
+        // window is on a display of a different density.
+        cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
+    }
+    // Hoisted out of the block ON PURPOSE. The block captured imagePeer, which
+    // is a JAVA_LONG -- a scalar -- so nothing retained the image across the
+    // dispatch. This native returns as soon as the block is queued, and
+    // IOSImplementation.share() holds the Image only in a local, so the
+    // collector could run NativeImage.finalize() first; that calls releasePeer,
+    // which is a plain [o release] of this very object. The block then read a
+    // freed peer. Capturing the OBJECT instead is what fixes it: copying a block
+    // onto the heap retains the Objective-C pointers it captures and releases
+    // them when the block is disposed, which is exactly the ownership this
+    // needed and could never get from an integer.
+    GLUIImage* glll = imagePeer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)(uintptr_t)imagePeer) : nil;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSMutableArray* dataToShare = [NSMutableArray array];
+        if (imagePeer != 0) {
+            CN1Image* i = [glll getImage];
+            if (someText != nil) [dataToShare addObject:someText];
+            if (i != nil) [dataToShare addObject:i];
+        } else if (someText != nil && [someText hasPrefix:@"file:"]) {
+            NSURL* fileURL = cn1URLForMediaString(someText);
+            if ([[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
+                [dataToShare addObject:fileURL];
+            } else {
+                [dataToShare addObject:someText];
+            }
+        } else if (someText != nil) {
+            [dataToShare addObject:someText];
+        }
+        // Anchored to the component that asked to share, in the window that
+        // asked -- an unanchored Mac share sheet appears in a corner with no
+        // relation to what the user clicked.
+        CN1MacPresentSharePicker(dataToShare, useRect, cgrect, 0);
+        POOL_END();
+    });
+#else
     NSString* someText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
     BOOL useRect = rectangle ? YES:NO;
     __block CGRect cgrect = CGRectMake(0,0,0,0);
@@ -11186,12 +13385,17 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
         cgrect.size.width = cgrect.size.width / scaleValue;
         cgrect.size.height = cgrect.size.height / scaleValue;
     }
+    // Hoisted for the same reason as the macOS branch above: the block captured
+    // imagePeer, a scalar, so nothing retained the image across the dispatch and
+    // a collection between the queue and the run freed it. This half predates
+    // the macOS port and is fixed with it rather than left as the one arm of the
+    // same function that still reads a freed peer.
+    GLUIImage* glll = imagePeer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)imagePeer) : nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSArray* dataToShare;
         if(imagePeer != 0) {
-            GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
-            UIImage* i = [glll getImage];
+            CN1Image* i = [glll getImage];
             if(someText != nil) {
                 dataToShare = [NSArray arrayWithObjects:someText, i, nil];
             } else {
@@ -11200,7 +13404,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
         } else {
             BOOL shareFile = NO;
             if (someText != nil && [someText hasPrefix:@"file:"]) {
-                NSURL* fileURL = [NSURL fileURLWithPath:[someText substringFromIndex:5]];
+                NSURL* fileURL = cn1URLForMediaString(someText);
                 if ([[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
                     shareFile = YES;
                     dataToShare = [NSArray arrayWithObjects:fileURL, nil];
@@ -11240,6 +13444,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
         POOL_END();
         repaintUI();
     });
+#endif
 }
 
 // Same as socialShare but installs a completionWithItemsHandler block on
@@ -11247,6 +13452,49 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
 // activity type (UIActivityType*), cancellation, or error. Status codes
 // mirror com.codename1.share.ShareResult: 1=SHARED_TO, 2=DISMISSED, 3=FAILED.
 void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String_long_com_codename1_ui_geom_Rectangle_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer, JAVA_OBJECT rectangle, JAVA_INT callbackId) {
+#if TARGET_OS_OSX
+    NSString* someText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
+    BOOL useRect = rectangle ? YES : NO;
+    __block CGRect cgrect = CGRectMake(0, 0, 0, 0);
+    if (useRect) {
+        // Left in Codename One pixels: the sheet is anchored against the scale of
+        // the window it opens in, which is not the process-wide one when that
+        // window is on a display of a different density.
+        cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
+    }
+    int cbId = (int)callbackId;
+    // Hoisted out of the block ON PURPOSE. The block captured imagePeer, which
+    // is a JAVA_LONG -- a scalar -- so nothing retained the image across the
+    // dispatch. This native returns as soon as the block is queued, and
+    // IOSImplementation.share() holds the Image only in a local, so the
+    // collector could run NativeImage.finalize() first; that calls releasePeer,
+    // which is a plain [o release] of this very object. The block then read a
+    // freed peer. Capturing the OBJECT instead is what fixes it: copying a block
+    // onto the heap retains the Objective-C pointers it captures and releases
+    // them when the block is disposed, which is exactly the ownership this
+    // needed and could never get from an integer.
+    GLUIImage* glll = imagePeer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)(uintptr_t)imagePeer) : nil;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSMutableArray* dataToShare = [NSMutableArray array];
+        if (imagePeer != 0) {
+            CN1Image* i = [glll getImage];
+            if (someText != nil) [dataToShare addObject:someText];
+            if (i != nil) [dataToShare addObject:i];
+        } else if (someText != nil && [someText hasPrefix:@"file:"]) {
+            NSURL* fileURL = cn1URLForMediaString(someText);
+            [dataToShare addObject:[[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]
+                                   ? (id)fileURL : (id)someText];
+        } else if (someText != nil) {
+            [dataToShare addObject:someText];
+        }
+        // The real outcome, through the picker's and then the service's
+        // delegate. Reporting SHARED_TO when the sheet opened made a dismissed
+        // sheet indistinguishable from a completed share.
+        CN1MacPresentSharePicker(dataToShare, useRect, cgrect, cbId);
+        POOL_END();
+    });
+#else
     NSString* someText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
     BOOL useRect = rectangle ? YES:NO;
     __block CGRect cgrect = CGRectMake(0,0,0,0);
@@ -11258,12 +13506,17 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
         cgrect.size.height = cgrect.size.height / scaleValue;
     }
     int cbId = (int)callbackId;
+    // Hoisted for the same reason as the macOS branch above: the block captured
+    // imagePeer, a scalar, so nothing retained the image across the dispatch and
+    // a collection between the queue and the run freed it. This half predates
+    // the macOS port and is fixed with it rather than left as the one arm of the
+    // same function that still reads a freed peer.
+    GLUIImage* glll = imagePeer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)imagePeer) : nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSArray* dataToShare;
         if(imagePeer != 0) {
-            GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
-            UIImage* i = [glll getImage];
+            CN1Image* i = [glll getImage];
             if(someText != nil) {
                 dataToShare = [NSArray arrayWithObjects:someText, i, nil];
             } else {
@@ -11272,7 +13525,7 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
         } else {
             BOOL shareFile = NO;
             if (someText != nil && [someText hasPrefix:@"file:"]) {
-                NSURL* fileURL = [NSURL fileURLWithPath:[someText substringFromIndex:5]];
+                NSURL* fileURL = cn1URLForMediaString(someText);
                 if ([[NSFileManager defaultManager] fileExistsAtPath:[fileURL path]]) {
                     shareFile = YES;
                     dataToShare = [NSArray arrayWithObjects:fileURL, nil];
@@ -11333,17 +13586,158 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
         POOL_END();
         repaintUI();
     });
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPrintingAvailable___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    // Every Mac can print: AppKit has no notion of printing being unavailable,
+    // and a machine with no printer configured still has Save as PDF.
+    return JAVA_TRUE;
+#else
     return [UIPrintInteractionController isPrintingAvailable];
+#endif
 }
+
+#if TARGET_OS_OSX
+/// A print view that paginates a PDF instead of flattening it.
+///
+/// AppKit prints a view, not a file, and the obvious way to print a PDF -- put
+/// it in an NSImageView -- prints exactly one page, because an NSPDFImageRep
+/// draws whichever page currentPage names and that starts at the first. The
+/// document is not rejected and no error is raised; the job simply comes out
+/// short, and reports success.
+///
+/// So the pagination is declared to AppKit instead: knowsPageRange: says how
+/// many pages there are, rectForPage: selects the one being printed and returns
+/// its size, and drawRect: draws whatever page rectForPage: last selected --
+/// which is the order AppKit calls them in. Pages are numbered from 1 by the
+/// print system and from 0 by NSPDFImageRep, which is the off-by-one to watch.
+///
+/// Not flipped: PDF user space has its origin at the bottom left and so does an
+/// unflipped NSView, so leaving the default means the rep needs no transform.
+@interface CN1MacPDFPrintView : NSView {
+    NSPDFImageRep* _cn1Pdf;
+}
+- (instancetype)initWithPDF:(NSPDFImageRep*)pdf;
+@end
+
+@implementation CN1MacPDFPrintView
+
+- (instancetype)initWithPDF:(NSPDFImageRep*)pdf {
+    // Sized to the first page so the view has a sensible frame before the print
+    // system asks; rectForPage: resizes it per page, which is what lets a
+    // document with mixed page sizes print correctly rather than being scaled
+    // to whatever the first page happened to be.
+    [pdf setCurrentPage:0];
+    NSRect first = [pdf bounds];
+    self = [super initWithFrame:NSMakeRect(0, 0, first.size.width, first.size.height)];
+    if (self != nil) {
+#ifdef CN1_USE_ARC
+        _cn1Pdf = pdf;
+#else
+        _cn1Pdf = [pdf retain];
+#endif
+    }
+    return self;
+}
+
+- (BOOL)knowsPageRange:(NSRangePointer)range {
+    range->location = 1;
+    range->length = (NSUInteger)[_cn1Pdf pageCount];
+    return YES;
+}
+
+- (NSRect)rectForPage:(NSInteger)page {
+    [_cn1Pdf setCurrentPage:page - 1];
+    NSRect b = [_cn1Pdf bounds];
+    NSRect frame = NSMakeRect(0, 0, b.size.width, b.size.height);
+    [self setFrame:frame];
+    return frame;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    [_cn1Pdf drawInRect:[self bounds]];
+}
+
+#ifndef CN1_USE_ARC
+- (void)dealloc {
+    [_cn1Pdf release];
+    [super dealloc];
+}
+#endif
+
+@end
+#endif
 
 // Prints the file at path through UIPrintInteractionController and reports
 // the outcome to IOSImplementation.printDocumentCallback using the supplied
 // callbackId. Status codes mirror com.codename1.printing.PrintResult:
 // 1=COMPLETED, 2=CANCELLED, 3=FAILED.
 void com_codename1_impl_ios_IOSNative_printDocument___java_lang_String_java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_OBJECT mimeType, JAVA_INT callbackId) {
+#if TARGET_OS_OSX
+    NSString* filePath = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    int cbId = (int)callbackId;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSString* ns = fixFilePath(filePath);
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+        BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:ns];
+        // A PDF is printed page by page, never as an image. NSImage wraps a PDF
+        // in an NSPDFImageRep whose currentPage defaults to the first, and
+        // drawing it draws THAT page -- so a multi-page document printed one
+        // page and the operation still reported COMPLETED. The remaining pages
+        // were not refused, they were silently dropped, which is the failure
+        // nobody notices until the paper is in their hand.
+        NSPDFImageRep* pdf = nil;
+        if (exists) {
+            NSData* data = [NSData dataWithContentsOfFile:ns];
+            if (data != nil) {
+                pdf = [[NSPDFImageRep alloc] initWithData:data];
+            }
+        }
+        // Sniffed from the bytes rather than trusted from the extension or the
+        // mime type, both of which the caller supplies and neither of which has
+        // to be right.
+        NSView* view = nil;
+        if (pdf != nil && pdf.pageCount > 0) {
+            view = [[CN1MacPDFPrintView alloc] initWithPDF:pdf];
+        } else {
+            NSImage* doc = exists ? [[NSImage alloc] initWithContentsOfFile:ns] : nil;
+            if (doc != nil) {
+                NSImageView* iv = [[NSImageView alloc]
+                        initWithFrame:NSMakeRect(0, 0, doc.size.width, doc.size.height)];
+                iv.image = doc;
+                iv.imageScaling = NSImageScaleProportionallyUpOrDown;
+                view = iv;
+#ifndef CN1_USE_ARC
+                [doc release];
+#endif
+            }
+        }
+#ifndef CN1_USE_ARC
+        [pdf release];
+#endif
+        if (view == nil) {
+            JAVA_OBJECT jErrMsg = fromNSString(threadStateData, @"The document cannot be printed");
+            com_codename1_impl_ios_IOSImplementation_printDocumentCallback___int_int_java_lang_String(threadStateData, (JAVA_INT)cbId, 3, jErrMsg);
+            POOL_END();
+            return;
+        }
+        NSPrintInfo* info = [NSPrintInfo sharedPrintInfo];
+        info.jobDisposition = NSPrintSpoolJob;
+        NSPrintOperation* op = [NSPrintOperation printOperationWithView:view printInfo:info];
+        op.jobTitle = [ns lastPathComponent];
+        BOOL completed = [op runOperation];
+        // Status two is "cancelled" and one is "completed", matching what the
+        // UIKit completion handler reports.
+        com_codename1_impl_ios_IOSImplementation_printDocumentCallback___int_int_java_lang_String(threadStateData, (JAVA_INT)cbId, completed ? 1 : 2, JAVA_NULL);
+#ifndef CN1_USE_ARC
+        [view release];
+#endif
+        POOL_END();
+    });
+#else
     NSString* filePath = toNSString(CN1_THREAD_STATE_PASS_ARG path);
     NSString* mime = toNSString(CN1_THREAD_STATE_PASS_ARG mimeType);
     int cbId = (int)callbackId;
@@ -11378,7 +13772,7 @@ void com_codename1_impl_ios_IOSNative_printDocument___java_lang_String_java_lang
             com_codename1_impl_ios_IOSImplementation_printDocumentCallback___int_int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)cbId, status, jErrMsg);
         };
         if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
-            UIView* view = [CodenameOne_GLViewController instance].view;
+            CN1View* view = [CodenameOne_GLViewController instance].view;
             CGRect sourceRect = CGRectMake(view.bounds.size.width / 2, view.bounds.size.height / 2, 1, 1);
             [printController presentFromRect:sourceRect inView:view animated:YES completionHandler:completionHandler];
         } else {
@@ -11387,6 +13781,7 @@ void com_codename1_impl_ios_IOSNative_printDocument___java_lang_String_java_lang
         POOL_END();
         repaintUI();
     });
+#endif
 }
 #else // TARGET_OS_WATCH || TARGET_OS_TV: no UIPickerView / UIDatePicker / UIActivityViewController / UIPrintInteractionController on the watch/tv.
 void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {}
@@ -11468,6 +13863,13 @@ void com_codename1_impl_ios_IOSNative_setNativeEditingComponentVisible___boolean
 }
 
 void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text) {
+#if TARGET_OS_OSX
+    // There is no separate native editor view on this port: the rendering view
+    // is itself the NSTextInputClient, so the framework's text is pushed into
+    // the input session rather than into a UITextView standing beside it.
+    extern void CN1MacTextInputSetText(NSString *text);
+    CN1MacTextInputSetText(toNSString(CN1_THREAD_STATE_PASS_ARG text));
+#else
     if (editingComponent == nil) {
         return;
     }
@@ -11501,6 +13903,7 @@ void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(
         POOL_END();
     });
 
+#endif
 }
 #else // TARGET_OS_WATCH: no inline native text-editing peer on the watch.
 void com_codename1_impl_ios_IOSNative_foldVKB__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {}
@@ -11853,7 +14256,7 @@ void com_codename1_impl_ios_IOSNative_nativePathRendererGetOutputBounds___long_i
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererGetConsumer___long(JAVA_OBJECT instanceObject, JAVA_LONG ptr)
 {
     //CN1Log(@"In getConsumer()");
-    return &(((Renderer*)ptr)->consumer);
+    return (JAVA_LONG)(uintptr_t)&(((Renderer*)(uintptr_t)ptr)->consumer);
 }
 
 //native void nativePathConsumerMoveTo(long ptr, double x, double y);
@@ -11945,10 +14348,10 @@ void com_codename1_impl_ios_IOSNative_nativeDeleteTexture___long(CN1_THREAD_STAT
 #define CN1_PATH_MASK_MAX_DIM 8192
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int(JAVA_OBJECT instanceObject, JAVA_LONG renderer, JAVA_INT color)
 {
-    Renderer *r = (Renderer*)renderer;
+    Renderer *r = (Renderer*)(uintptr_t)renderer;
     JAVA_INT outputBounds[4];
     
-    Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
+    Renderer_getOutputBounds((Renderer*)(uintptr_t)renderer, (JAVA_INT*)&outputBounds);
     // outputBounds is { minX, minY, maxX, maxY }; maxX / maxY can be
     // legitimately negative for shapes drawn at negative coordinates
     // (see the comment in nativePathRendererCreateTexture above).
@@ -11982,7 +14385,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
     //      ac.height
     //      );
     ac.alphas = (JAVA_ARRAY_BYTE*)data->fields.org_xmlvm_runtime_XMLVMArray.array_;
-    Renderer_produceAlphas(renderer, &ac);
+    Renderer_produceAlphas((Renderer*)(uintptr_t)renderer, &ac);
     
     org_xmlvm_runtime_XMLVMArray* idata = XMLVMArray_createSingleDimension(__CLASS_int, ac.width*ac.height);
     JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*)idata->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -11991,7 +14394,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
     JAVA_OBJECT data = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_GET_STATE_PASS_ARG ac.width*ac.height);
     ac.alphas = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)data)->data;
     
-    Renderer_produceAlphas(renderer, &ac);
+    Renderer_produceAlphas((Renderer*)(uintptr_t)renderer, &ac);
     JAVA_OBJECT idata = __NEW_ARRAY_JAVA_INT(CN1_THREAD_GET_STATE_PASS_ARG ac.width*ac.height);
     JAVA_ARRAY_INT* iArr = (JAVA_ARRAY_INT*)((JAVA_ARRAY)idata)->data;
     JAVA_ARRAY_BYTE* bArr = (JAVA_ARRAY_BYTE*)ac.alphas;
@@ -12013,7 +14416,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
 #if TARGET_OS_WATCH
     {
         JAVA_INT outputBounds[4];
-        Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
+        Renderer_getOutputBounds((Renderer*)(uintptr_t)renderer, (JAVA_INT*)&outputBounds);
         JAVA_INT x = min(outputBounds[0], outputBounds[2]);
         JAVA_INT y = min(outputBounds[1], outputBounds[3]);
         JAVA_INT width = outputBounds[2] - outputBounds[0];
@@ -12028,13 +14431,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         AlphaConsumer ac;
         ac.originX = x; ac.originY = y; ac.width = width; ac.height = height;
         ac.alphas = (JAVA_BYTE *)mask->alphas;
-        Renderer_produceAlphas(renderer, &ac);
+        Renderer_produceAlphas((Renderer*)(uintptr_t)renderer, &ac);
         return (JAVA_LONG)(uintptr_t)mask;
     }
 #endif
 #ifdef CN1_USE_METAL
     {
-        Renderer *r = (Renderer*)renderer;
+        Renderer *r = (Renderer*)(uintptr_t)renderer;
         // Bound the mask to the render target. A stroked path that runs far
         // off-screen (e.g. the graphics-draw-arc / graphics-draw-round-rect
         // tests at 4K) otherwise yields a mask wider than the Metal device max
@@ -12052,7 +14455,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
                 CN1_PATH_MASK_MAX_DIM);
         }
         JAVA_INT outputBounds[4];
-        Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
+        Renderer_getOutputBounds((Renderer*)(uintptr_t)renderer, (JAVA_INT*)&outputBounds);
         // outputBounds is { minX, minY, maxX, maxY } in renderer pixel
         // space, which can legitimately be entirely negative when the
         // input shape sits at negative coordinates (e.g. the SVG
@@ -12077,7 +14480,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         ac.originX = x; ac.originY = y; ac.width = width; ac.height = height;
         jbyte *maskArray = malloc(sizeof(jbyte) * ac.width * ac.height);
         ac.alphas = maskArray;
-        Renderer_produceAlphas(renderer, &ac);
+        Renderer_produceAlphas((Renderer*)(uintptr_t)renderer, &ac);
         // Build R8 MTLTexture from the alpha bytes; CFBridgingRetain so the
         // Java-side handle (returned as JAVA_LONG) keeps the texture alive
         // until nativeDeleteTexture releases it.
@@ -12113,10 +14516,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
             return;
         }
         
-        Renderer *r = (Renderer*)renderer;
+        Renderer *r = (Renderer*)(uintptr_t)renderer;
         JAVA_INT outputBounds[4];
 
-        Renderer_getOutputBounds(renderer, (JAVA_INT*)&outputBounds);
+        Renderer_getOutputBounds((Renderer*)(uintptr_t)renderer, (JAVA_INT*)&outputBounds);
         // outputBounds is { minX, minY, maxX, maxY }; the maxX/maxY
         // values can legitimately be negative when the shape sits in
         // the negative quadrant (e.g. the spinner SVG draws each
@@ -13606,29 +16009,29 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
     JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType, JAVA_BOOLEAN foreground
                                                                                                                                                                      ) {
 #ifdef CN1_INCLUDE_NOTIFICATIONS2
+    // Every string here is autoreleased -- [NSString string] and both of the
+    // stringBy... results -- so nothing in this function owns one and the three
+    // releases that used to sit between these lines were over-releases.
+    //
+    // They survived because of what they happened to be released: the empty
+    // string is a shared instance whose release does nothing, and a short ASCII
+    // result is a tagged pointer, where release is also a no-op. A body long
+    // enough to be heap-backed is neither, and that one crashed when the pool
+    // drained -- after the notification had been scheduled, so nowhere near the
+    // call that caused it.
     NSString * title = [NSString string];
     NSString * body = [NSString string];
     NSString *tmpStr;
     if (alertTitle != NULL) {
         tmpStr = [title stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle)];
-                    
-#ifndef CN1_USE_ARC
-        [title release];
-#endif
         title = tmpStr;
     }
-    
+
     if (alertBody != NULL) {
-        tmpStr = [body stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];     
-#ifndef CN1_USE_ARC
-        [body release];
-#endif
+        tmpStr = [body stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];
         body = tmpStr;
     }
     tmpStr = [body stringByReplacingOccurrencesOfString:@"%" withString:@"%%"];
-#ifndef CN1_USE_ARC
-    [body release];
-#endif
     body = tmpStr;
     
     NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
@@ -13797,7 +16200,11 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification2___java_lang_St
         }
 #endif // !TARGET_OS_TV
         if (timeSensitive) {
-            if (@available(iOS 15.0, *)) {
+            // macOS 12.0 named as well as iOS 15.0. The `*` reads as "available
+            // on macOS" and the interruption level arrived in 12, while this
+            // target deploys to 11.0 -- so on a Mac running 11 this was an
+            // unrecognised selector rather than a notification.
+            if (@available(iOS 15.0, macOS 12.0, *)) {
                 content.interruptionLevel = UNNotificationInterruptionLevelTimeSensitive;
             }
         }
@@ -13837,17 +16244,29 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification2___java_lang_St
         UNNotificationTrigger *trigger = cn1CreateNotificationTrigger(fireDate, repeatType);
         UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:notificationIdString content:content trigger:trigger];
         UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+        // Scheduled from INSIDE the completion handler, exactly as the plain
+        // sender above does it. requestAuthorization is asynchronous: on a fresh
+        // install it puts the permission prompt on screen and returns, so
+        // scheduling straight afterwards raced the user's answer and the first
+        // enriched notification an application ever posts was rejected and lost
+        // with nothing said about it. Every later one worked, which is the worst
+        // version of this bug -- it looks like a flake rather than a rule.
         [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert + UNAuthorizationOptionSound + UNAuthorizationOptionBadge)
             completionHandler:^(BOOL granted, NSError * _Nullable authError) {
                 if (authError != nil) {
                     CN1Log(@"Local notification authorization request failed: %@", authError.localizedDescription);
+                    return;
                 }
-        }];
-        cn1CancelScheduledLocalNotificationById(notificationIdString);
-        [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
-            if (error != nil) {
-                CN1Log(@"Failed to schedule local notification: %@", error.localizedDescription);
-            }
+                if (!granted) {
+                    CN1Log(@"Local notification authorization was not granted");
+                    return;
+                }
+                cn1CancelScheduledLocalNotificationById(notificationIdString);
+                [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
+                    if (error != nil) {
+                        CN1Log(@"Failed to schedule local notification: %@", error.localizedDescription);
+                    }
+                }];
         }];
     } else {
         CN1Log(@"Ignoring local notification request on iOS versions below 10");
@@ -13872,12 +16291,15 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_requestNotificationPermission___int(C
                 if (@available(iOS 12.0, *)) {
                     if (settings.authorizationStatus == UNAuthorizationStatusProvisional) { level = 3; }
                 }
-#if !TARGET_OS_WATCH && !TARGET_OS_TV
-                // UNAuthorizationStatusEphemeral is unavailable on watchOS/tvOS.
+#if !TARGET_OS_WATCH && !TARGET_OS_TV && !TARGET_OS_OSX
+                // UNAuthorizationStatusEphemeral is an App Clip state, so it is
+                // unavailable on watchOS, tvOS and macOS. Note @available's `*`
+                // wildcard does NOT keep it out of the macOS build: the wildcard
+                // is about OS versions, not about whether the symbol exists.
                 if (@available(iOS 14.0, *)) {
                     if (settings.authorizationStatus == UNAuthorizationStatusEphemeral) { level = 4; }
                 }
-#endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif // !TARGET_OS_WATCH && !TARGET_OS_TV && !TARGET_OS_OSX
                 BOOL g = (level == 2 || level == 3 || level == 4);
                 com_codename1_impl_ios_IOSImplementation_notificationPermissionResult___boolean_int(CN1_THREAD_GET_STATE_PASS_ARG g ? JAVA_TRUE : JAVA_FALSE, level);
             }];
@@ -13896,6 +16318,16 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_submitBackgroundProcessingTask___java
 JAVA_VOID com_codename1_impl_ios_IOSNative_cancelBackgroundTask___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier) {}
 #else
 JAVA_VOID com_codename1_impl_ios_IOSNative_registerBackgroundProcessingTask___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     if (@available(iOS 13.0, *)) {
         NSString *taskId = toNSString(CN1_THREAD_STATE_PASS_ARG identifier);
         [[BGTaskScheduler sharedScheduler] registerForTaskWithIdentifier:taskId usingQueue:nil launchHandler:^(BGTask * _Nonnull task) {
@@ -13908,9 +16340,20 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_registerBackgroundProcessingTask___ja
             });
         }];
     }
+#endif
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_submitBackgroundProcessingTask___java_lang_String_double_boolean_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier, JAVA_DOUBLE earliest, JAVA_BOOLEAN requiresNetwork, JAVA_BOOLEAN requiresPower) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     if (@available(iOS 13.0, *)) {
         NSString *taskId = toNSString(CN1_THREAD_STATE_PASS_ARG identifier);
         BGProcessingTaskRequest *request = [[BGProcessingTaskRequest alloc] initWithIdentifier:taskId];
@@ -13925,21 +16368,46 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_submitBackgroundProcessingTask___java
             CN1Log(@"Failed to submit background processing task %@: %@", taskId, submitError.localizedDescription);
         }
     }
+#endif
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_cancelBackgroundTask___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     if (@available(iOS 13.0, *)) {
         NSString *taskId = toNSString(CN1_THREAD_STATE_PASS_ARG identifier);
         [[BGTaskScheduler sharedScheduler] cancelTaskRequestWithIdentifier:taskId];
     }
+#endif
 }
 #endif // !TARGET_OS_WATCH (BackgroundTasks)
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBackgroundProcessingSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+// The two slices whose register/submit/cancel above are empty bodies. They have
+// to say so here, because @available's `*` wildcard means "true on every other
+// platform" -- so without this the answer was yes on both, and an application
+// took the supported path, persisted its work requests and scheduled tasks that
+// could never run.
+//
+// macOS: BGTaskScheduler exists on the desktop, so this is a port that has not
+// been written rather than a platform that cannot. watchOS: WKRefreshBackground
+// Task is a different API entirely.
+#if TARGET_OS_OSX || TARGET_OS_WATCH
+    return JAVA_FALSE;
+#else
     if (@available(iOS 13.0, *)) {
         return JAVA_TRUE;
     }
     return JAVA_FALSE;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBackgroundProcessingSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
@@ -14728,7 +17196,13 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
    
 JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask__(JAVA_OBJECT instanceObject)
 {
-#if !TARGET_OS_WATCH
+#if TARGET_OS_OSX
+    // A Mac application is not suspended when it loses focus, so there is no
+    // expiring window of background time to ask for and nothing to return a
+    // handle to. Answering zero is honest: it is the same "no task" value the
+    // matching endBackgroundTask ignores.
+    return 0;
+#elif !TARGET_OS_WATCH
     __block UIBackgroundTaskIdentifier bgTask = UIBackgroundTaskInvalid;
     bgTask = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:^{
         // Clean up any unfinished task business by marking where you
@@ -14752,7 +17226,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask___R_long(CN1_THRE
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_endBackgroundTask___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bgTask)
 {
-#if !TARGET_OS_WATCH
+#if TARGET_OS_OSX
+    // Nothing was begun, so there is nothing to end.
+#elif !TARGET_OS_WATCH
     [[UIApplication sharedApplication] endBackgroundTask:(UIBackgroundTaskIdentifier)bgTask];
 #endif // !TARGET_OS_WATCH
 }
@@ -14805,6 +17281,22 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRTLString___java_lang_String_R_b
 }
 
 void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT text) {
+#if TARGET_OS_OSX
+    POOL_BEGIN();
+    NSString *message = toNSString(CN1_THREAD_STATE_PASS_ARG text);
+    if (message != nil) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSWindow *w = [CN1MacHost sharedHost].window;
+            if (w != nil) {
+                NSAccessibilityPostNotificationWithUserInfo(w,
+                    NSAccessibilityAnnouncementRequestedNotification,
+                    @{NSAccessibilityAnnouncementKey: message,
+                      NSAccessibilityPriorityKey: @(NSAccessibilityPriorityHigh)});
+            }
+        });
+    }
+    POOL_END();
+#else
     if (text == JAVA_NULL) {
         return;
     }
@@ -14816,20 +17308,36 @@ void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_Strin
 #else
     // watchOS has no UIAccessibilityPostNotification.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 #if !TARGET_OS_WATCH
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 @interface CN1AccessibilityCustomAction : UIAccessibilityCustomAction
 @property(nonatomic, retain) NSString *cn1ActionId;
 @end
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 @implementation CN1AccessibilityCustomAction
 @end
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 @interface CN1AccessibilityElement : UIAccessibilityElement
 @property(nonatomic, assign) long long cn1NodeId;
 @property(nonatomic, retain) NSArray *cn1Actions;
 @end
+#endif
 
 static NSString *CN1AccessibilityActionId(NSArray *actions, NSString *wanted) {
     for (NSDictionary *action in actions) {
@@ -14849,6 +17357,10 @@ static void CN1PerformAccessibilityAction(long long nodeId, NSString *actionId, 
             CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)nodeId, javaAction, javaArgument);
 }
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 @implementation CN1AccessibilityElement
 - (BOOL)accessibilityActivate {
     NSString *action = CN1AccessibilityActionId(self.cn1Actions, @"activate");
@@ -14876,6 +17388,11 @@ static void CN1PerformAccessibilityAction(long long nodeId, NSString *actionId, 
 }
 
 - (BOOL)accessibilityScroll:(UIAccessibilityScrollDirection)direction {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     NSString *action = nil;
     if (direction == UIAccessibilityScrollDirectionDown || direction == UIAccessibilityScrollDirectionRight
             || direction == UIAccessibilityScrollDirectionNext) {
@@ -14886,6 +17403,7 @@ static void CN1PerformAccessibilityAction(long long nodeId, NSString *actionId, 
     if (action == nil) return NO;
     CN1PerformAccessibilityAction(self.cn1NodeId, action, nil);
     return YES;
+#endif
 }
 
 - (BOOL)cn1PerformCustomAction:(CN1AccessibilityCustomAction *)action {
@@ -14894,6 +17412,7 @@ static void CN1PerformAccessibilityAction(long long nodeId, NSString *actionId, 
     return YES;
 }
 @end
+#endif
 
 static NSMutableDictionary *cn1AccessibilityLiveValues;
 
@@ -14902,7 +17421,14 @@ static id CN1JSONValue(NSDictionary *node, NSString *key) {
     return value == [NSNull null] ? nil : value;
 }
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body.
+#if !TARGET_OS_OSX
 static UIAccessibilityTraits CN1AccessibilityTraitsForNode(NSDictionary *node) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     NSString *role = CN1JSONValue(node, @"role");
     UIAccessibilityTraits traits = UIAccessibilityTraitNone;
     if ([role isEqualToString:@"BUTTON"] || [role isEqualToString:@"TOGGLE_BUTTON"]
@@ -14923,7 +17449,9 @@ static UIAccessibilityTraits CN1AccessibilityTraitsForNode(NSDictionary *node) {
     if (![[CN1JSONValue(node, @"liveRegion") description] isEqualToString:@"OFF"])
         traits |= UIAccessibilityTraitUpdatesFrequently;
     return traits;
+#endif
 }
+#endif
 
 static NSString *CN1AccessibilityValueForNode(NSDictionary *node) {
     NSString *value = CN1JSONValue(node, @"value");
@@ -14948,6 +17476,19 @@ static NSString *CN1AccessibilityValueForNode(NSDictionary *node) {
 
 void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType) {
+#if TARGET_OS_OSX
+    // The tree is not a UIKit structure -- it arrives as JSON that the framework
+    // builds for every port -- so the macOS side projects the same list onto
+    // NSAccessibilityElement instead of UIAccessibilityElement. See
+    // CN1MacAccessibility.m.
+    if (json == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    extern void CN1MacAccessibilityUpdateTree(NSString *json, int changeType);
+    CN1MacAccessibilityUpdateTree(toNSString(CN1_THREAD_STATE_PASS_ARG json), (int)changeType);
+    POOL_END();
+#else
     if (json == JAVA_NULL) return;
     POOL_BEGIN();
     NSString *jsonString = toNSString(CN1_THREAD_STATE_PASS_ARG json);
@@ -14955,7 +17496,7 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
     NSDictionary *tree = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
     NSArray *nodes = [tree objectForKey:@"nodes"];
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIView *container = (UIView *)[[CodenameOne_GLViewController instance] eaglView];
+        CN1View *container = (CN1View *)[[CodenameOne_GLViewController instance] eaglView];
         if (container == nil) return;
         NSMutableArray *elements = [NSMutableArray arrayWithCapacity:[nodes count]];
         NSMutableDictionary *elementsById = [NSMutableDictionary dictionary];
@@ -15021,6 +17562,7 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
         }
     });
     POOL_END();
+#endif
 }
 #else
 void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int(
@@ -15222,6 +17764,7 @@ BOOL cn1AccessibilityEagerLatched(void) {
     return cn1A11yLatched;
 }
 
+#if !TARGET_OS_OSX
 static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *observer,
                                           CFStringRef name, const void *object,
                                           CFDictionaryRef userInfo) {
@@ -15229,6 +17772,7 @@ static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *
     com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
             CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
+#endif
 
 // Called from the METALView / EAGLView accessibilityElements getters: a real
 // client asked for
@@ -15239,6 +17783,18 @@ void cn1AccessibilityNoteClientQuery(void) {
         return;   // one transition only; this is on a UIKit query path
     }
     cn1A11yLatched = YES;
+    // Reached on the native macOS port too, now that its rendering view
+    // publishes a tree and hangs this call off accessibilityChildren. It is the
+    // ONLY trigger there: macOS gives no running flag for Switch Control or
+    // Voice Control and posts no notification when a technology starts, so
+    // without a client query the gate would stay false and those clients would
+    // walk an empty tree.
+    //
+    // The retention worry that used to keep this call out of the macOS branch
+    // was misplaced. isMethodUsedByNative asks whether the mangled symbol is a
+    // SUBSTRING of the native source text; it does not evaluate the
+    // preprocessor. The symbol appears in this file either way, so the method
+    // is retained on every Apple target regardless of which branch compiles.
     com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
             CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
@@ -15249,6 +17805,14 @@ void cn1RegisterAccessibilityStatusObservers(void) {
         return;
     }
     done = YES;
+#if TARGET_OS_OSX
+    // Nothing to observe. macOS publishes no notification for an assistive
+    // technology starting -- NSWorkspace reports the display-appearance
+    // preferences and nothing about VoiceOver or Switch Control -- so there is
+    // no transition to latch on. isAssistiveTechnologyActive below reads
+    // VoiceOver's own preference instead, which is the one signal the platform
+    // does give.
+#else
     // Built up rather than written as a literal: the AssistiveTouch notification
     // is iOS 10, and ios.deployment_target lets IPhoneBuilder emit older
     // targets, where the weakly-linked constant is nil -- and a nil inside an
@@ -15269,6 +17833,7 @@ void cn1RegisterAccessibilityStatusObservers(void) {
                                         (__bridge CFStringRef)n, NULL,
                                         CFNotificationSuspensionBehaviorDeliverImmediately);
     }
+#endif // TARGET_OS_OSX
 }
 #endif
 
@@ -15288,6 +17853,22 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_bo
     if(cn1AccessibilityEagerLatched()) {
         return JAVA_TRUE;
     }
+#if TARGET_OS_OSX
+    // VoiceOver's own preference domain, which is where macOS records it, and
+    // the only assistive technology the platform lets an application ask about.
+    // Switch Control and AssistiveTouch have no macOS query and no macOS
+    // equivalent respectively.
+    //
+    // Which is why the latch above matters more here than on iOS rather than
+    // less: it is the whole of this port's coverage for every client that is
+    // not VoiceOver. macOS also posts no notification when a technology starts,
+    // so the latch can only come from a client asking the rendering view for
+    // its children -- see -[METALView accessibilityChildren]. Answering false
+    // from here is therefore "no VoiceOver and nobody has looked yet", not "no
+    // assistive technology".
+    extern BOOL CN1MacHostIsVoiceOverRunning(void);
+    return CN1MacHostIsVoiceOverRunning() ? JAVA_TRUE : JAVA_FALSE;
+#else
     if(UIAccessibilityIsVoiceOverRunning() || UIAccessibilityIsSwitchControlRunning()) {
         return JAVA_TRUE;
     }
@@ -15298,6 +17879,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_bo
         return JAVA_TRUE;
     }
     return JAVA_FALSE;
+#endif // TARGET_OS_OSX
 #else
     return JAVA_FALSE;
 #endif
@@ -16780,7 +19362,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_St
 // Builds without the define compile the stub branch and link neither framework.
 #ifdef CN1_USE_INTENTS
 #import <CoreSpotlight/CoreSpotlight.h>
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MobileCoreServices/MobileCoreServices.h>
+#endif
 
 // PNG blobs staged by Java ahead of an index/complete call, keyed by the name the serializer
 // embedded in the JSON. Guarded because staging happens on the caller's thread while the
@@ -17777,6 +20362,10 @@ void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_ja
     POOL_END();
 }
 
+// The keychain is the same API on macOS, and every other secure-storage entry
+// point here is already unguarded. Guarding only the update meant a set over an
+// existing key returned neither a result nor an error, so the Java request never
+// completed.
 static void cn1_secureStorageUpdate(int requestId, NSString *nsReason, NSString *nsAccount, NSString *nsValue, NSString *appName, NSString *accessGroup) {
     NSMutableDictionary *q = [NSMutableDictionary dictionary];
     [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
@@ -18118,7 +20707,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageRemovePlain___java_la
 // CLANG_ENABLE_OBJC_ARC=NO -- see "cn1 iOS port runs without ARC" memory.
 
 #ifdef CN1_INCLUDE_NFC
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <CoreNFC/CoreNFC.h>
+#endif
 #endif
 
 #ifdef CN1_INCLUDE_NFC

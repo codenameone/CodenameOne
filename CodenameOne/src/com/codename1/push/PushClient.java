@@ -481,7 +481,24 @@ public final class PushClient {
             return "hms".equals(value) ? "huawei" : value;
         }
         String platform = Display.getInstance().getPlatformName();
-        if ("ios".equals(platform)) {
+        // APNs is decided by the port's own push prefix, not by the platform
+        // name. The native macOS port registers through UNUserNotificationCenter
+        // exactly as iOS does and has to route there -- falling through sent
+        // provider "native" to the server and no APNs subscription was ever
+        // created -- but it cannot be recognised by its name: a skinless JavaSE
+        // desktop build on a Mac reports "mac" as well and has no APNs
+        // registration at all, so keying on the name would send it down this
+        // branch and ask the server for a subscription that can never be
+        // delivered. The prefix is answered by the Apple ParparVM ports and the
+        // macOS one inherits it, which is exactly the set that registers.
+        // Mac Catalyst is unaffected either way -- it reports "ios".
+        // isApnsPushDevice(), not getProperty("cn1_push_prefix"): that key is one
+        // an application may legitimately set -- Push.getPushKey() reads exactly
+        // that override -- and letting it answer here sent provider "native" for
+        // a device that registers with APNs, so no deliverable subscription was
+        // ever created. The port's own answer is the capability; the
+        // application's is not a vote on it.
+        if (Display.getInstance().isApnsPushDevice()) {
             return "apns";
         }
         if ("win".equals(platform)) {

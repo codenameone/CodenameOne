@@ -163,7 +163,7 @@ static pthread_mutex_t g_attachMutex = PTHREAD_MUTEX_INITIALIZER;
 // still connects; without this, enabling on-device debugging on any project
 // that has a watch target failed to compile the watch slice outright.
 #if !TARGET_OS_WATCH
-static UIView* g_waitOverlay = nil;
+static CN1View* g_waitOverlay = nil;
 #endif
 
 // Forward declaration; callers in the command dispatch sit above the
@@ -1778,7 +1778,7 @@ static void* listenerThreadMain(void* arg) {
 /* --------------------------------------------------------------------- */
 
 #if !TARGET_OS_WATCH
-static UIView* cn1_debugger_active_host_view(void) {
+static CN1View* cn1_debugger_active_host_view(void) {
     UIWindow* w = nil;
     if (@available(iOS 13.0, *)) {
         for (UIScene* s in UIApplication.sharedApplication.connectedScenes) {
@@ -1803,7 +1803,7 @@ static void cn1_debugger_install_wait_overlay_now(void); // forward
 static int g_overlayInstallAttempts = 0;
 
 static void cn1_debugger_try_install_wait_overlay(void) {
-    UIView* host = cn1_debugger_active_host_view();
+    CN1View* host = cn1_debugger_active_host_view();
     if (host == nil) {
         // didFinishLaunching may not have set up the rootViewController yet;
         // retry on the next main-queue tick a few times.
@@ -1820,10 +1820,10 @@ static void cn1_debugger_try_install_wait_overlay(void) {
 
 static void cn1_debugger_install_wait_overlay_now(void) {
     if (g_waitOverlay != nil) return;
-    UIView* host = cn1_debugger_active_host_view();
+    CN1View* host = cn1_debugger_active_host_view();
     if (host == nil) return;
 
-    UIView* overlay = [[UIView alloc] initWithFrame:host.bounds];
+    CN1View* overlay = [[CN1View alloc] initWithFrame:host.bounds];
     overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     overlay.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.85];
 
@@ -1843,7 +1843,7 @@ static void cn1_debugger_install_wait_overlay_now(void) {
     lbl.textColor = [UIColor whiteColor];
     lbl.textAlignment = NSTextAlignmentCenter;
     lbl.numberOfLines = 0;
-    lbl.font = [UIFont systemFontOfSize:18 weight:UIFontWeightMedium];
+    lbl.font = [CN1Font systemFontOfSize:18 weight:UIFontWeightMedium];
     lbl.translatesAutoresizingMaskIntoConstraints = NO;
     [overlay addSubview:lbl];
 
@@ -1854,7 +1854,7 @@ static void cn1_debugger_install_wait_overlay_now(void) {
     sub.text = [NSString stringWithFormat:@"Proxy: %@:%@", host_s, portN ?: @"?"];
     sub.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
     sub.textAlignment = NSTextAlignmentCenter;
-    sub.font = [UIFont systemFontOfSize:13];
+    sub.font = [CN1Font systemFontOfSize:13];
     sub.translatesAutoresizingMaskIntoConstraints = NO;
     [overlay addSubview:sub];
 

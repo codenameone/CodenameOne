@@ -76,6 +76,20 @@ public class CameraApiTest extends BaseTest {
         // assertion chain below would only ever report the absent hardware.
         // Those ports stay outside this cross-port headless test and are
         // covered by the camera erratum on the port status page.
+        // Asked of the port before the platform list below, because a port that
+        // has no camera backend at all is a different thing from one whose
+        // backend needs a permission dialog. The AppKit macOS port is the first:
+        // the retained capture path is UIImagePickerController, which AppKit has
+        // no peer for, so hasCamera() answers false and the assertions below
+        // could only ever report the absent backend. Asked as a capability
+        // rather than added to the list of platform names, so the next port in
+        // that position is covered without anyone remembering to name it.
+        if (!Display.getInstance().hasCamera()) {
+            System.out.println("CN1SS:INFO:test=CameraApiTest status=SKIPPED "
+                    + "reason=no-camera-backend-on-" + platform);
+            done();
+            return true;
+        }
         boolean isHeadlessCameraSupported = "HTML5".equals(platform)
                 || (!"ios".equals(platform)
                 && !"and".equals(platform)

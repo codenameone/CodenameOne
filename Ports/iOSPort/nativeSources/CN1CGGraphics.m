@@ -174,7 +174,7 @@ void CN1CGFillAlphaMask(int color, int alpha, int x, int y, int w, int h, const 
     free(rgba);
 }
 
-void CN1CGDrawString(int color, int alpha, int x, int y, NSString *str, UIFont *font) {
+void CN1CGDrawString(int color, int alpha, int x, int y, NSString *str, CN1Font *font) {
     if (cn1ActiveContext == NULL || str == nil || str.length == 0) { return; }
     CGFloat r, g, b, a;
     cn1Components(color, alpha, &r, &g, &b, &a);

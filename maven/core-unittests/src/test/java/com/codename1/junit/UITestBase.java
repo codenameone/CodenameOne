@@ -70,7 +70,41 @@ public abstract class UITestBase {
     @BeforeAll
     protected void setUpDisplay() throws Exception {
         DisplayTest.initInvokeAndBlockThreads();
+        ensureDisplayInitialized();
+    }
+
+    /// Brings the Display up if it is down, and adopts it if it is already up.
+    ///
+    /// Called from `@BeforeAll` AND from `@BeforeEach`, which is the part that
+    /// matters. The teardown that clears the flag belongs to the PREVIOUS class's
+    /// EDT and runs whenever that thread gets round to it -- which can be after
+    /// this class's `@BeforeAll` has looked and found a live Display. Recovering
+    /// only there fixed the ordering where the teardown lands first and left the
+    /// whole class dead when it lands second: every test in it reports
+    /// "FormTest timed out after 5000ms; edt=display-not-initialized", which is
+    /// what CI produced for ValidatorTest and a local run never does, because
+    /// the window is only open while a loaded machine is descheduling the old
+    /// thread.
+    ///
+    /// Waiting for that thread to finish instead was tried and reverted: it
+    /// timed out for over a hundred classes and made the suite far slower.
+    private void ensureDisplayInitialized() throws Exception {
         if (!Display.isInitialized()) {
+            // Display.init() only does anything when codenameOneRunning is false,
+            // and isInitialized() is that flag AND impl.isInitialized(). The two
+            // come apart: the previous class's EDT calls impl.deinitialize() on
+            // its way out, on whatever implementation is current BY THEN -- so if
+            // it is still leaving while this class starts, it clears the flag on
+            // the implementation this class is about to use. init() then returns
+            // without doing anything, because codenameOneRunning is still true,
+            // and every test in the class times out reporting
+            // "display-not-initialized".
+            //
+            // Clearing the flag first makes the init below real in that case, and
+            // costs nothing in the normal one where it is already false. Cheaper
+            // and more reliable than waiting for the old thread: it does not need
+            // the EDT to have noticed anything yet.
+            Display.deinitialize();
             implementation = TestCodenameOneImplementation.getInstance();
             if (implementation == null) {
                 implementation = new TestCodenameOneImplementation();
@@ -97,6 +131,12 @@ public abstract class UITestBase {
 
     @BeforeEach
     protected void setUpImplementation() {
+        // No Display recovery here, deliberately. EDTTestInterceptor dispatches
+        // @BeforeEach onto the dispatch thread, so when that thread is the thing
+        // that has gone, this method never runs at all -- a recovery placed here
+        // is queued behind the failure it exists to repair. It lives in
+        // FormTestInterceptor.beforePretest(), which runs on the test thread
+        // before any dispatch.
         implementation = TestCodenameOneImplementation.getInstance();
         implementation.setLocalizationManager(new SafeL10NManager("en", "US"));
     }

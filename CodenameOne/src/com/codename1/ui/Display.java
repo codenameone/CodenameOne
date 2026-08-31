@@ -4904,6 +4904,74 @@ public final class Display extends CN1Constants {
         return impl.getProperty(key, defaultValue);
     }
 
+    /// The PORT's answer for a property, ignoring anything the application set
+    /// with `#setProperty(String, String)`.
+    ///
+    /// `#getProperty(String, String)` lets an application override any key,
+    /// which is right for configuration and wrong for a capability. Two
+    /// decisions in the framework are answered by port-supplied properties --
+    /// which transport a device's push subscription is created for, and whether
+    /// a model download has to be digest-pinned -- and an application that set
+    /// either key for its own reasons silently changed a routing or a security
+    /// decision it had no intention of making. Those two ask through here.
+    ///
+    /// Use `#getProperty(String, String)` for anything an application is
+    /// entitled to override, which is almost everything.
+    ///
+    /// #### Returns
+    ///
+    /// the implementation's value, or `defaultValue` when it has none
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the property
+    ///
+    /// - `defaultValue`: the value to answer when the implementation has none
+    String getImplementationProperty(String key, String defaultValue) {
+        return impl.getProperty(key, defaultValue);
+    }
+
+    /// Whether this port's device subscribes to push through APNs.
+    ///
+    /// A capability, so it is answered by the port and not by
+    /// `#getProperty(String, String)`: `cn1_push_prefix` is a key an
+    /// application may legitimately set -- `Push.getPushKey()` reads exactly
+    /// that override -- and letting the override answer here sent provider
+    /// "native" for a device that registers with APNs, so no deliverable
+    /// subscription was ever created.
+    ///
+    /// Narrow on purpose. The generic port-property accessor behind it stays
+    /// package private: an application has no business reading arbitrary
+    /// implementation properties, and every widening of that surface is
+    /// permanent.
+    ///
+    /// #### Returns
+    ///
+    /// true when the port registers with APNs
+    public boolean isApnsPushDevice() {
+        return "ios".equals(getImplementationProperty("cn1_push_prefix", ""));
+    }
+
+    /// Whether this port follows HTTP redirects below the portable network
+    /// layer, so the framework cannot see where a download actually came from.
+    ///
+    /// A capability for the same reason as `#isApnsPushDevice()`: it decides
+    /// whether a model download must be digest pinned, and reading it through
+    /// `#getProperty(String, String)` would let application or library code
+    /// switch that verification off.
+    ///
+    /// #### Returns
+    ///
+    /// true when redirects are followed natively
+    public boolean isNativeRedirects() {
+        // The literal rather than ModelCache.NATIVE_REDIRECTS_PROPERTY, which is
+        // package private in com.codename1.ai.inference and deliberately staying
+        // that way. InferenceApiTest sets the property through that constant and
+        // asserts the behaviour this method drives, so the two spellings cannot
+        // drift apart without a test failing.
+        return "true".equals(getImplementationProperty("cn1.nativeRedirects", "false"));
+    }
+
     /// Sets a local property to the application, this method has no effect on the
     /// implementation code and only allows the user to override the logic of getProperty
     /// for internal application purposes.
@@ -8575,15 +8643,102 @@ public final class Display extends CN1Constants {
         if (f == null) {
             return;
         }
+        // Once a component has taken the gesture it keeps it, updates and
+        // release alike, for as long as the gesture lasts. A magnify carries a
+        // location on every event and the layout under it moves as the component
+        // zooms, so hit-testing each update let one gesture drive two components:
+        // whichever did not get the release was left mid-pinch -- an ImageViewer
+        // that never receives pinchReleased() stays in isPinchZooming and never
+        // commits currentZoom -- and pinning only the release just moved which of
+        // the two was stranded.
+        //
+        // Scoped by pinchGestureActive, which is what makes this safe. A claim
+        // with no end would swallow every later gesture in the process, and ends
+        // are not guaranteed: a gesture can be cancelled, and fireMagnifyGesture
+        // is public and driven directly by tests and by ports with no gesture
+        // phases at all. So the claim exists only between an explicit begin and
+        // its release; a producer that reports no begin hit-tests every update,
+        // exactly as before, and is no worse off than it was.
+        // getTopLevelContainer(), not getComponentForm(). The latter returns null
+        // for a component hosted in a desktop Window -- its own javadoc says so,
+        // because a Window is not a Form -- so this attachment check was always
+        // false inside a secondary window and the claim was bypassed for exactly
+        // the case this port exists to support: every update fell through to a
+        // fresh hit test and the component that started the gesture could lose
+        // the release.
+        if (pinchGestureActive && pinchGestureTarget != null
+                && pinchGestureTarget.getTopLevelContainer() != null) {
+            pinchGestureTarget.pinch(scale);
+            return;
+        }
         Component cmp = gestureComponentAt(f, x, y);
         if (cmp == null) {
             cmp = f;
         }
         while (cmp != null) {
             if (cmp.pinch(scale)) {
+                // Recorded ONLY inside a reported gesture. A producer with no
+                // phases never calls firePinchReleaseGesture, so nothing would
+                // ever read this field or clear it -- and Display is a singleton,
+                // so the component and the form hierarchy behind it would be
+                // pinned for the life of the process, surviving every navigation
+                // away from it. Windows, Linux and JavaSE are exactly that kind
+                // of producer: they call Desktop.windowMagnifyGesture and
+                // nothing else.
+                //
+                // Recording it for them bought nothing even before the leak: the
+                // release it was meant to route never arrives.
+                if (pinchGestureActive) {
+                    pinchGestureTarget = cmp;
+                }
                 return;
             }
             cmp = cmp.getParent();
+        }
+    }
+
+    /// True between a reported gesture begin and its release. See
+    /// `#windowMagnifyGestureImpl` for why the claim is scoped rather than held
+    /// from the first consumption.
+    private boolean pinchGestureActive;
+
+    /// Starts a magnify (pinch) gesture. Invoked by the implementation when the
+    /// platform reports that a gesture began, before any scale is delivered.
+    ///
+    /// A port that reports this gets the gesture delivered to one component for
+    /// its whole duration; one that does not keeps the older behaviour of
+    /// resolving the component from the coordinates on every update. Reporting it
+    /// also discards a claim whose release never arrived, so a cancelled gesture
+    /// cannot strand the next one.
+    public void firePinchBeginGesture() {
+        pinchGestureActive = true;
+        pinchGestureTarget = null;
+    }
+
+    /// The component that consumed the magnify gesture currently in progress.
+    ///
+    /// Held so the end of the gesture can reach the same component. A touch
+    /// pinch also arrives as two pointers, and `Component#pointerDragged(int[], int[])`
+    /// ends it from there; a trackpad gesture produces no pointer events at all,
+    /// so without this a component that zooms would stay in its pinching state
+    /// after the user's fingers left the trackpad.
+    private Component pinchGestureTarget;
+
+    /// Ends the magnify (pinch) gesture in progress, notifying whichever component
+    /// consumed it. Invoked by the implementation when the platform reports that
+    /// the gesture finished; does nothing when no component took the gesture.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the gesture x position in display pixels
+    ///
+    /// - `y`: the gesture y position in display pixels
+    public void firePinchReleaseGesture(int x, int y) {
+        Component cmp = pinchGestureTarget;
+        pinchGestureTarget = null;
+        pinchGestureActive = false;
+        if (cmp != null) {
+            cmp.pinchReleased(x, y);
         }
     }
 

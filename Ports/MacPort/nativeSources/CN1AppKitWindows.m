@@ -1,0 +1,1664 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+#import <AppKit/AppKit.h>
+#import "METALView.h"
+#import "CN1MacHost.h"
+#import "CN1AppKitCompat.h"
+#import "CN1AppKitWindows.h"
+#import <objc/runtime.h>
+#import "CodenameOne_GLViewController.h"
+#include "cn1_globals.h"
+#include "java_lang_String.h"
+
+// Shared with Mac Catalyst; defined in IOSNative.m.
+extern void CN1MacWindowDeliverClose(int windowId);
+extern void CN1MacWindowDeliverClosed(int windowId);
+extern void CN1MacWindowDeliverMonitorsChanged(void);
+extern void CN1MacWindowDeliverMoved(int windowId);
+extern void CN1MacWindowDeliverWindowMonitorChanged(int windowId);
+extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
+extern void CN1MacWindowDeliverContentReady(int windowId);
+extern void CN1MacWindowDeliverVisibility(int windowId, BOOL shown);
+extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
+
+/*
+ * Native macOS desktop windows.
+ *
+ * Where the Mac Catalyst implementation needs a free-scene pool, a pending-slot
+ * queue, NSUserActivity activation requests with generation counters and a
+ * multi-step asynchronous settle loop -- because Catalyst cannot simply create a
+ * window -- AppKit returns one synchronously from an initializer. That is why
+ * this file is a fraction of the size of CN1MacWindows.m and why none of that
+ * machinery appears here.
+ */
+
+@implementation CN1MacWindow
+- (BOOL)canBecomeKeyWindow {
+    return self.cn1AcceptsKey && [super canBecomeKeyWindow];
+}
+@end
+
+@implementation CN1MacPanel
+- (BOOL)canBecomeKeyWindow {
+    return self.cn1AcceptsKey && [super canBecomeKeyWindow];
+}
+@end
+
+@interface CN1MacWindowRecord : NSObject <NSWindowDelegate>
+@property (nonatomic, assign) int windowId;
+@property (nonatomic, assign) int slot;
+@property (nonatomic, retain) NSWindow *window;
+@property (nonatomic, retain) METALView *view;
+@property (nonatomic, assign) BOOL inputEnabled;
+@property (nonatomic, assign) BOOL utility;
+@property (nonatomic, assign) BOOL disposed;
+@property (nonatomic, assign) NSModalSession modalSession;
+/// The owner this window is to be attached to on its first show. Held rather
+/// than attached at creation because addChildWindow: orders the child in
+/// immediately, and a window created hidden must not appear because it acquired
+/// an owner. assign, not retain: AppKit owns its windows and a retain here would
+/// be a cycle through the child's own delegate.
+@property (nonatomic, assign) NSWindow *pendingOwner;
+/// Set when the application was hidden while this window was on screen, so
+/// unhiding restores exactly the windows the hide took away and no others. A
+/// window already miniaturized when the hide arrived reported itself hidden
+/// then and must stay that way.
+@property (nonatomic, assign) BOOL hiddenByApp;
+/// Set when this window's OWNER going off screen took it with it, so the
+/// owner's restore brings back exactly those and not a child the
+/// application had already hidden itself.
+@property (nonatomic, assign) BOOL hiddenByOwner;
+/// The minimum size as the framework asked for it, in this window's pixels.
+/// contentMinSize is points, and AppKit keeps the point value across a move
+/// to a display of another scale -- so the pixel minimum the application set
+/// silently halved or doubled. Kept so it can be recomputed. Zero means none.
+@property (nonatomic, assign) int minWidthPixels;
+@property (nonatomic, assign) int minHeightPixels;
+@end
+
+/// Reports a window's visibility and that of every window it owns.
+/// Defined below the window table; declared here because the record's own
+/// delegate methods are the first callers.
+static void cn1DeliverHiddenWithOwner(CN1MacWindowRecord *rec);
+static void cn1ApplyMinimumSize(CN1MacWindowRecord *rec);
+extern void CN1MacWindowVisibilityChanged(void);
+static void cn1DeliverShownWithOwner(CN1MacWindowRecord *rec);
+
+@implementation CN1MacWindowRecord
+
+- (BOOL)windowShouldClose:(NSWindow *)sender {
+    // The framework decides whether the window actually closes -- it may have a
+    // close handler that vetoes -- so the close is reported and NO returned. If
+    // it agrees, it calls back through dispose().
+    CN1MacWindowDeliverClose(self.windowId);
+    return NO;
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+    CN1MacWindowDeliverClosed(self.windowId);
+}
+
+- (void)windowDidResize:(NSNotification *)notification {
+    METALView *v = self.view;
+    CGFloat scale = CN1AppKitBackingScale(v);
+    NSSize size = v.bounds.size;
+    int w = (int)(size.width * scale);
+    int h = (int)(size.height * scale);
+    [v updateFrameBufferSize:w h:h];
+    CN1MacWindowDeliverResize(self.windowId, w, h);
+}
+
+- (void)windowDidBecomeKey:(NSNotification *)notification {
+    CN1MacWindowDeliverFocus(self.windowId, YES);
+}
+
+- (void)windowDidResignKey:(NSNotification *)notification {
+    CN1MacWindowDeliverFocus(self.windowId, NO);
+}
+
+- (void)windowDidMove:(NSNotification *)notification {
+    // Nothing else reports a user drag, so without this Window.moved() never
+    // runs and an application cannot persist where its windows were left.
+    CN1MacWindowDeliverMoved(self.windowId);
+}
+
+- (void)windowWillMiniaturize:(NSNotification *)notification {
+    // A minimized window is a hidden one as far as the framework is concerned:
+    // nativeVisible stays true otherwise, so it keeps painting and animating
+    // into a window nobody can see, and the Minimized event never fires.
+    //
+    // WILL, not DID: the cascade records which owned windows were on screen, and
+    // by the time miniaturization has happened every one of them reports NO and
+    // a child the application had hidden itself is indistinguishable from one
+    // the owner took down.
+    cn1DeliverHiddenWithOwner(self);
+    // Deliberately NOT refreshing the aggregate here. isVisible is still YES at
+    // this point -- that is the whole reason the cascade runs now -- so asking
+    // "is any window still on screen" would answer yes about the window being
+    // minimized, and the answer is recomputed in windowDidMiniaturize: instead.
+}
+
+- (void)windowDidMiniaturize:(NSNotification *)notification {
+    // The aggregate, once AppKit has actually changed isVisible. Minimizing the
+    // last visible window while the main one was already minimized otherwise
+    // left the application unsuspended with nothing on screen: painting and
+    // timers carried on, because the only refresh ran a moment too early to see
+    // it go.
+    CN1MacWindowVisibilityChanged();
+}
+
+- (void)windowDidDeminiaturize:(NSNotification *)notification {
+    cn1DeliverShownWithOwner(self);
+    CN1MacWindowVisibilityChanged();
+}
+
+- (void)windowDidChangeScreen:(NSNotification *)notification {
+    // This window's own change, not the topology's. Reporting a drag onto a
+    // second display as monitorsChanged fired every application monitor
+    // listener and relayed out every window, for something that happened to
+    // one of them; monitorsChanged is for a display being attached, removed or
+    // reconfigured.
+    CN1MacWindowDeliverWindowMonitorChanged(self.windowId);
+}
+
+- (void)windowDidChangeBackingProperties:(NSNotification *)notification {
+    // The minimum first: it is stored in points and the scale that produced it
+    // has just changed, so leaving it alone turns a 400-pixel minimum set on a
+    // 2x display into 200 on a 1x one.
+    cn1ApplyMinimumSize(self);
+    [self windowDidResize:notification];
+    CN1MacWindowDeliverWindowMonitorChanged(self.windowId);
+}
+
+#ifndef CN1_USE_ARC
+- (void)dealloc {
+    [_window release];
+    [_view release];
+    [super dealloc];
+}
+#endif
+
+@end
+
+/// Slot table. A slot is never reused while a record is alive, and a destroyed
+/// window leaves NSNull behind, so a stale slot from Java fails as a lookup miss
+/// rather than as a wild pointer or as an operation on somebody else's window.
+static NSMutableArray *cn1MacWindows = nil;
+static BOOL cn1MacWatchingScreens = NO;
+
+static NSMutableArray *cn1WindowTable(void) {
+    if (cn1MacWindows == nil) {
+        cn1MacWindows = [[NSMutableArray alloc] init];
+    }
+    return cn1MacWindows;
+}
+
+static CN1MacWindowRecord *cn1WindowAt(int slot) {
+    NSMutableArray *table = cn1WindowTable();
+    if (slot < 0 || slot >= (int)table.count) {
+        return nil;
+    }
+    id entry = [table objectAtIndex:slot];
+    return entry == [NSNull null] ? nil : (CN1MacWindowRecord *)entry;
+}
+
+/// The record owning this AppKit window, or nil for a window we did not create.
+/// The record carrying this framework window id, or nil if none does.
+static CN1MacWindowRecord *cn1RecordForWindowId(int windowId) {
+    for (id entry in cn1WindowTable()) {
+        if (entry == [NSNull null]) {
+            continue;
+        }
+        CN1MacWindowRecord *rec = (CN1MacWindowRecord *)entry;
+        if (!rec.disposed && rec.windowId == windowId) {
+            return rec;
+        }
+    }
+    return nil;
+}
+
+static CN1MacWindowRecord *cn1RecordForWindow(NSWindow *window) {
+    if (window == nil) {
+        return nil;
+    }
+    for (id entry in cn1WindowTable()) {
+        if (entry == [NSNull null]) {
+            continue;
+        }
+        CN1MacWindowRecord *rec = (CN1MacWindowRecord *)entry;
+        if (rec.window == window) {
+            return rec;
+        }
+    }
+    return nil;
+}
+
+/// Reports a window hidden, and the windows it takes off screen with it.
+///
+/// AppKit removes owned windows with their owner and restores them with it, but
+/// posts no notification for the child, so reporting only the owner left a child
+/// with nativeVisible still true: painting, animating and answering
+/// isWindowShowing() while absent from the screen. The inherited cascade in
+/// MacWindowManager cannot cover this -- it walks a Catalyst peer list that
+/// AppKitWindowManager never populates -- so the cascade belongs here, where
+/// AppKit's ownership graph is the source of truth.
+///
+/// Only children that are actually on screen are marked. A child the application
+/// had already hidden with Window.hide() stays in childWindows, and restoring it
+/// with its owner would announce a window nobody asked to show. That is why this
+/// has to run BEFORE the owner leaves the screen, while isVisible still
+/// distinguishes the two.
+///
+/// The child list is snapshotted because delivering runs Java, which can close a
+/// window and mutate the collection being enumerated.
+static void cn1DeliverHiddenWithOwner(CN1MacWindowRecord *rec) {
+    if (rec == nil || rec.window == nil) {
+        return;
+    }
+    CN1MacWindowDeliverVisibility(rec.windowId, NO);
+    NSArray *children = [NSArray arrayWithArray:rec.window.childWindows];
+    for (NSWindow *child in children) {
+        CN1MacWindowRecord *childRec = cn1RecordForWindow(child);
+        if (childRec == nil || childRec.disposed || !child.isVisible) {
+            continue;
+        }
+        childRec.hiddenByOwner = YES;
+        cn1DeliverHiddenWithOwner(childRec);
+    }
+}
+
+/// Reports a window shown, and restores the children its hiding took away.
+static void cn1DeliverShownWithOwner(CN1MacWindowRecord *rec) {
+    if (rec == nil || rec.window == nil) {
+        return;
+    }
+    CN1MacWindowDeliverVisibility(rec.windowId, YES);
+    NSArray *children = [NSArray arrayWithArray:rec.window.childWindows];
+    for (NSWindow *child in children) {
+        CN1MacWindowRecord *childRec = cn1RecordForWindow(child);
+        if (childRec == nil || childRec.disposed || !childRec.hiddenByOwner) {
+            continue;
+        }
+        childRec.hiddenByOwner = NO;
+        cn1DeliverShownWithOwner(childRec);
+    }
+}
+
+/// Runs a block on the main thread and waits. Every AppKit call here has to be
+/// on the main thread, and the framework calls in from the event dispatch
+/// thread; waiting rather than dispatching asynchronously is what lets a
+/// getter return an answer at all.
+static void cn1OnMain(dispatch_block_t block) {
+    if ([NSThread isMainThread]) {
+        block();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
+}
+
+static CGFloat cn1DesktopScale(void);
+
+/// Codename One works in device pixels and AppKit in points, so every geometry
+/// value crossing the bridge is scaled by the window's backing factor.
+/// The window's OWN backing scale, for drawable sizes only.
+///
+/// Never for a desktop coordinate: see cn1DesktopScale.
+static CGFloat cn1WindowScale(CN1MacWindowRecord *rec) {
+    if (rec != nil && rec.window != nil) {
+        return rec.window.backingScaleFactor;
+    }
+    // No window means no drawable, so the answer is arbitrary -- but it must not
+    // be ARBITRARY PER CALL. mainScreen follows the key window, so the fallback
+    // changed as the user moved focus between displays of different densities.
+    return cn1DesktopScale();
+}
+
+/// The single scale every desktop coordinate is expressed in.
+///
+/// AppKit lays every screen out in ONE point space whose origin is the primary
+/// screen's bottom left, so a position only means something when the whole
+/// topology shares one conversion. Scaling each screen's origin by its own
+/// backing factor produced a space where the rectangles overlap: a 1440pt
+/// Retina primary reports 2880 wide, while the 1x display to its right still
+/// reports its origin as 1440, so placing a window there put it back on the
+/// primary. The primary's factor is the one that pairs with
+/// cn1PrimaryScreenHeight, which the y flip already uses for exactly this
+/// reason.
+static CGFloat cn1DesktopScale(void) {
+    // screens[0], not mainScreen. NSScreen.mainScreen is the screen holding the
+    // KEY WINDOW, not the primary one, so on a mixed-DPI setup this changed the
+    // unit of every window bound and monitor rectangle as focus moved between a
+    // Retina and a 1x display -- while the y flip above stayed on screens[0],
+    // leaving the two halves of one conversion disagreeing. A restored window
+    // then jumps or resizes for no reason the user did anything to cause.
+    NSArray<NSScreen *> *screens = [NSScreen screens];
+    if (screens.count == 0) {
+        return 1;
+    }
+    CGFloat s = [screens objectAtIndex:0].backingScaleFactor;
+    return s > 0 ? s : 1;
+}
+
+/// AppKit's global coordinate space has its origin at the primary screen's
+/// bottom left; Codename One's has it at the top left. Converting needs the
+/// primary screen's height rather than the window's own screen, which is the
+/// classic multi-display bug in a Mac port -- and one that never shows up on a
+/// single display machine.
+static CGFloat cn1PrimaryScreenHeight(void) {
+    NSArray<NSScreen *> *screens = [NSScreen screens];
+    if (screens.count == 0) {
+        return 0;
+    }
+    return [screens objectAtIndex:0].frame.size.height;
+}
+
+static NSRect cn1ToAppKitFrame(NSRect topLeftFrame) {
+    NSRect r = topLeftFrame;
+    r.origin.y = cn1PrimaryScreenHeight() - topLeftFrame.origin.y - topLeftFrame.size.height;
+    return r;
+}
+
+static NSRect cn1FromAppKitFrame(NSRect appKitFrame) {
+    NSRect r = appKitFrame;
+    r.origin.y = cn1PrimaryScreenHeight() - appKitFrame.origin.y - appKitFrame.size.height;
+    return r;
+}
+
+/// Blocks cannot capture a C array, so geometry crossing the main-thread hop
+/// travels in a struct.
+typedef struct {
+    int x;
+    int y;
+    int width;
+    int height;
+} CN1MacBounds;
+
+static NSScreen *cn1ScreenAt(int monitor) {
+    NSArray<NSScreen *> *screens = [NSScreen screens];
+    if (screens.count == 0) {
+        return nil;
+    }
+    if (monitor < 0 || monitor >= (int)screens.count) {
+        return [screens objectAtIndex:0];
+    }
+    return [screens objectAtIndex:monitor];
+}
+
+static int cn1IndexOfScreen(NSScreen *screen) {
+    NSArray<NSScreen *> *screens = [NSScreen screens];
+    NSUInteger idx = screen == nil ? NSNotFound : [screens indexOfObject:screen];
+    return idx == NSNotFound ? 0 : (int)idx;
+}
+
+/// Builds the window, or rebuilds it around an existing view when the utility
+/// flag changes -- AppKit decides panel behaviour at initialization, so there is
+/// no way to promote a window to a panel in place.
+static NSWindow *cn1MakeWindow(NSRect contentRect, BOOL decorated, BOOL resizable, BOOL utility) {
+    NSWindowStyleMask mask;
+    if (decorated) {
+        mask = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+             | NSWindowStyleMaskMiniaturizable;
+        if (resizable) {
+            mask |= NSWindowStyleMaskResizable;
+        }
+        if (utility) {
+            mask |= NSWindowStyleMaskUtilityWindow;
+        }
+    } else {
+        // A real frameless window, which is the thing Mac Catalyst cannot do:
+        // there it can only hide the title bar's contents and the frame stays.
+        mask = NSWindowStyleMaskBorderless;
+        if (resizable) {
+            mask |= NSWindowStyleMaskResizable;
+        }
+    }
+    Class cls = utility ? [CN1MacPanel class] : [CN1MacWindow class];
+    NSWindow *w = [[cls alloc] initWithContentRect:contentRect
+                                         styleMask:mask
+                                           backing:NSBackingStoreBuffered
+                                             defer:NO];
+    CN1MacWindowSetAcceptsKey(w, YES);
+    w.releasedWhenClosed = NO;
+    if (utility) {
+        ((NSPanel *)w).floatingPanel = NO;
+        ((NSPanel *)w).becomesKeyOnlyIfNeeded = NO;
+    }
+    if (!decorated) {
+        w.movableByWindowBackground = YES;
+    }
+    // A window created after the theme resolved has to adopt the forced
+    // appearance too, or its title bar stays light under a dark application.
+    extern void CN1MacApplyForcedAppearance(NSWindow *w);
+    CN1MacApplyForcedAppearance(w);
+    return w;
+}
+
+// ---- natives -------------------------------------------------------------
+
+JAVA_INT com_codename1_impl_mac_MacNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_int_boolean_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT windowId, JAVA_OBJECT titleObj, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_INT ownerSlot, JAVA_BOOLEAN positionSet) {
+    NSString *title = titleObj != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG titleObj)
+        : @"";
+    __block int slot = -1;
+    cn1OnMain(^{
+        // The desktop scale, because x/y are desktop coordinates -- the same
+        // unit setBounds and the monitor rectangles use. Reading mainScreen here
+        // meant a window created while a 1x display held focus was placed and
+        // sized in that display's unit and then reported back in the primary's.
+        CGFloat scale = cn1DesktopScale();
+        // The OUTER frame, the same rectangle setBounds and getBounds carry and
+        // the same one the JavaSE port applies with setSize/setLocation. This
+        // used to be read as the CONTENT rect, on the reasoning that the size an
+        // application asks for is the area it draws into -- but then a
+        // setWindowBounds() before show() came back from getBounds() taller by
+        // the title bar and with its top edge moved up, because the two ends of
+        // the round trip did not mean the same rectangle. Whatever the merits of
+        // either unit, the SPI has one, and getBounds already documents it.
+        NSRect requested = NSMakeRect(x / scale, y / scale,
+                                      MAX(width / scale, 1), MAX(height / scale, 1));
+        // cn1MakeWindow takes a content rect; the requested frame is applied
+        // below, where there is a window to convert between the two with.
+        NSWindow *w = cn1MakeWindow(requested, decorated != 0, resizable != 0, NO);
+        if (w == nil) {
+            return;
+        }
+        if (positionSet != 0) {
+            // One scale for the whole rectangle, and the desktop one -- the same
+            // cn1DesktopScale that setBounds, getBounds and the monitor
+            // rectangles use. This used to re-divide the SIZE by the window's own
+            // backing factor once it had landed, so that a window asked for on a
+            // 1x display would not come up half as wide. That trades one unit for
+            // two: getBounds still multiplies the frame by the primary scale, so
+            // a 400-pixel window placed on a 1x secondary was created 400 points
+            // wide and reported back as 800 -- and bounds saved and restored grew
+            // on every cycle. cn1WindowScale's own rule says it: the window's
+            // backing factor is for drawable sizes, never for a desktop
+            // coordinate. The drawable still gets it, through
+            // updateFrameBufferSize below.
+            [w setFrame:cn1ToAppKitFrame(requested) display:NO];
+        } else {
+            // Nobody asked for a position, but the size is still the outer one,
+            // so it cannot be left as the content rect the window was built with.
+            NSRect sized = w.frame;
+            sized.size = requested.size;
+            [w setFrame:sized display:NO];
+            [w center];
+        }
+        // Re-read rather than reused: the window may have been resized for its
+        // display just above, and the view and its framebuffer have to follow
+        // what the window actually is.
+        NSRect content = [w contentRectForFrameRect:w.frame];
+        w.title = title;
+
+        METALView *view = [[METALView alloc] initWithFrame:NSMakeRect(0, 0,
+                                                                      content.size.width,
+                                                                      content.size.height)];
+        view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+        view.cn1WindowId = windowId;
+        w.contentView = view;
+        [w makeFirstResponder:view];
+
+        CN1MacWindowRecord *rec = [[CN1MacWindowRecord alloc] init];
+        rec.windowId = windowId;
+        rec.window = w;
+        rec.view = view;
+        rec.inputEnabled = YES;
+        w.delegate = rec;
+
+        NSMutableArray *table = cn1WindowTable();
+        slot = (int)table.count;
+        rec.slot = slot;
+        [table addObject:rec];
+
+        // Ownership, once the window exists and is in the table. AppKit keeps a
+        // child above its owner and carries it through the owner's minimize,
+        // hide and close -- which is the whole of what an owned dialog or a
+        // palette means, and none of it happened while the owner was recorded
+        // only on the Java Peer.
+        NSWindow *owner = nil;
+        if (ownerSlot == -2) {
+            owner = [CN1MacHost sharedHost].window;
+        } else if (ownerSlot >= 0) {
+            CN1MacWindowRecord *ownerRec = cn1WindowAt(ownerSlot);
+            owner = ownerRec == nil ? nil : ownerRec.window;
+        }
+        // addChildWindow: orders the child in immediately, so it is deferred to
+        // the first show rather than applied here -- a window created hidden must
+        // not appear because it acquired an owner.
+        rec.pendingOwner = owner;
+
+        CGFloat s = w.backingScaleFactor;
+        [view updateFrameBufferSize:(int)(content.size.width * s)
+                                  h:(int)(content.size.height * s)];
+#ifndef CN1_USE_ARC
+        [rec release];
+        [view release];
+        [w release];
+#endif
+    });
+    return slot;
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowDestroy___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil) {
+            return;
+        }
+        rec.disposed = YES;
+        // Before the window goes: activeRenderingView does not retain what it
+        // points at, and a paint that claimed this window and never reached its
+        // flush -- the window was closed under it -- left the claim standing.
+        // The next frame then drew into a freed view, which is a main-thread
+        // segfault one test after the one that closed the window.
+        [[CN1MacHost sharedHost] forgetRenderingView:rec.view];
+        // And drop the framebuffer now rather than whenever the view happens to
+        // be deallocated. The screen and stencil textures are a window's worth
+        // of pixels each -- megabytes -- and the view can outlive this call in
+        // an autorelease pool or behind a reference AppKit has not let go of
+        // yet, so a loop that opens and closes windows would hold several
+        // windows' worth at once. Safe to call twice: deleteFramebuffer nils
+        // what it releases, and METALView's dealloc calls it again.
+        [rec.view deleteFramebuffer];
+        if (rec.modalSession != NULL) {
+            [NSApp endModalSession:rec.modalSession];
+            rec.modalSession = NULL;
+        }
+        rec.window.delegate = nil;
+        // Anything still remembering this window as its owner has to forget it
+        // first. pendingOwner does not retain -- it cannot, the relationship is
+        // AppKit's -- and the record about to be dropped holds the last
+        // reference to the window, so a child left pointing here would message a
+        // freed NSWindow the next time it was shown.
+        for (id entry in cn1WindowTable()) {
+            if (entry == [NSNull null]) {
+                continue;
+            }
+            CN1MacWindowRecord *other = (CN1MacWindowRecord *)entry;
+            if (other.pendingOwner == rec.window) {
+                other.pendingOwner = nil;
+            }
+        }
+        [rec.window orderOut:nil];
+        [rec.window close];
+        [cn1WindowTable() replaceObjectAtIndex:slot withObject:[NSNull null]];
+        // A destroyed window is one fewer on screen.
+        CN1MacWindowVisibilityChanged();
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowShow___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN visible) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil) {
+            return;
+        }
+        if (visible != 0) {
+            // Attached on show, so the child is ordered in with its owner rather
+            // than ahead of it.
+            //
+            // On EVERY show, not just the first, and the owner is remembered
+            // rather than consumed. orderOut: on a child detaches it from its
+            // parent -- measured: parentWindow is nil afterwards -- so hiding an
+            // owned window and showing it again used to lose the relationship
+            // for good, leaving a palette that no longer floated above its
+            // window or closed with it. The parentWindow test is what the
+            // clearing used to be for: re-adding a child that is still attached
+            // reorders it, which would jump a palette back in front every time
+            // its window is shown again.
+            if (rec.pendingOwner != nil && rec.pendingOwner != rec.window
+                    && rec.window.parentWindow == nil) {
+                [rec.pendingOwner addChildWindow:rec.window ordered:NSWindowAbove];
+            }
+            [rec.window makeKeyAndOrderFront:nil];
+            // The application's own decision outranks the app-hide bookkeeping:
+            // whatever unhiding would have done for this window, it has just
+            // been said explicitly. Both flags, so a later owner restore does not
+            // announce a window the application already showed.
+            rec.hiddenByApp = NO;
+            rec.hiddenByOwner = NO;
+            cn1DeliverShownWithOwner(rec);
+            CN1MacWindowVisibilityChanged();
+            // AppKit hands back a usable window synchronously, so the content is
+            // ready as soon as it is on screen. Catalyst has to wait for a scene
+            // to activate before it can say this.
+            CN1MacWindowDeliverContentReady(rec.windowId);
+        } else {
+            // Cascaded BEFORE orderOut:, for the same reason the miniaturize
+            // path uses windowWillMiniaturize: the cascade records which owned
+            // windows were on screen, and ordering the owner out first makes a
+            // child the application had already hidden indistinguishable from
+            // one this call is taking down.
+            cn1DeliverHiddenWithOwner(rec);
+            [rec.window orderOut:nil];
+            // Cleared for the same reason, and this is the direction that
+            // matters: hiding a window while the application itself is hidden --
+            // or while its OWNER is off screen -- must not be undone when that
+            // owner or the application comes back. Both flags, because the owner
+            // may have gone first and marked this child before the application
+            // hid it explicitly.
+            rec.hiddenByApp = NO;
+            rec.hiddenByOwner = NO;
+            CN1MacWindowVisibilityChanged();
+        }
+    });
+}
+
+JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macWindowReopen___int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+    __block BOOL ok = NO;
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil || rec.disposed) {
+            return;
+        }
+        [rec.window makeKeyAndOrderFront:nil];
+        rec.hiddenByApp = NO;
+        rec.hiddenByOwner = NO;
+        cn1DeliverShownWithOwner(rec);
+        CN1MacWindowVisibilityChanged();
+        ok = YES;
+    });
+    return ok ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetTitle___int_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_OBJECT titleObj) {
+    NSString *title = titleObj != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG titleObj)
+        : @"";
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        rec.window.title = title;
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetBounds___int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil) {
+            return;
+        }
+        // The OUTER frame, matching what getBounds returns. Treating the
+        // request as a content rect and expanding it by the chrome grew the
+        // window by its title bar on every restore, because the value being
+        // restored came from getBounds -- the round trip has to agree, and the
+        // SPI says both ends of it are the rectangle including chrome.
+        CGFloat scale = cn1DesktopScale();
+        NSRect frame = NSMakeRect(x / scale, y / scale,
+                                  MAX(width / scale, 1), MAX(height / scale, 1));
+        [rec.window setFrame:cn1ToAppKitFrame(frame) display:YES];
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowGetBounds___int_int_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_OBJECT outArr) {
+    if (outArr == JAVA_NULL) {
+        return;
+    }
+    JAVA_ARRAY arr = (JAVA_ARRAY)outArr;
+    if (arr->length < 4) {
+        return;
+    }
+    __block CN1MacBounds b = {0, 0, 0, 0};
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil) {
+            return;
+        }
+        // The FRAME, not the content rect: WindowManager.getBounds is documented
+        // to include native chrome, setBounds accepts the same rectangle, and
+        // the Linux and Windows ports both report the outer one. Returning the
+        // content rect made the round trip disagree with the request by exactly
+        // the title bar, which is what breaks restoring a window where the user
+        // left it. getWidth/getHeight remain the drawable-size APIs.
+        CGFloat scale = cn1DesktopScale();
+        NSRect topLeft = cn1FromAppKitFrame(rec.window.frame);
+        b.x = (int)(topLeft.origin.x * scale);
+        b.y = (int)(topLeft.origin.y * scale);
+        b.width = (int)(topLeft.size.width * scale);
+        b.height = (int)(topLeft.size.height * scale);
+    });
+    JAVA_ARRAY_INT *data = (JAVA_ARRAY_INT *)arr->data;
+    data[0] = b.x;
+    data[1] = b.y;
+    data[2] = b.width;
+    data[3] = b.height;
+}
+
+JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macMainWindowGetBounds___int_1ARRAY_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT outArr) {
+    if (outArr == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    JAVA_ARRAY arr = (JAVA_ARRAY)outArr;
+    if (arr->length < 4) {
+        return JAVA_FALSE;
+    }
+    __block CN1MacBounds b = {0, 0, 0, 0};
+    __block BOOL ok = NO;
+    cn1OnMain(^{
+        NSWindow *w = [CN1MacHost sharedHost].window;
+        if (w == nil) {
+            return;
+        }
+        // The shared desktop scale, not this window's own. Monitor rectangles
+        // and every secondary window's bounds are expressed in it, so a main
+        // window on a display of a different density reported a rectangle in a
+        // different space -- and Window.centerOver(Form) then computed a
+        // position in one space that was applied in the other, landing the
+        // window on the wrong monitor. The frame rather than the content rect,
+        // for the same reason getBounds returns the frame.
+        CGFloat scale = cn1DesktopScale();
+        NSRect topLeft = cn1FromAppKitFrame(w.frame);
+        b.x = (int)(topLeft.origin.x * scale);
+        b.y = (int)(topLeft.origin.y * scale);
+        b.width = (int)(topLeft.size.width * scale);
+        b.height = (int)(topLeft.size.height * scale);
+        ok = YES;
+    });
+    if (!ok) {
+        return JAVA_FALSE;
+    }
+    JAVA_ARRAY_INT *data = (JAVA_ARRAY_INT *)arr->data;
+    data[0] = b.x;
+    data[1] = b.y;
+    data[2] = b.width;
+    data[3] = b.height;
+    return JAVA_TRUE;
+}
+
+JAVA_INT com_codename1_impl_mac_MacNative_macWindowGetWidth___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+    __block int value = 0;
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec != nil) {
+            value = (int)(rec.view.bounds.size.width * cn1WindowScale(rec));
+        }
+    });
+    return value;
+}
+
+JAVA_INT com_codename1_impl_mac_MacNative_macWindowGetHeight___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+    __block int value = 0;
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec != nil) {
+            value = (int)(rec.view.bounds.size.height * cn1WindowScale(rec));
+        }
+    });
+    return value;
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetResizable___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN resizable) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil) {
+            return;
+        }
+        if (resizable != 0) {
+            rec.window.styleMask |= NSWindowStyleMaskResizable;
+        } else {
+            rec.window.styleMask &= ~NSWindowStyleMaskResizable;
+        }
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetDecorated___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN decorated) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil) {
+            return;
+        }
+        NSWindow *w = rec.window;
+        BOOL resizable = (w.styleMask & NSWindowStyleMaskResizable) != 0;
+        if (decorated != 0) {
+            NSWindowStyleMask mask = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+                                   | NSWindowStyleMaskMiniaturizable;
+            if (resizable) {
+                mask |= NSWindowStyleMaskResizable;
+            }
+            if (rec.utility) {
+                mask |= NSWindowStyleMaskUtilityWindow;
+            }
+            w.styleMask = mask;
+            w.movableByWindowBackground = NO;
+        } else {
+            w.styleMask = resizable
+                ? (NSWindowStyleMaskBorderless | NSWindowStyleMaskResizable)
+                : NSWindowStyleMaskBorderless;
+            // Without this an undecorated window cannot be moved at all, since
+            // there is no title bar left to drag it by.
+            w.movableByWindowBackground = YES;
+        }
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetMinimumSize___int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_INT width, JAVA_INT height) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil) {
+            return;
+        }
+        // Zero or less clears the constraint, per the WindowManager contract.
+        // Scaling it instead installed a nonpositive minimum: the old constraint
+        // was not lifted, and AppKit is entitled to reject a negative one, so a
+        // window that dropped its minimum kept the previous one.
+        if (width <= 0 || height <= 0) {
+            // The retained request is cleared too, not just the live constraint.
+            // Leaving it set would let the next backing-scale change reapply a
+            // minimum the application had just lifted.
+            rec.minWidthPixels = 0;
+            rec.minHeightPixels = 0;
+            rec.window.contentMinSize = NSZeroSize;
+            return;
+        }
+        rec.minWidthPixels = (int)width;
+        rec.minHeightPixels = (int)height;
+        cn1ApplyMinimumSize(rec);
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetAlwaysOnTop___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN alwaysOnTop) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec != nil) {
+            rec.window.level = alwaysOnTop != 0 ? NSFloatingWindowLevel : NSNormalWindowLevel;
+        }
+    });
+}
+
+/// Defined below, next to the modality natives it belongs with; the utility
+/// rebuild needs it too.
+static void cn1SetWindowChromeEnabled(NSWindow *w, BOOL enabled);
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN utility) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil || rec.utility == (utility != 0)) {
+            return;
+        }
+        // A panel and a window are different classes and AppKit decides which at
+        // initialization, so the flag is applied by rebuilding the window around
+        // the view that is already rendering into it.
+        NSWindow *old = rec.window;
+        BOOL wasVisible = old.isVisible;
+        // Whether it held the keyboard, which is not implied by being on screen.
+        // setUtilityWindow() is a chrome and task-switcher property an
+        // application may set after showing the window, and restoring every
+        // visible window as the key one took the keyboard away from whatever the
+        // user was actually typing into.
+        BOOL wasKey = old.isKeyWindow;
+        // Miniaturization is part of the state being carried over, and it is not
+        // implied by visibility: a miniaturized window reports isVisible NO. Lost
+        // here, the rebuilt window either came back on screen while the framework
+        // still believed it hidden, or stayed ordered out with macWindowRestore()
+        // unable to bring it back, because that path checks isMiniaturized and
+        // would have found NO.
+        BOOL wasMiniaturized = old.isMiniaturized;
+        // Whether it was maximized. The frame it had BEFORE being maximized is
+        // not readable -- AppKit keeps it privately, as the target zoom: would
+        // restore to -- so it is recovered below by un-zooming the outgoing
+        // window once it is off screen. Rebuilding at the maximized frame
+        // instead would make the screen-sized geometry the window's normal one,
+        // and the next toggleMaximize() would have nothing to go back to.
+        BOOL wasZoomed = old.isZoomed;
+        BOOL decorated = (old.styleMask & NSWindowStyleMaskTitled) != 0;
+        BOOL resizable = (old.styleMask & NSWindowStyleMaskResizable) != 0;
+        NSString *title = old.title;
+        METALView *view = rec.view;
+        // Everything else the window had been told, carried across. The
+        // replacement is a different NSWindow, so anything not copied here is
+        // silently lost -- and the framework does not re-apply it, because from
+        // its side nothing changed. Window.show() sets always-on-top before
+        // converting to a utility window, so dropping the level left a window
+        // whose isAlwaysOnTop() is true and which does not float.
+        NSWindowLevel level = old.level;
+        NSSize minSize = old.contentMinSize;
+        NSWindow *owner = old.parentWindow;
+        // The windows this one OWNS, snapshotted before the close below detaches
+        // them. Only the parent link was carried across, so a rebuild left every
+        // child attached to a closed window: they stopped floating above their
+        // owner, and stopped hiding, minimizing and closing with it. The Java
+        // ownership graph still said they were children, so nothing on that side
+        // ever re-established the link. Copied rather than held, because
+        // childWindows is a live array that the detaching below mutates.
+        NSArray *ownedChildren = [NSArray arrayWithArray:old.childWindows];
+        // A modal session belongs to the window it was begun for, so it cannot
+        // outlive this one: left alone it would keep the CLOSED window modal and
+        // leave the visible replacement ordinary. Ended here, restarted below.
+        BOOL wasModal = rec.modalSession != NULL;
+        if (wasModal) {
+            [NSApp endModalSession:rec.modalSession];
+            rec.modalSession = NULL;
+        }
+
+        [view removeFromSuperview];
+        old.delegate = nil;
+        if (owner != nil) {
+            [owner removeChildWindow:old];
+        }
+        for (NSWindow *child in ownedChildren) {
+            [old removeChildWindow:child];
+        }
+        [old orderOut:nil];
+        if (wasZoomed) {
+            // After orderOut, so it costs nothing visible: the window is already
+            // off screen, and this only moves its frame back to what the user
+            // had before maximizing so it can be read.
+            [old zoom:nil];
+        }
+        // Read here rather than with the other state above, because the line
+        // above is what makes it the pre-zoom rectangle.
+        NSRect content = [old contentRectForFrameRect:old.frame];
+        [old close];
+
+        NSWindow *fresh = cn1MakeWindow(content, decorated, resizable, utility != 0);
+        fresh.title = title;
+        [fresh setFrame:[fresh frameRectForContentRect:content] display:NO];
+        fresh.contentView = view;
+        fresh.delegate = rec;
+        fresh.level = level;
+        fresh.contentMinSize = minSize;
+        // Every record that remembered the OLD window as its owner is repointed
+        // at the replacement, before the record below drops the last reference
+        // to it. pendingOwner outlives the first show now, so it is no longer
+        // only the never-shown windows that hold one: a child hidden with
+        // orderOut: has been detached from AppKit's side and is remembered ONLY
+        // here, so it is not in ownedChildren and a sweep of that list would
+        // miss it. Left alone it would be re-attached on its next show to a
+        // window that has been closed and released.
+        //
+        // Before rec.window is reassigned, because that releases old.
+        for (id entry in cn1WindowTable()) {
+            if (entry == [NSNull null]) {
+                continue;
+            }
+            CN1MacWindowRecord *other = (CN1MacWindowRecord *)entry;
+            if (other.pendingOwner == old) {
+                other.pendingOwner = fresh;
+            }
+        }
+        rec.window = fresh;
+        rec.utility = utility != 0;
+        // addChildWindow: ORDERS THE CHILD IN -- measured, not assumed: adding a
+        // window that was off screen puts it on screen. So ownership is only
+        // re-established here for windows that are going to be on screen anyway;
+        // one that is not keeps its owner in pendingOwner and is re-attached by
+        // the next show. Without this, converting a window while the application
+        // was hidden -- which leaves isVisible NO and parentWindow set -- put it
+        // back on screen, and the visibility block below could not take it down
+        // again because it never was visible.
+        BOOL landsOnScreen = wasVisible || wasMiniaturized;
+        if (owner != nil) {
+            // A window still waiting for its first show has no parentWindow at
+            // all and keeps whatever pendingOwner it already had.
+            if (landsOnScreen) {
+                [owner addChildWindow:fresh ordered:NSWindowAbove];
+            } else {
+                rec.pendingOwner = owner;
+            }
+        }
+        // Re-adopted by the replacement, so ownership survives the rebuild in
+        // both directions rather than only upwards -- under the same rule, since
+        // a child can be off screen for the same reasons its owner can.
+        for (NSWindow *child in ownedChildren) {
+            if (child.isVisible || child.isMiniaturized) {
+                [fresh addChildWindow:child ordered:NSWindowAbove];
+            }
+            // A child that is off screen is left to its next show, which finds
+            // the replacement in the pendingOwner the sweep above repointed.
+        }
+        // The view carries cn1InputEnabled across with it, but the chrome is the
+        // new window's own: a window blocked by a modal dialog would otherwise
+        // come back with live close and minimize buttons.
+        cn1SetWindowChromeEnabled(fresh, rec.inputEnabled);
+        if (wasVisible) {
+            if (wasKey) {
+                [fresh makeKeyAndOrderFront:nil];
+            } else {
+                [fresh orderFront:nil];
+            }
+        }
+        if (wasMiniaturized) {
+            // Ordered in first: AppKit miniaturizes a window that is on screen,
+            // and miniaturizing one that never appeared leaves nothing in the
+            // Dock to click.
+            [fresh orderFront:nil];
+            [fresh miniaturize:nil];
+        }
+        if (wasZoomed) {
+            // Built at the pre-zoom frame and maximized after, rather than built
+            // maximized: this is what leaves AppKit holding the user's own frame
+            // as the restore target, which is the whole point of carrying the
+            // state across.
+            [fresh zoom:nil];
+        }
+        [fresh makeFirstResponder:view];
+        if (wasModal) {
+            rec.modalSession = [NSApp beginModalSessionForWindow:fresh];
+        }
+#ifndef CN1_USE_ARC
+        [fresh release];
+#endif
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowMinimize___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+    cn1OnMain(^{
+        [cn1WindowAt(slot).window miniaturize:nil];
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowRestore___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil) {
+            return;
+        }
+        if (rec.window.isMiniaturized) {
+            [rec.window deminiaturize:nil];
+        }
+        // Deliberately NOT un-maximized. restore() undoes minimize and nothing
+        // else -- toggleMaximize() owns that independently -- and deminiaturize:
+        // already brings a window back to whatever size it had. Zooming after it
+        // took a window that was maximized when the user minimized it and
+        // un-maximized it on the way back.
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowToggleMaximize___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+    cn1OnMain(^{
+        [cn1WindowAt(slot).window zoom:nil];
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowRequestFocus___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec != nil) {
+            [rec.window makeKeyAndOrderFront:nil];
+            [rec.window makeFirstResponder:rec.view];
+        }
+    });
+}
+
+/// The window's own chrome, which the framework's input filter cannot reach.
+///
+/// Disabling the rendering view stops content events and nothing else: the title
+/// bar belongs to AppKit, so the close button of a window blocked by a modal
+/// dialog still reached the application and disposed it. That is the exact case
+/// WindowManager.setInputEnabled documents as its reason for existing.
+/// The rendering view of the window with this framework id, or nil.
+///
+/// Native peers are added to a view, and which one has to be decided when the
+/// peer is added rather than inferred from whatever happens to be painting.
+/// Called from the main queue at the moment the peer is attached, so a window
+/// destroyed in the meantime answers nil and the peer falls back to the main
+/// surface instead of being added to a view that no longer has a window.
+/// The window a peer was attached to, remembered ON the peer.
+///
+/// A peer is added to a view more than once: at initialization, and again every
+/// time it comes back from lightweight mode -- a transition, a form change. Only
+/// the first of those is told which Window the component belongs to, and the
+/// later ones run wherever the framework happens to be, so resolving the host
+/// from whatever is painting put a re-shown peer on the main surface even though
+/// it had been placed correctly to begin with. Storing the answer on the view
+/// means every attach after the first uses the same one.
+static const void *CN1MacPeerOwnerKey = &CN1MacPeerOwnerKey;
+
+void CN1MacPeerSetOwnerWindowId(NSView *peer, int windowId) {
+    if (peer == nil) {
+        return;
+    }
+    objc_setAssociatedObject(peer, CN1MacPeerOwnerKey,
+                             windowId < 0 ? nil : [NSNumber numberWithInt:windowId],
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+/// The rendering view of the window this peer was placed in, or nil when it was
+/// never placed in one or that window has since gone.
+NSView *CN1MacPeerOwnerHostView(NSView *peer) {
+    if (peer == nil) {
+        return nil;
+    }
+    NSNumber *windowId = objc_getAssociatedObject(peer, CN1MacPeerOwnerKey);
+    return windowId == nil ? nil : CN1MacPeerHostViewForWindowId([windowId intValue]);
+}
+
+NSView *CN1MacPeerHostViewForWindowId(int windowId) {
+    if (windowId < 0) {
+        return nil;
+    }
+    CN1MacWindowRecord *rec = cn1RecordForWindowId(windowId);
+    return rec != nil ? rec.view : nil;
+}
+
+void CN1MacWindowSetAcceptsKey(NSWindow *w, BOOL accepts) {
+    if ([w respondsToSelector:@selector(setCn1AcceptsKey:)]) {
+        [(CN1MacWindow *)w setCn1AcceptsKey:accepts];
+    }
+}
+
+static void cn1SetWindowChromeEnabled(NSWindow *w, BOOL enabled) {
+    if (w == nil) {
+        return;
+    }
+    // The keyboard, as well as the chrome. Disabling the rendering view makes
+    // the window discard what is typed into it; it does not stop the window
+    // holding the keyboard in the first place, and the modal session this port
+    // begins is never pumped, so it does not stop it either. Without this the
+    // blocked window could take key focus back from the modal one and then throw
+    // away every keystroke aimed at it.
+    CN1MacWindowSetAcceptsKey(w, enabled);
+    if (!enabled && w.isKeyWindow) {
+        // Already holding it, so the gate alone is too late -- it only refuses
+        // the next request. Hand the keyboard to the window that caused the
+        // block. NSApp.modalWindow is the one an application modal session named;
+        // a window modal block names none, and there the framework makes its own
+        // dialog key straight afterwards.
+        NSWindow *modal = [NSApp modalWindow];
+        if (modal != nil && modal != w) {
+            [modal makeKeyAndOrderFront:nil];
+        }
+    }
+    // Enabling restores what the style mask says rather than switching all three
+    // on. AppKit derives these from the mask itself -- a window built without
+    // NSWindowStyleMaskResizable has a dead zoom button -- and this function
+    // overrides that for as long as something is blocking the window. Turning
+    // them all on afterwards therefore left a non-resizable window with a live
+    // zoom button, and an unclosable one with a live close button, purely as a
+    // side effect of a modal having opened and closed in front of it.
+    NSWindowStyleMask mask = w.styleMask;
+    struct {
+        NSWindowButton button;
+        NSWindowStyleMask required;
+    } chrome[] = {
+        { NSWindowCloseButton, NSWindowStyleMaskClosable },
+        { NSWindowMiniaturizeButton, NSWindowStyleMaskMiniaturizable },
+        { NSWindowZoomButton, NSWindowStyleMaskResizable }
+    };
+    for (unsigned i = 0; i < sizeof(chrome) / sizeof(chrome[0]); i++) {
+        NSButton *b = [w standardWindowButton:chrome[i].button];
+        if (b != nil) {
+            b.enabled = enabled && (mask & chrome[i].required) != 0;
+        }
+    }
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetInputEnabled___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN enabled) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil) {
+            return;
+        }
+        rec.inputEnabled = enabled != 0;
+        rec.view.cn1InputEnabled = enabled != 0;
+        cn1SetWindowChromeEnabled(rec.window, enabled != 0);
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macMainWindowSetInputEnabled___boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_BOOLEAN enabled) {
+    cn1OnMain(^{
+        METALView *v = (METALView *)[CN1MacHost sharedHost].renderingView;
+        v.cn1InputEnabled = enabled != 0;
+        // The main window has a title bar too, and blocking it is the whole
+        // point when a modal dialog is up.
+        cn1SetWindowChromeEnabled([CN1MacHost sharedHost].window, enabled != 0);
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetModal___int_boolean_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN modal, JAVA_BOOLEAN applicationWide) {
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil) {
+            return;
+        }
+        // An AppKit modal session stops EVERY other window taking focus, which
+        // is what MODALITY_APPLICATION means and is wrong for MODALITY_WINDOW:
+        // that one blocks the dialog's owner only, and an unrelated top-level
+        // window has to stay usable. Window modality is left to the framework,
+        // which disables the blocked window's input -- and now its chrome too --
+        // through setInputEnabled.
+        if (modal != 0 && applicationWide == 0) {
+            if (rec.modalSession != NULL) {
+                [NSApp endModalSession:rec.modalSession];
+                rec.modalSession = NULL;
+            }
+            return;
+        }
+        if (modal != 0) {
+            if (rec.modalSession == NULL) {
+                // A session rather than runModalForWindow:, which would spin its
+                // own event loop and block the one the application is already
+                // running. The framework enforces the modality itself; this is
+                // what makes the window behave like a Mac modal window while it
+                // does.
+                rec.modalSession = [NSApp beginModalSessionForWindow:rec.window];
+            }
+        } else if (rec.modalSession != NULL) {
+            [NSApp endModalSession:rec.modalSession];
+            rec.modalSession = NULL;
+        }
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetIcon___int_int_1ARRAY_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_OBJECT argbArr, JAVA_INT width, JAVA_INT height) {
+    // A null array is setIcon(null): the application removing the icon, which
+    // has to reach AppKit rather than being dropped here.
+    NSImage *image = nil;
+    if (argbArr != JAVA_NULL) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        JAVA_ARRAY arr = (JAVA_ARRAY)argbArr;
+        if (arr->length < width * height) {
+            return;
+        }
+        image = CN1AppKitNSImageFromARGB((unsigned int *)arr->data, width, height);
+        if (image == nil) {
+            return;
+        }
+    }
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec == nil) {
+            return;
+        }
+        // A window's icon on macOS is its represented file's icon, and a window
+        // with no file has none. Setting the application's icon is the closest
+        // honest equivalent and is what the user actually sees. nil restores the
+        // icon from the bundle -- checked, not assumed.
+        //
+        // One consequence of mapping a per-window property onto a per-process
+        // one: with several windows carrying icons, the last to set or clear one
+        // wins. That is the same trade the set path already makes.
+        [NSApp setApplicationIconImage:image];
+    });
+}
+
+// ---- rendering -----------------------------------------------------------
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowBeginPaint___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+    CN1MacWindowRecord *rec = cn1WindowAt(slot);
+    if (rec != nil) {
+        [CN1MacHost sharedHost].activeRenderingView = rec.view;
+    }
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowFlush___int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
+    CN1MacWindowRecord *rec = cn1WindowAt(slot);
+    if (rec == nil) {
+        // The window went away between beginPaint and here. The claim it made
+        // has to be dropped even though there is nothing left to flush.
+        [CN1MacHost sharedHost].activeRenderingView = nil;
+        return;
+    }
+    [CN1MacHost sharedHost].activeRenderingView = rec.view;
+    [[CodenameOne_GLViewController instance] flushBuffer:nil x:x y:y width:width height:height];
+    // Cleared so anything that paints without claiming a window -- the main
+    // window's own cycle, most of all -- cannot land in this one's drawable.
+    [CN1MacHost sharedHost].activeRenderingView = nil;
+}
+
+JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macWindowCapture___int_int_1ARRAY_int_int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_OBJECT argbArr, JAVA_INT width, JAVA_INT height) {
+    if (argbArr == JAVA_NULL || width <= 0 || height <= 0) {
+        return JAVA_FALSE;
+    }
+    JAVA_ARRAY arr = (JAVA_ARRAY)argbArr;
+    if (arr->length < width * height) {
+        return JAVA_FALSE;
+    }
+    CN1MacWindowRecord *rec = cn1WindowAt(slot);
+    if (rec == nil) {
+        return JAVA_FALSE;
+    }
+    // Read back from the window's own retained render target rather than from a
+    // shared raster: each window has its own, which is the whole reason this
+    // port needs no offscreen image per window.
+    //
+    // This is the texture, so it holds what Codename One drew and NOT the native
+    // peer views AppKit composites above it -- a BrowserComponent or a video
+    // player in the window is absent from the result. Compositing them in is not
+    // one call: cacheDisplayInRect: does not render a layer-hosted CAMetalLayer,
+    // and the peers that matter each need their own snapshot API (WKWebView's is
+    // asynchronous, AVPlayerView has none), so a correct composite is a change of
+    // its own rather than a line here. Documented as a limitation in
+    // Desktop-Windows.asciidoc rather than left for someone to discover.
+    return [rec.view readbackInto:(unsigned int *)arr->data width:width height:height]
+        ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/// Converts the retained pixel minimum into the points AppKit wants.
+///
+/// The WINDOW's own scale, not the desktop one. A minimum size is compared
+/// against what getWidth/getHeight report, and those are this window's drawable
+/// pixels -- so on a 1x secondary window under a 2x primary, a 400-pixel minimum
+/// divided by the desktop scale became 200. Position is desktop-space and size
+/// is drawable-space; this is a size.
+///
+/// Called again whenever the backing scale changes, because contentMinSize holds
+/// points and AppKit carries that value unchanged onto the new display.
+static void cn1ApplyMinimumSize(CN1MacWindowRecord *rec) {
+    if (rec == nil || rec.window == nil) {
+        return;
+    }
+    if (rec.minWidthPixels <= 0 && rec.minHeightPixels <= 0) {
+        rec.window.contentMinSize = NSZeroSize;
+        return;
+    }
+    CGFloat scale = cn1WindowScale(rec);
+    rec.window.contentMinSize = NSMakeSize(rec.minWidthPixels / scale,
+                                           rec.minHeightPixels / scale);
+}
+
+/// Whether any window this port created is still on screen.
+///
+/// The global "surface hidden" state drives applicationDidEnterBackground, and
+/// deriving it from the main window alone told the framework the application had
+/// gone to the background while a secondary window was still visible and being
+/// used -- so timers stopped and resources were released under a live window.
+BOOL CN1MacAnyWindowVisible(void) {
+    for (id entry in cn1WindowTable()) {
+        if (entry == [NSNull null]) {
+            continue;
+        }
+        CN1MacWindowRecord *rec = (CN1MacWindowRecord *)entry;
+        if (!rec.disposed && rec.window != nil && rec.window.isVisible) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+/// Report every on-screen window hidden when the application is hidden, and
+/// restore them when it is unhidden.
+///
+/// Cmd-H (and Hide Others) takes every window off screen, but AppKit posts no
+/// per-window notification for it -- windowDidMiniaturize: fires only for an
+/// actual miniaturize -- so without this a secondary window kept reporting
+/// nativeVisible. Display.shouldEDTSleep() takes its minimized shortcut only
+/// when no window is visible, deliberately, so that a miniaturized main window
+/// cannot park the EDT while a tool window is still on screen animating. Under
+/// a whole-application hide nothing is on screen, so that same guard held the
+/// EDT awake for as long as the user left the application hidden.
+void CN1MacWindowsDeliverAppHidden(BOOL hidden) {
+    NSMutableArray *table = cn1WindowTable();
+    for (id entry in table) {
+        if (entry == [NSNull null]) {
+            continue;
+        }
+        CN1MacWindowRecord *rec = (CN1MacWindowRecord *)entry;
+        if (rec.disposed || rec.window == nil) {
+            continue;
+        }
+        if (hidden) {
+            // isVisible, not isMiniaturized. A window the application already
+            // took off screen with Window.hide() is not miniaturized either, and
+            // marking it would hand it a visible callback on unhide that AppKit
+            // never backs -- the framework would then paint a window that is
+            // still ordered out. isVisible is NO for a miniaturized window too,
+            // so this covers that case as well. It is only meaningful because
+            // the sweep runs from applicationWillHide:, while the windows are
+            // still on screen; by applicationDidHide: they all read NO.
+            if (!rec.window.isVisible || rec.hiddenByApp) {
+                continue;
+            }
+            rec.hiddenByApp = YES;
+            CN1MacWindowDeliverVisibility(rec.windowId, NO);
+        } else if (rec.hiddenByApp) {
+            rec.hiddenByApp = NO;
+            CN1MacWindowDeliverVisibility(rec.windowId, YES);
+        }
+    }
+}
+
+// ---- monitors ------------------------------------------------------------
+
+/// Binds the next text session to a named window rather than to the key window.
+///
+/// The session records its owner when it starts, and it took that from
+/// NSApp.keyWindow -- correct when the user clicked into the field, wrong when
+/// the application called startEditingAsync() on a field in a visible window
+/// that is not key. The Java side knows which Window the component is in, so it
+/// says so here first and startWithText: uses this instead of guessing. Cleared
+/// after one use: an owner named for one session must not silently apply to the
+/// next, which may well be the user clicking somewhere else entirely.
+/// Anchors the next popover presentation in a named window.
+///
+/// Same reasoning as macTextInputSetOwnerWindow: the key window is the right
+/// guess when the user drove the interaction and the wrong one when the
+/// application opened it for a component elsewhere. Takes the framework's window
+/// id; -1 restores the default.
+JAVA_VOID com_codename1_impl_mac_MacNative_macPresentationSetOwnerWindow___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT windowId) {
+    cn1OnMain(^{
+        extern void CN1MacSetPendingHostView(NSView *view);
+        if (windowId == -1) {
+            // No source component at all. Nothing can be named, so the key
+            // window stays the answer.
+            CN1MacSetPendingHostView(nil);
+            return;
+        }
+        if (windowId < 0) {
+            // -2: the main Form's surface, which has no Window and so no id.
+            // Named rather than left to the fallback, which would anchor the
+            // popover in a secondary key window using coordinates measured
+            // against this one.
+            CN1MacSetPendingHostView([CN1MacHost sharedHost].renderingView);
+            return;
+        }
+        CN1MacWindowRecord *rec = cn1RecordForWindowId(windowId);
+        CN1MacSetPendingHostView(rec != nil ? rec.view : nil);
+    });
+}
+
+/// The modifier keys held right now, in PointerEvent's mask.
+///
+/// Display.isShiftKeyDown() and its siblings answer false from the base
+/// implementation unless a port tracks this; MacImplementation reads it here.
+JAVA_INT com_codename1_impl_mac_MacNative_macCurrentModifiers___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    extern int CN1MacCurrentModifiers(void);
+    return CN1MacCurrentModifiers();
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macTextInputSetOwnerWindow___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT windowId) {
+    cn1OnMain(^{
+        extern void CN1MacTextInputSetPendingOwner(NSView *view);
+        if (windowId == -1) {
+            // Nobody could say which surface this belongs to -- a TextInputClient
+            // that is not a Component, which the Java side passes as -1 on
+            // purpose. Cleared, so startWithText: falls back to the key window,
+            // which is where the user is typing. Sending it to the main view
+            // instead moved first responder out of a secondary window the user
+            // had just clicked into, and the client then received nothing: the
+            // Java side documents this exact fallback, and this was the half
+            // that did not honour it.
+            CN1MacTextInputSetPendingOwner(nil);
+            return;
+        }
+        if (windowId < 0) {
+            // -2: the main Form's surface, which has no Window and so no id.
+            CN1MacTextInputSetPendingOwner([CN1MacHost sharedHost].renderingView);
+            return;
+        }
+        // By WINDOW ID, not by slot. The two are different numbers -- a slot is
+        // this table's index and is reused after a dispose, an id is the
+        // framework's own and starts at 1 -- and the Java side has the id. Read
+        // as a slot it named a different window, or none.
+        CN1MacWindowRecord *rec = cn1RecordForWindowId(windowId);
+        CN1MacTextInputSetPendingOwner(rec != nil ? rec.view : nil);
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowWatchScreens__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    cn1OnMain(^{
+        if (cn1MacWatchingScreens) {
+            return;
+        }
+        cn1MacWatchingScreens = YES;
+        [[NSNotificationCenter defaultCenter]
+            addObserverForName:NSApplicationDidChangeScreenParametersNotification
+                        object:nil
+                         queue:[NSOperationQueue mainQueue]
+                    usingBlock:^(NSNotification *note) {
+            CN1MacWindowDeliverMonitorsChanged();
+        }];
+    });
+}
+
+JAVA_INT com_codename1_impl_mac_MacNative_macMonitorCount___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    // On the main thread, like every other AppKit call in this file -- see
+    // cn1OnMain. These monitor getters are reached from Desktop.getMonitors() on
+    // the event dispatch thread, which is not AppKit's main thread on this port,
+    // and NSScreen is no more thread safe than the window calls below it that
+    // have always marshalled. A display reconfiguration landing between the
+    // count and the queries that follow it is the race this closes.
+    __block int count = 0;
+    cn1OnMain(^{
+        count = (int)[NSScreen screens].count;
+    });
+    return count;
+}
+
+JAVA_INT com_codename1_impl_mac_MacNative_macPrimaryMonitor___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    // Index zero by definition: NSScreen.screens is documented to lead with the
+    // screen holding the menu bar.
+    return 0;
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macMonitorBounds___int_boolean_int_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT monitor, JAVA_BOOLEAN workArea, JAVA_OBJECT outArr) {
+    if (outArr == JAVA_NULL) {
+        return;
+    }
+    JAVA_ARRAY arr = (JAVA_ARRAY)outArr;
+    if (arr->length < 4) {
+        return;
+    }
+    // The whole lookup inside one hop, not four: the screen, its rectangle and
+    // the desktop scale have to describe the same moment, and a reconfiguration
+    // between them would place a window using one display's origin and another's
+    // scale. The Java array is filled afterwards -- writing to it needs no
+    // particular thread, and keeping it out of the block keeps the AppKit
+    // section to AppKit.
+    // Four scalars rather than an int[4]: a block cannot capture an array.
+    __block BOOL found = NO;
+    __block int x = 0;
+    __block int y = 0;
+    __block int w = 0;
+    __block int h = 0;
+    cn1OnMain(^{
+        NSScreen *screen = cn1ScreenAt(monitor);
+        if (screen == nil) {
+            return;
+        }
+        NSRect r = workArea != 0 ? screen.visibleFrame : screen.frame;
+        NSRect topLeft = cn1FromAppKitFrame(r);
+        // One scale for the whole desktop, not this screen's own -- see
+        // cn1DesktopScale. Per screen, the reported rectangles overlap on a
+        // mixed-DPI setup and a window placed at a monitor's origin lands on the
+        // wrong display.
+        CGFloat scale = cn1DesktopScale();
+        x = (int)(topLeft.origin.x * scale);
+        y = (int)(topLeft.origin.y * scale);
+        w = (int)(topLeft.size.width * scale);
+        h = (int)(topLeft.size.height * scale);
+        found = YES;
+    });
+    if (!found) {
+        return;
+    }
+    JAVA_ARRAY_INT *data = (JAVA_ARRAY_INT *)arr->data;
+    data[0] = x;
+    data[1] = y;
+    data[2] = w;
+    data[3] = h;
+}
+
+JAVA_INT com_codename1_impl_mac_MacNative_macMonitorDpi___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT monitor) {
+    __block int dpiWidth = 96;
+    cn1OnMain(^{
+        NSScreen *screen = cn1ScreenAt(monitor);
+        if (screen == nil) {
+            return;
+        }
+        NSValue *res = [screen.deviceDescription objectForKey:NSDeviceResolution];
+        if (res == nil) {
+            return;
+        }
+        // NSDeviceResolution is in dots per inch of the backing store already, so
+        // it does not want the backing scale applied on top of it.
+        NSSize dpi = [res sizeValue];
+        if (dpi.width > 0) {
+            dpiWidth = (int)dpi.width;
+        }
+    });
+    return dpiWidth;
+}
+
+JAVA_INT com_codename1_impl_mac_MacNative_macMonitorScaleTimes100___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT monitor) {
+    __block CGFloat scale = 1;
+    cn1OnMain(^{
+        NSScreen *screen = cn1ScreenAt(monitor);
+        if (screen != nil) {
+            scale = screen.backingScaleFactor;
+        }
+    });
+    return (int)(scale * 100);
+}
+
+JAVA_INT com_codename1_impl_mac_MacNative_macMonitorForWindow___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+    __block int index = 0;
+    cn1OnMain(^{
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        if (rec != nil) {
+            index = cn1IndexOfScreen(rec.window.screen);
+        }
+    });
+    return index;
+}
+
+JAVA_INT com_codename1_impl_mac_MacNative_macMonitorForMainWindow___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    __block int index = 0;
+    cn1OnMain(^{
+        index = cn1IndexOfScreen([CN1MacHost sharedHost].window.screen);
+    });
+    return index;
+}
+
+JAVA_OBJECT com_codename1_impl_mac_MacNative_macMonitorName___int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT monitor) {
+    // Copied out rather than read across the hop: the string AppKit hands back
+    // is autoreleased into the MAIN thread's pool, which is not this thread's,
+    // so holding the pointer past the block is holding something another thread
+    // may already have drained.
+    __block NSString *name = nil;
+    cn1OnMain(^{
+        NSScreen *screen = cn1ScreenAt(monitor);
+        if (screen != nil && screen.localizedName != nil) {
+            name = [screen.localizedName copy];
+        }
+    });
+    if (name == nil) {
+        return JAVA_NULL;
+    }
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG name);
+#ifndef CN1_USE_ARC
+    [name release];
+#endif
+    return result;
+}
