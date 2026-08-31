@@ -126,7 +126,22 @@
 // -DCN1_GC_NO_FORCE_STOP restores the unbounded cooperative spin. It is the ablation arm
 // GcUncooperativeThreadIntegrationTest builds to prove the gate can fail -- without a
 // build that still wedges, an assertion that the VM does not wedge proves nothing.
-#if defined(CN1_CONSERVATIVE_GC_ROOTS) && !defined(_WIN32) && !defined(CN1_GC_NO_FORCE_STOP)
+//
+// ALSO OFF UNDER -DCN1_DISABLE_SATB, which is the interesting one. A freeze is only
+// releasable early -- before the mark drain -- because the SATB deletion barrier covers a
+// mutator released mid-mark, exactly as it already covers native threads, which are never
+// blocked at all. With the barrier compiled out that argument is gone, and the two ways to
+// keep the escalation would both be worse than not having it: releasing early would let
+// the resumed thread move a child out of a captured root into a local no snapshot contains
+// and have the sweep take it, while holding the freeze through the drain puts markStatics
+// (force-marking, which mallocs through the force-visited table) and gcMarkDrainParallel
+// (lazy pthread_create) inside a window where the frozen thread may own the allocator or
+// pthread lock -- a wedge in the middle of the fix for a wedge. The frozen window has to
+// stay small and enumerable, and a full parallel drain is neither. So this ablation keeps
+// master's unbounded cooperative wait, which is the behaviour it is there to measure
+// against anyway.
+#if defined(CN1_CONSERVATIVE_GC_ROOTS) && !defined(_WIN32) \
+        && !defined(CN1_GC_NO_FORCE_STOP) && !defined(CN1_DISABLE_SATB)
 #define CN1_GC_CAN_FORCE_STOP 1
 #endif
 

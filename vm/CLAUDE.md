@@ -401,8 +401,22 @@ frozen wherever it happened to be rather than at a point it chose:
   spins out its whole timeout and then reports failure on a thread that is demonstrably
   stopped. `gcMarkForcedStop` tells `cn1GcScanThreadNativeStack` to reuse the capture.
 
-Windows has no POSIX signals, so there the spin stays unbounded -- proceeding without
-stopping the thread would miss its roots and free live objects, which is worse than a hang.
+Two configurations deliberately do NOT get the escalation, and both are enforced in the
+`CN1_GC_CAN_FORCE_STOP` guard rather than argued at the use site. **Windows**, which has no
+POSIX signals -- proceeding without stopping the thread would miss its roots and free live
+objects, which is worse than a hang. And **`-DCN1_DISABLE_SATB`**, because the early
+release is what keeps the frozen window small, and only the barrier makes an early release
+sound; holding the freeze through the drain instead drags `markStatics` (force-marking,
+which mallocs through the force-visited table) and `gcMarkDrainParallel` (lazy
+`pthread_create`) inside it, which is a wedge in the middle of the fix for a wedge.
+
+A thread inside its own **nursery minor collection** is never frozen either.
+`cn1NurseryWriteBarrier` raises `nurseryPromoting` and leaves `threadActive` TRUE for the
+duration, so it is a prime escalation candidate -- and the root scans mark through the
+TARGET's thread state, where that flag makes `gcMarkObject` promote-or-return without
+marking anything. Freezing one would hand the sweep a thread whose roots were all silently
+skipped. The check runs AFTER the stop, because a flag read while the thread is still
+running can be raised in the window before the signal lands.
 The proper long-term answer is a back-edge poll in the translator; it costs throughput in
 every loop the VM ever runs, and this makes the pathological case survivable without paying
 that everywhere.
