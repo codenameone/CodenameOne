@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -24,7 +24,8 @@ package com.codename1.components;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.TextField;
+import com.codename1.ui.EditField;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
@@ -33,10 +34,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Exercises {@link OtpField} through its public API: construction guards,
- * value get/set, box structure, the auto-advance / backspace editing logic,
- * paste distribution and the completion-listener firing. All driven on the
- * EDT (via {@link FormTest}) since the boxes call {@code startEditingAsync}.
+ * Exercises {@link OtpField} through its public API: construction guards, the
+ * value, the boxes that display it, and the single field that owns it --
+ * including the path a platform-offered code takes, which is the reason the
+ * whole code lands in one field rather than one character per box.
  */
 class OtpFieldTest extends UITestBase {
 
@@ -46,7 +47,7 @@ class OtpFieldTest extends UITestBase {
     void defaultConstructorIsSixNumericBoxes() {
         OtpField f = new OtpField();
         assertEquals(6, f.getLength());
-        assertEquals(6, f.getComponentCount());
+        assertTrue(f.isNumericOnly());
         assertEquals("OtpField", f.getUIID());
         assertEquals("OtpDigit", f.getBox(0).getUIID());
     }
@@ -55,20 +56,9 @@ class OtpFieldTest extends UITestBase {
     void lengthConstructorHonoursLength() {
         OtpField f = new OtpField(4);
         assertEquals(4, f.getLength());
-        assertEquals(4, f.getComponentCount());
         for (int i = 0; i < 4; i++) {
             assertNotNull(f.getBox(i));
-            assertSame(f.getBox(i), f.getComponentAt(i));
         }
-    }
-
-    @FormTest
-    void numericConstructorAppliesNumericConstraint() {
-        OtpField numeric = new OtpField(4, true);
-        assertEquals(TextField.NUMERIC, numeric.getBox(0).getConstraint());
-
-        OtpField anyChar = new OtpField(4, false);
-        assertEquals(0, anyChar.getBox(0).getConstraint());
     }
 
     @FormTest
@@ -85,6 +75,23 @@ class OtpFieldTest extends UITestBase {
     void boundaryLengthsAreAccepted() {
         assertEquals(2, new OtpField(2).getLength());
         assertEquals(16, new OtpField(16).getLength());
+    }
+
+    // ---- the hint that makes the platform offer the code -------------
+
+    @FormTest
+    void inputCarriesTheOneTimeCodeHint() {
+        EditField input = new OtpField(6).getInputField();
+        assertNotEquals(0, input.getConstraint() & TextArea.ONE_TIME_CODE,
+                "without the hint no platform offers the code from the SMS");
+        assertNotEquals(0, input.getConstraint() & TextArea.NUMERIC);
+    }
+
+    @FormTest
+    void nonNumericFieldStillCarriesTheHint() {
+        EditField input = new OtpField(6, false).getInputField();
+        assertNotEquals(0, input.getConstraint() & TextArea.ONE_TIME_CODE);
+        assertEquals(0, input.getConstraint() & TextArea.NUMERIC);
     }
 
     // ---- value get / set --------------------------------------------
@@ -115,7 +122,7 @@ class OtpFieldTest extends UITestBase {
     }
 
     @FormTest
-    void setTextNullClearsAllBoxes() {
+    void setTextNullClears() {
         OtpField f = new OtpField(4);
         f.setText("1234");
         f.setText(null);
@@ -123,12 +130,10 @@ class OtpFieldTest extends UITestBase {
     }
 
     @FormTest
-    void getTextOmitsEmptyBoxesForPartialEntry() {
-        OtpField f = new OtpField(6);
-        f.getBox(0).setText("9");
-        f.getBox(2).setText("7");
-        // boxes 1, 3, 4, 5 left empty -> concatenation skips them
-        assertEquals("97", f.getText());
+    void setTextDropsCharactersTheFieldDoesNotAccept() {
+        OtpField f = new OtpField(4);
+        f.setText("1a2b3c4d");
+        assertEquals("1234", f.getText());
     }
 
     @FormTest
@@ -137,49 +142,45 @@ class OtpFieldTest extends UITestBase {
         f.setText("424242");
         f.clear();
         assertEquals("", f.getText());
+        assertEquals("", f.getBox(0).getText());
+        assertFalse(f.isComplete());
     }
 
-    // ---- editing behaviour (data-changed driven) --------------------
+    @FormTest
+    void setTextLeavesTheCaretAfterTheLastCharacter() {
+        OtpField f = new OtpField(6);
+        f.setText("12");
+        assertEquals(2, f.getInputField().getCaretOffset(),
+                "typing continues after what was set, not in front of it");
+    }
+
+    // ---- typing, pasting, and a code the platform offers -------------
 
     @FormTest
-    void typingSingleCharAdvancesAndFinalKeyCompletes() {
+    void typingOneDigitAtATimeFillsTheBoxesInOrder() {
         OtpField f = new OtpField(3);
+        EditField input = f.getInputField();
+        input.insertText("1");
+        assertEquals("1", f.getBox(0).getText());
+        assertEquals("", f.getBox(1).getText());
+        input.insertText("2");
+        input.insertText("3");
+        assertEquals("123", f.getText());
+        assertEquals("3", f.getBox(2).getText());
+    }
+
+    @FormTest
+    void wholeCodeArrivingAtOnceFillsEveryBox() {
+        // this is the platform offering the code out of the SMS, and it is also
+        // a paste: both arrive as one commit of the whole value
+        OtpField f = new OtpField(6);
         AtomicInteger fired = new AtomicInteger();
         f.addCompleteListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
                 fired.incrementAndGet();
             }
         });
-        // Type one digit at a time; each setText triggers the DataChangedListener.
-        f.getBox(0).setText("1");
-        f.getBox(1).setText("2");
-        assertEquals(0, fired.get(), "must not fire until the last box is filled");
-        f.getBox(2).setText("3");
-        assertEquals("123", f.getText());
-        assertEquals(1, fired.get(), "completion fires exactly once when the field is full");
-    }
-
-    @FormTest
-    void backspaceOnEmptyBoxDoesNotFireOrThrow() {
-        OtpField f = new OtpField(3);
-        AtomicInteger fired = new AtomicInteger();
-        f.addCompleteListener(evt -> fired.incrementAndGet());
-        f.getBox(2).setText("3");
-        // emptying a box (backspace) steps back; must not complete
-        f.getBox(2).setText("");
-        assertEquals(0, fired.get());
-        assertEquals("", f.getText());
-    }
-
-    // ---- paste distribution -----------------------------------------
-
-    @FormTest
-    void pasteIntoFirstBoxSpreadsAcrossBoxesAndCompletes() {
-        OtpField f = new OtpField(6);
-        AtomicInteger fired = new AtomicInteger();
-        f.addCompleteListener(evt -> fired.incrementAndGet());
-        // simulate a paste of the whole code into the first box
-        f.getBox(0).setText("135790");
+        f.getInputField().insertText("135790");
         assertEquals("135790", f.getText());
         assertEquals("1", f.getBox(0).getText());
         assertEquals("0", f.getBox(5).getText());
@@ -187,63 +188,84 @@ class OtpFieldTest extends UITestBase {
     }
 
     @FormTest
-    void pasteSkipsNonDigitsWhenNumeric() {
-        OtpField f = new OtpField(4, true);
-        f.getBox(0).setText("1a2b3c4d");
-        // non-digit chars are skipped, leaving the four digits
+    void charactersPastTheLastBoxAreDropped() {
+        OtpField f = new OtpField(4);
+        f.getInputField().insertText("123456789");
         assertEquals("1234", f.getText());
     }
 
     @FormTest
-    void pasteKeepsNonDigitsWhenNotNumeric() {
+    void typingSkipsNonDigitsWhenNumeric() {
+        OtpField f = new OtpField(4, true);
+        f.getInputField().insertText("1a2b3c4d");
+        assertEquals("1234", f.getText());
+    }
+
+    @FormTest
+    void typingKeepsNonDigitsWhenNotNumeric() {
         OtpField f = new OtpField(4, false);
-        f.getBox(0).setText("ab12");
+        f.getInputField().insertText("ab12");
         assertEquals("ab12", f.getText());
     }
 
     @FormTest
-    void pasteStartingMidFieldOnlyFillsFromThatIndex() {
-        OtpField f = new OtpField(6);
-        f.getBox(2).setText("789");
-        assertEquals("", f.getBox(0).getText());
-        assertEquals("", f.getBox(1).getText());
-        assertEquals("7", f.getBox(2).getText());
-        assertEquals("9", f.getBox(4).getText());
-        assertEquals("789", f.getText());
+    void lineBreaksNeverEnterTheCode() {
+        // a code pasted out of a message often carries the rest of the line
+        OtpField f = new OtpField(4, false);
+        f.getInputField().insertText("12\n34");
+        assertEquals("1234", f.getText());
     }
 
-    // ---- listener management ----------------------------------------
+    // ---- completion ---------------------------------------------------
 
     @FormTest
-    void removedListenerIsNotInvoked() {
-        OtpField f = new OtpField(2);
+    void completionFiresOnceWhenTheLastBoxFills() {
+        OtpField f = new OtpField(3);
         AtomicInteger fired = new AtomicInteger();
-        ActionListener l = evt -> fired.incrementAndGet();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        EditField input = f.getInputField();
+        input.insertText("1");
+        input.insertText("2");
+        assertEquals(0, fired.get(), "must not fire until the last box is filled");
+        input.insertText("3");
+        assertEquals(1, fired.get());
+        assertTrue(f.isComplete());
+    }
+
+    @FormTest
+    void completionFiresAgainAfterTheCodeIsCorrected() {
+        OtpField f = new OtpField(3);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        f.setText("123");
+        assertEquals(1, fired.get());
+        f.setText("12");
+        assertFalse(f.isComplete());
+        assertEquals(1, fired.get());
+        f.setText("124");
+        assertEquals(2, fired.get(), "a corrected code is a new attempt");
+    }
+
+    @FormTest
+    void removedListenerStopsFiring() {
+        OtpField f = new OtpField(3);
+        AtomicInteger fired = new AtomicInteger();
+        ActionListener l = new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        };
         f.addCompleteListener(l);
         f.removeCompleteListener(l);
-        f.getBox(0).setText("1");
-        f.getBox(1).setText("2");
+        f.setText("123");
         assertEquals(0, fired.get());
-    }
-
-    @FormTest
-    void nullListenerIsIgnored() {
-        OtpField f = new OtpField(2);
-        f.addCompleteListener(null);
-        // no NPE when the field fills
-        f.setText("12");
-        f.getBox(1).setText("3"); // re-trigger a change on the last box
-        assertEquals("13", f.getText());
-    }
-
-    @FormTest
-    void consumingListenerStopsLaterListeners() {
-        OtpField f = new OtpField(2);
-        AtomicInteger second = new AtomicInteger();
-        f.addCompleteListener(ActionEvent::consume);
-        f.addCompleteListener(evt -> second.incrementAndGet());
-        f.getBox(0).setText("1");
-        f.getBox(1).setText("2");
-        assertEquals(0, second.get(), "second listener skipped once the event is consumed");
     }
 }
