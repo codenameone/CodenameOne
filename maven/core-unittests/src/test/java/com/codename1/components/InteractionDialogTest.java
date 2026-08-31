@@ -933,4 +933,40 @@ class InteractionDialogTest extends UITestBase {
         DisplayTest.flushEdt();
     }
 
+    /// Hiding the backing window ends the showing.
+    ///
+    /// The window exists for this showing, so one that is not on screen means nothing
+    /// is being shown -- and the framework already reads it that way, releasing a
+    /// parked modal caller as soon as the window stops being visible. Ignored, it left
+    /// the dialog parented to an invisible window with isShowing() answering true and
+    /// getNativeWindow() contradicting its own "only while showing" contract.
+    @FormTest
+    void hidingTheBackingWindowEndsTheShowing() {
+        implementation.setMultiWindowSupported(true);
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("native");
+        dialog.add(new Label("body"));
+        dialog.setNativeWindowMode(true);
+        dialog.show(10, 10, 10, 10);
+        DisplayTest.flushEdt();
+        Window w = dialog.getNativeWindow();
+        assertNotNull(w, "precondition: it really is in a window");
+        assertTrue(dialog.isShowing(), "precondition: and it is showing");
+
+        // Hidden, not disposed -- the public Window API an application can reach.
+        w.hide();
+        DisplayTest.flushEdt();
+
+        assertFalse(dialog.isShowing(),
+                "a dialog in a window that is not on screen is not showing");
+        assertNull(dialog.getNativeWindow(),
+                "and getNativeWindow() is documented as non-null only while showing");
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+
 }

@@ -2233,7 +2233,7 @@ public class Dialog extends Form implements AbstractDialog {
         publishNativeMenuCommands(w);
         w.addCommandListener(new NativeCommandBridge(this));
         w.addCloseListener(new NativeCloseBridge(this));
-        w.addWindowListener(new NativeDisposeBridge(this));
+        w.addWindowListener(new NativeShowingEndedBridge(this));
         initNativeWindow(w);
         hideOwnTitleIfDecorated(w);
         // The keyboard, on the same terms as a hosted dialog. A window never reads a
@@ -2741,6 +2741,12 @@ public class Dialog extends Form implements AbstractDialog {
         // flag clear would send a later dispose() down the ordinary Form teardown for a
         // showing that never went through it.
         setDisposed(true);
+        // The third teardown path, and it reaches none of the others: dispose() returns
+        // into the window rather than through here, and disposeImpl() is not on this
+        // route at all. A showing that ends without stopping its clock leaves a
+        // non-daemon timer thread holding the whole dialog until a deadline nobody is
+        // waiting for -- and this is the path a window disposed from outside takes.
+        cancelTimeoutClock();
         detachNativePayload();
         restoreOwnTitle();
     }
@@ -2775,17 +2781,37 @@ public class Dialog extends Form implements AbstractDialog {
 
     /// Tears the dialog down however its window died -- disposed by the dialog, by an
     /// owner cascade, or by the desktop shutting down.
-    private static final class NativeDisposeBridge implements ActionListener {
+    private static final class NativeShowingEndedBridge implements ActionListener {
         private final Dialog dlg;
 
-        NativeDisposeBridge(Dialog dlg) {
+        NativeShowingEndedBridge(Dialog dlg) {
             this.dlg = dlg;
         }
 
         @Override
         public void actionPerformed(ActionEvent evt) {
-            if (evt instanceof WindowEvent
-                    && ((WindowEvent) evt).getType() == WindowEvent.Type.Disposed) {
+            if (!(evt instanceof WindowEvent)) {
+                return;
+            }
+            WindowEvent.Type type = ((WindowEvent) evt).getType();
+            // Hidden ends the showing as surely as Disposed does. This window exists
+            // for this showing, so a window that is not on screen means there is
+            // nothing being shown -- and the framework already reads it that way,
+            // releasing a parked modal caller the moment the window stops being
+            // visible. Ignoring it left the dialog parented to an invisible window,
+            // with isShowing() answering true and getNativeWindow() contradicting its
+            // own "only while showing" contract, and nothing left that would change
+            // either back.
+            //
+            // Minimizing does not arrive here. It clears native visibility too, but
+            // the port reports it as Minimized, so a window the user shrank keeps its
+            // dialog and gets it back on restore.
+            //
+            // Deliberately not the rule used for a dialog hosted in someone else's
+            // window, where Hidden is terminal only for a modal one: that window is
+            // the application's and may be hidden precisely so it can be shown again.
+            // This one is not.
+            if (type == WindowEvent.Type.Disposed || type == WindowEvent.Type.Hidden) {
                 dlg.finishNativeShowing();
             }
         }

@@ -3518,4 +3518,77 @@ class DialogInWindowTest extends UITestBase {
                 "the lower teardown ends a showing too, so it has to stop the clock");
     }
 
+    /// A window that stops being on screen ends the showing; minimizing does not.
+    ///
+    /// Both arrive as the platform telling the window it is no longer visible, and the
+    /// difference is the whole of the rule: hide() means the showing is over, while a
+    /// minimize is recorded separately so the window keeps its dialog and gets it back
+    /// on restore. Driven through hideNotify, which is what the ports actually call --
+    /// Window.minimize() only asks the window manager, and a fake one answers nothing.
+    @FormTest
+    void aMinimizedNativeDialogSurvivesWhereAHiddenOneDoesNot() {
+        implementation.setMultiWindowSupported(true);
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        Dialog minimized = new Dialog("minimized");
+        minimized.setNativeWindowMode(true);
+        minimized.show(0, 0, 0, 0, false, false);
+        DisplayTest.flushEdt();
+        Window mw = minimized.getNativeWindow();
+        assertNotNull(mw, "precondition: it really is in a window");
+
+        mw.hideNotify();
+        DisplayTest.flushEdt();
+        assertNotNull(minimized.getNativeWindow(),
+                "a minimized window keeps its dialog and gets it back on restore");
+        minimized.dispose();
+        DisplayTest.flushEdt();
+
+        Dialog hidden = new Dialog("hidden");
+        hidden.setNativeWindowMode(true);
+        hidden.show(0, 0, 0, 0, false, false);
+        DisplayTest.flushEdt();
+        Window hw = hidden.getNativeWindow();
+        assertNotNull(hw, "precondition: it really is in a window");
+
+        hw.hide();
+        DisplayTest.flushEdt();
+        assertNull(hidden.getNativeWindow(),
+                "a window that is not on screen is not showing the dialog any more");
+        hw.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    /// A window disposed from outside ends the showing, so it stops the clock.
+    ///
+    /// This is the path an owner cascade and getNativeWindow().dispose() take, and it
+    /// reaches neither dispose() nor disposeImpl(): the dialog is detached from the
+    /// window that is going away. Leaving the clock armed there holds a non-daemon
+    /// timer thread, and the dialog it references, until a deadline nobody awaits.
+    @FormTest
+    void aNativeWindowDisposedFromOutsideStopsTheTimeoutClock() {
+        implementation.setMultiWindowSupported(true);
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        Dialog dlg = new Dialog("native");
+        dlg.setNativeWindowMode(true);
+        dlg.setTimeout(600000);
+        dlg.show(0, 0, 0, 0, false, false);
+        DisplayTest.flushEdt();
+        Window w = dlg.getNativeWindow();
+        assertNotNull(w, "precondition: it really is in a window");
+        assertNotNull(timeoutClockOf(dlg), "precondition: the timeout armed a clock");
+
+        // Not dlg.dispose() -- the window going away underneath it.
+        w.dispose();
+        DisplayTest.flushEdt();
+
+        assertNull(timeoutClockOf(dlg),
+                "the window dying ends the showing, so it has to stop the clock too");
+    }
+
 }
