@@ -46,6 +46,12 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
     /// frame at least says what is wrong.
     private int decodeRepaintsLeft = 60;
 
+    /// Whether a frame has actually been painted with the asynchronous pictures.
+    ///
+    /// The decode landing and the screen showing it are two different events, and
+    /// only the second one is what a screenshot can capture.
+    private boolean paintedWithAsyncImages;
+
     /// Whether the pictures whose decode is asynchronous are ready to draw.
     ///
     /// Image.createImage(byte[]) hands the browser encoded bytes and the
@@ -59,7 +65,8 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
                 && fromBytes.getWidth() == size && encoded.getWidth() == size;
     }
 
-    /// Holds the capture until the asynchronously decoded pictures exist.
+    /// Holds the capture until a frame has been painted WITH the asynchronously
+    /// decoded pictures, not merely until they have decoded.
     ///
     /// The repaint request below can only ask for another paint; it cannot stop
     /// the screenshot being taken before one arrives, and an outstanding decode
@@ -68,12 +75,15 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
     /// complete and its bottom half all but empty: the two lower variants
     /// painted before the decode and nothing repainted them afterwards.
     ///
-    /// Measured against the mutable image rather than the cell width, because
-    /// that is the size every picture here was built at and it needs no bounds
-    /// to read.
+    /// Gating on arrival was still a race, because arrival and display are two
+    /// events and only the second one is in the screenshot. Between them the
+    /// frame on screen is the one painted without the pictures, and what closed
+    /// the gap was a fixed settle delay -- fine until a loaded runner spends it
+    /// before the repaint lands, which is the same wrong frame again. Waiting for
+    /// the paint itself needs no delay to be right.
     @Override
     protected boolean captureBlockedByPendingContent() {
-        return mutable != null && !asyncImagesReady(mutable.getWidth());
+        return mutable != null && !paintedWithAsyncImages;
     }
 
     /// One forced repaint after the decode lands, before the shot.
@@ -113,7 +123,24 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
         // This is what made graphics-draw-image-rect differ between runs -- the
         // bottom half, which is the two mutable-image variants, captured
         // whatever had decoded by the first paint.
-        if (!asyncImagesReady(size) && decodeRepaintsLeft > 0) {
+        //
+        // Driven by whether a whole frame has been painted with the pictures in
+        // hand, not by whether they have arrived. Arrival is not the thing the
+        // capture needs: the variants painted before it are still on screen with
+        // their pictures missing, and asking only until arrival stops asking on
+        // the very paint that first sees them -- leaving the frame that made it
+        // to the screenshot one short.
+        if (asyncImagesReady(size)) {
+            // This pass is drawing them. The variants of one frame are drawn in a
+            // single synchronous pass, so by the time anything can capture, every
+            // one of them has been through here with the pictures present.
+            //
+            // Set before the request below, so a port that decodes synchronously
+            // answers true on its first paint and never asks for the extra one --
+            // leaving every such port's frames exactly as they were.
+            paintedWithAsyncImages = true;
+        }
+        if (!paintedWithAsyncImages && decodeRepaintsLeft > 0) {
             decodeRepaintsLeft--;
             com.codename1.ui.Form current = com.codename1.ui.Display.getInstance().getCurrent();
             if (current != null) {
