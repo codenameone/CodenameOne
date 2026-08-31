@@ -316,6 +316,38 @@ class PhoneVerificationTest extends UITestBase {
                 "a resend the user walked away from must not drag them back");
     }
 
+    @FormTest
+    void anAnswerStillArrivesAfterTheComponentLeavesTheForm() {
+        // An application that shows a progress screen over the wait deinitializes this
+        // component while the server is still thinking. Dropping the answer then would
+        // lose a verification the server did give, and leave the user with nothing --
+        // which is worse than a listener firing a moment after they moved on. Going
+        // BACK to the number stage is the case that retires a request, and it is a
+        // different thing: there the user said they were done waiting.
+        RecordingVerifier verifier = new RecordingVerifier();
+        AtomicInteger verified = new AtomicInteger();
+        PhoneVerification v = new PhoneVerification();
+        v.setCodeVerifier(verifier);
+        v.addVerifiedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                verified.incrementAndGet();
+            }
+        });
+        Form f = new Form("t", BoxLayout.y());
+        f.add(v);
+        f.show();
+        v.showCodeStage("+972501234567");
+        v.getOtpField().setText("123456");
+        assertEquals(1, verifier.codes.size());
+
+        f.removeComponent(v);
+
+        verifier.pending.succeeded();
+        flushSerialCalls();
+        assertEquals(1, verified.get(),
+                "the answer the server gave must still reach the application");
+    }
+
     // ---- resend ------------------------------------------------------------
 
     @FormTest

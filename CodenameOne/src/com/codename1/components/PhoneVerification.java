@@ -489,6 +489,24 @@ public class PhoneVerification extends Container {
         super.deinitialize();
     }
 
+    /*
+     * Leaving the form does NOT retire a pending request, and that asymmetry with
+     * showNumberStage is deliberate.
+     *
+     * A stage transition is the user saying they are done waiting for this answer --
+     * they went back to fix the number. Deinitialization says nothing of the kind: it
+     * happens whenever the component stops being displayed, including when an
+     * application shows a progress screen over the wait, which is a reasonable thing
+     * to do and would then never hear the result. Silently losing a verification the
+     * server did answer is worse than the two things dropping it would prevent, and
+     * both of those are mild: a detached component moving to its code stage is the
+     * state it should be in when it is shown again, and a listener firing late belongs
+     * to the application, which can remove it if it has moved on.
+     *
+     * PhoneVerificationTest pins this, so that a later reading of the same evidence
+     * does not quietly reverse it.
+     */
+
     @Override
     protected void initComponent() {
         super.initComponent();
