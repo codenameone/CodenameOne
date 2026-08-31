@@ -879,6 +879,25 @@ public class Sheet extends Container {
     ///
     /// - #show()
     public void show(final int duration) {
+        showOnHost(duration, null);
+    }
+
+    /// Shows this sheet, optionally on a surface that has already been decided.
+    ///
+    /// `captured` is non-null only for the retry queued behind a host's animation. That
+    /// retry has to land on the surface the deferred show resolved, and it cannot ask
+    /// for it again: focus can move to another window while the animation drains, and
+    /// naming it through the shared pin instead made the decision outlive this one show
+    /// -- a second show requested before the queue drained then found the first show's
+    /// surface, attached to it, and cleared the pin, leaving the second to move the
+    /// sheet away and abandon the layered pane and painter it had just built there.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: duration of the slide transition in milliseconds
+    ///
+    /// - `captured`: the surface a deferred show already resolved, or null to resolve
+    private void showOnHost(final int duration, TopLevelContainer captured) {
 
         // We need to add some margin to the title  to prevent overlap with the
         // back button and the commaneds.
@@ -991,7 +1010,7 @@ public class Sheet extends Container {
 
         // END Deal with iPhoneX notch
 
-        TopLevelContainer f = resolveHost();
+        final TopLevelContainer f = captured != null ? captured : resolveHost();
         if (f == null) {
             throw new IllegalStateException(
                     "Sheet.show() has no top level to show on: no window is focused and "
@@ -999,22 +1018,23 @@ public class Sheet extends Container {
         }
         shownHost = f;
         if (f.getAnimationManager().isAnimating()) {
-            // Pinned across the wait. The retry calls this method again, which would
-            // otherwise resolve a surface of its own -- and the focused window can
-            // change while the animation drains, so it would attach the sheet to a
-            // different window than the one shownHost was just set to.
-            pinnedShowHost = f;
+            // Handed to the retry rather than left in a field. The retry must land on
+            // the surface resolved here -- focus can move to another window while the
+            // animation drains -- but saying so through the shared pin made one show's
+            // decision visible to every other: a second show requested before the queue
+            // drained resolved this one's surface too, and the two then attached to
+            // different surfaces in turn, abandoning a layered pane and its painter on
+            // the one left behind. This says it to exactly one retry.
             f.getAnimationManager().flushAnimation(new Runnable() {
                 @Override
                 public void run() {
-                    show(duration);
+                    showOnHost(duration, f);
                 }
             });
             return;
         }
-        // Consumed here rather than above, because the animating branch returns and
-        // queues this method again: clearing it earlier meant the retry resolved a host
-        // of its own, which is the split this field exists to prevent.
+        // A pin belongs to one show. back() sets it so an unwinding stack does not
+        // split across surfaces, and this is where that show consumes it.
         pinnedShowHost = null;
         if (getParent() != null) {
             remove();
