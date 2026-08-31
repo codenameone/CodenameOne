@@ -597,6 +597,11 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
         nativeWindow = null;
         disposed = true;
+        // This showing is over too, and it did not come through dispose(): the window
+        // was disposed from outside -- an owner cascade, getNativeWindow().dispose(), or
+        // a modal window being hidden. The clock outlives the window it was armed
+        // under, so leaving it armed here lets it close a later showing.
+        retireArmedTimeout();
         restoreOwnTitle();
         if (getParent() != null) {
             remove();
@@ -907,8 +912,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     @Override
     public void dispose() {
         disposed = true;
-        // Retires any armed timeout: it belongs to the showing that is ending here.
-        timeoutGeneration++;
+        retireArmedTimeout();
         releaseInferredHost();
         if (nativeWindow != null) {
             // The window fires Disposed, which is what takes the dialog back out. None
@@ -1974,9 +1978,19 @@ public class InteractionDialog extends Container implements AbstractDialog {
         });
     }
 
-    /// Bumped by every arming and every dispose, so a timeout that outlives the showing
-    /// that armed it is discarded rather than closing whatever is on screen now.
+    /// Identifies the showing a timeout was armed under. Bumped by every arming and by
+    /// every path that ends a showing, so a clock that outlives the showing it belongs
+    /// to is discarded rather than closing whatever is on screen by then.
     private int timeoutGeneration;
+
+    /// Retires whatever timeout is currently armed.
+    ///
+    /// Every path that ends a showing has to call this, not just `dispose()`: the clock
+    /// is deliberately not tied to the surface, so it survives the window being torn
+    /// down. Bumping twice is harmless -- the counter only ever has to stop matching.
+    private void retireArmedTimeout() {
+        timeoutGeneration++;
+    }
 
     /// Shows this interaction dialog and blocks until it is disposed.
     @Override

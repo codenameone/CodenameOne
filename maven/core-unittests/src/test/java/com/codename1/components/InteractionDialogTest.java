@@ -779,4 +779,51 @@ class InteractionDialogTest extends UITestBase {
                         + " clock and can stall it by not painting");
     }
 
+    /// The armed timeout's generation, via reflection.
+    private static int timeoutGenerationOf(InteractionDialog d) {
+        try {
+            java.lang.reflect.Field f =
+                    InteractionDialog.class.getDeclaredField("timeoutGeneration");
+            f.setAccessible(true);
+            return f.getInt(d);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// A showing that ends without dispose() still has to retire its timeout.
+    ///
+    /// The clock is deliberately independent of the surface, so it outlives the window
+    /// it was armed under -- which dispose() handles, and which the native window being
+    /// torn down from outside (an owner cascade, getNativeWindow().dispose(), a modal
+    /// window hidden) reaches through finishNativeShowing() instead. Left armed there,
+    /// it still matches when the same dialog is shown again and closes that showing.
+    @FormTest
+    void aNativeShowingEndedFromOutsideRetiresItsTimeout() {
+        implementation.setMultiWindowSupported(true);
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("timed");
+        dialog.add(new Label("body"));
+        dialog.setNativeWindowMode(true);
+        dialog.setTimeout(600000);
+        dialog.show(10, 10, 10, 10);
+        DisplayTest.flushEdt();
+
+        int armed = timeoutGenerationOf(dialog);
+        assertEquals(0L, pendingTimeoutOf(dialog),
+                "precondition: the timeout was armed rather than left pending");
+
+        // Not dispose() -- the window going away underneath the dialog.
+        dialog.finishNativeShowing();
+        DisplayTest.flushEdt();
+
+        assertNotEquals(armed, timeoutGenerationOf(dialog),
+                "ending the showing from outside has to retire the armed timeout, or it"
+                        + " still matches and closes whatever is shown next");
+        dialog.dispose();
+    }
+
 }
