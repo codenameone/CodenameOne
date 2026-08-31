@@ -1812,6 +1812,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-08-31T15:01:07+00:00"
+      },
+      "devto": {
+        "id": 4539773,
+        "url": "https://dev.to/codenameone/one-java-api-for-homekit-matter-and-google-home-2g85",
+        "syndicated_at": "2026-08-31T19:30:16+00:00"
       }
     }
   }
