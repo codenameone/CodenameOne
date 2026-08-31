@@ -52,8 +52,9 @@ import com.codename1.ui.spinner.*;
 import java.io.*;
 import java.util.*;
 
+import com.codename1.io.rest.*;
 
-class AuthenticationAndIdentityJava021Snippet {
+class PhoneNumberVerificationJava007Snippet {
 
 
     Object context;
@@ -79,8 +80,38 @@ class AuthenticationAndIdentityJava021Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     void snippet() throws Exception {
-        // tag::authentication-and-identity-java-021[]
-        TextField code = new TextField("", "Code", 6, TextArea.NUMERIC | TextArea.ONE_TIME_CODE);
-        // end::authentication-and-identity-java-021[]
+        // tag::phone-number-verification-java-007[]
+        PhoneVerification verify = new PhoneVerification();
+
+        verify.setCodeSender((number, response) ->
+            Rest.post(myApi + "/verify/start")
+                .jsonContent()
+                .body("{\"phone\":\"" + number + "\"}")
+                .fetchAsJsonMap(result -> {
+                    if (result.getResponseCode() == 200) {
+                        response.succeeded();
+                    } else {
+                        response.failed(null);
+                    }
+                }));
+
+        verify.setCodeVerifier((number, code, response) ->
+            Rest.post(myApi + "/verify/check")
+                .jsonContent()
+                .body("{\"phone\":\"" + number + "\",\"code\":\"" + code + "\"}")
+                .fetchAsJsonMap(result -> {
+                    if (result.getResponseCode() == 200) {
+                        // the session the server issued lives in the response body
+                        storeSession(result.getResponseData());
+                        response.succeeded();
+                    } else {
+                        response.failed(null);
+                    }
+                }));
+        // end::phone-number-verification-java-007[]
     }
+
+    String myApi = "https://example.com/api";
+
+    void storeSession(Object body) { }
 }

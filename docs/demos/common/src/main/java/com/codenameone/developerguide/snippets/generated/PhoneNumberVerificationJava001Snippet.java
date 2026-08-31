@@ -52,8 +52,9 @@ import com.codename1.ui.spinner.*;
 import java.io.*;
 import java.util.*;
 
+import com.codename1.io.rest.*;
 
-class AuthenticationAndIdentityJava022Snippet {
+class PhoneNumberVerificationJava001Snippet {
 
 
     Object context;
@@ -79,12 +80,18 @@ class AuthenticationAndIdentityJava022Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     void snippet() throws Exception {
-        // tag::authentication-and-identity-java-022[]
-        PhoneNumberField phone = new PhoneNumberField();
-        phone.setCountry(PhoneNumberField.findCountry("IL"));
-        form.add(phone);
-        // after the user types 050-123-4567
-        String number = phone.getE164();   // "+972501234567"
-        // end::authentication-and-identity-java-022[]
+        // tag::phone-number-verification-java-001[]
+        PhoneVerification verify = new PhoneVerification();
+        verify.setCodeSender((number, response) -> myServerSendsCode(number, response));
+        verify.setCodeVerifier((number, code, response) -> myServerChecksCode(number, code, response));
+        verify.addVerifiedListener(e -> onVerified(verify.getPhoneNumber()));
+        form.add(verify);
+        // end::phone-number-verification-java-001[]
     }
+
+    void myServerSendsCode(String number, PhoneVerification.Response response) { }
+
+    void myServerChecksCode(String number, String code, PhoneVerification.Response response) { }
+
+    void onVerified(String number) { }
 }

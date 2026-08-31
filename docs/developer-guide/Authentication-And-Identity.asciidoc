@@ -264,82 +264,9 @@ Or, if the provider exposes a discovery document:
 [[verifying-a-phone-number]]
 === Verifying a phone number
 
-Signing a user in by phone number is two round trips to your own server: send a code to the number, then check the code the user types back. Codename One doesn't send the message -- that's your server's job, and the service it uses (Twilio, Vonage, AWS SNS, Firebase Phone Auth) is your choice. What the framework provides is everything on the device: entering the number, entering the code, and letting the platform hand the code over so the user never types it at all.
+Signing a user in by phone number is a flow of its own rather than an OpenID Connect one: your server sends a code to the number and checks the code the user types back, and the device's part is entering the number, entering the code, and letting the platform offer the code out of the arriving message so the user never types it.
 
-==== The code field
-
-`com.codename1.components.OtpField` renders a code one box per digit and reports when the last box fills:
-
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AuthenticationAndIdentityJava020Snippet.java[tag=authentication-and-identity-java-020,indent=0]
-----
-
-The boxes are drawn rather than being separate editors, and one field behind them holds the whole code. That's what lets an arriving code land in a single step: a code is one value, and a row of one-character fields could only ever receive one character of it.
-
-==== Letting the platform fill the code in
-
-The field carries the `com.codename1.ui.TextArea#ONE_TIME_CODE` constraint, which tells the platform what the field is for:
-
-* On iOS the keyboard's suggestion bar offers the code out of Messages.
-* On Android the autofill service offers it from the SMS.
-* In a browser the input is marked `one-time-code`, which is what a password manager and iOS Safari match on.
-* Anywhere else nothing changes and the user types the code.
-
-None of these routes reads messages, and none of them asks for a messaging permission. The application says what the field holds; the platform decides what to offer. That's also why the constraint is worth setting on a field you build yourself:
-
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AuthenticationAndIdentityJava021Snippet.java[tag=authentication-and-identity-java-021,indent=0]
-----
-
-WARNING: A field without the hint is offered nothing, on any platform. The only alternative left to an application is reading the SMS itself, which on Android means holding `READ_SMS` -- a permission Google Play restricts to applications whose core function is messaging.
-
-==== Entering the number
-
-`com.codename1.components.PhoneNumberField` pairs a country selector with a number field and produces one E.164 string:
-
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AuthenticationAndIdentityJava022Snippet.java[tag=authentication-and-identity-java-022,indent=0]
-----
-
-It starts on the country the device reports and offers every calling code. An application serving three countries can narrow the list with `setCountries`, and one that already knows the number can set it with `setE164`.
-
-Country names are English and each is looked up in the theme's resource bundle first, under `Country.` plus the ISO code, so translations drop in without replacing the list.
-
-==== The whole flow
-
-`com.codename1.components.PhoneVerification` puts the two stages together, and owns the wait before a resend is offered, the way back to a mistyped number, and the errors either server call reports. You supply the two calls:
-
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AuthenticationAndIdentityJava023Snippet.java[tag=authentication-and-identity-java-023,indent=0]
-----
-
-Each call is handed a `PhoneVerification.Response` and answers it once, from any thread. Until it does, the button that started the request stays disabled, so a second tap can't send a second message. An answer that arrives after the user has gone back and sent to a different number is dropped rather than applied, because it belongs to a screen that's no longer showing.
-
-The code is submitted as soon as the last box is filled, so the usual flow has no button to press at the end.
-
-==== Styling
-
-|===
-| UIID | Applies to
-
-| `OtpField`
-| The code field as a whole.
-
-| `OtpDigit`
-| One box of the code.
-
-| `PhoneNumberField`, `PhoneNumberCountry`, `PhoneNumberText`
-| The number entry, its country selector and its number field.
-
-| `PhoneVerification`, `PhoneVerificationText`, `PhoneVerificationError`, `PhoneVerificationButton`, `PhoneVerificationLink`
-| The flow, its explanatory and error lines, its main buttons, and the resend / change-number buttons.
-|===
-
-The shipped native themes style these. A theme of your own that doesn't define `OtpDigit` gets the theme's default component style for the boxes, which is seldom what you want -- derive it from `TextField`.
+`com.codename1.components.PhoneVerification` is that screen, and `com.codename1.ui.TextArea#ONE_TIME_CODE` is the hint that makes the platform offer the code without any messaging permission. See <<Phone Number Verification>>.
 
 === A universal sign-in demo
 

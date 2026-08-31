@@ -52,8 +52,9 @@ import com.codename1.ui.spinner.*;
 import java.io.*;
 import java.util.*;
 
+import com.codename1.io.rest.*;
 
-class AuthenticationAndIdentityJava020Snippet {
+class PhoneNumberVerificationJava002Snippet {
 
 
     Object context;
@@ -79,12 +80,8 @@ class AuthenticationAndIdentityJava020Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     void snippet() throws Exception {
-        // tag::authentication-and-identity-java-020[]
-        OtpField otp = new OtpField(6);
-        otp.addCompleteListener(e -> verifyOnMyServer(otp.getText()));
-        form.add(otp);
-        // end::authentication-and-identity-java-020[]
+        // tag::phone-number-verification-java-002[]
+        TextField code = new TextField("", "Code", 6, TextArea.NUMERIC | TextArea.ONE_TIME_CODE);
+        // end::phone-number-verification-java-002[]
     }
-
-    void verifyOnMyServer(String code) { }
 }
