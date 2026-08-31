@@ -1728,7 +1728,14 @@ public class Dialog extends Form implements AbstractDialog {
             // the dialog at once.
             if (dlg.isShowingAnywhere()) {
                 dlg.isTimedOut();
+                return;
             }
+            // Not on screen, so the deadline stays -- but this clock has fired and is
+            // spent, and leaving it in place is worse than useless: armTimeoutClockIfPending
+            // declines to arm while one is set, so the show that the deadline was being
+            // kept for would get no clock at all and be back to closing only when
+            // painted. Dropping it also lets the timer's thread go.
+            dlg.cancelTimeoutClock();
         }
     }
 

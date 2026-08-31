@@ -3430,6 +3430,28 @@ class DialogInWindowTest extends UITestBase {
         assertNotEquals(0L, deadlineOf(dlg),
                 "the clock must not retire a deadline for a dialog that was never shown,"
                         + " or the show that follows has no timeout at all");
+        assertNull(timeoutClockOf(dlg),
+                "and it has to drop the spent clock, or nothing will arm the replacement"
+                        + " that the kept deadline exists for");
+
+        // The whole point of keeping the deadline: the show it was kept for honours it.
+        // Already past, so the clock armed for it fires at once and closes the dialog --
+        // which is only reachable because the spent clock was dropped above.
+        dlg.show(0, 0, 0, 0, false, false);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException err) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        DisplayTest.flushEdt();
+
+        assertTrue(dlg.isDisposed(),
+                "the deadline was kept so that this show would honour it");
     }
 
     /// Showing a dialog again re-arms the clock its previous showing took down.
