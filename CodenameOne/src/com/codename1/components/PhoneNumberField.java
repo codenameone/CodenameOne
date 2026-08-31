@@ -473,12 +473,16 @@ public class PhoneNumberField extends Container {
         Country[] list = getCountries();
         String iso = L10NManager.getInstance().getLocale();
         if (iso != null) {
-            // the locale is an ISO 3166 country code, but a device that reports
-            // a full locale ("en_US") still names the country in its tail
-            String upper = iso.toUpperCase();
+            // The locale is an ISO 3166 country code, but a device that reports
+            // a full locale ("en_US") still names the country in its tail.
+            // Compared without folding either side, for the reason findCountry gives.
+            String tail = iso;
+            int separator = Math.max(iso.lastIndexOf('_'), iso.lastIndexOf('-'));
+            if (separator >= 0) {
+                tail = iso.substring(separator + 1);
+            }
             for (int i = 0; i < list.length; i++) {
-                String code = list[i].getIsoCode();
-                if (upper.equals(code) || upper.endsWith("_" + code) || upper.endsWith("-" + code)) {
+                if (list[i].getIsoCode().equalsIgnoreCase(tail)) {
                     return list[i];
                 }
             }
@@ -521,10 +525,14 @@ public class PhoneNumberField extends Container {
         if (isoCode == null) {
             return null;
         }
-        String upper = isoCode.toUpperCase();
         Country[] all = allCountries();
         for (int i = 0; i < all.length; i++) {
-            if (all[i].getIsoCode().equals(upper)) {
+            // equalsIgnoreCase rather than folding the argument: String.toUpperCase folds
+            // with the device's locale, and a Turkish device turns "il" into a dotted
+            // capital I that matches no ISO 3166 code -- so this documented case
+            // insensitive lookup would find nothing at all there. Character-wise case
+            // comparison carries no locale.
+            if (all[i].getIsoCode().equalsIgnoreCase(isoCode)) {
                 return all[i];
             }
         }

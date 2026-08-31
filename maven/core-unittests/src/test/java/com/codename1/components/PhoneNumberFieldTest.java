@@ -66,6 +66,23 @@ class PhoneNumberFieldTest extends UITestBase {
     }
 
     @FormTest
+    void countryLookupSurvivesALocaleThatFoldsItsOwnWay() {
+        // String.toUpperCase folds with the device's locale: in Turkish "il" becomes a
+        // dotted capital I, which matches no ISO 3166 code. A device set to Turkish would
+        // have found no country at all.
+        java.util.Locale previous = java.util.Locale.getDefault();
+        java.util.Locale.setDefault(new java.util.Locale("tr", "TR"));
+        try {
+            assertNotNull(PhoneNumberField.findCountry("il"), "lower case ISO code");
+            assertEquals("IL", PhoneNumberField.findCountry("il").getIsoCode());
+            assertEquals("IN", PhoneNumberField.findCountry("in").getIsoCode());
+            assertEquals("IL", PhoneNumberField.findCountry("IL").getIsoCode());
+        } finally {
+            java.util.Locale.setDefault(previous);
+        }
+    }
+
+    @FormTest
     void everyEntryIsWellFormedAndUnique() {
         Set<String> seen = new HashSet<String>();
         for (Country c : PhoneNumberField.getAllCountries()) {
