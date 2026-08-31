@@ -180,8 +180,13 @@ public abstract class BaseTest extends AbstractTest {
         boolean animating = wrongForm
                 || (am != null && am.isAnimating())
                 || Display.getInstance().isInTransition();
+        // Content the test itself knows has not arrived yet. Nothing above can
+        // see it: an asynchronous image decode leaves the form idle, the
+        // animation manager quiet and the right form current, so every existing
+        // condition reads "settled" while half the picture is missing.
+        boolean pendingContent = captureBlockedByPendingContent();
         int waitCapMs = wrongOrientation ? 15000 : 5000;
-        if ((!animating && !wrongOrientation) || waitedMs >= waitCapMs) {
+        if ((!animating && !wrongOrientation && !pendingContent) || waitedMs >= waitCapMs) {
             long extra = extraSettleBeforeCaptureMillis();
             if (extra > 0) {
                 // Heavy forms on the iOS Metal backend can have their first
@@ -212,6 +217,23 @@ public abstract class BaseTest extends AbstractTest {
     /// framebuffer -- overrides this to force a fresh, fully-presented frame.
     protected long extraSettleBeforeCaptureMillis() {
         return 0;
+    }
+
+    /// Whether this test still has content that has not arrived, holding the
+    /// capture off until it has. Defaults to false, so no existing test changes.
+    ///
+    /// The settle loop watches the form, the animation manager, the transition
+    /// state and the orientation -- all of which report "ready" while an
+    /// asynchronous image decode is still outstanding, because nothing about a
+    /// pending decode makes the form busy. A test whose content arrives that way
+    /// cannot express the wait any other way, and the alternative it is left
+    /// with -- asking for repaints and hoping one lands after the decode -- is a
+    /// race it loses intermittently.
+    ///
+    /// Bounded by the same wait cap as everything else here: content that never
+    /// arrives still captures, and still fails, rather than hanging the suite.
+    protected boolean captureBlockedByPendingContent() {
+        return false;
     }
 
     /// Tests that INTENTIONALLY capture in a non-baseline orientation (the

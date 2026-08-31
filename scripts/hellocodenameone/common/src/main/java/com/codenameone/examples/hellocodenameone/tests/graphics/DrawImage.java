@@ -59,6 +59,34 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
                 && fromBytes.getWidth() == size && encoded.getWidth() == size;
     }
 
+    /// Holds the capture until the asynchronously decoded pictures exist.
+    ///
+    /// The repaint request below can only ask for another paint; it cannot stop
+    /// the screenshot being taken before one arrives, and an outstanding decode
+    /// leaves the form perfectly idle, so the settle loop used to see nothing to
+    /// wait for. That is how this test failed intermittently with its top half
+    /// complete and its bottom half all but empty: the two lower variants
+    /// painted before the decode and nothing repainted them afterwards.
+    ///
+    /// Measured against the mutable image rather than the cell width, because
+    /// that is the size every picture here was built at and it needs no bounds
+    /// to read.
+    @Override
+    protected boolean captureBlockedByPendingContent() {
+        return mutable != null && !asyncImagesReady(mutable.getWidth());
+    }
+
+    /// One forced repaint after the decode lands, before the shot.
+    ///
+    /// The gate above says the pictures now exist; it does not say anything has
+    /// drawn them. Without this the capture can still take the frame painted
+    /// while they were missing, which is the same wrong picture arrived at one
+    /// step later.
+    @Override
+    protected long extraSettleBeforeCaptureMillis() {
+        return 150;
+    }
+
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
         int size = bounds.getWidth() / 4;
