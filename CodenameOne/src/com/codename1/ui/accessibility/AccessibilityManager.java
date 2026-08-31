@@ -68,6 +68,18 @@ public final class AccessibilityManager {
     private long nextId = 1;
     private long generation;
     private boolean refreshScheduled;
+    /// The root currently being walked, so the walk cannot dirty the tree it is itself
+    /// producing. Describing a component asks it what it says, and some of those
+    /// questions mutate: `List.getAccessibilityItemText` runs the shared cell renderer,
+    /// whose `setText`/`setIcon` invalidate accessibility in turn. Left alone that is a
+    /// fixed point with no fixed point -- every pass marks its own result stale and
+    /// queues another, which on a port that projects eagerly never stops.
+    ///
+    /// Only this root is exempt. An invalidation naming a *different* surface during the
+    /// walk is real news -- it cannot have been produced by the tree being built -- and
+    /// is queued as usual, which is what keeps a second window from going stale behind
+    /// a refresh of the first.
+    private Container buildingRoot;
     private int pendingChanges = CHANGE_ALL;
     /// The root the cached snapshot describes. A `Container` rather than a `Form`,
     /// because a `com.codename1.ui.Window` is a root in its own right.
@@ -233,6 +245,13 @@ public final class AccessibilityManager {
             changedTop = CN.getCurrentTopLevel();
         }
         final Container refreshRoot = changedTop == null ? null : changedTop.asContainer();
+        if (!allRoots && refreshRoot != null
+                && refreshRoot == buildingRoot) { //NOPMD CompareObjectsWithEquals
+            // Provoked by the walk of this very root -- see buildingRoot. The tree being
+            // built already reflects it, and marking that tree stale is what made the
+            // pass queue itself from its own output.
+            return;
+        }
         markDirty(allRoots ? null : refreshRoot);
         try {
             // Most mutations only need to make the cached snapshot stale. Ports
@@ -471,11 +490,20 @@ public final class AccessibilityManager {
         }
 
         List<BuildNode> roots = new ArrayList<BuildNode>();
-        resolveComponent(form, roots);
-        sortTree(roots);
         List<Long> rootIds = new ArrayList<Long>();
         LinkedHashMap<Long, AccessibilityNodeSnapshot> nodes = new LinkedHashMap<Long, AccessibilityNodeSnapshot>();
-        freeze(roots, -1, rootIds, nodes);
+        // Saved and restored rather than cleared, so a nested build -- a component
+        // getter that asks for a tree while this one is being walked -- cannot hand the
+        // outer walk back an unguarded state for the rest of its own run.
+        Container outerRoot = buildingRoot;
+        buildingRoot = form;
+        try {
+            resolveComponent(form, roots);
+            sortTree(roots);
+            freeze(roots, -1, rootIds, nodes);
+        } finally {
+            buildingRoot = outerRoot;
+        }
         generation++;
         AccessibilityTreeSnapshot updatedSnapshot = new AccessibilityTreeSnapshot(generation, rootIds, nodes);
         snapshot = updatedSnapshot;

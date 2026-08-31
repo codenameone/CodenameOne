@@ -1355,4 +1355,44 @@ class AccessibilityWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+
+    /// One invalidation has to settle, even when describing the surface mutates it.
+    ///
+    /// `List.getAccessibilityItemText` runs the shared cell renderer to find out what an
+    /// item says, and the renderer's own `setText` invalidates accessibility in turn. On
+    /// a port that projects eagerly that made the refresh pass queue itself again from
+    /// its own output: every pass dirtied the tree it had just built, re-posted, and the
+    /// serial-call queue grew without bound until the surface stopped being painted.
+    @FormTest
+    void describingAListDoesNotQueueRefreshesForever() {
+        implementation.setAccessibilityTreeSupported(true);
+        implementation.setAccessibilityTreeUpdateRequired(Boolean.TRUE);
+        try {
+            Form f = new Form("list", new BorderLayout());
+            com.codename1.ui.List<String> list =
+                    new com.codename1.ui.List<String>(new String[]{"alpha", "beta", "gamma"});
+            f.add(BorderLayout.CENTER, list);
+            f.show();
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            implementation.clearAccessibilityNotifications();
+            AccessibilityManager.getInstance().invalidate(list, AccessibilityManager.CHANGE_CONTENT);
+            // Well past the one pass the invalidation is owed. A self-feeding pass
+            // produces one more notification for every drain, so the count tracks the
+            // number of flushes instead of standing still.
+            for (int iter = 0; iter < 12; iter++) {
+                DisplayTest.flushEdt();
+            }
+
+            assertTrue(implementation.getAccessibilityNotifications().size() <= 2,
+                    "one invalidation has to settle, but the refresh pass reported "
+                            + implementation.getAccessibilityNotifications().size()
+                            + " times -- it is queueing itself from its own output");
+        } finally {
+            implementation.setAccessibilityTreeUpdateRequired(null);
+            implementation.setAccessibilityTreeSupported(false);
+            DisplayTest.flushEdt();
+        }
+    }
 }
