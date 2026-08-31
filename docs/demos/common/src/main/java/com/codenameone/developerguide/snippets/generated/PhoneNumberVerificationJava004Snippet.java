@@ -83,9 +83,11 @@ class PhoneNumberVerificationJava004Snippet {
         // tag::phone-number-verification-java-004[]
         PhoneNumberField phone = new PhoneNumberField();
         form.add(phone);
-        // the user picks a country and types 050-123-4567
+        // the user picks Israel and types 50-123-4567; separators are dropped
         String number = phone.getE164();   // "+972501234567"
         boolean plausible = phone.isValid();
+        // typing the trunk prefix they say out loud, 050-123-4567, keeps it:
+        // "+9720501234567". Your sending service normalizes that -- see below.
         // end::phone-number-verification-java-004[]
     }
 }

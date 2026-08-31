@@ -118,6 +118,23 @@ class PhoneNumberFieldTest extends UITestBase {
     }
 
     @FormTest
+    void aTypedTrunkPrefixIsKeptRatherThanGuessedAt() {
+        // Pinned because the class documents it and an example that claimed
+        // otherwise shipped in this file's first draft. A leading 0 is a trunk
+        // prefix in Israel and part of the number in Italy; stripping it here
+        // would corrupt the second to normalize the first, so what the user
+        // typed survives and the sending service normalizes.
+        PhoneNumberField f = new PhoneNumberField();
+        f.setCountry(PhoneNumberField.findCountry("IL"));
+        f.getNumberField().setText("050-123-4567");
+        assertEquals("0501234567", f.getNationalNumber());
+        assertEquals("+9720501234567", f.getE164());
+
+        f.getNumberField().setText("50-123-4567");
+        assertEquals("+972501234567", f.getE164());
+    }
+
+    @FormTest
     void changingCountryKeepsTheNumberThatWasTyped() {
         PhoneNumberField f = new PhoneNumberField();
         f.setCountry(PhoneNumberField.findCountry("US"));

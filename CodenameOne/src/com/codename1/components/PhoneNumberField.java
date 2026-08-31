@@ -58,18 +58,33 @@ import java.util.List;
 /// `#getE164()` returns the number in the one format a server can act on --
 /// a leading "+", the calling code, then the national number, digits only:
 ///
+/// Everything that is not a digit is dropped, so the separators a user reaches
+/// for make no difference:
+///
 /// ```java
 /// phone.setCountry(PhoneNumberField.findCountry("IL"));
-/// // user types 501234567, or 050-123-4567, or (050) 123 4567
+/// // user types 50-123-4567, or 50 123 4567, or (50) 1234567
 /// phone.getE164(); // "+972501234567"
 /// ```
 ///
-/// A national trunk prefix is not something this field can strip for you: "0"
-/// is a trunk prefix in Israel and part of the number in Italy, and telling
-/// them apart is a per-country rule this field deliberately does not carry.
-/// What it does carry is the shape of E.164 -- at most fifteen digits, and the
-/// calling code separated from the rest -- so `#isValid()` is a sanity check
-/// and the service that sends the message stays the authority.
+/// A national trunk prefix is a digit, and it is kept:
+///
+/// ```java
+/// // the same user typing the number the way they say it out loud
+/// // user types 050-123-4567
+/// phone.getE164(); // "+9720501234567" -- the leading 0 is still there
+/// ```
+///
+/// That is not an oversight, and it is the one thing to handle before sending.
+/// "0" is a trunk prefix in Israel and part of the number in Italy, and telling
+/// them apart is a per-country rule this field does not carry, so stripping one
+/// here would corrupt numbers in the countries where it belongs. Normalizing is
+/// left to the service that sends the message, which has the rules and can
+/// refuse what it cannot make sense of.
+///
+/// What this field does carry is the shape of E.164 -- at most fifteen digits,
+/// and the calling code separated from the rest -- so `#isValid()` is a sanity
+/// check rather than a verdict.
 ///
 /// #### Country names
 ///
