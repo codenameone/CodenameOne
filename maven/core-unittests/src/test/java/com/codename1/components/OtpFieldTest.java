@@ -419,6 +419,24 @@ class OtpFieldTest extends UITestBase {
         assertEquals("123456", f.getText());
     }
 
+    @FormTest
+    void aRangeReplacementIsFilteredLikeEverythingElse() {
+        // iOS delivers edits through UITextInput as range replacements, which reach
+        // neither the typed-text hook nor the commit
+        OtpField f = new OtpField(6);
+        f.setText("12");
+        f.getInputField().replaceRange(2, 2, "a3");
+        assertEquals("123", f.getText());
+    }
+
+    @FormTest
+    void aRangeReplacementCannotOverfillTheField() {
+        OtpField f = new OtpField(6);
+        f.getInputField().replaceRange(0, 0, "123456789");
+        assertEquals("123456", f.getText());
+        assertTrue(f.isComplete());
+    }
+
     // ---- completion ---------------------------------------------------
 
     @FormTest

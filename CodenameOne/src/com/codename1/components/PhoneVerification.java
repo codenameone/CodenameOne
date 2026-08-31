@@ -161,6 +161,8 @@ public class PhoneVerification extends Container {
     private CodeSender codeSender;
     private CodeVerifier codeVerifier;
     private String number;
+    /// The number a send is out for, which becomes `number` only if it succeeds.
+    private String pendingNumber;
     private int resendDelay = 60;
     private int resendRemaining;
     private UITimer resendTimer;
@@ -330,7 +332,13 @@ public class PhoneVerification extends Container {
             setError(localize("PhoneVerification.NoSender", "No verification service is configured"));
             return;
         }
-        number = e164Number;
+        // Held, not committed. The number a code was sent to only becomes this
+        // component's number when the server says it sent one: a custom layout can call
+        // this from the code stage with a different number, and if that send is refused
+        // the screen still describes the number that worked -- so the code the user is
+        // looking at must still be verified against that one, and getPhoneNumber must
+        // still name it.
+        pendingNumber = e164Number;
         setError(null);
         setBusy(true);
         generation++;
@@ -400,7 +408,8 @@ public class PhoneVerification extends Container {
         setBusy(false);
         if (ok) {
             if (sending) {
-                showCodeStage(number);
+                // and now it is the number, because a code was sent to it
+                showCodeStage(pendingNumber);
             } else {
                 fireVerified();
             }

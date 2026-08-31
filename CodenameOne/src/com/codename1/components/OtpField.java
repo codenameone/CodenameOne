@@ -460,6 +460,19 @@ public class OtpField extends Container {
             super.setComposingText(limit(text), relativeCaret);
         }
 
+        /// A platform editing a range of the document directly, which is how iOS
+        /// delivers an edit through UITextInput -- the bridge calls this rather than
+        /// committing text, so it reaches neither the typed-text hook nor the commit.
+        /// The fourth door into this field, and the last one: a range replacement could
+        /// otherwise put letters in a numeric code or more characters than there are
+        /// boxes, which shows as a code that can never be complete.
+        @Override
+        public void replaceRange(int start, int end, String text) {
+            int replaced = Math.abs(end - start);
+            int used = getText().length() - replaced;
+            super.replaceRange(start, end, owner.accept(text, owner.length - used));
+        }
+
         /// The end of a composition with no commit behind it, which is a final answer
         /// too. It changes no text, so nothing else would tell the field to look again.
         @Override

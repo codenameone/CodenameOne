@@ -222,6 +222,40 @@ class PhoneVerificationTest extends UITestBase {
         assertEquals("", v.getOtpField().getText());
     }
 
+    @FormTest
+    void aRefusedSendDoesNotTakeOverTheNumberTheCodeWasSentTo() {
+        // a custom layout can call requestCode from the code stage with another number;
+        // if that send is refused the screen still describes the one that worked, so the
+        // code the user is looking at must still be verified against it
+        RecordingSender sender = new RecordingSender();
+        RecordingVerifier verifier = new RecordingVerifier();
+        PhoneVerification v = new PhoneVerification();
+        v.setCodeSender(sender);
+        v.setCodeVerifier(verifier);
+        v.showCodeStage("+972501234567");
+
+        v.requestCode("+15550100123");
+        sender.pending.failed("no route");
+        flushSerialCalls();
+
+        assertEquals("+972501234567", v.getPhoneNumber(),
+                "the number a code was actually sent to");
+        v.getOtpField().setText("123456");
+        assertEquals("+972501234567", verifier.number,
+                "and the code is checked against that one");
+    }
+
+    @FormTest
+    void anAcceptedSendDoesTakeOverTheNumber() {
+        RecordingSender sender = new RecordingSender();
+        PhoneVerification v = withNumber("IL", "501234567");
+        v.setCodeSender(sender);
+        v.requestCode("+972501234567");
+        sender.pending.succeeded();
+        flushSerialCalls();
+        assertEquals("+972501234567", v.getPhoneNumber());
+    }
+
     // ---- the response contract -------------------------------------------
 
     @FormTest
