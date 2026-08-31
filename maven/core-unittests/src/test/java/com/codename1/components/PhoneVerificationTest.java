@@ -25,8 +25,10 @@ package com.codename1.components;
 import com.codename1.components.PhoneVerification.Response;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BoxLayout;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -320,6 +322,47 @@ class PhoneVerificationTest extends UITestBase {
         assertEquals(60, v.getResendDelay());
         v.showCodeStage("+972501234567");
         assertFalse(v.getResendButton().isEnabled(), "a resend offered at once invites a second SMS");
+    }
+
+    @FormTest
+    void startingAtTheCodeStageBeforeThereIsAFormStillOpensTheKeyboard() {
+        // the documented way to start at the second stage builds the component,
+        // calls showCodeStage and only then adds it to a form; requestFocus does
+        // nothing until there is one
+        PhoneVerification v = new PhoneVerification();
+        v.showCodeStage("+972501234567");
+
+        Form f = new Form("t", BoxLayout.y());
+        f.add(v);
+        f.show();
+        flushSerialCalls();
+
+        assertTrue(v.getOtpField().getInputField().hasFocus(),
+                "the code field should be ready to type into");
+    }
+
+    @FormTest
+    void shorteningTheResendDelayAppliesToTheWaitAlreadyRunning() {
+        PhoneVerification v = new PhoneVerification();
+        v.showCodeStage("+972501234567");
+        assertFalse(v.getResendButton().isEnabled());
+
+        v.setResendDelay(0);
+        assertTrue(v.getResendButton().isEnabled(),
+                "setting the delay to zero offers the resend now, not at the next stage");
+    }
+
+    @FormTest
+    void lengtheningTheResendDelayLeavesTheWaitAlreadyRunningAlone() {
+        // extending a wait somebody is already serving is not something a setter
+        // should do behind their back
+        PhoneVerification v = new PhoneVerification();
+        v.setResendDelay(5);
+        v.showCodeStage("+972501234567");
+        v.setResendDelay(600);
+        assertEquals(600, v.getResendDelay());
+        v.setResendDelay(0);
+        assertTrue(v.getResendButton().isEnabled());
     }
 
     @FormTest

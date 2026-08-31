@@ -166,6 +166,10 @@ public class PhoneVerification extends Container {
     private UITimer resendTimer;
     private int generation;
     private boolean busy;
+    /// Set when the code stage was entered before there was a form to focus into --
+    /// the documented way to start at the second stage does exactly that -- so the
+    /// keyboard can be opened once the component is attached instead of not at all.
+    private boolean focusCodeWhenAttached;
 
     /// Builds the flow with a six digit code.
     public PhoneVerification() {
@@ -265,7 +269,10 @@ public class PhoneVerification extends Container {
         setError(null);
         setBusy(false);
         startResendTimer();
-        code.startEditing();
+        focusCodeWhenAttached = getComponentForm() == null;
+        if (!focusCodeWhenAttached) {
+            code.startEditing();
+        }
     }
 
     /// Retires whatever request is still out. A stage transition is the user
@@ -480,6 +487,21 @@ public class PhoneVerification extends Container {
     @Override
     protected void initComponent() {
         super.initComponent();
+        if (focusCodeWhenAttached && isCodeStage()) {
+            // Once, and only for a request that had nowhere to go. Focusing on every
+            // initComponent would take focus back and reopen the keyboard each time the
+            // user returned to this screen. Deferred a beat because the form settles its
+            // own initial focus as it is shown, and the later of the two wins.
+            focusCodeWhenAttached = false;
+            CN.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    if (isCodeStage()) {
+                        code.startEditing();
+                    }
+                }
+            });
+        }
         if (isCodeStage() && resendRemaining > 0 && resendTimer == null && getComponentForm() != null) {
             resendTimer = UITimer.timer(1000, true, getComponentForm(), new Runnable() {
                 @Override
@@ -522,6 +544,18 @@ public class PhoneVerification extends Container {
     /// - `seconds`: the delay
     public void setResendDelay(int seconds) {
         this.resendDelay = Math.max(0, seconds);
+        if (resendRemaining > resendDelay) {
+            // A countdown already running is shortened to the new delay, so setting zero
+            // offers the resend now rather than at the next stage change. A LONGER delay
+            // is not applied to it: extending a wait somebody is already serving is not
+            // something a setter should do behind their back, and it takes effect on the
+            // next code like any other change.
+            resendRemaining = resendDelay;
+            updateResendLabel();
+            if (resendRemaining <= 0) {
+                stopResendTimer();
+            }
+        }
     }
 
     /// The number the code was sent to, in E.164 form, or null before a code
