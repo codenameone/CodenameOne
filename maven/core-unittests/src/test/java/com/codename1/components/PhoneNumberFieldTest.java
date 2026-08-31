@@ -263,6 +263,20 @@ class PhoneNumberFieldTest extends UITestBase {
         f.setCountries(new Country[]{PhoneNumberField.findCountry("IL")});
         f.setCountries(null);
         assertTrue(f.getCountries().length > 200);
+        assertEquals("IL", f.getCountry().getIsoCode(),
+                "a country the full list also has stays selected");
+    }
+
+    @FormTest
+    void restoringTheFullListDropsACountryOnlyACustomListHad() {
+        // the selection has to be one of the countries on offer; a country invented
+        // for a replaced list is not in the full one
+        PhoneNumberField f = new PhoneNumberField();
+        f.setCountries(new Country[]{new Country("XA", "1", "Somewhere")});
+        assertEquals("XA", f.getCountry().getIsoCode());
+        f.setCountries(null);
+        assertNotNull(PhoneNumberField.findCountry(f.getCountry().getIsoCode()),
+                "the selected country must be one the full list carries");
     }
 
     @FormTest

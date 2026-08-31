@@ -27,6 +27,7 @@ import com.codename1.ui.EditField;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.TextInputConfig;
 import com.codename1.ui.TextInputState;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -379,6 +380,20 @@ public class OtpField extends Container {
             getAllStyles().setPadding(0, 0, 0, 0);
             getAllStyles().setMargin(0, 0, 0, 0);
             setConstraint((owner.numericOnly ? TextArea.NUMERIC : TextArea.ANY) | TextArea.ONE_TIME_CODE);
+        }
+
+        /// Correction and capitalization off, whatever the field's other settings.
+        ///
+        /// A code is not language. The platform would otherwise capitalize the first
+        /// letter of an alphanumeric code and offer to correct the rest, and it does that
+        /// BEFORE the value reaches this field -- so the user types the code they were
+        /// sent, the keyboard changes it, and the server rejects a code that was correct
+        /// when it left their hands. A digits-only field is safe from this by virtue of
+        /// its keyboard; one that accepts letters is not, and the flags cost nothing
+        /// either way.
+        @Override
+        public TextInputConfig getConfig() {
+            return super.getConfig().setAutoCorrect(false).setAutoCapitalize(false);
         }
 
         @Override

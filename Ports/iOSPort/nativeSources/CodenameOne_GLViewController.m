@@ -1117,6 +1117,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 if (@available(iOS 12, *)) {
                     utf.textContentType = UITextContentTypeOneTimeCode;
                 }
+                // and no correcting or capitalizing it: the keyboard would otherwise change
+                // a code between the user reading it and the server checking it. A digit code
+                // is safe by virtue of its keypad; one that takes letters is not.
+                utf.autocorrectionType = UITextAutocorrectionTypeNo;
+                utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
             }
             if(scale != 1) {
                 float s = ((BRIDGE_CAST CN1Font*)font).pointSize / scale;
@@ -1350,6 +1355,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 if (@available(iOS 12, *)) {
                     utv.textContentType = UITextContentTypeOneTimeCode;
                 }
+                // and no correcting or capitalizing it: the keyboard would otherwise change
+                // a code between the user reading it and the server checking it. A digit code
+                // is safe by virtue of its keypad; one that takes letters is not.
+                utv.autocorrectionType = UITextAutocorrectionTypeNo;
+                utv.autocapitalizationType = UITextAutocapitalizationTypeNone;
             }
 
 #if !TARGET_OS_TV

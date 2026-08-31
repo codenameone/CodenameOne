@@ -262,6 +262,14 @@ public class PhoneNumberField extends Container {
     public void setCountries(Country[] countries) {
         if (countries == null) {
             this.countries = null;
+            // The selection has to come from the list on offer, and a country that was
+            // only in a replaced list is not in this one. Not by taking the first entry
+            // of the full table, which is Afghanistan and has nothing to do with anyone:
+            // silently moving a user from +1 to +93 is worse than the inconsistency it
+            // tidies. The same code is preferred where the full list has it, and the
+            // device's own country is the fallback -- which is where the field started.
+            Country listed = findCountry(country.getIsoCode());
+            setCountry(listed != null ? listed : defaultCountry());
             return;
         }
         if (countries.length == 0) {

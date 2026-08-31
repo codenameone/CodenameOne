@@ -29,6 +29,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.TextInputConfig;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.events.ActionEvent;
@@ -97,6 +98,15 @@ class OtpFieldTest extends UITestBase {
         EditField input = new OtpField(6, false).getInputField();
         assertNotEquals(0, input.getConstraint() & TextArea.ONE_TIME_CODE);
         assertEquals(0, input.getConstraint() & TextArea.NUMERIC);
+    }
+
+    @FormTest
+    void theKeyboardIsNotAllowedToCorrectOrCapitaliseTheCode() {
+        // the platform applies both before the value ever reaches the field, so a
+        // corrected code is a code the user typed correctly and the server rejects
+        TextInputConfig cfg = new OtpField(6, false).getInputField().getConfig();
+        assertFalse(cfg.isAutoCorrect());
+        assertFalse(cfg.isAutoCapitalize());
     }
 
     // ---- value get / set --------------------------------------------
