@@ -216,6 +216,39 @@ class OtpFieldTest extends UITestBase {
         assertEquals("1234", f.getText());
     }
 
+    // ---- what the platform hands over -----------------------------------
+
+    @FormTest
+    void aCodeCommittedByThePlatformIsFilteredLikeATypedOne() {
+        // The Android autofill path commits the whole value into the field. An
+        // autofill service that keeps the message's separators hands over
+        // something the user could never have typed, and a field left holding it
+        // never reaches the length that completes it.
+        OtpField f = new OtpField(6);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        f.getInputField().commitText("123-456");
+        assertEquals("123456", f.getText());
+        assertTrue(f.isComplete());
+        assertEquals(1, fired.get());
+    }
+
+    @FormTest
+    void aCommittedCodeReplacesWhateverWasThereRatherThanAppending() {
+        // the platform is answering "the value is this", so a half typed code is
+        // replaced rather than prefixed onto the offer
+        OtpField f = new OtpField(6);
+        f.setText("99");
+        EditField input = f.getInputField();
+        input.setSelectionRange(0, input.getText().length());
+        input.commitText("123456");
+        assertEquals("123456", f.getText());
+    }
+
     // ---- completion ---------------------------------------------------
 
     @FormTest

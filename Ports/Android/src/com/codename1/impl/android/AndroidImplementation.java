@@ -488,9 +488,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void run() {
-            // a filled code replaces the field rather than being inserted at the caret: the
-            // platform is answering "the value is this", not typing into what is there
-            client.replaceRange(0, client.getTextLength(), text);
+            // A filled value replaces the field rather than being inserted at the caret: the
+            // platform is answering "the value is this", not typing into what is there. It
+            // still arrives as a commit rather than a raw range replacement, because a field
+            // filters what it accepts and a filled value has no more right to bypass that
+            // than a typed one -- an OTP field asked for six digits and can be handed
+            // "123-456" by an autofill service that kept the separator, and a replacement
+            // would leave the field holding a value it would never have let anyone type,
+            // never reaching the length that completes it.
+            client.setSelectionRange(0, client.getTextLength());
+            client.commitText(text);
         }
     }
 

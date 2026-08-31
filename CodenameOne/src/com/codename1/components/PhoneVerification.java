@@ -240,6 +240,7 @@ public class PhoneVerification extends Container {
     /// Returns to the first stage, with the number as it was left, and clears
     /// any code that was typed.
     public void showNumberStage() {
+        abandonPendingRequest();
         stopResendTimer();
         code.setText("");
         replaceStage(numberStage);
@@ -255,6 +256,7 @@ public class PhoneVerification extends Container {
     ///
     /// - `e164Number`: the number the code went to
     public void showCodeStage(String e164Number) {
+        abandonPendingRequest();
         number = e164Number;
         phone.setE164(e164Number);
         sentTo.setText(localize("PhoneVerification.SentTo", "Code sent to") + " " + e164Number);
@@ -264,6 +266,22 @@ public class PhoneVerification extends Container {
         setBusy(false);
         startResendTimer();
         code.startEditing();
+    }
+
+    /// Retires whatever request is still out. A stage transition is the user
+    /// saying the request they were waiting for no longer describes the screen:
+    /// they backed out of a verification, or changed a number a code was being
+    /// sent to. Without this the answer still matches the current generation
+    /// when it lands, so a late success would report a number as verified after
+    /// the user left that screen, or drag them back to a code stage they had
+    /// just abandoned.
+    ///
+    /// Answers already delivered are unaffected -- this only invalidates one
+    /// that has not arrived yet.
+    private void abandonPendingRequest() {
+        // busy is left to the caller: both transitions set it through setBusy so
+        // the buttons follow, and a second owner of that flag would be one too many
+        generation++;
     }
 
     private void replaceStage(Container stage) {

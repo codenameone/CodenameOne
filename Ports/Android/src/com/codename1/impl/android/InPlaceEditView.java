@@ -198,25 +198,43 @@ public class InPlaceEditView extends FrameLayout{
     /// string is the contract an autofill service matches on.
     private static final String AUTOFILL_HINT_SMS_OTP = "smsOTPCode";
 
-    /// Tells the platform that this field holds a code that arrived by message, which is what makes
-    /// an autofill service offer that code on it. A field without the hint is offered nothing, and
-    /// the application would be left reading SMS itself to fill it -- with the permission that
-    /// implies. Suggestions are turned off with it: a code is not a word, and predictive input has
-    /// no business learning one.
+    /// Tells the platform whether this field holds a code that arrived by message, which is what
+    /// makes an autofill service offer that code on it. A field without the hint is offered
+    /// nothing, and the application would be left reading SMS itself to fill it -- with the
+    /// permission that implies. Suggestions are turned off with it: a code is not a word, and
+    /// predictive input has no business learning one.
+    ///
+    /// Set AND cleared, because the native field outlives the Codename One field it is editing.
+    /// Tapping from one field straight into another reuses this same EditText through
+    /// switchToTextArea rather than building a new one, so a hint left behind by a code field
+    /// would still be on the view when the next field opens, and the platform would offer the
+    /// next arriving code to whatever the user tapped into. Clearing restores what a freshly
+    /// constructed EditText carries: no hints, and AUTO rather than NO -- an ordinary field is
+    /// autofillable, and turning that off here would stop a password manager filling the
+    /// username and password fields it is the whole point of.
+    ///
+    /// The input type needs no such undo: it is recomputed and assigned in full above rather
+    /// than amended, so the no-suggestions flag cannot survive into the next field.
     ///
     /// #### Parameters
     ///
     /// - `edit`: the native field being opened
     ///
     /// - `codenameOneInputType`: the Codename One constraint the field carries
-    private void applyOneTimeCodeHint(AutoCompleteTextView edit, int codenameOneInputType) {
-        if (!hasConstraint(codenameOneInputType, TextArea.ONE_TIME_CODE)) {
+    private void updateOneTimeCodeHint(AutoCompleteTextView edit, int codenameOneInputType) {
+        boolean oneTimeCode = hasConstraint(codenameOneInputType, TextArea.ONE_TIME_CODE);
+        if (oneTimeCode) {
+            edit.setInputType(edit.getInputType() | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        }
+        if (android.os.Build.VERSION.SDK_INT < 26) {
             return;
         }
-        edit.setInputType(edit.getInputType() | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        if (android.os.Build.VERSION.SDK_INT >= 26) {
+        if (oneTimeCode) {
             edit.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_YES);
             edit.setAutofillHints(new String[]{AUTOFILL_HINT_SMS_OTP});
+        } else {
+            edit.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_AUTO);
+            edit.setAutofillHints((String[]) null);
         }
     }
     private boolean isNonPredictive(int inputType) {
@@ -1025,7 +1043,7 @@ public class InPlaceEditView extends FrameLayout{
             mEditText.setTransformationMethod(new MyPasswordTransformationMethod());
         }
 
-        applyOneTimeCodeHint(mEditText, codenameOneInputType);
+        updateOneTimeCodeHint(mEditText, codenameOneInputType);
 
         int maxLength = textArea.maxSize;
         InputFilter[] FilterArray = new InputFilter[1];

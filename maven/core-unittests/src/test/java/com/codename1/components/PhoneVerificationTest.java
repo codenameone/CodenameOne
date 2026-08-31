@@ -271,6 +271,47 @@ class PhoneVerificationTest extends UITestBase {
         assertEquals("+972501111111", v.getPhoneNumber());
     }
 
+    @FormTest
+    void anAnswerArrivingAfterTheUserBackedOutIsDropped() {
+        RecordingVerifier verifier = new RecordingVerifier();
+        AtomicInteger verified = new AtomicInteger();
+        PhoneVerification v = new PhoneVerification();
+        v.setCodeVerifier(verifier);
+        v.addVerifiedListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                verified.incrementAndGet();
+            }
+        });
+        v.showCodeStage("+972501234567");
+        v.getOtpField().setText("123456");
+
+        // the user gave up waiting and went back to fix the number
+        v.showNumberStage();
+
+        verifier.pending.succeeded();
+        flushSerialCalls();
+        assertEquals(0, verified.get(),
+                "a number must not be reported verified on a screen the user left");
+        assertFalse(v.isCodeStage());
+    }
+
+    @FormTest
+    void aResendAnswerArrivingAfterTheUserBackedOutDoesNotReopenTheCodeStage() {
+        RecordingSender sender = new RecordingSender();
+        PhoneVerification v = withNumber("IL", "501234567");
+        v.setCodeSender(sender);
+        v.setResendDelay(0);
+        v.showCodeStage("+972501234567");
+        v.requestCode("+972501234567");
+
+        v.showNumberStage();
+
+        sender.pending.succeeded();
+        flushSerialCalls();
+        assertFalse(v.isCodeStage(),
+                "a resend the user walked away from must not drag them back");
+    }
+
     // ---- resend ------------------------------------------------------------
 
     @FormTest
