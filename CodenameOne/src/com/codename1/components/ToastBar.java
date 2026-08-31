@@ -549,12 +549,13 @@ public final class ToastBar {
         // inset was added on top of it.
         Style s = c.getAllStyles();
         s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        // Back to what the theme asked for, not to nothing -- see safeAreaPadding*Base.
         if (c.safeAreaPaddingTop > 0) {
-            s.setPaddingTop(0);
+            s.setPaddingTop(c.safeAreaPaddingTopBase);
             c.safeAreaPaddingTop = 0;
         }
         if (c.safeAreaPaddingBottom > 0) {
-            s.setPaddingBottom(0);
+            s.setPaddingBottom(c.safeAreaPaddingBottomBase);
             c.safeAreaPaddingBottom = 0;
         }
         // And the gap left for the keyboard, which belongs to the bottom edge just as
@@ -880,8 +881,13 @@ public final class ToastBar {
                     && (safeBottomMargin > 0 || c.safeAreaPaddingBottom > 0)) {
                 int applied = Math.max(0, safeBottomMargin);
                 Style s = c.getAllStyles();
+                if (c.safeAreaPaddingBottom == 0) {
+                    c.safeAreaPaddingBottomBase = c.getStyle().getPaddingBottom();
+                }
                 s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-                s.setPaddingBottom(applied);
+                // The theme's own value back when there is no inset to write, not a
+                // zero: this owns the padding only while an inset is applied.
+                s.setPaddingBottom(applied > 0 ? applied : c.safeAreaPaddingBottomBase);
                 c.safeAreaPaddingBottom = applied;
             } else if (position == Component.TOP
                     && (safeArea.getY() > 0 || c.safeAreaPaddingTop > 0)) {
@@ -895,8 +901,11 @@ public final class ToastBar {
                     if (needed > 0 || c.safeAreaPaddingTop > 0) {
                         int applied = Math.max(0, needed);
                         Style s = c.getAllStyles();
+                        if (c.safeAreaPaddingTop == 0) {
+                            c.safeAreaPaddingTopBase = c.getStyle().getPaddingTop();
+                        }
                         s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-                        s.setPaddingTop(applied);
+                        s.setPaddingTop(applied > 0 ? applied : c.safeAreaPaddingTopBase);
                         c.safeAreaPaddingTop = applied;
                     }
                 }
@@ -1268,6 +1277,16 @@ public final class ToastBar {
         /// both -- taller than it should be and inset away from the edge it now sits at.
         int safeAreaPaddingTop;
         int safeAreaPaddingBottom;
+        /// What the style asked for before an inset was written over it.
+        ///
+        /// The inset replaces the padding rather than adding to it, so the theme's own
+        /// value is gone for as long as one is applied -- and putting a zero back when
+        /// it is taken off left a bar that the theme had spaced away from the edge
+        /// sitting flush against it instead, for the rest of its life. Meaningful only
+        /// while the matching safeAreaPadding above is non-zero, which is exactly the
+        /// period this class owns the value in the style.
+        int safeAreaPaddingTopBase;
+        int safeAreaPaddingBottomBase;
         /// The keyboard margin this class has written, so it can be taken off again.
         int keyboardMarginBottom;
         Button leadButton = new Button();

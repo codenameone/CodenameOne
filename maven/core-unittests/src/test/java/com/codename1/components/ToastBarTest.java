@@ -363,4 +363,51 @@ class ToastBarTest extends UITestBase {
         cleanupToastBar(c);
     }
 
+    /**
+     * Taking an inset off restores the theme's spacing, not nothing.
+     *
+     * The inset replaces the padding rather than adding to it, so while one is applied
+     * the theme's own value is gone. Putting a zero back when it is taken off left a
+     * bar the theme had spaced away from the edge sitting flush against it for the rest
+     * of its life -- and the same loss happened on a move to the other edge.
+     */
+    @FormTest
+    void testClearingASafeAreaInsetRestoresTheThemedPadding() throws Exception {
+        implementation.setDisplaySafeArea(null);
+        ToastBar tb = ToastBar.getInstance();
+        tb.setPosition(Component.BOTTOM);
+
+        Form f = Display.getInstance().getCurrent();
+        f.revalidate();
+
+        Container c = invokeGetToastBarComponent(tb);
+        assertNotNull(c, "ToastBarComponent should be created");
+
+        // Stand in for a theme that asks for spacing under the bar.
+        Style themed = c.getAllStyles();
+        themed.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        themed.setPaddingBottom(9);
+        assertEquals(9, c.getStyle().getPaddingBottom(), "precondition: themed spacing");
+
+        // An inset arrives and replaces it.
+        int safeTop = 50;
+        int safeHeight = 1820;
+        implementation.setDisplaySafeArea(new Rectangle(0, safeTop, 1080, safeHeight));
+        f.revalidate();
+        assertSame(c, invokeGetToastBarComponent(tb), "precondition: the same toast");
+        assertEquals(1920 - safeTop - safeHeight, c.getStyle().getPaddingBottom(),
+                "precondition: the inset took the padding over");
+
+        // And goes away again.
+        implementation.setDisplaySafeArea(new Rectangle(0, 0, 1080, 1920));
+        f.revalidate();
+        assertSame(c, invokeGetToastBarComponent(tb), "precondition: still the same toast");
+
+        assertEquals(9, c.getStyle().getPaddingBottom(),
+                "the theme's spacing has to come back when the inset goes, or the bar"
+                        + " sits flush against the edge for the rest of its life");
+
+        cleanupToastBar(c);
+    }
+
 }

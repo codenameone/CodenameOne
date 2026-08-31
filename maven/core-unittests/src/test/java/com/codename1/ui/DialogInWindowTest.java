@@ -3644,4 +3644,79 @@ class DialogInWindowTest extends UITestBase {
         }
     }
 
+    /// A listener equal to the registered one removes it, wrapper included.
+    ///
+    /// The form removes a key listener by equality -- it hands it to a list, which
+    /// matches on equals -- so a caller passing a distinct but equal listener has its
+    /// registration taken off. Comparing by identity when taking the hosted wrapper off
+    /// the window left that wrapper published: the listener the caller had just removed
+    /// went on firing until the dialog was torn down.
+    @FormTest
+    void removingAnEqualListenerAlsoTakesItsHostedWrapperOff() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            Dialog dlg = new Dialog("hosted");
+            dlg.setTopLevelHost(w);
+            dlg.showModeless();
+            DisplayTest.flushEdt();
+            assertSame(w, dlg.getTopLevelContainer(),
+                    "precondition: hosted in the window, which is what publishes");
+
+            dlg.addKeyListener(-92, new NamedListener("shortcut"));
+            assertEquals(1, hostedKeyListenerCountOf(dlg),
+                    "precondition: the wrapper was published on the host");
+
+            // Equal, not the same object -- which is all the form needs.
+            dlg.removeKeyListener(-92, new NamedListener("shortcut"));
+
+            assertEquals(0, hostedKeyListenerCountOf(dlg),
+                    "removing by equality has to take the wrapper off too, or the"
+                            + " listener keeps firing after it was removed");
+            dlg.dispose();
+            DisplayTest.flushEdt();
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    /// A listener whose equality is by name rather than by identity.
+    private static final class NamedListener implements ActionListener {
+        private final String name;
+
+        NamedListener(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof NamedListener && name.equals(((NamedListener) other).name);
+        }
+
+        @Override
+        public int hashCode() {
+            return name.hashCode();
+        }
+    }
+
+    /// How many wrappers this dialog has published on its host, via reflection.
+    private static int hostedKeyListenerCountOf(Dialog d) {
+        try {
+            java.lang.reflect.Field f = Dialog.class.getDeclaredField("hostedKeyListeners");
+            f.setAccessible(true);
+            java.util.List<?> published = (java.util.List<?>) f.get(d);
+            return published == null ? 0 : published.size();
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
 }
