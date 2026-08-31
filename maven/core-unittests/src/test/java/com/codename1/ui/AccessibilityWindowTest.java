@@ -1395,4 +1395,56 @@ class AccessibilityWindowTest extends UITestBase {
             DisplayTest.flushEdt();
         }
     }
+    /// An all-surfaces invalidation reaches a window, not just the main form.
+    ///
+    /// A port turning eager projection on -- assistive technology starting -- has to
+    /// describe every live surface at that moment, because nothing was projected while
+    /// it was off. Naming the current form names the main one however many windows are
+    /// up, so the window the user is actually in would hold no elements until some
+    /// unrelated change happened to touch it.
+    @FormTest
+    void invalidatingEverySurfaceReachesAWindowAndNotOnlyTheCurrentForm() {
+        implementation.setMultiWindowSupported(true);
+        implementation.setAccessibilityTreeSupported(true);
+        try {
+            Form main = new Form("main", new BorderLayout());
+            main.add(BorderLayout.CENTER, new Button("on the main form"));
+            main.show();
+            DisplayTest.flushEdt();
+
+            final Window w = new Window("second", new BorderLayout());
+            w.setWindowSize(400, 300);
+            w.add(BorderLayout.CENTER, new Button("in the window"));
+            w.show();
+            DisplayTest.flushEdt();
+
+            implementation.clearAccessibilityNotifications();
+            // What a port does when assistive technology becomes active.
+            AccessibilityManager.getInstance().invalidate(null,
+                    AccessibilityManager.CHANGE_STRUCTURE);
+            DisplayTest.flushEdt();
+            DisplayTest.flushEdt();
+
+            boolean namedTheWindow = false;
+            boolean namedTheMainSurface = false;
+            for (int[] n : implementation.getAccessibilityNotifications()) {
+                if (n[1] == w.getWindowId()) {
+                    namedTheWindow = true;
+                }
+                if (n[1] == 0) {
+                    namedTheMainSurface = true;
+                }
+            }
+            assertTrue(namedTheMainSurface, "the main surface still has to be described");
+            assertTrue(namedTheWindow,
+                    "and so does a window that is up, or the surface the user is in"
+                            + " holds nothing until something else happens to change");
+
+            w.dispose();
+            DisplayTest.flushEdt();
+        } finally {
+            implementation.setAccessibilityTreeSupported(false);
+        }
+    }
+
 }

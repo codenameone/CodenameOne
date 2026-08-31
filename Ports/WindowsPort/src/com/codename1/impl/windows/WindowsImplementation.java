@@ -933,6 +933,29 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return surfaceBridge;
     }
 
+    /// {@inheritDoc}
+    ///
+    /// Only the main surface. The native side keeps one accessibility tree for the
+    /// process -- every window here is served by the same provider -- so projecting a
+    /// secondary window's nodes would install them as the application's and replace the
+    /// main surface's with them, while an update for a window that is not focused would
+    /// describe the wrong surface entirely. A window therefore has no accessibility yet
+    /// rather than the wrong accessibility, which is where this stood before there were
+    /// windows to get wrong. Per-surface native storage is what would lift it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `changeType`: bit mask of `AccessibilityManager.CHANGE_*` constants
+    ///
+    /// - `windowId`: the surface that changed, zero for the main one
+    @Override
+    public void accessibilityTreeChanged(int changeType, int windowId) {
+        if (windowId != 0) {
+            return;
+        }
+        accessibilityTreeChanged(changeType);
+    }
+
     @Override
     public void accessibilityTreeChanged(int changeType) {
         AccessibilityTreeSnapshot tree = getAccessibilityTreeSnapshot();
