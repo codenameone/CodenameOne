@@ -213,6 +213,17 @@ public class KotlinStdlibAlignment {
         if (strictlyPinsBaseStdlibBelowTheFloor(appGradleFragments)) {
             return "";
         }
+        // The two shims cannot be suppressed independently when the app holds one of
+        // them below the merge. Measured: an app pinning the whole family at 1.7.22
+        // resolves with no duplicate, and emitting only the surviving sibling raises
+        // kotlin-stdlib to 1.8.0 -- which carries the jdk8 classes -- beside the app's
+        // class-bearing jdk8 1.7.22 jar. That is this block MAKING the duplicate it
+        // exists to prevent, in a graph the app had arranged correctly.
+        for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
+            if (declaredBelowTheFloor(ALIGNED_ARTIFACTS[i], appGradleFragments)) {
+                return "";
+            }
+        }
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
             if (declaresArtifact(ALIGNED_ARTIFACTS[i], config, appGradleFragments)) {
@@ -228,6 +239,88 @@ public class KotlinStdlibAlignment {
             return "";
         }
         return "    constraints {\n" + out + "    }\n";
+    }
+
+    /**
+     * Whether the app declares this shim at a version below the merge floor.
+     *
+     * <p>A version this cannot read counts as below it. An app naming one of
+     * these artifacts at all is managing the family, and the harm of assuming
+     * the worst is an alignment not written for an app that had already sorted
+     * itself out, against a duplicate class manufactured in one that had.</p>
+     */
+    private static boolean declaredBelowTheFloor(String artifact,
+            String[] appGradleFragments) {
+        if (appGradleFragments == null) {
+            return false;
+        }
+        for (int i = 0; i < appGradleFragments.length; i++) {
+            String[] lines = activeLines(appGradleFragments[i]);
+            for (int j = 0; j < lines.length; j++) {
+                if (!declaresArtifactOnLine(artifact, "implementation", lines[j])
+                        && !declaresArtifactOnLine(artifact, "api", lines[j])) {
+                    continue;
+                }
+                if (!namesArtifactAnywhere(lines[j], artifact)) {
+                    continue;
+                }
+                if (belowTheFloor(declaredVersionOf(lines[j], artifact))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether the statement names the artifact, in either spelling. */
+    private static boolean namesArtifactAnywhere(String line, String artifact) {
+        return namesCoordinate(line, artifact)
+                || (line.contains(KOTLIN_GROUP) && declaresMapEntry(line, "name", artifact));
+    }
+
+    /**
+     * The version this statement declares for {@code artifact}: the third
+     * segment of its coordinate, or the map form's {@code version:} entry.
+     * Null when neither is readable, which callers treat as below the floor.
+     */
+    private static String declaredVersionOf(String line, String artifact) {
+        String coordinate = KOTLIN_GROUP + ":" + artifact + ":";
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c != '\'' && c != '"') {
+                continue;
+            }
+            int end = endOfStringLiteral(line, i);
+            String literal = line.substring(i + 1, Math.min(end, line.length()));
+            if (literal.startsWith(coordinate) && !hasWhitespace(literal)) {
+                return literal.substring(coordinate.length());
+            }
+            i = end;
+        }
+        return mapEntryValue(line, "version");
+    }
+
+    /** The value of a {@code key: 'value'} map entry, or null. */
+    private static String mapEntryValue(String line, String key) {
+        int at = line.indexOf(key);
+        while (at >= 0) {
+            boolean startsToken = at == 0 || !isIdentifierChar(line.charAt(at - 1));
+            if (startsToken) {
+                int i = skipBlanks(line, at + key.length());
+                if (i < line.length() && line.charAt(i) == ':') {
+                    i = skipBlanks(line, i + 1);
+                    if (i < line.length()
+                            && (line.charAt(i) == '\'' || line.charAt(i) == '"')) {
+                        int end = endOfStringLiteral(line, i);
+                        if (end < line.length()) {
+                            return line.substring(i + 1, end);
+                        }
+                    }
+                }
+            }
+            at = line.indexOf(key, at + 1);
+        }
+        return null;
     }
 
     /**
@@ -953,14 +1046,21 @@ public class KotlinStdlibAlignment {
                 out.add(current.toString().replace('\n', ' '));
             }
         }
+        // Definitions are folded in FIRST, because the merge below only absorbs a
+        // closure into a statement that already names the Kotlin group -- and a
+        // statement referring to the coordinate through a variable does not name it
+        // until the fold has happened. Merging first left `implementation(stdlib) {`
+        // unmerged, so its `strictly` was never associated with the coordinate.
+        List<String> defined = inlineLiteralDefinitions(out);
+
         // A declaration's own configuration block belongs to it: the version that
         // decides this is written as `version { strictly '1.7.22' }` on the line after
         // the coordinate. Only a statement that already names the Kotlin group absorbs
         // its block, so a `dependencies {` or `android {` opening cannot swallow the
         // fragment -- the blast radius is one declaration, never the file.
         List<String> merged = new ArrayList<String>();
-        for (int i = 0; i < out.size(); i++) {
-            String statement = out.get(i);
+        for (int i = 0; i < defined.size(); i++) {
+            String statement = defined.get(i);
             if (statement.contains(KOTLIN_GROUP)) {
                 // A trailing closure may sit on the line AFTER the call's closing
                 // parenthesis -- Gradle accepts it and the strictly inside really does
@@ -968,20 +1068,20 @@ public class KotlinStdlibAlignment {
                 // against it. The parenthesis depth is already back to zero there, so
                 // without this the closure lands in its own statement and the version
                 // it carries is never associated with the coordinate above it.
-                while (i + 1 < out.size() && opensAClosure(out.get(i + 1))) {
+                while (i + 1 < defined.size() && opensAClosure(defined.get(i + 1))) {
                     i++;
-                    statement = statement + " " + out.get(i);
+                    statement = statement + " " + defined.get(i);
                 }
                 int braces = trailingBraceBalance(statement);
-                while (braces > 0 && i + 1 < out.size()) {
+                while (braces > 0 && i + 1 < defined.size()) {
                     i++;
-                    statement = statement + " " + out.get(i);
-                    braces += braceBalance(out.get(i));
+                    statement = statement + " " + defined.get(i);
+                    braces += braceBalance(defined.get(i));
                 }
             }
             merged.add(statement);
         }
-        return inlineLiteralDefinitions(merged);
+        return merged.toArray(new String[merged.size()]);
     }
 
     /**
@@ -1011,16 +1111,17 @@ public class KotlinStdlibAlignment {
      * and it is a decision about documented behaviour rather than a defect to
      * patch here.</p>
      */
-    private static String[] inlineLiteralDefinitions(List<String> statements) {
+    private static List<String> inlineLiteralDefinitions(List<String> statements) {
         Map<String, String> literals = new LinkedHashMap<String, String>();
         for (int i = 0; i < statements.size(); i++) {
             collectLiteralDefinition(statements.get(i), literals);
         }
-        String[] out = new String[statements.size()];
+        if (literals.isEmpty()) {
+            return statements;
+        }
+        List<String> out = new ArrayList<String>();
         for (int i = 0; i < statements.size(); i++) {
-            out[i] = literals.isEmpty()
-                    ? statements.get(i)
-                    : withLiteralsInlined(statements.get(i), literals);
+            out.add(withLiteralsInlined(statements.get(i), literals));
         }
         return out;
     }

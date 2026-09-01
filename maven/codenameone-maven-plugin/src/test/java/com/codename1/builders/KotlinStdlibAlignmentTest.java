@@ -257,8 +257,9 @@ public class KotlinStdlibAlignmentTest {
                     + "('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22')\n");
             check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
                     "a pin on " + configuration + " is the app managing jdk8");
-            check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
-                    "and jdk7 is still constrained after a " + configuration + " pin");
+            check("".equals(out),
+                    "a below-floor pin on " + configuration + " suppresses BOTH shims, "
+                    + "since raising the sibling would strand the pinned one");
         }
     }
 
@@ -358,13 +359,13 @@ public class KotlinStdlibAlignmentTest {
         String spaced = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation(group : 'org.jetbrains.kotlin', "
                 + "name : 'kotlin-stdlib-jdk8', version : '1.7.22')\n");
-        check(!spaced.contains("kotlin-stdlib-jdk8:1.8.0"),
-                "a spaced map entry still pins jdk8");
+        check("".equals(spaced),
+                "a spaced map entry still pins jdk8, below the floor so both go");
 
         String doubleQuoted = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation(group: \"org.jetbrains.kotlin\", "
                 + "name:\"kotlin-stdlib-jdk8\", version: \"1.7.22\")\n");
-        check(!doubleQuoted.contains("kotlin-stdlib-jdk8:1.8.0"),
+        check("".equals(doubleQuoted),
                 "and so does an unspaced double-quoted one");
 
         // A different artifact in the same shape must still not count.
@@ -401,6 +402,62 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * The two shims cannot be suppressed independently below the merge floor.
+     * Measured with Gradle: an app pinning the whole family at 1.7.22 resolves
+     * with no duplicate, and emitting only the surviving sibling raises
+     * kotlin-stdlib to 1.8.0 -- which carries the jdk8 classes -- beside the
+     * app's class-bearing jdk8 1.7.22 jar. That is this block manufacturing the
+     * duplicate it exists to prevent, in a graph the app had arranged correctly.
+     */
+    @Test
+    public void aPreMergeShimPinSuppressesItsSiblingToo() {
+        String jdk8Pinned = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n");
+        check("".equals(jdk8Pinned),
+                "a pre-merge jdk8 pin takes the jdk7 constraint with it");
+
+        String jdk7Pinned = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.7.22'\n");
+        check("".equals(jdk7Pinned),
+                "and the same the other way round");
+    }
+
+    /**
+     * Above the floor they stay independent, because the sibling constraint
+     * cannot strand a shim that is already merged-era. Without this the fix
+     * above would have been "suppress everything whenever the app mentions
+     * either artifact", which gives up alignment an app still needs.
+     */
+    @Test
+    public void aMergedEraShimPinStillLeavesTheSiblingConstrained() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "jdk7 is still constrained beside a merged-era jdk8 pin");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "and jdk8 is left to the app");
+    }
+
+    /**
+     * A def reference whose closure spans lines needs the definition folded in
+     * BEFORE closures are merged: the merge only absorbs into a statement that
+     * already names the Kotlin group, and a statement referring to the
+     * coordinate through a variable does not name it until the fold happens.
+     * Running the passes the other way round left the closure unmerged and the
+     * strict pin unseen.
+     */
+    @Test
+    public void aDefReferenceWithAMultilineClosureIsStillAPin() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def stdlib = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n"
+                + "    implementation(stdlib) {\n"
+                + "        version { strictly '1.7.22' }\n"
+                + "    }\n");
+        check("".equals(out),
+                "the strict base pin behind a def with a multiline closure is honoured");
+    }
+
+    /**
      * A reason that OPENS with the coordinate is still a reason. Accepting any
      * literal starting with one let a warning about the duplicate
      * -- because 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22 causes
@@ -426,10 +483,8 @@ public class KotlinStdlibAlignmentTest {
         String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    def jdk8 = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
                 + "    implementation(jdk8) { version { strictly '1.7.22' } }\n");
-        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
-                "the strict pin behind a def is honoured");
-        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
-                "and jdk7 is still constrained");
+        check("".equals(out),
+                "the strict pin behind a def is honoured, and below the floor both go");
     }
 
     /**
@@ -489,10 +544,8 @@ public class KotlinStdlibAlignmentTest {
                 "    implementation group: 'org.jetbrains.kotlin',\n"
                 + "        name: 'kotlin-stdlib-jdk8',\n"
                 + "        version: '1.7.22'\n");
-        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
-                "a comma-continued map declaration pins jdk8");
-        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
-                "and leaves jdk7 constrained");
+        check("".equals(out),
+                "a comma-continued map declaration pins jdk8, below the floor so both go");
     }
 
     /**
@@ -713,10 +766,8 @@ public class KotlinStdlibAlignmentTest {
         String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
                 + "{ version { strictly '1.7.22' } }\n");
-        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
-                "pinning the jdk8 shim leaves jdk7 constrained, not the whole block off");
-        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
-                "and jdk8 itself is left to the app");
+        check("".equals(out),
+                "a strict pre-merge shim pin suppresses both, not just its own");
     }
 
     /**
@@ -747,10 +798,9 @@ public class KotlinStdlibAlignmentTest {
         String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    dependencies.add(\"runtimeOnly\", "
                 + "\"org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22\")\n");
-        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
-                "a quoted configuration name still pins jdk8");
-        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
-                "and leaves jdk7 constrained");
+        check("".equals(out),
+                "a quoted configuration name still pins jdk8, and a below-floor pin "
+                + "suppresses both");
     }
 
     /**
@@ -824,10 +874,8 @@ public class KotlinStdlibAlignmentTest {
                 "    implementation(\n"
                 + "        'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
                 + "    )\n");
-        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
-                "a wrapped declaration pins jdk8");
-        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
-                "and leaves jdk7 constrained");
+        check("".equals(out),
+                "a wrapped declaration pins jdk8, below the floor so both go");
     }
 
     /**
