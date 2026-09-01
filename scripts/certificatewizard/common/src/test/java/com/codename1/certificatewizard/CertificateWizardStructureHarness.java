@@ -176,6 +176,9 @@ public final class CertificateWizardStructureHarness {
         check(selectedSegment(form, "pick.type.ios_app_store"), "App Store segment starts selected");
         check(find(form, "pick.cert.3") == null,
                 "only certificates the selected profile type can use are offered");
+        check(find(form, "pick.cert.5") != null,
+                "a certificate with no stored private key is still offered: creating a profile "
+                        + "sends its Apple ID, and only the later export needs the key");
         check(find(form, "pick.device.DEV_1") == null,
                 "an App Store profile does not ask for devices");
         Component requirement = find(form, "modal.profile.requirement");
@@ -197,12 +200,14 @@ public final class CertificateWizardStructureHarness {
                 "a distribution certificate is dropped when the type becomes development");
         check(find(form, "pick.cert.2") != null, "the development certificate is offered instead");
         check(find(form, "pick.device.DEV_1") != null, "a development profile asks for devices");
+        check(find(form, "pick.device.DEV_3") == null, "a disabled device is not offered");
         fire(form, "pick.cert.2");
         check(!enabled(form, "modal.profile.submit"), "create waits for the devices it now needs");
         check(requirementText(form).contains("device"), "the missing devices are named");
         fire(form, "modal.profile.selectAllDevices");
         check(selectedCheckBox(form, "pick.device.DEV_1") && selectedCheckBox(form, "pick.device.DEV_2"),
                 "select all checks every device");
+        check(find(form, "pick.device.DEV_3") == null, "select all cannot reach a disabled device");
         check(enabled(form, "modal.profile.submit"), "create enables once devices are selected");
         fire(form, "modal.profile.clearDevices");
         check(!selectedCheckBox(form, "pick.device.DEV_1"), "clear unchecks every device");

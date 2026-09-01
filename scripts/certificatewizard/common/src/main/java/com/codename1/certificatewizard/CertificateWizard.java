@@ -1199,11 +1199,19 @@ public class CertificateWizard extends Lifecycle {
             // Only the certificates this profile type can actually be signed with. Offering all
             // of them let a Mac Installer certificate be picked for an iOS App Store profile,
             // which Apple rejects at creation time -- long after the wizard said it was fine.
-            List<SigningState.Certificate> usable = WizardDecisions.compatibleCertificates(state, profileType[0]);
+            // Note this is NOT compatibleCertificates: that one also demands a stored private
+            // key, which creating a profile does not need and which a certificate synced from
+            // Apple often does not have.
+            List<SigningState.Certificate> usable = WizardDecisions.profileCertificateChoices(state, profileType[0]);
             final List<Button> certButtons = new ArrayList<Button>();
             for (SigningState.Certificate cert : usable) {
                 String id = String.valueOf(cert.id());
-                Button pick = choice(cert.displayName(), typeLabel(cert.certificateType()), id.equals(certificateId[0]));
+                // The list is already filtered to one certificate type, so repeating that type on
+                // every row says nothing. The private key is the thing that differs between them,
+                // and saying so here beats discovering it at install time -- the one step that
+                // actually needs it. A Button clips rather than wraps, so this stays short.
+                String detail = cert.privateKeyPresent() ? null : "no stored private key";
+                Button pick = choice(cert.displayName(), detail, id.equals(certificateId[0]));
                 pick.setName("pick.cert." + cert.id());
                 certButtons.add(pick);
                 pick.addActionListener(e -> {
@@ -1217,7 +1225,7 @@ public class CertificateWizard extends Lifecycle {
             }
             if (usable.isEmpty()) {
                 label(c, "No active " + typeLabel(WizardDecisions.requiredCertificateType(profileType[0]))
-                        + " certificate with a private key. Generate one first.", "CWCardMeta");
+                        + " certificate. Generate one first.", "CWCardMeta");
                 Button makeCert = outline("Generate certificate", "btn.profileNeedsCert");
                 makeCert.addActionListener(e -> { d.dispose(); certificateDialog(); });
                 c.add(makeCert);
@@ -1225,12 +1233,17 @@ public class CertificateWizard extends Lifecycle {
 
             if (WizardDecisions.profileRequiresDevices(profileType[0])) {
                 label(c, "Devices", "CWFieldLabel");
+                // Disabled devices are still on the account and Apple rejects a request that
+                // names one, so the picker offers exactly what deviceIdsFor sends. Listing them
+                // and letting "select all" sweep them in made one click enough to build a
+                // request that could not succeed.
+                final List<SigningState.Device> devices = WizardDecisions.usableDevices(state);
                 final List<CheckBox> deviceBoxes = new ArrayList<CheckBox>();
                 Button all = outline("Select all", "modal.profile.selectAllDevices");
                 Button none = outline("Clear", "modal.profile.clearDevices");
                 all.addActionListener(e -> {
                     devs.clear();
-                    for (SigningState.Device dev : state.devices) {
+                    for (SigningState.Device dev : devices) {
                         devs.add(dev.id());
                     }
                     for (CheckBox box : deviceBoxes) {
@@ -1246,7 +1259,7 @@ public class CertificateWizard extends Lifecycle {
                     revalidate.run();
                 });
                 c.add(actionRow(Component.LEFT, all, none));
-                for (SigningState.Device device : state.devices) {
+                for (SigningState.Device device : devices) {
                     CheckBox cb = new CheckBox(device.name() + "   " + device.udid());
                     cb.setName("pick.device." + device.id());
                     cb.setUIID(uiid("CWFieldLabel"));
@@ -1264,8 +1277,8 @@ public class CertificateWizard extends Lifecycle {
                     });
                     c.add(cb);
                 }
-                if (state.devices.isEmpty()) {
-                    label(c, "No devices registered. Register one before creating this profile type.",
+                if (devices.isEmpty()) {
+                    label(c, "No enabled devices. Register one before creating this profile type.",
                             "CWCardMeta");
                 }
             } else {
@@ -2073,10 +2086,8 @@ public class CertificateWizard extends Lifecycle {
         if (!WizardDecisions.profileRequiresDevices(profileType)) {
             return out;
         }
-        for (SigningState.Device d : state.devices) {
-            if ("ENABLED".equals(d.status()) || "ACTIVE".equals(d.status())) {
-                out.add(d.id());
-            }
+        for (SigningState.Device d : WizardDecisions.usableDevices(state)) {
+            out.add(d.id());
         }
         return out;
     }

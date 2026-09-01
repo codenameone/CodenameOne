@@ -157,6 +157,45 @@ public final class WizardDecisions {
                 .replace("DEVELOPER_ID_", "Developer ID ").replace('_', ' ').toLowerCase();
     }
 
+    /// The certificates a profile of this type may be created against.
+    ///
+    /// Deliberately weaker than [#compatibleCertificates]: creating a profile sends only the
+    /// certificate's Apple ID, so a locally stored private key is not needed for it. That key is
+    /// needed to EXPORT the .p12 afterwards, which is why the auto-setup and reuse path insists
+    /// on it -- but insisting on it here hides a perfectly valid certificate that came back from
+    /// a sync with Apple and tells its owner to generate a second one they do not need.
+    ///
+    /// The type match is kept, because that one is not a preference: Apple rejects a profile
+    /// whose certificate is the wrong kind for it.
+    public static List<SigningState.Certificate> profileCertificateChoices(SigningState state, String profileType) {
+        String required = requiredCertificateType(profileType);
+        List<SigningState.Certificate> out = new ArrayList<SigningState.Certificate>();
+        for (SigningState.Certificate c : state.certificates) {
+            if ("ACTIVE".equals(c.status()) && required.equals(c.certificateType()) && c.appleCertId() != null) {
+                out.add(c);
+            }
+        }
+        return out;
+    }
+
+    /// Whether Apple will accept this device in a new profile. A device that has been disabled is
+    /// still listed on the account, and putting its ID in the request gets the whole request
+    /// rejected -- so the same predicate has to decide what a picker OFFERS and what automatic
+    /// setup SENDS, or a "select all" quietly builds a request that cannot succeed.
+    public static boolean isUsableDevice(SigningState.Device device) {
+        return device != null && ("ENABLED".equals(device.status()) || "ACTIVE".equals(device.status()));
+    }
+
+    public static List<SigningState.Device> usableDevices(SigningState state) {
+        List<SigningState.Device> out = new ArrayList<SigningState.Device>();
+        for (SigningState.Device d : state.devices) {
+            if (isUsableDevice(d)) {
+                out.add(d);
+            }
+        }
+        return out;
+    }
+
     public static boolean canCreateProfile(String profileType, String bundleId, List<String> certificateIds,
                                            List<String> deviceIds, String name) {
         if (profileType == null || bundleId == null || certificateIds == null || certificateIds.isEmpty()) {

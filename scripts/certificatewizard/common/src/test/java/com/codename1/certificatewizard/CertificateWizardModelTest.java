@@ -90,6 +90,55 @@ class CertificateWizardModelTest {
         assertFalse(WizardDecisions.canCreateProfile("IOS_APP_STORE", "BID1", certs, devices, ""));
     }
 
+    /// Creating a profile sends the certificate's Apple ID and nothing else, so the picker must
+    /// not apply the export-time private-key rule that compatibleCertificates does -- that hid a
+    /// valid certificate synced from Apple and told its owner to make a second one. The type
+    /// match is a different matter and stays: Apple rejects the wrong kind outright.
+    @Test
+    void profileCertificateChoicesKeepCertificatesWithNoStoredPrivateKey() {
+        long now = System.currentTimeMillis();
+        List<SigningState.Certificate> certs = new ArrayList<SigningState.Certificate>();
+        certs.add(new SigningState.Certificate(1L, "APPLE_NO_KEY", "IOS_DISTRIBUTION",
+                "Synced App Store Certificate", "SER1", now + 300L * 86400000L, "ACTIVE", false));
+        certs.add(new SigningState.Certificate(2L, "APPLE_EXPORTABLE", "IOS_DISTRIBUTION",
+                "Exportable App Store Certificate", "SER2", now + 300L * 86400000L, "ACTIVE", true));
+        certs.add(new SigningState.Certificate(3L, "APPLE_REVOKED", "IOS_DISTRIBUTION",
+                "Revoked", "SER3", now + 300L * 86400000L, "REVOKED", true));
+        certs.add(new SigningState.Certificate(4L, "APPLE_MAC", "MAC_APP_DISTRIBUTION",
+                "Mac App Store", "SER4", now + 300L * 86400000L, "ACTIVE", true));
+        SigningState state = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                certs, null, null, null, null, null);
+
+        List<SigningState.Certificate> choices = WizardDecisions.profileCertificateChoices(state, "IOS_APP_STORE");
+
+        assertEquals(2, choices.size(), "both active iOS distribution certificates are offered");
+        assertEquals("APPLE_NO_KEY", choices.get(0).appleCertId());
+        assertEquals("APPLE_EXPORTABLE", choices.get(1).appleCertId());
+        // and the export path is unchanged, because THAT one really does need the key
+        assertEquals(1, WizardDecisions.compatibleCertificates(state, "IOS_APP_STORE").size());
+    }
+
+    /// What the picker offers and what automatic setup sends have to be the same set, or a
+    /// "select all" builds a request naming a disabled device, which Apple rejects whole.
+    @Test
+    void onlyEnabledDevicesAreOffered() {
+        List<SigningState.Device> devices = new ArrayList<SigningState.Device>();
+        devices.add(new SigningState.Device("DEV_1", "QA iPhone", "UDID1", "IOS", "ENABLED"));
+        devices.add(new SigningState.Device("DEV_2", "Old iPad", "UDID2", "IOS", "DISABLED"));
+        devices.add(new SigningState.Device("DEV_3", "Bench Mac", "UDID3", "MAC", "ACTIVE"));
+        SigningState state = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, devices, null, null, null);
+
+        List<SigningState.Device> usable = WizardDecisions.usableDevices(state);
+
+        assertEquals(2, usable.size());
+        assertEquals("DEV_1", usable.get(0).id());
+        assertEquals("DEV_3", usable.get(1).id());
+        assertTrue(WizardDecisions.isUsableDevice(devices.get(0)));
+        assertFalse(WizardDecisions.isUsableDevice(devices.get(1)));
+        assertFalse(WizardDecisions.isUsableDevice(null));
+    }
+
     /// The create action is disabled until the request is complete, and the reporter of issue
     /// #5636 could not tell which of four sections was the incomplete one. The message names the
     /// FIRST thing missing, reading down the dialog, so following it always moves forward.
