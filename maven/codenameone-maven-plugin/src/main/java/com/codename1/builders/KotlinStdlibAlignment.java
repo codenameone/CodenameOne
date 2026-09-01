@@ -902,6 +902,18 @@ public class KotlinStdlibAlignment {
                     depth--;
                 }
             } else if ((c == '\n' || c == ';') && depth == 0) {
+                // A trailing comma continues the statement. Groovy's parenthesis-free
+                // map notation spreads one declaration over several lines --
+                //   implementation group: 'org.jetbrains.kotlin',
+                //                  name: 'kotlin-stdlib-jdk8',
+                //                  version: '1.7.22'
+                // -- and splitting there left the configuration, the group, the
+                // artifact and any closure in four statements, none of which is a
+                // declaration on its own.
+                if (c == '\n' && endsWithComma(current)) {
+                    current.append(' ');
+                    continue;
+                }
                 out.add(current.toString().replace('\n', ' '));
                 current.setLength(0);
                 continue;
@@ -941,7 +953,7 @@ public class KotlinStdlibAlignment {
                     i++;
                     statement = statement + " " + out.get(i);
                 }
-                int braces = braceBalance(statement);
+                int braces = trailingBraceBalance(statement);
                 while (braces > 0 && i + 1 < out.size()) {
                     i++;
                     statement = statement + " " + out.get(i);
@@ -953,10 +965,55 @@ public class KotlinStdlibAlignment {
         return merged.toArray(new String[merged.size()]);
     }
 
+    /** Whether the text so far ends with a comma, ignoring trailing blanks. */
+    private static boolean endsWithComma(StringBuilder text) {
+        for (int i = text.length() - 1; i >= 0; i--) {
+            char c = text.charAt(i);
+            if (c == ' ' || c == '\t' || c == '\r') {
+                continue;
+            }
+            return c == ',';
+        }
+        return false;
+    }
+
     /** Whether the statement is nothing but the start of a closure. */
     private static boolean opensAClosure(String statement) {
         String trimmed = statement.trim();
         return trimmed.startsWith("{");
+    }
+
+    /**
+     * The brace balance of what follows a declaration's coordinate, which is
+     * the only part that can be its own trailing closure.
+     *
+     * <p>Counting the whole statement caught the ENCLOSING block's opener when
+     * a fragment put its first dependency on the same line as it --
+     * {@code dependencies { implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'}
+     * -- and the declaration then swallowed every following statement up to the
+     * closing brace, so an unrelated {@code strictly} further down read as a
+     * pin on the stdlib and silenced the whole block. A block opener sits
+     * BEFORE the coordinate and a trailing closure after it, so counting from
+     * the end of the last string literal separates them.</p>
+     */
+    private static int trailingBraceBalance(String statement) {
+        // From the end of the COORDINATE literal, not the last literal: a trailing
+        // closure carries strings of its own -- an exclusion's module name, a strict
+        // version -- and counting after those missed the closure's own opening brace.
+        for (int i = 0; i < statement.length(); i++) {
+            char c = statement.charAt(i);
+            if (c != '\'' && c != '"') {
+                continue;
+            }
+            int end = endOfStringLiteral(statement, i);
+            if (statement.substring(i + 1, Math.min(end, statement.length()))
+                    .startsWith(KOTLIN_GROUP)) {
+                return braceBalance(statement.substring(Math.min(end + 1,
+                        statement.length())));
+            }
+            i = end;
+        }
+        return braceBalance(statement);
     }
 
     /** How far a statement opens or closes braces, ignoring those in strings. */

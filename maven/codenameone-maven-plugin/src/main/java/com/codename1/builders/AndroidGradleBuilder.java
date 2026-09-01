@@ -7306,10 +7306,13 @@ public class AndroidGradleBuilder extends Executor {
                     // dependencies block. Read off ShieldInjector's GRADLE_TEXT_HINTS,
                     // which is this tree's enumeration of hints interpolated into a
                     // Gradle file, rather than off the ones that came to mind --
-                    // android.supportv4Dep was missed exactly that way, and it is
-                    // written into the block a few lines below. The rest of that list
+                    // android.supportv4Dep was missed exactly that way, and so was
+                    // android.gradlePlugin: it is interpolated at top level right after
+                    // `apply plugin`, where a dependencies { } block of its own is
+                    // valid and reaches the same configurations. The rest of that list
                     // lands in buildscript, repositories or the android block, where a
                     // dependency cannot be declared.
+                    request.getArg("android.gradlePlugin", ""),
                     additionalDependencies,
                     aiExtraGradleDependencies.toString(),
                     request.getArg("android.gradleDep", ""),

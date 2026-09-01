@@ -401,6 +401,63 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Groovy's parenthesis-free map notation spreads one declaration over
+     * several lines, held together by trailing commas. Splitting at those
+     * newlines left the configuration, the group, the artifact and the closure
+     * in four statements, none of which is a declaration on its own -- so a
+     * strict pre-1.8 pin written that way was missed and the constraint made
+     * resolution fail.
+     */
+    @Test
+    public void aCommaContinuesAMultilineMapDeclaration() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation group: 'org.jetbrains.kotlin',\n"
+                + "        name: 'kotlin-stdlib-jdk8',\n"
+                + "        version: '1.7.22'\n");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a comma-continued map declaration pins jdk8");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and leaves jdk7 constrained");
+    }
+
+    /**
+     * An enclosing block's opening brace is not the declaration's own closure.
+     * A fragment putting its first dependency on the same line as
+     * {@code dependencies &#123;} made that declaration swallow every following
+     * statement up to the closing brace, so an unrelated strict pin further
+     * down read as one on the stdlib and silenced the whole block.
+     */
+    @Test
+    public void anEnclosingBlockBraceIsNotATrailingClosure() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "dependencies { implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'\n"
+                + "    implementation('com.example:other:1.0') "
+                + "{ version { strictly '1.7.22' } }\n"
+                + "}\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the unrelated strict pin does not attach to the stdlib declaration");
+    }
+
+    /**
+     * android.gradlePlugin is interpolated at top level right after
+     * `apply plugin`, where a dependencies block of its own is valid and
+     * reaches the same configurations -- so it has to be scanned like the
+     * other app-controlled fragments. It was missed the same way
+     * android.supportv4Dep was.
+     */
+    @Test
+    public void theBuilderScansTheGradlePluginFragment() throws Exception {
+        byte[] bytes = java.nio.file.Files.readAllBytes(new java.io.File(
+                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath());
+        String builderSrc = new String(bytes, "UTF-8");
+        int at = builderSrc.indexOf("KotlinStdlibAlignment.constraintsBlock(");
+        check(at >= 0, "the builder calls the alignment");
+        String call = builderSrc.substring(at, builderSrc.indexOf(";", at));
+        check(call.contains("request.getArg(\"android.gradlePlugin\", \"\")"),
+                "android.gradlePlugin reaches the generated script and must be scanned");
+    }
+
+    /**
      * The version comes from the strict call, not from a reason that mentions
      * one. Finding the call correctly and then reading the version with a
      * plain search let prose supply it, so a declaration whose real strict
