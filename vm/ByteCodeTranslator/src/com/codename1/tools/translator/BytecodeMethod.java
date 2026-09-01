@@ -4178,12 +4178,56 @@ public class BytecodeMethod implements SignatureSet {
         return new CustomIntruction("", "", new ArrayList<String>());
     }
 
+    /**
+     * Drop a CHECKCAST that immediately repeats the one before it.
+     *
+     * Deliberately narrow. Only a LineNumber may sit between the two, because it
+     * carries no semantics; a LabelInstruction may NOT, since another path can
+     * jump there with a different value on the stack, and then the second cast is
+     * the only one guarding it. Same reasoning for anything else in between: if it
+     * can touch the stack, the second cast is not redundant.
+     */
+    private void removeRepeatedCheckcasts() {
+        TypeInstruction previousCast = null;
+        for (int iter = 0 ; iter < instructions.size() ; iter++) {
+            Instruction current = instructions.get(iter);
+            if (current instanceof LineNumber) {
+                continue;                       // no semantics, does not break the pair
+            }
+            if (current instanceof TypeInstruction
+                    && current.getOpcode() == Opcodes.CHECKCAST) {
+                TypeInstruction cast = (TypeInstruction) current;
+                if (previousCast != null
+                        && previousCast.getTypeName() != null
+                        && previousCast.getTypeName().equals(cast.getTypeName())) {
+                    instructions.remove(iter);
+                    iter--;                     // the list shifted under us
+                    continue;                   // previousCast still stands
+                }
+                previousCast = cast;
+                continue;
+            }
+            previousCast = null;
+        }
+    }
+
     boolean optimize() {
         // FUSED OBJECTS, constructor side: rewrite each planned
         // `ALOAD 0; <len>; NEWARRAY T; PUTFIELD f` quadruple into the
         // self-contained KEEP-IF-NULL FusedFieldInit BEFORE any other pass can
         // fold/reorder those instructions. Runs on the raw list (first thing).
         replaceFusedCtorTriples();
+
+        // A CHECKCAST immediately repeated to the SAME type is a no-op: the first
+        // one already proved the type or threw, and neither touches the stack
+        // otherwise. javac emits the pair readily -- 23 of the 122 checkcast sites
+        // in a backend build were duplicates, 9 of them in java.lang.String, whose
+        // charInternal is the hottest String method under a server load.
+        //
+        // Worth removing rather than tolerating because a checked cast is REAL work
+        // here: builds pass -Dcn1.checkedCasts=true, so BC_CHECKCAST_CHECKED walks
+        // the class hierarchy instead of expanding to nothing.
+        removeRepeatedCheckcasts();
 
         int instructionCount = instructions.size();
 

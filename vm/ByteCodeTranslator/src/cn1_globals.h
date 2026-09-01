@@ -2825,6 +2825,16 @@ extern void cn1GcInstallSignalHandler(void);
 // universal-stop handler.
 extern __thread struct ThreadLocalData* cn1TlsSelf;
 
+struct cn1VirtualThread;
+/**
+ * A VM thread state. bindToCallingOsThread false builds one for a VIRTUAL thread,
+ * which owns it rather than borrowing the host's -- see the definition.
+ */
+extern struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThread);
+/** A virtual thread with a Java stack of its own, ready to be resumed. */
+extern struct cn1VirtualThread* cn1SpawnVirtualThread(void (*body)(void*), void* arg,
+                                                      size_t stackBytes);
+
 // Capture a parking mutator's native register file + native-stack low bound so the
 // concurrent GC can conservatively scan [sp, stackBase) for native-stack-held roots.
 // MUST be a macro so setjmp + the SP marker live in the PARKING frame itself: that
@@ -2851,6 +2861,22 @@ extern __thread struct ThreadLocalData* cn1TlsSelf;
 #ifdef CN1_GC_CONFORM
 extern long long cn1StallNowNs(void);
 extern void cn1StallRecord(int cause, long long ns, struct ThreadLocalData* ts);
+/* Stall causes. Declared HERE rather than in cn1_globals.m because
+   CN1_RESUME_THREAD below expands to CN1_STALL_ADD(..., CN1_STALL_NATIVE_RESUME,
+   ...), and every native file that wraps a blocking call uses that macro. With
+   the codes private to cn1_globals.m, any other native source failed to compile
+   under -DCN1_GC_CONFORM with "use of undeclared identifier"; the backend's
+   sockets, database and crypto natives are the first outside the core to wrap
+   blocking calls this way. */
+#define CN1_STALL_PACING_VOLUME 0   // regime-A run-ahead cap (cn1PacingPark, no budget)
+#define CN1_STALL_PACING_BUDGET 1   // regime-B admission wait (cn1PacingPark, under a ceiling)
+#define CN1_STALL_LOWMEM        2   // the low-memory allocation throttle
+#define CN1_STALL_HANDSHAKE     3   // threadBlockedByGC: this thread's own share of the mark
+#define CN1_STALL_PENDING_FULL  4   // per-thread pending table full: waits out a WHOLE cycle
+#define CN1_STALL_NATIVE_RESUME 5   // returning from a native call into a running mark
+#define CN1_STALL_SIGNAL_STOP   6   // parked inside the GC's stop signal handler
+#define CN1_STALL_CAUSES        7
+
 #define CN1_STALL_T0(v) long long v = cn1StallNowNs()
 #define CN1_STALL_ADD(v, cause, ts) cn1StallRecord((cause), cn1StallNowNs() - (v), (ts))
 #else

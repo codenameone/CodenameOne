@@ -572,9 +572,18 @@ class WatchNativeBuilder {
             // Swift phase fixup, which globs <Main>-src/**/*.swift, would have swept the watch
             // copy into the PHONE target instead. It is excluded from that glob for the same
             // reason (see IPhoneBuilder's swift fixup).
+            // .S belongs here too, for the same reason .swift does. The virtual-thread
+            // runtime's context switch has to be assembly (glibc aborts a cross-stack
+            // longjmp under _FORTIFY_SOURCE and musl has no makecontext), and it is the
+            // first .S the translator emits -- so copying cn1_virtual_thread.c without
+            // cn1_virtual_thread_asm.S left the WATCH target compiling a caller whose
+            // callee did not exist: "_cn1VirtualThreadSwitch, referenced from
+            // _cn1VirtualThreadYield ... symbol(s) not found". The phone target linked
+            // fine, so only a watch-enabled build shows it.
             boolean source = name.endsWith(".m") || name.endsWith(".c")
                     || name.endsWith(".swift") || name.endsWith(".mm")
-                    || name.endsWith(".cpp") || name.endsWith(".cc");
+                    || name.endsWith(".cpp") || name.endsWith(".cc")
+                    || name.endsWith(".S") || name.endsWith(".s");
             if (!source && !name.endsWith(".h")) {
                 // Only the code. The watch bundle's plist, resources and project file are written
                 // by this builder against the PHONE project -- taking the second translation's

@@ -26,6 +26,7 @@
 #endif
 
 #include "cn1_globals.h"
+#include "cn1_virtual_thread.h"
 #include <stdint.h>
 #include <stdio.h>
 #ifndef _WIN32
@@ -1951,143 +1952,231 @@ int nThreadsToKill = 0;         // the number of threads we expect to be finaliz
 
 pthread_key_t   threadIdKey = 0;
 JAVA_LONG threadKeyCounter = 1;
+/**
+ * Build a fresh VM thread state.
+ *
+ * Split out of getThreadLocalData so a VIRTUAL thread can have one too. A
+ * virtual thread needs its own Java locals and operand stack -- that is the
+ * whole point of it, since a request's state lives there -- and it must be
+ * registered in allThreads like any other, or the precise scan never walks its
+ * object stack and its live objects are collected under it.
+ *
+ * The one thing this deliberately does NOT do is bind the state to the calling
+ * OS thread: a virtual thread's state belongs to the virtual thread and travels
+ * with it between hosts.
+ */
+struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThread) {
+    struct ThreadLocalData* i;
+        JAVA_LONG nativeThreadId = threadKeyCounter;
+    threadKeyCounter++;
+    i = malloc(sizeof(struct ThreadLocalData));
+    i->threadId = nativeThreadId;
+    i->tryBlockOffset = 0;
+    
+    i->lightweightThread = JAVA_FALSE;
+    i->threadBlockedByGC = JAVA_FALSE;
+    i->threadActive = JAVA_FALSE;
+    i->threadKilled = JAVA_FALSE;
+#ifdef CN1_GC_CONFORM
+    // Malloc'd, so this starts as garbage. See gcThreadStartMs in cn1_globals.h.
+    { extern void cn1StallRegisterThread(struct ThreadLocalData* t);
+      cn1StallRegisterThread(i); }
+#endif
+    i->interrupted = JAVA_FALSE;
+    
+    i->currentThreadObject = 0;
+    
+    i->utf8Buffer = 0;
+    i->utf8BufferSize = 0;
+    /*
+     * calloc, not malloc+memset. These four buffers are ~300KB per thread and the
+     * eager memset TOUCHED EVERY PAGE, so a thread that never runs a deep call
+     * chain still paid the whole footprint in resident memory -- measured at
+     * ~118KB per parked thread, which is what decides whether a server-side
+     * binary can afford a thread per connection.
+     *
+     * The eager clear was redundant: every frame prologue memsets exactly the
+     * slots it is about to claim (see the frame-entry helpers in cn1_globals.h),
+     * and the collector only scans threadObjectStack up to
+     * threadObjectStackOffset, so no slot is ever read before the frame that owns
+     * it has zeroed it. calloc for a request this size comes from mmap and is
+     * lazily zeroed by the OS, so a shallow thread commits a few pages instead of
+     * all of them.
+     */
+    i->threadObjectStack = cn1AllocThreadStack();
+    i->threadObjectStackOffset = 0;
+
+    i->callStackClass = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
+    i->callStackLine = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
+    i->callStackMethod = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
+
+#ifdef CN1_ON_DEVICE_DEBUG
+    i->callStackLocalsAddresses = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
+    memset(i->callStackLocalsAddresses, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
+    i->callStackFrameInfo = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
+    memset(i->callStackFrameInfo, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
+#endif
+
+    i->callStackOffset = 0;
+
+    // ThreadLocalData is malloc'd (not zeroed); 0 means "frameless native-stack
+    // limit not yet computed" -- it is filled in lazily on first frameless entry.
+    i->nativeStackLimit = 0;
+
+    i->pendingHeapAllocations = calloc(PER_THREAD_ALLOCATION_COUNT, sizeof(void *));
+    i->heapAllocationSize = 0;
+    i->threadHeapTotalSize = PER_THREAD_ALLOCATION_COUNT;
+    // ThreadLocalData is malloc'd, NOT zeroed. bibopBytesLocal feeds the GC
+    // trigger/pacing accounting (CN1_BIBOP_FLUSH_BYTES adds it into the global
+    // counters); garbage here means a spurious immediate GC + hard-cap park, or
+    // a dead allocation trigger, on every new thread. nativeAllocationMode is
+    // read by the inlined alloc fast path (cn1BibopFastAlloc) before any setter
+    // runs -- garbage-nonzero silently disables the fast path for the thread.
+    i->bibopBytesLocal = 0;
+    i->bibopEpochBytes = 0;
+#ifndef CN1_DISABLE_BIBOP
+    i->bibopObservedGcEpoch = atomic_load_explicit(&bibopGcEpoch,
+                                        memory_order_relaxed);
+#else
+    i->bibopObservedGcEpoch = 0;
+#endif
+    i->bibopHighThroughputUntilEpoch = 0;
+    for(int __bi = 0 ; __bi < CN1_BIBOP_NUM_CLASSES ; __bi++) {
+#ifndef CN1_DISABLE_BIBOP
+        i->bibopBypassSeen[__bi] = atomic_load_explicit(&bibopBypassGeneration[__bi],
+                                            memory_order_relaxed);
+#else
+        i->bibopBypassSeen[__bi] = 0;
+#endif
+        i->bibopBypassRemaining[__bi] = 0;
+    }
+    i->nativeAllocationMode = JAVA_FALSE;
+    // dead-thread pending-migration queue state (single-writer allObjectsInHeap)
+    i->gcDeadNext = 0;
+    i->gcQueuedForDrain = JAVA_FALSE;
+    i->gcReleaseRequested = JAVA_FALSE;
+    
+    i->blocks = malloc(CN1_MAX_TRY_BLOCKS * sizeof(struct TryBlock));
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // PHASE 3b: record this thread's pthread handle + TLS self pointer so the GC can
+    // signal-stop it and the async-signal-safe stop handler can find its state.
+    i->gcParkCaptured = JAVA_FALSE;
+    // Carried over when this initialisation was extracted into a function: the
+    // forced-stop work (issue #5537) added this field to the inline block that used
+    // to live in the thread runner, and ThreadLocalData is malloc'd, NOT zeroed --
+    // an uninitialised flag here reads as garbage and the collector would believe it
+    // had already force-stopped a thread it never touched.
+    i->gcMarkForcedStop = JAVA_FALSE;
+    i->gcStackPointerAtPark = 0;
+    i->gcSigStopRequest = 0;
+    i->gcSigStopped = 0;
+    i->gcSigRelease = 0;
+    i->gcSigStopGen = 0;
+    i->gcSigStackPointer = 0;
+    // Zeroed for the same reason as the rest of this block: ThreadLocalData is
+    // malloc'd, not zeroed. The forced-stop scan guards on these being non-zero
+    // before it marks [sp, base), so garbage here would pass that guard and hand
+    // the conservative scan a bogus range.
+    i->gcSigStackBase = 0;
+    i->gcSigStackSize = 0;
+    i->gcSigRegsLen = 0;
+    if(bindToCallingOsThread) {
+        i->gcPthread = pthread_self();
+        i->gcPthreadValid = JAVA_TRUE;
+        cn1TlsSelf = i;
+    } else {
+        // A VIRTUAL thread has no pthread of its own and may run on a different
+        // host next time, so binding either of these to whoever happens to be
+        // creating it would be a lie the collector acts on. gcPthreadValid false
+        // makes cn1GcScanThreadNativeStack skip it, which is right: its C stack is
+        // reached through the virtual-thread registry instead, and its Java object
+        // stack through allThreads like everyone else. cn1TlsSelf must keep naming
+        // the HOST thread, because the async-signal stop handler runs on the host
+        // and needs the host's state.
+        i->gcPthread = 0;
+        i->gcPthreadValid = JAVA_FALSE;
+    }
+#endif
+    if(bindToCallingOsThread) {
+        pthread_setspecific(threadIdKey, i);
+    }
+    
+    if(!allThreads) {
+        allThreads = malloc(NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
+        memset(allThreads, 0, NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
+    }
+    int threadOffset = -1;
+    lockCriticalSection();
+    for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
+        if(allThreads[iter] == 0) {
+        threadOffset = iter;
+        break;
+        }
+    }
+    CODENAME_ONE_ASSERT(threadOffset > -1);
+    allThreads[threadOffset] = i;
+    unlockCriticalSection();
+    //printf("Thread slot %d assigned to thread %d\n",threadOffset,(int)i->threadId);
+
+    return i;
+}
+
+/**
+ * Create a virtual thread that can run Java: a stack of its own plus a VM thread
+ * state of its own.
+ *
+ * The two halves are both necessary and neither is sufficient. The stack carries
+ * the C activation records of the Java methods it is inside; the thread state
+ * carries their locals and operand stack, which is where a request's objects
+ * actually live. Giving it a stack but sharing the host's state would have two
+ * threads of control writing one Java stack.
+ *
+ * Sizing: threadObjectStack is mmap'd and lazily faulted, so the 264KB it
+ * reserves costs only the pages a virtual thread touches -- a handler that nests
+ * a dozen frames commits a page or two. That is the difference against the
+ * ~118KB RESIDENT a parked OS thread costs, and it is what decides whether a
+ * context per connection is affordable.
+ */
+#ifdef CN1_VIRTUAL_THREADS
+struct cn1VirtualThread* cn1SpawnVirtualThread(cn1VirtualThreadBody body, void* arg,
+                                               size_t stackBytes) {
+    struct ThreadLocalData* state;
+    struct cn1VirtualThread* vt = cn1VirtualThreadCreate(body, arg, stackBytes);
+    if(vt == 0) {
+        return 0;
+    }
+    // JAVA_FALSE: this state belongs to the virtual thread, not to whoever is
+    // creating it. See cn1CreateThreadLocalData for what that turns off.
+    state = cn1CreateThreadLocalData(JAVA_FALSE);
+    if(state == 0) {
+        cn1VirtualThreadFree(vt);
+        return 0;
+    }
+    state->lightweightThread = JAVA_TRUE;
+    cn1VirtualThreadSetState(vt, state);
+    return vt;
+}
+#endif /* CN1_VIRTUAL_THREADS -- backend only, see cn1_virtual_thread.h */
+
 struct ThreadLocalData* getThreadLocalData() {
+    // A running virtual thread supplies its own state; every generated method
+    // reaches its locals through this, so missing it would silently give the
+    // virtual thread the HOST thread's Java stack and corrupt both.
+    {
+        struct cn1VirtualThread* __vt = cn1VirtualThreadCurrent();
+        if(__vt != 0) {
+            struct ThreadLocalData* __s = (struct ThreadLocalData*)cn1VirtualThreadState(__vt);
+            if(__s != 0) {
+                return __s;
+            }
+        }
+    }
     if(threadIdKey == 0) {
         pthread_key_create(&threadIdKey, NULL);
     }
     struct ThreadLocalData* i = pthread_getspecific(threadIdKey);
     if(i == NULL) {
-        JAVA_LONG nativeThreadId = threadKeyCounter;
-        threadKeyCounter++;
-        i = malloc(sizeof(struct ThreadLocalData));
-        i->threadId = nativeThreadId;
-        i->tryBlockOffset = 0;
-        
-        i->lightweightThread = JAVA_FALSE;
-        i->threadBlockedByGC = JAVA_FALSE;
-        i->threadActive = JAVA_FALSE;
-        i->threadKilled = JAVA_FALSE;
-#ifdef CN1_GC_CONFORM
-        // Malloc'd, so this starts as garbage. See gcThreadStartMs in cn1_globals.h.
-        { extern void cn1StallRegisterThread(struct ThreadLocalData* t);
-          cn1StallRegisterThread(i); }
-#endif
-        i->interrupted = JAVA_FALSE;
-        
-        i->currentThreadObject = 0;
-        
-        i->utf8Buffer = 0;
-        i->utf8BufferSize = 0;
-        /*
-         * calloc, not malloc+memset. These four buffers are ~300KB per thread and the
-         * eager memset TOUCHED EVERY PAGE, so a thread that never runs a deep call
-         * chain still paid the whole footprint in resident memory -- measured at
-         * ~118KB per parked thread, which is what decides whether a server-side
-         * binary can afford a thread per connection.
-         *
-         * The eager clear was redundant: every frame prologue memsets exactly the
-         * slots it is about to claim (see the frame-entry helpers in cn1_globals.h),
-         * and the collector only scans threadObjectStack up to
-         * threadObjectStackOffset, so no slot is ever read before the frame that owns
-         * it has zeroed it. calloc for a request this size comes from mmap and is
-         * lazily zeroed by the OS, so a shallow thread commits a few pages instead of
-         * all of them.
-         */
-        i->threadObjectStack = cn1AllocThreadStack();
-        i->threadObjectStackOffset = 0;
-
-        i->callStackClass = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
-        i->callStackLine = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
-        i->callStackMethod = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
-
-#ifdef CN1_ON_DEVICE_DEBUG
-        i->callStackLocalsAddresses = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
-        memset(i->callStackLocalsAddresses, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
-        i->callStackFrameInfo = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
-        memset(i->callStackFrameInfo, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
-#endif
-
-        i->callStackOffset = 0;
-
-        // ThreadLocalData is malloc'd (not zeroed); 0 means "frameless native-stack
-        // limit not yet computed" -- it is filled in lazily on first frameless entry.
-        i->nativeStackLimit = 0;
-
-        i->pendingHeapAllocations = calloc(PER_THREAD_ALLOCATION_COUNT, sizeof(void *));
-        i->heapAllocationSize = 0;
-        i->threadHeapTotalSize = PER_THREAD_ALLOCATION_COUNT;
-        // ThreadLocalData is malloc'd, NOT zeroed. bibopBytesLocal feeds the GC
-        // trigger/pacing accounting (CN1_BIBOP_FLUSH_BYTES adds it into the global
-        // counters); garbage here means a spurious immediate GC + hard-cap park, or
-        // a dead allocation trigger, on every new thread. nativeAllocationMode is
-        // read by the inlined alloc fast path (cn1BibopFastAlloc) before any setter
-        // runs -- garbage-nonzero silently disables the fast path for the thread.
-        i->bibopBytesLocal = 0;
-        i->bibopEpochBytes = 0;
-#ifndef CN1_DISABLE_BIBOP
-        i->bibopObservedGcEpoch = atomic_load_explicit(&bibopGcEpoch,
-                                                        memory_order_relaxed);
-#else
-        i->bibopObservedGcEpoch = 0;
-#endif
-        i->bibopHighThroughputUntilEpoch = 0;
-        for(int __bi = 0 ; __bi < CN1_BIBOP_NUM_CLASSES ; __bi++) {
-#ifndef CN1_DISABLE_BIBOP
-            i->bibopBypassSeen[__bi] = atomic_load_explicit(&bibopBypassGeneration[__bi],
-                                                            memory_order_relaxed);
-#else
-            i->bibopBypassSeen[__bi] = 0;
-#endif
-            i->bibopBypassRemaining[__bi] = 0;
-        }
-        i->nativeAllocationMode = JAVA_FALSE;
-        // dead-thread pending-migration queue state (single-writer allObjectsInHeap)
-        i->gcDeadNext = 0;
-        i->gcQueuedForDrain = JAVA_FALSE;
-        i->gcReleaseRequested = JAVA_FALSE;
-        
-        i->blocks = malloc(CN1_MAX_TRY_BLOCKS * sizeof(struct TryBlock));
-#ifdef CN1_CONSERVATIVE_GC_ROOTS
-        // PHASE 3b: record this thread's pthread handle + TLS self pointer so the GC can
-        // signal-stop it and the async-signal-safe stop handler can find its state.
-        i->gcPthread = pthread_self();
-        i->gcPthreadValid = JAVA_TRUE;
-        i->gcParkCaptured = JAVA_FALSE;
-        i->gcStackPointerAtPark = 0;
-        i->gcSigStopRequest = 0;
-        i->gcSigStopped = 0;
-        i->gcSigRelease = 0;
-        i->gcSigStopGen = 0;
-        i->gcSigStackPointer = 0;
-        i->gcSigStackBase = 0;
-        i->gcSigStackSize = 0;
-        i->gcSigRegsLen = 0;
-        // ThreadLocalData is malloc'd, NOT zeroed (see the notes on nativeStackLimit and
-        // bibopBytesLocal above). Garbage-nonzero here would tell
-        // cn1GcScanThreadNativeStack that the mark loop already froze this thread, so it
-        // would scan a RUNNING thread's stack from a garbage SP and never signal-stop it
-        // -- missed roots, then a use-after-free on whatever the sweep took.
-        i->gcMarkForcedStop = JAVA_FALSE;
-        cn1TlsSelf = i;
-#endif
-        pthread_setspecific(threadIdKey, i);
-        
-        if(!allThreads) {
-            allThreads = malloc(NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
-            memset(allThreads, 0, NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
-        }
-        int threadOffset = -1;
-        lockCriticalSection();
-        for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
-            if(allThreads[iter] == 0) {
-                threadOffset = iter;
-                break;
-            }
-        }
-        CODENAME_ONE_ASSERT(threadOffset > -1);
-        allThreads[threadOffset] = i;
-        unlockCriticalSection();
-        //printf("Thread slot %d assigned to thread %d\n",threadOffset,(int)i->threadId);
+        i = cn1CreateThreadLocalData(JAVA_TRUE);
     }
     return i;
 }

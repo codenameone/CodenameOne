@@ -422,6 +422,11 @@ public class ByteCodeTranslator {
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), Files.newOutputStream(cn1Globals.toPath()));
         File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), Files.newOutputStream(cn1Intrinsics.toPath()));
+        // Virtual threads: the switch is a few instructions of assembly per
+        // architecture, so the .S travels with the runtime rather than being
+        // generated. A project that gets the C and not the .S links against a
+        // missing symbol, which is at least loud.
+        emitVirtualThreadRuntime(srcRoot);
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
@@ -766,6 +771,11 @@ public class ByteCodeTranslator {
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), Files.newOutputStream(cn1Globals.toPath()));
         File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), Files.newOutputStream(cn1Intrinsics.toPath()));
+        // Virtual threads: the switch is a few instructions of assembly per
+        // architecture, so the .S travels with the runtime rather than being
+        // generated. A project that gets the C and not the .S links against a
+        // missing symbol, which is at least loud.
+        emitVirtualThreadRuntime(srcRoot);
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
@@ -1472,6 +1482,26 @@ public class ByteCodeTranslator {
      * @param i source
      * @param o destination
      */
+    /**
+     * Emit the virtual-thread runtime beside the generated sources.
+     *
+     * Three files rather than one because the switch has to be assembly: glibc
+     * aborts a cross-stack longjmp under _FORTIFY_SOURCE and musl has no
+     * makecontext, so neither portable route survives every target we ship.
+     */
+    private static void emitVirtualThreadRuntime(File srcRoot) throws IOException {
+        String[] names = { "cn1_virtual_thread.h", "cn1_virtual_thread.c", "cn1_virtual_thread_asm.S" };
+        for (String name : names) {
+            InputStream in = ByteCodeTranslator.class.getResourceAsStream("/" + name);
+            if (in == null) {
+                // Missing here means the build did not stage it; failing now names the
+                // cause, where the link error later names only a symbol.
+                throw new IOException("virtual-thread runtime resource missing: " + name);
+            }
+            copy(in, Files.newOutputStream(new File(srcRoot, name).toPath()));
+        }
+    }
+
     public static void copy(InputStream i, OutputStream o) throws IOException {
         copy(i, o, 8192);
     }
