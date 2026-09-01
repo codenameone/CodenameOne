@@ -356,6 +356,29 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * An exclusion written before the version block must not take the strict
+     * marker with it. Cutting the statement from {@code exclude} to its end
+     * did exactly that, and losing the strict marker is what turns this
+     * class's constraint into a failed resolution rather than an override.
+     */
+    @Test
+    public void anExclusionBeforeTheVersionBlockDoesNotHideTheStrictPin() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    compileOnly('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ exclude group: 'x', module: 'y'; version { strictly '1.7.22' } }\n");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the strict pin survives an exclusion written before it");
+
+        String multiline = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    compileOnly('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') {\n"
+                + "        exclude group: 'x', module: 'y'\n"
+                + "        version { strictly '1.7.22' }\n"
+                + "    }\n");
+        check(!multiline.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "and the same written across lines");
+    }
+
+    /**
      * The block absorbed for that check belongs to the declaration that opened
      * it and no further. A dependencies or android block must not swallow the
      * fragment: only a statement already naming the Kotlin group absorbs one.
@@ -534,6 +557,29 @@ public class KotlinStdlibAlignmentTest {
                 + "name: 'kotlin-stdlib-jdk8', version: '1.9.22'\n");
         check(!out.contains("kotlin-stdlib-jdk8:1.8.0"), "the map form pins jdk8");
         check(out.contains("kotlin-stdlib-jdk7:1.8.0"), "and leaves jdk7 constrained");
+    }
+
+    /**
+     * A comment delimiter inside a string is not a delimiter. A {@code /*} in
+     * a quoted value used to open a block comment that swallowed the rest of
+     * the fragment, taking an explicit strict pin with it -- and losing a
+     * strict marker is what turns this class's constraint into a failed
+     * resolution rather than an override.
+     */
+    @Test
+    public void aCommentDelimiterInsideAStringIsNotADelimiter() {
+        String blockOpener = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def marker = '/*'\n"
+                + "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check(!blockOpener.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a /* inside a string does not swallow the pin that follows it");
+
+        String lineOpener = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def marker = \"//\"\n"
+                + "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check(!lineOpener.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a // inside a string does not comment out the line");
     }
 
     /**

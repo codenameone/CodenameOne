@@ -469,10 +469,16 @@ public class KotlinStdlibAlignment {
      * A fragment's lines with comments removed and exclusions dropped -- the
      * text that actually declares something.
      *
-     * <p>A line comment is only a comment when the {@code //} does not follow
-     * a colon: {@code maven { url 'https://...' }} is an ordinary declaration
-     * that a naive strip would cut in half, and these fragments really do
-     * carry repository URLs.</p>
+     * <p>Comment delimiters are only delimiters outside a string, which is the
+     * same rule the statement scanner already applied to parentheses and
+     * semicolons and which this had been missing. It matters in both
+     * directions: {@code maven { url 'https://...' }} is an ordinary
+     * declaration that a naive strip cuts in half, and a {@code /*} inside a
+     * string used to open a block comment that swallowed the rest of the
+     * fragment -- including, in the case that found this, an explicit strict
+     * pin whose loss turns this class's constraint into a failed resolution.
+     * Tracking quotes covers both, and replaces the narrower rule that only
+     * spared a {@code //} following a colon.</p>
      *
      * <p>Regrouping into statements is {@link #statements}; this method only
      * removes the comments.</p>
@@ -483,6 +489,7 @@ public class KotlinStdlibAlignment {
         }
         StringBuilder out = new StringBuilder();
         boolean inBlockComment = false;
+        char quote = 0;
         for (int i = 0; i < fragment.length(); i++) {
             char c = fragment.charAt(i);
             if (inBlockComment) {
@@ -494,6 +501,21 @@ public class KotlinStdlibAlignment {
                 }
                 continue;
             }
+            if (quote != 0) {
+                out.append(c);
+                if (c == '\\' && i + 1 < fragment.length()) {
+                    out.append(fragment.charAt(i + 1));
+                    i++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+                continue;
+            }
+            if (c == '\'' || c == '"') {
+                quote = c;
+                out.append(c);
+                continue;
+            }
             if (c == '/' && i + 1 < fragment.length()) {
                 char next = fragment.charAt(i + 1);
                 if (next == '*') {
@@ -501,7 +523,7 @@ public class KotlinStdlibAlignment {
                     i++;
                     continue;
                 }
-                if (next == '/' && (i == 0 || fragment.charAt(i - 1) != ':')) {
+                if (next == '/') {
                     while (i < fragment.length() && fragment.charAt(i) != '\n') {
                         i++;
                     }
@@ -533,11 +555,19 @@ public class KotlinStdlibAlignment {
      *                                                  for containing "exclude"
      * </pre>
      *
-     * <p>So a line whose parentheses are still open is joined to the next, and
-     * a statement is truncated at {@code exclude} rather than discarded -- what
-     * precedes the exclusion is the declaration, and what follows it is the
-     * part that must not count. A bare {@code exclude} line truncates to
-     * nothing and so is still not a pin.</p>
+     * <p>So a line whose parentheses are still open is joined to the next.
+     * Exclusions are left alone: they used to be cut out here, which was
+     * needed while a declaration was recognised by the artifact name appearing
+     * anywhere, and became both unnecessary and harmful once a declaration had
+     * to be spelled as one. Unnecessary, because an exclusion writes
+     * {@code group: '...', module: 'kotlin-stdlib-jdk8'} and never the
+     * colon-joined coordinate or the {@code name:} map form the declaration
+     * check looks for, so it cannot match one. Harmful, because cutting from
+     * {@code exclude} to the end of the statement also threw away anything
+     * after it -- an exclusion written before a
+     * {@code version { strictly '1.7.22' } }} block took that block with it,
+     * and losing the strict marker is what turns this class's constraint into
+     * a failed resolution.</p>
      *
      * <p>A statement ends at a newline or at a semicolon, whichever comes
      * first, and neither ends one inside parentheses or inside a string. The
@@ -616,13 +646,7 @@ public class KotlinStdlibAlignment {
             }
             merged.add(statement);
         }
-        List<String> kept = new ArrayList<String>();
-        for (int i = 0; i < merged.size(); i++) {
-            String statement = merged.get(i);
-            int at = statement.indexOf("exclude");
-            kept.add(at < 0 ? statement : statement.substring(0, at));
-        }
-        return kept.toArray(new String[kept.size()]);
+        return merged.toArray(new String[merged.size()]);
     }
 
     /** How far a statement opens or closes braces, ignoring those in strings. */
