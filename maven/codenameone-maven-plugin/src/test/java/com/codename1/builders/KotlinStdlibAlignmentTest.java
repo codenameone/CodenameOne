@@ -642,6 +642,63 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Gradle's parenthesis-free map form puts two bare tokens in a row, which
+     * is what a typed declaration looks like to a token counter. Read as one,
+     * {@code implementation group: group, ...} "declared" a variable called
+     * group with no initialiser and cleared the real binding of that name, so
+     * the strict declaration using it later was never matched.
+     */
+    @Test
+    public void aNamedArgumentIsNotADeclaration() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def group = 'org.jetbrains.kotlin'\n"
+                + "    implementation group: group, name: 'other', version: '1.0'\n"
+                + "    implementation(group: group, name: 'kotlin-stdlib', "
+                + "version: '1.7.22') { version { strictly '1.7.22' } }\n");
+        check("".equals(out),
+                "the binding survives the map-form declaration, got <<" + out + ">>");
+    }
+
+    /**
+     * A map entry's value is not handed to a dependency. A catalog of strings
+     * carrying a strict-looking coordinate suppressed the block for something
+     * never added to any configuration.
+     */
+    @Test
+    public void aMapEntryValueIsNotADeclaration() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def catalog = [legacy: "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!']\n"
+                + "    implementation 'androidx.appcompat:appcompat:1.6.1'\n");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a catalog entry decides nothing, got <<" + out + ">>");
+
+        // But a coordinate in a forcedModules list decides everything, and it sits
+        // right after a bracket -- which is why only the colon is read this way.
+        String forced = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.forcedModules = "
+                + "['org.jetbrains.kotlin:kotlin-stdlib:1.7.22'] }\n");
+        check("".equals(forced), "a forced module is still read, got <<" + forced + ">>");
+    }
+
+    /**
+     * A closure opened and a local declared on the same line is still a
+     * closure. Depth is tracked between statements, so that local looked like
+     * it belonged to the script and outlived the closure it was written in.
+     */
+    @Test
+    public void aSameLineClosureIsStillAScope() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    ext.dep = 'com.example:other:1.0'\n"
+                + "    ext.helper = { def dep = "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22' }\n"
+                + "    implementation(dep)\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the closure's local does not escape it, got <<" + out + ">>");
+    }
+
+    /**
      * The backward scans know what whitespace is too. Three of them stopped at
      * a space or a tab, so a fragment with Windows line endings put a carriage
      * return where they were looking and the token behind it stopped being

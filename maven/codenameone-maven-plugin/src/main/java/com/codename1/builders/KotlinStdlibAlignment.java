@@ -633,9 +633,46 @@ public class KotlinStdlibAlignment {
      */
     private static boolean isAssignedValue(String line, int quoteAt) {
         int i = skipBlanksBackward(line, quoteAt - 1);
-        return i >= 0 && line.charAt(i) == '='
+        if (i < 0) {
+            return false;
+        }
+        char before = line.charAt(i);
+        // A map ENTRY's value is not handed to a dependency either:
+        //   def catalog = [legacy: 'org.jetbrains.kotlin:...:1.7.22!!']
+        // is a map of strings, and reading its entry as a strict declaration
+        // suppressed the block for something never added to a configuration. The
+        // dependency map form -- group:, name:, version: -- is read by
+        // declaresMapEntry, which does not come through here.
+        //
+        // Only the colon. A bracket and a comma both looked like they belonged in
+        // this set and neither does: forcedModules = ['org.jetbrains.kotlin:...']
+        // and dependencies.add('implementation', '...') each put a coordinate that
+        // really does decide something directly after one, and excluding them
+        // stopped a genuine force from being seen. So a bare list of coordinates
+        // assigned to a variable nothing uses still suppresses -- the narrower
+        // reading, and the one the tests hold.
+        if (before == ':') {
+            return true;
+        }
+        return before == '='
                 && (i == 0 || line.charAt(i - 1) != '=')
                 && (i + 1 >= line.length() || line.charAt(i + 1) != '=');
+    }
+
+    /**
+     * Whether the token ending at {@code end} is a named argument's key.
+     *
+     * <p>Gradle's parenthesis-free map form puts two bare tokens in a row --
+     * {@code implementation group: group, name: '...'} -- which is exactly what
+     * a typed declaration looks like to a token counter. Read as one, it
+     * "declared" a variable called group with no initialiser and cleared the
+     * real binding of that name, so the strict declaration that used it later
+     * was never matched.</p>
+     */
+    private static boolean followedByMapKeyColon(String statement, int end) {
+        int at = skipBlanks(statement, end);
+        return at < statement.length() && statement.charAt(at) == ':'
+                && (at + 1 >= statement.length() || statement.charAt(at + 1) != ':');
     }
 
     /**
@@ -2005,6 +2042,20 @@ public class KotlinStdlibAlignment {
     }
 
     /**
+     * The depth at {@code index}, counting braces opened earlier in this
+     * statement.
+     *
+     * <p>Depth is tracked between statements, so a closure opened and a local
+     * declared on the SAME line looked like top level:
+     * {@code ext.helper = { def dep = '...' }} recorded dep as if it belonged
+     * to the script, and it then outlived the closure and shadowed the real
+     * binding for everything after.</p>
+     */
+    private static int depthAt(String statement, int index, int base) {
+        return base + braceBalance(statement.substring(0, Math.min(index, statement.length())));
+    }
+
+    /**
      * The names a scope introduced, so they can be taken back when it closes.
      *
      * <p>A `def` inside a closure or a method is local to it, and a single flat
@@ -2129,7 +2180,7 @@ public class KotlinStdlibAlignment {
                 lastTokenEnd = scan;
                 scan = skipBlanks(statement, scan);
             }
-            if (tokens > 1) {
+            if (tokens > 1 && !followedByMapKeyColon(statement, lastTokenEnd)) {
                 declared = true;
                 i = lastTokenStart;
             } else if (tokens == 1) {
@@ -2160,7 +2211,7 @@ public class KotlinStdlibAlignment {
             return;
         }
         if (declared) {
-            scope.declared(depth, name, literals);
+            scope.declared(depthAt(statement, nameStart, depth), name, literals);
         }
         i = skipBlanks(statement, i);
         if (i >= statement.length() || statement.charAt(i) != '='
@@ -2215,7 +2266,7 @@ public class KotlinStdlibAlignment {
                 return;
             }
             if (declared) {
-                scope.declared(depth, name, literals);
+                scope.declared(depthAt(statement, nextName, depth), name, literals);
             }
             i = assign;
         }
