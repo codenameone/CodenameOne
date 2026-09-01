@@ -167,6 +167,9 @@ public class KotlinStdlibAlignment {
     /** The group every artifact this class reasons about belongs to. */
     private static final String KOTLIN_GROUP = "org.jetbrains.kotlin";
 
+    /** The merged library both shims depend on at the floor. */
+    private static final String BASE_STDLIB = "kotlin-stdlib";
+
     private KotlinStdlibAlignment() {
     }
 
@@ -198,6 +201,16 @@ public class KotlinStdlibAlignment {
                 + " absorbed the jdk7/jdk8 classes and the 1.8.x line ships no "
                 + "Gradle module metadata to say so, so these are raised to the "
                 + "empty shims to avoid a duplicate class in checkDuplicateClasses";
+        // A strict pin on the merged library itself blocks BOTH shims, because the
+        // shim at this floor depends on kotlin-stdlib at the same floor. An app
+        // strictly holding kotlin-stdlib below it therefore cannot resolve either
+        // constraint, and the pre-merge family it is holding had no duplicate to
+        // begin with -- so constraining there converts a working build into
+        // "Could not resolve ... {strictly 1.7.22}", which is the one outcome this
+        // class must never produce.
+        if (strictlyPinsBaseStdlibBelowTheFloor(appGradleFragments)) {
+            return "";
+        }
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
             if (declaresArtifact(ALIGNED_ARTIFACTS[i], config, appGradleFragments)) {
@@ -213,6 +226,101 @@ public class KotlinStdlibAlignment {
             return "";
         }
         return "    constraints {\n" + out + "    }\n";
+    }
+
+    /**
+     * Whether the app strictly holds {@code kotlin-stdlib} itself below the
+     * floor both shims depend on.
+     *
+     * <p>The artifact has to be matched exactly. {@code kotlin-stdlib} is a
+     * prefix of {@code kotlin-stdlib-jdk8}, so a loose match would read every
+     * shim declaration as a pin on the base library and switch the whole block
+     * off. The character after the coordinate decides it: a colon starts the
+     * version and a quote ends the coordinate, while anything else -- a
+     * hyphen above all -- means this is a longer artifact name.</p>
+     *
+     * <p>An unreadable strict version counts as below the floor, because the
+     * failure it guards against cannot be worked around by the app while the
+     * duplicate class it risks instead can.</p>
+     */
+    private static boolean strictlyPinsBaseStdlibBelowTheFloor(String[] appGradleFragments) {
+        if (appGradleFragments == null) {
+            return false;
+        }
+        for (int i = 0; i < appGradleFragments.length; i++) {
+            String[] lines = activeLines(appGradleFragments[i]);
+            for (int j = 0; j < lines.length; j++) {
+                if (!callsStrictly(lines[j]) || !namesBaseStdlib(lines[j])) {
+                    continue;
+                }
+                String version = strictVersionIn(lines[j]);
+                if (version == null
+                        || compareVersions(version, MERGED_STDLIB_FLOOR) < 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether the statement names {@code kotlin-stdlib} and not a longer name. */
+    private static boolean namesBaseStdlib(String line) {
+        String coordinate = KOTLIN_GROUP + ":" + BASE_STDLIB;
+        int at = line.indexOf(coordinate);
+        while (at >= 0) {
+            int after = at + coordinate.length();
+            if (after < line.length()
+                    && (line.charAt(after) == ':' || line.charAt(after) == '\''
+                            || line.charAt(after) == '"')) {
+                return true;
+            }
+            at = line.indexOf(coordinate, at + 1);
+        }
+        return line.contains(KOTLIN_GROUP) && declaresMapEntry(line, "name", BASE_STDLIB);
+    }
+
+    /** The version inside this statement's {@code strictly} call, or null. */
+    private static String strictVersionIn(String statement) {
+        int at = statement.indexOf(STRICTLY);
+        while (at >= 0) {
+            int i = skipBlanks(statement, at + STRICTLY.length());
+            if (i < statement.length() && statement.charAt(i) == '(') {
+                i = skipBlanks(statement, i + 1);
+            }
+            if (i < statement.length()
+                    && (statement.charAt(i) == '\'' || statement.charAt(i) == '"')) {
+                char q = statement.charAt(i);
+                int end = statement.indexOf(q, i + 1);
+                if (end > i) {
+                    return statement.substring(i + 1, end);
+                }
+            }
+            at = statement.indexOf(STRICTLY, at + 1);
+        }
+        return null;
+    }
+
+    /** Numeric dotted version compare; a missing segment counts as zero. */
+    private static int compareVersions(String left, String right) {
+        String[] l = left.split("\\.");
+        String[] r = right.split("\\.");
+        int len = Math.max(l.length, r.length);
+        for (int i = 0; i < len; i++) {
+            int a = i < l.length ? parseSegment(l[i]) : 0;
+            int b = i < r.length ? parseSegment(r[i]) : 0;
+            if (a != b) {
+                return a < b ? -1 : 1;
+            }
+        }
+        return 0;
+    }
+
+    private static int parseSegment(String segment) {
+        try {
+            return Integer.parseInt(segment);
+        } catch (NumberFormatException notANumber) {
+            return 0;
+        }
     }
 
     /**
@@ -236,6 +344,16 @@ public class KotlinStdlibAlignment {
      *
      * <p>Two spellings count as a declaration -- the colon-joined coordinate
      * and the map form -- because those are what a pin is actually written as.
+     * A declaration inside {@code if (project.hasProperty('x'))} counts as
+     * present, deliberately: whether it is in force is decided by Gradle at
+     * evaluation time and cannot be read out of the text. Treating it as
+     * present honours the documented promise at the cost of leaving a
+     * duplicate the app already had; the alternative -- suppressing only on a
+     * strict version, which is the one declaration a constraint cannot coexist
+     * with -- removes that hazard along with everything else in this method,
+     * and is a documented behaviour change rather than a bug fix, so it is a
+     * decision for the project rather than something to slip in under a review
+     * thread.
      * Anything else falls through to "not declared", which is the safe
      * direction: emitting a constraint the app did not need only raises an
      * artifact to a shim, while skipping one it did need fails the build.</p>

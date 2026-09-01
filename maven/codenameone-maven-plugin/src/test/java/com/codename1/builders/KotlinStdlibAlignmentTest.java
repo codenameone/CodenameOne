@@ -376,6 +376,47 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A strict pin on kotlin-stdlib itself blocks both shims, not one. The
+     * shim at this floor depends on kotlin-stdlib at the same floor, so an app
+     * strictly holding the base library below it cannot resolve either
+     * constraint -- and the pre-merge family it is holding had no duplicate to
+     * begin with, so constraining there turns a working build into
+     * "Could not resolve ... {strictly 1.7.22}".
+     */
+    @Test
+    public void aStrictPinOnTheBaseStdlibBlocksBothShims() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check("".equals(out),
+                "a strict pre-merge base pin writes no constraints at all");
+
+        // At or above the floor there is no conflict, so the block still goes in:
+        // a shim requiring 1.8.0 is satisfied by a strict 1.9.22.
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.9.22') "
+                + "{ version { strictly '1.9.22' } }\n");
+        check(modern.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a strict modern base pin does not need the block suppressed");
+    }
+
+    /**
+     * kotlin-stdlib is a prefix of kotlin-stdlib-jdk8, so the base match has to
+     * be exact. A loose one would read every shim declaration as a pin on the
+     * base library and switch the whole block off.
+     */
+    @Test
+    public void aStrictShimPinIsNotAPinOnTheBaseStdlib() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "pinning the jdk8 shim leaves jdk7 constrained, not the whole block off");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "and jdk8 itself is left to the app");
+    }
+
+    /**
      * The block absorbed for that check belongs to the declaration that opened
      * it and no further. A dependencies or android block must not swallow the
      * fragment: only a statement already naming the Kotlin group absorbs one.

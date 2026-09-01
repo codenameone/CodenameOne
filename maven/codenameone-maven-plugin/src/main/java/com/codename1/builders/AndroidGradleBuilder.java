@@ -7278,8 +7278,15 @@ public class AndroidGradleBuilder extends Executor {
         // adds nothing to a graph that has no Kotlin in it, so an app that could
         // never hit the clash resolves exactly as it did before.
         //
-        // Gated on AndroidX because the block is written on the implementation
-        // configuration, and on Gradle 6 rather than on 4.6 where the constraints
+        // Gated on AndroidX because that is what decides the configuration name a few
+        // lines below: `compile` is only "implementation" when useAndroidX or the aar
+        // implementation flag is set, so a useAndroidX=false build would take this
+        // block on the legacy `compile` configuration. Reviewed as an unrelated flag
+        // to gate on -- it is not, and the failing case it is meant to protect needs
+        // a modern AndroidX dependency in a project that has AndroidX turned off,
+        // which AGP refuses for its own reasons before this could matter.
+        //
+        // On Gradle 6 rather than on 4.6 where the constraints
         // DSL first appeared. That is deliberate, and it has been questioned in
         // review, so: 4.6 selects AGP 3.2.0, which cannot compile against a
         // compileSdk the current AndroidX releases require, and the builder gives
