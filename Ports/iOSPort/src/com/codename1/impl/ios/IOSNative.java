@@ -1998,7 +1998,13 @@ public final class IOSNative {
 
     public static native void announceForAccessibility(String text);
 
-    public static native void updateAccessibilityTree(String json, int changeType);
+    /// Installs one surface's semantic tree on that surface's native view.
+    ///
+    /// `windowId` is zero for the application's main surface and otherwise names a
+    /// desktop window, whose own view is what the tree has to go on -- installing every
+    /// surface's tree on the main view replaces the main surface's elements with
+    /// whichever window changed last.
+    public static native void updateAccessibilityTree(String json, int changeType, int windowId);
 
     // ============================================================
     // Crypto bridge -- backed by CN1Crypto.{h,m} in nativeSources/.

@@ -218,6 +218,7 @@ static void cn1MacResignActiveIfApplicationInactive(void) {
     // application becoming active, which would run the main form's resume path.
     {
         int windowId = cn1MacCodenameOneWindowScene(scene);
+        CN1MacWindowNoteFocus(windowId, YES);
         if (windowId >= 0) {
             CN1MacWindowDeliverFocus(windowId, YES);
             // Clicking one of our windows is still how the user brings a resigned
@@ -248,6 +249,7 @@ static void cn1MacResignActiveIfApplicationInactive(void) {
 #if TARGET_OS_MACCATALYST
     {
         int windowId = cn1MacCodenameOneWindowScene(scene);
+        CN1MacWindowNoteFocus(windowId, NO);
         if (windowId >= 0) {
             CN1MacWindowDeliverFocus(windowId, NO);
         }

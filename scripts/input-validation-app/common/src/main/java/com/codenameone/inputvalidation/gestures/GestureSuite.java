@@ -6,6 +6,19 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codenameone.inputvalidation.gestures;
 
@@ -122,8 +135,12 @@ public final class GestureSuite {
     /// DROPS messages under burst pressure (CI observed interleaved event
     /// lines missing from both `log stream` and `log show`). The full event
     /// transcript is therefore also rewritten to a file in the app home on
-    /// every line; the platform driver reads it from the app container after
-    /// the run. The console line stays as a live-progress channel.
+    /// every line, and closed each time, so it is on disk as soon as the line
+    /// is logged. The platform driver reads it from the app container both
+    /// while the run is in flight -- it is what releases each XCUITest gesture,
+    /// since the live log stream may attach late or never speak at all -- and
+    /// again afterwards for the assertions. The console line stays as a
+    /// live-progress channel.
     private static void log(String line) {
         System.out.println(line);
         EVENT_LOG.append(line).append('\n');

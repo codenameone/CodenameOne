@@ -3045,6 +3045,50 @@ void com_codename1_impl_ios_IOSNative_setMacWindowUndecorated___boolean(CN1_THRE
 #import "CN1MacWindows.h"
 #endif
 
+/*
+ * Where a system sheet -- sharing, camera capture, the photo gallery, the file
+ * chooser, the full screen video player -- is presented from.
+ *
+ * All of them presented from CodenameOne_GLViewController, which is rooted at the
+ * application's main scene. On Mac Catalyst, where the application can have several
+ * windows, invoking one from a secondary window put the sheet over the main window
+ * instead, and the share popover anchored to coordinates in a window the user was
+ * not looking at.
+ *
+ * On every other target these expand to the identical expression they replaced, so
+ * the iOS slice is byte for byte what it was.
+ */
+#if TARGET_OS_MACCATALYST
+static UIViewController* cn1PresentingController(void) {
+    UIViewController* c = CN1MacWindowPresentingController();
+    return c != nil ? c : [CodenameOne_GLViewController instance];
+}
+
+static UIView* cn1PresentingView(void) {
+    UIView* v = CN1MacWindowPresentingView();
+    return v != nil ? v : [CodenameOne_GLViewController instance].view;
+}
+
+/* The scale of the screen the presenting view is actually on, rather than the
+ * process-global scaleValue, which is [UIScreen mainScreen].scale captured for the
+ * main scene. An anchor rectangle arrives in Codename One pixels and has to be
+ * divided by the scale of the surface it will be drawn on; using the main scene's
+ * for a secondary window puts the popover in the wrong place. Falls back to the
+ * global whenever no CN1 window owns the presentation, which is the case this
+ * expression had before. */
+static CGFloat cn1PresentingScale(void) {
+    UIView* v = CN1MacWindowPresentingView();
+    if (v != nil && v.window != nil && v.window.screen != nil) {
+        return v.window.screen.scale;
+    }
+    return scaleValue;
+}
+#else
+#define cn1PresentingController() [CodenameOne_GLViewController instance]
+#define cn1PresentingView() [CodenameOne_GLViewController instance].view
+#define cn1PresentingScale() scaleValue
+#endif
+
 JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_boolean_R_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT windowId, JAVA_OBJECT title,
         JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
@@ -6919,7 +6963,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
                 [picker addAttachmentData:d mimeType:mime fileName:fileComponent];
             }
         }
-        [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
+        [cn1PresentingController() presentModalViewController:picker animated:YES];
         
 #ifndef CN1_USE_ARC
         [picker release];
@@ -7586,7 +7630,7 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
         POOL_BEGIN();
         if (useAVKit()) {
 #ifdef CN1_USE_AVKIT
-            [[CodenameOne_GLViewController instance] presentViewController:getAVPlayerController(peer) animated:YES completion:nil];
+            [cn1PresentingController() presentViewController:getAVPlayerController(peer) animated:YES completion:nil];
 #endif
         } else {
             NSObject* obj = (BRIDGE_CAST NSObject*)peer;
@@ -8461,14 +8505,14 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD
                                      initWithContentViewController:pickerController];
                 popoverController.delegate = [CodenameOne_GLViewController instance];
                 [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
-                                                   inView:[[CodenameOne_GLViewController instance] view]
+                                                   inView:cn1PresentingView()
                                  permittedArrowDirections:UIPopoverArrowDirectionAny
                                                  animated:YES];
 
             }
             else
             {
-                [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+                [cn1PresentingController() presentModalViewController:pickerController animated:YES];
             }
             
         } else {
@@ -8598,7 +8642,7 @@ void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THR
         if (popoverSupported()) {
             pickerController.modalPresentationStyle = UIModalPresentationFormSheet;
         }
-        [[CodenameOne_GLViewController instance] presentViewController:pickerController animated:YES completion:nil];
+        [cn1PresentingController() presentViewController:pickerController animated:YES completion:nil];
         POOL_END();
     });
 #else
@@ -8659,11 +8703,11 @@ void openGalleryMultipleWithPhotoKit(JAVA_INT type) {
 
                 popoverController.delegate = [CodenameOne_GLViewController instance];
                 [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
-                                                   inView:[[CodenameOne_GLViewController instance] view]
+                                                   inView:cn1PresentingView()
                                  permittedArrowDirections:UIPopoverArrowDirectionAny
                                                  animated:YES];
             } else {
-                [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+                [cn1PresentingController() presentModalViewController:pickerController animated:YES];
             }
 
 
@@ -8708,11 +8752,11 @@ void openGalleryMultiple(JAVA_INT type) {
             
             popoverController.delegate = [CodenameOne_GLViewController instance];
             [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
-                                               inView:[[CodenameOne_GLViewController instance] view]
+                                               inView:cn1PresentingView()
                              permittedArrowDirections:UIPopoverArrowDirectionAny
                                              animated:YES];
         } else {
-            [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+            [cn1PresentingController() presentModalViewController:pickerController animated:YES];
         }
         POOL_END();
     });
@@ -8865,11 +8909,11 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
             
             popoverController.delegate = [CodenameOne_GLViewController instance];
             [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
-                                               inView:[[CodenameOne_GLViewController instance] view]
+                                               inView:cn1PresentingView()
                              permittedArrowDirections:UIPopoverArrowDirectionAny
                                              animated:YES];
         } else {
-            [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+            [cn1PresentingController() presentModalViewController:pickerController animated:YES];
         }
         POOL_END();
     });
@@ -10586,7 +10630,7 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
             
             [picker setBody:smsBody];
             
-            [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
+            [cn1PresentingController() presentModalViewController:picker animated:YES];
             
 #ifndef CN1_USE_ARC
             [picker release];
@@ -13379,11 +13423,10 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
     BOOL useRect = rectangle ? YES:NO;
     __block CGRect cgrect = CGRectMake(0,0,0,0);
     if (useRect){
+        /* Left in Codename One pixels here. The divisor depends on which window ends
+         * up presenting, and that is only known on the main thread inside the block
+         * below. */
         cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
-        cgrect.origin.x = cgrect.origin.x / scaleValue;
-        cgrect.origin.y = cgrect.origin.y / scaleValue;
-        cgrect.size.width = cgrect.size.width / scaleValue;
-        cgrect.size.height = cgrect.size.height / scaleValue;
     }
     // Hoisted for the same reason as the macOS branch above: the block captured
     // imagePeer, a scalar, so nothing retained the image across the dispatch and
@@ -13393,6 +13436,13 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
     GLUIImage* glll = imagePeer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)imagePeer) : nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+        if (useRect){
+            CGFloat presentingScale = cn1PresentingScale();
+            cgrect.origin.x = cgrect.origin.x / presentingScale;
+            cgrect.origin.y = cgrect.origin.y / presentingScale;
+            cgrect.size.width = cgrect.size.width / presentingScale;
+            cgrect.size.height = cgrect.size.height / presentingScale;
+        }
         NSArray* dataToShare;
         if(imagePeer != 0) {
             CN1Image* i = [glll getImage];
@@ -13420,9 +13470,9 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
 #ifdef NEW_CODENAME_ONE_VM
         if ( [activityViewController respondsToSelector:@selector(popoverPresentationController)] ) {
             //iOS8
-            activityViewController.popoverPresentationController.sourceView = [CodenameOne_GLViewController instance].view;
-            int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
-            int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
+            activityViewController.popoverPresentationController.sourceView = cn1PresentingView();
+            int SCREEN_HEIGHT = cn1PresentingView().bounds.size.height;
+            int SCREEN_WIDTH = cn1PresentingView().bounds.size.width;
             if ( useRect ){
                 if (cgrect.origin.y < SCREEN_HEIGHT/4 && cgrect.origin.y+cgrect.size.height > 3*SCREEN_HEIGHT/4){
                     cgrect = CGRectMake(
@@ -13440,7 +13490,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
             
         }
 #endif
-        [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
+        [cn1PresentingController() presentViewController:activityViewController animated:YES completion:^{}];
         POOL_END();
         repaintUI();
     });
@@ -13499,11 +13549,10 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
     BOOL useRect = rectangle ? YES:NO;
     __block CGRect cgrect = CGRectMake(0,0,0,0);
     if (useRect){
+        /* Left in Codename One pixels here. The divisor depends on which window ends
+         * up presenting, and that is only known on the main thread inside the block
+         * below. */
         cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
-        cgrect.origin.x = cgrect.origin.x / scaleValue;
-        cgrect.origin.y = cgrect.origin.y / scaleValue;
-        cgrect.size.width = cgrect.size.width / scaleValue;
-        cgrect.size.height = cgrect.size.height / scaleValue;
     }
     int cbId = (int)callbackId;
     // Hoisted for the same reason as the macOS branch above: the block captured
@@ -13514,6 +13563,13 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
     GLUIImage* glll = imagePeer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)imagePeer) : nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+        if (useRect){
+            CGFloat presentingScale = cn1PresentingScale();
+            cgrect.origin.x = cgrect.origin.x / presentingScale;
+            cgrect.origin.y = cgrect.origin.y / presentingScale;
+            cgrect.size.width = cgrect.size.width / presentingScale;
+            cgrect.size.height = cgrect.size.height / presentingScale;
+        }
         NSArray* dataToShare;
         if(imagePeer != 0) {
             CN1Image* i = [glll getImage];
@@ -13540,9 +13596,9 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
                                                                                              applicationActivities:nil];
 #ifdef NEW_CODENAME_ONE_VM
         if ( [activityViewController respondsToSelector:@selector(popoverPresentationController)] ) {
-            activityViewController.popoverPresentationController.sourceView = [CodenameOne_GLViewController instance].view;
-            int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
-            int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
+            activityViewController.popoverPresentationController.sourceView = cn1PresentingView();
+            int SCREEN_HEIGHT = cn1PresentingView().bounds.size.height;
+            int SCREEN_WIDTH = cn1PresentingView().bounds.size.width;
             if ( useRect ){
                 if (cgrect.origin.y < SCREEN_HEIGHT/4 && cgrect.origin.y+cgrect.size.height > 3*SCREEN_HEIGHT/4){
                     cgrect = CGRectMake(
@@ -13582,7 +13638,7 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
             JAVA_OBJECT jErrMsg = errMsg != nil ? fromNSString(CN1_THREAD_GET_STATE_PASS_ARG errMsg) : JAVA_NULL;
             com_codename1_impl_ios_IOSImplementation_socialShareCallback___int_int_java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)cbId, status, jActivityType, jErrMsg);
         };
-        [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
+        [cn1PresentingController() presentViewController:activityViewController animated:YES completion:^{}];
         POOL_END();
         repaintUI();
     });
@@ -17474,8 +17530,8 @@ static NSString *CN1AccessibilityValueForNode(NSDictionary *node) {
     return value;
 }
 
-void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType) {
+void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType, JAVA_INT windowId) {
 #if TARGET_OS_OSX
     // The tree is not a UIKit structure -- it arrives as JSON that the framework
     // builds for every port -- so the macOS side projects the same list onto
@@ -17485,8 +17541,12 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
         return;
     }
     POOL_BEGIN();
-    extern void CN1MacAccessibilityUpdateTree(NSString *json, int changeType);
-    CN1MacAccessibilityUpdateTree(toNSString(CN1_THREAD_STATE_PASS_ARG json), (int)changeType);
+    extern void CN1MacAccessibilityUpdateTree(NSString *json, int changeType, int windowId);
+    // The surface it describes travels with it, for the reason the UIKit side
+    // below installs per window: a tree handed to the main view describes a
+    // surface the reader is not looking at.
+    CN1MacAccessibilityUpdateTree(toNSString(CN1_THREAD_STATE_PASS_ARG json),
+            (int)changeType, (int)windowId);
     POOL_END();
 #else
     if (json == JAVA_NULL) return;
@@ -17496,8 +17556,39 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
     NSDictionary *tree = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
     NSArray *nodes = [tree objectForKey:@"nodes"];
     dispatch_async(dispatch_get_main_queue(), ^{
-        CN1View *container = (CN1View *)[[CodenameOne_GLViewController instance] eaglView];
+        /* The view of the surface this tree describes. Every surface used to be
+         * installed on the main one, so a change inside a desktop window replaced the
+         * main surface's elements with the window's hierarchy and left the window
+         * exposing nothing. Only Mac Catalyst has windows; everywhere else the lookup
+         * is absent and the main view is the only surface there is. */
+        CN1View *container = nil;
+#if TARGET_OS_MACCATALYST
+        if (windowId != 0) {
+            container = CN1MacWindowContentViewForWindowId((int) windowId);
+            /* The window is gone, or its scene has not been granted yet. Falling back
+             * to the main view here is what this exists to prevent. */
+            if (container == nil) return;
+        }
+#else
+        if (windowId != 0) return;
+#endif
+        if (container == nil) {
+            container = (CN1View *)[[CodenameOne_GLViewController instance] eaglView];
+        }
         if (container == nil) return;
+        /* The backing scale of the display this surface is on, which is not the process
+         * global one as soon as a window is dragged to a second monitor: the bounds
+         * arrive in the device pixels Codename One laid them out in, and dividing them
+         * by the main screen's scale then hands VoiceOver hit regions that are shifted
+         * and the wrong size. Only Mac Catalyst can have a window on another display, so
+         * the iOS slice keeps the value it always used. */
+        CGFloat cn1Scale = scaleValue <= 0 ? [UIScreen mainScreen].scale : scaleValue;
+#if TARGET_OS_MACCATALYST
+        UIScreen *cn1Screen = container.window.screen;
+        if (cn1Screen != nil && cn1Screen.scale > 0) {
+            cn1Scale = cn1Screen.scale;
+        }
+#endif
         NSMutableArray *elements = [NSMutableArray arrayWithCapacity:[nodes count]];
         NSMutableDictionary *elementsById = [NSMutableDictionary dictionary];
         if (cn1AccessibilityLiveValues == nil) cn1AccessibilityLiveValues = [[NSMutableDictionary alloc] init];
@@ -17516,12 +17607,11 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
             element.accessibilityViewIsModal = [CN1JSONValue(node, @"modal") boolValue];
             NSArray *bounds = [node objectForKey:@"bounds"];
             if ([bounds count] == 4) {
-                CGFloat scale = scaleValue <= 0 ? [UIScreen mainScreen].scale : scaleValue;
                 element.accessibilityFrameInContainerSpace = CGRectMake(
-                        [[bounds objectAtIndex:0] doubleValue] / scale,
-                        [[bounds objectAtIndex:1] doubleValue] / scale,
-                        [[bounds objectAtIndex:2] doubleValue] / scale,
-                        [[bounds objectAtIndex:3] doubleValue] / scale);
+                        [[bounds objectAtIndex:0] doubleValue] / cn1Scale,
+                        [[bounds objectAtIndex:1] doubleValue] / cn1Scale,
+                        [[bounds objectAtIndex:2] doubleValue] / cn1Scale,
+                        [[bounds objectAtIndex:3] doubleValue] / cn1Scale);
             }
             NSMutableArray *custom = [NSMutableArray array];
             for (NSDictionary *action in element.cn1Actions) {
@@ -17565,8 +17655,8 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
 #endif
 }
 #else
-void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int(
-        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType) {
+void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType, JAVA_INT windowId) {
     // watchOS uses a separate SwiftUI accessibility model.
 }
 #endif

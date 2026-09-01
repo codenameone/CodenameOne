@@ -107,7 +107,10 @@ public class TooltipManager {
                 pendingTooltip = null;
             }
         });
-        Form f = cmp.getComponentForm();
+        // The top level, not the form: getComponentForm() is null by design inside a
+        // Window, so a tooltip on anything in one was scheduled against nothing and
+        // never appeared.
+        TopLevelContainer f = cmp.getTopLevelContainer();
         if (f != null) {
             pendingTooltip.schedule(tooltipShowDelay, false, f);
         }
@@ -124,12 +127,15 @@ public class TooltipManager {
     protected void showTooltip(final String tip, final Component cmp) {
         // The anchor may have been removed (e.g. the form was rebuilt) between scheduling and
         // now -- showing a popup on a detached component throws and can wedge the UI, so bail.
-        Form f = cmp.getComponentForm();
-        if (f == null || f != Display.getInstance().getCurrent()) { //NOPMD CompareObjectsWithEquals
+        TopLevelContainer f = cmp.getTopLevelContainer();
+        if (f == null || !f.isTopLevelShowing()) {
             clearTooltip();
             return;
         }
         currentTooltip = new InteractionDialog(new BorderLayout());
+        // showPopupDialog infers the host from the anchor anyway, but saying it is
+        // free and records which surface this tooltip belongs to.
+        currentTooltip.setTopLevelHost(f);
 
         TextArea text = new TextArea(tip);
         text.setGrowByContent(true);

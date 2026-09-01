@@ -65,6 +65,7 @@ import com.codename1.push.PushActionsProvider;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
 import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -14605,7 +14606,19 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void accessibilityTreeChanged(int changeType) {
-        IOSNative.updateAccessibilityTree(getAccessibilityTreeSnapshot().toJson(), changeType);
+        // The main surface by name rather than "the latest tree". The surface-less
+        // accessor answers with whatever was rebuilt last, which since the tree became
+        // per surface can be a window -- and this pushes onto the main view.
+        accessibilityTreeChanged(changeType, 0);
+    }
+
+    @Override
+    public void accessibilityTreeChanged(int changeType, int windowId) {
+        AccessibilityTreeSnapshot tree = getAccessibilityTreeSnapshot(windowId);
+        if (tree == null) {
+            return;
+        }
+        IOSNative.updateAccessibilityTree(tree.toJson(), changeType, windowId);
     }
 
     @Override
@@ -14647,13 +14660,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Form f = Display.getInstance().getCurrent();
-                if (f != null) {
-                    AccessibilityManager.getInstance().invalidate(f,
-                            AccessibilityManager.CHANGE_STRUCTURE
-                                    | AccessibilityManager.CHANGE_CONTENT
-                                    | AccessibilityManager.CHANGE_STATE);
-                }
+                // Every live surface, not the current form. Assistive technology
+                // starting is the one moment all of them have to be described at once:
+                // nothing was projected while it was off, so a window that has focus
+                // holds no elements at all -- and naming Display.getCurrent() names the
+                // main form however many windows are up, leaving the one the user is
+                // actually in empty until some unrelated change happens to touch it.
+                AccessibilityManager.getInstance().invalidate(null,
+                        AccessibilityManager.CHANGE_STRUCTURE
+                                | AccessibilityManager.CHANGE_CONTENT
+                                | AccessibilityManager.CHANGE_STATE);
             }
         });
     }

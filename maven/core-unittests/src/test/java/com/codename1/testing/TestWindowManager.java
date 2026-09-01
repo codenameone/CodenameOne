@@ -484,16 +484,88 @@ public class TestWindowManager extends WindowManager {
         return out;
     }
 
+    private double desktopUnitsPerPixel = 1.0;
+
+    /// Models a port whose desktop coordinates are not device pixels.
+    ///
+    /// The default of one is every pixel-addressed port: `setBounds` and the drawable
+    /// are the same space. A windowing system that is itself resolution independent --
+    /// AWT is -- places windows in logical units while Codename One lays out in device
+    /// pixels, so on a display at twice the scale a frame is half as many units as it
+    /// is pixels, and the drawable this reports grows accordingly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `units`: desktop units per device pixel, so 0.5 for a display at twice the scale
+    public void setDesktopUnitsPerPixel(double units) {
+        this.desktopUnitsPerPixel = units;
+    }
+
+    @Override
+    public double getDesktopUnitsPerPixel(Object peer) {
+        return desktopUnitsPerPixel;
+    }
+
+    /// The drawable in device pixels, which is what the real ports report.
+    private int toPixels(int desktopUnits) {
+        double u = desktopUnitsPerPixel > 0 ? desktopUnitsPerPixel : 1.0;
+        return Math.max(0, (int) Math.round(desktopUnits / u));
+    }
+
     @Override
     public int getWidth(Object peer) {
         FakeWindow w = win(peer);
-        return w == null ? 0 : w.width;
+        if (w == null) {
+            return 0;
+        }
+        return toPixels(chromeMeasurable ? Math.max(0, w.width - chromeWidth) : w.width);
     }
 
     @Override
     public int getHeight(Object peer) {
         FakeWindow w = win(peer);
-        return w == null ? 0 : w.height;
+        if (w == null) {
+            return 0;
+        }
+        return toPixels(chromeMeasurable ? Math.max(0, w.height - chromeHeight) : w.height);
+    }
+
+    /// How much of a window's frame is chrome rather than drawable area.
+    ///
+    /// Real decorated windows have a title bar and borders outside the surface Codename
+    /// One paints into, so `setBounds` and `getWidth`/`getHeight` do not describe the
+    /// same rectangle. Zero by default, which keeps every existing test seeing the
+    /// frame size it always did.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the horizontal chrome in pixels
+    ///
+    /// - `height`: the vertical chrome in pixels
+    public void setChromeInsets(int width, int height) {
+        chromeWidth = width;
+        chromeHeight = height;
+    }
+
+    private int chromeWidth;
+    private int chromeHeight;
+
+    /// Whether the chrome is measurable yet.
+    ///
+    /// Mac Catalyst grants a window scene asynchronously and, until it arrives,
+    /// answers both the frame and the drawable with the size that was asked for -- so
+    /// the chrome measures zero even though the window is decorated. Setting this false
+    /// reproduces that window.
+    private boolean chromeMeasurable = true;
+
+    /// Whether this manager reports chrome yet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `measurable`: false to answer as a platform whose window scene has not
+    ///   connected, which reports the frame size as the drawable
+    public void setChromeMeasurable(boolean measurable) {
+        this.chromeMeasurable = measurable;
     }
 
     @Override

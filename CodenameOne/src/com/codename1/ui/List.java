@@ -1666,12 +1666,16 @@ public class List<T> extends Component implements ActionSource {
     protected void fireActionEvent(ActionEvent a) {
         if (isEnabled() && !Display.getInstance().hasDragOccured()) {
             if (disposeDialogOnSelection) {
-                // Form only on purpose: this disposes the enclosing Dialog, and Dialog
-                // is documented as unsupported inside a Window. Form.dispose() means
-                // "pop back to the previous form", which a Window has no notion of.
-                Form disposing = getComponentForm();
-                if (disposing != null) {
-                    disposing.dispose();
+                // The enclosing Dialog, found the same way an activated command finds
+                // who owns it. getComponentForm() used to be enough because a Dialog
+                // always was the current form; a Dialog hosted in a Window is a
+                // parented Form, so that lookup returns null there and selecting an
+                // item left the popup open with its caller still blocked. A list that
+                // is not in a dialog resolves to its top level and disposes nothing,
+                // which is what Form.dispose() did for it before.
+                Container disposing = TopLevelSupport.commandHostOf(this);
+                if (disposing instanceof Dialog) {
+                    ((Dialog) disposing).dispose();
                 }
             }
             super.fireActionEvent();
@@ -1681,14 +1685,16 @@ public class List<T> extends Component implements ActionSource {
                 if (i != null && i instanceof Command && ((Command) i).isEnabled()) {
                     ((Command) i).actionPerformed(a);
                     if (!a.isConsumed()) {
-                        // The top level rather than the form: getComponentForm() is null
-                        // by design inside a Window, so a command list there invoked the
-                        // command and then told nobody -- the window's command listeners
-                        // never saw the activation. Neither branch re-invokes the
-                        // command, which has just run above.
-                        TopLevelContainer top = getTopLevelContainer();
-                        if (top != null) {
-                            top.asContainer().commandActivatedFromList((Command) i, a);
+                        // The command host rather than the form: getComponentForm() is
+                        // null by design inside a Window, so a command list there invoked
+                        // the command and then told nobody -- the window's command
+                        // listeners never saw the activation. It is also not simply the
+                        // top level: a Dialog hosted in a window's layered pane is a
+                        // parented Form, which that walk goes straight past. Neither
+                        // branch re-invokes the command, which has just run above.
+                        Container host = TopLevelSupport.commandHostOf(this);
+                        if (host != null) {
+                            host.commandActivatedFromList((Command) i, a);
                         }
                     }
                 }

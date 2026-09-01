@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.util;
 
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.TopLevelContainer;
@@ -114,7 +115,16 @@ public class UITimer {
     /// the timer instance
     public static UITimer timer(int timeMillis, boolean repeat, Runnable r) {
         UITimer uit = new UITimer(r);
-        uit.schedule(timeMillis, repeat, Display.getInstance().getCurrent());
+        // The top level the user is in, not the current form. Bound to the form, a
+        // timer started from inside a window was registered on a surface that is not
+        // being painted there, so it never elapsed.
+        //
+        // This cannot tell which surface its caller belongs to, so a component on a
+        // surface that is not the focused one gets a timer on the focused window
+        // instead -- and disposing that window takes the callback with it. The answer
+        // is for a caller that knows its own surface to name it, through the overload
+        // below that takes one, which is what the framework's own callers now do.
+        uit.schedule(timeMillis, repeat, CN.getCurrentTopLevel());
         return uit;
     }
 

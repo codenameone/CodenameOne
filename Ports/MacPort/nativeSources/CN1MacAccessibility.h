@@ -41,7 +41,12 @@
 /// `changeType` carries the framework's change flags; bit 256 means the screen
 /// itself changed rather than part of it, which is the difference between
 /// telling VoiceOver to re-read everything and telling it the layout moved.
-void CN1MacAccessibilityUpdateTree(NSString *json, int changeType);
+/// Installs one surface's semantic tree on that surface's own rendering view.
+///
+/// `windowId` is zero for the application's main surface and otherwise names a
+/// desktop window. Every window renders into its own view, so a tree installed on
+/// the main one describes a surface the reader is not looking at.
+void CN1MacAccessibilityUpdateTree(NSString *json, int changeType, int windowId);
 
 #endif
 #endif

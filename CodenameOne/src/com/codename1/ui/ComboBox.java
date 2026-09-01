@@ -341,6 +341,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
                 //if only height changed it's the virtual keyboard, no need to
                 //resize the popup just resize the parent form
                 if (getWidth() == w && getHeight() != h) {
+                    // Null inside a window, which has no previous form.
                     Form frm = getPreviousForm();
                     if (frm != null) {
                         frm.sizeChangedInternal(w, h);
@@ -362,6 +363,13 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         popupDialog.setTransitionOutAnimator(CommonTransitions.createEmpty());
         popupDialog.setLayout(new BorderLayout());
         popupDialog.addComponent(BorderLayout.CENTER, l);
+        // Never a window of its own. A combo popup is placed by the margins computed
+        // against the surface it drops out of and dismissed by a press outside itself,
+        // and an operating system window has neither: the margins mean nothing in it,
+        // its slide transition never runs, and it cannot see the click meant to close
+        // it. Dialog exempts anchored popups already, but this one is positioned by
+        // hand rather than through showPopupDialog, so it has to say so itself.
+        popupDialog.setNativeWindowMode(false);
         return popupDialog;
     }
 
@@ -420,7 +428,10 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             popupDialog.setTransitionInAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 200));
             popupDialog.setTransitionOutAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 200));
             showingPopupDialog = true;
-            Command out = popupDialog.show(Display.getInstance().getDisplayHeight() - popupDialog.getDialogComponent().getPreferredH(), 0, 0, 0, true, true);
+            Command out = popupDialog.show(
+                    TopLevelSupport.hostHeight(getTopLevelContainer())
+                            - popupDialog.getDialogComponent().getPreferredH(),
+                    0, 0, 0, true, true);
             showingPopupDialog = false;
             return out;
         }
@@ -435,7 +446,10 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             int bottom;
             int left;
             int right;
-            Form parentForm = getComponentForm();
+            // The top level, not the form: getComponentForm() is null by design inside
+            // a Window, so the whole placement below dereferenced null and clicking a
+            // combo box in a window did nothing at all.
+            TopLevelContainer parentForm = getTopLevelContainer();
 
             int listW = Math.max(getWidth(), l.getPreferredW());
             listW = Math.min(listW + l.getSideGap(), parentForm.getContentPane().getWidth());
@@ -453,13 +467,10 @@ public class ComboBox<T> extends List<T> implements ActionSource {
 
             bottom = 0;
             top = getAbsoluteY();
-            int formHeight = parentForm.getHeight();
-            if (parentForm.getSoftButtonCount() > 1) {
-                Component c = parentForm.getSoftButton(0).getParent();
-                formHeight -= c.getHeight();
-                Style s = c.getStyle();
-                formHeight -= (s.getVerticalMargins());
-            }
+            int formHeight = parentForm.asContainer().getHeight();
+            // A window has no soft button bar, and asking a Form for one it does not
+            // have is what this used to spell out inline.
+            formHeight -= TopLevelSupport.softButtonAreaHeight(parentForm);
 
             if (listH < formHeight) {
                 switch (popupPlacement) {
@@ -495,7 +506,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             }
 
             left = getAbsoluteX();
-            right = parentForm.getWidth() - left - listW;
+            right = parentForm.asContainer().getWidth() - left - listW;
             if (right < 0) {
                 left += right;
                 right = 0;
@@ -518,9 +529,13 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         l.dispatcher = dispatcher;
         l.eventSource = this;
         l.disposeDialogOnSelection = true;
-        Form parentForm = getComponentForm();
+        // The top level, not the form: inside a Window getComponentForm() is null by
+        // design, which turned the EDT violation guard below into a permanent one and
+        // made a combo box in a window inert. It still guards the violation it was
+        // written for.
+        TopLevelContainer parentForm = getTopLevelContainer();
 
-        // unlikely to ever happen but occurs on EDT violations 
+        // unlikely to ever happen but occurs on EDT violations
         // github.com/codenameone/CodenameOne/issues/4726
         if (parentForm == null) {
             return;
@@ -529,17 +544,66 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         int tint = parentForm.getTintColor();
         parentForm.setTintColor(0);
         Dialog popupDialog = createPopupDialog(l);
+        popupDialog.setTopLevelHost(parentForm);
         int originalSel = getSelectedIndex();
-        Form.comboLock = includeSelectCancel;
-        float rr = Dialog.getDefaultBlurBackgroundRadius();
-        Dialog.setDefaultBlurBackgroundRadius(-1);
-        Command result = showPopupDialog(popupDialog, l);
-        Dialog.setDefaultBlurBackgroundRadius(rr);
-        Form.comboLock = false;
+        // On the popup itself, because that is what the routing is about -- the two
+        // readers in Form test their own menu bar. A popup is modal only to the surface
+        // it is on, so with windows two can be open at once; a shared flag had whichever
+        // closed first switch the other one's routing off.
+        popupDialog.comboSelectCancelRouting = includeSelectCancel;
+        // On the form the popup is shown over, which is the one whose teardown reads it.
+        // A window host has no such teardown, and a form elsewhere must not be told a
+        // popup is up over it.
+        Form guarded = parentForm instanceof Form ? (Form) parentForm : null;
+        if (guarded != null) {
+            guarded.comboShowDepth++;
+        }
+        pushBlurOverride();
+        Command result;
+        try {
+            result = showPopupDialog(popupDialog, l);
+        } finally {
+            if (guarded != null) {
+                guarded.comboShowDepth--;
+            }
+            popBlurOverride();
+        }
         parentForm.setTintColor(tint);
         if (result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() || //NOPMD CompareObjectsWithEquals
                 popupDialog.wasDisposedDueToRotation()) {
             setSelectedIndex(originalSel);
+        }
+    }
+
+    /// How many popups currently want the blur off, and what it was before the first
+    /// of them asked.
+    ///
+    /// The radius is one process-wide value and a popup is modal only to the surface it
+    /// is on, so with windows two can be open at once. Saving and restoring it per call
+    /// meant the second popup captured the -1 the first had already installed, and
+    /// whichever finished last wrote that back -- turning the blur off for every dialog
+    /// created afterwards. Both fields are only ever touched while showing a popup,
+    /// which is event-thread work.
+    private static int blurOverrideDepth;
+    private static float blurOverrideSaved;
+
+    /// Turns the blur off for the duration of a popup, remembering the real value once.
+    private static void pushBlurOverride() {
+        if (blurOverrideDepth == 0) {
+            blurOverrideSaved = Dialog.getDefaultBlurBackgroundRadius();
+            Dialog.setDefaultBlurBackgroundRadius(-1);
+        }
+        blurOverrideDepth++;
+    }
+
+    /// Gives the real value back once the last popup wanting it off has gone.
+    private static void popBlurOverride() {
+        if (blurOverrideDepth == 0) {
+            return;
+        }
+        blurOverrideDepth--;
+        if (blurOverrideDepth == 0) {
+            Dialog.setDefaultBlurBackgroundRadius(blurOverrideSaved);
         }
     }
 

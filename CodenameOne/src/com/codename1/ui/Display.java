@@ -765,6 +765,17 @@ public final class Display extends CN1Constants {
         impl.accessibilityTreeChanged(changeType);
     }
 
+    /// Notifies the native port that one surface's semantic tree changed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `changeType`: bit mask of `AccessibilityManager.CHANGE_*` constants
+    ///
+    /// - `windowId`: the surface that changed, zero for the application's main one
+    public void accessibilityTreeChanged(int changeType, int windowId) {
+        impl.accessibilityTreeChanged(changeType, windowId);
+    }
+
     /// Returns true when the active port exposes lightweight components through
     /// a native virtual accessibility tree.
     public boolean isAccessibilityTreeSupported() {
@@ -3698,6 +3709,22 @@ public final class Display extends CN1Constants {
     ///
     /// @return the form currently displayed on the screen or null if no form is
     /// currently displayed
+    /// The top level the user is currently working in, which may be a `Window`.
+    ///
+    /// `#getCurrent()` only ever names a `Form`, so on the desktop it reports the main
+    /// surface even while the user is typing into another window. Code that wants to
+    /// put something in front of the user -- rather than specifically on the main
+    /// surface -- should ask this instead.
+    ///
+    /// #### Returns
+    ///
+    /// the focused window when one has focus, otherwise the current form, or null
+    public TopLevelContainer getCurrentTopLevel() {
+        return TopLevelSupport.current();
+    }
+
+    /// The form currently displayed on the main surface. See `#getCurrentTopLevel()`
+    /// for the answer that can also name a `Window`.
     public Form getCurrent() {
         Form current = impl.getCurrentForm();
         if (current instanceof Dialog) {

@@ -25,6 +25,7 @@
 
 #import "CN1MacAccessibility.h"
 #import "CN1MacHost.h"
+#import "CN1AppKitWindows.h"
 #import "cn1_globals.h"
 #import "com_codename1_impl_ios_IOSImplementation.h"
 
@@ -274,9 +275,48 @@ static NSString *CN1MacValueForNode(NSDictionary *node) {
 
 /// Last announced text per live-region node, so a region is only spoken when it
 /// actually changed rather than on every tree update.
+///
+/// Partitioned by surface -- windowId to (nodeId to spoken text) -- rather than shared.
+/// A pane change is scoped to the surface it happened on and drops that surface's
+/// history, and out of one shared dictionary that also dropped every other window's:
+/// a region on an untouched window then had nothing to compare against, so its next
+/// change read as an initial value and VoiceOver never announced it.
 static NSMutableDictionary *cn1MacLiveValues = nil;
 
-void CN1MacAccessibilityUpdateTree(NSString *json, int changeType) {
+/// The live-region history for one surface, created on first use.
+///
+/// Also drops the history of any window that has gone away. Partitioning is what makes
+/// that necessary -- there is one dictionary per surface now rather than one in total --
+/// and the port has no accessibility teardown hook to hang it on. Windows are few and
+/// this runs once per tree update, so a sweep is cheaper than the hook would be.
+/// Window 0 is the main surface, which is never resolved this way and so never swept.
+static NSMutableDictionary *CN1MacLiveValuesForWindow(int windowId) {
+    if (cn1MacLiveValues == nil) {
+        cn1MacLiveValues = [[NSMutableDictionary alloc] init];
+    }
+    NSMutableArray *dead = nil;
+    for (NSNumber *key in cn1MacLiveValues) {
+        int keyWindowId = [key intValue];
+        if (keyWindowId != 0 && CN1MacPeerHostViewForWindowId(keyWindowId) == nil) {
+            if (dead == nil) {
+                dead = [NSMutableArray array];
+            }
+            [dead addObject:key];
+        }
+    }
+    if (dead != nil) {
+        [cn1MacLiveValues removeObjectsForKeys:dead];
+    }
+    NSNumber *windowKey = [NSNumber numberWithInt:windowId];
+    NSMutableDictionary *forWindow = [cn1MacLiveValues objectForKey:windowKey];
+    if (forWindow == nil) {
+        forWindow = [NSMutableDictionary dictionary];
+        [cn1MacLiveValues setObject:forWindow forKey:windowKey];
+    }
+    return forWindow;
+}
+
+void CN1MacAccessibilityUpdateTree(NSString *json, int changeType, int windowId) {
     if (json == nil) {
         return;
     }
@@ -287,34 +327,24 @@ void CN1MacAccessibilityUpdateTree(NSString *json, int changeType) {
         return;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
-        // The MAIN host view, deliberately, and this is a known gap rather than
-        // an oversight: VoiceOver cannot navigate the controls of a secondary
-        // desktop Window on this port.
+        // The view of the surface this tree describes, which is what the framework
+        // now says it is: the refresh names the root it rebuilt and the snapshot is
+        // fetched for that surface, so a window's tree is its own rather than the
+        // main form's wearing its name. That was the blocker recorded here -- the
+        // manager only answered for a Form, so publishing anything on a secondary
+        // window would have put the main form's controls in it -- and it is gone.
         //
-        // Routing the container to the querying window's view is the easy half
-        // and would make things worse on its own. The tree itself comes from
-        // AccessibilityManager.getCurrentSnapshot(), which builds it from
-        // Display.getCurrent() -- the main Form. Attaching that to a secondary
-        // window would publish the MAIN form's controls as the contents of a
-        // window that does not contain them, which is wrong data in the right
-        // place; today's behaviour publishes nothing there, which is at least
-        // honest.
-        //
-        // A correct fix cannot live in this port. AccessibilityManager's only
-        // entry point is getSnapshot(Form), and a secondary window is a
-        // TopLevelContainer -- an interface that offers asContainer() and
-        // getContentPane() and no Form at all. So there is no way to ask the
-        // framework for that window's tree until the manager accepts a
-        // TopLevelContainer, which changes accessibility for every port and
-        // belongs in its own change rather than inside a port.
-        NSView *container = [CN1MacHost sharedHost].renderingView;
+        // A window whose id no longer resolves is left alone rather than falling
+        // back to the main view, which would be the same wrong-data-in-the-right-
+        // place this used to avoid by publishing nothing.
+        NSView *container = windowId == 0
+                ? [CN1MacHost sharedHost].renderingView
+                : CN1MacPeerHostViewForWindowId(windowId);
         if (container == nil || container.window == nil) {
             return;
         }
         CGFloat scale = CN1MacHostViewScale(container);
-        if (cn1MacLiveValues == nil) {
-            cn1MacLiveValues = [[NSMutableDictionary alloc] init];
-        }
+        NSMutableDictionary *liveValues = CN1MacLiveValuesForWindow(windowId);
         NSMutableArray *elements = [NSMutableArray arrayWithCapacity:[nodes count]];
         NSMutableDictionary *byId = [NSMutableDictionary dictionaryWithCapacity:[nodes count]];
         for (NSDictionary *node in nodes) {
@@ -420,7 +450,7 @@ void CN1MacAccessibilityUpdateTree(NSString *json, int changeType) {
                 NSString *value = [element accessibilityValue];
                 NSString *spoken = [NSString stringWithFormat:@"%@|%@",
                         label == nil ? @"" : label, value == nil ? @"" : value];
-                NSString *previous = [cn1MacLiveValues objectForKey:nodeId];
+                NSString *previous = [liveValues objectForKey:nodeId];
                 if (previous != nil && ![previous isEqualToString:spoken]) {
                     NSString *text = label != nil ? label : value;
                     if (text != nil) {
@@ -430,7 +460,7 @@ void CN1MacAccessibilityUpdateTree(NSString *json, int changeType) {
                                    NSAccessibilityPriorityKey: @(NSAccessibilityPriorityMedium) });
                     }
                 }
-                [cn1MacLiveValues setObject:spoken forKey:nodeId];
+                [liveValues setObject:spoken forKey:nodeId];
             }
         }
         // YES here, unlike the UIKit port which sets isAccessibilityElement NO on
@@ -490,8 +520,10 @@ void CN1MacAccessibilityUpdateTree(NSString *json, int changeType) {
         // cases post a layout change; the screen case also drops the remembered
         // live-region text, because a region on the previous screen has nothing
         // to compare against and would otherwise announce itself once on arrival.
+        // This surface's history only: the screen that changed is this one, and
+        // another window's regions still have something to compare against.
         if ((changeType & 256) != 0) {
-            [cn1MacLiveValues removeAllObjects];
+            [liveValues removeAllObjects];
         }
         NSAccessibilityPostNotification(container, NSAccessibilityLayoutChangedNotification);
     });

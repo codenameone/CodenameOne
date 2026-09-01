@@ -294,6 +294,15 @@ jobs:
             '-Dsurefire.failIfNoSpecifiedTests=false' || rc=$?
           for core in /tmp/cn1-cores/core.*; do
             [ -f "$core" ] || continue
+            # gdb is not on the runner image, so this whole post-mortem printed
+            # "gdb: command not found" and the core -- the only thing that names the
+            # faulting frame -- was collected and thrown away. An intermittent SIGSEGV
+            # here has now cost several runs with nothing to show for them. Installed
+            # inside the loop so a run that does not crash never pays for it.
+            if ! command -v gdb >/dev/null 2>&1; then
+              (sudo apt-get update -qq && sudo apt-get install -y -qq gdb) >/dev/null 2>&1 \
+                || apk add --no-cache gdb >/dev/null 2>&1 || true
+            fi
             elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
             mkdir -p "$(dirname "$CN1_APP_LOG_TEE")"
             {

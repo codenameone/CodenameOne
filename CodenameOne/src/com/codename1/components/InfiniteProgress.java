@@ -24,6 +24,7 @@ package com.codename1.components;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -34,6 +35,7 @@ import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.Container;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -175,24 +177,83 @@ public class InfiniteProgress extends Component {
     ///
     /// the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
     public Dialog showInfiniteBlocking() {
-        Form f = Display.getInstance().getCurrent();
+        // The top level the user is in, not the current form: on the desktop those
+        // differ, and the spinner was dimming the main window while the user waited in
+        // another one.
+        TopLevelContainer f = CN.getCurrentTopLevel();
         if (f == null) {
-            f = new Form();
-            f.show();
+            Form nf = new Form();
+            nf.show();
+            f = nf;
         }
-        if (f.getClientProperty("isInfiniteProgress") == null) {
-            f.setTintColor(tintColor);
-        }
+        Container hostCnt = f.asContainer();
+        // The original marker still decides it on a form: a nested spinner there sees
+        // the *first* spinner's own dialog as the current surface, and that dialog
+        // carries the marker. A hosted dialog never becomes the current top level, so
+        // on a window the marker could not be found however many spinners were up, and
+        // each new one re-tinted the window over the first one's choice.
         Dialog d = new Dialog();
+        // Never a window of its own, whatever the application asked for globally. This
+        // one is shown modeless and does its blocking with the scrim the hosted path
+        // installs -- as a modeless operating system window it would install nothing,
+        // leave the surface behind it fully interactive, and let the user start the
+        // operation again while it span. Making it a modal window instead is not the
+        // answer either: the caller is handed this dialog and disposes it later, which
+        // a modal show would never let it reach.
+        d.setNativeWindowMode(false);
         d.putClientProperty("isInfiniteProgress", true);
         d.setTintColor(0x0);
         d.setDialogUIID("Container");
         d.setLayout(new BorderLayout());
         d.addComponent(BorderLayout.CENTER, this);
+        // Claimed only once the spinner is actually in the dialog. addComponent throws
+        // if this spinner is already parented -- showInfiniteBlocking() called twice
+        // over, before the first dialog was disposed -- and the claim is given back when
+        // the spinner leaves a hierarchy, so one taken before it ever entered would
+        // never be given back: the host would keep a depth above zero for good and
+        // every later spinner on it would skip its tint.
+        boolean alreadyTinted = hostCnt.getClientProperty("isInfiniteProgress") != null;
+        Integer held = (Integer) hostCnt.getClientProperty(PROGRESS_DEPTH);
+        int depth = held == null ? 0 : held.intValue();
+        if (!alreadyTinted && depth == 0) {
+            f.setTintColor(tintColor);
+        }
+        hostCnt.putClientProperty(PROGRESS_DEPTH, Integer.valueOf(depth + 1));
+        // Released when this spinner leaves the hierarchy, which is what disposing the
+        // dialog does to it. Held per spinner rather than per host: each one is in
+        // exactly one dialog, so each releases exactly the count it took.
+        progressHost = hostCnt;
         d.setTransitionInAnimator(CommonTransitions.createEmpty());
         d.setTransitionOutAnimator(CommonTransitions.createEmpty());
+        d.setTopLevelHost(f);
         d.showPacked(BorderLayout.CENTER, false);
+        if (!isInitialized()) {
+            // The show was refused rather than performed -- showModal returns at once
+            // while the application is minimized, and the dialog is never installed. The
+            // claim above is given back when this spinner leaves the hierarchy, and one
+            // that never entered it never leaves, so the count stayed up for good and
+            // every later spinner on this surface skipped its tint.
+            releaseProgressHost();
+        }
         return d;
+    }
+
+    /// How many blocking spinners are up on a given surface.
+    private static final String PROGRESS_DEPTH = "cn1$infiniteProgressDepth";
+
+    /// The surface this spinner counted itself against, until it releases it.
+    private Container progressHost;
+
+    /// Gives back this spinner's claim on its host, once.
+    private void releaseProgressHost() {
+        Container h = progressHost;
+        if (h == null) {
+            return;
+        }
+        progressHost = null;
+        Integer held = (Integer) h.getClientProperty(PROGRESS_DEPTH);
+        int depth = held == null ? 0 : held.intValue() - 1;
+        h.putClientProperty(PROGRESS_DEPTH, depth <= 0 ? null : Integer.valueOf(depth));
     }
 
     /// True when this spinner's own top level is the one on screen.
@@ -206,13 +267,7 @@ public class InfiniteProgress extends Component {
     /// true when the surface holding this component is displayed
     private boolean isOnDisplayedTopLevel() {
         TopLevelContainer top = getTopLevelContainer();
-        if (top == null) {
-            return false;
-        }
-        if (top instanceof com.codename1.ui.Window) {
-            return ((com.codename1.ui.Window) top).isWindowShowing();
-        }
-        return Display.getInstance().getCurrent() == top; //NOPMD CompareObjectsWithEquals
+        return top != null && top.isTopLevelShowing();
     }
 
     /// {@inheritDoc}
@@ -228,6 +283,7 @@ public class InfiniteProgress extends Component {
     /// {@inheritDoc}
     @Override
     protected void deinitialize() {
+        releaseProgressHost();
         // The fallback to the current form existed because deinitialize can run after
         // the component has left its hierarchy. It threw outright in a window-only
         // application, where there is no current form either -- and that threw during

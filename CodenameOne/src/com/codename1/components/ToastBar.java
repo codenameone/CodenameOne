@@ -28,12 +28,15 @@ import com.codename1.io.NetworkManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.TopLevelContainer;
+import com.codename1.ui.Window;
 import com.codename1.ui.Slider;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.animations.CommonTransitions;
@@ -131,6 +134,17 @@ public final class ToastBar {
     private String defaultMessageUIID = "ToastBarMessage";
     //FIXME SH Need to style the {@code ToastBar} so that it looks nicer
     private boolean useFormLayeredPane;
+
+    /// Which of the inheritable settings this instance has been given in its own right.
+    ///
+    /// A window's toast bar takes the singleton's configuration so the static helpers
+    /// keep honouring settings made once at start-up, but it must not be frozen at the
+    /// moment it happened to be created -- nor have a later change to the shared
+    /// defaults overwrite something set on this window deliberately.
+    private boolean positionExplicit;
+    private boolean useFormLayeredPaneExplicit;
+    private boolean defaultUIIDExplicit;
+    private boolean defaultMessageUIIDExplicit;
     /// Flag to indicate that the status is updating.  This is used to prevent
     /// two status updates from happening at the same time.
     private boolean updatingStatus;
@@ -161,8 +175,76 @@ public final class ToastBar {
     }
 
     /// Gets reference to the singleton StatusBar instance
+    ///
+    /// The singleton shows on whichever `com.codename1.ui.Form` is current, including
+    /// while a desktop window has the focus. To toast on a window use
+    /// `#getForTopLevel(com.codename1.ui.TopLevelContainer)`, which is what the static
+    /// helpers on this class do.
     public static ToastBar getInstance() {
         return ToastBarHolder.INSTANCE;
+    }
+
+    /// The toast bar for a given top level.
+    ///
+    /// The singleton follows whichever `Form` is current, which is the behaviour every
+    /// existing application relies on, so a `Form` or null still gets it. A
+    /// `com.codename1.ui.Window` gets its own instance instead, cached on the window
+    /// and dying with it -- a settable host on the singleton would have meant one
+    /// window silently redirecting another surface's toasts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to show on, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the toast bar for that top level, never null
+    public static ToastBar getForTopLevel(TopLevelContainer top) {
+        if (!(top instanceof Window)) {
+            return ToastBarHolder.INSTANCE;
+        }
+        Container c = top.asContainer();
+        ToastBar b = (ToastBar) c.getClientProperty(WINDOW_INSTANCE_PROP);
+        if (b == null) {
+            b = new ToastBar();
+            b.host = top;
+            c.putClientProperty(WINDOW_INSTANCE_PROP, b);
+        }
+        // On every lookup, not only when one is created. An application sets the
+        // position, the layer choice and the UIIDs on the singleton and then calls the
+        // static helpers; those helpers reach this instance whenever a window has the
+        // focus. Seeding once froze the window's bar at whatever the defaults happened
+        // to be the first time it was asked for, so every configuration change after
+        // that point was silently dropped -- which the static helpers have always
+        // honoured.
+        b.inheritDefaultsFrom(ToastBarHolder.INSTANCE);
+        return b;
+    }
+
+    /// The client property a window's own toast bar is cached under.
+    private static final String WINDOW_INSTANCE_PROP = "cn1$ToastBar";
+
+    /// The top level this instance shows on, or null for the singleton, which follows
+    /// whichever form is current.
+    private TopLevelContainer host;
+
+    /// The top level to show on.
+    ///
+    /// #### Returns
+    ///
+    /// the host, or null when there is none
+    private TopLevelContainer resolveHost() {
+        if (host != null) {
+            return host;
+        }
+        // The current form, not the top level the user is in. The singleton is
+        // form-only by contract, and it has to stay that way: a window already has its
+        // own instance from getForTopLevel(TopLevelContainer), and letting the singleton
+        // resolve to that window as well would give two instances with two status
+        // lists the same cached component to fight over -- one expiring a toast the
+        // other still thinks it is showing. Callers that want the surface the user is
+        // in ask for it, which is what the static helpers below do.
+        return Display.getInstance().getCurrent();
     }
 
     /// Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
@@ -190,7 +272,7 @@ public final class ToastBar {
     ///
     /// the status if we want to clear it before timeout elapses
     public static Status showMessage(String msg, char icon, int timeout, ActionListener listener) {
-        Status s = ToastBar.getInstance().createStatus();
+        Status s = ToastBar.getForTopLevel(CN.getCurrentTopLevel()).createStatus();
         Style stl = UIManager.getInstance().getComponentStyle(s.getMessageUIID());
         s.setIcon(FontImage.createMaterial(icon, stl, 4));
         s.setMessage(msg);
@@ -290,7 +372,7 @@ public final class ToastBar {
      */
     public static void showConnectionProgress(String message, final ConnectionRequest cr,
                                               final SuccessCallback<NetworkEvent> onSuccess, final FailureCallback<NetworkEvent> onError) {
-        final ToastBar.Status s = ToastBar.getInstance().createStatus();
+        final ToastBar.Status s = ToastBar.getForTopLevel(CN.getCurrentTopLevel()).createStatus();
         s.setProgress(-1);
         s.setMessage(message);
         s.show();
@@ -364,6 +446,7 @@ public final class ToastBar {
     ///
     /// - `defaultUIID`: the defaultUIID to set
     public void setDefaultUIID(String defaultUIID) {
+        defaultUIIDExplicit = true;
         this.defaultUIID = defaultUIID;
     }
 
@@ -384,6 +467,7 @@ public final class ToastBar {
     ///
     /// - `defaultMessageUIID`: the defaultMessageUIID to set
     public void setDefaultMessageUIID(String defaultMessageUIID) {
+        defaultMessageUIIDExplicit = true;
         this.defaultMessageUIID = defaultMessageUIID;
     }
 
@@ -403,17 +487,28 @@ public final class ToastBar {
     /// Self for chaining.
     ///
     public ToastBar useFormLayeredPane(boolean useFormLayeredPane) {
-        if (useFormLayeredPane != this.useFormLayeredPane) {
+        useFormLayeredPaneExplicit = true;
+        applyUseFormLayeredPane(useFormLayeredPane);
+        return this;
+    }
+
+    /// Moves the bar between the layered panes without recording the choice as this
+    /// instance's own, which is what inheriting the shared default must do.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layered`: true to use the form layered pane
+    private void applyUseFormLayeredPane(boolean layered) {
+        if (layered != this.useFormLayeredPane) {
             ToastBarComponent c = getToastBarComponent(false);
             if (c != null) {
                 c.remove();
                 getLayeredPane().remove();
             }
 
-            this.useFormLayeredPane = useFormLayeredPane;
+            this.useFormLayeredPane = layered;
 
         }
-        return this;
     }
 
     /// Gets the position of the toast bar on the screen.  Either `Component#TOP` or `Component#BOTTOM`.
@@ -431,7 +526,85 @@ public final class ToastBar {
     ///
     /// - `position`: the position to set Should be one of `Component#TOP` and `Component#BOTTOM`
     public void setPosition(int position) {
+        positionExplicit = true;
         this.position = position;
+    }
+
+    /// Puts an existing toast component in the slot the current position asks for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component already on screen
+    private void applyPositionTo(ToastBarComponent c) {
+        Container parent = c.getParent();
+        if (parent == null || !(parent.getLayout() instanceof BorderLayout)) {
+            return;
+        }
+        String want = position == Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH;
+        if (want.equals(parent.getLayout().getComponentConstraint(c))) {
+            return;
+        }
+        // The inset written for the edge it is leaving. Only the edge the bar sits at is
+        // ever written, so left in place it stayed on the far side while the new edge's
+        // inset was added on top of it.
+        Style s = c.getAllStyles();
+        s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        // Back to what the theme asked for, not to nothing -- see safeAreaPadding*Base.
+        if (c.safeAreaPaddingTop > 0) {
+            s.setPaddingTop(c.safeAreaPaddingTopBase);
+            c.safeAreaPaddingTop = 0;
+        }
+        if (c.safeAreaPaddingBottom > 0) {
+            s.setPaddingBottom(c.safeAreaPaddingBottomBase);
+            c.safeAreaPaddingBottom = 0;
+        }
+        // And the gap left for the keyboard, which belongs to the bottom edge just as
+        // much as the inset does.
+        if (c.keyboardMarginBottom > 0) {
+            s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
+            s.setMarginBottom(0);
+            c.keyboardMarginBottom = 0;
+        }
+        parent.removeComponent(c);
+        parent.addComponent(want, c);
+        parent.revalidateLater();
+    }
+
+    /// Takes the shared defaults for every setting this instance has not been given
+    /// in its own right.
+    ///
+    /// Explicit beats inherited in both directions and at any time: configuring a
+    /// window's bar keeps that setting however the shared default moves afterwards,
+    /// and everything else keeps following it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaults`: the shared instance to inherit from
+    private void inheritDefaultsFrom(ToastBar defaults) {
+        if (defaults == this) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
+        if (!positionExplicit && position != defaults.position) {
+            position = defaults.position;
+            // A bar already on screen has to move with it. The slot is otherwise only
+            // chosen when the component is built or reattached, so it stayed where it
+            // was created while animating as though it had gone to the other end.
+            ToastBarComponent shown = getToastBarComponent(false);
+            if (shown != null) {
+                applyPositionTo(shown);
+            }
+        }
+        if (!useFormLayeredPaneExplicit) {
+            // Through the mover, so a bar already on screen changes pane rather than
+            // having the flag flipped underneath it.
+            applyUseFormLayeredPane(defaults.useFormLayeredPane);
+        }
+        if (!defaultUIIDExplicit) {
+            defaultUIID = defaults.defaultUIID;
+        }
+        if (!defaultMessageUIIDExplicit) {
+            defaultMessageUIID = defaults.defaultMessageUIID;
+        }
     }
 
     /// Updates the ToastBar UI component with the settings of the current status.
@@ -623,7 +796,9 @@ public final class ToastBar {
     }
 
     private Container getLayeredPane() {
-        Form f = Display.getInstance().getCurrent();
+        // The host, not the current form: a window has its own layered panes, and a
+        // toast for one used to be added to the main form behind it.
+        TopLevelContainer f = resolveHost();
         if (f == null) {
             throw new IllegalStateException("Cannot get layered pane when form is null");
         }
@@ -635,7 +810,7 @@ public final class ToastBar {
     }
 
     private void moveLayerToFront() {
-        Form f = Display.getInstance().getCurrent();
+        TopLevelContainer f = resolveHost();
         if (f == null) {
             return;
         }
@@ -654,43 +829,84 @@ public final class ToastBar {
     }
 
     private ToastBarComponent getToastBarComponent(boolean create) {
-        Form f = Display.getInstance().getCurrent();
+        TopLevelContainer f = resolveHost();
         if (f != null && !(f instanceof Dialog)) {
-            ToastBarComponent c = (ToastBarComponent) f.getClientProperty("ToastBarComponent");
+            ToastBarComponent c = (ToastBarComponent) f.asContainer().getClientProperty("ToastBarComponent");
             if (c == null && !create) {
                 return null;
             }
             if (c == null || c.getParent() == null) {
                 c = new ToastBarComponent();
                 c.hidden = true;
-                f.putClientProperty("ToastBarComponent", c);
+                f.asContainer().putClientProperty("ToastBarComponent", c);
                 Container layered = getLayeredPane();
                 layered.setLayout(new BorderLayout());
                 layered.addComponent(position == Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH, c);
                 updateStatus();
+            } else {
+                // The constraint above is only chosen when the component is built or
+                // reattached, and the position can change under one that is neither --
+                // inheriting the shared default now does exactly that. Left alone the
+                // bar stayed in the slot it was created in while animating as though it
+                // had moved to the other one.
+                applyPositionTo(c);
             }
-            Rectangle safeArea = Display.getInstance().getDisplaySafeArea(new Rectangle(0, 0, 0, 0));
-            // PMD Fix (CollapsibleIfStatements): Combine nested position checks to simplify the layout adjustments.
-            if (position == Component.BOTTOM && f.getInvisibleAreaUnderVKB() > 0) {
+            // The host's safe area and height. A window has no notch of its own, and
+            // its height is what the toast has to sit inside.
+            Rectangle safeArea = f.getSafeArea();
+            // Written when it applies and taken off when it stops. Only the "applies"
+            // half was here, so the gap the keyboard needed outlived the keyboard: it
+            // stayed under a bar moved to the top, and stayed under one left at the
+            // bottom once the keyboard had gone, in both cases as blank space no longer
+            // standing for anything.
+            int keyboardMargin = position == Component.BOTTOM ? f.getInvisibleAreaUnderVKB() : 0;
+            if (keyboardMargin > 0 || c.keyboardMarginBottom > 0) {
                 Style s = c.getAllStyles();
                 s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
-                s.setMarginBottom(f.getInvisibleAreaUnderVKB());
+                s.setMarginBottom(keyboardMargin);
+                c.keyboardMarginBottom = keyboardMargin;
             }
-            int safeBottomMargin = Display.getInstance().getDisplayHeight()
+            int safeBottomMargin = (f instanceof Window
+                        ? f.asContainer().getHeight()
+                        : Display.getInstance().getDisplayHeight())
                     - safeArea.getY()
                     - safeArea.getHeight();
-            if (position == Component.BOTTOM && safeBottomMargin > 0) {
+            // Entered when there is an inset to apply OR one already applied, in the
+            // shape the keyboard margin above already uses. Gated on the new value
+            // alone, an inset that went away -- a rotation out of a notched edge -- left
+            // the last one in the style: applyPositionTo clears these only when the
+            // toast changes edge, so a cached toast staying at the bottom kept a blank
+            // gap under it for as long as it lived.
+            if (position == Component.BOTTOM
+                    && (safeBottomMargin > 0 || c.safeAreaPaddingBottom > 0)) {
+                int applied = Math.max(0, safeBottomMargin);
                 Style s = c.getAllStyles();
+                if (c.safeAreaPaddingBottom == 0) {
+                    c.safeAreaPaddingBottomBase = c.getStyle().getPaddingBottom();
+                }
                 s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-                s.setPaddingBottom(safeBottomMargin);
-            } else if (position == Component.TOP && safeArea.getY() > 0) {
+                // The theme's own value back when there is no inset to write, not a
+                // zero: this owns the padding only while an inset is applied.
+                s.setPaddingBottom(applied > 0 ? applied : c.safeAreaPaddingBottomBase);
+                c.safeAreaPaddingBottom = applied;
+            } else if (position == Component.TOP
+                    && (safeArea.getY() > 0 || c.safeAreaPaddingTop > 0)) {
                 Container parent = c.getParent();
                 if (parent != null) {
-                    int neededPadding = safeArea.getY() - parent.getAbsoluteY();
-                    if (neededPadding > 0) {
+                    int needed = safeArea.getY() - parent.getAbsoluteY();
+                    // Only what this owns. A top inset that resolves to nothing was
+                    // always left alone -- the padding there is the style's own, and
+                    // writing a zero over it takes away whatever the theme asked for.
+                    // The clearing half is for an inset this actually applied.
+                    if (needed > 0 || c.safeAreaPaddingTop > 0) {
+                        int applied = Math.max(0, needed);
                         Style s = c.getAllStyles();
+                        if (c.safeAreaPaddingTop == 0) {
+                            c.safeAreaPaddingTopBase = c.getStyle().getPaddingTop();
+                        }
                         s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
-                        s.setPaddingTop(neededPadding);
+                        s.setPaddingTop(applied > 0 ? applied : c.safeAreaPaddingTopBase);
+                        c.safeAreaPaddingTop = applied;
                     }
                 }
             }
@@ -715,9 +931,9 @@ public final class ToastBar {
             c.setVisible(false);
             c.setHeight(0);
             c.setShouldCalcPreferredSize(true);
-            Form f = c.getComponentForm();
+            TopLevelContainer f = c.getTopLevelContainer();
             if (f != null) {
-                f.revalidate();
+                f.asContainer().revalidate();
             } else {
                 c.getParent().revalidate();
             }
@@ -731,8 +947,11 @@ public final class ToastBar {
             updateStatus();
 
         } else {
-            Form f = c.getComponentForm();
-            if (Display.getInstance().getCurrent() == f && !f.getMenuBar().isMenuShowing()) { //NOPMD CompareObjectsWithEquals
+            TopLevelContainer f = c.getTopLevelContainer();
+            // A window has no menu bar and never will, so the menu test is a Form
+            // question rather than something to widen the top level contract for.
+            boolean menuShowing = f instanceof Form && ((Form) f).getMenuBar().isMenuShowing();
+            if (f != null && f.isTopLevelShowing() && !menuShowing) {
                 if (this.position == Component.BOTTOM) {
                     c.setY(c.getY() + c.getHeight());
                 }
@@ -1049,6 +1268,27 @@ public final class ToastBar {
         private final Slider progressBar;
         private final Label icon;
         boolean hidden = true;
+        /// The safe-area padding this class has written, so a move can take it off.
+        ///
+        /// The inset belongs to the edge the bar sits at, and only that edge is written
+        /// when it is applied. Moving the bar to the other end therefore left the old
+        /// edge's inset in place and added the new one on top, so a bar that started at
+        /// the bottom of a device with a home indicator and was moved to the top carried
+        /// both -- taller than it should be and inset away from the edge it now sits at.
+        int safeAreaPaddingTop;
+        int safeAreaPaddingBottom;
+        /// What the style asked for before an inset was written over it.
+        ///
+        /// The inset replaces the padding rather than adding to it, so the theme's own
+        /// value is gone for as long as one is applied -- and putting a zero back when
+        /// it is taken off left a bar that the theme had spaced away from the edge
+        /// sitting flush against it instead, for the rest of its life. Meaningful only
+        /// while the matching safeAreaPadding above is non-zero, which is exactly the
+        /// period this class owns the value in the style.
+        int safeAreaPaddingTopBase;
+        int safeAreaPaddingBottomBase;
+        /// The keyboard margin this class has written, so it can be taken off again.
+        int keyboardMarginBottom;
         Button leadButton = new Button();
         private TextArea label;
         private Status currentlyShowing;

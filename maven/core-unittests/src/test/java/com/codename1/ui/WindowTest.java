@@ -5348,4 +5348,720 @@ class WindowTest extends UITestBase {
         a.dispose();
         b.dispose();
     }
+
+    @FormTest
+    void setContentSwapsTheWindowsScreenWithATransition() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("screens", new BorderLayout());
+        w.setWindowSize(400, 300);
+        Label first = new Label("first");
+        w.add(BorderLayout.CENTER, first);
+        w.show();
+        DisplayTest.flushEdt();
+        assertEquals(1, w.getContentPane().getComponentCount());
+
+        Label second = new Label("second");
+        w.setContent(second, null);
+        DisplayTest.flushEdt();
+        assertEquals(1, w.getContentPane().getComponentCount());
+        assertSame(second, w.getContentPane().getComponentAt(0),
+                "moving between screens inside a window is an ordinary swap");
+        assertNull(first.getParent());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aWindowCarriesTheTintPropertyWithoutPaintingItTwice() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("tint", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+
+        // The property exists because ComboBox, FloatingActionButton and
+        // InfiniteProgress read and write it. Window deliberately does not paint it in
+        // paint(): its layered pane repaints the whole window as a backdrop, so a tint
+        // there would be composited twice and read darker than the same tint on a form.
+        w.setTintColor(0x80112233);
+        assertEquals(0x80112233, w.getTintColor());
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aWindowAnswersWhetherItIsShowing() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("showing", new BorderLayout());
+        assertFalse(w.isTopLevelShowing(), "not until it is shown");
+        w.show();
+        DisplayTest.flushEdt();
+        assertTrue(w.isTopLevelShowing());
+        w.dispose();
+        DisplayTest.flushEdt();
+        assertFalse(w.isTopLevelShowing(), "and not once it is gone");
+    }
+
+    @FormTest
+    void aWindowHasNoSoftButtonArea() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("soft", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+        assertEquals(0, w.softButtonAreaHeight(),
+                "a window has no soft button bar, so it costs nothing");
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void layeredPaneAccessorsDoNotCreateTheLayer() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("layers", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+
+        assertNull(w.getFormLayeredPaneIfExists(),
+                "asking must not build a layer, or overlays create one to find it empty");
+        assertNull(w.getLayeredPaneIfExists());
+        assertNotNull(w.getFormLayeredPane(WindowTest.class, true));
+        assertNotNull(w.getFormLayeredPaneIfExists(), "and reports it once it exists");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aNestedFormRegistersItsAnimationsWithTheWindow() {
+        // Independent of Dialog: an embedded form used to register through
+        // getParent().getComponentForm(), which is null inside a window, so it was
+        // never ticked and every animateLayout on it waited forever.
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("nested", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+
+        Form nested = new Form("nested form", new BorderLayout());
+        nested.add(BorderLayout.CENTER, new Label("body"));
+        w.getContentPane().addComponent(BorderLayout.CENTER, nested);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+
+        assertSame(w, nested.getTopLevelContainer(),
+                "an embedded form hands the walk up to the window");
+        assertNull(nested.getComponentForm(),
+                "and getComponentForm stays null inside a window by design");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aWindowWithNoOverlayDispatchesKeysExactlyAsBefore() {
+        // The compatibility half of the key input scope: with nothing claiming the
+        // keyboard a window has to behave as it always did, or every window without a
+        // dialog on it changes.
+        implementation.setMultiWindowSupported(true);
+        final int[] pressed = new int[1];
+        final int[] released = new int[1];
+        Window w = new Window("keys", new BorderLayout());
+        w.setWindowSize(400, 300);
+        Button b = new Button("target") {
+            @Override
+            public void keyPressed(int keyCode) {
+                pressed[0]++;
+                super.keyPressed(keyCode);
+            }
+
+            @Override
+            public void keyReleased(int keyCode) {
+                released[0]++;
+                super.keyReleased(keyCode);
+            }
+        };
+        w.add(BorderLayout.CENTER, b);
+        w.show();
+        DisplayTest.flushEdt();
+        w.setFocused(b);
+        DisplayTest.flushEdt();
+
+        assertNull(w.getKeyInputScope(), "nothing claims the keyboard by default");
+        w.keyPressed('x');
+        w.keyReleased('x');
+        DisplayTest.flushEdt();
+        assertEquals(1, pressed[0], "the focused component still gets its keys");
+        assertEquals(1, released[0]);
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aKeyInputScopeHandsTheKeyboardBackWhenItIsCleared() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("scoped", new BorderLayout());
+        w.setWindowSize(400, 300);
+        Button outside = new Button("outside");
+        w.add(BorderLayout.CENTER, outside);
+        w.show();
+        DisplayTest.flushEdt();
+        w.setFocused(outside);
+        DisplayTest.flushEdt();
+
+        Container scope = new Container(new BorderLayout());
+        Button inside = new Button("inside");
+        scope.add(BorderLayout.CENTER, inside);
+        w.getFormLayeredPane(WindowTest.class, true).addComponent(scope);
+        w.revalidateWithAnimationSafety();
+        DisplayTest.flushEdt();
+
+        w.pushKeyInputScope(scope);
+        DisplayTest.flushEdt();
+        assertSame(inside, w.getFocused(),
+                "the scope takes focus off whatever was outside it");
+
+        w.removeKeyInputScope(scope);
+        DisplayTest.flushEdt();
+        assertNull(w.getKeyInputScope());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aThemeChangeReloadsTheTintTheWayAFormDoes() {
+        // Form.initLaf overwrites its tint from the look and feel on every theme
+        // change and keeps nothing the application set, so a window preserving one
+        // behaved differently from the class it is a sibling of. It also could not be
+        // done honestly: the overlays that borrow the tint save it, set zero and put it
+        // back through the same setter, and nothing in the value tells that apart from
+        // a deliberate choice.
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("tinted", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+
+        LookAndFeel laf = UIManager.getInstance().getLookAndFeel();
+        int themeTint = laf.getDefaultFormTintColor();
+        try {
+            assertEquals(themeTint, w.getTintColor());
+
+            // The save, override and restore an overlay performs leaves the window
+            // following the theme, which is the case that used to freeze it.
+            int saved = w.getTintColor();
+            w.setTintColor(0);
+            w.setTintColor(saved);
+            laf.setDefaultFormTintColor(0x00ff00);
+            w.refreshTheme(false);
+            DisplayTest.flushEdt();
+            assertEquals(0x00ff00, w.getTintColor(),
+                    "the tint follows the theme after an overlay borrowed it");
+
+            // And a value the application set follows the theme too, exactly as it
+            // does on a form.
+            w.setTintColor(0x123456);
+            assertEquals(0x123456, w.getTintColor(), "until the theme changes");
+            laf.setDefaultFormTintColor(0x0000ff);
+            w.refreshTheme(false);
+            DisplayTest.flushEdt();
+            assertEquals(0x0000ff, w.getTintColor(),
+                    "a theme change reloads it, as Form.initLaf does");
+        } finally {
+            laf.setDefaultFormTintColor(themeTint);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+    @FormTest
+    void aContentSizeAskedForBeforeShowingIsStillAContentSize() {
+        // Before there is a peer there is no chrome to measure, and the request used to
+        // be applied as an ordinary frame size -- so the drawable came out short by the
+        // title bar, which is the opposite of what the method promises. Only a caller
+        // who knew to ask again after showing got what it asked for.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+
+        Window w = new Window("sized early", new BorderLayout());
+        w.setDecorated(true);
+        w.setWindowContentSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+
+        // The drawable, which is what was asked for. Asserting the difference between
+        // the frame and the drawable instead would only restate the fake manager's own
+        // insets and pass whatever the window did with the request.
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(400, wm.getWidth(peer),
+                "the drawable has to be the size the caller asked for");
+        assertEquals(300, wm.getHeight(peer));
+        assertEquals(420, peer.getWidth(), "with the chrome added on top of it");
+        assertEquals(350, peer.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aContentSizeSurvivesAPeerWhoseGeometryIsNotRealYet() {
+        // Mac Catalyst grants the window scene asynchronously and, until it arrives,
+        // answers both the frame and the drawable with the size that was asked for. The
+        // chrome therefore measures zero on a decorated window, and treating the mere
+        // existence of a peer as enough left the drawable clipped by the title bar once
+        // the scene did connect.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+        wm.setChromeMeasurable(false);
+
+        Window w = new Window("late geometry", new BorderLayout());
+        w.setDecorated(true);
+        w.setWindowContentSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(400, peer.getWidth(),
+                "nothing measurable yet, so the frame is what was asked for");
+
+        // The scene connects and the platform reports geometry worth measuring.
+        wm.setChromeMeasurable(true);
+        Desktop.getInstance().windowSizeChanged(w.getWindowId(),
+                wm.getWidth(peer), wm.getHeight(peer));
+        // The correction is queued rather than applied inside the size callback, so it
+        // takes another turn of the event thread.
+        for (int iter = 0; iter < 20 && wm.getWidth(peer) != 400; iter++) {
+            DisplayTest.flushEdt();
+        }
+
+        assertEquals(400, wm.getWidth(peer),
+                "and the content size is applied once the chrome can be measured");
+        assertEquals(300, wm.getHeight(peer));
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aLaterFrameSizeSupersedesAnEarlierContentSize() {
+        // The two express different intents for the same window and the last caller
+        // wins. Leaving the earlier content request pending meant show() applied it
+        // over the size the caller had settled on afterwards.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+
+        Window w = new Window("changed its mind", new BorderLayout());
+        w.setDecorated(true);
+        w.setWindowContentSize(400, 300);
+        w.setWindowSize(800, 600);
+        w.show();
+        DisplayTest.flushEdt();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(800, peer.getWidth(),
+                "the frame size asked for last is the one that applies");
+        assertEquals(600, peer.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void movingAWindowDoesNotCancelAPendingContentSize() {
+        // A move passes the size it already has, so it is not a change of mind about
+        // the size. Superseding on it cancelled the correction for anything that moved
+        // after asking for a content size -- including the centring a native dialog
+        // does immediately afterwards.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+
+        Window w = new Window("moved", new BorderLayout());
+        w.setDecorated(true);
+        w.setWindowContentSize(400, 300);
+        w.setWindowLocation(120, 90);
+        w.show();
+        DisplayTest.flushEdt();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(400, wm.getWidth(peer),
+                "a move must not cancel the content size asked for before it");
+        assertEquals(300, wm.getHeight(peer));
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void anExplicitBoundsChangeStillSupersedesAContentSize() {
+        // The other half: setWindowBounds does name a frame size, so it wins.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+
+        Window w = new Window("rebounded", new BorderLayout());
+        w.setDecorated(true);
+        w.setWindowContentSize(400, 300);
+        w.setWindowBounds(new Rectangle(10, 10, 800, 600));
+        w.show();
+        DisplayTest.flushEdt();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(800, peer.getWidth(),
+                "the frame the caller named last is the one that applies");
+        assertEquals(600, peer.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aBackgroundCallersGeometryRequestsApplyInTheOrderItMadeThem() throws Exception {
+        // The supersession used to run on the calling thread while the request it was
+        // meant to supersede was still queued -- so it cleared nothing, and the older
+        // content size won over the bounds asked for after it.
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setChromeInsets(20, 50);
+
+        final Window w = new Window("ordered", new BorderLayout());
+        w.setDecorated(true);
+
+        Thread caller = new Thread(new Runnable() {
+            public void run() {
+                w.setWindowContentSize(400, 300);
+                w.setWindowBounds(new Rectangle(10, 10, 800, 600));
+            }
+        }, "cn1-test-geometry-caller");
+        caller.start();
+        caller.join(5000);
+        for (int iter = 0; iter < 50; iter++) {
+            DisplayTest.flushEdt();
+        }
+
+        w.show();
+        DisplayTest.flushEdt();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertEquals(800, peer.getWidth(),
+                "the bounds asked for second must win, as they would on the "
+                        + "event dispatch thread");
+        assertEquals(600, peer.getHeight());
+
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aBrowserOnTheMainFormKeepsItsTimeoutWhenAWindowGoesAway() {
+        // The timer overload that is given no surface binds to the focused top level,
+        // because it cannot know which surface its caller belongs to. A component does
+        // know, so the framework's own callers name theirs: without that, a browser on
+        // the main form put its timeout on whatever window happened to have the focus,
+        // and disposing that window tore down the loop the callback was waiting on.
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        BrowserComponent browser = new BrowserComponent();
+        main.add(BorderLayout.CENTER, browser);
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        Desktop.getInstance().windowFocusChanged(w.getWindowId(), true);
+        DisplayTest.flushEdt();
+
+        final int[] errors = new int[1];
+        browser.execute(30, "1", new com.codename1.util.Callback<com.codename1.ui.BrowserComponent.JSRef>() {
+            public void onSucess(com.codename1.ui.BrowserComponent.JSRef v) {
+            }
+
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                errors[0]++;
+            }
+        });
+        DisplayTest.flushEdt();
+
+        // The window the timeout must NOT have been bound to goes away.
+        w.dispose();
+        DisplayTest.flushEdt();
+
+        for (int iter = 0; iter < 300 && errors[0] == 0; iter++) {
+            main.repaintAnimations();
+            DisplayTest.flushEdt();
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        assertEquals(1, errors[0],
+                "the timeout belongs to the browser's own surface, which is still there");
+    }
+
+    @FormTest
+    void editingResumesOnTheNewFieldAfterItsOldWindowIsHidden() {
+        // Moving editing off a field stops the old editor and resumes on the new one from
+        // a timer. That timer belongs to the surface about to be edited: bound to the old
+        // field's surface, hiding that window stopped its loop and editing never began on
+        // the new field at all.
+        implementation.setMultiWindowSupported(true);
+        implementation.setUsesInvokeAndBlockForEditString(true);
+        Form main = new Form("main", new BorderLayout());
+        TextArea target = new TextArea("target");
+        main.add(BorderLayout.CENTER, target);
+        main.show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        TextArea old = new TextArea("old");
+        w.add(BorderLayout.CENTER, old);
+        w.show();
+        DisplayTest.flushEdt();
+
+        // The old field is the one the port thinks is being edited.
+        implementation.setFocusedEditingText(old);
+        DisplayTest.flushEdt();
+        assertSame(old, com.codename1.ui.Display.impl.getEditingText(),
+                "precondition: the window's field is the current editor");
+
+        // Hidden rather than disposed: the field stays parented in it, so it still
+        // resolves to that window as its surface -- a window whose loop has stopped.
+        // Disposing would detach the field and let the null fallback rescue it, which is
+        // not the case the report is about.
+        w.hide();
+        DisplayTest.flushEdt();
+        assertSame(w, old.getTopLevelContainer(),
+                "precondition: the old field still belongs to the hidden window");
+
+        target.startEditingAsync();
+        DisplayTest.flushEdt();
+
+        for (int iter = 0; iter < 200
+                && com.codename1.ui.Display.impl.getEditingText() != target; iter++) { //NOPMD CompareObjectsWithEquals
+            main.repaintAnimations();
+            DisplayTest.flushEdt();
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        assertSame(target, com.codename1.ui.Display.impl.getEditingText(),
+                "editing has to start on the new field even though the old field's window "
+                        + "has gone");
+
+        // Hidden is not gone: the window is still live and still registered, and the
+        // editor is still set. Leaving either behind hands the tests that follow a
+        // window nobody owns -- which is exactly what the window-count assertions in
+        // this class measure -- and an editing field on a surface that is going away.
+        implementation.setFocusedEditingText(null);
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+    @FormTest
+    void anExplicitFocusLinkOutOfADialogIsNotFollowed() {
+        // A component names its own neighbour and that link is honoured before anything
+        // is scanned by position, so constraining only the geometric scan left a way out
+        // of an overlay holding the keyboard: the first arrow press moved focus to a
+        // component the dialog covers, and every repeat went there until the key came up.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        Button behind = new Button("behind the dialog");
+        w.add(BorderLayout.CENTER, behind);
+        w.show();
+        DisplayTest.flushEdt();
+
+        Container overlay = new Container(new BorderLayout());
+        Button inDialog = new Button("in the dialog");
+        overlay.add(BorderLayout.CENTER, inDialog);
+        w.getFormLayeredPane(WindowTest.class, true).add(overlay);
+        DisplayTest.flushEdt();
+
+        // The control inside the overlay points at one the overlay covers.
+        inDialog.setNextFocusDown(behind);
+        w.setFocused(inDialog);
+        w.pushKeyInputScope(overlay);
+        DisplayTest.flushEdt();
+        try {
+            assertNull(w.findNextFocusDown(),
+                    "a link out of the overlay holding the keyboard must not be followed");
+        } finally {
+            w.removeKeyInputScope(overlay);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+    @FormTest
+    void aCancelledGestureStaysCancelledAfterTheOverlayGoes() {
+        // An overlay that takes the pointer mid-gesture can be gone by the time the drag
+        // or the release arrives -- a tooltip, a menu that dismissed itself. Removing the
+        // last scope leaves no scope at all while the gesture is still cancelled, and the
+        // remainder then went to the window's ordinary listeners, so whatever sat behind
+        // the overlay acted on a release whose press it never saw.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            final int[] released = new int[1];
+            w.addPointerReleasedListener(new com.codename1.ui.events.ActionListener() {
+                @Override
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    released[0]++;
+                }
+            });
+
+            // The press starts an ordinary gesture on the window.
+            w.pointerPressed(new int[] {10}, new int[] {10});
+            DisplayTest.flushEdt();
+
+            // An overlay takes the pointer away and is then disposed, which removes the
+            // last scope while this gesture is still in flight.
+            Container overlay = new Container(new BorderLayout());
+            w.getFormLayeredPane(WindowTest.class, true).add(overlay);
+            // Pushing the scope is what cancels the gesture in flight, which is how a
+            // dialog shown from a press does it.
+            w.pushPointerInputScope(overlay);
+            w.removePointerInputScope(overlay);
+            DisplayTest.flushEdt();
+
+            w.pointerReleased(new int[] {10}, new int[] {10});
+            DisplayTest.flushEdt();
+
+            assertEquals(0, released[0],
+                    "the rest of a cancelled gesture must not reach the window's listeners");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+    @FormTest
+    void aStylusStrokeDoesNotContinueIntoTheOverlayThatInterruptedIt() {
+        // The stylus continuation resolves the component under the pointer afresh, and
+        // it ran before the cancellation was consulted -- so once an overlay took the
+        // pointer the stroke hit tested into that overlay and carried on into it, on a
+        // gesture whose press it never saw.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        implementation.setPointerType(com.codename1.ui.events.PointerEvent.TYPE_STYLUS);
+        try {
+            final int[] strokes = new int[1];
+            Container overlay = new Container(new BorderLayout());
+            Button inOverlay = new Button("in the overlay");
+            inOverlay.addStylusListener(new com.codename1.ui.events.ActionListener() {
+                @Override
+                public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                    strokes[0]++;
+                }
+            });
+            overlay.add(BorderLayout.CENTER, inOverlay);
+
+            w.pointerPressed(new int[] {10}, new int[] {10});
+            DisplayTest.flushEdt();
+
+            // A press handler puts an overlay up, which takes the pointer. Laid out, so
+            // the hit test this is about can actually land in it.
+            Container layer = w.getFormLayeredPane(WindowTest.class, true);
+            layer.setLayout(new BorderLayout());
+            layer.add(BorderLayout.CENTER, overlay);
+            w.revalidate();
+            DisplayTest.flushEdt();
+            w.pushPointerInputScope(overlay);
+            DisplayTest.flushEdt();
+
+            w.pointerDragged(new int[] {20}, new int[] {20});
+            w.pointerReleased(new int[] {20}, new int[] {20});
+            DisplayTest.flushEdt();
+            assertEquals(0, strokes[0],
+                    "the rest of a cancelled stroke must not reach the overlay that took it");
+        } finally {
+            implementation.setPointerType(com.codename1.ui.events.PointerEvent.TYPE_UNKNOWN);
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+    /// Counts long key presses reaching a component.
+    private static final class LongKeyCountingComponent extends Component {
+        private int longPresses;
+
+        LongKeyCountingComponent() {
+            setFocusable(true);
+        }
+
+        @Override
+        protected void longKeyPress(int keyCode) {
+            longPresses++;
+        }
+
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            return new com.codename1.ui.geom.Dimension(120, 90);
+        }
+    }
+
+    @FormTest
+    void aLongKeyPressDoesNotLandOnWhateverTheDialogUncovered() {
+        // The long press timer is armed by the key going down and fires later, so a
+        // handler that dismissed the overlay in between has changed which control is
+        // focused. The repeat and release paths already refuse that; this one went
+        // straight to the newly focused component, which never saw the key go down.
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(400, 300);
+        LongKeyCountingComponent behind = new LongKeyCountingComponent();
+        w.add(BorderLayout.CENTER, behind);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            Container overlay = new Container(new BorderLayout());
+            Button inOverlay = new Button("in the overlay");
+            overlay.add(BorderLayout.CENTER, inOverlay);
+            Container layer = w.getFormLayeredPane(WindowTest.class, true);
+            layer.setLayout(new BorderLayout());
+            layer.add(BorderLayout.CENTER, overlay);
+            w.revalidate();
+            DisplayTest.flushEdt();
+
+            w.setFocused(inOverlay);
+            w.pushKeyInputScope(overlay);
+            DisplayTest.flushEdt();
+
+            // The key goes down while the overlay owns the keyboard.
+            w.keyPressed('x');
+            DisplayTest.flushEdt();
+
+            // A handler dismisses the overlay before the long press interval elapses.
+            w.removeKeyInputScope(overlay);
+            overlay.remove();
+            w.setFocused(behind);
+            DisplayTest.flushEdt();
+
+            w.longKeyPress('x');
+            DisplayTest.flushEdt();
+
+            assertEquals(0, behind.longPresses,
+                    "a long press must not reach a control that never saw the key down");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
 }

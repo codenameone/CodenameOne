@@ -109,6 +109,22 @@ void CN1MacWindowSetEditingSlot(int slot);
 /** The view the native editor belongs in, or nil for the application's main view. */
 CN1View* CN1MacWindowEditingHostView(void);
 
+/* The view a window's own accessibility elements belong on, or nil when no Codename
+ * One window owns that id. Each window draws into its own view, so a tree installed
+ * on the main view describes a surface the reader is not looking at. */
+CN1View* CN1MacWindowContentViewForWindowId(int windowId);
+
+/* Records which scene the user is actually in, so that a sheet presented from a
+ * context-free static lands on it. Pass -1 for the application's main scene.
+ * connectedScenes carries no focus ordering and several scenes can be foreground
+ * active at once, so the set alone cannot answer the question. */
+void CN1MacWindowNoteFocus(int windowId, BOOL gained);
+/* The controller a system sheet should be presented from when the user is in a
+ * Codename One window, or nil when the main scene should present it as before. */
+UIViewController* CN1MacWindowPresentingController(void);
+/* The view a popover from that controller should anchor to, or nil. */
+CN1View* CN1MacWindowPresentingView(void);
+
 /* Invoked from the scene delegate when a Codename One window scene connects, so
  * a scene the system restored on launch is adopted rather than orphaned. */
 void CN1MacWindowSceneConnected(UIWindowScene* scene);

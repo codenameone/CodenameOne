@@ -70,7 +70,23 @@ public class Form extends Container implements TopLevelContainer {
     static int rippleX;
     static int rippleY;
     /// Used by the combo box to block some default Codename One behaviors
-    static boolean comboLock;
+    /// How many combo popups are in the middle of being shown over *this* form.
+    ///
+    /// A count rather than a flag, because a popup is modal only to the surface it is
+    /// on and two windows can each have one open, so the first to close must not lift
+    /// the guard while the other is still going up. Per form rather than shared for the
+    /// same reason: the guard is read while an unrelated form is being torn down, and a
+    /// popup open in a window would otherwise stop that form releasing its input device
+    /// -- a hosted popup neither replaces nor deinitializes it.
+    int comboShowDepth;
+
+    /// Whether this form is a combo popup that routes select and cancel itself.
+    ///
+    /// Per instance, not static. Both readers ask about *this* form's own menu bar,
+    /// so one shared flag answered on behalf of every other surface too: with a popup
+    /// open in one window, commands in an unrelated dialog in another were suppressed
+    /// as though they were the popup's.
+    boolean comboSelectCancelRouting;
     private static Motion rippleMotion;
     private static Component rippleComponent;
     private final Container contentPane;
@@ -1291,7 +1307,45 @@ public class Form extends Container implements TopLevelContainer {
         if (keyListeners == null) {
             keyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
         }
-        addKeyListener(keyCode, listener, keyListeners);
+        // Only when the map actually gained it. The helper below ignores a duplicate,
+        // so publishing unconditionally put two wrappers on the host for one
+        // registration -- and the single removal that matches it took away one wrapper
+        // and the registration, leaving the other wrapper calling a listener the
+        // application had removed.
+        if (addKeyListener(keyCode, listener, keyListeners)) {
+            keyListenerAdded(keyCode, listener);
+        }
+    }
+
+    /// A key listener was registered on this form. Inert here; a `Dialog` hosted in a
+    /// window overrides it, because the window dispatches keys through its own map and
+    /// would never consult this one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the code it was registered for
+    ///
+    /// - `listener`: the listener
+    void keyListenerAdded(int keyCode, ActionListener listener) {
+    }
+
+    /// A key listener was removed from this form. Inert here, overridden by `Dialog`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the code it was registered for
+    ///
+    /// - `listener`: the listener
+    void keyListenerRemoved(int keyCode, ActionListener listener) {
+    }
+
+    /// Every key listener registered on this form, by key code, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the live map, not a copy
+    HashMap<Integer, ArrayList<ActionListener>> keyListenerMap() {
+        return keyListeners;
     }
 
     /// Removes a key listener from the given keycode
@@ -1307,6 +1361,7 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
         removeKeyListener(keyCode, listener, keyListeners);
+        keyListenerRemoved(keyCode, listener);
     }
 
     /// Removes a game key listener from the given game keycode
@@ -1321,9 +1376,10 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
         removeKeyListener(keyCode, listener, gameKeyListeners);
+        gameKeyListenerRemoved(keyCode, listener);
     }
 
-    private void addKeyListener(int keyCode, ActionListener listener, HashMap<Integer, ArrayList<ActionListener>> keyListeners) {
+    private boolean addKeyListener(int keyCode, ActionListener listener, HashMap<Integer, ArrayList<ActionListener>> keyListeners) {
         if (keyListeners == null) {
             keyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
         }
@@ -1333,11 +1389,13 @@ public class Form extends Container implements TopLevelContainer {
             vec = new ArrayList<ActionListener>();
             vec.add(listener);
             keyListeners.put(code, vec);
-            return;
+            return true;
         }
         if (!vec.contains(listener)) {
             vec.add(listener);
+            return true;
         }
+        return false;
     }
 
     private void removeKeyListener(int keyCode, ActionListener listener, HashMap<Integer, ArrayList<ActionListener>> keyListeners) {
@@ -1367,7 +1425,41 @@ public class Form extends Container implements TopLevelContainer {
         if (gameKeyListeners == null) {
             gameKeyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
         }
-        addKeyListener(keyCode, listener, gameKeyListeners);
+        if (addKeyListener(keyCode, listener, gameKeyListeners)) {
+            gameKeyListenerAdded(keyCode, listener);
+        }
+    }
+
+    /// A game key listener was registered on this form. Inert here; a `Dialog` in a
+    /// window overrides it, for the same reason as `#keyListenerAdded(int,
+    /// ActionListener)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the game action it was registered for
+    ///
+    /// - `listener`: the listener
+    void gameKeyListenerAdded(int keyCode, ActionListener listener) {
+    }
+
+    /// A game key listener was removed from this form. Inert here, overridden by
+    /// `Dialog`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the game action it was registered for
+    ///
+    /// - `listener`: the listener
+    void gameKeyListenerRemoved(int keyCode, ActionListener listener) {
+    }
+
+    /// Every game key listener registered on this form, by game action, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the live map, not a copy
+    HashMap<Integer, ArrayList<ActionListener>> gameKeyListenerMap() {
+        return gameKeyListeners;
     }
 
     /// Returns the number of buttons on the menu bar for use with getSoftButton()
@@ -1393,6 +1485,20 @@ public class Form extends Container implements TopLevelContainer {
     /// a button that can be manipulated
     public Button getSoftButton(int offset) {
         return menuBar.getSoftButtons()[offset];
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// The height of the soft button bar as the popup placement code has always
+    /// measured it: the bar's own height plus its vertical margins, and nothing at all
+    /// when there are not at least two soft buttons.
+    @Override
+    int softButtonAreaHeight() {
+        if (getSoftButtonCount() > 1) {
+            Component c = getSoftButton(0).getParent();
+            return c.getHeight() + c.getStyle().getVerticalMargins();
+        }
+        return 0;
     }
 
     /// Returns the style of the menu
@@ -1819,6 +1925,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// The layered pane if it's been created - or null.
+    @Override
     protected Container getLayeredPaneIfExists() {
         return layeredPane;
     }
@@ -1829,6 +1936,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// The layered pane if it's been created - or null.
+    @Override
     protected Container getFormLayeredPaneIfExists() {
         return formLayeredPane;
     }
@@ -2135,7 +2243,7 @@ public class Form extends Container implements TopLevelContainer {
     }
 
     @Override
-    boolean isTopLevelShowing() {
+    public boolean isTopLevelShowing() {
         return Display.getInstance().getCurrent() == this; //NOPMD CompareObjectsWithEquals
     }
 
@@ -2157,6 +2265,17 @@ public class Form extends Container implements TopLevelContainer {
     @Override
     void commandActivatedFromComponent(Command cmd, ActionEvent ev) {
         actionCommandImplNoRecurseComponent(cmd, ev);
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// Exactly the condition under which `#getTopLevelContainer()` answers `this`, so
+    /// the walk that looks for a command host ends where the top level walk already
+    /// ended for every hierarchy that exists today. An embedded form keeps handing its
+    /// commands outwards, as it always has.
+    @Override
+    boolean isCommandHost() {
+        return getParent() == null;
     }
 
     @Override
@@ -2528,7 +2647,7 @@ public class Form extends Container implements TopLevelContainer {
             }
         }
 
-        if (comboLock) {
+        if (comboSelectCancelRouting) {
             if (cmd == menuBar.getCancelMenuItem()) { //NOPMD CompareObjectsWithEquals
                 actionCommand(cmd);
                 return;
@@ -2562,7 +2681,7 @@ public class Form extends Container implements TopLevelContainer {
             return;
         }
 
-        if (comboLock) {
+        if (comboSelectCancelRouting) {
             if (cmd == menuBar.getCancelMenuItem()) { //NOPMD CompareObjectsWithEquals
                 actionCommand(cmd);
                 return;
@@ -2627,7 +2746,7 @@ public class Form extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     void deinitializeImpl() {
-        if (!comboLock) {
+        if (comboShowDepth == 0) {
             // Some input devices are compound widgets that contain
             // comboboxes.  If those comboboxes are selected, then
             // it shows the combobox popup (which is a Dialog) which will
@@ -2642,11 +2761,15 @@ public class Form extends Container implements TopLevelContainer {
             }
         }
         if (getParent() != null) {
-            Form f = getParent().getComponentForm();
-            if (f != null) {
-                f.deregisterAnimated(this);
+            // The top level, not the form. getComponentForm() is null by design inside
+            // a Window, so an embedded form there was never deregistered -- the mirror
+            // of the registration below, which never happened either.
+            TopLevelContainer host = TopLevelSupport.of(getParent());
+            if (host != null) {
+                host.deregisterAnimated(this);
             }
         }
+        reclaimTransferredListeners();
         super.deinitializeImpl();
         animMananger.flush();
         componentsAwaitingRelease = null;
@@ -2654,45 +2777,441 @@ public class Form extends Container implements TopLevelContainer {
         dragged = null;
     }
 
+    /// The four kinds of pointer listener an embedded form hands to its host.
+    private static final int POINTER_PRESSED = 0;
+    private static final int POINTER_DRAGGED = 1;
+    private static final int POINTER_RELEASED = 2;
+    private static final int LONG_PRESS = 3;
+
+    /// The host an embedded form gave its pointer listeners to, or null.
+    private TopLevelContainer transferredListenerHost;
+    private ArrayList<TransferredListener> transferredPointerPressed;
+    private ArrayList<TransferredListener> transferredPointerDragged;
+    private ArrayList<TransferredListener> transferredPointerReleased;
+    private ArrayList<TransferredListener> transferredLongPress;
+
+    /// One listener this form handed to a host, and the wrapper standing in for it
+    /// there.
+    ///
+    /// The host is given a fresh wrapper rather than the listener itself, because
+    /// EventDispatcher ignores a listener it already holds: handing over one the host
+    /// or another dialog already had would add nothing, and taking it off again would
+    /// remove somebody else's registration. A wrapper is unique to this form and this
+    /// registration, so adding and removing it can never touch anyone else's -- which
+    /// a flag saying "the transfer is what put it there" could not express once more
+    /// than one owner was possible.
+    private static final class TransferredListener implements ActionListener {
+        private final ActionListener listener;
+        private final Form owner;
+
+        TransferredListener(Form owner, ActionListener listener) {
+            this.owner = owner;
+            this.listener = listener;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            // Re-sourced to the form the listener was registered on. The host builds
+            // these events with itself as the source, and a listener that was handed
+            // over still belongs to this form: forwarding the host's event unchanged
+            // handed it a Window where it had always been given the dialog, so a
+            // listener comparing the source, or casting it to Form, saw something else
+            // entirely -- and only on the hosted path.
+            ActionEvent forwarded =
+                    new ActionEvent(owner, evt.getEventType(), evt.getX(), evt.getY());
+            forwarded.setPointerPressedDuringDrag(evt.isPointerPressedDuringDrag());
+            listener.actionPerformed(forwarded);
+            // Consumption belongs to the gesture, not to the copy, so it has to travel
+            // back: the host decides what to do next by asking its own event.
+            if (forwarded.isConsumed()) {
+                evt.consume();
+            }
+        }
+    }
+
+    /// Moves a dispatcher's listeners onto the host and returns what was moved.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dispatcher`: the dispatcher to drain, may be null
+    ///
+    /// - `host`: the top level to add them to
+    ///
+    /// - `kind`: which of the four pointer listener kinds these are
+    ///
+    /// #### Returns
+    ///
+    /// the listeners handed over, or null when there were none
+    private ArrayList<TransferredListener> transferListeners(EventDispatcher dispatcher,
+            TopLevelContainer host, int kind) {
+        if (dispatcher == null) {
+            return null;
+        }
+        ArrayList<TransferredListener> moved = new ArrayList<TransferredListener>();
+        for (ActionListener l : (Collection<ActionListener>) dispatcher.getListenerCollection()) {
+            TransferredListener entry = new TransferredListener(this, l);
+            addTransferred(host, kind, entry);
+            moved.add(entry);
+        }
+        return moved.isEmpty() ? null : moved;
+    }
+
+    /// Maps this class's listener kind onto the one the window's exemption registry
+    /// uses, so the two never drift apart silently.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kind`: a `#POINTER_PRESSED` constant
+    ///
+    /// #### Returns
+    ///
+    /// the matching `Window#POINTER_SCOPE_PRESSED` constant
+    private static int pointerScopeKind(int kind) {
+        switch (kind) {
+            case POINTER_PRESSED:
+                return Window.POINTER_SCOPE_PRESSED;
+            case POINTER_DRAGGED:
+                return Window.POINTER_SCOPE_DRAGGED;
+            case POINTER_RELEASED:
+                return Window.POINTER_SCOPE_RELEASED;
+            default:
+                return Window.POINTER_SCOPE_LONG_PRESS;
+        }
+    }
+
+    private void addTransferred(TopLevelContainer host, int kind, TransferredListener l) {
+        // Marked as this form's rather than the host's, so that a hosted overlay
+        // claiming the pointer suppresses the host's own listeners without also
+        // suppressing the ones the application registered on the overlay itself.
+        // Recorded with the event and the owner, so a press cannot run this form's
+        // release listeners and a stacked dialog cannot run the ones below it.
+        if (host instanceof Window) {
+            ((Window) host).addPointerScopeExempt(pointerScopeKind(kind), this, l);
+        }
+        switch (kind) {
+            case POINTER_PRESSED:
+                host.asContainer().addPointerPressedListener(l);
+                break;
+            case POINTER_DRAGGED:
+                host.asContainer().addPointerDraggedListener(l);
+                break;
+            case POINTER_RELEASED:
+                host.asContainer().addPointerReleasedListener(l);
+                break;
+            default:
+                host.asContainer().addLongPressListener(l);
+                break;
+        }
+    }
+
+    private void removeTransferred(TopLevelContainer host, int kind,
+            TransferredListener l) {
+        if (host instanceof Window) {
+            ((Window) host).removePointerScopeExempt(pointerScopeKind(kind), this, l);
+        }
+        switch (kind) {
+            case POINTER_PRESSED:
+                host.asContainer().removePointerPressedListener(l);
+                break;
+            case POINTER_DRAGGED:
+                host.asContainer().removePointerDraggedListener(l);
+                break;
+            case POINTER_RELEASED:
+                host.asContainer().removePointerReleasedListener(l);
+                break;
+            default:
+                host.asContainer().removeLongPressListener(l);
+                break;
+        }
+    }
+
+    /// Takes back every pointer listener this form handed to a host when it was
+    /// embedded, so nothing on the host still points into a hierarchy that has left.
+    private void reclaimTransferredListeners() {
+        TopLevelContainer host = transferredListenerHost;
+        if (host == null) {
+            return;
+        }
+        transferredListenerHost = null;
+        reclaim(host, transferredPointerPressed, POINTER_PRESSED);
+        transferredPointerPressed = null;
+        reclaim(host, transferredPointerDragged, POINTER_DRAGGED);
+        transferredPointerDragged = null;
+        reclaim(host, transferredPointerReleased, POINTER_RELEASED);
+        transferredPointerReleased = null;
+        reclaim(host, transferredLongPress, LONG_PRESS);
+        transferredLongPress = null;
+    }
+
+    private void reclaim(TopLevelContainer host, ArrayList<TransferredListener> moved,
+            int kind) {
+        if (moved == null) {
+            return;
+        }
+        for (int iter = 0; iter < moved.size(); iter++) { // NOPMD ForLoopCanBeForeach
+            TransferredListener entry = moved.get(iter);
+            ActionListener l = entry.listener;
+            removeTransferred(host, kind, entry);
+            // Back into this form's own dispatcher, which was cleared when they were
+            // handed over. Only taking them off the host would lose them outright, so a
+            // dialog shown a second time would have none of the listeners it was built
+            // with.
+            addOwn(kind, l);
+        }
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// While this form's listeners live on a host -- which is the case for the whole
+    /// time it is embedded, or hosted in a window -- additions and removals have to go
+    /// there too. The host's pointer dispatch is what drives the hierarchy, so a
+    /// listener added later (from `onShow()`, say) would sit in a dispatcher nothing
+    /// consults, and removing a transferred one would leave it firing on the host.
+    @Override
+    public void addPointerPressedListener(ActionListener l) {
+        if (routeToHost(POINTER_PRESSED, l, true)) {
+            return;
+        }
+        super.addPointerPressedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void removePointerPressedListener(ActionListener l) {
+        if (routeToHost(POINTER_PRESSED, l, false)) {
+            return;
+        }
+        super.removePointerPressedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void addPointerDraggedListener(ActionListener l) {
+        if (routeToHost(POINTER_DRAGGED, l, true)) {
+            return;
+        }
+        super.addPointerDraggedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void removePointerDraggedListener(ActionListener l) {
+        if (routeToHost(POINTER_DRAGGED, l, false)) {
+            return;
+        }
+        super.removePointerDraggedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void addPointerReleasedListener(ActionListener l) {
+        if (routeToHost(POINTER_RELEASED, l, true)) {
+            return;
+        }
+        super.addPointerReleasedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void removePointerReleasedListener(ActionListener l) {
+        if (routeToHost(POINTER_RELEASED, l, false)) {
+            return;
+        }
+        super.removePointerReleasedListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void addLongPressListener(ActionListener l) {
+        if (routeToHost(LONG_PRESS, l, true)) {
+            return;
+        }
+        super.addLongPressListener(l);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void removeLongPressListener(ActionListener l) {
+        if (routeToHost(LONG_PRESS, l, false)) {
+            return;
+        }
+        super.removeLongPressListener(l);
+    }
+
+    /// Sends a listener change to the host this form transferred its listeners to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kind`: which of the four pointer listener kinds this is
+    ///
+    /// - `l`: the listener
+    ///
+    /// - `adding`: true to add, false to remove
+    ///
+    /// #### Returns
+    ///
+    /// true when the host took it, false when this form is not embedded and should
+    /// keep the listener itself
+    private boolean routeToHost(int kind, ActionListener l, boolean adding) {
+        TopLevelContainer host = transferredListenerHost;
+        if (host == null) {
+            return false;
+        }
+        ArrayList<TransferredListener> tracked = trackedFor(kind);
+        if (adding) {
+            // Registered twice is registered once, as it is on any dispatcher. The
+            // host's own collection ignores the duplicate, but the exemption list is
+            // walked directly while an overlay owns the pointer, so a second entry
+            // meant one press called the listener twice.
+            if (tracked != null) {
+                for (TransferredListener existing : tracked) {
+                    if (sameListener(existing.listener, l)) {
+                        return true;
+                    }
+                }
+            }
+            TransferredListener entry = new TransferredListener(this, l);
+            addTransferred(host, kind, entry);
+            if (tracked == null) {
+                tracked = new ArrayList<TransferredListener>();
+                setTrackedFor(kind, tracked);
+            }
+            tracked.add(entry);
+        } else {
+            // Only a registration this form made. Removing a listener it never
+            // registered has always been a no-op, and the wrapper it would have to find
+            // does not exist in that case.
+            if (tracked != null) {
+                for (int iter = 0; iter < tracked.size(); iter++) {
+                    TransferredListener entry = tracked.get(iter);
+                    if (sameListener(entry.listener, l)) {
+                        removeTransferred(host, kind, entry);
+                        tracked.remove(iter);
+                        break;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    /// Whether a wrapper handed to a host stands for the listener a caller has named.
+    ///
+    /// By equality, because that is how a listener is matched everywhere else:
+    /// EventDispatcher adds through a list's contains and removes through its remove,
+    /// and removeKeyListener does the same -- all of which compare with equals. A
+    /// caller passing a distinct but equal listener is therefore naming the one already
+    /// registered, and comparing by identity here read it as a different listener: a
+    /// second wrapper for one registration, so the host called it twice for one event,
+    /// and a removal that could not find the wrapper it had to take off.
+    ///
+    /// #### Parameters
+    ///
+    /// - `registered`: the listener a wrapper was made for
+    ///
+    /// - `candidate`: the listener the caller has named
+    ///
+    /// #### Returns
+    ///
+    /// true when the wrapper stands for that listener
+    static boolean sameListener(ActionListener registered, ActionListener candidate) {
+        if (candidate == null) {
+            return registered == null;
+        }
+        return candidate.equals(registered);
+    }
+
+    private ArrayList<TransferredListener> trackedFor(int kind) {
+        switch (kind) {
+            case POINTER_PRESSED:
+                return transferredPointerPressed;
+            case POINTER_DRAGGED:
+                return transferredPointerDragged;
+            case POINTER_RELEASED:
+                return transferredPointerReleased;
+            default:
+                return transferredLongPress;
+        }
+    }
+
+    private void setTrackedFor(int kind, ArrayList<TransferredListener> v) {
+        switch (kind) {
+            case POINTER_PRESSED:
+                transferredPointerPressed = v;
+                break;
+            case POINTER_DRAGGED:
+                transferredPointerDragged = v;
+                break;
+            case POINTER_RELEASED:
+                transferredPointerReleased = v;
+                break;
+            default:
+                transferredLongPress = v;
+                break;
+        }
+    }
+
+    private void addOwn(int kind, ActionListener l) {
+        switch (kind) {
+            case POINTER_PRESSED:
+                addPointerPressedListener(l);
+                break;
+            case POINTER_DRAGGED:
+                addPointerDraggedListener(l);
+                break;
+            case POINTER_RELEASED:
+                addPointerReleasedListener(l);
+                break;
+            default:
+                addLongPressListener(l);
+                break;
+        }
+    }
+
     /// {@inheritDoc}
     @Override
     void initComponentImpl() {
         super.initComponentImpl();
         dragged = null;
-        if (Display.getInstance().isNativeCommands()) {
-            Display.impl.setNativeCommands(menuBar.getCommands());
-        } else if (isDesktopNativeChrome() && toolbar != null) {
-            // bridge the (hidden) toolbar's commands to the native desktop menu bar
-            Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
+        // Only a form that owns the surface publishes its commands to the platform.
+        // An embedded one -- a Dialog hosted in a window's layered pane, a form inside
+        // an EmbeddedContainer -- would otherwise overwrite the real surface's native
+        // menu bar with its own.
+        if (getParent() == null) {
+            if (Display.getInstance().isNativeCommands()) {
+                Display.impl.setNativeCommands(menuBar.getCommands());
+            } else if (isDesktopNativeChrome() && toolbar != null) {
+                // bridge the (hidden) toolbar's commands to the native desktop menu bar
+                Display.impl.setNativeCommands(toolbar.getAllNativeMenuCommands());
+            }
         }
         if (getParent() != null) {
-            Form f = getParent().getComponentForm();
+            // The top level, not the form. Inside a Window getComponentForm() is null,
+            // so an embedded form registered its animations with nobody: Form.animate()
+            // was never ticked, and every animateLayout() on it or its children either
+            // did nothing or waited forever. The listeners below were dropped the same
+            // way, and they are Container level calls, so the top level takes them.
+            TopLevelContainer f = TopLevelSupport.of(getParent());
             if (f != null) {
                 f.registerAnimated(this);
-                if (pointerPressedListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>) pointerPressedListeners.getListenerCollection()) {
-                        f.addPointerPressedListener(l);
-                    }
-                    pointerPressedListeners = null;
-                }
-                if (pointerDraggedListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>) pointerDraggedListeners.getListenerCollection()) {
-                        f.addPointerDraggedListener(l);
-                    }
-                    pointerDraggedListeners = null;
-                }
-                if (pointerReleasedListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>) pointerReleasedListeners.getListenerCollection()) {
-                        f.addPointerReleasedListener(l);
-                    }
-                    pointerReleasedListeners = null;
-                }
-                if (longPressListeners != null) {
-                    for (ActionListener l : (Collection<ActionListener>) longPressListeners.getListenerCollection()) {
-                        f.addLongPressListener(l);
-                    }
-                    longPressListeners = null;
-                }
+                // Recorded as they are handed over, because the dispatchers they came
+                // from are cleared here and deinitialization would otherwise have no
+                // way to say which of the host's listeners belonged to this form. Left
+                // on the host they keep firing into a hierarchy that has been removed,
+                // and keep it reachable.
+                transferredListenerHost = f;
+                transferredPointerPressed = transferListeners(
+                        pointerPressedListeners, f, POINTER_PRESSED);
+                pointerPressedListeners = null;
+                transferredPointerDragged = transferListeners(
+                        pointerDraggedListeners, f, POINTER_DRAGGED);
+                pointerDraggedListeners = null;
+                transferredPointerReleased = transferListeners(
+                        pointerReleasedListeners, f, POINTER_RELEASED);
+                pointerReleasedListeners = null;
+                transferredLongPress = transferListeners(
+                        longPressListeners, f, LONG_PRESS);
+                longPressListeners = null;
             }
         }
     }
@@ -2771,6 +3290,59 @@ public class Form extends Container implements TopLevelContainer {
     /// be glued onto the content pane
     ///
     /// - `modal`: indictes if this is a modal or modeless dialog true for modal dialogs
+    /// Places the dialog box by writing the given insets into the title and content
+    /// pane margins.
+    ///
+    /// Extracted from `#showModal(int, int, int, int, boolean, boolean, boolean)`
+    /// unchanged so a dialog shown on a `com.codename1.ui.Window` can be positioned by
+    /// the identical arithmetic instead of a second copy of it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: space in pixels above the dialog
+    ///
+    /// - `bottom`: space in pixels below the dialog
+    ///
+    /// - `left`: space in pixels left of the dialog
+    ///
+    /// - `right`: space in pixels right of the dialog
+    ///
+    /// - `includeTitle`: whether the title hangs at the top or is glued to the content
+    void applyDialogMargins(int top, int bottom, int left, int right, boolean includeTitle) {
+        if (!title.isVisible()) {
+            includeTitle = false;
+        }
+        Style titleStyle = title.getStyle();
+        titleStyle.removeListeners();
+
+        Style contentStyle = contentPane.getUnselectedStyle();
+        contentStyle.removeListeners();
+
+        if (includeTitle) {
+            titleStyle.setMargin(Component.TOP, top, false);
+            titleStyle.setMargin(Component.BOTTOM, 0, false);
+            titleStyle.setMargin(Component.LEFT, left, false);
+            titleStyle.setMargin(Component.RIGHT, right, false);
+
+            contentStyle.setMargin(Component.TOP, 0, false);
+            contentStyle.setMargin(Component.BOTTOM, bottom, false);
+            contentStyle.setMargin(Component.LEFT, left, false);
+            contentStyle.setMargin(Component.RIGHT, right, false);
+        } else {
+            titleStyle.setMargin(Component.TOP, 0, false);
+            titleStyle.setMargin(Component.BOTTOM, 0, false);
+            titleStyle.setMargin(Component.LEFT, 0, false);
+            titleStyle.setMargin(Component.RIGHT, 0, false);
+
+            contentStyle.setMargin(Component.TOP, top, false);
+            contentStyle.setMargin(Component.BOTTOM, bottom, false);
+            contentStyle.setMargin(Component.LEFT, left, false);
+            contentStyle.setMargin(Component.RIGHT, right, false);
+        }
+        titleStyle.setMarginUnit(null);
+        contentStyle.setMarginUnit(null);
+    }
+
     void showModal(int top, int bottom, int left, int right, boolean includeTitle, boolean modal, boolean reverse) {
         Display.getInstance().flushEdt();
         if (previousForm == null) {
@@ -2792,38 +3364,7 @@ public class Form extends Container implements TopLevelContainer {
         previousForm.tint = true;
         Painter p = getStyle().getBgPainter();
         if (top > 0 || bottom > 0 || left > 0 || right > 0) {
-            if (!title.isVisible()) {
-                includeTitle = false;
-            }
-            Style titleStyle = title.getStyle();
-            titleStyle.removeListeners();
-
-            Style contentStyle = contentPane.getUnselectedStyle();
-            contentStyle.removeListeners();
-
-            if (includeTitle) {
-                titleStyle.setMargin(Component.TOP, top, false);
-                titleStyle.setMargin(Component.BOTTOM, 0, false);
-                titleStyle.setMargin(Component.LEFT, left, false);
-                titleStyle.setMargin(Component.RIGHT, right, false);
-
-                contentStyle.setMargin(Component.TOP, 0, false);
-                contentStyle.setMargin(Component.BOTTOM, bottom, false);
-                contentStyle.setMargin(Component.LEFT, left, false);
-                contentStyle.setMargin(Component.RIGHT, right, false);
-            } else {
-                titleStyle.setMargin(Component.TOP, 0, false);
-                titleStyle.setMargin(Component.BOTTOM, 0, false);
-                titleStyle.setMargin(Component.LEFT, 0, false);
-                titleStyle.setMargin(Component.RIGHT, 0, false);
-
-                contentStyle.setMargin(Component.TOP, top, false);
-                contentStyle.setMargin(Component.BOTTOM, bottom, false);
-                contentStyle.setMargin(Component.LEFT, left, false);
-                contentStyle.setMargin(Component.RIGHT, right, false);
-            }
-            titleStyle.setMarginUnit(null);
-            contentStyle.setMarginUnit(null);
+            applyDialogMargins(top, bottom, left, right, includeTitle);
             initDialogBgPainter(p, previousForm);
             revalidate();
         } else {
@@ -4705,6 +5246,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// the tint color when a dialog or a menu is shown
+    @Override
     public int getTintColor() {
         return tintColor;
     }
@@ -4714,6 +5256,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `tintColor`: the tint color when a dialog or a menu is shown
+    @Override
     public void setTintColor(int tintColor) {
         this.tintColor = tintColor;
     }

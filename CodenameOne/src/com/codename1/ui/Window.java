@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.impl.WindowManager;
 import com.codename1.io.Log;
 import com.codename1.ui.animations.Animation;
@@ -169,6 +170,11 @@ public class Window extends Container implements TopLevelContainer {
     private final ArrayList<Container> pendingRevalidateQueue = new ArrayList<Container>();
 
     private UIManager uiManager;
+    private int tintColor;
+    /// Whether `#tintColor` has been resolved yet. The default comes from the look and
+    /// feel, which a window cannot read at construction time -- its `UIManager` may be
+    /// set afterwards -- so it is resolved on first use rather than in the constructor.
+    private boolean tintColorSet;
     private VirtualInputDevice currentInputDevice;
     private final TextSelection textSelection = new TextSelection(this);
     private boolean enableCursors;
@@ -439,6 +445,18 @@ public class Window extends Container implements TopLevelContainer {
 
     /// {@inheritDoc}
     @Override
+    Container getFormLayeredPaneIfExists() {
+        return windowLayeredPane;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    Container getLayeredPaneIfExists() {
+        return layeredPane;
+    }
+
+    /// {@inheritDoc}
+    @Override
     public Painter getGlassPane() {
         return glassPane;
     }
@@ -602,7 +620,7 @@ public class Window extends Container implements TopLevelContainer {
     }
 
     @Override
-    boolean isTopLevelShowing() {
+    public boolean isTopLevelShowing() {
         return isWindowShowing();
     }
 
@@ -619,6 +637,12 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     void commandActivatedFromComponent(Command cmd, ActionEvent ev) {
         dispatchCommandNoRecurse(cmd, ev);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    boolean isCommandHost() {
+        return getParent() == null;
     }
 
     @Override
@@ -1093,6 +1117,54 @@ public class Window extends Container implements TopLevelContainer {
 
     /// {@inheritDoc}
     ///
+    /// Note the window does not paint this itself, unlike `Form`. Its layered pane
+    /// repaints the whole window underneath whatever sits in the pane
+    /// (`#getFormLayeredPane(java.lang.Class, boolean)`), so a tint applied in
+    /// `#paint(Graphics)` would be composited once for the window and once more for
+    /// that backdrop, and read visibly darker than the same tint on a form. What
+    /// covers the window paints the tint instead, exactly once.
+    @Override
+    public int getTintColor() {
+        if (!tintColorSet) {
+            tintColorSet = true;
+            tintColor = getUIManager().getLookAndFeel().getDefaultFormTintColor();
+        }
+        return tintColor;
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// A window caches the tint it took from the look and feel, so a theme change has
+    /// to drop it or every later overlay keeps painting the old theme's scrim.
+    @Override
+    public void refreshTheme(boolean merge) {
+        refreshTintFromLaf();
+        super.refreshTheme(merge);
+    }
+
+    /// Drops the cached tint so the next read picks the new theme's up.
+    ///
+    /// Unconditional, exactly as `Form#initLaf(UIManager)` is: a form reloads its tint
+    /// from the look and feel on every theme change and keeps nothing an application
+    /// set, so a window that tried to preserve one behaved differently from the class
+    /// it is a sibling of. Preserving it also cannot be done honestly -- the overlays
+    /// that borrow the tint (a ComboBox popup, a floating action button's submenu)
+    /// save it, set zero and put it back through this same setter, and nothing in the
+    /// value tells that restoration apart from a deliberate choice.
+    private void refreshTintFromLaf() {
+        tintColorSet = false;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setTintColor(int tintColor) {
+        this.tintColor = tintColor;
+        this.tintColorSet = true;
+        repaint();
+    }
+
+    /// {@inheritDoc}
+    ///
     /// A desktop window has no notch or rounded corner to avoid, so the safe area is
     /// the whole window.
     @Override
@@ -1234,8 +1306,11 @@ public class Window extends Container implements TopLevelContainer {
 
     /// Sets whether the platform draws a title bar and border for this window.
     ///
-    /// An undecorated window paired with a `Toolbar` is how an application draws its
-    /// own chrome.
+    /// An undecorated window draws no chrome of its own either, and
+    /// `#getDragRegionStatus(int, int)` refuses to drag it, so the application has to
+    /// supply both. A `Toolbar` is not the way to do that: it is installed through
+    /// `Form#setToolbar(Toolbar)` and is bound to a form throughout, so it cannot be
+    /// put on a window.
     ///
     /// #### Parameters
     ///
@@ -1381,13 +1456,284 @@ public class Window extends Container implements TopLevelContainer {
         return new Rectangle(out[0], out[1], out[2], out[3]);
     }
 
+    /// Sizes this window so its Codename One drawable area is the given size, rather
+    /// than its native frame.
+    ///
+    /// `#setWindowSize(int, int)` asks the platform for a frame of that size. On a
+    /// decorated window the title bar and borders sit outside the surface Codename One
+    /// paints into, so the drawable comes back smaller -- and content sized to fit is
+    /// clipped along the bottom by exactly the height of the title bar. This asks for
+    /// the drawable size instead and lets the window work out its own chrome.
+    ///
+    /// The correction is applied once, after the native window exists, and only when
+    /// the platform actually disagrees. A port whose chrome varies with the size it is
+    /// given cannot make this oscillate.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the drawable width in pixels
+    ///
+    /// - `height`: the drawable height in pixels
+    public void setWindowContentSize(final int width, final int height) {
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    setWindowContentSize(width, height);
+                }
+            });
+            return;
+        }
+        if (nativePeer == null) {
+            // There is nothing to measure the chrome against yet, so the request is
+            // held and applied again once the peer exists. Treating it as an ordinary
+            // frame size here was the whole defect: the drawable came out short by the
+            // title bar, which is the opposite of what this method promises, and only a
+            // caller who knew to ask a second time after showing got what it asked for.
+            pendingContentWidth = width;
+            pendingContentHeight = height;
+            applyingContentSize = true;
+            try {
+                setWindowSize(width, height);
+            } finally {
+                applyingContentSize = false;
+            }
+            return;
+        }
+
+        // Both numbers come from the port, which is the only thing that knows how much
+        // of a frame is chrome. Asking the component for its width instead compares two
+        // different moments: a window's component size is whatever the last size-changed
+        // callback delivered, so it lags the frame the platform reports and the
+        // difference between them is not the chrome at all.
+        WindowManager wm = manager();
+        int[] chrome = measureChrome(wm, new int[2]);
+        double units = wm.getDesktopUnitsPerPixel(nativePeer);
+        int chromeW = chrome[0];
+        int chromeH = chrome[1];
+        applyingContentSize = true;
+        try {
+            setWindowSize((int) Math.round(width * units) + chromeW,
+                    (int) Math.round(height * units) + chromeH);
+        } finally {
+            applyingContentSize = false;
+        }
+        if (isDecorated() && chromeW == 0 && chromeH == 0) {
+            // A peer exists but its geometry is not real yet. Mac Catalyst grants the
+            // window scene asynchronously and, until it arrives, answers both the frame
+            // and the drawable with the size that was asked for -- so the chrome
+            // measures zero and a decorated window would be left with its title bar
+            // eating the content. The request is kept and applied again from the first
+            // genuine size change.
+            pendingContentWidth = width;
+            pendingContentHeight = height;
+        } else {
+            pendingContentWidth = -1;
+            pendingContentHeight = -1;
+        }
+    }
+
+    /// How many units of the coordinate space this window's bounds use one device pixel
+    /// occupies, on the display it is currently on.
+    ///
+    /// Bounds, monitor bounds and work areas are all in desktop coordinates, while sizes
+    /// Codename One lays out -- a preferred size, a content size -- are device pixels.
+    /// The two are the same on a platform addressed in pixels and differ by the backing
+    /// scale on one that is not, so anything comparing a layout size against a screen
+    /// dimension has to convert first. `#getScale()` is not that number: it reports the
+    /// display's backing scale, which is two on a retina display whether or not the
+    /// platform's own coordinates already count pixels.
+    ///
+    /// #### Returns
+    ///
+    /// desktop units per device pixel, one when the two spaces are the same
+    double getDesktopUnitsPerPixel() {
+        if (nativePeer == null) {
+            return 1.0;
+        }
+        return manager().getDesktopUnitsPerPixel(nativePeer);
+    }
+
+    /// The usable area of this window's display, in the device pixels a layout uses.
+    ///
+    /// `Monitor#getWorkArea()` is in desktop coordinates, which count pixels only where
+    /// the platform's own coordinates do. Compared raw against a preferred size, the
+    /// usable width on a display at twice the scale reads as half what it is -- so a
+    /// dialog capped at nine tenths of it was really held to about 45%.
+    ///
+    /// #### Returns
+    ///
+    /// the work area of the display this window is on, in device pixels
+    public Rectangle getWorkAreaInPixels() {
+        Rectangle work = getMonitor().getWorkArea();
+        double units = getDesktopUnitsPerPixel();
+        if (units <= 0 || units == 1.0) {
+            return work;
+        }
+        // The origin too, or the rectangle is half in one space and half in the other:
+        // a caller testing containment or an edge against it would be comparing a pixel
+        // size to a desktop-unit position.
+        return new Rectangle(
+                (int) Math.round(work.getX() / units),
+                (int) Math.round(work.getY() / units),
+                (int) Math.round(work.getWidth() / units),
+                (int) Math.round(work.getHeight() / units));
+    }
+
+    /// How much of this window's frame is chrome rather than drawable, in the desktop
+    /// coordinates the frame itself is measured in.
+    ///
+    /// The two measurements come from different spaces on a port whose windowing system
+    /// places windows in logical units: `WindowManager#getWidth` reports device pixels
+    /// and `WindowManager#getBounds` desktop units. Shared by the two callers so they
+    /// cannot answer the question differently, which is exactly what happened when the
+    /// deferred correction kept a copy of the arithmetic.
+    ///
+    /// #### Parameters
+    ///
+    /// - `wm`: this window's manager
+    ///
+    /// - `out`: a two element array receiving the width and height of the chrome
+    ///
+    /// #### Returns
+    ///
+    /// the array that was passed in
+    private int[] measureChrome(WindowManager wm, int[] out) {
+        int[] frame = wm.getBounds(nativePeer, new int[4]);
+        double units = wm.getDesktopUnitsPerPixel(nativePeer);
+        out[0] = Math.max(0, frame[2] - (int) Math.round(wm.getWidth(nativePeer) * units));
+        out[1] = Math.max(0, frame[3] - (int) Math.round(wm.getHeight(nativePeer) * units));
+        return out;
+    }
+
+    /// Applies a content size that could not be measured when it was asked for.
+    ///
+    /// Called from the size-changed callback, which is the first moment a platform
+    /// that grants its window asynchronously reports geometry worth measuring.
+    private void reapplyPendingContentSize() {
+        if (pendingContentWidth < 0 || pendingContentHeight < 0 || nativePeer == null
+                || reapplyingContentSize) {
+            return;
+        }
+        // Off the size callback rather than inside it. Correcting the size resizes the
+        // window, which reports another size change, and doing that while the port is
+        // still delivering the first one re-enters this path with half-applied
+        // geometry.
+        reapplyingContentSize = true;
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                reapplyingContentSize = false;
+                if (pendingContentWidth < 0 || pendingContentHeight < 0
+                        || nativePeer == null) {
+                    return;
+                }
+                WindowManager wm = manager();
+                // Measured the same way as the request itself. Subtracted raw, a frame
+                // in desktop units minus a drawable in device pixels is negative on a
+                // display whose two spaces differ, so the chrome clamped to zero and a
+                // decorated window read as "not measurable yet" for good -- the request
+                // below never applied and the window stayed the size it was asked for
+                // before its geometry existed.
+                int[] chrome = measureChrome(wm, new int[2]);
+                int chromeW = chrome[0];
+                int chromeH = chrome[1];
+                if (isDecorated() && chromeW == 0 && chromeH == 0) {
+                    // The geometry is still the size that was asked for rather than
+                    // anything measured, so the request stays pending. Waiting is the
+                    // whole point: treating this as "already correct" is what cleared
+                    // the request before the scene had ever reported a real frame.
+                    return;
+                }
+                if (wm.getWidth(nativePeer) == pendingContentWidth
+                        && wm.getHeight(nativePeer) == pendingContentHeight) {
+                    // Measurable, and already the size that was asked for.
+                    pendingContentWidth = -1;
+                    pendingContentHeight = -1;
+                    return;
+                }
+                setWindowContentSize(pendingContentWidth, pendingContentHeight);
+            }
+        });
+    }
+
+    /// True once an overlay took the pointer away mid-gesture, until a new press.
+    private boolean gestureCancelled;
+
+    /// True while a deferred content-size correction is queued.
+    private boolean reapplyingContentSize;
+
+    /// A content size asked for before the peer existed, or -1.
+    private int pendingContentWidth = -1;
+
+    /// The height half of `#pendingContentWidth`.
+    private int pendingContentHeight = -1;
+
     /// Moves and resizes this window.
     ///
     /// #### Parameters
     ///
     /// - `r`: the new bounds in desktop coordinates
+    /// Drops a content-size request that a later frame-size call has superseded.
+    ///
+    /// The two express different intents for the same window, and the last caller wins.
+    /// Leaving the earlier content request pending meant show() applied it over a size
+    /// the caller had asked for afterwards.
+    private void supersedePendingContentSize() {
+        if (applyingContentSize) {
+            // This window's own correction, not a caller changing its mind.
+            return;
+        }
+        pendingContentWidth = -1;
+        pendingContentHeight = -1;
+    }
+
+    /// True while `#setWindowContentSize(int, int)` is setting the frame itself.
+    private boolean applyingContentSize;
+
     public void setWindowBounds(Rectangle r) {
-        setWindowBounds(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+        // Read now rather than when a queued call runs. The rectangle belongs to the
+        // caller, which is free to mutate or reuse it the moment this returns, so
+        // holding on to it moved the window to whatever it happened to contain later
+        // instead of what was asked for here.
+        setWindowBoundsSuperseding(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+    }
+
+    /// Bounds asked for by a caller, which supersede a pending content size.
+    ///
+    /// Marshalled here rather than only in the private form below, so that the
+    /// supersession keeps its place in the queue. A background caller that asks for a
+    /// content size and then for bounds queued the first and ran the second's
+    /// supersession immediately -- clearing a request that had not been installed yet,
+    /// and leaving the one that arrived afterwards to win.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the new x position in desktop coordinates
+    ///
+    /// - `y`: the new y position in desktop coordinates
+    ///
+    /// - `w`: the new width
+    ///
+    /// - `h`: the new height
+    private void setWindowBoundsSuperseding(final int x, final int y, final int w, final int h) {
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    setWindowBoundsSuperseding(x, y, w, h);
+                }
+            });
+            return;
+        }
+        // Here rather than in the shared private form below, which is also how a move
+        // is carried out: setWindowLocation and the centering helpers pass the size
+        // they already have, and a location is not a change of mind about the size.
+        // Superseding there cancelled the pending correction for anything that moved
+        // after asking for a content size -- including the centring a native dialog
+        // does immediately afterwards, which defeated the deferred sizing entirely.
+        supersedePendingContentSize();
+        setWindowBounds(x, y, w, h);
     }
 
     private void setWindowBounds(final int x, final int y, final int w, final int h) {
@@ -1441,6 +1787,12 @@ public class Window extends Container implements TopLevelContainer {
             });
             return;
         }
+        // A frame size the application asked for supersedes a content size it asked for
+        // earlier: the two express different intents for the same window and the last
+        // caller wins. After the marshalling above, so a background caller's two
+        // requests are applied in the order it made them rather than one of them
+        // jumping the queue.
+        supersedePendingContentSize();
         if (nativePeer == null) {
             // Only the size. Routing through setWindowBounds before the window exists
             // would hand the port the placeholder (0,0) as though the application had
@@ -1940,6 +2292,10 @@ public class Window extends Container implements TopLevelContainer {
                 wm.setMinimumSize(nativePeer, minimumWindowSize.getWidth(),
                         minimumWindowSize.getHeight());
             }
+            if (pendingContentWidth >= 0 && pendingContentHeight >= 0) {
+                // Asked for before there was a peer to measure the chrome against.
+                setWindowContentSize(pendingContentWidth, pendingContentHeight);
+            }
         }
         Desktop.getInstance().registerWindow(this);
         // Commands added before the peer existed have not reached the port yet.
@@ -1965,6 +2321,14 @@ public class Window extends Container implements TopLevelContainer {
         initFocused();
         // Whether this is bringing a hidden window back, which decides whether what it
         // painted before still stands for what it shows now.
+        // No accessibility invalidation here, deliberately, even though this path sets
+        // the flag itself and so skips the one in showNotify(). It does not need one:
+        // revalidateWithAnimationSafety() and initFocused() above both invalidate this
+        // root, so a tree evicted while the window was hidden comes back anyway --
+        // measured, by putting a call here and watching the tree return with it taken
+        // out again. One would buy nothing and cost a walk of the whole hierarchy on
+        // every re-show. showNotify() does need its own: a window coming back from
+        // minimization is neither re-laid out nor re-focused.
         boolean wasHidden = !nativeVisible;
         nativeVisible = true;
         if (wasHidden) {
@@ -2108,6 +2472,14 @@ public class Window extends Container implements TopLevelContainer {
     /// Both steps happen in the same hop so no input can be dispatched between the
     /// window appearing and the block taking effect.
     private void showAndBlock() {
+        // Disposed while this hop was queued. showModal() from a background thread
+        // schedules this onto the event dispatch thread, so anything on that thread --
+        // a timeout, a command, an owner going away -- can dispose the window before it
+        // runs. Showing it then throws out of a dispatch nobody is in a position to
+        // catch, and there is nothing left to show or to block behind.
+        if (isWindowDisposed()) {
+            return;
+        }
         show();
         acquireModal();
         // The windows this one blocks have to be told as well, which acquireModal()
@@ -2318,6 +2690,9 @@ public class Window extends Container implements TopLevelContainer {
             ((Window) ownerWindow).forgetOwned(this);
         }
         releaseModal();
+        // The accessibility tree cached for this window outlives it otherwise, keeping
+        // the whole disposed hierarchy reachable.
+        AccessibilityManager.getInstance().releaseRoot(this);
         Desktop.getInstance().deregisterWindow(this);
         Display.getInstance().windowDisposed(this);
         deinitializeImpl();
@@ -2731,6 +3106,7 @@ public class Window extends Container implements TopLevelContainer {
         int oldWidth = getWidth();
         int oldHeight = getHeight();
         setSize(new Dimension(w, h));
+        reapplyPendingContentSize();
         setShouldCalcPreferredSize(true);
         if (windowLayeredPane != null) {
             windowLayeredPane.setWidth(w);
@@ -2802,6 +3178,17 @@ public class Window extends Container implements TopLevelContainer {
     /// window has no equivalent of.
     @Override
     public void pointerPressed(int x, int y) {
+        // The gesture starts here, before any callback below can run, because those
+        // callbacks are free to put an overlay up too -- a context menu handler and a
+        // stylus listener both are. Starting it further down meant the flag they raised
+        // by taking the pointer was cleared again a moment later, and the press carried
+        // on into UI that had not existed when the pen or finger went down.
+        initialPressX = x;
+        initialPressY = y;
+        currentPointerPress = new Object();
+        // A real press starts a real gesture again.
+        gestureCancelled = false;
+        dragged = null;
         // A secondary (right / stylus barrel) press is a context menu request first,
         // exactly as on a Form. Without this a right click in a window never reached
         // the component's context menu listener, and an unconsumed right press could
@@ -2834,21 +3221,27 @@ public class Window extends Container implements TopLevelContainer {
         // afterwards that nested release found no gesture to clear, and this method then
         // installed a fresh press whose release had already happened, leaving the
         // component latched until some later gesture freed it.
-        initialPressX = x;
-        initialPressY = y;
-        currentPointerPress = new Object();
-        dragged = null;
-        if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
-            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y);
-            pointerPressedListeners.fireActionEvent(e);
-            if (e.isConsumed()) {
-                return;
-            }
+        if (firePointerEvent(POINTER_SCOPE_PRESSED, pointerPressedListeners,
+                new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y))) {
+            return;
         }
-        // A press dismisses any tooltip so it cannot linger over a drag image or be
-        // stranded when the gesture rebuilds the UI, as on a Form.
+        // Before the cancelled-gesture return below, not after it. A press dismisses any
+        // tooltip so it cannot linger over a drag image or be stranded when the gesture
+        // rebuilds the UI, as on a Form -- and a press that puts an overlay up is exactly
+        // when a pending hover timer would otherwise go on to build a tooltip for a
+        // component the overlay now covers.
         if (TooltipManager.getInstance() != null) {
             TooltipManager.getInstance().clearTooltip();
+        }
+        if (gestureCancelled) {
+            // A listener put an overlay up without consuming the press -- showing a
+            // dialog from a press is routine, and a blocking progress dialog goes up
+            // while the finger is still down. pushPointerInputScope ended the gesture
+            // for exactly that reason, and carrying on to hit testing would undo it:
+            // the walk below resolves the overlay that was not there when the finger
+            // went down and makes it the release target, so the lift activates or
+            // dismisses UI this press never touched.
+            return;
         }
         Component cmp = resolveComponentAt(x, y);
         // Gated exactly as Form.pointerPressed gates it. Many components -- Button
@@ -2915,7 +3308,13 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
-        if (Display.getInstance().isStylusPointer()) {
+        // Not once the gesture has been taken away. This resolves the component under
+        // the pointer afresh, so after an overlay took the pointer it hit tested into
+        // that overlay and handed it the rest of a gesture whose press it never saw --
+        // a stylus press that puts a dialog up would have gone on stroking into the
+        // dialog. Only the continuation is suppressed; the bookkeeping below still runs,
+        // so the flags this gesture set are cleared as they always were.
+        if (Display.getInstance().isStylusPointer() && !gestureCancelled) {
             Component stylusCmp = resolveComponentAt(x, y);
             if (stylusCmp != null) {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerDrag, x, y);
@@ -2926,13 +3325,17 @@ public class Window extends Container implements TopLevelContainer {
         // the session that it too continued out of a glide.
         boolean pressedDuringDrag = pointerPressedAgainDuringDrag;
         pointerPressedAgainDuringDrag = false;
-        if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
-            e.setPointerPressedDuringDrag(pressedDuringDrag);
-            pointerDraggedListeners.fireActionEvent(e);
-            if (e.isConsumed()) {
-                return;
-            }
+        ActionEvent dragEvent = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
+        dragEvent.setPointerPressedDuringDrag(pressedDuringDrag);
+        if (firePointerEvent(POINTER_SCOPE_DRAGGED, pointerDraggedListeners, dragEvent)) {
+            return;
+        }
+        if (gestureCancelled) {
+            // The same rule as the other three dispatch points: a drag listener is free
+            // to put an overlay up, and the gesture ends when that overlay takes the
+            // pointer. The targets are already cleared, so this only stops autoRelease
+            // acting for a gesture nobody owns any more.
+            return;
         }
         autoRelease(x, y);
         Component target = dragged != null ? dragged : pressedCmp;
@@ -2952,15 +3355,13 @@ public class Window extends Container implements TopLevelContainer {
         // The same listener block the scalar overload runs. Adding it there only
         // meant a gesture stopped notifying window listeners the moment it became
         // multi touch, which is where pull to refresh loses its updates.
-        if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerDrag, x[0], y[0]);
-            // Reported but not cleared here, which is what Form's multi-pointer path
-            // does -- the scalar path above owns the reset.
-            e.setPointerPressedDuringDrag(pointerPressedAgainDuringDrag);
-            pointerDraggedListeners.fireActionEvent(e);
-            if (e.isConsumed()) {
-                return;
-            }
+        ActionEvent multiDragEvent =
+                new ActionEvent(this, ActionEvent.Type.PointerDrag, x[0], y[0]);
+        // Reported but not cleared here, which is what Form's multi-pointer path
+        // does -- the scalar path above owns the reset.
+        multiDragEvent.setPointerPressedDuringDrag(pointerPressedAgainDuringDrag);
+        if (firePointerEvent(POINTER_SCOPE_DRAGGED, pointerDraggedListeners, multiDragEvent)) {
+            return;
         }
         autoRelease(x[0], y[0]);
         Component target = dragged != null ? dragged : pressedCmp;
@@ -2973,7 +3374,13 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
-        if (Display.getInstance().isStylusPointer()) {
+        // Not once the gesture has been taken away. This resolves the component under
+        // the pointer afresh, so after an overlay took the pointer it hit tested into
+        // that overlay and handed it the rest of a gesture whose press it never saw --
+        // a stylus press that puts a dialog up would have gone on stroking into the
+        // dialog. Only the continuation is suppressed; the bookkeeping below still runs,
+        // so the flags this gesture set are cleared as they always were.
+        if (Display.getInstance().isStylusPointer() && !gestureCancelled) {
             Component stylusCmp = resolveComponentAt(x, y);
             if (stylusCmp != null) {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerReleased, x, y);
@@ -2991,10 +3398,9 @@ public class Window extends Container implements TopLevelContainer {
         // its own.
         final Component releasingDragged = dragged;
         final Component releasingPressed = pressedCmp;
-        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
+        {
             ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
-            pointerReleasedListeners.fireActionEvent(e);
-            if (e.isConsumed()) {
+            if (firePointerEvent(POINTER_SCOPE_RELEASED, pointerReleasedListeners, e)) {
                 // A drag that was actually activated still has to be finished, or the
                 // component stays hidden and the drop never runs -- Form does the
                 // same on its consumed path.
@@ -3006,6 +3412,17 @@ public class Window extends Container implements TopLevelContainer {
                 endGesture(releasing);
                 return;
             }
+        }
+        if (gestureCancelled) {
+            // A release listener put an overlay up without consuming the event. The
+            // gesture it belonged to ended as that overlay took the pointer, so the
+            // component captured before the listeners ran must not be given the release
+            // -- it would act on a lift the overlay has already claimed.
+            if (releasingDragged != null && releasingDragged.isDragAndDropInitialized()) {
+                LeadUtil.dragFinished(releasingDragged, x, y);
+            }
+            endGesture(releasing);
+            return;
         }
         Component target = releasingDragged != null ? releasingDragged : releasingPressed;
         if (target != null) {
@@ -3089,6 +3506,16 @@ public class Window extends Container implements TopLevelContainer {
     /// it to be reported.
     @Override
     protected void longKeyPress(int keyCode) {
+        // The scope this key went down in, exactly as the repeat and release paths ask.
+        // The timer that brings us here is armed by the press and fires later, so a
+        // handler that opened or dismissed an overlay in between has changed which
+        // control is focused: without this the long press lands on whatever the change
+        // exposed, a control that never saw the key go down.
+        Integer held = Integer.valueOf(keyCode);
+        if (keyPressScopes != null && keyPressScopes.containsKey(held)
+                && keyPressScopes.get(held) != keyInputScope) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
         if (focused != null && focused.getTopLevelContainer() == this) { //NOPMD CompareObjectsWithEquals
             focused.longKeyPress(keyCode);
         }
@@ -3101,15 +3528,24 @@ public class Window extends Container implements TopLevelContainer {
     /// neither the component nor its context menu.
     @Override
     public void longPointerPress(int x, int y) {
+        if (gestureCancelled) {
+            // The press this would have completed was taken away by an overlay, so
+            // there is nothing here to hold down.
+            return;
+        }
         // Listeners registered on the window itself run first and can consume the
         // gesture, the same order Form uses. Forwarding to the child without this
         // silently dropped every addLongPressListener attached to the window.
-        if (longPressListeners != null && longPressListeners.hasListeners()) {
-            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y);
-            longPressListeners.fireActionEvent(ev);
-            if (ev.isConsumed()) {
-                return;
-            }
+        if (firePointerEvent(POINTER_SCOPE_LONG_PRESS, longPressListeners,
+                new ActionEvent(this, ActionEvent.Type.LongPointerPress, x, y))) {
+            return;
+        }
+        if (gestureCancelled) {
+            // A long press listener put an overlay up without consuming the event, and
+            // the hold it would have completed went with the pointer. Carrying on would
+            // hand the context menu or the long press to the overlay that has just
+            // appeared under the finger.
+            return;
         }
         // A long press is the touch equivalent of a right click, so it is a context
         // menu request next, exactly as on a Form.
@@ -3355,6 +3791,10 @@ public class Window extends Container implements TopLevelContainer {
     /// pressed state with no release coming; and the framework's own recorded targets
     /// and timers, which otherwise keep firing into a tree nobody can see.
     void cancelPendingInput() {
+        // Held keys never arrive as releases once the window has gone, so their
+        // recorded scopes would sit here until some later press happened to reuse the
+        // same key code.
+        keyPressScopes = null;
         if (dragged != null && dragged.isDragAndDropInitialized()) {
             // Finished outside the window so no drop target is found: the user never
             // completed the drag, the window simply went away. This still restores
@@ -3418,11 +3858,382 @@ public class Window extends Container implements TopLevelContainer {
 
     private void initFocused() {
         if (focused == null) {
-            Component first = getActualPane().findFirstFocusable();
+            // The blocking overlay first when there is one, then the content. Unlike
+            // Form.initFocused this used to search the content pane only, so a window
+            // with a modal dialog over it would hand focus straight back to a control
+            // underneath the dialog.
+            Component first = keyInputScope != null
+                    ? keyInputScope.findFirstFocusable() : null;
+            if (first == null && keyInputScope == null) {
+                first = getActualPane().findFirstFocusable();
+            }
             if (first != null) {
                 setFocused(first);
             }
         }
+    }
+
+    /// The container that owns the keyboard while it is set, or null when the whole
+    /// window does.
+    ///
+    /// A hosted modal dialog covers the window and swallows presses through its scrim,
+    /// but keys are dispatched to whatever the window last focused -- which is a
+    /// control underneath it. A dialog with nothing focusable of its own, which is
+    /// exactly what InfiniteProgress builds, therefore left the button or text field
+    /// behind it fully operable from the keyboard.
+    private Container keyInputScope;
+
+    /// Every container currently claiming the keyboard, innermost last.
+    ///
+    /// A stack rather than a saved value per claimant, because overlays do not
+    /// necessarily close in the order they opened: a timed dialog can expire while a
+    /// newer one is still up. With each claimant remembering "what was in force when I
+    /// arrived", that older dialog would put its own answer back over the newer one's,
+    /// and the newer one would later restore a scope pointing at a hierarchy that had
+    /// already been detached -- leaving keys going into dead components. Removing an
+    /// entry from anywhere in a stack has none of those problems.
+    private ArrayList<Container> keyInputScopes;
+
+    /// What had focus before the first of those claimants arrived, so it can be given
+    /// focus back once the last of them leaves. Held here rather than by each claimant
+    /// for the same reason as the stack itself: a claimant records whatever the one
+    /// below it had focused, which by the time it leaves is usually a component that
+    /// has already been detached.
+    private Component preKeyInputScopeFocus;
+
+    /// The container currently owning the keyboard, or null.
+    Container getKeyInputScope() {
+        return keyInputScope;
+    }
+
+    /// Claims the keyboard for a container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scope`: the container that owns keys until it releases them
+    void pushKeyInputScope(Container scope) {
+        if (scope == null) {
+            return;
+        }
+        if (keyInputScopes == null) {
+            keyInputScopes = new ArrayList<Container>();
+            preKeyInputScopeFocus = getFocused();
+        }
+        keyInputScopes.add(scope);
+        applyKeyInputScope();
+    }
+
+    /// Releases a claim, wherever it sits in the stack.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scope`: the container releasing the keyboard
+    void removeKeyInputScope(Container scope) {
+        if (keyInputScopes == null || scope == null) {
+            return;
+        }
+        keyInputScopes.remove(scope);
+        Component restoreFocusTo = null;
+        if (keyInputScopes.isEmpty()) {
+            keyInputScopes = null;
+            restoreFocusTo = preKeyInputScopeFocus;
+            preKeyInputScopeFocus = null;
+        }
+        applyKeyInputScope();
+        // Only once nothing is left holding the keyboard, and only if what held focus
+        // then is still part of this window -- a claimant can take its own content away
+        // with it, and focusing a detached component silently eats every later key.
+        if (restoreFocusTo != null && contains(restoreFocusTo)) {
+            setFocused(restoreFocusTo);
+        }
+    }
+
+    /// Every container currently claiming the pointer, innermost last. A stack for the
+    /// same reason the keyboard one is.
+    private ArrayList<Container> pointerInputScopes;
+
+    /// Listeners exempt from that claim: the ones a hosted overlay handed to this
+    /// window when it was embedded. They belong to the overlay, so they are the only
+    /// pointer listeners that should still run while an overlay owns the pointer.
+    ///
+    /// Each entry carries the event it was registered for and the overlay it came
+    /// from. Both matter: without the event kind a press would run the overlay's
+    /// release and drag listeners as well, and without the owner a dialog underneath
+    /// the active one would still be hearing presses meant for the one on top.
+    private ArrayList<PointerExemption> pointerScopeExempt;
+
+    /// A pointer listener belonging to an embedded overlay rather than to the window.
+    private static final class PointerExemption {
+        private final int kind;
+        private final Container scope;
+        private final ActionListener listener;
+
+        PointerExemption(int kind, Container scope, ActionListener listener) {
+            this.kind = kind;
+            this.scope = scope;
+            this.listener = listener;
+        }
+    }
+
+    /// Pointer-pressed listeners, for `#addPointerScopeExempt(int, Container,
+    /// ActionListener)`.
+    static final int POINTER_SCOPE_PRESSED = 0;
+
+    /// Pointer-dragged listeners.
+    static final int POINTER_SCOPE_DRAGGED = 1;
+
+    /// Pointer-released listeners.
+    static final int POINTER_SCOPE_RELEASED = 2;
+
+    /// Long-press listeners.
+    static final int POINTER_SCOPE_LONG_PRESS = 3;
+
+    /// Claims the pointer for a container.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scope`: the container that owns presses until it releases them
+    void pushPointerInputScope(Container scope) {
+        if (scope == null) {
+            return;
+        }
+        if (pointerInputScopes == null) {
+            pointerInputScopes = new ArrayList<Container>();
+        }
+        pointerInputScopes.add(scope);
+        // Whatever gesture was already in flight ends here. A dialog is routinely shown
+        // from a press -- and a blocking progress dialog is shown while the finger is
+        // still down -- so the component underneath is left pressed, with this window
+        // still holding it as the release target. Suppressing the window's listeners
+        // does not help: the release path dispatches through that saved component, so
+        // lifting the finger over the new dialog would activate the control behind it.
+        cancelPointerGesture();
+    }
+
+    /// Ends the gesture this window is currently tracking, without the window-level
+    /// notification `#cancelPendingInput()` sends -- that one is for a window going
+    /// away, this one is for input changing hands while the window stays put.
+    private void cancelPointerGesture() {
+        if (dragged != null && dragged.isDragAndDropInitialized()) {
+            // No drop target: the user never completed the drag, something took the
+            // pointer away. This still restores visibility and clears the drag flags.
+            LeadUtil.dragFinished(dragged, -1, -1);
+        }
+        if (pressedCmp != null) {
+            // The existing "ended without completing" primitive: it resets the pressed
+            // state without firing the action, which is the whole point here.
+            LeadUtil.dragInitiated(pressedCmp);
+        }
+        // The awaiting-release list too. It is normally emptied by the release that
+        // never comes here, and a stale entry left in it makes the next gesture's list
+        // hold two -- which takes autoRelease out of its single-component branch, so
+        // dragging off the newly pressed component no longer cancels it.
+        clearComponentsAwaitingRelease();
+        // The routed press too, or the eventual physical release is delivered to the
+        // container that took a press the overlay has since taken over -- and the long
+        // press that is still pending would arrive at the overlay having never been
+        // pressed on it.
+        pointerPressTarget = null;
+        gestureCancelled = true;
+        pressedCmp = null;
+        dragged = null;
+        currentPointerPress = null;
+        pointerPressedAgainDuringDrag = false;
+    }
+
+    /// Releases a pointer claim, wherever it sits in the stack.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scope`: the container releasing the pointer
+    void removePointerInputScope(Container scope) {
+        if (pointerInputScopes == null || scope == null) {
+            return;
+        }
+        pointerInputScopes.remove(scope);
+        if (pointerInputScopes.isEmpty()) {
+            pointerInputScopes = null;
+        }
+    }
+
+    /// Whether anything currently claims the pointer.
+    ///
+    /// #### Returns
+    ///
+    /// true when no overlay owns presses
+    boolean isPointerInputScopeEmpty() {
+        return pointerInputScopes == null;
+    }
+
+    /// Marks a listener as belonging to an embedded overlay rather than to this window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kind`: which pointer event it was registered for, a `#POINTER_SCOPE_PRESSED`
+    ///   constant
+    ///
+    /// - `scope`: the overlay it belongs to
+    ///
+    /// - `l`: the listener
+    void addPointerScopeExempt(int kind, Container scope, ActionListener l) {
+        if (l == null) {
+            return;
+        }
+        if (pointerScopeExempt == null) {
+            pointerScopeExempt = new ArrayList<PointerExemption>();
+        }
+        pointerScopeExempt.add(new PointerExemption(kind, scope, l));
+    }
+
+    /// Drops a listener from the exempt set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kind`: which pointer event it was registered for
+    ///
+    /// - `scope`: the overlay it belongs to
+    ///
+    /// - `l`: the listener
+    void removePointerScopeExempt(int kind, Container scope, ActionListener l) {
+        if (pointerScopeExempt == null || l == null) {
+            return;
+        }
+        int count = pointerScopeExempt.size();
+        for (int iter = 0; iter < count; iter++) {
+            PointerExemption e = pointerScopeExempt.get(iter);
+            // All three, the owner included. Two overlays can share a listener instance
+            // for the same event, and matching on the pair alone let the one on top
+            // delete the entry belonging to the one underneath -- which then had its
+            // own listener suppressed for good, once it owned the pointer again.
+            if (e.kind == kind && e.scope == scope //NOPMD CompareObjectsWithEquals
+                    && e.listener == l) { //NOPMD CompareObjectsWithEquals
+                pointerScopeExempt.remove(iter);
+                break;
+            }
+        }
+        if (pointerScopeExempt.isEmpty()) {
+            pointerScopeExempt = null;
+        }
+    }
+
+    /// Fires a pointer event to this window's own listeners, honouring any overlay's
+    /// claim on the pointer.
+    ///
+    /// A modal dialog used to replace the surface underneath it, so the surface's
+    /// listeners simply never ran. Hosted in a layer the window stays current, and
+    /// without this its listeners still fired for presses on the dialog -- one that
+    /// consumed the event took the press away from the dialog entirely. Only the
+    /// listeners the overlay itself handed over run while it owns the pointer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dispatcher`: this window's listeners for the event, may be null
+    ///
+    /// - `e`: the event
+    ///
+    /// #### Returns
+    ///
+    /// true if the event was consumed
+    private boolean firePointerEvent(int kind, EventDispatcher dispatcher, ActionEvent e) {
+        if (gestureCancelled) {
+            // Before the no-scope branch below, not after it. An overlay that takes the
+            // pointer mid-gesture can be gone by the time the drag or the release
+            // arrives -- a tooltip, a menu that dismissed itself -- and removing the
+            // last scope leaves no scope at all while this gesture is still cancelled.
+            // Checked afterwards, the remainder of a gesture nobody is meant to see went
+            // to the window's ordinary listeners, so whatever sat behind the overlay
+            // acted on a drag or a release whose press it never got. The next press
+            // clears the flag, which is where a new gesture is allowed to start.
+            return false;
+        }
+        if (pointerInputScopes == null) {
+            if (dispatcher != null && dispatcher.hasListeners()) {
+                dispatcher.fireActionEvent(e);
+            }
+            return e.isConsumed();
+        }
+        if (pointerScopeExempt != null && dispatcher != null && dispatcher.hasListeners()) {
+            // Only this event's listeners, and only the topmost overlay's: the list
+            // holds every kind for every overlay that ever handed listeners over, so
+            // firing it whole would run release and drag listeners on a press and would
+            // reach dialogs stacked underneath the one that owns the pointer.
+            Container top = pointerInputScopes.get(pointerInputScopes.size() - 1);
+            // A copy: a listener is free to add or remove listeners as it runs.
+            ArrayList<PointerExemption> exempt =
+                    new ArrayList<PointerExemption>(pointerScopeExempt);
+            int count = exempt.size();
+            for (int iter = 0; iter < count; iter++) {
+                PointerExemption entry = exempt.get(iter);
+                if (entry.kind != kind || entry.scope != top) { //NOPMD CompareObjectsWithEquals
+                    continue;
+                }
+                entry.listener.actionPerformed(e);
+                if (e.isConsumed()) {
+                    break;
+                }
+            }
+        }
+        return e.isConsumed();
+    }
+
+    /// Whether a listener registered on this window may hear the key being dispatched.
+    ///
+    /// While an overlay owns the keyboard, only listeners belonging to an input scope
+    /// may run: everything else was registered by, or on behalf of, the surface the
+    /// overlay is covering. Without this an access key registered by a component in the
+    /// content -- an HTML document registers one per accesskey attribute -- still
+    /// activated its link or checkbox from underneath a modal dialog.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener about to be given the key
+    ///
+    /// #### Returns
+    ///
+    /// true when it may run
+    private boolean mayDispatchKeyTo(ActionListener l) {
+        return keyInputScope == null || l instanceof ScopedKeyListener;
+    }
+
+    /// Whether anything at all currently claims the keyboard.
+    ///
+    /// #### Returns
+    ///
+    /// true when no overlay owns keys
+    boolean isKeyInputScopeEmpty() {
+        return keyInputScopes == null;
+    }
+
+    private void applyKeyInputScope() {
+        Container scope = keyInputScopes == null ? null
+                : keyInputScopes.get(keyInputScopes.size() - 1);
+        this.keyInputScope = scope;
+        if (scope != null && (focused == null || !scope.contains(focused))) {
+            focused = null;
+            initFocused();
+        }
+    }
+
+    /// Whether a key may be dispatched at all.
+    ///
+    /// #### Returns
+    ///
+    /// false when a blocking overlay is up and nothing in it can take the key, in
+    /// which case the key is dropped rather than reaching what is behind it
+    private boolean focusWithinKeyScope() {
+        if (keyInputScope == null) {
+            return true;
+        }
+        if (focused != null && keyInputScope.contains(focused)) {
+            return true;
+        }
+        Component first = keyInputScope.findFirstFocusable();
+        if (first != null) {
+            setFocused(first);
+            return true;
+        }
+        focused = null;
+        return false;
     }
 
     /// {@inheritDoc}
@@ -3439,11 +4250,20 @@ public class Window extends Container implements TopLevelContainer {
         Component cmp = resolveComponentAt(x[0], y[0]);
         if (cmp != null) {
             LeadUtil.pointerHover(cmp, x, y);
-            // Deliberately no TooltipManager call. It schedules only when
-            // getComponentForm() is non-null and displays through InteractionDialog on
-            // the current form, so from a window it would either do nothing or put the
-            // tooltip on the main window. It is listed with the other form-coupled
-            // overlays in the developer guide rather than half-wired here.
+        }
+        // The tooltip timer starts here or it never starts at all: this is the only
+        // hover dispatch a window has. The manager resolves the surface through
+        // getTopLevelContainer() and hosts the tooltip on it, so a tooltip raised from
+        // a window appears on that window. Guarded on cmp, which the Form path is not
+        // -- a hover over empty space there would already have been a null dereference.
+        TooltipManager tm = TooltipManager.getInstance();
+        if (tm != null && cmp != null) {
+            String tip = cmp.getTooltip();
+            if (tip != null && tip.length() > 0) {
+                tm.prepareTooltip(tip, cmp);
+            } else {
+                tm.clearTooltip();
+            }
         }
     }
 
@@ -3507,6 +4327,16 @@ public class Window extends Container implements TopLevelContainer {
             nativeVisible = true;
             iconified = false;
             fireWindowEvent(WindowEvent.Type.Restored);
+            // Minimizing clears nativeVisible, so this window read as not showing while
+            // it was down and the snapshot cache was free to evict it to stay under its
+            // cap. Nothing else would have rebuilt it: the tree did not change while the
+            // window was minimized, so no mutation was ever recorded, and an off-EDT
+            // reader is answered with an empty tree on a cache miss -- a screen reader
+            // would have found the restored window empty until something unrelated
+            // happened to it. Cheap when it was never evicted: the rebuild is one pass
+            // over a window that was just put back on screen and repainted in full.
+            AccessibilityManager.getInstance().invalidate(this,
+                    AccessibilityManager.CHANGE_STRUCTURE);
             repaint();
             Display.getInstance().wakeEdt();
         }
@@ -3550,17 +4380,43 @@ public class Window extends Container implements TopLevelContainer {
     /// window does not have: commands reach the desktop menu instead.
     @Override
     public void keyPressed(int keyCode) {
+        // Whoever owns the keyboard as the key goes down owns its release, whatever has
+        // happened in between. A focused control is free to close the overlay it is in
+        // from keyPressed -- a button that acts on the press does exactly that -- and
+        // by the time the release arrives the overlay underneath has been uncovered and
+        // focused. Sampling the scope at release time finds that one and hands it a
+        // release whose press it never saw.
+        if (!keyRepeatSynthetic) {
+            if (keyPressScopes == null) {
+                keyPressScopes = new HashMap<Integer, Container>();
+            }
+        // Null is a value here, not an absence -- it means the window itself owned the
+        // key -- so membership is what says a press is outstanding.
+            keyPressScopes.put(Integer.valueOf(keyCode), keyInputScope);
+        }
+        if (!focusWithinKeyScope()) {
+            return;
+        }
         int game = Display.getInstance().getGameAction(keyCode);
         if (focused != null) {
-            if (focused.isEnabled()) {
-                focused.keyPressed(keyCode);
+            // Everything below is asked of the component that took the press, not of
+            // whatever holds the focus once it returns. The handler is free to move the
+            // focus, and a control that closes its dialog on the key down goes further
+            // and leaves the field null -- releasing the overlay's claim on the keyboard
+            // drops the focus with it. Reading the field again then answers for a
+            // component that never saw this key, or dereferences nothing at all.
+            Component pressTarget = focused;
+            if (pressTarget.isEnabled()) {
+                pressTarget.keyPressed(keyCode);
             }
-            if (focused.handlesInput()) {
+            if (pressTarget.handlesInput()) {
                 return;
             }
-            if (focused.getTopLevelContainer() == this) { //NOPMD CompareObjectsWithEquals
+            if (pressTarget.getTopLevelContainer() == this) { //NOPMD CompareObjectsWithEquals
                 updateWindowFocus(game);
             } else {
+                // Includes the torn-down case: initFocused honours the key scope, so
+                // this settles on the overlay that has just been uncovered.
                 focused = null;
                 initFocused();
             }
@@ -3575,30 +4431,278 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public void keyReleased(int keyCode) {
-        if (focused != null && focused.getTopLevelContainer() == this //NOPMD CompareObjectsWithEquals
+        // The scope gates who the key is delivered to, not whether the window hears it
+        // at all: fireKeyEvent is how a hosted dialog receives the back key, so
+        // returning early here made a dialog with nothing focusable swallow its own
+        // way out.
+        // The scope that took the press, when this release belongs to one. Reading it
+        // here -- even before the focused component is given the key -- is not enough
+        // on its own, because the press handler may already have closed the overlay
+        // that owned it.
+        Container scopeAtRelease = keyInputScope;
+        Integer held = Integer.valueOf(keyCode);
+        if (keyPressScopes != null && keyPressScopes.containsKey(held)) {
+            // A repeat is a pair synthesized for a key that is still physically down,
+            // so it must leave the record alone: consuming it here meant the hardware
+            // release still to come found nothing and was handed to whatever was on top
+            // by then -- a dialog that timed out under a held arrow key had its release
+            // delivered to the surface it uncovered.
+            Container pressScope = keyRepeatSynthetic
+                    ? keyPressScopes.get(held) : keyPressScopes.remove(held);
+            if (!keyRepeatSynthetic && keyPressScopes.isEmpty()) {
+                keyPressScopes = null;
+            }
+            if (pressScope != keyInputScope) { //NOPMD CompareObjectsWithEquals
+                // The overlay that took the press has gone, or another has taken the
+                // keyboard since. Either way this release is not addressed to whoever
+                // holds it now, and delivering it would act twice on one keystroke.
+                return;
+            }
+            scopeAtRelease = pressScope;
+        }
+        if (focusWithinKeyScope() && focused != null
+                && focused.getTopLevelContainer() == this //NOPMD CompareObjectsWithEquals
                 && focused.isEnabled()) {
             focused.keyReleased(keyCode);
         }
-        fireKeyEvent(keyCode);
+        dispatchDefaultCommand(keyCode, scopeAtRelease);
+        // Against the scope that took the press, for the same reason. The wrappers
+        // check who owns the keyboard as they run, and by now the top dialog may have
+        // closed itself -- so the one it uncovered would answer a release whose press
+        // it never saw.
+        keyDispatchScope = scopeAtRelease;
+        keyDispatchActive = true;
+        try {
+            fireKeyEvent(keyCode);
+            // Both maps, which is what Form.keyReleased does. Dispatching only the raw
+            // code left every game key shortcut on a hosted dialog silently dead.
+            fireGameKeyEvent(keyCode);
+        } finally {
+            keyDispatchActive = false;
+            keyDispatchScope = null;
+        }
+    }
+
+    /// Runs the default command of the overlay holding the keyboard, if a fire key was
+    /// released.
+    ///
+    /// `Form.keyReleased` does this for the surface it owns, and a hosted dialog lost
+    /// it: this window forwards a release to the focused component and to the key
+    /// listeners and nothing else, so Enter stopped invoking the dialog's default
+    /// action -- including the ordinary case where that action is not the focused
+    /// control.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the key that was released
+    ///
+    /// - `scope`: the overlay that owned the keyboard when the key arrived
+    private void dispatchDefaultCommand(int keyCode, Container scope) {
+        if (Display.getInstance().getGameAction(keyCode) != Display.GAME_FIRE) {
+            return;
+        }
+        // Still the owner, and still the one that owned it when the key arrived. A
+        // dialog that has already gone does not get a second bite, and the one it
+        // uncovered does not inherit this release.
+        if (!(scope instanceof Dialog) || scope != keyInputScope) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
+        Dialog dlg = (Dialog) scope;
+        Command defaultCmd = dlg.getDefaultCommand();
+        if (defaultCmd != null) {
+            defaultCmd.actionPerformed(new ActionEvent(defaultCmd, keyCode));
+            // The same call Form.keyReleased makes, which builds the event itself --
+            // the no-recurse variant dereferences the one it is handed.
+            dlg.actionCommandImpl(defaultCmd);
+        }
     }
 
     /// {@inheritDoc}
     @Override
     public void keyRepeated(int keyCode) {
-        if (focused == null) {
-            keyPressed(keyCode);
-            keyReleased(keyCode);
+        // A repeat belongs to the press that started it, on the same terms as the
+        // release. If the overlay holding that press has gone -- a timeout under a held
+        // key does exactly that -- the repeats still arriving are not addressed to
+        // whatever it uncovered. This has to be caught here rather than at the release:
+        // Component.keyRepeated runs its own press and release handlers directly, so a
+        // repeat forwarded to the newly focused component activates or navigates it
+        // without ever passing the scoped guard.
+        Integer repeating = Integer.valueOf(keyCode);
+        if (keyPressScopes != null && keyPressScopes.containsKey(repeating)
+                && keyPressScopes.get(repeating) != keyInputScope) { //NOPMD CompareObjectsWithEquals
             return;
         }
-        if (focused.isEnabled()) {
-            focused.keyRepeated(keyCode);
+        // Held across the callback below, because both can move while it runs.
+        Component target = focused;
+        Container scope = keyInputScope;
+        if (target == null) {
+            synthesizeRepeat(keyCode);
+            return;
+        }
+        if (target.isEnabled()) {
+            target.keyRepeated(keyCode);
+        }
+        // A handler is entitled to end the showing this repeat belongs to -- closing
+        // its own dialog from keyRepeated does exactly that -- and doing so retargets
+        // the focus and takes the input scope with it. What is left below belongs to
+        // the press that started the repeat: read from the field again it would either
+        // dereference a focus that is now null, or ask whatever the closed overlay
+        // uncovered whether it wants an arrow key, and synthesize one into a surface
+        // that never saw the press.
+        if (focused != target //NOPMD CompareObjectsWithEquals
+                || keyInputScope != scope) { //NOPMD CompareObjectsWithEquals
+            return;
         }
         int game = Display.getInstance().getGameAction(keyCode);
-        if (!focused.handlesInput()
+        if (!target.handlesInput()
                 && (game == Display.GAME_DOWN || game == Display.GAME_UP
                     || game == Display.GAME_LEFT || game == Display.GAME_RIGHT)) {
+            synthesizeRepeat(keyCode);
+        }
+    }
+
+    /// Runs one repeat as the press/release pair `Form` uses, without letting it look
+    /// like a keystroke of its own.
+    ///
+    /// The key is still physically down: its ownership belongs to the press that
+    /// started it and has to outlast every repeat, or the hardware release is orphaned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the key being repeated
+    private void synthesizeRepeat(int keyCode) {
+        keyRepeatSynthetic = true;
+        try {
             keyPressed(keyCode);
             keyReleased(keyCode);
+        } finally {
+            keyRepeatSynthetic = false;
+        }
+    }
+
+    /// Whether the press/release pair being dispatched was synthesized for a repeat of
+    /// a key that is still down, rather than being a keystroke in its own right.
+    private boolean keyRepeatSynthetic;
+
+    /// The overlay that owned the keyboard when each currently-held key went down.
+    ///
+    /// One entry per key rather than a single slot, because keys overlap: hold A, press
+    /// B on a control that closes the dialog, release B, release A. With one slot B's
+    /// release consumed it, and A's release was then handed to whatever B had uncovered
+    /// even though that surface never saw A go down.
+    private HashMap<Integer, Container> keyPressScopes;
+
+    /// A key listener that belongs to an input scope and polices that for itself.
+    ///
+    /// Everything else registered on a window belongs to whatever the overlay is
+    /// covering. On a `Form` that surface stops hearing keys the moment a dialog is
+    /// shown, because the dialog becomes the current form; a window has to say so.
+    interface ScopedKeyListener extends ActionListener {
+    }
+
+    /// Whether a key is being dispatched right now. Distinct from a null scope, which
+    /// is a real answer meaning the window itself owned the key rather than any overlay.
+    private boolean keyDispatchActive;
+
+    /// The overlay that owned the keyboard when the release being dispatched arrived,
+    /// or null outside a dispatch.
+    private Container keyDispatchScope;
+
+    /// Whether the overlay a published key listener belongs to is the one this dispatch
+    /// is for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `owner`: the overlay that published the listener
+    ///
+    /// #### Returns
+    ///
+    /// true if the listener should run
+    boolean isKeyDispatchOwner(Container owner) {
+        if (keyDispatchActive) {
+            // Null is a real answer while a key is being dispatched: the window itself
+            // owned it, so no hosted dialog did, and none may claim it now. Falling
+            // back to the live scope here let a dialog opened by an earlier handler in
+            // this same release answer for it -- the listeners are dispatched from two
+            // separate snapshots, so one taken after the dialog went up contains it --
+            // and an Enter that opened a dialog whose Enter listener closes it shut the
+            // dialog again before it was ever seen.
+            return keyDispatchScope == owner; //NOPMD CompareObjectsWithEquals
+        }
+        // Outside a dispatch there is no key to attribute, so the question is only
+        // whether anything currently holds the keyboard away from this owner.
+        return keyInputScope == null || keyInputScope == owner; //NOPMD CompareObjectsWithEquals
+    }
+
+    /// Game key listeners, by game action.
+    ///
+    /// Package private rather than public API: a window has never offered game key
+    /// listeners of its own and this does not add them. It exists so that a dialog
+    /// hosted here keeps the game key shortcuts it was built with, which a form gives
+    /// it and a window would otherwise silently drop.
+    private HashMap<Integer, ArrayList<ActionListener>> gameKeyListeners;
+
+    /// Registers a game key listener on this window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the game action
+    ///
+    /// - `listener`: the listener
+    void addGameKeyListener(int keyCode, ActionListener listener) {
+        if (gameKeyListeners == null) {
+            gameKeyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
+        }
+        Integer code = Integer.valueOf(keyCode);
+        ArrayList<ActionListener> l = gameKeyListeners.get(code);
+        if (l == null) {
+            l = new ArrayList<ActionListener>();
+            gameKeyListeners.put(code, l);
+        }
+        if (!l.contains(listener)) {
+            l.add(listener);
+        }
+    }
+
+    /// Removes a game key listener from this window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the game action
+    ///
+    /// - `listener`: the listener
+    void removeGameKeyListener(int keyCode, ActionListener listener) {
+        if (gameKeyListeners == null) {
+            return;
+        }
+        ArrayList<ActionListener> l = gameKeyListeners.get(Integer.valueOf(keyCode));
+        if (l != null) {
+            l.remove(listener);
+        }
+    }
+
+    private void fireGameKeyEvent(int keyCode) {
+        if (gameKeyListeners == null) {
+            return;
+        }
+        ArrayList<ActionListener> listeners = gameKeyListeners.get(
+                Integer.valueOf(Display.getInstance().getGameAction(keyCode)));
+        if (listeners == null) {
+            return;
+        }
+        ActionEvent evt = new ActionEvent(this, keyCode);
+        // Over a copy, for the same reason the raw key dispatch below uses one.
+        ActionListener[] snapshot = listeners.toArray(new ActionListener[listeners.size()]);
+        for (int iter = 0; iter < snapshot.length; iter++) { // NOPMD ForLoopCanBeForeach
+            if (!mayDispatchKeyTo(snapshot[iter])) {
+                continue;
+            }
+            snapshot[iter].actionPerformed(evt);
+            // As the raw key dispatch below does, and as Form.fireKeyEvent does. A
+            // dialog with two shortcuts on one action ran both for a single release.
+            if (evt.isConsumed()) {
+                return;
+            }
         }
     }
 
@@ -3611,9 +4715,15 @@ public class Window extends Container implements TopLevelContainer {
             return;
         }
         ActionEvent evt = new ActionEvent(this, keyCode);
-        int len = listeners.size();
-        for (int iter = 0; iter < len; iter++) {
-            listeners.get(iter).actionPerformed(evt);
+        // Over a copy: a listener is entitled to deregister itself or another while it
+        // handles the key -- closing a dialog does exactly that -- and walking the live
+        // list against a length captured before the loop then reads past its end.
+        ActionListener[] snapshot = listeners.toArray(new ActionListener[listeners.size()]);
+        for (int iter = 0; iter < snapshot.length; iter++) { // NOPMD ForLoopCanBeForeach
+            if (!mayDispatchKeyTo(snapshot[iter])) {
+                continue;
+            }
+            snapshot[iter].actionPerformed(evt);
             if (evt.isConsumed()) {
                 return;
             }
@@ -3624,6 +4734,33 @@ public class Window extends Container implements TopLevelContainer {
     /// `Component#getNextFocusDown()` before scanning by position, exactly as a `Form`
     /// does.
     ///
+    /// An explicit focus link, when the keyboard is allowed to go where it points.
+    ///
+    /// A component names its own neighbour through `Component#setNextFocusDown(Component)`
+    /// and the rest, and that link is honoured before anything is scanned by position.
+    /// Constraining only the geometric scan therefore left a way out of an overlay
+    /// holding the keyboard: a control inside a hosted dialog whose link named something
+    /// in the window behind it moved focus there on the first arrow press, scrolled it
+    /// into view, and every repeat until the key came up went to a component the dialog
+    /// covers.
+    ///
+    /// #### Parameters
+    ///
+    /// - `link`: the component the focus owner names, or null
+    ///
+    /// #### Returns
+    ///
+    /// that component, or null when it lies outside the scope holding the keyboard
+    private Component reachableFocusLink(Component link) {
+        if (link == null) {
+            return null;
+        }
+        if (keyInputScope != null && !keyInputScope.contains(link)) {
+            return null;
+        }
+        return link;
+    }
+
     /// `Container`'s versions of these four answer null, which is right for an
     /// ordinary container and wrong for a top level: every arrow key in a window
     /// resolved through them and moved focus nowhere, so a window could not be
@@ -3631,8 +4768,9 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     Component findNextFocusDown() {
         if (focused != null) {
-            if (focused.getNextFocusDown() != null) {
-                return focused.getNextFocusDown();
+            Component link = reachableFocusLink(focused.getNextFocusDown());
+            if (link != null) {
+                return link;
             }
             return findNextFocusVertical(true);
         }
@@ -3643,8 +4781,9 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     Component findNextFocusUp() {
         if (focused != null) {
-            if (focused.getNextFocusUp() != null) {
-                return focused.getNextFocusUp();
+            Component link = reachableFocusLink(focused.getNextFocusUp());
+            if (link != null) {
+                return link;
             }
             return findNextFocusVertical(false);
         }
@@ -3656,8 +4795,9 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     Component findNextFocusRight() {
         if (focused != null) {
-            if (focused.getNextFocusRight() != null) {
-                return focused.getNextFocusRight();
+            Component link = reachableFocusLink(focused.getNextFocusRight());
+            if (link != null) {
+                return link;
             }
             return findNextFocusHorizontal(true);
         }
@@ -3668,8 +4808,9 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     Component findNextFocusLeft() {
         if (focused != null) {
-            if (focused.getNextFocusLeft() != null) {
-                return focused.getNextFocusLeft();
+            Component link = reachableFocusLink(focused.getNextFocusLeft());
+            if (link != null) {
+                return link;
             }
             return findNextFocusHorizontal(false);
         }
@@ -3692,6 +4833,30 @@ public class Window extends Container implements TopLevelContainer {
     /// the next focusable component, or null
     private Component findNextFocusVertical(boolean down) {
         Component c;
+        if (keyInputScope != null) {
+            // Only inside the overlay holding the keyboard. Searching on into the layers
+            // and the content behind it moved focus to a component the overlay covers,
+            // and every key after that was refused for being outside the scope -- so an
+            // arrow press left navigation stranded behind a modal dialog.
+            c = TopLevelSupport.findNextFocusVertical(focused, null, keyInputScope, down);
+            if (c != null) {
+                return c;
+            }
+            if (isCyclicFocus()) {
+                c = TopLevelSupport.findNextFocusVertical(focused, null, keyInputScope, !down);
+                if (c != null) {
+                    Component current =
+                            TopLevelSupport.findNextFocusVertical(c, null, keyInputScope, !down);
+                    while (current != null) {
+                        c = current;
+                        current = TopLevelSupport.findNextFocusVertical(
+                                c, null, keyInputScope, !down);
+                    }
+                    return c;
+                }
+            }
+            return null;
+        }
         // The whole-window overlay first, which is what Form does with its own
         // formLayeredPane. A form-mode InteractionDialog, a side menu and anything else
         // installed through getFormLayeredPane() lives here, NOT in the content-area
@@ -3740,6 +4905,29 @@ public class Window extends Container implements TopLevelContainer {
     /// the next focusable component, or null
     private Component findNextFocusHorizontal(boolean right) {
         Component c;
+        if (keyInputScope != null) {
+            // Inside the overlay holding the keyboard only, for the reason given in the
+            // vertical case above.
+            c = TopLevelSupport.findNextFocusHorizontal(focused, null, keyInputScope, right);
+            if (c != null) {
+                return c;
+            }
+            if (isCyclicFocus()) {
+                c = TopLevelSupport.findNextFocusHorizontal(
+                        focused, null, keyInputScope, !right);
+                if (c != null) {
+                    Component current = TopLevelSupport.findNextFocusHorizontal(
+                            c, null, keyInputScope, !right);
+                    while (current != null) {
+                        c = current;
+                        current = TopLevelSupport.findNextFocusHorizontal(
+                                c, null, keyInputScope, !right);
+                    }
+                    return c;
+                }
+            }
+            return null;
+        }
         // The whole-window overlay first, which is what Form does with its own
         // formLayeredPane. A form-mode InteractionDialog, a side menu and anything else
         // installed through getFormLayeredPane() lives here, NOT in the content-area
@@ -3859,6 +5047,43 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     public int getComponentIndex(Component cmp) {
         return contentPane.getComponentIndex(cmp);
+    }
+
+    /// Replaces this window's content, animating the change.
+    ///
+    /// The window analogue of showing another `Form` with a transition, and the reason
+    /// a `Form` transition into or out of a window is not a thing: a transition paints
+    /// the two screens into one `Graphics` covering one surface, and two operating
+    /// system windows are composited by the window server, on monitors that may not
+    /// even share a scale factor. There is no shared context to draw an in between
+    /// frame into. Moving between screens *inside* one window is an ordinary
+    /// transition, and this is it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the new content
+    ///
+    /// - `t`: the transition to animate with, or null to swap immediately
+    public void setContent(Component content, Transition t) {
+        Container cp = getContentPane();
+        // Null content means "empty the window", which no transition can animate to --
+        // Container.replace dereferences what it is given. The other branch already
+        // treats it as a clear, so supplying a transition must not change the outcome.
+        if (t == null || content == null || cp.getComponentCount() != 1) {
+            cp.removeAll();
+            if (content != null) {
+                // A BorderLayout content pane -- which is what a window built with one
+                // has -- refuses an add with no constraint.
+                if (cp.getLayout() instanceof BorderLayout) {
+                    cp.addComponent(BorderLayout.CENTER, content);
+                } else {
+                    cp.addComponent(content);
+                }
+            }
+            cp.revalidateWithAnimationSafety();
+            return;
+        }
+        cp.replace(cp.getComponentAt(0), content, t);
     }
 
     /// {@inheritDoc}

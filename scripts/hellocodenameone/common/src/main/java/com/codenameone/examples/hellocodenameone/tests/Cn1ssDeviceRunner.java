@@ -564,6 +564,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new WindowEditingTest(),
             new WindowOverlayTest(),
             new WindowModalTest(),
+            new WindowDialogTest(),
             // VideoIO animation screenshot: encodes a 6-frame counting clip (digits
             // 1..6), decodes it back with the video decoder, and lays the decoded
             // frames out as a 2x3 grid -- so a decode regression is visible. Placed

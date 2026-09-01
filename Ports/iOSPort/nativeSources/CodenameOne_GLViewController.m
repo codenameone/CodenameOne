@@ -6067,13 +6067,15 @@ static NSString *cn1CopyPickedDocumentToTemp(NSURL *url) {
 // so the whole declaration is dropped rather than just its body. Guarding
 // only the body would leave a signature naming an unknown type.
 #if !TARGET_OS_OSX
+// Dismissed through the composer itself rather than through self. UIKit forwards a
+// dismiss sent to a presented controller on to whichever controller presented it, so
+// this works no matter who that was. Sending it to self only ever worked because self
+// was always the presenter: on Mac Catalyst a composer opened from a focused secondary
+// window is presented by that window's controller, and asking the main controller to
+// dismiss something it never presented does nothing at all -- Send and Cancel would
+// both leave the sheet on screen with no way to close it.
 -(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-#else
-	[self dismissModalViewControllerAnimated:YES];
-#endif
+	[controller dismissViewControllerAnimated:YES completion:nil];
 }
 #endif
 
@@ -6082,12 +6084,8 @@ static NSString *cn1CopyPickedDocumentToTemp(NSURL *url) {
 // only the body would leave a signature naming an unknown type.
 #if !TARGET_OS_OSX
 -(void) messageComposeViewController:(MFMessageComposeViewController*)controller didFinishWithResult:(MessageComposeResult)result {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-#else
-	[self dismissModalViewControllerAnimated:YES];
-#endif
+	// Through the composer, for the reason given on the mail delegate above.
+	[controller dismissViewControllerAnimated:YES completion:nil];
 }
 #endif
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (MessageUI delegates)

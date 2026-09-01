@@ -2015,6 +2015,101 @@ double CN1MacWindowEditingScale(void) {
     return scale;
 }
 
+/*
+ * The view controller a system sheet should be presented from, or nil when no
+ * Codename One window owns the window the user is in.
+ *
+ * Sharing, camera capture, the photo gallery, the file chooser and the full screen
+ * video player all present from CodenameOne_GLViewController, which is rooted at the
+ * application's main scene. Invoked from a secondary window that put the sheet over
+ * the main window instead -- and the share popover, which anchors to a view, landed
+ * at coordinates belonging to a window the user was not looking at.
+ *
+ * The key window is the right question rather than a window id threaded down from
+ * Java: Display.share(), Capture.capturePhoto() and FileChooser are context free
+ * statics with nothing to thread. Returning nil rather than a fallback keeps the
+ * decision at the call site, which is where the existing behaviour lives.
+ */
+static int g_focusedWindowId = -1;
+
+void CN1MacWindowNoteFocus(int windowId, BOOL gained) {
+    pthread_mutex_lock(&g_slotLock);
+    if (gained) {
+        g_focusedWindowId = windowId;
+    } else if (g_focusedWindowId == windowId) {
+        g_focusedWindowId = -1;
+    }
+    pthread_mutex_unlock(&g_slotLock);
+}
+
+UIViewController* CN1MacWindowPresentingController(void) {
+    __block UIViewController* found = nil;
+    int focused;
+    pthread_mutex_lock(&g_slotLock);
+    focused = g_focusedWindowId;
+    pthread_mutex_unlock(&g_slotLock);
+    /* The main scene is where the user is, and it already presents correctly through
+     * CodenameOne_GLViewController. */
+    if (focused < 0) {
+        return nil;
+    }
+    CN1MacRunOnMainSync(^{
+        for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) {
+                continue;
+            }
+            UIWindowScene* windowScene = (UIWindowScene*) scene;
+            if (windowScene.activationState != UISceneActivationStateForegroundActive) {
+                continue;
+            }
+            /* The one the user is actually in, not merely the first that is foreground
+             * active: several scenes can be, connectedScenes has no focus ordering, and
+             * taking the first put the sheet over an arbitrary window -- or over a
+             * secondary one when the action was invoked from the main scene. */
+            if (CN1MacWindowIdForScene(windowScene) != focused) {
+                continue;
+            }
+            for (UIWindow* window in windowScene.windows) {
+                if (window.isKeyWindow && window.rootViewController != nil) {
+                    found = [[window.rootViewController retain] autorelease];
+                    break;
+                }
+            }
+            if (found != nil) {
+                break;
+            }
+        }
+    });
+    return found;
+}
+
+/*
+ * The view a popover presented by CN1MacWindowPresentingController should anchor to,
+ * or nil. The controller's own view, so the popover's source rectangle is in the
+ * coordinate space of the window the sheet is appearing over.
+ */
+CN1View* CN1MacWindowPresentingView(void) {
+    UIViewController* c = CN1MacWindowPresentingController();
+    return c == nil ? nil : c.view;
+}
+
+CN1View* CN1MacWindowContentViewForWindowId(int windowId) {
+    int i;
+    CN1View* content = nil;
+    /* Under the lock like every other slot read: this runs on the event dispatch
+     * thread while adoption can be replacing the content view. */
+    pthread_mutex_lock(&g_slotLock);
+    for (i = 0; i < CN1_MAC_MAX_WINDOWS; i++) {
+        CN1MacWindow* w = slotAt(i);
+        if (w != NULL && w->windowId == windowId) {
+            content = w->content == nil ? nil : [[w->content retain] autorelease];
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_slotLock);
+    return content;
+}
+
 CN1View* CN1MacWindowEditingHostView(void) {
     CN1MacWindow* w;
     CN1View* content;

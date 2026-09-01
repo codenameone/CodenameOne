@@ -3124,8 +3124,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         @Override
         public javax.accessibility.AccessibleContext getAccessibleContext() {
             if (cn1Accessibility == null) {
-                cn1Accessibility = new JavaSEAccessibility(this, JavaSEPort.this);
-                AccessibilityManager.getInstance().invalidateAll();
+                // Bound to this canvas's own surface. Every window has its own canvas,
+                // so a bridge that always described surface zero handed a screen reader
+                // on a secondary window the main window's tree.
+                cn1Accessibility = new JavaSEAccessibility(this, JavaSEPort.this, windowId);
+                // This canvas's own surface, named rather than left to be inferred.
+                // invalidateAll() has no root to work from, so the eager refresh built
+                // whichever surface had focus -- and a reader attaching to a window
+                // that did not have focus was left with nothing to read until that
+                // window happened to change.
+                com.codename1.ui.TopLevelContainer requesting = canvasTopLevel();
+                if (requesting == null) {
+                    AccessibilityManager.getInstance().invalidateAll();
+                } else {
+                    AccessibilityManager.getInstance().invalidate(
+                            requesting.asContainer(), AccessibilityManager.CHANGE_ALL);
+                }
             }
             return cn1Accessibility.getContext();
         }
@@ -4180,6 +4194,18 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void mouseExited(MouseEvent e) {
             e.consume();
+            // A tooltip timer armed by the last hover has nothing left to cancel it:
+            // only another hover does, and once the pointer is off the canvas no more
+            // are coming. The surface goes on ticking its animations either way, so the
+            // timer still fired and opened a tooltip over a surface the pointer had
+            // left. This class is the canvas for the main form and for every secondary
+            // window, so both are covered.
+            com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    com.codename1.ui.TooltipManager.hideTooltip();
+                }
+            });
         }
         public void mouseDragged(MouseEvent e) {
             e.consume();
@@ -4657,6 +4683,43 @@ public class JavaSEPort extends CodenameOneImplementation {
         EventQueue.invokeLater(new Runnable() {
             public void run() {
                 if (canvas != null) canvas.accessibilityChanged(changeType);
+                // Every desktop window has its own canvas and its own tree. Telling
+                // only the main one left a screen reader on a secondary window with a
+                // description that never updated.
+                for (C c : liveWindowCanvases()) {
+                    c.accessibilityChanged(changeType);
+                }
+            }
+        });
+    }
+
+    /**
+     * Tells one surface's canvas that its tree changed, rather than all of them.
+     *
+     * <p>The surface-less form below has to reach every canvas, because it does not
+     * know which one is meant. Left to inherit that, a state, focus or pane change
+     * inside one window announced itself on every other window as well, and a screen
+     * reader refreshed and spoke surfaces that had not changed.</p>
+     *
+     * @param changeType bit mask of the accessibility change constants
+     * @param windowId the surface that changed, zero for the main one
+     */
+    @Override
+    public void accessibilityTreeChanged(final int changeType, final int windowId) {
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                if (windowId == 0) {
+                    if (canvas != null) {
+                        canvas.accessibilityChanged(changeType);
+                    }
+                    return;
+                }
+                for (C c : liveWindowCanvases()) {
+                    if (c.windowId == windowId) {
+                        c.accessibilityChanged(changeType);
+                        return;
+                    }
+                }
             }
         });
     }
@@ -4668,7 +4731,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public boolean isAccessibilityTreeUpdateRequired() {
-        return screenReaderEnabled || canvas != null && canvas.isAccessibilityContextRequested();
+        if (screenReaderEnabled || canvas != null && canvas.isAccessibilityContextRequested()) {
+            return true;
+        }
+        // A reader attached to a secondary window and not to the main one still needs
+        // the eager refreshes, so the answer is over every surface rather than one.
+        for (C c : liveWindowCanvases()) {
+            if (c.isAccessibilityContextRequested()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void paintDirty() {
@@ -21812,7 +21885,37 @@ public class JavaSEPort extends CodenameOneImplementation {
     C createWindowCanvas(int windowId) {
         C c = new C();
         c.windowId = windowId;
+        synchronized (windowCanvases) {
+            windowCanvases.add(new java.lang.ref.WeakReference<C>(c));
+        }
         return c;
+    }
+
+    /**
+     * The canvas of every desktop window, so accessibility changes reach them too.
+     * Weakly held: a window's canvas dies with the window, and keeping a hard
+     * reference here would pin every window ever opened for the life of the port.
+     */
+    private final java.util.List<java.lang.ref.WeakReference<C>> windowCanvases =
+            new java.util.ArrayList<java.lang.ref.WeakReference<C>>();
+
+    /**
+     * Every live window canvas, dropping any whose window has gone.
+     */
+    private java.util.List<C> liveWindowCanvases() {
+        java.util.List<C> out = new java.util.ArrayList<C>();
+        synchronized (windowCanvases) {
+            java.util.Iterator<java.lang.ref.WeakReference<C>> it = windowCanvases.iterator();
+            while (it.hasNext()) {
+                C c = it.next().get();
+                if (c == null) {
+                    it.remove();
+                } else {
+                    out.add(c);
+                }
+            }
+        }
+        return out;
     }
 
     /**

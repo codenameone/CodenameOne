@@ -27,12 +27,15 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.Window;
+import com.codename1.ui.animations.Animation;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
@@ -719,4 +722,254 @@ class InteractionDialogTest extends UITestBase {
         assertEquals(5000L, pendingTimeoutOf(dialog),
                 "it is held until there is somewhere to bind it");
     }
+    /// A surface that counts what gets registered on its animation loop.
+    ///
+    /// Named rather than anonymous: an anonymous subclass here trips
+    /// SIC_INNER_SHOULD_BE_STATIC_ANON under the zero-findings SpotBugs gate.
+    private static final class CountingForm extends Form {
+        private int registrations;
+
+        CountingForm(String title, Layout layout) {
+            super(title, layout);
+        }
+
+        @Override
+        protected void onRegisterAnimated(Animation cmp) {
+            registrations++;
+        }
+    }
+
+    /// Shows a dialog on a counting host and reports what the show registered.
+    private static int registrationsForShow(boolean withTimeout) {
+        CountingForm f = new CountingForm("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("timed");
+        dialog.add(new Label("body"));
+        if (withTimeout) {
+            // Long enough that it cannot fire during the test -- this is about how the
+            // timeout is driven, not about it arriving.
+            dialog.setTimeout(600000);
+        }
+        int before = f.registrations;
+        dialog.show(10, 10, 10, 10);
+        int after = f.registrations;
+        dialog.dispose();
+        DisplayTest.flushEdt();
+        return after - before;
+    }
+
+    /// The timeout must not be driven by the surface's animation loop.
+    ///
+    /// A UITimer runs by registering itself as an animation on the top level it is bound
+    /// to, so it only ticks while that surface is being painted -- a minimized or hidden
+    /// window stops the clock, and a modal showDialog() whose timeout is what releases
+    /// the caller then blocks for as long as the window stays down. Asserted structurally
+    /// rather than by waiting: arming a timeout must add nothing to the host's animation
+    /// list, which is exactly what stops the surface from being able to stall it.
+    @FormTest
+    void armingATimeoutRegistersNothingOnTheSurface() {
+        int withoutTimeout = registrationsForShow(false);
+        int withTimeout = registrationsForShow(true);
+
+        assertEquals(withoutTimeout, withTimeout,
+                "arming a timeout registered " + (withTimeout - withoutTimeout)
+                        + " extra animation(s) on the host, so the surface drives the"
+                        + " clock and can stall it by not painting");
+    }
+
+    /// The armed timeout's generation, via reflection.
+    private static int timeoutGenerationOf(InteractionDialog d) {
+        try {
+            java.lang.reflect.Field f =
+                    InteractionDialog.class.getDeclaredField("timeoutGeneration");
+            f.setAccessible(true);
+            return f.getInt(d);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// A showing that ends without dispose() still has to retire its timeout.
+    ///
+    /// The clock is deliberately independent of the surface, so it outlives the window
+    /// it was armed under -- which dispose() handles, and which the native window being
+    /// torn down from outside (an owner cascade, getNativeWindow().dispose(), a modal
+    /// window hidden) reaches through finishNativeShowing() instead. Left armed there,
+    /// it still matches when the same dialog is shown again and closes that showing.
+    @FormTest
+    void aNativeShowingEndedFromOutsideRetiresItsTimeout() {
+        implementation.setMultiWindowSupported(true);
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("timed");
+        dialog.add(new Label("body"));
+        dialog.setNativeWindowMode(true);
+        dialog.setTimeout(600000);
+        dialog.show(10, 10, 10, 10);
+        DisplayTest.flushEdt();
+
+        int armed = timeoutGenerationOf(dialog);
+        assertEquals(0L, pendingTimeoutOf(dialog),
+                "precondition: the timeout was armed rather than left pending");
+
+        // Not dispose() -- the window going away underneath the dialog.
+        dialog.finishNativeShowing();
+        DisplayTest.flushEdt();
+
+        assertNotEquals(armed, timeoutGenerationOf(dialog),
+                "ending the showing from outside has to retire the armed timeout, or it"
+                        + " still matches and closes whatever is shown next");
+        dialog.dispose();
+    }
+
+    /// The armed clock itself, via reflection.
+    private static Object timeoutClockOf(InteractionDialog d) {
+        try {
+            java.lang.reflect.Field f =
+                    InteractionDialog.class.getDeclaredField("timeoutClock");
+            f.setAccessible(true);
+            return f.get(d);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// An armed timeout has to be stopped, not merely ignored.
+    ///
+    /// The generation token settles what a callback already in flight does. It does not
+    /// settle whether one is still coming: Timer runs a non-daemon thread and the
+    /// scheduled task holds the dialog, so a token-only retirement kept both alive until
+    /// a deadline nobody was waiting for -- once per early dispose, and once more for
+    /// every replacement timeout armed over a pending one.
+    @FormTest
+    void endingAShowingStopsItsTimeoutClock() {
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("timed");
+        dialog.add(new Label("body"));
+        dialog.setTimeout(600000);
+        dialog.show(10, 10, 10, 10);
+        Object armed = timeoutClockOf(dialog);
+        assertNotNull(armed, "precondition: showing armed a clock");
+
+        // A replacement armed over the pending one must not strand it.
+        dialog.setTimeout(600000);
+        assertNotSame(armed, timeoutClockOf(dialog),
+                "precondition: the replacement is a different clock");
+
+        dialog.dispose();
+        assertNull(timeoutClockOf(dialog),
+                "ending the showing has to stop the clock, not just ignore what it does");
+    }
+
+    /// A directional dispose ends the showing too, so it retires the clock.
+    ///
+    /// disposeToTheLeft and its siblings do not go through dispose(), and the clock is
+    /// deliberately not tied to the surface -- so leaving it armed there held a timer
+    /// thread and this hierarchy until a deadline nobody was waiting for, and closed the
+    /// next showing if one arrived before it.
+    @FormTest
+    void aDirectionalDisposeStopsTheTimeoutClock() {
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("timed");
+        dialog.add(new Label("body"));
+        dialog.setTimeout(600000);
+        dialog.show(10, 10, 10, 10);
+        assertNotNull(timeoutClockOf(dialog), "precondition: showing armed a clock");
+
+        dialog.disposeToTheLeft();
+        DisplayTest.flushEdt();
+
+        assertNull(timeoutClockOf(dialog),
+                "a directional dispose ends the showing, so it has to stop the clock");
+    }
+
+    /// resize() describes margins against a host, which a platform window does not have.
+    ///
+    /// In native window mode the dialog's parent is the window's own content pane, so
+    /// the lightweight body rewrote that pane's geometry and animated a layer built on
+    /// the owner surface -- disturbing the window's root layout while resizing nothing
+    /// the caller asked about. It is inert here, like the margin arguments to show().
+    @FormTest
+    void resizeDoesNotTouchTheOwnerSurfaceInNativeWindowMode() {
+        implementation.setMultiWindowSupported(true);
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("native");
+        dialog.add(new Label("body"));
+        dialog.setNativeWindowMode(true);
+        dialog.show(10, 10, 10, 10);
+        DisplayTest.flushEdt();
+        assertNotNull(dialog.getNativeWindow(), "precondition: it really is in a window");
+
+        Container parentBefore = dialog.getParent();
+        Style style = dialog.getUnselectedStyle();
+        int marginTop = (int) style.getMarginTop();
+        int marginLeft = (int) style.getMarginLeftNoRTL();
+
+        dialog.resize(37, 37, 37, 37);
+        DisplayTest.flushEdt();
+
+        assertSame(parentBefore, dialog.getParent(),
+                "resize must not reparent a dialog the platform owns");
+        // The margins are the operation: the lightweight body writes all four and then
+        // rewrites the parent's geometry from them. Untouched here means it did not run.
+        assertEquals(marginTop, (int) style.getMarginTop(),
+                "resize must not write host margins onto a dialog the platform places");
+        assertEquals(marginLeft, (int) style.getMarginLeftNoRTL(),
+                "resize must not write host margins onto a dialog the platform places");
+        dialog.dispose();
+        DisplayTest.flushEdt();
+    }
+
+    /// Hiding the backing window ends the showing.
+    ///
+    /// The window exists for this showing, so one that is not on screen means nothing
+    /// is being shown -- and the framework already reads it that way, releasing a
+    /// parked modal caller as soon as the window stops being visible. Ignored, it left
+    /// the dialog parented to an invisible window with isShowing() answering true and
+    /// getNativeWindow() contradicting its own "only while showing" contract.
+    @FormTest
+    void hidingTheBackingWindowEndsTheShowing() {
+        implementation.setMultiWindowSupported(true);
+        Form f = new Form("host", new BorderLayout());
+        f.show();
+        DisplayTest.flushEdt();
+
+        InteractionDialog dialog = new InteractionDialog("native");
+        dialog.add(new Label("body"));
+        dialog.setNativeWindowMode(true);
+        dialog.show(10, 10, 10, 10);
+        DisplayTest.flushEdt();
+        Window w = dialog.getNativeWindow();
+        assertNotNull(w, "precondition: it really is in a window");
+        assertTrue(dialog.isShowing(), "precondition: and it is showing");
+
+        // Hidden, not disposed -- the public Window API an application can reach.
+        w.hide();
+        DisplayTest.flushEdt();
+
+        assertFalse(dialog.isShowing(),
+                "a dialog in a window that is not on screen is not showing");
+        assertNull(dialog.getNativeWindow(),
+                "and getNativeWindow() is documented as non-null only while showing");
+        // hide() keeps the peer and the desktop registration so a window can be shown
+        // again; this one never will be, so ending the showing has to release it or it
+        // is an allocated window nothing can reach, one per hide.
+        assertTrue(w.isWindowDisposed(),
+                "the window belonged to that showing, so it goes with it");
+    }
+
+
 }

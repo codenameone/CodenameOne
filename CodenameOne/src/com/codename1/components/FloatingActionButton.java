@@ -30,6 +30,7 @@ import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -355,7 +356,7 @@ public class FloatingActionButton extends Button {
         // The top level rather than the form: getComponentForm() is null by design in a
         // Window, so binding to a window's content pane fell through to the wrapper
         // below and returned it unattached -- the button simply never appeared.
-        com.codename1.ui.TopLevelContainer f = cnt.getTopLevelContainer();
+        TopLevelContainer f = cnt.getTopLevelContainer();
         if (f != null && (f.getContentPane() == cnt || f.asContainer() == cnt)) { //NOPMD CompareObjectsWithEquals
             // special case for content pane installs the button directly on the content pane
             Container layers = f.getLayeredPane(getClass(), true);
@@ -389,22 +390,57 @@ public class FloatingActionButton extends Button {
 
     @Override
     protected void fireActionEvent(int x, int y) {
-        // This button's own top level, not the process-wide current form. A button in a
-        // secondary window would otherwise dispose a dialog showing on the main window
-        // -- activating a window does not change Display.getCurrent(), so the dialog it
-        // closed had nothing to do with the click.
-        com.codename1.ui.TopLevelContainer top = getTopLevelContainer();
-        if (top instanceof Dialog) {
-            ((Dialog) top).dispose();
-        } else if (top == null || top instanceof Form) {
-            Form current = Display.getInstance().getCurrent();
-            if (current instanceof Dialog) {
-                ((Dialog) current).dispose();
+        // The dialog this button is actually inside, found by walking up rather than by
+        // asking for the top level. A hosted dialog is parented in its window's layered
+        // pane, so the top level is that window and the dialog around the button was
+        // never seen: the button fired and left the dialog -- and a caller blocked on it
+        // -- open.
+        Dialog enclosing = enclosingDialog(this);
+        if (enclosing != null) {
+            // Disposed before the dispatch below, and the command still lands on it.
+            // Disposing takes the dialog out of the layer it was in, which leaves it
+            // parentless -- and a parentless Form is a command host -- so the walk up
+            // from this button in Button.fireActionEvent still reaches the dialog and
+            // records the command there, which is what a modal showDialog() returns.
+            // Guarded by aFabCommandInsideAHostedDialogIsStillRecordedOnIt.
+            enclosing.dispose();
+        } else {
+            // Nothing encloses it, so the only dialog it can mean is one showing over
+            // its own surface. Its own, not the process-wide current form: a button in a
+            // secondary window would otherwise dispose a dialog on the main window --
+            // activating a window does not change Display.getCurrent(), so the dialog it
+            // closed had nothing to do with the click.
+            TopLevelContainer top = getTopLevelContainer();
+            if (top == null || top instanceof Form) {
+                Form current = Display.getInstance().getCurrent();
+                if (current instanceof Dialog) {
+                    ((Dialog) current).dispose();
+                }
             }
         }
         super.fireActionEvent(x, y);
     }
 
+
+    /// The nearest dialog this component sits inside, if any.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component to walk up from
+    ///
+    /// #### Returns
+    ///
+    /// the enclosing dialog, or null when nothing encloses it
+    private static Dialog enclosingDialog(Component c) {
+        Component probe = c;
+        while (probe != null) {
+            if (probe instanceof Dialog) {
+                return (Dialog) probe;
+            }
+            probe = probe.getParent();
+        }
+        return null;
+    }
 
     @Override
     public void released(int x, int y) {
@@ -416,13 +452,11 @@ public class FloatingActionButton extends Button {
         }
         //if this fab has sub fab's display them
         if (subMenu != null) {
-            // The submenu is shown in a Dialog, which is not top-level-aware: inside a
-            // Window getComponentForm() is null by design, and the tint calls below
-            // dereferenced it without checking, so releasing a sub-menu FAB in a window
-            // threw out of the button press. There is nothing to show there until
-            // Dialog itself becomes window-aware, but a standard component must not
-            // throw to say so -- see the unsupported list in the desktop windows guide.
-            if (getComponentForm() == null) {
+            // The top level, not the form: getComponentForm() is null by design inside
+            // a Window, and the tint calls below dereference it. Dialog is window aware
+            // now, so the submenu opens on whatever surface the button is actually on.
+            TopLevelContainer f = getTopLevelContainer();
+            if (f == null) {
                 return;
             }
             final Container con = createPopupContent(subMenu);
@@ -439,7 +473,6 @@ public class FloatingActionButton extends Button {
             for (Component c : con) {
                 c.setVisible(false);
             }
-            Form f = getComponentForm();
             int oldTint = f.getTintColor();
             f.setTintColor(0);
             d.setBlurBackgroundRadius(-1);

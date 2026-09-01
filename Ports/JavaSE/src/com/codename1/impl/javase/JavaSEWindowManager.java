@@ -542,6 +542,23 @@ public class JavaSEWindowManager extends WindowManager {
         return out;
     }
 
+    /**
+     * AWT places and sizes windows in logical units while Codename One lays out in
+     * device pixels, which is the same distinction {@link #scaled} applies when
+     * reporting a drawable and {@link #applyMinimumSize} applies in the other
+     * direction. So one device pixel is one over the display's backing scale of a
+     * desktop unit here, rather than the one every pixel-addressed port reports.
+     */
+    @Override
+    public double getDesktopUnitsPerPixel(Object peerObj) {
+        Peer p = peer(peerObj);
+        if (p == null) {
+            return 1.0;
+        }
+        double scale = getMonitorScale(monitorIndexOf(p));
+        return scale > 0 ? 1.0 / scale : 1.0;
+    }
+
     @Override
     public int getWidth(Object peerObj) {
         Peer p = peer(peerObj);

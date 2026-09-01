@@ -142,14 +142,16 @@ public class Sheet extends Container {
     private final ActionListener formPointerListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
-            Form f = getComponentForm();
+            // The top level, not the form: getComponentForm() is null by design inside
+            // a Window, so tapping outside a sheet there did nothing.
+            TopLevelContainer f = getTopLevelContainer();
             if (f == null) {
                 return;
             }
             if (Display.impl.isScrollWheeling()) {
                 return;
             }
-            Component cmp = f.getComponentAt(evt.getX(), evt.getY());
+            Component cmp = f.asContainer().getComponentAt(evt.getX(), evt.getY());
             if (Sheet.this.contains(cmp) || Sheet.this == cmp || cmp.isOwnedBy(Sheet.this)) { //NOPMD CompareObjectsWithEquals
                 // do nothing.
             } else {
@@ -358,7 +360,28 @@ public class Sheet extends Container {
     /// that asks for no inset puts these back rather than leaving the inset of the previous border
     /// behind.
     private ArrayList<ContentPaneInset> contentPaneInsets;
-    private Form form;
+    /// The top level this sheet attached its listeners to, which may be a window.
+    private TopLevelContainer form;
+
+    /// The top level this sheet was shown on, held for the whole showing.
+    ///
+    /// show() and hide() used to resolve the current form independently, so a sheet
+    /// shown on one form and hidden after navigating to another tore down the wrong
+    /// layered pane and left itself on screen.
+    private TopLevelContainer shownHost;
+
+    /// The top level the application named, or null to work it out.
+    private TopLevelContainer hostTopLevel;
+
+    /// The surface the next `#show(int)` must use, good for exactly one show.
+    ///
+    /// Two things set it, for the same reason: a show must not resolve a surface of its
+    /// own when one has already been decided. A child sheet's `back()` names the
+    /// surface its parent belongs on, or the stack unwinds onto two windows; and a show
+    /// deferred behind an animation names the surface it resolved, or focus moving to
+    /// another window before the retry runs would attach the sheet to that one while
+    /// `shownHost` still recorded the first.
+    private TopLevelContainer pinnedShowHost;
     private final Rectangle sheetBounds = new Rectangle();
     private boolean trackSheetBounds;
     private Rectangle sheetEntry;
@@ -410,6 +433,16 @@ public class Sheet extends Container {
     }
 
     private void startTrackingBounds() {
+        // Only for a sheet on the main surface. The one reader of this list is the
+        // native peer hit test, which resolves against Display.getCurrent() and knows
+        // nothing of any other top level, so a rectangle from a secondary window would
+        // be compared against main-surface coordinates it has no relation to -- a peer
+        // there would stop receiving input because an unrelated window happens to hold
+        // a sheet over the same numbers. There is no true positive to lose: peers in a
+        // secondary window are never tested against this list at all.
+        if (!(shownHost instanceof Form)) {
+            return;
+        }
         trackSheetBounds = true;
         sheetEntry = sheetBounds;
         addSheetEntry(sheetEntry);
@@ -468,6 +501,54 @@ public class Sheet extends Container {
 
     }
 
+    /// Sets the top level this sheet appears on, which may be a
+    /// `com.codename1.ui.Window` rather than the current `Form`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the top level to show on, or null to work it out
+    public void setTopLevelHost(TopLevelContainer host) {
+        this.hostTopLevel = host;
+    }
+
+    /// Returns the top level set with `#setTopLevelHost(TopLevelContainer)`.
+    ///
+    /// #### Returns
+    ///
+    /// the explicit host, or null when none was set
+    public TopLevelContainer getTopLevelHost() {
+        return hostTopLevel;
+    }
+
+    /// The top level to show on: the explicit host, else the one this sheet is already
+    /// attached to, else the focused window, else the current form.
+    ///
+    /// #### Returns
+    ///
+    /// the host top level, or null when there is none
+    private TopLevelContainer resolveHost() {
+        if (pinnedShowHost != null) {
+            if (pinnedShowHost.isTopLevelShowing()) {
+                return pinnedShowHost;
+            }
+            // The surface the deferred show was waiting on has gone. That wait is driven
+            // by the host's own animation manager, so a host hidden or disposed before it
+            // drained never ran the retry that clears this -- and the pin then outlived
+            // the show it belonged to, sending the next one, and every one after it, at a
+            // surface that is not there any more even when the caller had since named
+            // another with setTopLevelHost().
+            pinnedShowHost = null;
+        }
+        if (hostTopLevel != null) {
+            return hostTopLevel;
+        }
+        TopLevelContainer attached = getTopLevelContainer();
+        if (attached != null) {
+            return attached;
+        }
+        return CN.getCurrentTopLevel();
+    }
+
     /// Gets the current sheet on the current form or null if no sheet is currently being displayed.
     ///
     /// #### Returns
@@ -475,10 +556,23 @@ public class Sheet extends Container {
     /// The current sheet or null.
     ///
     public static Sheet getCurrentSheet() {
-        if (CN.getCurrentForm() == null) {
+        return getCurrentSheet(CN.getCurrentTopLevel());
+    }
+
+    /// Gets the sheet currently showing on the given top level, or null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to look on, may be null
+    ///
+    /// #### Returns
+    ///
+    /// The current sheet or null.
+    public static Sheet getCurrentSheet(TopLevelContainer top) {
+        if (top == null) {
             return null;
         }
-        Container cnt = CN.getCurrentForm().getFormLayeredPaneIfExists();
+        Container cnt = TopLevelSupport.formLayeredPaneIfExists(top);
         if (cnt == null) {
             return null;
         }
@@ -535,11 +629,11 @@ public class Sheet extends Container {
         if (allowClose != this.allowClose) {
             this.allowClose = allowClose;
             if (!allowClose && isInitialized()) {
-                form.removePointerPressedListener(formPointerListener);
+                form.asContainer().removePointerPressedListener(formPointerListener);
                 detachSwipeListeners(form);
                 dragging = false;
             } else if (allowClose && isInitialized()) {
-                form.addPointerPressedListener(formPointerListener);
+                form.asContainer().addPointerPressedListener(formPointerListener);
                 attachSwipeListeners(form);
             }
             if (parentSheet == null) {
@@ -579,22 +673,22 @@ public class Sheet extends Container {
         }
     }
 
-    private void attachSwipeListeners(Form f) {
+    private void attachSwipeListeners(TopLevelContainer f) {
         if (f == null) {
             return;
         }
-        f.addPointerPressedListener(formSwipePressedListener);
-        f.addPointerDraggedListener(formSwipeDraggedListener);
-        f.addPointerReleasedListener(formSwipeReleasedListener);
+        f.asContainer().addPointerPressedListener(formSwipePressedListener);
+        f.asContainer().addPointerDraggedListener(formSwipeDraggedListener);
+        f.asContainer().addPointerReleasedListener(formSwipeReleasedListener);
     }
 
-    private void detachSwipeListeners(Form f) {
+    private void detachSwipeListeners(TopLevelContainer f) {
         if (f == null) {
             return;
         }
-        f.removePointerPressedListener(formSwipePressedListener);
-        f.removePointerDraggedListener(formSwipeDraggedListener);
-        f.removePointerReleasedListener(formSwipeReleasedListener);
+        f.asContainer().removePointerPressedListener(formSwipePressedListener);
+        f.asContainer().removePointerDraggedListener(formSwipeDraggedListener);
+        f.asContainer().removePointerReleasedListener(formSwipeReleasedListener);
     }
 
     /// Gets the content pane of the sheet.  All sheet content should be added to the content pane
@@ -785,6 +879,25 @@ public class Sheet extends Container {
     ///
     /// - #show()
     public void show(final int duration) {
+        showOnHost(duration, null);
+    }
+
+    /// Shows this sheet, optionally on a surface that has already been decided.
+    ///
+    /// `captured` is non-null only for the retry queued behind a host's animation. That
+    /// retry has to land on the surface the deferred show resolved, and it cannot ask
+    /// for it again: focus can move to another window while the animation drains, and
+    /// naming it through the shared pin instead made the decision outlive this one show
+    /// -- a second show requested before the queue drained then found the first show's
+    /// surface, attached to it, and cleared the pin, leaving the second to move the
+    /// sheet away and abandon the layered pane and painter it had just built there.
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: duration of the slide transition in milliseconds
+    ///
+    /// - `captured`: the surface a deferred show already resolved, or null to resolve
+    private void showOnHost(final int duration, TopLevelContainer captured) {
 
         // We need to add some margin to the title  to prevent overlap with the
         // back button and the commaneds.
@@ -848,16 +961,42 @@ public class Sheet extends Container {
             }
         }
 
-        Style statusBarStyle = uim.getComponentStyle("StatusBar");
-        Style titleAreaStyle = uim.getComponentStyle("TitleArea");
-
-        int topPadding = statusBarStyle.getPaddingTop() + statusBarStyle.getPaddingBottom() + titleAreaStyle.getPaddingTop();
         int positionInt = getPositionInt();
+        // The host's safe area and height, not the display's. A window has no notch to
+        // avoid and its own height is what the sheet has to fit, so measuring the main
+        // display padded a sheet in a window for a cutout that is not in front of it.
+        // The same surface the attachment below uses, resolved once. A deferred retry
+        // carries the surface its show resolved, and asking again here answered with
+        // whatever has focus now -- so a sheet on its way into a window could be laid
+        // out against the main form's chrome and then attached to the window anyway.
+        final TopLevelContainer safeHost = captured != null ? captured : resolveHost();
         Rectangle displaySafeArea = new Rectangle();
-        Display.getInstance().getDisplaySafeArea(displaySafeArea);
+        if (safeHost != null) {
+            Rectangle hostSafe = safeHost.getSafeArea();
+            displaySafeArea.setBounds(hostSafe.getX(), hostSafe.getY(),
+                    hostSafe.getWidth(), hostSafe.getHeight());
+        } else {
+            Display.getInstance().getDisplaySafeArea(displaySafeArea);
+        }
+        // The top inset from the same place as the bottom one when the host is a
+        // window. StatusBar and TitleArea padding describe a phone's chrome -- a notch
+        // to clear and a status bar to sit under -- and a desktop window has neither:
+        // its title bar is outside the drawable and its safe area is the whole of it.
+        // Themes still give those styles a nonzero top padding, so reading them here
+        // pushed every window sheet down by an inset with nothing behind it.
+        int topPadding;
+        if (safeHost instanceof Window) {
+            topPadding = displaySafeArea.getY();
+        } else {
+            Style statusBarStyle = uim.getComponentStyle("StatusBar");
+            Style titleAreaStyle = uim.getComponentStyle("TitleArea");
+            topPadding = statusBarStyle.getPaddingTop() + statusBarStyle.getPaddingBottom()
+                    + titleAreaStyle.getPaddingTop();
+        }
         // Use original bottom padding to prevent accumulation
         int bottomPadding = originalPadding[2];
-        int safeAreaBottomPadding = CN.getDisplayHeight() - (displaySafeArea.getY() + displaySafeArea.getHeight());
+        int safeAreaBottomPadding = TopLevelSupport.hostHeight(safeHost)
+                - (displaySafeArea.getY() + displaySafeArea.getHeight());
         bottomPadding = bottomPadding + safeAreaBottomPadding;
         if (positionInt == S || positionInt == C) {
             // For Center and South position we use margin to
@@ -875,20 +1014,36 @@ public class Sheet extends Container {
 
         // END Deal with iPhoneX notch
 
-        Form f = CN.getCurrentForm();
+        final TopLevelContainer f = safeHost;
+        if (f == null) {
+            throw new IllegalStateException(
+                    "Sheet.show() has no top level to show on: no window is focused and "
+                    + "no form is current");
+        }
+        shownHost = f;
         if (f.getAnimationManager().isAnimating()) {
+            // Handed to the retry rather than left in a field. The retry must land on
+            // the surface resolved here -- focus can move to another window while the
+            // animation drains -- but saying so through the shared pin made one show's
+            // decision visible to every other: a second show requested before the queue
+            // drained resolved this one's surface too, and the two then attached to
+            // different surfaces in turn, abandoning a layered pane and its painter on
+            // the one left behind. This says it to exactly one retry.
             f.getAnimationManager().flushAnimation(new Runnable() {
                 @Override
                 public void run() {
-                    show(duration);
+                    showOnHost(duration, f);
                 }
             });
             return;
         }
+        // A pin belongs to one show. back() sets it so an unwinding stack does not
+        // split across surfaces, and this is where that show consumes it.
+        pinnedShowHost = null;
         if (getParent() != null) {
             remove();
         }
-        Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);
+        Container cnt = f.getFormLayeredPane(Sheet.class, true);
         if (!(cnt.getLayout() instanceof BorderLayout)) {
             cnt.setLayout(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
 
@@ -1272,6 +1427,15 @@ public class Sheet extends Container {
     public void back(int duration) {
         if (this.parentSheet != null) {
             fireBackEvent();
+            // On the host this sheet was shown on, not whatever is focused now. Left to
+            // resolve for itself the parent could be added to a different window while
+            // this one is still in the first window's layered pane, which duplicates
+            // the stack across surfaces instead of unwinding it.
+            // For this one showing only. Writing it through setTopLevelHost would make
+            // it the parent's permanent configuration -- overwriting a host the
+            // application chose, and pinning the sheet to a window that may be long
+            // gone the next time it is shown on its own.
+            this.parentSheet.pinnedShowHost = shownHost;
             this.parentSheet.show(duration);
         } else {
             hide(duration);
@@ -1279,7 +1443,13 @@ public class Sheet extends Container {
     }
 
     private void hide(int duration) {
-        final Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);
+        // The host the sheet was shown on, not whatever is current now: navigating
+        // away between show and hide used to tear down the wrong layered pane.
+        TopLevelContainer host = shownHost != null ? shownHost : resolveHost();
+        if (host == null) {
+            return;
+        }
+        final Container cnt = host.getFormLayeredPane(Sheet.class, true);
         setX(getHiddenX(cnt));
         setY(getHiddenY(cnt));
         cnt.animateUnlayout(duration, 255, new Runnable() {
@@ -1327,7 +1497,7 @@ public class Sheet extends Container {
             hide(duration);
             return;
         }
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f == null) {
             hide(duration);
             return;
@@ -1417,9 +1587,9 @@ public class Sheet extends Container {
     @Override
     protected void initComponent() {
         super.initComponent();
-        form = getComponentForm();
+        form = getTopLevelContainer();
         if (form != null && allowClose) {
-            form.addPointerPressedListener(formPointerListener);
+            form.asContainer().addPointerPressedListener(formPointerListener);
             attachSwipeListeners(form);
         }
     }
@@ -1427,7 +1597,7 @@ public class Sheet extends Container {
     @Override
     protected void deinitialize() {
         if (form != null) {
-            form.removePointerPressedListener(formPointerListener);
+            form.asContainer().removePointerPressedListener(formPointerListener);
             detachSwipeListeners(form);
             form = null;
         }

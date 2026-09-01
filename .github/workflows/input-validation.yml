@@ -175,7 +175,11 @@ jobs:
           mkdir -p "$ARTIFACTS_DIR"
           ./scripts/input-validation-app/drivers/run-ios.sh \
             '${{ steps.build-app-bundle.outputs.app_bundle }}'
-        timeout-minutes: 15
+        # Most of this is not the gestures. Booting the simulator and installing the
+        # runner took ten and a half minutes of a fifteen minute budget on one observed
+        # run, which left the suite passing in 62s and the step killed four seconds
+        # later -- a green test reported as a red build.
+        timeout-minutes: 25
 
       - name: Upload iOS artifacts
         if: always()

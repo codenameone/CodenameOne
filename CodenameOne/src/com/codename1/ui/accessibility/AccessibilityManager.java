@@ -25,16 +25,20 @@ package com.codename1.ui.accessibility;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
+import com.codename1.ui.CN;
 import com.codename1.ui.Container;
+import com.codename1.ui.Desktop;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.Slider;
+import com.codename1.ui.Window;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.table.Table;
 import java.util.ArrayList;
@@ -42,6 +46,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /// Builds, caches, diffs, and dispatches actions for the portable semantic tree.
 ///
@@ -63,10 +68,167 @@ public final class AccessibilityManager {
     private static final AccessibilityManager INSTANCE = new AccessibilityManager();
     private long nextId = 1;
     private long generation;
-    private boolean dirty = true;
     private boolean refreshScheduled;
+    /// The root currently being walked, so the walk cannot dirty the tree it is itself
+    /// producing. Describing a component asks it what it says, and some of those
+    /// questions mutate: `List.getAccessibilityItemText` runs the shared cell renderer,
+    /// whose `setText`/`setIcon` invalidate accessibility in turn. Left alone that is a
+    /// fixed point with no fixed point -- every pass marks its own result stale and
+    /// queues another, which on a port that projects eagerly never stops.
+    ///
+    /// Only this root is exempt. An invalidation naming a *different* surface during the
+    /// walk is real news -- it cannot have been produced by the tree being built -- and
+    /// is queued as usual, which is what keeps a second window from going stale behind
+    /// a refresh of the first.
+    private Container buildingRoot;
     private int pendingChanges = CHANGE_ALL;
-    private Form snapshotForm;
+    /// The root the cached snapshot describes. A `Container` rather than a `Form`,
+    /// because a `com.codename1.ui.Window` is a root in its own right.
+    private Container snapshotRoot;
+
+    /// Snapshots for roots other than the most recent one, so a screen reader moving
+    /// between two windows does not rebuild both trees on every hop. Bounded, and
+    /// cleared whole by `#invalidate(Component, int)` -- staleness is tracked per root,
+    /// because per root dirtiness is a second thing to get wrong.
+    private final LinkedHashMap<Container, AccessibilityTreeSnapshot> snapshotsByRoot =
+            new LinkedHashMap<Container, AccessibilityTreeSnapshot>();
+
+    /// How many roots' snapshots to keep.
+    private static final int MAX_CACHED_ROOTS = 8;
+
+    /// Roots invalidated since the pending refresh was scheduled, all of which it has
+    /// to rebuild rather than only the one that scheduled it.
+    /// The roots waiting to be rebuilt, each with the changes recorded against it.
+    ///
+    /// Per root rather than one shared mask: the mask is handed to the port with the
+    /// surface it describes, and a port acts on the bits. On iOS a pane change is a
+    /// screen-change notification, so forwarding the union to every queued surface moved
+    /// the reader's focus on a window where nothing of the sort had happened. Ordered,
+    /// so surfaces are still rebuilt in the order they went stale.
+    private final LinkedHashMap<Container, Integer> pendingRoots =
+            new LinkedHashMap<Container, Integer>();
+
+    /// Whether a mutation with no resolvable surface is waiting for the refresh. Not
+    /// the same as an empty queue, which is also what disposing every queued root
+    /// leaves behind.
+    private boolean pendingRootlessRefresh;
+
+    /// The cached roots whose trees are stale.
+    ///
+    /// Staleness used to be one flag for the whole manager, which is wrong the moment
+    /// there is more than one surface: invalidating one root and then rebuilding
+    /// another cleared it, and the first root's cached tree was handed back as though
+    /// it were current. A rebuild clears only the root it rebuilt.
+    private final ArrayList<Container> dirtyRoots = new ArrayList<Container>();
+
+    /// Queues every surface known to be alive, so the refresh rebuilds all of them
+    /// rather than picking one.
+    ///
+    /// Its own method rather than inline in `#invalidate(Component, int)`: the loop
+    /// walks a generic collection, and the compiler's cast for that would sit inside
+    /// that method's catch of Throwable -- which ParparVM does not raise for a failed
+    /// cast, so the repository's cast-semantics gate rejects it.
+    private void queueEveryLiveRoot(int changeType) {
+        for (Container root : snapshotsByRoot.keySet()) {
+            queueRoot(root, changeType);
+        }
+        // The open windows, not only the ones already described. A cache holds what has
+        // been asked for, and the moment this exists to serve -- assistive technology
+        // starting after an application has opened several windows -- is exactly the
+        // moment nothing has been. Taking the cache as the census left every one of
+        // those windows empty until something in it happened to change.
+        if (Desktop.isSupported()) {
+            Window[] open = Desktop.getInstance().getWindows();
+            for (Window w : open) {
+                queueRoot(w, changeType);
+            }
+        }
+        // The main form as well as the focused surface. When a window has focus these
+        // are two different things, and the form behind it is no less live for it.
+        Form main = Display.getInstance().getCurrent();
+        if (main != null) {
+            queueRoot(main, changeType);
+        }
+        TopLevelContainer current = CN.getCurrentTopLevel();
+        Container currentRoot = current == null ? null : current.asContainer();
+        if (currentRoot != null) {
+            queueRoot(currentRoot, changeType);
+        }
+    }
+
+    /// Records a change against a root, keeping whatever was already recorded for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the surface that changed
+    ///
+    /// - `changeType`: the bits to add to its mask
+    private void queueRoot(Container root, int changeType) {
+        Integer existing = pendingRoots.get(root);
+        pendingRoots.put(root, Integer.valueOf(
+                existing == null ? changeType : existing.intValue() | changeType));
+    }
+
+    /// How many roots are currently recorded as stale.
+    ///
+    /// #### Returns
+    ///
+    /// the size of the dirty set
+    public synchronized int dirtyRootCount() {
+        return dirtyRoots.size();
+    }
+
+    /// A tree describing nothing.
+    ///
+    /// For a surface that no longer exists. A port can outlive a window -- an
+    /// accessibility bridge is held by the platform and asked for its tree after the
+    /// window it describes has been disposed -- and the alternatives are both wrong:
+    /// the last tree built anywhere belongs to some other window, and rebuilding is
+    /// impossible with nothing to walk.
+    ///
+    /// #### Returns
+    ///
+    /// an empty snapshot, never null
+    public synchronized AccessibilityTreeSnapshot emptySnapshot() {
+        generation++;
+        return new AccessibilityTreeSnapshot(generation,
+                Collections.<Long>emptyList(),
+                Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
+    }
+
+    /// How many roots currently have a cached tree.
+    ///
+    /// #### Returns
+    ///
+    /// the size of the snapshot cache
+    public synchronized int cachedRootCount() {
+        return snapshotsByRoot.size();
+    }
+
+    /// Marks a root's tree stale.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root, or null for every cached one
+    private void markDirty(Container root) {
+        if (root == null) {
+            for (Container cached : snapshotsByRoot.keySet()) {
+                if (!dirtyRoots.contains(cached)) {
+                    dirtyRoots.add(cached);
+                }
+            }
+            return;
+        }
+        // Only a root that actually has a cached tree. Marking one that has none
+        // achieves nothing -- a cache miss rebuilds it anyway -- and this list is held
+        // by a singleton, so recording every form the application has ever shown, which
+        // is what Display.setCurrent invalidating each new one amounts to, pinned every
+        // one of them and its whole component hierarchy for the life of the process.
+        // Only a disposed window ever releases a root explicitly.
+        if (snapshotsByRoot.containsKey(root) && !dirtyRoots.contains(root)) {
+            dirtyRoots.add(root);
+        }
+    }
     private AccessibilityTreeSnapshot snapshot = new AccessibilityTreeSnapshot(
             0, Collections.<Long>emptyList(), Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
 
@@ -78,8 +240,37 @@ public final class AccessibilityManager {
     }
 
     public synchronized void invalidate(Component component, int changeType) {
-        dirty = true;
         pendingChanges |= changeType;
+        // Deliberately not clearing the per-root cache. The eager refresh below
+        // rebuilds one root, so emptying all of them would leave every other surface
+        // with nothing to hand an off-EDT reader until that surface happened to mutate
+        // -- a screen reader on another window would lose its whole tree. Correctness
+        // on the EDT does not depend on the clear either: the root is marked stale and
+        // rebuilt there, and the rebuild overwrites the entry it replaces. Off the EDT
+        // a stale tree for the right surface is the documented contract; an empty one
+        // is not.
+        // The root the changed component actually lives on, not whatever form happens
+        // to be current: a change inside a window used to schedule a rebuild of the
+        // main form's tree instead, so the window's own tree stayed stale.
+        // A null component is invalidateAll(): every surface is stale, not the focused
+        // one. Substituting the current top level here turned an all-root invalidation
+        // into a single-root refresh of whichever window happened to have focus, and
+        // the rebuild then cleared the global dirty flag -- so a window that asked for
+        // accessibility while unfocused was left with nothing until it next changed.
+        final boolean allRoots = component == null;
+        TopLevelContainer changedTop = allRoots ? null : component.getTopLevelContainer();
+        if (changedTop == null && !allRoots) {
+            changedTop = CN.getCurrentTopLevel();
+        }
+        final Container refreshRoot = changedTop == null ? null : changedTop.asContainer();
+        if (!allRoots && refreshRoot != null
+                && refreshRoot == buildingRoot) { //NOPMD CompareObjectsWithEquals
+            // Provoked by the walk of this very root -- see buildingRoot. The tree being
+            // built already reflects it, and marking that tree stale is what made the
+            // pass queue itself from its own output.
+            return;
+        }
+        markDirty(allRoots ? null : refreshRoot);
         try {
             // Most mutations only need to make the cached snapshot stale. Ports
             // that can pull the tree do so on demand, and ports such as Android
@@ -89,26 +280,111 @@ public final class AccessibilityManager {
             if (!Display.getInstance().isAccessibilityTreeUpdateRequired()) {
                 return;
             }
+            // Queued rather than captured. A second invalidation on another root
+            // while this one is still pending used to be swallowed by the
+            // refreshScheduled flag: the callback rebuilt only the root it had closed
+            // over, and the other root was never rebuilt at all, so its tree stayed
+            // stale for good -- which off-EDT screen readers, now
+            // that they are handed their own surface's tree, would have read forever.
+            // Not capped. The list holds one entry per distinct root, and it is
+            // drained by the refresh, so it is bounded by the number of live surfaces
+            // -- while a cap would silently drop the earliest window's refresh and
+            // leave it stale, which is the defect this queue exists to fix. The
+            // snapshot cache is capped because it holds whole trees; this holds
+            // references to containers that are alive anyway.
+            if (allRoots) {
+                queueEveryLiveRoot(changeType);
+            } else if (refreshRoot == null) {
+                // A mutation whose component belongs to no surface at all. Recorded
+                // separately from the queue, because an empty queue can also mean every
+                // root that was in it has since been disposed -- and clearing every
+                // cached surface is right for the first and destroys every other
+                // window's tree for the second.
+                pendingRootlessRefresh = true;
+            } else {
+                queueRoot(refreshRoot, changeType);
+            }
             if (!refreshScheduled) {
                 refreshScheduled = true;
-                Display.getInstance().callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        int changes;
-                        synchronized (AccessibilityManager.this) {
-                            changes = pendingChanges;
-                        }
-                        getSnapshot(Display.getInstance().getCurrent());
-                        synchronized (AccessibilityManager.this) {
-                            refreshScheduled = false;
-                        }
-                        Display.getInstance().accessibilityTreeChanged(changes);
-                    }
-                });
+                Display.getInstance().callSerially(new RefreshPass());
             }
         } catch (Throwable ignored) {
             // Display may not be initialized yet while an application constructs its first form.
             refreshScheduled = false;
+        }
+    }
+
+    /// One drain of the refresh queue, and the re-post that keeps it honest.
+    ///
+    /// Named rather than anonymous because it re-schedules itself: snapshots are built
+    /// outside the lock, so an invalidation arriving during a pass finds the queue
+    /// already emptied and `refreshScheduled` still set, and schedules nothing of its
+    /// own. Clearing the flag without looking left that root stale until some unrelated
+    /// later invalidation happened to come along.
+    private final class RefreshPass implements Runnable {
+        @Override
+        public void run() {
+            int changes;
+            ArrayList<Container> roots;
+            ArrayList<Integer> masks;
+            boolean rootless;
+            synchronized (AccessibilityManager.this) {
+                // Taken, not just read. The rebuilds below used to clear this as a
+                // side effect, so a bit arriving while this pass was walking an earlier
+                // root was wiped before the pass it queued could report it -- losing the
+                // pane change VoiceOver needs to move focus to a newly opened pane.
+                changes = pendingChanges;
+                pendingChanges = 0;
+                roots = new ArrayList<Container>(pendingRoots.keySet());
+                masks = new ArrayList<Integer>(pendingRoots.values());
+                pendingRoots.clear();
+                rootless = pendingRootlessRefresh;
+                pendingRootlessRefresh = false;
+            }
+            if (rootless) {
+                getSnapshotForRoot(null);
+            }
+            int count = roots.size();
+            for (int iter = 0; iter < count; iter++) {
+                synchronized (AccessibilityManager.this) {
+                    // Marked stale again for each one in turn, so none is
+                    // served out of the cache this refresh exists to replace.
+                    markDirty(roots.get(iter));
+                }
+                getSnapshotForRoot(roots.get(iter));
+            }
+            boolean again;
+            synchronized (AccessibilityManager.this) {
+                // Anything queued while this pass was running. The flag stays set
+                // across the re-post, because it is still scheduled -- clearing it
+                // first would let a third invalidation queue a second pass for the
+                // same work.
+                again = !pendingRoots.isEmpty() || pendingRootlessRefresh;
+                if (!again) {
+                    refreshScheduled = false;
+                }
+            }
+            // Named per surface. A port that pushes the tree into a native view needs
+            // to know which one it just described: told only that something changed, it
+            // reads whatever was rebuilt last and installs that on the main view, so a
+            // change inside a window replaced the main surface's elements with the
+            // window's. Ports with one surface, and ports that pull, are unaffected --
+            // the two argument form forwards to the old one by default.
+            if (count == 0) {
+                Display.getInstance().accessibilityTreeChanged(changes);
+            } else {
+                for (int iter = 0; iter < count; iter++) {
+                    // Its own changes, not the union. A port acts on these bits -- iOS
+                    // reads a pane change as "move the reader to the top of this screen"
+                    // -- so handing one surface's bits to another moved the reader on a
+                    // window where nothing had happened.
+                    Display.getInstance().accessibilityTreeChanged(
+                            masks.get(iter).intValue(), windowIdOf(roots.get(iter)));
+                }
+            }
+            if (again) {
+                Display.getInstance().callSerially(this);
+            }
         }
     }
 
@@ -122,19 +398,98 @@ public final class AccessibilityManager {
                 return snapshot;
             }
         }
-        return getSnapshot(Display.getInstance().getCurrent());
+        return getSnapshot(CN.getCurrentTopLevel());
+    }
+
+    /// The accessibility tree for a top level, which may be a
+    /// `com.codename1.ui.Window` rather than a `Form`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to describe, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the snapshot, never null
+    public AccessibilityTreeSnapshot getSnapshot(TopLevelContainer top) {
+        return getSnapshotForRoot(top == null ? null : top.asContainer());
+    }
+
+    /// Drops any snapshot cached for a root that is going away.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root being disposed
+    public synchronized void releaseRoot(Container root) {
+        if (root == null) {
+            return;
+        }
+        snapshotsByRoot.remove(root);
+        rootWasShowing.remove(root);
+        dirtyRoots.remove(root);
+        // Out of the refresh queue as well, or a refresh already scheduled would walk
+        // a hierarchy that has just been destroyed and cache a tree for it -- putting
+        // back exactly what this method exists to take away.
+        pendingRoots.remove(root);
+        if (snapshotRoot == root) { //NOPMD CompareObjectsWithEquals
+            snapshotRoot = null;
+            // The snapshot itself, not only the reference to its root. It holds a node
+            // per component of a hierarchy that has just been destroyed, and it is what
+            // off-EDT accessibility callers are handed -- so a late screen reader query
+            // would read, or act on, a window that is gone.
+            generation++;
+            snapshot = new AccessibilityTreeSnapshot(generation,
+                    Collections.<Long>emptyList(),
+                    Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
+            // Nothing is marked stale here: the root that was is gone, and every other
+            // surface's tree is still exactly as current as it was.
+        }
     }
 
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public synchronized AccessibilityTreeSnapshot getSnapshot(Form form) {
+        return getSnapshotForRoot(form);
+    }
+
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
+    private synchronized AccessibilityTreeSnapshot getSnapshotForRoot(Container form) {
         // Walking a live lightweight component hierarchy off the Codename One
-        // EDT is unsafe. Native bridges on other threads receive the last
-        // immutable snapshot; active bridges arrange eager refreshes on the EDT.
+        // EDT is unsafe. Native bridges on other threads receive an immutable
+        // snapshot; active bridges arrange eager refreshes on the EDT.
         if (!Display.getInstance().isEdt()) {
-            return snapshot;
+            // The one cached for the surface actually being asked about. An
+            // invalidation rebuilds a single root and then notifies every window
+            // bridge, so the most recently built tree usually belongs to a different
+            // window -- handing that back would have a screen reader on one window
+            // announce, and act on, another window's contents. An empty tree when
+            // nothing has been built for this root yet, because "nothing known here"
+            // is recoverable on the next refresh and describing the wrong window
+            // is not.
+            if (form == null) {
+                return snapshot;
+            }
+            AccessibilityTreeSnapshot cached = snapshotsByRoot.get(form);
+            if (cached != null) {
+                return cached;
+            }
+            return form == snapshotRoot ? snapshot //NOPMD CompareObjectsWithEquals
+                    : new AccessibilityTreeSnapshot(generation,
+                            Collections.<Long>emptyList(),
+                            Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
         }
-        if (!dirty && form == snapshotForm) {
-            return snapshot;
+        // This root's staleness, not the manager's. Asking the global flag meant that
+        // rebuilding one surface declared every other surface fresh, and the next pull
+        // for one of them was answered out of a cache that had already been invalidated.
+        if (!dirtyRoots.contains(form)) {
+            if (form == snapshotRoot) { //NOPMD CompareObjectsWithEquals
+                return snapshot;
+            }
+            AccessibilityTreeSnapshot cached = snapshotsByRoot.get(form);
+            if (cached != null) {
+                snapshot = cached;
+                snapshotRoot = form;
+                return snapshot;
+            }
         }
         if (form == null) {
             generation++;
@@ -142,25 +497,180 @@ public final class AccessibilityManager {
                     generation, Collections.<Long>emptyList(),
                     Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
             snapshot = emptySnapshot;
-            snapshotForm = null;
-            dirty = false;
-            pendingChanges = 0;
+            snapshotRoot = null;
+            snapshotsByRoot.clear();
+            rootWasShowing.clear();
+            dirtyRoots.clear();
+            // The bits are not cleared by building a tree. They describe changes that
+            // have not been announced yet, and only the refresh pass announces them --
+            // clearing here wiped whatever had arrived while that pass was running.
             return snapshot;
         }
 
         List<BuildNode> roots = new ArrayList<BuildNode>();
-        resolveComponent(form, roots);
-        sortTree(roots);
         List<Long> rootIds = new ArrayList<Long>();
         LinkedHashMap<Long, AccessibilityNodeSnapshot> nodes = new LinkedHashMap<Long, AccessibilityNodeSnapshot>();
-        freeze(roots, -1, rootIds, nodes);
+        // Saved and restored rather than cleared, so a nested build -- a component
+        // getter that asks for a tree while this one is being walked -- cannot hand the
+        // outer walk back an unguarded state for the rest of its own run.
+        Container outerRoot = buildingRoot;
+        buildingRoot = form;
+        try {
+            resolveComponent(form, roots);
+            sortTree(roots);
+            freeze(roots, -1, rootIds, nodes);
+        } finally {
+            buildingRoot = outerRoot;
+        }
         generation++;
         AccessibilityTreeSnapshot updatedSnapshot = new AccessibilityTreeSnapshot(generation, rootIds, nodes);
         snapshot = updatedSnapshot;
-        snapshotForm = form;
-        dirty = false;
-        pendingChanges = 0;
+        snapshotRoot = form;
+        // Whether this surface was the one on screen when it was described. That is what
+        // separates a surface the application has since navigated away from -- whose
+        // retained ids must stop working -- from one that was never on screen to begin
+        // with, which is a form being prepared, or one shown a moment ago that the event
+        // thread has not made current yet. Both of those are live surfaces a caller acts
+        // on legitimately, and they are indistinguishable from the navigated-away one by
+        // asking only whether it is showing now.
+        rootWasShowing.put(form, Boolean.valueOf(isShowingRoot(form)));
+        snapshotsByRoot.put(form, updatedSnapshot);
+        evictStaleRoots();
+        dirtyRoots.remove(form);
         return snapshot;
+    }
+
+    /// Trims the cache without ever dropping a surface the user can still see.
+    ///
+    /// The cap is here because a root is only released explicitly when a window is
+    /// disposed -- an application walking through fifty forms would otherwise keep a
+    /// frozen tree for every one of them. But evicting by age alone dropped live
+    /// windows once there were more of them than the cap, and an off-EDT reader on an
+    /// evicted window is handed an empty tree, which is a screen reader losing the
+    /// whole hierarchy. So age decides only among the surfaces that are no longer
+    /// showing; when every entry is still showing the cache is allowed to exceed the
+    /// cap, which is bounded anyway by how many surfaces can exist at once.
+    private void evictStaleRoots() {
+        while (snapshotsByRoot.size() > MAX_CACHED_ROOTS) {
+            Container evictable = null;
+            for (Container root : snapshotsByRoot.keySet()) {
+                boolean showing = root instanceof TopLevelContainer
+                        && ((TopLevelContainer) root).isTopLevelShowing();
+                if (!showing) {
+                    evictable = root;
+                    break;
+                }
+            }
+            if (evictable == null) {
+                return;
+            }
+            snapshotsByRoot.remove(evictable);
+            rootWasShowing.remove(evictable);
+            // And out of the dirty set with it. Dirtiness is only ever recorded for a
+            // root that has a cached tree, so an entry left behind here describes a
+            // tree that no longer exists -- and because a form never releases its root
+            // explicitly, that entry would hold the form and its whole hierarchy for
+            // good.
+            dirtyRoots.remove(evictable);
+        }
+    }
+
+    private AccessibilityNodeSnapshot findNode(long nodeId) {
+        // The tree most recently built, whatever it describes. Gating this one on the
+        // root being current as well refused an action the moment a caller performed one
+        // straight after showing a form -- the device suite does exactly that, and the
+        // surface is not current at that instant. The hazard reported was ids surviving
+        // in the *cached* trees below, which is where the check belongs.
+        // Unless that surface has since been taken off screen. A window hidden without
+        // being disposed stays the last tree built, and its ids went on resolving here
+        // -- so a reader holding one could press a button on a window nobody can see.
+        AccessibilityNodeSnapshot node = isWithdrawnRoot(snapshotRoot)
+                ? null : snapshot.getNode(nodeId);
+        if (node != null) {
+            return node;
+        }
+        for (Map.Entry<Container, AccessibilityTreeSnapshot> cached
+                : snapshotsByRoot.entrySet()) {
+            // Only surfaces that are actually on screen. A tree stays cached after the
+            // main form has navigated away -- deliberately, so a live secondary window
+            // keeps its own -- and an id retained from the old one still resolved here,
+            // so a reader could invoke a command on a form nobody can see any more.
+            if (!isShowingRoot(cached.getKey())) {
+                continue;
+            }
+            node = cached.getValue().getNode(nodeId);
+            if (node != null) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    /// The surface a rebuilt root belongs to, zero for the application's main one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root that was rebuilt, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the window id, or zero for a form
+    private static int windowIdOf(Container root) {
+        return root instanceof Window ? ((Window) root).getWindowId() : 0;
+    }
+
+    /// Whether a root has been taken off screen since its tree was built.
+    ///
+    /// Only a window can be: the platform maps it and unmaps it again, and once it is
+    /// unmapped an id retained from it must not act on it. A form's showing flag cannot
+    /// answer this question -- it means "is the current surface", which is equally false
+    /// for a form being prepared off screen and for the instant between `Form#show()` and
+    /// the event thread processing it. Both are live surfaces a caller legitimately acts
+    /// on, which is why the check below is the wrong one to apply here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root that owns the most recently built tree, may be null
+    ///
+    /// #### Returns
+    ///
+    /// true when it is a window that is no longer on screen
+    private boolean isWithdrawnRoot(Container root) {
+        if (root instanceof Window) {
+            return !((Window) root).isWindowShowing();
+        }
+        // A form, which has no mapped/unmapped state of its own: it is withdrawn when it
+        // was the surface on screen at the time it was described and is not any more.
+        // This root's own history, not the last-built tree's. The question is asked of
+        // whichever surface owns the action being performed, which is routinely not the
+        // one described most recently -- an action resolved from a cached tree for the
+        // form on screen, while the latest tree belongs to one being prepared off it.
+        // Answered from a single flag, that action was measured against the wrong
+        // surface's history entirely.
+        Boolean described = rootWasShowing.get(root);
+        return described != null && described.booleanValue() && !isShowingRoot(root);
+    }
+
+    /// Whether `#snapshotRoot` was the surface on screen when its tree was built.
+    /// Whether each described root was the surface on screen when its tree was built.
+    ///
+    /// Kept beside the trees themselves and dropped with them, because it answers for the
+    /// root it is recorded against rather than for whichever one was described last.
+    private final LinkedHashMap<Container, Boolean> rootWasShowing =
+            new LinkedHashMap<Container, Boolean>();
+
+    /// Whether a cached root is a surface the user can currently see.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the cached root, may be null
+    ///
+    /// #### Returns
+    ///
+    /// true when it is a top level and it is showing
+    private static boolean isShowingRoot(Container root) {
+        return root instanceof TopLevelContainer
+                && ((TopLevelContainer) root).isTopLevelShowing();
     }
 
     public synchronized int getPendingChanges() {
@@ -171,7 +681,12 @@ public final class AccessibilityManager {
         final AccessibilityNodeSnapshot node;
         final AccessibilityAction action;
         synchronized (this) {
-            node = snapshot.getNode(nodeId);
+            // Across every cached surface, not just the last one built. Off-EDT
+            // readers are now handed their own window's tree, so the node they act on
+            // routinely comes from a snapshot other than the current one -- resolving
+            // only against that one would leave every button on a secondary window
+            // inert.
+            node = findNode(nodeId);
             action = node == null ? null : node.getAction(actionId);
         }
         if (node == null || action == null || !action.isEnabled()) {
@@ -180,8 +695,24 @@ public final class AccessibilityManager {
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                action.perform(node.getComponent(), argument);
-                invalidate(node.getComponent(), CHANGE_STATE | CHANGE_VALUE | CHANGE_CONTENT);
+                // Asked again here, not only when the id was resolved. A window can be
+                // hidden or disposed between the two, and the action would then press a
+                // button on a surface that has gone. The question is the same narrow one
+                // the lookup asks -- has this surface been taken off screen -- rather
+                // than "is it showing", which is equally false for a form that was never
+                // shown and is a live surface a caller acts on.
+                Component target = node.getComponent();
+                TopLevelContainer top = target == null ? null : target.getTopLevelContainer();
+                // No surface at all means the component has been taken out of the
+                // hierarchy since the id was resolved -- a rebuilt form, a list that
+                // replaced its rows. Pressing it then acts on something no longer on
+                // screen just as surely as a hidden window does. A form that has not
+                // been shown yet is not this: its components still answer with it.
+                if (top == null || isWithdrawnRoot(top.asContainer())) {
+                    return;
+                }
+                action.perform(target, argument);
+                invalidate(target, CHANGE_STATE | CHANGE_VALUE | CHANGE_CONTENT);
             }
         });
         return true;

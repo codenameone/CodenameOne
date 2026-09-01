@@ -156,12 +156,39 @@ rm -f "$SYNC_DIR/tap.go" "$SYNC_DIR/drag.go" "$SYNC_DIR/longpress.go"
 XCB_RC_FILE="$ARTIFACTS_DIR/xcodebuild.rc"
 rm -f "$XCB_RC_FILE"
 
+# The app's own transcript, which is the authoritative record -- the same file the
+# assertions at the end of this script fall back to. Resolved lazily and cached: the
+# container's Documents directory only exists once the app has run.
+CN1IV_EVENTS_FILE=""
+resolve_app_events_file() {
+  if [ -n "$CN1IV_EVENTS_FILE" ] && [ -f "$CN1IV_EVENTS_FILE" ]; then
+    return 0
+  fi
+  local container
+  container="$(xcrun simctl get_app_container "$SIM_UDID" "$BUNDLE_ID" data 2>/dev/null || true)"
+  [ -n "$container" ] || return 1
+  CN1IV_EVENTS_FILE="$(find "$container" -maxdepth 3 -name 'cn1iv-events.log' 2>/dev/null | head -n1)"
+  [ -n "$CN1IV_EVENTS_FILE" ] && [ -f "$CN1IV_EVENTS_FILE" ]
+}
+
 wait_for_log_marker() {
   local needle="$1"
   local timeout_seconds="${2:-45}"
   local deadline=$((SECONDS + timeout_seconds))
+  local spin=0
   while [ "$SECONDS" -lt "$deadline" ]; do
     if grep -q "$needle" "$LOG_FILE"; then
+      return 0
+    fi
+    # The live stream is not a channel this handshake can depend on. It attaches its
+    # predicate a few seconds late -- which the archive pass further down already
+    # compensates for -- and a CI run saw it deliver nothing whatsoever, so every
+    # gesture stalled behind a marker the app had in fact printed a second after
+    # startup. Ask the app directly instead. Throttled to once a second because each
+    # attempt spawns simctl until the file exists.
+    spin=$((spin + 1))
+    if [ "$((spin % 5))" -eq 0 ] && resolve_app_events_file \
+        && grep -q "$needle" "$CN1IV_EVENTS_FILE"; then
       return 0
     fi
     if [ -f "$XCB_RC_FILE" ]; then
@@ -199,6 +226,16 @@ set +e
 ) | tee -a "$XCODEBUILD_LOG" &
 XCB_PIPE_PID=$!
 SYNC_FAILED=0
+# The app has to exist before any step deadline means anything. xcodebuild builds the
+# UI test target before it launches anything, which took just over four minutes on the
+# CI runner -- so the first step's own budget was spent waiting for a build, expired
+# four seconds before the app started, and the tap was never released. Every later step
+# then released on time against an XCUITest still blocked on the first one. Waited for
+# separately, and generously, so the per-step budgets measure what they are named for.
+if ! wait_for_log_marker "CN1IV:SUITE:STARTED" "${CN1IV_LAUNCH_TIMEOUT:-1200}"; then
+  iv_log "Timed out waiting for the app to start before releasing any gesture"
+  SYNC_FAILED=1
+fi
 release_xcui_step tap || SYNC_FAILED=1
 release_xcui_step drag || SYNC_FAILED=1
 release_xcui_step longpress || SYNC_FAILED=1

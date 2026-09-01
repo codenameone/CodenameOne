@@ -30,6 +30,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.Desktop;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.Window;
@@ -37,6 +38,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
@@ -48,7 +50,6 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.animations.Transition;
-import com.codename1.ui.util.UITimer;
 
 /// Unlike a regular dialog the interaction dialog only looks like a dialog,
 /// it resides in the layered pane and can be used to implement features where
@@ -230,6 +231,14 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// - `title`: the title text.
     public void setTitle(String title) {
         this.title.setText(title);
+        // Onto the operating system's title bar too while this dialog is backed by a
+        // window of its own, exactly as Dialog does. The window took a copy when it was
+        // created and this label is hidden behind the native title bar, so without this
+        // a setTitle from initNativeWindow or after a modeless show would change
+        // nothing the user can see.
+        if (nativeWindow != null && !nativeWindow.isWindowDisposed()) {
+            nativeWindow.setTitle(title == null ? "" : title);
+        }
     }
 
     /// {@inheritDoc}
@@ -335,7 +344,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// runs, so it cannot resolve its own host the way an attached component can. Left
     /// unset it uses the current `Form`, which is the historical behaviour and the
     /// right answer for an application with one window. Set it to put the dialog on a
-    /// `com.codename1.ui.Window` instead: without it the dialog is added to the main
+    /// `Window` instead: without it the dialog is added to the main
     /// form's layered pane, so it appears on the main window while the window that
     /// asked for it is merely dimmed -- and in an application with no form at all
     /// there is nothing to resolve and showing it fails.
@@ -343,6 +352,335 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// #### Parameters
     ///
     /// - `host`: the top level to show on, or null for the current form
+    /// Whether this dialog is backed by a real operating system window.
+    ///
+    /// Resolved when the dialog is shown: what `#setNativeWindowMode(boolean)` was
+    /// told, else `Dialog#isDefaultNativeWindowMode()` and the theme constant behind
+    /// it. A platform with no windowing system ignores all of it and shows the dialog
+    /// on its host's layered pane as before.
+    ///
+    /// #### Returns
+    ///
+    /// true when this dialog asks for its own window
+    public boolean isNativeWindowMode() {
+        if (nativeWindowMode != null) {
+            return nativeWindowMode.booleanValue();
+        }
+        return Dialog.isDefaultNativeWindowMode();
+    }
+
+    /// Sets whether this dialog is backed by a real operating system window.
+    ///
+    /// Takes effect the next time the dialog is shown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeWindowMode`: true to open this dialog in its own window
+    public void setNativeWindowMode(boolean nativeWindowMode) {
+        this.nativeWindowMode = Boolean.valueOf(nativeWindowMode);
+    }
+
+    /// The window backing this dialog while it is showing.
+    ///
+    /// #### Returns
+    ///
+    /// the window, or null when the dialog is not in one
+    public Window getNativeWindow() {
+        return nativeWindow;
+    }
+
+    /// Called once the window backing this dialog has been configured and before it is
+    /// shown, so an application can adjust it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the window about to be shown
+    protected void initNativeWindow(Window w) {
+    }
+
+    /// Whether this showing opens a real operating system window.
+    ///
+    /// An anchored popup never does: it points at a rectangle in its host's coordinate
+    /// space, and a separate window neither shares that space nor sees the click that
+    /// is meant to dismiss it.
+    ///
+    /// #### Returns
+    ///
+    /// true to open a window of its own
+    private boolean usesNativeWindow() {
+        return Desktop.isSupported() && !inPopupShow && isNativeWindowMode();
+    }
+
+    /// True while an anchored popup is being shown.
+    private boolean inPopupShow;
+
+    /// Shows this dialog as a real operating system window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `modal`: whether to park the caller until the dialog goes
+    private void showInNativeWindow(boolean modal) {
+        // Showing again without disposing first is something the lightweight path
+        // tolerates, so this one has to as well. Overwriting the field left the first
+        // window on screen and empty -- the payload having moved into the second --
+        // while its own close and dispose bridges went on acting on this dialog, whose
+        // window was now the second one: closing the abandoned window tore down the
+        // showing the user was actually looking at.
+        Window previous = nativeWindow;
+        if (previous != null) {
+            finishNativeShowing();
+            if (!previous.isWindowDisposed()) {
+                previous.dispose();
+            }
+            disposed = false;
+        }
+        TopLevelContainer host = resolveHost();
+        Window w = new Window(
+                getTitle() == null ? "" : getTitle(), new BorderLayout());
+        nativeWindow = w;
+        if (host != null) {
+            w.setOwnerWindow(host);
+        }
+        w.setCloseOperation(Window.DO_NOTHING_ON_CLOSE);
+        w.setResizable(false);
+        w.setDecorated(true);
+        w.getContentPane().setScrollableY(false);
+        Style unselectedStyle = getUnselectedStyle();
+        unselectedStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS,
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
+        unselectedStyle.setMargin(TOP, 0);
+        unselectedStyle.setMargin(BOTTOM, 0);
+        unselectedStyle.setMargin(LEFT, 0);
+        unselectedStyle.setMargin(RIGHT, 0);
+        remove();
+        w.getContentPane().addComponent(BorderLayout.CENTER, this);
+        w.addCloseListener(new NativeCloseBridge(this));
+        w.addWindowListener(new NativeShowingEndedBridge(this));
+        initNativeWindow(w);
+        hideOwnTitleIfDecorated(w);
+        revalidate();
+        if (modal) {
+            w.setModalityType(Window.MODALITY_WINDOW);
+        }
+        // Shown before it is sized: the size that matters is the drawable, and a window
+        // cannot report how much of its frame is chrome until the platform has made
+        // one. Sizing first asked for a frame the size of the content and left the
+        // dialog clipped by the height of the title bar.
+        w.show();
+        // Onto the owner's display first, for the reason the Dialog path does it: the
+        // conversions below and inside setWindowContentSize read the window's own
+        // monitor, so sizing before the move measured against whichever display the
+        // platform opened it on.
+        placeNativeWindow(w, host);
+        int cw = Math.max(1, getPreferredW());
+        int ch = Math.max(1, getPreferredH());
+        // Clamped to the monitor, as the Dialog path is. The window is not resizable and
+        // is centred, so content that prefers more than the screen -- a large image, a
+        // long line that does not wrap -- put its own controls off both edges at once,
+        // where nothing can reach them. Never null: Desktop reports a single monitor
+        // covering the display even where there is no windowing system. In device pixels
+        // rather than desktop coordinates: compared raw, the cap on a scaled display came
+        // out at half what it should be.
+        Rectangle work = w.getWorkAreaInPixels();
+        if (work.getWidth() > 0) {
+            cw = Math.min(cw, work.getWidth() * 9 / 10);
+        }
+        if (work.getHeight() > 0) {
+            ch = Math.min(ch, work.getHeight() * 9 / 10);
+        }
+        w.setWindowContentSize(cw, ch);
+        // Centred again at the size it ended up rather than the one it opened with.
+        placeNativeWindow(w, host);
+        startPendingTimeout(w);
+        if (modal) {
+            // Idempotent for a window already on screen: it takes the blocker and parks
+            // the caller without showing anything twice.
+            w.showModal();
+            // Disposed rather than just detached, for the reason the Dialog path is:
+            // hiding the window ends the modal wait too, and finishNativeShowing() alone
+            // would leave the peer registered with its owner once per showing.
+            if (!w.isWindowDisposed()) {
+                w.dispose();
+            }
+            finishNativeShowing();
+        }
+    }
+
+    /// Ends a showing that is still up in the representation this one is not using.
+    ///
+    /// The mode is read when the dialog is shown, so a caller that changes it while the
+    /// dialog is up and shows again would otherwise leave both alive. Going to the
+    /// lightweight layer reparented the payload and left the operating system window on
+    /// screen and empty, with `nativeWindow` still set -- so the next `#dispose()` took
+    /// the native path and never tore the layer down. Going the other way pulled a live
+    /// lightweight dialog out of its layer while it still counted as showing, so the
+    /// pointer listeners it had given its host were never reclaimed.
+    ///
+    /// `#dispose()` already knows how to end either one, so this only decides whether
+    /// there is a mismatched showing to end.
+    ///
+    /// #### Parameters
+    ///
+    /// - `wantsNative`: true when this showing is about to open its own window
+    private void finishShowingInOtherMode(boolean wantsNative) {
+        boolean showingNative = nativeWindow != null;
+        boolean showingLightweight = !showingNative && getParent() != null;
+        if ((showingNative && !wantsNative) || (showingLightweight && wantsNative)) {
+            dispose();
+        }
+    }
+
+    /// Puts a native-window dialog on its owner's display, centred.
+    private static void placeNativeWindow(Window w, TopLevelContainer host) {
+        if (host != null) {
+            w.centerOn(host);
+        } else {
+            w.centerOnDesktop();
+        }
+    }
+
+    /// Hides the dialog's own title while the platform draws one in the window chrome.
+    ///
+    /// Without this a titled dialog in a decorated window shows the same text twice:
+    /// once in the native title bar and once in the payload underneath it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the window about to be shown
+    private void hideOwnTitleIfDecorated(Window w) {
+        if (!w.isDecorated() || nativeTitleHidden) {
+            return;
+        }
+        nativeTitleHidden = true;
+        // What they were, not what they usually are: an application is free to suppress
+        // the title before showing, and this dialog is reusable, so putting both back
+        // visible would resurrect title UI that was deliberately hidden.
+        titleAreaWasVisible = titleArea.isVisible();
+        titleWasVisible = title.isVisible();
+        titleArea.setVisible(false);
+        title.setVisible(false);
+    }
+
+    /// Puts the dialog's own title back.
+    private void restoreOwnTitle() {
+        if (!nativeTitleHidden) {
+            return;
+        }
+        nativeTitleHidden = false;
+        titleArea.setVisible(titleAreaWasVisible);
+        title.setVisible(titleWasVisible);
+    }
+
+    /// True while the dialog's own title is hidden because the window draws one.
+    private boolean nativeTitleHidden;
+
+    /// Whether the title area was visible before the native window hid it.
+    private boolean titleAreaWasVisible;
+
+    /// Whether the title label was visible before the native window hid it.
+    private boolean titleWasVisible;
+
+    /// Takes this dialog back out of its window. Idempotent, and on the event dispatch
+    /// thread.
+    void finishNativeShowing() {
+        if (!CN.isEdt()) {
+            CN.callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    finishNativeShowing();
+                }
+            });
+            return;
+        }
+        if (nativeWindow == null) {
+            return;
+        }
+        nativeWindow = null;
+        disposed = true;
+        // This showing is over too, and it did not come through dispose(): the window
+        // was disposed from outside -- an owner cascade, getNativeWindow().dispose(), or
+        // a modal window being hidden. The clock outlives the window it was armed
+        // under, so leaving it armed here lets it close a later showing.
+        retireArmedTimeout();
+        restoreOwnTitle();
+        if (getParent() != null) {
+            remove();
+        }
+    }
+
+    /// The user activated the window's own close control.
+    void nativeCloseRequested(ActionEvent evt) {
+        evt.consume();
+        dispose();
+    }
+
+    /// Routes the window's close control back into the dialog.
+    private static final class NativeCloseBridge implements ActionListener {
+        private final InteractionDialog dlg;
+
+        NativeCloseBridge(InteractionDialog dlg) {
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            dlg.nativeCloseRequested(evt);
+        }
+    }
+
+    /// Ends the showing however the window stopped being on screen.
+    private static final class NativeShowingEndedBridge implements ActionListener {
+        private final InteractionDialog dlg;
+
+        NativeShowingEndedBridge(InteractionDialog dlg) {
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            if (!(evt instanceof WindowEvent)) {
+                return;
+            }
+            WindowEvent.Type type = ((WindowEvent) evt).getType();
+            // Hidden ends the showing as surely as Disposed does. This window exists
+            // for this showing, so a window that is not on screen means there is
+            // nothing being shown -- and the framework already reads it that way,
+            // releasing a parked modal caller the moment the window stops being
+            // visible. Ignoring it left the dialog parented to an invisible window,
+            // with isShowing() answering true and getNativeWindow() contradicting its
+            // own "only while showing" contract, and nothing left that would change
+            // either back.
+            //
+            // Minimizing does not arrive here. It clears native visibility too, but
+            // the port reports it as Minimized, so a window the user shrank keeps its
+            // dialog and gets it back on restore.
+            //
+            // Deliberately not the rule used for a dialog hosted in someone else's
+            // window, where Hidden is terminal only for a modal one: that window is
+            // the application's and may be hidden precisely so it can be shown again.
+            // This one is not.
+            if (type == WindowEvent.Type.Disposed) {
+                dlg.finishNativeShowing();
+                return;
+            }
+            if (type == WindowEvent.Type.Hidden) {
+                // Taken before the showing ends, because that clears the reference.
+                Window closing = dlg.getNativeWindow();
+                dlg.finishNativeShowing();
+                if (closing != null) {
+                    // The window is this showing's own, and hide() deliberately keeps
+                    // its peer and its place in the desktop registry so it can be shown
+                    // again. This dialog never will: the showing is over and the next
+                    // show() builds a window of its own, so leaving it would be an
+                    // allocated window nothing can reach, one per hide. Disposing it
+                    // re-enters here with Disposed, which finds the showing already
+                    // ended and does nothing.
+                    closing.dispose();
+                }
+            }
+        }
+    }
+
     public void setTopLevelHost(TopLevelContainer host) {
         this.hostTopLevel = host;
         // An explicit choice replaces an inferred one outright, and there is no longer
@@ -374,10 +712,21 @@ public class InteractionDialog extends Container implements AbstractDialog {
         if (attached != null) {
             return attached;
         }
-        return Display.getInstance().getCurrent();
+        // The top level the user is in, not the current form. Falling back to the form
+        // put a dialog opened from a focused window onto the main surface, owned by it
+        // and blocking it, while the window it came from stayed live. This is the
+        // fallback AbstractDialog documents and the one Dialog already uses.
+        return CN.getCurrentTopLevel();
     }
 
     private TopLevelContainer hostTopLevel;
+
+    /// What this dialog was told about native window mode, or null when it was not
+    /// told. A `Boolean` rather than a boolean so "unset" is distinguishable from off.
+    private Boolean nativeWindowMode;
+
+    /// The window backing this dialog, non-null for exactly one native mode showing.
+    private Window nativeWindow;
 
     /// A timeout set before the dialog was shown, waiting for a host to bind to.
     private long pendingTimeout;
@@ -472,7 +821,29 @@ public class InteractionDialog extends Container implements AbstractDialog {
         }
     }
 
+    /// Repositions a dialog that is laid out inside a host surface.
+    ///
+    /// The four arguments are margins against that host, so they describe nothing a
+    /// platform window has: in native window mode the dialog is the content of a window
+    /// the operating system places, sizes and lets the user drag. This is inert there
+    /// rather than approximated, which is the same rule the margin arguments to show()
+    /// follow -- and the body below would otherwise rewrite the geometry of the window's
+    /// own content pane and animate a layer built on the owner surface, neither of which
+    /// has anything to do with the dialog the caller is trying to resize.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: margin from the top of the host
+    ///
+    /// - `bottom`: margin from the bottom of the host
+    ///
+    /// - `left`: margin from the left of the host
+    ///
+    /// - `right`: margin from the right of the host
     public void resize(final int top, final int bottom, final int left, final int right) {
+        if (nativeWindow != null) {
+            return;
+        }
         if (!disposed) {
             final TopLevelContainer f = resolveHost();
             if (f == null) {
@@ -518,7 +889,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// - `right`: space in pixels between the right of the screen and the form
     public void show(int top, int bottom, int left, int right) {
         getUnselectedStyle().setOpacity(255);
+        boolean wantsNative = usesNativeWindow();
+        finishShowingInOtherMode(wantsNative);
         disposed = false;
+        if (wantsNative) {
+            showInNativeWindow(false);
+            return;
+        }
         TopLevelContainer f = resolveHost();
         if (f == null) {
             return;
@@ -592,7 +969,14 @@ public class InteractionDialog extends Container implements AbstractDialog {
     @Override
     public void dispose() {
         disposed = true;
+        retireArmedTimeout();
         releaseInferredHost();
+        if (nativeWindow != null) {
+            // The window fires Disposed, which is what takes the dialog back out. None
+            // of the layered pane teardown below applies -- there is no layer.
+            nativeWindow.dispose();
+            return;
+        }
         Container p = getParent();
         if (p != null) {
             TopLevelContainer f = p.getTopLevelContainer();
@@ -697,7 +1081,23 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     private void disposeTo(int direction, final Runnable onFinish) {
         disposed = true;
+        // Before the branch, because both sides of it end the showing: a directional
+        // dispose is a dispose, and skipping this left the clock running against a
+        // showing that is over -- holding a timer thread and this hierarchy until the
+        // deadline, and closing the next showing if one arrived first.
+        retireArmedTimeout();
         releaseInferredHost();
+        if (nativeWindow != null) {
+            // There is no layered pane to slide out of, and no direction that means
+            // anything for a window the platform draws. Animating the payload here
+            // would leave the operating system window on screen and, for a modal
+            // showDialog(), its caller parked on a window that never goes away.
+            nativeWindow.dispose();
+            if (onFinish != null) {
+                onFinish.run();
+            }
+            return;
+        }
         final Container p = getParent();
         if (p != null) {
             final TopLevelContainer f = p.getTopLevelContainer();
@@ -1043,6 +1443,27 @@ public class InteractionDialog extends Container implements AbstractDialog {
     }
 
     private void showPopupDialogImpl(Rectangle rect, boolean bias) {
+        inPopupShow = true;
+        try {
+            showPopupDialogBody(rect, bias);
+        } finally {
+            inPopupShow = false;
+        }
+    }
+
+    /// The body of `#showPopupDialogImpl(Rectangle, boolean)`.
+    ///
+    /// Split out so the popup flag is cleared however the showing ends. An anchored
+    /// popup never opens an operating system window: the rectangle it points at is in
+    /// its host's coordinate space, and nothing exposes where a window's drawable
+    /// begins on the desktop.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: the rectangle to point at
+    ///
+    /// - `bias`: the portrait placement bias
+    private void showPopupDialogBody(Rectangle rect, boolean bias) {
         if (rect == null) {
             throw new IllegalArgumentException("rect cannot be null");
         }
@@ -1570,21 +1991,129 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     /// Binds the pending timeout to the host the dialog is actually on.
     private void startPendingTimeout() {
+        // The window whenever there is one. setTimeout() can be called after a modeless
+        // dialog is already up and reaches this, and an explicit setTopLevelHost() wins
+        // in resolveHost() -- so the timer went onto the owner form, which stops being
+        // animated as soon as navigation replaces it, and the dialog never closed.
+        startPendingTimeout(nativeWindow != null ? nativeWindow : resolveHost());
+    }
+
+    /// Starts the pending timeout against a named surface.
+    ///
+    /// The surface decides whether there is a timeout at all -- there is nothing to
+    /// close while the dialog is not up -- but it does not drive the clock. That
+    /// distinction is the fix: a timer ticked by the surface it is registered on stops
+    /// whenever that surface stops being painted, and a modal `showDialog()` whose
+    /// timeout is the thing that releases the caller then blocks for as long as the
+    /// window stays minimized, which for a window never restored is for good.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the surface to register the timeout on, may be null
+    private void startPendingTimeout(TopLevelContainer host) {
         if (pendingTimeout <= 0) {
             return;
         }
-        TopLevelContainer host = resolveHost();
         if (host == null) {
             return;
         }
-        int millis = (int) pendingTimeout;
+        long millis = pendingTimeout;
         pendingTimeout = 0;
-        UITimer.timer(millis, false, host, new Runnable() {
-            @Override
-            public void run() {
-                dispose();
+        // Which showing armed this clock. A UITimer dies with the surface it is
+        // registered on, so it could not outlive the dialog; this one can, and without
+        // the token a dialog disposed and then shown again inside the original timeout
+        // would be closed by the previous showing's timer.
+        //
+        // Retiring first also takes down a clock that is still pending, which is what a
+        // replacement timeout armed while an earlier one is running would otherwise
+        // leave behind: the field would point at the new timer and the old thread would
+        // run on, holding this dialog, until a deadline nobody is waiting for.
+        retireArmedTimeout();
+        final int token = timeoutGeneration;
+        // Not tied to the surface. A UITimer is driven by the painting of the top level
+        // it is registered on, so a window that is minimized or hidden stops the clock
+        // -- and a modal dialog whose timeout is what releases the caller then holds it
+        // for as long as the window stays down, which for a window never restored is
+        // for good. The host still decides whether there is a timeout at all; it just
+        // does not have to be painted for it to arrive.
+        //
+        // Scheduled at the caller's own scale. setTimeout(long) accepts delays that do
+        // not fit in an int, and narrowing one wraps it negative past about 24.8 days,
+        // which makes Timer.schedule throw on the spot instead of firing at the
+        // deadline. Timer takes a long, so nothing has to be narrowed.
+        java.util.Timer clock = new java.util.Timer();
+        clock.schedule(new TimeoutSchedule(this, token), Math.max(0L, millis));
+        // Held so it can be stopped. The token alone only makes the callback do
+        // nothing when it eventually runs: the timer thread is not a daemon and the
+        // scheduled task holds this dialog, so until the original deadline passed both
+        // the thread and the whole hierarchy stayed alive -- once per early dispose.
+        timeoutClock = clock;
+    }
+
+    /// Closes the showing that armed it, once, from the event thread.
+    ///
+    /// Named rather than anonymous: an anonymous subclass here is
+    /// SIC_INNER_SHOULD_BE_STATIC_ANON under the zero-findings SpotBugs gate.
+    private static final class TimeoutSchedule extends java.util.TimerTask {
+        private final InteractionDialog dlg;
+        private final int token;
+
+        TimeoutSchedule(InteractionDialog dlg, int token) {
+            this.dlg = dlg;
+            this.token = token;
+        }
+
+        @Override
+        public void run() {
+            // Disposing is UI work, and this runs on the timer's own thread.
+            Display.getInstance().callSerially(new TimeoutDispatch(dlg, token));
+        }
+    }
+
+    /// The event-thread half of a timeout, gated on the showing that armed it.
+    private static final class TimeoutDispatch implements Runnable {
+        private final InteractionDialog dlg;
+        private final int token;
+
+        TimeoutDispatch(InteractionDialog dlg, int token) {
+            this.dlg = dlg;
+            this.token = token;
+        }
+
+        @Override
+        public void run() {
+            if (token == dlg.timeoutGeneration) {
+                dlg.dispose();
             }
-        });
+        }
+    }
+
+    /// Identifies the showing a timeout was armed under. Bumped by every arming and by
+    /// every path that ends a showing, so a clock that outlives the showing it belongs
+    /// to is discarded rather than closing whatever is on screen by then.
+    private int timeoutGeneration;
+
+    /// The armed clock itself, so it can be stopped rather than only ignored.
+    private java.util.Timer timeoutClock;
+
+    /// Retires whatever timeout is currently armed.
+    ///
+    /// Every path that ends a showing has to call this, not just `dispose()`: the clock
+    /// is deliberately not tied to the surface, so it survives the window being torn
+    /// down. Bumping twice is harmless -- the counter only ever has to stop matching.
+    ///
+    /// The counter settles what a callback already in flight does; cancelling settles
+    /// whether one is still coming at all. Both are needed: Timer runs a non-daemon
+    /// thread and the scheduled task holds this dialog, so a token-only retirement left
+    /// the thread and the hierarchy alive until the deadline it no longer cared about.
+    private void retireArmedTimeout() {
+        timeoutGeneration++;
+        if (timeoutClock != null) {
+            // cancel() discards the scheduled task and lets the timer thread exit; there
+            // is nothing else on this timer, so there is nothing left to purge.
+            timeoutClock.cancel();
+            timeoutClock = null;
+        }
     }
 
     /// Shows this interaction dialog and blocks until it is disposed.
@@ -1595,6 +2124,16 @@ public class InteractionDialog extends Container implements AbstractDialog {
         // centred it in the wrong coordinate space, and on a window smaller than the
         // display the margins could exceed the host outright and leave the dialog
         // clipped or off screen.
+        if (usesNativeWindow()) {
+            // Real window modality rather than the polling loop below: the framework
+            // blocks input for it and the caller is parked properly instead of waking
+            // every ten milliseconds to ask again.
+            finishShowingInOtherMode(true);
+            disposed = false;
+            getUnselectedStyle().setOpacity(255);
+            showInNativeWindow(true);
+            return lastCommandPressed;
+        }
         TopLevelContainer host = resolveHost();
         int width = host == null
                 ? Display.getInstance().getDisplayWidth() : host.asContainer().getWidth();

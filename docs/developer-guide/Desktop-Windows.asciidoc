@@ -344,41 +344,108 @@ Leave the host unset and the dialog uses the current form, which is the right an
 an application with one window and is what every existing single-window application
 already relies on.
 
-The other ready-made overlays aren't window-aware yet. `Dialog`, `Sheet` and `ToastBar`
-resolve their host through `CN.getCurrentForm()` or `getComponentForm()`, so from inside
-a window they either attach to the main form or find nothing at all - `getComponentForm()`
-returns null in a window by design. Showing one from a window puts it on the main window,
-which isn't what the calling code meant. Build the overlay against the window's own
-layered pane, as above, until those components gain a top-level-aware attachment path.
+`Dialog`, `Sheet` and `ToastBar` take the same host. A `Dialog` shown on a window goes
+into that window's layered pane rather than replacing the main form, and returns the
+command that was pressed exactly as it always did:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava016Snippet.java[tag=desktop-windows-java-016,indent=0]
+----
+
+A `Sheet` takes `setTopLevelHost` too, and `Sheet.getCurrentSheet(TopLevelContainer)`
+answers per surface - with more than one surface, "the current sheet" has no single
+answer. `ToastBar` gives each window its own instance through
+`ToastBar.getForTopLevel(TopLevelContainer)`; the singleton keeps following the current
+form, which is what an application with one surface relies on. The static helpers
+(`ToastBar.showMessage` and friends) target the window the user is actually in.
+
+A `ComboBox` popup, a `FloatingActionButton` submenu and `InfiniteProgress` are all
+`Dialog` underneath, so they follow the surface they were opened from with no code
+change. Tooltips and `HTMLComponent` do too.
+
+Anything you write yourself should resolve its surface with
+`Component.getTopLevelContainer()` rather than `getComponentForm()`, and measure against
+that top level rather than against `Display`. For code with no component to start
+from - a static helper, say - `CN.getCurrentTopLevel()` is the window the user is in,
+where `CN.getCurrentForm()` only ever names the main surface.
+
+[[native-window-dialogs]]
+=== Dialogs in a window of their own
+
+A dialog can be a real operating system window instead of something drawn inside the
+application's surface:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava017Snippet.java[tag=desktop-windows-java-017,indent=0]
+----
+
+`Dialog.setDefaultNativeWindowMode(boolean)` sets it for the application, and the theme
+constant `defaultNativeWindowModeBool` sets it for the theme. The instance setting wins,
+then the static default, then the theme constant - and all three are subordinate to
+there being a windowing system at all. On iOS, Android, JavaScript, headless and in the
+phone-skinned simulator the request is ignored and the dialog shows the ordinary way, so
+shared code doesn't have to guard it. `InteractionDialog` takes the same setting.
+
+The window is decorated, so the user can move it, close it and find it in the window
+list. Override `initNativeWindow(Window)` to change that or anything else about it
+before it appears. Closing it with the platform's own close control dispatches the back
+command, or disposes the dialog when there isn't one, so it means the same thing as
+Cancel. `getNativeWindow()` returns the window while the dialog is showing.
+
+Commands split by what they already are: buttons stay buttons inside the dialog, and
+commands added with `addCommand` are published to the window so the platform can put
+them wherever it shows a window's commands.
+
+These are ignored in this mode, because they describe a dialog drawn inside another
+surface: the margin arguments to `show(top, bottom, left, right)`, the position argument
+to `showPacked` and `showStretched`, the tint and `setBlurBackgroundRadius`, transitions,
+`setDisposeWhenPointerOutOfBounds` and `disposeOnRotation`. `Display.getCurrent()` also
+keeps naming the main form rather than the dialog.
+
+An anchored popup - `showPopupDialog(Component)`, `showPopupDialog(Rectangle)`, and so
+the `ComboBox` and `Picker` popups with them - never opens a window even with the option
+on for the whole application. The rectangle it points at is in its host's coordinate
+space, nothing exposes where a window's drawable begins on the desktop, a separate
+window would never receive the click meant to dismiss it, and it would steal focus from
+its opener every time it appeared.
+
+[[window-transitions]]
+=== Transitions in a window
+
+A `Form` transition into or out of a window isn't supported, and won't be. A transition
+paints both screens into one `Graphics` covering one surface; two operating system
+windows are composited by the window server, on monitors that need not even share a
+scale factor, so there is no shared context to draw an in-between frame into. That's the
+same reason `Window.capture()` exists rather than `Display.screenshot()`. A window's own
+appear and disappear animation belongs to the platform.
+
+Moving between screens *inside* a window is an ordinary transition:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava018Snippet.java[tag=desktop-windows-java-018,indent=0]
+----
+
+`replace`, `replaceAndWait`, `animateLayout`, `animateHierarchy` and their fade variants
+all work on a window as they do on a form.
 
 === Unsupported inside a window
 
-* `Dialog`, `Sheet` and `ToastBar`, for the reason just described.
-* `ComboBox`. Its popup is a `Dialog`, so it inherits that limitation: clicking one
-  inside a window has no effect at all rather than opening the list. Use a
-  `Picker`, or a button that opens your own overlay on the window's layered pane.
-  A `Picker` in a window always uses its lightweight popup, even on a platform with
-  a native one, because every native picker attaches to the main surface and would
-  open over the wrong window.
-* `FloatingActionButton` with sub-buttons, for the same reason - the submenu is a
-  `Dialog` too. A plain floating action button with no submenu works normally;
-  only the submenu form is affected, and releasing one in a window opens nothing
-  rather than throwing.
-* System sheets on Mac Catalyst - sharing (`ShareButton` and `Display.share()`), camera
-  capture, the photo gallery, the file chooser and the full-screen video player. All
-  are presented by the application's main scene, so invoking one from a secondary
-  window shows it over the main window instead; the share sheet also anchors its
-  popover to the main window's coordinates, so it lands in the wrong place as well.
-  These work normally from the main window.
-* Tooltips. `TooltipManager` schedules against `getComponentForm()` and displays through
-  an `InteractionDialog` on the current form, so it has the same limitation even though
-  `InteractionDialog` itself doesn't.
-* `Form` transitions into or out of a window.
-* `HTMLComponent`.
-* Accessibility on secondary windows.
+* A `Picker` in a window always uses its lightweight popup, even on a platform with a
+  native one, because every native picker attaches to the main surface and would open
+  over the wrong window.
+* `Form` transitions into or out of a window - see <<window-transitions>> for why, and
+  for what to use instead.
+* A `Toolbar` on a window. `Toolbar` is installed through `Form.setToolbar` and is
+  bound to a form throughout, so there is no supported way to put one on a window yet.
+  Window commands go to the platform through `addCommand`.
 
 `Display.getDisplayWidth()` and `getDisplayHeight()` continue to report the *main*
-window. Components inside a window should size against their own top level.
+window. Components inside a window should size against their own top level, and
+`CN.getCurrentTopLevel()` is the surface the user is in where `CN.getCurrentForm()`
+only ever names the main one.
 
 [[window-capture]]
 === Capturing a window
@@ -454,6 +521,12 @@ bundle it has always had.
 `Desktop.isSupported()` reads the key back out of the running bundle rather than
 trusting a build flag, so the API and the `Info.plist` can never disagree -- including
 in a project that was generated once and then hand-edited.
+
+System sheets follow the focused window. Sharing (`ShareButton` and `Display.share()`),
+camera capture, the photo gallery, the file chooser and the full-screen video player are
+presented from the scene the user is actually in, and the share popover anchors against
+that window's own coordinates and screen scale rather than the main scene's. Invoking
+one from a secondary window opens it over that window, where it belongs.
 
 Catalyst differs in one implementation detail worth knowing: a window's Codename One
 content is rendered into an off-screen raster and presented to the scene's view, rather

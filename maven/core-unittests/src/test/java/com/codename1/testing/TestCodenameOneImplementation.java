@@ -841,6 +841,91 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return windowManager;
     }
 
+    /// Whether semantic invalidations are projected eagerly, off by default as on any
+    /// port with no assistive technology attached.
+    private boolean accessibilityTreeSupported;
+
+    /// Turns eager accessibility projection on or off for a test.
+    ///
+    /// #### Parameters
+    ///
+    /// - `supported`: true to have invalidations schedule a rebuild
+    public void setAccessibilityTreeSupported(boolean supported) {
+        this.accessibilityTreeSupported = supported;
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return accessibilityTreeSupported;
+    }
+
+    private boolean minimized;
+
+    /// Models an application that has been put into the background.
+    ///
+    /// A modal show is refused outright while minimized -- it returns at once without
+    /// installing anything -- so this is how a test reaches the paths that have to cope
+    /// with a show that did not happen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimized`: true to report the application as minimized
+    public void setMinimized(boolean minimized) {
+        this.minimized = minimized;
+    }
+
+    @Override
+    public boolean isMinimized() {
+        return minimized;
+    }
+
+    private final java.util.List<int[]> accessibilityNotifications =
+            new java.util.ArrayList<int[]>();
+
+    /// Every surface the framework said had changed, as {changeType, windowId} pairs.
+    ///
+    /// A port that pushes the tree into a native view is told which surface it is
+    /// describing; recorded here so a test can assert the window was named rather than
+    /// the main surface being described over and over.
+    public java.util.List<int[]> getAccessibilityNotifications() {
+        return new java.util.ArrayList<int[]>(accessibilityNotifications);
+    }
+
+    public void clearAccessibilityNotifications() {
+        accessibilityNotifications.clear();
+    }
+
+    @Override
+    public void accessibilityTreeChanged(int changeType, int windowId) {
+        accessibilityNotifications.add(new int[]{changeType, windowId});
+        super.accessibilityTreeChanged(changeType, windowId);
+    }
+
+    private Boolean accessibilityTreeUpdateRequired;
+
+    /// Models a port that exposes the tree but never projects it eagerly.
+    ///
+    /// The default ties this to `#isAccessibilityTreeSupported()`, which is the
+    /// Android shape: assistive technology is active, so every invalidation schedules a
+    /// rebuild. Ports that are pulled from instead -- the desktop and iOS bridges ask
+    /// for a tree when they want one -- report false here while still supporting it, and
+    /// then nothing rebuilds a surface behind the manager's back.
+    ///
+    /// #### Parameters
+    ///
+    /// - `required`: true or false to force it, null to follow whether it is supported
+    public void setAccessibilityTreeUpdateRequired(Boolean required) {
+        this.accessibilityTreeUpdateRequired = required;
+    }
+
+    @Override
+    public boolean isAccessibilityTreeUpdateRequired() {
+        if (accessibilityTreeUpdateRequired != null) {
+            return accessibilityTreeUpdateRequired.booleanValue();
+        }
+        return super.isAccessibilityTreeUpdateRequired();
+    }
+
     /// Returns the fake window manager as its concrete type, for assertions.
     public TestWindowManager getTestWindowManager() {
         return windowManager;
@@ -1268,6 +1353,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     public void reset() {
+        minimized = false;
+        usesInvokeAndBlockForEditString = false;
         windowManager = null;
         desktop = false;
         nativeTitle = false;
@@ -1982,6 +2069,26 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public boolean isAsyncEditMode() {
         return true;
+    }
+
+    /// Whether the port is one of those that edit through invokeAndBlock, which is what
+    /// makes TextArea stop the previous editor and resume the new one from a timer.
+    /// False by default, as the real default is, so the path is only exercised by a test
+    /// that asks for it.
+    private boolean usesInvokeAndBlockForEditString;
+
+    /// Turns the invokeAndBlock editing path on for a test.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uses`: true to report that this port edits through invokeAndBlock
+    public void setUsesInvokeAndBlockForEditString(boolean uses) {
+        usesInvokeAndBlockForEditString = uses;
+    }
+
+    @Override
+    public boolean usesInvokeAndBlockForEditString() {
+        return usesInvokeAndBlockForEditString;
     }
 
     @Override

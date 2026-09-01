@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.components;
 
 import com.codename1.junit.FormTest;
@@ -7,7 +29,9 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 
 import java.lang.reflect.Method;
@@ -273,4 +297,117 @@ class ToastBarTest extends UITestBase {
         cleanupToastBar(c);
         tb.useFormLayeredPane(false);
     }
+    @FormTest
+    void theKeyboardGapGoesWhenTheKeyboardDoes() throws Exception {
+        // The gap left for the keyboard was written when it applied and never taken off,
+        // so it outlived the keyboard: under a bar moved to the top, and under one left
+        // at the bottom once the keyboard had gone -- blank space standing for nothing.
+        Form host = new Form("host", new BorderLayout());
+        host.show();
+        DisplayTest.flushEdt();
+        host.setOverrideInvisibleAreaUnderVKB(120);
+
+        ToastBar tb = ToastBar.getInstance();
+        tb.setPosition(Component.BOTTOM);
+        Container c = invokeGetToastBarComponent(tb);
+        assertNotNull(c, "precondition: the bar was built");
+        assertEquals(120, c.getStyle().getMarginBottom(),
+                "precondition: the keyboard's gap is under the bar");
+
+        // The keyboard goes away and the bar is asked for again.
+        host.setOverrideInvisibleAreaUnderVKB(0);
+        c = invokeGetToastBarComponent(tb);
+
+        assertEquals(0, c.getStyle().getMarginBottom(),
+                "the gap has to go when the keyboard does");
+
+        cleanupToastBar(c);
+        DisplayTest.flushEdt();
+    }
+    /**
+     * An inset that goes away has to take its padding with it.
+     *
+     * The same toast component is reused across safe-area changes, and the padding it
+     * carries is cleared only when the toast changes edge. Applying the inset only when
+     * the new one is positive therefore left the previous value in the style: a toast
+     * staying at the bottom across a rotation out of a notched edge kept a blank gap
+     * under it for as long as it lived.
+     */
+    @FormTest
+    void testBottomSafeAreaPaddingIsClearedWhenTheInsetDisappears() throws Exception {
+        int safeTop = 50;
+        int safeHeight = 1820;  // leaves 50px at the bottom
+        implementation.setDisplaySafeArea(new Rectangle(0, safeTop, 1080, safeHeight));
+
+        ToastBar tb = ToastBar.getInstance();
+        tb.setPosition(Component.BOTTOM);
+
+        Form f = Display.getInstance().getCurrent();
+        f.revalidate();
+
+        Container c = invokeGetToastBarComponent(tb);
+        assertNotNull(c, "ToastBarComponent should be created");
+        assertEquals(1920 - safeTop - safeHeight, c.getStyle().getPaddingBottom(),
+                "precondition: the inset was applied");
+
+        // The rotation: same toast, same edge, no bottom inset any more. Re-resolved
+        // rather than merely revalidated, because that is where the insets are applied.
+        implementation.setDisplaySafeArea(new Rectangle(0, 0, 1080, 1920));
+        f.revalidate();
+        assertSame(c, invokeGetToastBarComponent(tb), "precondition: the same toast");
+
+        assertEquals(0, c.getStyle().getPaddingBottom(),
+                "an inset that is gone must not leave its padding behind, or the toast"
+                        + " keeps a blank gap under it for as long as it lives");
+
+        cleanupToastBar(c);
+    }
+
+    /**
+     * Taking an inset off restores the theme's spacing, not nothing.
+     *
+     * The inset replaces the padding rather than adding to it, so while one is applied
+     * the theme's own value is gone. Putting a zero back when it is taken off left a
+     * bar the theme had spaced away from the edge sitting flush against it for the rest
+     * of its life -- and the same loss happened on a move to the other edge.
+     */
+    @FormTest
+    void testClearingASafeAreaInsetRestoresTheThemedPadding() throws Exception {
+        implementation.setDisplaySafeArea(null);
+        ToastBar tb = ToastBar.getInstance();
+        tb.setPosition(Component.BOTTOM);
+
+        Form f = Display.getInstance().getCurrent();
+        f.revalidate();
+
+        Container c = invokeGetToastBarComponent(tb);
+        assertNotNull(c, "ToastBarComponent should be created");
+
+        // Stand in for a theme that asks for spacing under the bar.
+        Style themed = c.getAllStyles();
+        themed.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        themed.setPaddingBottom(9);
+        assertEquals(9, c.getStyle().getPaddingBottom(), "precondition: themed spacing");
+
+        // An inset arrives and replaces it.
+        int safeTop = 50;
+        int safeHeight = 1820;
+        implementation.setDisplaySafeArea(new Rectangle(0, safeTop, 1080, safeHeight));
+        f.revalidate();
+        assertSame(c, invokeGetToastBarComponent(tb), "precondition: the same toast");
+        assertEquals(1920 - safeTop - safeHeight, c.getStyle().getPaddingBottom(),
+                "precondition: the inset took the padding over");
+
+        // And goes away again.
+        implementation.setDisplaySafeArea(new Rectangle(0, 0, 1080, 1920));
+        f.revalidate();
+        assertSame(c, invokeGetToastBarComponent(tb), "precondition: still the same toast");
+
+        assertEquals(9, c.getStyle().getPaddingBottom(),
+                "the theme's spacing has to come back when the inset goes, or the bar"
+                        + " sits flush against the edge for the rest of its life");
+
+        cleanupToastBar(c);
+    }
+
 }

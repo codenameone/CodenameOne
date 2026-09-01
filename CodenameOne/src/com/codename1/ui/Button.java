@@ -719,14 +719,17 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             ActionEvent ev = new ActionEvent(cmd, this, x, y);
             dispatcher.fireActionEvent(ev);
             if (!ev.isConsumed()) {
-                // The top level rather than the form: getComponentForm() is null by
+                // The command host rather than the form: getComponentForm() is null by
                 // design inside a Window, so a command-backed button there fired its
                 // own listeners and then told nobody -- the window's command listeners
-                // never saw the activation. Neither path re-invokes the command, which
+                // never saw the activation. It is also not simply the top level: a
+                // Dialog hosted in a window's layered pane is a parented Form, which
+                // that walk goes straight past, so the dialog never learned its own
+                // button had been pressed. Neither path re-invokes the command, which
                 // this method has already run.
-                TopLevelContainer top = getTopLevelContainer();
-                if (top != null) {
-                    top.asContainer().commandActivatedFromComponent(cmd, ev);
+                Container host = TopLevelSupport.commandHostOf(this);
+                if (host != null) {
+                    host.commandActivatedFromComponent(cmd, ev);
                 }
             }
         } else {

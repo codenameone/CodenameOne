@@ -32,13 +32,13 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -1278,23 +1278,26 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         repaint();
 
         //Places the focus on the first link in the page, as long as it is within the visible area of the first page
-        if (getComponentForm() != null) {
-            getComponentForm().revalidate(); // a revalidate on the component itself does not always result in correct size calculation, thus leaving unreachable elements in the HTML (Note that the first revalidate on the component is also necessary)
+        // The top level, not the form: getComponentForm() is null by design inside a
+        // Window, so an HTMLComponent there never revalidated, never took focus and
+        // never registered its animation.
+        if (getTopLevelContainer() != null) {
+            getTopLevelContainer().asContainer().revalidate(); // a revalidate on the component itself does not always result in correct size calculation, thus leaving unreachable elements in the HTML (Note that the first revalidate on the component is also necessary)
             if (firstFocusable != null) {
                 if (autoFocus) {
                     if (firstFocusable.getY() < getHeight()) {
-                        getComponentForm().setFocused(firstFocusable);
+                        getTopLevelContainer().setFocused(firstFocusable);
                     } else {
-                        getComponentForm().setFocused(mainContainer);
+                        getTopLevelContainer().setFocused(mainContainer);
                     }
                 }
             } else {
                 mainContainer.setFocusable(true); // If there are no focused components, the main container will become focusable, thus enabling it to be pixel-scrolled
-                getComponentForm().setFocused(mainContainer);
+                getTopLevelContainer().setFocused(mainContainer);
             }
 
             if (!marqueeComponents.isEmpty()) {
-                getComponentForm().registerAnimated(this);
+                getTopLevelContainer().registerAnimated(this);
                 int dir = getUIManager().getLookAndFeel().isRTL() ? 1 : -1;
                 marqueeMotion = Motion.createLinearMotion(0, dir * getWidth(), MARQUEE_DELAY / 2);
                 marqueeMotion.start();
@@ -1304,8 +1307,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
 
         setPageStatus(HTMLCallback.STATUS_DISPLAYED);
-        if (getComponentForm() != null) {
-            getComponentForm().revalidate();
+        if (getTopLevelContainer() != null) {
+            getTopLevelContainer().asContainer().revalidate();
         }
     }
 
@@ -1610,7 +1613,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         accesskey = '\0';
         for (Enumeration e = accessKeys.keys(); e.hasMoreElements(); ) {
             int keyCode = ((Integer) e.nextElement()).intValue();
-            getComponentForm().removeKeyListener(keyCode, this);
+            if (getTopLevelContainer() != null) {
+                getTopLevelContainer().removeKeyListener(keyCode, this);
+            }
         }
         accessKeys.clear(); //=new Hashtable();
 
@@ -1907,9 +1912,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         threadQueue.discardQueue();
         embeddedCSS = null;
         externalCSS = null;
-        if (getComponentForm() != null) {
+        if (getTopLevelContainer() != null) {
             marqueeMotion = null;
-            getComponentForm().deregisterAnimated(this);
+            getTopLevelContainer().deregisterAnimated(this);
         }
 
     }
@@ -2233,7 +2238,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
 
         accessKeys.put(Integer.valueOf(accessKey), cmp);
-        Form form = getComponentForm();
+        TopLevelContainer form = getTopLevelContainer();
         if (form != null) {
             form.addKeyListener(accessKey, this);
         }
@@ -2246,7 +2251,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         super.initComponent();
         for (Enumeration e = accessKeys.keys(); e.hasMoreElements(); ) {
             int keyCode = ((Integer) e.nextElement()).intValue();
-            getComponentForm().addKeyListener(keyCode, this);
+            if (getTopLevelContainer() != null) {
+                getTopLevelContainer().addKeyListener(keyCode, this);
+            }
         }
     }
 
@@ -2256,7 +2263,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         super.deinitialize();
         for (Enumeration e = accessKeys.keys(); e.hasMoreElements(); ) {
             int keyCode = ((Integer) e.nextElement()).intValue();
-            getComponentForm().removeKeyListener(keyCode, this);
+            if (getTopLevelContainer() != null) {
+                getTopLevelContainer().removeKeyListener(keyCode, this);
+            }
         }
         // TODO - clean DOM's UI references on deinit? Then what happens on init???
     }
@@ -2685,7 +2694,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     returnInputField = newInputField;
 
                     // Replace operation must be done on the EDT if the form is visible
-                    if (Display.getInstance().getCurrent() != inputField.getComponentForm()) { // ((inputField.getComponentForm()==null) || //NOPMD CompareObjectsWithEquals
+                    TopLevelContainer inputTop = inputField.getTopLevelContainer();
+                    if (inputTop == null || !inputTop.isTopLevelShowing()) {
                         inputField.getParent().replace(inputField, newInputField, null); // Applying the constraints may return a new instance that has to be replaced in the form
                     } else {
                         Display.getInstance().callSerially(new InputFormatRunnable(inputField, newInputField));
@@ -3854,8 +3864,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     ///
     /// - `cmp`: The component to focus and select
     void selectComponent(Component cmp) {
-        getComponentForm().setFocused(cmp);
-        getComponentForm().scrollComponentToVisible(cmp);
+        getTopLevelContainer().setFocused(cmp);
+        getTopLevelContainer().scrollComponentToVisible(cmp);
         if (cmp instanceof RadioButton) {
             ((RadioButton) cmp).setSelected(true);
         } else if (cmp instanceof CheckBox) {
@@ -3916,7 +3926,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     /// {{@inheritDoc}}
     @Override
     public void actionPerformed(ActionEvent evt) {
-        if (getComponentForm().getFocused() instanceof TextField) {
+        if (getTopLevelContainer().getFocused() instanceof TextField) {
             return;
         }
         int keyCode = evt.getKeyEvent();
