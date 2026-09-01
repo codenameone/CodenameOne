@@ -649,7 +649,7 @@ final class BuildHintsAndroid {
                         + "that reaches `kotlin-stdlib` 1.8 or newer through one dependency and an older "
                         + "`kotlin-stdlib-jdk8` through another gets two jars carrying the same classes, "
                         + "and the build fails in `checkReleaseDuplicateClasses` naming Kotlin artifacts "
-                        + "the app never asked for. It is expressed as a Gradle constraint, so it adds "
+                        + "the app never asked for. Expressed as a Gradle constraint, so it adds "
                         + "nothing to an app with no Kotlin anywhere in its dependencies and never "
                         + "lowers a version. Set to false only to manage those coordinates yourself; "
                         + "declaring `kotlin-stdlib-jdk7`, `kotlin-stdlib-jdk8` or `kotlin-bom` in your "
