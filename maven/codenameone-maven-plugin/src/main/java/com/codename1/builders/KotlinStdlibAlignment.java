@@ -1821,9 +1821,18 @@ public class KotlinStdlibAlignment {
                 i = end;
                 continue;
             }
-            if (c == '(') {
+            // Brackets hold a statement together exactly as parentheses do. A force
+            // is written across lines as
+            //   resolutionStrategy.forcedModules = [
+            //           'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'
+            //   ]
+            // and splitting there left the assignment in one statement and its
+            // coordinate in another, so neither said anything and the force went
+            // unread. Counted together because the question is only ever "is this
+            // newline inside something", not which kind of something.
+            if (c == '(' || c == '[') {
                 depth++;
-            } else if (c == ')') {
+            } else if (c == ')' || c == ']') {
                 if (depth > 0) {
                     depth--;
                 }

@@ -642,6 +642,42 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A bracket holds a statement together exactly as a parenthesis does. A
+     * force written across lines had its assignment in one statement and its
+     * coordinate in another, so neither said anything and the force went
+     * unread while the shims were raised around it.
+     */
+    @Test
+    public void aBracketHoldsAStatementTogether() {
+        String across = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all {\n"
+                + "        resolutionStrategy.forcedModules = [\n"
+                + "                'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n"
+                + "        ]\n"
+                + "    }\n");
+        check("".equals(across),
+                "the force spans lines, got <<" + across + ">>");
+
+        String mapAcross = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation([\n"
+                + "        group: 'org.jetbrains.kotlin',\n"
+                + "        name: 'kotlin-stdlib-jdk8',\n"
+                + "        version: '1.7.22'\n"
+                + "    ])\n");
+        check("".equals(mapAcross),
+                "and so does a map written across them, got <<" + mapAcross + ">>");
+
+        // Statements that are NOT inside brackets still separate, which is what
+        // stops one declaration's configuration pairing with another's coordinate.
+        String separate = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'androidx.appcompat:appcompat:1.6.1'\n"
+                + "    implementation 'com.google.code.gson:gson:2.10.1'\n");
+        check(separate.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && separate.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "ordinary declarations still split, got <<" + separate + ">>");
+    }
+
+    /**
      * Gradle's parenthesis-free map form puts two bare tokens in a row, which
      * is what a typed declaration looks like to a token counter. Read as one,
      * {@code implementation group: group, ...} "declared" a variable called
