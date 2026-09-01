@@ -564,6 +564,78 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Setting a property is not calling a method. {@code { force = false }}
+     * explicitly turns forcing OFF, and reading the word as a force turned an
+     * ordinary version request into an absolute pin -- suppressing the block
+     * for a declaration asking for nothing of the kind.
+     */
+    @Test
+    public void aForceThatIsSwitchedOffIsNotAForce() {
+        String off = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.7.22') "
+                + "{ force = false }\n");
+        check(off.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && off.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "force = false does not suppress, got <<" + off + ">>");
+
+        String on = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.7.22') "
+                + "{ force = true }\n");
+        check("".equals(on), "force = true does, got <<" + on + ">>");
+    }
+
+    /**
+     * Every literal form Groovy has interpolates except the single-quoted
+     * ones, so a coordinate assembled inside any of the others carries its
+     * definitions with it.
+     */
+    @Test
+    public void everyInterpolatingLiteralExpandsItsDefinitions() {
+        String[] assembled = {
+            "\"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$v\"",
+            "\"\"\"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$v\"\"\"",
+            "$/org.jetbrains.kotlin:kotlin-stdlib-jdk7:$v/$",
+        };
+        for (int i = 0; i < assembled.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    def v = '1.9.22'\n"
+                    + "    def dep = " + assembled[i] + "\n"
+                    + "    implementation dep\n");
+            check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                    "the sibling is aligned for <<" + assembled[i] + ">>, got <<" + out + ">>");
+            check(!out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "and the declaration is read as merged-era, got <<" + out + ">>");
+        }
+
+        // A single-quoted literal does not interpolate, so $v is not a version and
+        // the conservative answer stands.
+        String literal = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def v = '1.9.22'\n"
+                + "    def dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:$v'\n"
+                + "    implementation dep\n");
+        check("".equals(literal),
+                "an uninterpolated $v is not a version, got <<" + literal + ">>");
+    }
+
+    /**
+     * A reason is prose to the version scan as well. It reached the reason's
+     * coordinate before the map's own version entry, so the comment describing
+     * an old artifact supplied the version for the declaration warning about
+     * it -- and took the whole block down.
+     */
+    @Test
+    public void aReasonDoesNotSupplyTheVersion() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation(group: 'org.jetbrains.kotlin', "
+                + "name: 'kotlin-stdlib-jdk7', version: '1.9.22') "
+                + "{ because 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.7.22' }\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the sibling is still aligned, got <<" + out + ">>");
+        check(!out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and the declared 1.9.22 is what was read, got <<" + out + ">>");
+    }
+
+    /**
      * Every spelling Gradle has for a force is a force. {@code force} is the
      * method, {@code setForcedModules} its setter, {@code forcedModules} the
      * property, and all three hold a module absolutely -- so all three leave

@@ -311,7 +311,12 @@ public class KotlinStdlibAlignment {
             }
             int end = endOfStringLiteral(line, i);
             String literal = stringLiteralContent(line, i);
-            if (literal.startsWith(coordinate) && !hasWhitespace(literal)) {
+            if (literal.startsWith(coordinate) && !hasWhitespace(literal)
+                    && !isReasonArgument(line, i)) {
+                // A reason can be nothing but a coordinate, and this scan reached it
+                // before the map's own version: entry. namesCoordinate learned to
+                // skip a reason and this did not, so the comment describing an old
+                // artifact supplied the version for the declaration warning about it.
                 return versionComponentOf(literal.substring(coordinate.length()));
             }
             i = end;
@@ -944,28 +949,57 @@ public class KotlinStdlibAlignment {
      * forced version is read exactly like a strict one.</p>
      */
     private static boolean callsForce(String statement) {
-        for (int i = 0; i < FORCE_SPELLINGS.length; i++) {
-            if (callsNamed(statement, FORCE_SPELLINGS[i], true)) {
-                return true;
-            }
+        // The method forms, which callsNamed now distinguishes from an assignment.
+        if (callsNamed(statement, "force") || callsNamed(statement, "setForcedModules")) {
+            return true;
         }
-        return false;
+        // forcedModules is only ever written as an assignment, and assigning it any
+        // module list is a force. `force` as a property is the one that has to be
+        // read: `{ force = false }` explicitly turns forcing OFF, and accepting any
+        // assignment after the word read that as an absolute pin -- suppressing the
+        // block for a declaration that was asking for nothing of the kind.
+        if (assignedValue(statement, "forcedModules") != null) {
+            return true;
+        }
+        return "true".equals(assignedValue(statement, "force"));
     }
 
     /**
-     * Gradle's spellings of the same thing. {@code force} is the method,
-     * {@code setForcedModules} its setter and {@code forcedModules} the
-     * property, and all three pin a module absolutely. This is a list of API
-     * names rather than a guess at syntax, which is why it can be one.
+     * The value assigned to {@code name}, or null if it is not assigned here.
+     * Read outside literals, like every other question about syntax.
      */
-    private static final String[] FORCE_SPELLINGS = {
-        "force",
-        "setForcedModules",
-        "forcedModules"
-    };
+    private static String assignedValue(String statement, String name) {
+        for (int i = 0; i < statement.length(); i++) {
+            if (isLiteralStart(statement, i)) {
+                i = endOfStringLiteral(statement, i);
+                continue;
+            }
+            if (!statement.startsWith(name, i)) {
+                continue;
+            }
+            boolean startsToken = i == 0 || !isIdentifierChar(statement.charAt(i - 1));
+            int after = i + name.length();
+            if (!startsToken || (after < statement.length()
+                    && isIdentifierChar(statement.charAt(after)))) {
+                continue;
+            }
+            int at = skipBlanks(statement, after);
+            if (at >= statement.length() || statement.charAt(at) != '='
+                    || (at + 1 < statement.length() && statement.charAt(at + 1) == '=')) {
+                continue;
+            }
+            int from = skipBlanks(statement, at + 1);
+            int to = from;
+            while (to < statement.length() && !isBlank(statement.charAt(to))) {
+                to++;
+            }
+            return statement.substring(from, to);
+        }
+        return null;
+    }
 
     private static boolean callsStrictly(String statement) {
-        return callsNamed(statement, STRICTLY, false);
+        return callsNamed(statement, STRICTLY);
     }
 
     /**
@@ -975,24 +1009,34 @@ public class KotlinStdlibAlignment {
      * which only Gradle's forcedModules is written as. It is not offered to
      * every caller because `def strictly = false` is not a strict pin.</p>
      */
-    private static boolean callsNamed(String statement, String call, boolean assigned) {
+    private static boolean callsNamed(String statement, String call) {
         for (int i = 0; i < statement.length(); i++) {
             if (isLiteralStart(statement, i)) {
                 i = endOfStringLiteral(statement, i);
                 continue;
             }
-            if (statement.startsWith(call, i)) {
-                boolean startsToken = i == 0
-                        || !isIdentifierChar(statement.charAt(i - 1));
-                int after = i + call.length();
-                boolean endsToken = after < statement.length()
-                        && (isBlank(statement.charAt(after))
-                                || statement.charAt(after) == '('
-                                || (assigned && statement.charAt(after) == '='));
-                if (startsToken && endsToken) {
-                    return true;
-                }
+            if (!statement.startsWith(call, i)) {
+                continue;
             }
+            boolean startsToken = i == 0 || !isIdentifierChar(statement.charAt(i - 1));
+            int after = i + call.length();
+            if (!startsToken || after >= statement.length()) {
+                continue;
+            }
+            char next = statement.charAt(after);
+            if (next != '(' && !isBlank(next)) {
+                continue;
+            }
+            // `force = false` is a property being SET, not a call, and reading it as
+            // one turned an explicit "do not force" into an absolute pin. A call is
+            // what is left after excluding the assignment.
+            int assignment = skipBlanks(statement, after);
+            if (assignment < statement.length() && statement.charAt(assignment) == '='
+                    && (assignment + 1 >= statement.length()
+                            || statement.charAt(assignment + 1) != '=')) {
+                continue;
+            }
+            return true;
         }
         return false;
     }
@@ -1803,7 +1847,12 @@ public class KotlinStdlibAlignment {
     private static String expandedLiteral(String text, int from, int end,
             Map<String, String> literals) {
         String literal = text.substring(from, end + 1);
-        return text.charAt(from) == '"'
+        // Every literal form Groovy has interpolates EXCEPT the single-quoted
+        // ones. Testing for a double quote missed the slashy forms, so a coordinate
+        // assembled as $/...:$v/$ kept the text $v as its version -- no version,
+        // therefore below the floor, therefore the block suppressed for a project
+        // that was already merged-era.
+        return text.charAt(from) != '\''
                 ? withInterpolationsExpanded(literal, literals)
                 : literal;
     }
@@ -1822,7 +1871,8 @@ public class KotlinStdlibAlignment {
                 // to as $name or ${name} is the same one hop this already follows for
                 // a bare token. Reading it as unreadable made a merged-era version
                 // look pre-merge and dropped the sibling's constraint with it.
-                out.append(c == '"' ? withInterpolationsExpanded(literal, literals)
+                // The same rule as expandedLiteral: everything but a single quote.
+                out.append(c != '\'' ? withInterpolationsExpanded(literal, literals)
                         : literal);
                 i = end;
                 continue;
