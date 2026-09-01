@@ -2821,6 +2821,21 @@ extern JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JA
 extern void codenameOneGCMark();
 extern void codenameOneGCSweep();
 
+/* Thread-state and virtual-thread construction. Declared OUTSIDE the
+   conservative-roots block: neither depends on how the collector finds its roots,
+   and burying them there broke -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS -- the precise
+   threadObjectStack arm vm/CLAUDE.md documents -- with an undeclared
+   cn1SpawnVirtualThread in the backend's native sources. */
+struct cn1VirtualThread;
+/**
+ * A VM thread state. bindToCallingOsThread false builds one for a VIRTUAL thread,
+ * which owns it rather than borrowing the host's -- see the definition.
+ */
+extern struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThread);
+/** A virtual thread with a Java stack of its own, ready to be resumed. */
+extern struct cn1VirtualThread* cn1SpawnVirtualThread(void (*body)(void*), void* arg,
+                                                      size_t stackBytes);
+
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // PHASE 3b production conservative-root API. cn1ConservativeResolve maps an
 // arbitrary machine word to the base of the live heap object it points into
@@ -2837,16 +2852,6 @@ extern void cn1GcInstallSignalHandler(void);
 // Per-thread self pointer, set at thread registration; read async-signal-safely by the
 // universal-stop handler.
 extern __thread struct ThreadLocalData* cn1TlsSelf;
-
-struct cn1VirtualThread;
-/**
- * A VM thread state. bindToCallingOsThread false builds one for a VIRTUAL thread,
- * which owns it rather than borrowing the host's -- see the definition.
- */
-extern struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThread);
-/** A virtual thread with a Java stack of its own, ready to be resumed. */
-extern struct cn1VirtualThread* cn1SpawnVirtualThread(void (*body)(void*), void* arg,
-                                                      size_t stackBytes);
 
 // Capture a parking mutator's native register file + native-stack low bound so the
 // concurrent GC can conservatively scan [sp, stackBase) for native-stack-held roots.
