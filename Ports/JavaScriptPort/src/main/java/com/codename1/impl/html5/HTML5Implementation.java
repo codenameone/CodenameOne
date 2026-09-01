@@ -11043,35 +11043,63 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
     }
 
+    /// Caches any object, not just a `JSObject`.
+    ///
+    /// The cached value used to have to be a `JSObject` and everything else fell
+    /// through to `super`, which answers `new WeakReference(o)`. ParparVM's
+    /// `WeakReference` never holds what it was constructed with, so that branch is a
+    /// reference that is empty the moment it is made -- and the framework's caches
+    /// are built on ordinary Java objects, not `JSObject`s, so that was every one of
+    /// them. `EncodedImage` was the visible casualty: `getInternal()` keeps the
+    /// decoded picture in one of these, so a permanent miss made it hand the bytes
+    /// back to the browser on EVERY draw and paint nothing until that decode landed,
+    /// with no repaint scheduled for when it did. That is a picture that can stay
+    /// blank on screen, and in CI it was `graphics-draw-image-rect` differing in
+    /// about a third of runs, each run missing a different subset of the cells that
+    /// draw the same EncodedImage.
+    ///
+    /// A Java object reaches a `@JSBody` script as its own JS representation, which
+    /// is a perfectly good WeakMap value, so nothing about the mechanism needed the
+    /// `JSObject` bound -- only the declared type did.
     @Override
     public Object createSoftWeakRef(Object o) {
-        if (Display.getInstance().getProperty("javascript.useES6WeakRefs", "true").equals("true")
-                && isWeakMapSupported()
-                && (o == null || o instanceof JSObject)) {
+        if (useES6WeakRefs()) {
             if (o == null) {
                 return new JSObjectWrapper();
             }
-            JSObject key = createSoftWeakRefImpl((JSObject)o);
             JSObjectWrapper keyOut = new JSObjectWrapper();
-            keyOut.o = key;
+            keyOut.o = createSoftWeakRefImpl(o);
             return keyOut;
         } else {
             return super.createSoftWeakRef(o);
         }
     }
 
+    /// Reads back whatever `#createSoftWeakRef(Object)` handed out.
+    ///
+    /// Dispatches on the shape of the token rather than on the WeakMap being
+    /// available now, which is what the two used to disagree about: create fell
+    /// through to `super` for anything it could not put in the map, extract did not,
+    /// so a `super` token came back null however alive its referent was. The token is
+    /// the only thing that says which side made it, so it is the only thing worth
+    /// asking. Tested with `instanceof` rather than a cast because a failed cast does
+    /// not throw under ParparVM.
     @Override
     public Object extractHardRef(Object o) {
-        if (Display.getInstance().getProperty("javascript.useES6WeakRefs", "true").equals("true") && isWeakMapSupported()) {
-            if (o==null || !(o instanceof JSObjectWrapper)) {
-                return null;
-            }
-            JSObjectWrapper w = (JSObjectWrapper)o;
-            
-            return w.o == null ? null : extractHardRefImpl(w.o);
-        } else {
-            return super.extractHardRef(o);
+        if (o == null) {
+            return null;
         }
+        if (o instanceof JSObjectWrapper) {
+            JSObjectWrapper w = (JSObjectWrapper)o;
+            return w.o == null ? null : extractHardRefImpl(w.o);
+        }
+        return super.extractHardRef(o);
+    }
+
+    /// Whether the ES6 WeakMap path is both wanted and available.
+    private boolean useES6WeakRefs() {
+        return Display.getInstance().getProperty("javascript.useES6WeakRefs", "true").equals("true")
+                && isWeakMapSupported();
     }
     
     
@@ -11084,10 +11112,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static native boolean isWeakMapSupported();
     
     @JSBody(params={"o"}, script="var key={}; window.cn1GlobalWeakMap.set(key, o); return key;")
-    private native static JSObject createSoftWeakRefImpl(JSObject o);
+    private native static JSObject createSoftWeakRefImpl(Object o);
     
     @JSBody(params={"key"}, script="return window.cn1GlobalWeakMap.has(key) ? window.cn1GlobalWeakMap.get(key) : null")
-    private native static JSObject extractHardRefImpl(JSObject key);
+    private native static Object extractHardRefImpl(JSObject key);
     
     @JSBody(params={}, script="return window.cn1IsPreview === true")
     private native static boolean isPreview_();

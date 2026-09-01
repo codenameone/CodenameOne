@@ -2025,9 +2025,14 @@ bindNative([
   return null;
 });
 
+// The cached value is declared java.lang.Object, not JSObject: the framework's
+// caches hold ordinary Java objects and the JSObject-only spelling sent every one
+// of them down the WeakReference fallback, which under ParparVM never holds its
+// referent. Keep these names in step with HTML5Implementation.createSoftWeakRefImpl
+// -- ParparVM encodes the whole signature here, so a stale name binds nothing.
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl_com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl___com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject"
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl_java_lang_Object_R_com_codename1_html5_js_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl___java_lang_Object_R_com_codename1_html5_js_JSObject"
 ], function(objectRef) {
   if (typeof WeakMap !== "function") {
     return null;
@@ -2042,8 +2047,8 @@ bindNative([
 });
 
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl_com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl___com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject"
+  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl_com_codename1_html5_js_JSObject_R_java_lang_Object",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl___com_codename1_html5_js_JSObject_R_java_lang_Object"
 ], function(keyRef) {
   if (typeof WeakMap !== "function") {
     return null;
@@ -2058,7 +2063,14 @@ bindNative([
     return null;
   }
   const value = weakMap.get(key);
-  return value == null ? null : jvm.wrapJsObject(value, jvm.inferJsObjectClass(value, null));
+  if (value == null) {
+    return null;
+  }
+  // A stored Java object is already a VM object: wrapping it again would hand the
+  // caller a JSObject shell around its own instance, and the cast back to the type
+  // it cached would not throw to say so. Only a genuinely foreign JS value needs a
+  // wrapper.
+  return value.__classDef ? value : jvm.wrapJsObject(value, jvm.inferJsObjectClass(value, null));
 });
 
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag___java_lang_String_R_boolean"], function(name) {
