@@ -458,6 +458,42 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Whether a declaration is strict and what version it is strict AT are two
+     * questions. Asking only the second let `version { strictly kotlinVersion }`
+     * read as not strict at all -- the opposite of the conservative path
+     * documented everywhere else, and the one case where being wrong costs a
+     * failed resolution rather than an override.
+     */
+    @Test
+    public void aStrictPinWithAnUnreadableVersionStillSuppresses() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.7.22') "
+                + "{ version { strictly kotlinVersion } }\n");
+        check("".equals(out),
+                "a strict pin whose version cannot be read takes the conservative path");
+    }
+
+    /**
+     * Groovy's command syntax drops the parentheses, and requiring them
+     * rejected a declaration carrying an explicit strict pin.
+     */
+    @Test
+    public void theParenthesisFreeAddFormCounts() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    add 'implementation', "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n");
+        check("".equals(out),
+                "add without parentheses is still an add");
+
+        // and a quoted configuration name with no add in front still counts for nothing
+        String bare = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def cfg = 'implementation'\n"
+                + "    something cfg, 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n");
+        check(bare.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a quoted configuration name without an add does not declare anything");
+    }
+
+    /**
      * A rich-version closure carries the version instead of the coordinate.
      * Reading no version there made a merged-era declaration look below the
      * floor, which took the SIBLING's constraint down with it -- and the

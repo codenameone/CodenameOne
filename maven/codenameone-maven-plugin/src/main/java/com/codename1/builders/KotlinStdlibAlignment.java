@@ -383,8 +383,14 @@ public class KotlinStdlibAlignment {
                 if (!namesBaseStdlib(lines[j])) {
                     continue;
                 }
-                String strict = strictVersionOfBaseStdlib(lines[j]);
-                if (strict != null && belowTheFloor(strict)) {
+                // Whether it is held strictly and what version it is held AT are two
+                // questions. Asking only the second let a strict pin whose version is
+                // unreadable -- version { strictly kotlinVersion } -- read as not
+                // strict at all, which is the opposite of the conservative path this
+                // documents everywhere else. belowTheFloor(null) is true for exactly
+                // this reason, and guarding on non-null defeated it.
+                if (holdsBaseStdlibStrictly(lines[j])
+                        && belowTheFloor(strictVersionOfBaseStdlib(lines[j]))) {
                     return true;
                 }
             }
@@ -416,6 +422,15 @@ public class KotlinStdlibAlignment {
             return declared.substring(0, declared.length() - STRICT_SUFFIX.length());
         }
         return null;
+    }
+
+    /** Whether the statement holds the base library strictly, in either spelling. */
+    private static boolean holdsBaseStdlibStrictly(String line) {
+        if (callsStrictly(line)) {
+            return true;
+        }
+        String declared = declaredVersionOf(line, BASE_STDLIB);
+        return declared != null && declared.endsWith(STRICT_SUFFIX);
     }
 
     /** Gradle's strict-version shorthand, written after the version. */
@@ -892,18 +907,25 @@ public class KotlinStdlibAlignment {
         return false;
     }
 
-    /** Whether the string literal opening at {@code quoteAt} is an add() argument. */
+    /**
+     * Whether the string literal opening at {@code quoteAt} is the
+     * configuration argument of an {@code add} call.
+     *
+     * <p>Both spellings count. Groovy's command syntax drops the parentheses --
+     * {@code add 'implementation', 'group:artifact:version'} is as valid as
+     * {@code add("implementation", "...")} -- and requiring the parenthesis
+     * rejected a declaration that was carrying an explicit strict pin.</p>
+     */
     private static boolean isAddCallArgument(String line, int quoteAt) {
         int i = quoteAt - 1;
         while (i >= 0 && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
             i--;
         }
-        if (i < 0 || line.charAt(i) != '(') {
-            return false;
-        }
-        i--;
-        while (i >= 0 && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+        if (i >= 0 && line.charAt(i) == '(') {
             i--;
+            while (i >= 0 && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+                i--;
+            }
         }
         return i >= 2 && "add".equals(line.substring(i - 2, i + 1))
                 && (i - 3 < 0 || !isIdentifierChar(line.charAt(i - 3)));
