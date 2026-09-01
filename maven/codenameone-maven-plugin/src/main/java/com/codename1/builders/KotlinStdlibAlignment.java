@@ -61,6 +61,19 @@ package com.codename1.builders;
  * telling Gradle the two artifacts overlap, and it has no way to find out.
  * This class supplies for 1.8.x what JetBrains supplies from 1.9.22 on.</p>
  *
+ * <p><b>Why nothing else excuses the block either.</b> A Kotlin BOM used to
+ * suppress it, on the reasoning that a BOM manages the whole
+ * {@code org.jetbrains.kotlin} group. That went the way of the plugin check
+ * and for the same measured reason: against a graph carrying billing 9.1.0
+ * and appcompat 1.6.1, adding this block alongside {@code kotlin-bom:1.9.22}
+ * produced byte-identical resolution, because a BOM's constraints are not
+ * strict and the higher version simply wins. Alongside
+ * {@code kotlin-bom:1.7.22} it is not merely harmless but necessary -- a
+ * pre-merge BOM raises the jdk artifacts and cannot pull
+ * {@code kotlin-stdlib} back down, which is the duplicate. Removing the case
+ * also removes the question of whether a BOM declared inside an {@code if}
+ * block is in force, which no amount of reading the text can answer.</p>
+ *
  * <p><b>Why a constraint and not a force.</b> A constraint raises a version
  * and never lowers one, and never pulls a module into a graph that does not
  * already contain it. An app with no Kotlin anywhere is therefore completely
@@ -151,35 +164,6 @@ public class KotlinStdlibAlignment {
         "kotlin-stdlib-jdk8"
     };
 
-    /**
-     * The marker that can suppress the whole block rather than one artifact.
-     * A BOM manages every module in the {@code org.jetbrains.kotlin} group,
-     * jdk7 and jdk8 included, so a new enough one answers the question for
-     * both artifacts at once.
-     *
-     * <p><b>Only a new enough one.</b> A BOM raises the jdk artifacts but
-     * cannot pull {@code kotlin-stdlib} back down, because a platform
-     * contributes constraints and the highest version still wins. So a
-     * pre-merge BOM leaves exactly the arrangement this class exists to
-     * prevent -- measured, with the same graph as the class comment's
-     * table:</p>
-     *
-     * <pre>
-     * no BOM           stdlib 1.8.22 + jdk7/jdk8 1.6.21   duplicate
-     * kotlin-bom 1.7.22  stdlib 1.8.22 + jdk7/jdk8 1.7.22   STILL a duplicate
-     * kotlin-bom 1.9.22  all 1.9.22, jdk artifacts shims    safe
-     * </pre>
-     *
-     * <p>The BOM is therefore tested by version, exactly like the Kotlin
-     * Gradle plugin above it, and for the same reason: presence is not
-     * alignment.</p>
-     */
-    private static final String KOTLIN_BOM = "kotlin-bom";
-
-    /** The coordinate a BOM's version is read from. */
-    private static final String KOTLIN_BOM_COORDINATE =
-            "org.jetbrains.kotlin:kotlin-bom:";
-
     /** The group every artifact this class reasons about belongs to. */
     private static final String KOTLIN_GROUP = "org.jetbrains.kotlin";
 
@@ -207,11 +191,6 @@ public class KotlinStdlibAlignment {
             return "";
         }
         String config = configuration.trim();
-        if (declaresArtifact(KOTLIN_BOM, config, appGradleFragments)
-                && atOrPastTheMerge(declaredVersion(
-                        KOTLIN_BOM_COORDINATE, config, appGradleFragments))) {
-            return "";
-        }
         // "because" is not decoration: it is what `gradle dependencyInsight` prints
         // next to the raised version, and this constraint is otherwise unattributable
         // to anything in the developer's project.
@@ -234,72 +213,6 @@ public class KotlinStdlibAlignment {
             return "";
         }
         return "    constraints {\n" + out + "    }\n";
-    }
-
-    /**
-     * Whether a Kotlin version is at or past the release that merged the jdk
-     * artifacts away, and therefore aligns them wherever it is in force --
-     * as the Gradle plugin's version or as a BOM's.
-     *
-     * <p>Unknown reads as false everywhere it is used. A version that cannot
-     * be parsed -- {@code kotlin-gradle-plugin:$kotlin_version} and
-     * {@code kotlin-bom:$kotlinVersion} both produce one -- must not silently
-     * switch the alignment off.</p>
-     */
-    private static boolean atOrPastTheMerge(String kotlinVersion) {
-        if (kotlinVersion == null) {
-            return false;
-        }
-        // Shared with the Health Connect floor check rather than parsed again here:
-        // it already drops a qualifier, which rounds a prerelease up to its release
-        // and is the forgiving direction for a floor.
-        String numeric = HealthManifestFragments.numericVersionPrefix(
-                kotlinVersion.trim());
-        if (numeric == null) {
-            return false;
-        }
-        return compareVersions(numeric, MERGED_STDLIB_FLOOR) >= 0;
-    }
-
-    /**
-     * The version an app's own Gradle text declares immediately after
-     * {@code coordinate}, or null when it declares none there or writes one
-     * this cannot read -- a Gradle variable rather than a literal.
-     */
-    private static String declaredVersion(String coordinate, String configuration,
-            String[] appGradleFragments) {
-        if (appGradleFragments == null) {
-            return null;
-        }
-        for (int i = 0; i < appGradleFragments.length; i++) {
-            // The same active text the declaration check reads, so a commented-out
-            // BOM cannot supply the version that suppresses the block.
-            String[] lines = activeLines(appGradleFragments[i]);
-            for (int j = 0; j < lines.length; j++) {
-                String fragment = lines[j];
-                // Same configuration filter as the declaration check, so a debug-only
-                // BOM cannot supply the version that suppresses the main variant's
-                // constraints.
-                if (!declaresOnTheConstrainedConfiguration(configuration, fragment)) {
-                    continue;
-                }
-                int at = fragment.indexOf(coordinate);
-                if (at < 0) {
-                    continue;
-                }
-                int from = at + coordinate.length();
-                int to = from;
-                while (to < fragment.length()
-                        && "0123456789.".indexOf(fragment.charAt(to)) >= 0) {
-                    to++;
-                }
-                while (to > from && fragment.charAt(to - 1) == '.') {
-                    to--;
-                }
-                return to > from ? fragment.substring(from, to) : null;
-            }
-        }
-        return null;
     }
 
     /**
@@ -594,7 +507,15 @@ public class KotlinStdlibAlignment {
             char c = text.charAt(i);
             if (quote != 0) {
                 current.append(c);
-                if (c == quote) {
+                // Escapes, because the comment stripper beside this already handles
+                // them: 'can\'t' otherwise closes the string on the apostrophe it is
+                // escaping, and every following newline is read as being inside a
+                // string rather than ending a statement -- which merges statements
+                // that must stay apart.
+                if (c == '\\' && i + 1 < text.length()) {
+                    current.append(text.charAt(i + 1));
+                    i++;
+                } else if (c == quote) {
                     quote = 0;
                 }
                 continue;
@@ -670,26 +591,4 @@ public class KotlinStdlibAlignment {
         return depth;
     }
 
-    /** Numeric dotted version compare; a missing segment counts as zero. */
-    private static int compareVersions(String left, String right) {
-        String[] l = left.split("\\.");
-        String[] r = right.split("\\.");
-        int len = Math.max(l.length, r.length);
-        for (int i = 0; i < len; i++) {
-            int a = i < l.length ? parse(l[i]) : 0;
-            int b = i < r.length ? parse(r[i]) : 0;
-            if (a != b) {
-                return a < b ? -1 : 1;
-            }
-        }
-        return 0;
-    }
-
-    private static int parse(String segment) {
-        try {
-            return Integer.parseInt(segment);
-        } catch (NumberFormatException notANumber) {
-            return 0;
-        }
-    }
 }

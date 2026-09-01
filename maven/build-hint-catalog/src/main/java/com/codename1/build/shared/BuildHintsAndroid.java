@@ -652,8 +652,11 @@ final class BuildHintsAndroid {
                         + "the app never asked for. Expressed as a Gradle constraint, so it adds "
                         + "nothing to an app with no Kotlin anywhere in its dependencies and never "
                         + "lowers a version. Set to false only to manage those coordinates yourself; "
-                        + "declaring `kotlin-stdlib-jdk7`, `kotlin-stdlib-jdk8` or `kotlin-bom` in your "
-                        + "own Gradle build hints already switches it off."));
+                        + "declaring `kotlin-stdlib-jdk7` or `kotlin-stdlib-jdk8` in your own Gradle "
+                        + "build hints already switches it off for that artifact, as does pinning one "
+                        + "with a strict version. A Kotlin BOM has no such effect, and needs none: a "
+                        + "BOM contributes ordinary constraints rather than strict ones, so a newer "
+                        + "BOM simply wins over this floor while an older BOM still needs it."));
 
         h.add(new Hint("android.largeScreens")
                 .group(HintGroup.ANDROID)
