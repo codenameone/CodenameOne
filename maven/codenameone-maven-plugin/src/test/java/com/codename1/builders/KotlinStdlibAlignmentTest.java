@@ -307,6 +307,69 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * activeText strips comments, and the builder has to use it on
+     * android.topDependency before the plugin version is parsed out of it.
+     * HealthManifestFragments takes the FIRST bare substring match, so a
+     * commented-out 1.8+ plugin above an active 1.7.x one is read as the
+     * applied version and the alignment is skipped for a build that needs it.
+     */
+    @Test
+    public void aCommentedOutPluginIsNotTheAppliedPlugin() throws Exception {
+        String topDependency =
+                "// classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22'\n"
+                + "classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.7.22'\n";
+        check(KotlinStdlibAlignment.activeText(topDependency)
+                .indexOf("1.9.22") < 0,
+                "the commented plugin is gone from the active text");
+        check(KotlinStdlibAlignment.activeText(topDependency)
+                .indexOf("1.7.22") >= 0,
+                "the active plugin survives");
+
+        byte[] bytes = java.nio.file.Files.readAllBytes(new java.io.File(
+                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath());
+        String builderSrc = new String(bytes, "UTF-8");
+        check(builderSrc.contains("KotlinStdlibAlignment.activeText("),
+                "the builder strips comments before reading the plugin version");
+    }
+
+    /**
+     * A declaration on a variant or test configuration does not reach the one
+     * the constraints are written on, so it cannot stand in for a pin.
+     * debugImplementation of a new-enough BOM constrains the debug variant
+     * alone -- suppressing on it removes the constraint from the release build
+     * that still needs it, and the release build is the one that ships.
+     */
+    @Test
+    public void aVariantOnlyDeclarationDoesNotSuppress() {
+        String debugBom = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    debugImplementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n");
+        check(debugBom.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a debug-only BOM does not suppress the main variant");
+
+        String testPin = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    testImplementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check(testPin.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a test-only pin does not suppress the main variant");
+
+        String releasePin = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    releaseImplementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check(releasePin.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "even a release-only pin is not the configuration being constrained");
+    }
+
+    /**
+     * api is a real pin on the main variant and is honoured, so the
+     * configuration filter did not narrow to a single keyword.
+     */
+    @Test
+    public void anApiDeclarationCountsAsAPin() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    api 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"), "api pins jdk8");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"), "and leaves jdk7 constrained");
+    }
+
+    /**
      * An exclusion is the opposite of a pin. It applies only to the dependency
      * edge it is written on, so an independent path still brings the
      * class-bearing jar -- reading it as "the app manages this" removes the

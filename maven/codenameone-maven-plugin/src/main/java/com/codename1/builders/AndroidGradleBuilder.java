@@ -7279,9 +7279,17 @@ public class AndroidGradleBuilder extends Executor {
         // never hit the clash resolves exactly as it did before.
         //
         // Gated on AndroidX because the block is written on the implementation
-        // configuration and Gradle's constraints DSL only arrived in 4.6; the
-        // legacy support-library templates predate both, and predate the AndroidX
-        // releases that produce the clash.
+        // configuration, and on Gradle 6 rather than on 4.6 where the constraints
+        // DSL first appeared. That is deliberate, and it has been questioned in
+        // review, so: 4.6 selects AGP 3.2.0, which cannot compile against a
+        // compileSdk the current AndroidX releases require, and the builder gives
+        // that path appcompat 1.0.0, whose graph contains no Kotlin at all. A graph
+        // that reaches a merged kotlin-stdlib cannot occur there. Widening the gate
+        // would put an untested constraints block into AGP 3.x builds that work
+        // today, to fix a clash they cannot have -- and the two failure directions
+        // are not symmetrical: too narrow leaves an ancient build with a failure it
+        // already had, too wide breaks a build that currently succeeds. Raise this
+        // gate only with a reproduction on that path.
         // The Kotlin Gradle plugin version this build actually applies, empty when it
         // applies none. Which version matters: only 1.8 and newer align the jdk stdlib
         // variants themselves. An app that declares its own kotlin-gradle-plugin wins,
@@ -7291,7 +7299,12 @@ public class AndroidGradleBuilder extends Executor {
         String appliedKotlinPlugin = "";
         if (hasKotlinSources) {
             appliedKotlinPlugin = kotlinVersion;
-            String kotlinTopDependency = request.getArg("android.topDependency", "");
+            // Comments stripped first: HealthManifestFragments reads the FIRST bare
+            // substring match, so a commented-out 1.8+ plugin sitting above an active
+            // 1.7.x one is read as the applied version, and the alignment is then
+            // skipped for a build whose real plugin does not align.
+            String kotlinTopDependency = KotlinStdlibAlignment.activeText(
+                    request.getArg("android.topDependency", ""));
             if (HealthManifestFragments.declaresKotlinPlugin(kotlinTopDependency)) {
                 String declared = HealthManifestFragments
                         .declaredKotlinPluginVersion(kotlinTopDependency);

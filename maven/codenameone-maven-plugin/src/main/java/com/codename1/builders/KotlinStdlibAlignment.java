@@ -209,12 +209,12 @@ public class KotlinStdlibAlignment {
         if (configuration == null || configuration.trim().length() == 0) {
             return "";
         }
-        if (declaresArtifact(KOTLIN_BOM, appGradleFragments)
-                && atOrPastTheMerge(
-                        declaredVersion(KOTLIN_BOM_COORDINATE, appGradleFragments))) {
+        String config = configuration.trim();
+        if (declaresArtifact(KOTLIN_BOM, config, appGradleFragments)
+                && atOrPastTheMerge(declaredVersion(
+                        KOTLIN_BOM_COORDINATE, config, appGradleFragments))) {
             return "";
         }
-        String config = configuration.trim();
         // "because" is not decoration: it is what `gradle dependencyInsight` prints
         // next to the raised version, and this constraint is otherwise unattributable
         // to anything in the developer's project.
@@ -224,7 +224,7 @@ public class KotlinStdlibAlignment {
                 + "empty shims to avoid a duplicate class in checkDuplicateClasses";
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
-            if (declaresArtifact(ALIGNED_ARTIFACTS[i], appGradleFragments)) {
+            if (declaresArtifact(ALIGNED_ARTIFACTS[i], config, appGradleFragments)) {
                 continue;
             }
             out.append("        ").append(config)
@@ -283,7 +283,7 @@ public class KotlinStdlibAlignment {
      * {@code coordinate}, or null when it declares none there or writes one
      * this cannot read -- a Gradle variable rather than a literal.
      */
-    private static String declaredVersion(String coordinate,
+    private static String declaredVersion(String coordinate, String configuration,
             String[] appGradleFragments) {
         if (appGradleFragments == null) {
             return null;
@@ -294,6 +294,12 @@ public class KotlinStdlibAlignment {
             String[] lines = activeLines(appGradleFragments[i]);
             for (int j = 0; j < lines.length; j++) {
                 String fragment = lines[j];
+                // Same configuration filter as the declaration check, so a debug-only
+                // BOM cannot supply the version that suppresses the main variant's
+                // constraints.
+                if (!declaresOnTheConstrainedConfiguration(configuration, fragment)) {
+                    continue;
+                }
                 int at = fragment.indexOf(coordinate);
                 if (at < 0) {
                     continue;
@@ -338,14 +344,15 @@ public class KotlinStdlibAlignment {
      * direction: emitting a constraint the app did not need only raises an
      * artifact to a shim, while skipping one it did need fails the build.</p>
      */
-    private static boolean declaresArtifact(String artifact, String[] appGradleFragments) {
+    private static boolean declaresArtifact(String artifact, String configuration,
+            String[] appGradleFragments) {
         if (appGradleFragments == null) {
             return false;
         }
         for (int i = 0; i < appGradleFragments.length; i++) {
             String[] lines = activeLines(appGradleFragments[i]);
             for (int j = 0; j < lines.length; j++) {
-                if (declaresArtifactOnLine(artifact, lines[j])) {
+                if (declaresArtifactOnLine(artifact, configuration, lines[j])) {
                     return true;
                 }
             }
@@ -353,7 +360,11 @@ public class KotlinStdlibAlignment {
         return false;
     }
 
-    private static boolean declaresArtifactOnLine(String artifact, String line) {
+    private static boolean declaresArtifactOnLine(String artifact, String configuration,
+            String line) {
+        if (!declaresOnTheConstrainedConfiguration(configuration, line)) {
+            return false;
+        }
         if (line.contains(KOTLIN_GROUP + ":" + artifact)) {
             return true;
         }
@@ -361,6 +372,63 @@ public class KotlinStdlibAlignment {
         return line.contains(KOTLIN_GROUP)
                 && (line.contains("name: '" + artifact + "'")
                         || line.contains("name: \"" + artifact + "\""));
+    }
+
+    /**
+     * Whether a declaration on this line reaches the same configuration the
+     * constraints are written on.
+     *
+     * <p>A declaration on a variant or test configuration does not.
+     * {@code debugImplementation platform('...kotlin-bom:1.9.22')} constrains
+     * the debug variant alone, so treating it as the app managing the stdlib
+     * removes the constraint from the release build that still needs it --
+     * and the release build is the one that ships.</p>
+     *
+     * <p>The variant forms camel-case the configuration they derive from, so
+     * requiring the configuration's own lowercase spelling excludes
+     * {@code debugImplementation}, {@code releaseImplementation} and
+     * {@code testImplementation} without listing them, and cannot be defeated
+     * by a variant name nobody thought of. {@code api} is accepted alongside
+     * it because an api declaration is a real pin on the main variant; its
+     * variant forms are camel-cased in the same way.</p>
+     */
+    private static boolean declaresOnTheConstrainedConfiguration(String configuration,
+            String line) {
+        if (line.contains(configuration)) {
+            return true;
+        }
+        int at = line.indexOf("api");
+        while (at >= 0) {
+            boolean startsToken = at == 0 || !Character.isLetterOrDigit(line.charAt(at - 1));
+            int after = at + "api".length();
+            boolean endsToken = after < line.length()
+                    && (line.charAt(after) == ' ' || line.charAt(after) == '(');
+            if (startsToken && endsToken) {
+                return true;
+            }
+            at = line.indexOf("api", at + 1);
+        }
+        return false;
+    }
+
+    /**
+     * A Gradle fragment with its comments removed, for a caller that has to
+     * read a version out of it.
+     *
+     * <p>Exposed because the builder parses {@code android.topDependency} for
+     * the Kotlin plugin version with a helper that takes the first bare
+     * substring match, so a commented-out declaration above an active one wins
+     * and decides the alignment. Same hazard as the one this class already
+     * guards against on its own fragments, reached through a different
+     * parser.</p>
+     */
+    public static String activeText(String fragment) {
+        String[] lines = activeLines(fragment);
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            out.append(lines[i]).append('\n');
+        }
+        return out.toString();
     }
 
     /**
