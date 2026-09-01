@@ -1252,32 +1252,43 @@ public class KotlinStdlibAlignment {
      * patch here.</p>
      */
     private static List<String> inlineLiteralDefinitions(List<String> statements) {
+        // In statement order, and the definition is recorded AFTER its own statement
+        // has been rewritten. A two-pass version substituted a variable's first value
+        // into every use of it, including uses after a reassignment -- so
+        //   def dep = '...kotlin-stdlib-jdk8:1.9.22'; debugImplementation(dep)
+        //   dep = 'com.example:other:1.0'; implementation(dep)
+        // made the LAST statement read as a main-variant Kotlin declaration.
         Map<String, String> literals = new LinkedHashMap<String, String>();
-        for (int i = 0; i < statements.size(); i++) {
-            collectLiteralDefinition(statements.get(i), literals);
-        }
-        if (literals.isEmpty()) {
-            return statements;
-        }
         List<String> out = new ArrayList<String>();
         for (int i = 0; i < statements.size(); i++) {
-            out.add(withLiteralsInlined(statements.get(i), literals));
+            String statement = statements.get(i);
+            out.add(literals.isEmpty()
+                    ? statement
+                    : withLiteralsInlined(statement, literals));
+            updateLiteralDefinitions(statement, literals);
         }
         return out;
     }
 
-    /** Records a {@code def name = 'literal'} definition, if this is one. */
-    private static void collectLiteralDefinition(String statement,
+    /**
+     * Applies this statement's effect on the known definitions: a
+     * {@code def name = 'literal'}, a reassignment of one already known, or a
+     * reassignment to something unreadable, which forgets it rather than
+     * leaving a stale value behind.
+     */
+    private static void updateLiteralDefinitions(String statement,
             Map<String, String> literals) {
+        int i = 0;
+        boolean declared = false;
         int at = statement.indexOf(DEF);
-        if (at < 0) {
-            return;
+        if (at >= 0 && (at == 0 || !isIdentifierChar(statement.charAt(at - 1)))
+                && (at + DEF.length() >= statement.length()
+                        || !isIdentifierChar(statement.charAt(at + DEF.length())))) {
+            declared = true;
+            i = skipBlanks(statement, at + DEF.length());
+        } else {
+            i = skipBlanks(statement, 0);
         }
-        boolean startsToken = at == 0 || !isIdentifierChar(statement.charAt(at - 1));
-        if (!startsToken) {
-            return;
-        }
-        int i = skipBlanks(statement, at + DEF.length());
         int nameStart = i;
         while (i < statement.length() && isIdentifierChar(statement.charAt(i))) {
             i++;
@@ -1286,20 +1297,24 @@ public class KotlinStdlibAlignment {
             return;
         }
         String name = statement.substring(nameStart, i);
+        if (!declared && !literals.containsKey(name)) {
+            return;
+        }
         i = skipBlanks(statement, i);
-        if (i >= statement.length() || statement.charAt(i) != '=') {
+        if (i >= statement.length() || statement.charAt(i) != '='
+                || (i + 1 < statement.length() && statement.charAt(i + 1) == '=')) {
             return;
         }
         i = skipBlanks(statement, i + 1);
-        if (i >= statement.length()
-                || (statement.charAt(i) != '\'' && statement.charAt(i) != '"')) {
-            return;
+        if (i < statement.length()
+                && (statement.charAt(i) == '\'' || statement.charAt(i) == '"')) {
+            int end = endOfStringLiteral(statement, i);
+            if (end < statement.length()) {
+                literals.put(name, statement.substring(i, end + 1));
+                return;
+            }
         }
-        int end = endOfStringLiteral(statement, i);
-        if (end >= statement.length()) {
-            return;
-        }
-        literals.put(name, statement.substring(i, end + 1));
+        literals.remove(name);
     }
 
     /** The statement with known definition names replaced by their literals. */
@@ -1310,7 +1325,14 @@ public class KotlinStdlibAlignment {
             char c = statement.charAt(i);
             if (c == '\'' || c == '"') {
                 int end = endOfStringLiteral(statement, i);
-                out.append(statement, i, Math.min(end + 1, statement.length()));
+                String literal = statement.substring(i,
+                        Math.min(end + 1, statement.length()));
+                // A double-quoted string interpolates, so a known definition referred
+                // to as $name or ${name} is the same one hop this already follows for
+                // a bare token. Reading it as unreadable made a merged-era version
+                // look pre-merge and dropped the sibling's constraint with it.
+                out.append(c == '"' ? withInterpolationsExpanded(literal, literals)
+                        : literal);
                 i = end;
                 continue;
             }
@@ -1327,6 +1349,44 @@ public class KotlinStdlibAlignment {
             String literal = literals.get(token);
             out.append(literal == null ? token : literal);
             i = end - 1;
+        }
+        return out.toString();
+    }
+
+    /** A double-quoted literal with known {@code $name} references expanded. */
+    private static String withInterpolationsExpanded(String literal,
+            Map<String, String> literals) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < literal.length(); i++) {
+            char c = literal.charAt(i);
+            if (c != '$' || i + 1 >= literal.length()) {
+                out.append(c);
+                continue;
+            }
+            int nameStart = i + 1;
+            boolean braced = literal.charAt(nameStart) == '{';
+            if (braced) {
+                nameStart++;
+            }
+            int nameEnd = nameStart;
+            while (nameEnd < literal.length()
+                    && isIdentifierChar(literal.charAt(nameEnd))) {
+                nameEnd++;
+            }
+            if (nameEnd == nameStart
+                    || (braced && (nameEnd >= literal.length()
+                            || literal.charAt(nameEnd) != '}'))) {
+                out.append(c);
+                continue;
+            }
+            String value = literals.get(literal.substring(nameStart, nameEnd));
+            if (value == null) {
+                out.append(c);
+                continue;
+            }
+            // Stored with its quotes, which do not belong inside another string.
+            out.append(value, 1, value.length() - 1);
+            i = braced ? nameEnd : nameEnd - 1;
         }
         return out.toString();
     }

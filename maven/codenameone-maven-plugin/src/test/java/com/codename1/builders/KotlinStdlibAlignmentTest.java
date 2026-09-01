@@ -458,6 +458,60 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A known definition referred to as $name inside a double-quoted string is
+     * the same one hop already followed for a bare token. Reading it as
+     * unreadable made a merged-era version look pre-merge and took the
+     * sibling's constraint down with it.
+     */
+    @Test
+    public void aKnownDefinitionExpandsInsideAnInterpolatedString() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def kotlinVersion = '1.9.22'\n"
+                + "    implementation \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion\"\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the expanded version is merged-era, so the sibling stays constrained");
+
+        String braced = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def v = '1.7.22'\n"
+                + "    implementation \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:${v}\"\n");
+        check("".equals(braced), "and a pre-merge one still suppresses both");
+
+        // an UNKNOWN name stays unreadable, which is the conservative path
+        String unknown = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$mystery\"\n");
+        check("".equals(unknown), "an unknown name is still unreadable");
+    }
+
+    /**
+     * Definitions are applied in statement order. Substituting a variable's
+     * FIRST value into every use of it made a statement after a reassignment
+     * read as a declaration of the old value -- turning a debug-only Kotlin
+     * pin into a main-variant one and dropping the jdk8 constraint.
+     */
+    @Test
+    public void aReassignedVariableUsesItsCurrentValue() {
+        // Ordered the other way round on purpose: with a two-pass map the LAST value
+        // wins everywhere, so the main declaration above the reassignment reads as a
+        // Kotlin pin it never was. Only walking in order gets this right.
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = 'com.example:other:1.0'\n"
+                + "    implementation(dep)\n"
+                + "    dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n"
+                + "    debugImplementation(dep)\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the main declaration uses the value in force where it stands");
+
+        // and a reassignment to something unreadable forgets the name rather than
+        // leaving the old value standing
+        String forgotten = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n"
+                + "    dep = someFunction()\n"
+                + "    implementation(dep)\n");
+        check(forgotten.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an unreadable reassignment forgets the old literal");
+    }
+
+    /**
      * The map form has to match the declared GROUP, not the group appearing
      * anywhere. A fork under another group whose reason merely mentions
      * org.jetbrains.kotlin combined with an unrelated artifact name and read
