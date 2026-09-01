@@ -111,6 +111,23 @@
                                      the builder deletes whichever halves the
                                      app did not ask for. -->
                                 <exclude>com/codename1/impl/android/nearby/**</exclude>
+                                <!-- BillingSupport is written against the Play
+                                     Billing ProductDetails API, which needs
+                                     billing 8 or newer; cn1-binaries carries
+                                     the 4.0.0 jar this module used to compile
+                                     it against, and Play stopped accepting
+                                     apps built below 8 on Aug 31 2026. Like
+                                     the four above it ships as source and
+                                     compiles inside the app build, where
+                                     AndroidGradleBuilder adds the real billing
+                                     dependency at the version the app asked
+                                     for and deletes the file for apps with no
+                                     in-app purchase. PlayBillingVersions is
+                                     what keeps that compile honest: it refuses
+                                     a build below the floor with a sentence,
+                                     rather than letting javac fail in the
+                                     generated project. -->
+                                <exclude>com/codename1/impl/android/BillingSupport.java</exclude>
                             </excludes>
                         </configuration>
                     </plugin>
@@ -204,13 +221,6 @@
                     <version>3.0.0</version>
                     <scope>system</scope>
                     <systemPath>${cn1.binaries}/android/google-services-3.0.0.jar</systemPath>
-                </dependency>
-                <dependency>
-                    <groupId>com.codenameone.cn1binaries</groupId>
-                    <artifactId>android-billing</artifactId>
-                    <version>4.0.0</version>
-                    <scope>system</scope>
-                    <systemPath>${cn1.binaries}/android/android-billing-4.0.0.jar</systemPath>
                 </dependency>
                 <dependency>
                     <groupId>com.codenameone.cn1binaries</groupId>

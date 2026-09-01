@@ -251,8 +251,18 @@ final class BuildHintsAndroid {
         h.add(new Hint("android.billingclient.version")
                 .group(HintGroup.ANDROID)
                 .type(HintType.VERSION)
-                .def("4.0.0")
-                .platform("android"));
+                .def("8.0.0")
+                .platform("android")
+                .doc("The Play Billing Library version an in-app-purchase app is built against, "
+                        + "defaulting to 8.0.0. Codename One's billing implementation uses the "
+                        + "ProductDetails API, so 8.0.0 is also the minimum: Play Billing removed "
+                        + "the older SkuDetails API, and a build set lower is refused with an "
+                        + "explanation rather than a page of compiler errors. The default is the "
+                        + "lowest version Google still accepts for new apps and updates, and the "
+                        + "only one at that level whose library is content with `minSdkVersion` 21; "
+                        + "every later release requires 23. Setting a newer version raises "
+                        + "`android.min_sdk_version` to match, because the library's own manifest "
+                        + "would otherwise fail the merge."));
 
         h.add(new Hint("android.blockExternalStoragePermission")
                 .group(HintGroup.ANDROID)
