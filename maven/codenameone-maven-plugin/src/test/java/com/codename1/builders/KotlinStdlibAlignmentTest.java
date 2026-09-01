@@ -458,6 +458,30 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A rich-version closure carries the version instead of the coordinate.
+     * Reading no version there made a merged-era declaration look below the
+     * floor, which took the SIBLING's constraint down with it -- and the
+     * sibling is the one the graph still needed.
+     */
+    @Test
+    public void aRichVersionClosureSuppliesTheVersion() {
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7') "
+                + "{ version { strictly '1.9.22' } }\n");
+        check(modern.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a merged-era jdk7 declaration leaves the jdk8 constraint standing");
+        check(!modern.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and jdk7 itself is left to the app");
+
+        // Below the floor it still takes both, which is the case that rule exists for.
+        String preMerge = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check("".equals(preMerge),
+                "a pre-merge rich-version declaration still suppresses both");
+    }
+
+    /**
      * Gradle's {@code !!} suffix is the strict-version shorthand, and missing
      * it produced the worst outcome available here. Measured: an app writing
      * kotlin-stdlib:1.7.22!! beside a pre-merge jdk8 resolves the coherent

@@ -302,7 +302,18 @@ public class KotlinStdlibAlignment {
             }
             i = end;
         }
-        return mapEntryValue(line, "version");
+        String mapped = mapEntryValue(line, "version");
+        if (mapped != null) {
+            return mapped;
+        }
+        // A rich-version closure carries the version instead of the coordinate:
+        //   implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7') {
+        //       version { strictly '1.9.22' }
+        //   }
+        // Returning null there made a merged-era declaration read as below the floor
+        // and took the sibling's constraint down with it, which is the one the graph
+        // still needed.
+        return strictVersionIn(line);
     }
 
     /**
