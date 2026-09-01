@@ -1714,10 +1714,18 @@ class CleanTargetIntegrationTest {
         String linkLine = CompilerHelper.isWindows()
                 ? ""
                 : "\ntarget_link_libraries(${PROJECT_NAME} m)";
-        String replacement = content.replace(
-                "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})" + linkLine
-        );
+        // Match the CALL, not the whole argument list. Spelling the arguments out here
+        // means any source set the generator adds (the assembly glob was the one that
+        // caught this) silently stops matching, and every clean-target test then builds
+        // a LIBRARY and fails looking for an executable that was never asked for.
+        int at = content.indexOf("add_library(${PROJECT_NAME}");
+        assertTrue(at >= 0, "the generated CMakeLists no longer declares add_library(${PROJECT_NAME}...):\n" + content);
+        int end = content.indexOf(')', at);
+        assertTrue(end >= 0, "unterminated add_library() in the generated CMakeLists:\n" + content);
+        String replacement = content.substring(0, at)
+                + "add_executable(" + content.substring(at + "add_library(".length(), end + 1)
+                + linkLine
+                + content.substring(end + 1);
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
 

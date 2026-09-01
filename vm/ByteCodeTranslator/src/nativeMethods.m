@@ -2157,7 +2157,7 @@ struct cn1VirtualThread* cn1SpawnVirtualThread(cn1VirtualThreadBody body, void* 
     cn1VirtualThreadSetState(vt, state);
     return vt;
 }
-#endif /* CN1_VIRTUAL_THREADS -- backend only, see cn1_virtual_thread.h */
+#endif /* CN1_VIRTUAL_THREADS -- see the capability gate in cn1_virtual_thread.h */
 
 struct ThreadLocalData* getThreadLocalData() {
     // A running virtual thread supplies its own state; every generated method

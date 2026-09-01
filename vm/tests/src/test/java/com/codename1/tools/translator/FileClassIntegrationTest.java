@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.translator;
 
 import org.junit.jupiter.params.ParameterizedTest;
@@ -70,7 +92,13 @@ public class FileClassIntegrationTest {
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
 
         Path srcRoot = distDir.resolve("FileTestApp-src");
-        replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+        // The SHARED helper, not a private copy. The copy that used to live at the
+        // bottom of this file matched the add_library line by its full argument list,
+        // so the moment the generator gained an assembly glob it silently stopped
+        // matching -- and this test built a library, then failed to run an executable
+        // that was never asked for.
+        CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(
+                cmakeLists, srcRoot.getFileName().toString());
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
@@ -116,12 +144,4 @@ public class FileClassIntegrationTest {
                "}";
     }
 
-    private void replaceLibraryWithExecutableTarget(Path cmakeLists, String sourceDirName) throws IOException {
-        String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
-        String replacement = content.replace(
-                "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m)"
-        );
-        Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
-    }
 }

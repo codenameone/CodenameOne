@@ -38,9 +38,9 @@
 #include <math.h>
 #include <stdatomic.h>
 /* For CN1_RESUME_THREAD, which yields a virtual thread rather than sleeping the
-   carrier it runs on. Off the backend every entry point here is a static inline
-   stub answering "there is no virtual thread", so the macro folds back to the
-   plain sleep and every other platform is byte-for-byte unchanged. */
+   carrier it runs on. Where the switch is not implemented, every entry point here
+   is a static inline stub answering "there is no virtual thread", so the macro
+   folds back to the plain sleep and that platform is byte-for-byte unchanged. */
 #include "cn1_virtual_thread.h"
 #include <stdint.h>
 
@@ -2831,7 +2831,7 @@ extern void codenameOneGCSweep();
    conservative-roots block: neither depends on how the collector finds its roots,
    and burying them there broke -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS -- the precise
    threadObjectStack arm vm/CLAUDE.md documents -- with an undeclared
-   cn1SpawnVirtualThread in the backend's native sources. */
+   cn1SpawnVirtualThread in any native source that spawns one. */
 struct cn1VirtualThread;
 /**
  * A VM thread state. bindToCallingOsThread false builds one for a VIRTUAL thread,
@@ -2889,9 +2889,8 @@ extern void cn1StallRecord(int cause, long long ns, struct ThreadLocalData* ts);
    CN1_RESUME_THREAD below expands to CN1_STALL_ADD(..., CN1_STALL_NATIVE_RESUME,
    ...), and every native file that wraps a blocking call uses that macro. With
    the codes private to cn1_globals.m, any other native source failed to compile
-   under -DCN1_GC_CONFORM with "use of undeclared identifier"; the backend's
-   sockets, database and crypto natives are the first outside the core to wrap
-   blocking calls this way. */
+   under -DCN1_GC_CONFORM with "use of undeclared identifier", which is every port
+   whose sockets, database or crypto natives wrap a blocking call this way. */
 #define CN1_STALL_PACING_VOLUME 0   // regime-A run-ahead cap (cn1PacingPark, no budget)
 #define CN1_STALL_PACING_BUDGET 1   // regime-B admission wait (cn1PacingPark, under a ceiling)
 #define CN1_STALL_LOWMEM        2   // the low-memory allocation throttle

@@ -1075,14 +1075,31 @@ public class ByteCodeTranslator {
             // generated .S that .incbin's the resource blobs (ASM language).
             boolean embedResources = (windows && new File(srcRoot, "cn1_resources.rc").isFile())
                     || (linux && new File(srcRoot, "cn1_resources_data.S").isFile());
+            // Assembly is driven by what is actually THERE, not by which feature put it
+            // there. The resource .S used to be the only one, so the ASM language and its
+            // glob were gated on embedResources; the virtual-thread context switch is a
+            // second .S, and under that gate the clean target compiled its C half and
+            // failed to link on _cn1VirtualThreadSwitch with the source sitting in the
+            // same directory.
+            boolean hasAsm = false;
+            String[] rootFiles = srcRoot.list();
+            if (rootFiles != null) {
+                for (String f : rootFiles) {
+                    if (f.endsWith(".S") || f.endsWith(".s")) {
+                        hasAsm = true;
+                        break;
+                    }
+                }
+            }
             if (windows) {
                 writer.append("project(").append(appName).append(embedResources
                         ? " LANGUAGES C CXX RC)\n" : " LANGUAGES C CXX)\n");
             } else if (linux) {
-                writer.append("project(").append(appName).append(embedResources
+                writer.append("project(").append(appName).append(hasAsm
                         ? " LANGUAGES C ASM)\n" : " LANGUAGES C)\n");
             } else {
-                writer.append("project(").append(appName).append(" LANGUAGES C)\n");
+                writer.append("project(").append(appName).append(hasAsm
+                        ? " LANGUAGES C ASM)\n" : " LANGUAGES C)\n");
             }
             // C11 for <stdatomic.h> (cn1_globals.h) and _Static_assert (Win32 shim);
             // supported by clang/clang-cl, gcc and Xcode's clang alike.
@@ -1103,12 +1120,13 @@ public class ByteCodeTranslator {
             writer.append("file(GLOB TRANSLATOR_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.c\")\n");
             writer.append("file(GLOB TRANSLATOR_HEADERS \"${CN1_APP_SOURCE_ROOT}/*.h\")\n");
             if (linux) {
-                // The Linux executable is pure C (GTK/Cairo/Pango/GdkPixbuf are C
-                // libraries). The generated resource .S (.incbin of each classpath
-                // resource) is added when present so getResourceAsStream can read
-                // the blobs straight out of the ELF .rodata.
+                // The Linux executable is otherwise pure C (GTK/Cairo/Pango/GdkPixbuf
+                // are C libraries). Two things can put a .S beside it: the generated
+                // resource blob (.incbin of each classpath resource, so
+                // getResourceAsStream reads straight out of the ELF .rodata) and the
+                // virtual-thread context switch. Both are picked up by presence.
                 String asmGlob = "";
-                if (embedResources) {
+                if (hasAsm) {
                     writer.append("file(GLOB TRANSLATOR_ASM_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.S\")\n");
                     asmGlob = " ${TRANSLATOR_ASM_SOURCES}";
                 }
@@ -1119,13 +1137,26 @@ public class ByteCodeTranslator {
             } else if (windows) {
                 // The port's nativeSources contribute the C++ DirectWrite layer.
                 writer.append("file(GLOB TRANSLATOR_CXX_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.cpp\")\n");
+                // Assembly is a COMPILER question here, not an app-type one. MSVC cannot
+                // assemble GNU syntax, but the Windows app type is also cross-built with
+                // clang on a POSIX host, where _WIN32 is undefined, the virtual-thread
+                // switch is live, and the link fails without it. CMake knows which one it
+                // got only after project() has enabled C, so ask it there rather than
+                // guessing from the app type. Under MSVC the variable stays unset and
+                // expands to nothing.
+                if (hasAsm) {
+                    writer.append("if(NOT MSVC)\n");
+                    writer.append("    enable_language(ASM)\n");
+                    writer.append("    file(GLOB TRANSLATOR_ASM_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.S\")\n");
+                    writer.append("endif()\n");
+                }
                 if (embedResources) {
                     // The resource script compiles to a .res linked into the exe,
                     // putting the app's classpath resources in the PE resource section.
                     writer.append("file(GLOB TRANSLATOR_RC_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.rc\")\n");
-                    writer.append("add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_CXX_SOURCES} ${TRANSLATOR_RC_SOURCES} ${TRANSLATOR_HEADERS})\n");
+                    writer.append("add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_CXX_SOURCES} ${TRANSLATOR_ASM_SOURCES} ${TRANSLATOR_RC_SOURCES} ${TRANSLATOR_HEADERS})\n");
                 } else {
-                    writer.append("add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_CXX_SOURCES} ${TRANSLATOR_HEADERS})\n");
+                    writer.append("add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_CXX_SOURCES} ${TRANSLATOR_ASM_SOURCES} ${TRANSLATOR_HEADERS})\n");
                 }
                 writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
                 // Math lives in the CRT under MSVC (no separate libm to link); every
@@ -1197,7 +1228,13 @@ public class ByteCodeTranslator {
                 writer.append("    target_link_libraries(${PROJECT_NAME} m)\n");
                 writer.append("endif()\n");
             } else {
-                writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
+                String asmGlob = "";
+                if (hasAsm) {
+                    writer.append("file(GLOB TRANSLATOR_ASM_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.S\")\n");
+                    asmGlob = " ${TRANSLATOR_ASM_SOURCES}";
+                }
+                writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES}")
+                        .append(asmGlob).append(" ${TRANSLATOR_HEADERS})\n");
                 writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
             }
 
@@ -1370,16 +1407,18 @@ public class ByteCodeTranslator {
         if(s.endsWith(".m") || s.endsWith(".c")) {
             return "sourcecode.c.objc";
         }
-        // Assembly. Xcode has no default mapping for .S/.s, and an unrecognised
-        // extension becomes `lastKnownFileType = file`, which lands the file in the
-        // RESOURCES phase: it ships into the bundle and is never assembled, so the
-        // link fails naming a symbol whose source is sitting right there in the
-        // project. .S is preprocessed before assembling (the capability gate in
-        // cn1_virtual_thread_asm.S needs that); .s is not.
-        if(s.endsWith(".S")) {
-            return "sourcecode.asm.asm";
-        }
-        if(s.endsWith(".s")) {
+        // Assembly. An extension Xcode does not recognise becomes
+        // `lastKnownFileType = file`, which lands the file in the RESOURCES phase: it
+        // ships into the bundle and is never assembled, so the link fails naming a
+        // symbol whose source is sitting right there in the project.
+        //
+        // sourcecode.asm is the identifier to use for BOTH spellings. Xcode's
+        // StandardFileTypes.xcspec lists it as `Extensions = (s)` with
+        // `GccDialectName = assembler-with-cpp`, so it runs the preprocessor -- which
+        // the capability gate in cn1_virtual_thread_asm.S needs. .S is not in any
+        // Extensions list of its own, and the neighbouring sourcecode.asm.asm is for
+        // .asm, not for it.
+        if(s.endsWith(".S") || s.endsWith(".s")) {
             return "sourcecode.asm";
         }
         if(s.endsWith(".xcassets")) {

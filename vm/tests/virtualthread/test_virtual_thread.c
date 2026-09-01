@@ -23,9 +23,9 @@
 
 /* Correctness first, cost second. A fast switch that corrupts a register or
  * loses a stack is not a foundation for a scheduler. */
-/* This exercises the BACKEND virtual-thread runtime, which is gated off
- * everywhere else, so the test turns it on for itself rather than depending on
- * whatever flags a caller happens to pass. */
+/* Define the gate rather than relying on the header's capability test, so that
+ * building this test on a target the switch is NOT written for is a loud
+ * assembler error instead of a silently vacuous pass. */
 #ifndef CN1_VIRTUAL_THREADS
 #define CN1_VIRTUAL_THREADS 1
 #endif

@@ -1069,6 +1069,23 @@ class BytecodeInstructionIntegrationTest {
             assertTrue(pbxproj.contains("CoreText.framework"),
                     "iOS projects must link CoreText for IOSNative bundled font registration");
 
+            // The assembly file must be typed AND filed as a source. An extension
+            // Xcode does not recognise gets `lastKnownFileType = file` and lands in
+            // the Resources phase, where it is copied into the bundle and never
+            // assembled -- a green build that fails to link on a symbol whose source
+            // is right there in the project. Assert both halves: the type alone does
+            // not prove the phase, and the phase alone does not prove it assembles.
+            assertTrue(Files.exists(srcRoot.resolve("cn1_virtual_thread_asm.S")),
+                    "the virtual-thread switch must travel with the generated sources");
+            String asmReference = fileReferenceLine(pbxproj, "cn1_virtual_thread_asm.S");
+            assertTrue(asmReference.contains("lastKnownFileType = sourcecode.asm"),
+                    "cn1_virtual_thread_asm.S must be typed as assembly, not left as `file`:\n"
+                            + asmReference);
+            assertTrue(buildPhase(pbxproj, "PBXSourcesBuildPhase").contains("cn1_virtual_thread_asm.S"),
+                    "cn1_virtual_thread_asm.S must be in the Sources build phase");
+            assertFalse(buildPhase(pbxproj, "PBXResourcesBuildPhase").contains("cn1_virtual_thread_asm.S"),
+                    "cn1_virtual_thread_asm.S must not be shipped as a resource");
+
             // Verify bundle copied
             assertTrue(Files.exists(srcRoot.resolve("test.bundle")));
             assertTrue(Files.exists(srcRoot.resolve("test.bundle/info.txt")));
@@ -1426,4 +1443,27 @@ class BytecodeInstructionIntegrationTest {
         // or mock if possible. But here we can check basic behavior.
     }
 
+
+    /**
+     * The text of one pbxproj section, so a "contains" question can be asked of the
+     * SOURCES phase rather than of the whole file, where every path appears at least
+     * once as a file reference and the answer is always yes.
+     */
+    private static String buildPhase(String pbxproj, String isa) {
+        int at = pbxproj.indexOf("isa = " + isa);
+        assertTrue(at >= 0, "the generated project has no " + isa);
+        int end = pbxproj.indexOf("};", at);
+        assertTrue(end >= 0, "unterminated " + isa + " in the generated project");
+        return pbxproj.substring(at, end);
+    }
+
+    /** The PBXFileReference line naming this file, for a failure message that shows the real type. */
+    private static String fileReferenceLine(String pbxproj, String fileName) {
+        for (String line : pbxproj.split("\n")) {
+            if (line.contains("PBXFileReference") && line.contains(fileName)) {
+                return line.trim();
+            }
+        }
+        return "(no PBXFileReference names " + fileName + ")";
+    }
 }

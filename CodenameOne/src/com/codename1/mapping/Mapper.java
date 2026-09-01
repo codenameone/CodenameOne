@@ -65,8 +65,6 @@ public interface Mapper<T> {
     /// LinkedHashMap. On a translated device build the map is
     /// `vm/JavaAPI`'s, which overrides the natives HashMap gets and costs about
     /// 1.5x a HashMap to build -- so the saving there is at least this, not less.
-    /// The same change on a server JSON route, where serialising is one cost
-    /// among request parsing and socket I/O, was worth 29% end to end.
     ///
     /// Implemented as a separate interface rather than a method on `Mapper` so
     /// hand-written mappers keep compiling; `Mappers#toJson` uses it when the
