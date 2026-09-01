@@ -48,22 +48,27 @@
 #define CN1_VIRTUAL_THREAD_H
 
 /*
- * BACKEND ONLY. Virtual threads exist to let one server thread carry many
- * connections; nothing on a device uses them, and the switch is hand-written
- * assembly, so a target that cannot use them should not be made to build it.
+ * Virtual threads are on wherever they CAN be, which is anywhere the hand-written
+ * context switch has an implementation. That is deliberately a capability test and
+ * not a build flag: there is no separate "server build" of the VM, so a flag would
+ * only mean the feature is off in every build nobody remembered to set it in.
  *
- * Gating matters for a reason beyond dead code. The switch lives in a .S, which
- * is the only assembly file the translator emits, and Xcode does not recognise
- * the extension: it files a .S under `lastKnownFileType = file` into the
- * RESOURCES phase, so the iOS target shipped it as a resource, never assembled
- * it, and failed to link with "_cn1VirtualThreadSwitch, referenced from
- * _cn1VirtualThreadYield". With this off there is no reference to resolve, so
- * the misfiled resource is simply inert and the phone target links.
+ * The switch has to be assembly -- glibc aborts a cross-stack longjmp under
+ * _FORTIFY_SOURCE and musl has no makecontext -- and it is written for aarch64 and
+ * x86_64. Anywhere else, and on Windows (whose calling convention needs its own
+ * prologue and whose stack has a guard page the switch would have to poke), the
+ * declarations below collapse to the no-ops at the bottom of this header. Those
+ * report "there is no virtual thread here", which is true, so the shared collector
+ * in cn1_globals.m needs no #ifdefs of its own and every call folds away.
  *
- * The backend defines CN1_VIRTUAL_THREADS (see docker/link.sh). Everywhere else
- * the calls below collapse to the no-ops at the bottom of this header, so the
- * shared collector in cn1_globals.m needs no #ifdefs of its own.
+ * CN1_DISABLE_VIRTUAL_THREADS forces the no-op path on a target that would
+ * otherwise qualify.
  */
+#if !defined(CN1_VIRTUAL_THREADS) && !defined(CN1_DISABLE_VIRTUAL_THREADS) \
+        && !defined(_WIN32) && (defined(__aarch64__) || defined(__x86_64__))
+#define CN1_VIRTUAL_THREADS 1
+#endif
+
 #ifdef CN1_VIRTUAL_THREADS
 
 #include <stddef.h>

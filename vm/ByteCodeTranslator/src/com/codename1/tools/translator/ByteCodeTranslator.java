@@ -941,7 +941,7 @@ public class ByteCodeTranslator {
                 }
             } else {
                 fileListEntry.append("; path = \"");
-                if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") ||
+                if(file.endsWith(".m") || file.endsWith(".S") || file.endsWith(".s") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") ||
                         file.endsWith(".swift") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib") ||
                         file.endsWith(".metal")) {
                     fileListEntry.append(file);
@@ -977,7 +977,7 @@ public class ByteCodeTranslator {
                         .append(" };\n");
             }
             
-            if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".hh") || file.endsWith(".hpp") ||
+            if(file.endsWith(".m") || file.endsWith(".S") || file.endsWith(".s") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".hh") || file.endsWith(".hpp") ||
                     file.endsWith(".swift") || file.endsWith(".mm") || file.endsWith(".h") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".xib") ||
                     file.endsWith(".metal")) {
                 
@@ -1369,6 +1369,18 @@ public class ByteCodeTranslator {
         }
         if(s.endsWith(".m") || s.endsWith(".c")) {
             return "sourcecode.c.objc";
+        }
+        // Assembly. Xcode has no default mapping for .S/.s, and an unrecognised
+        // extension becomes `lastKnownFileType = file`, which lands the file in the
+        // RESOURCES phase: it ships into the bundle and is never assembled, so the
+        // link fails naming a symbol whose source is sitting right there in the
+        // project. .S is preprocessed before assembling (the capability gate in
+        // cn1_virtual_thread_asm.S needs that); .s is not.
+        if(s.endsWith(".S")) {
+            return "sourcecode.asm.asm";
+        }
+        if(s.endsWith(".s")) {
+            return "sourcecode.asm";
         }
         if(s.endsWith(".xcassets")) {
             return "folder.assetcatalog";

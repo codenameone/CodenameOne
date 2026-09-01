@@ -51,9 +51,16 @@
  * it fails to link, or worse, links against nothing on a platform where the
  * caller is also assembly.
  */
-/* BACKEND ONLY. Without this the file still assembles on a device target and
- * defines symbols nothing calls; with it the object is empty, which is what lets
- * a toolchain that misfiles a .S (Xcode puts it in Resources) stay harmless. */
+/* This is preprocessed assembly, so it cannot include cn1_virtual_thread.h -- the
+ * header's C declarations would not assemble. The predicate is therefore repeated
+ * here and MUST stay identical to the one in that header: if the two disagree the C
+ * side calls a switch this file did not define, and the link fails naming
+ * _cn1VirtualThreadSwitch. */
+#if !defined(CN1_VIRTUAL_THREADS) && !defined(CN1_DISABLE_VIRTUAL_THREADS) \
+        && !defined(_WIN32) && (defined(__aarch64__) || defined(__x86_64__))
+#define CN1_VIRTUAL_THREADS 1
+#endif
+
 #ifdef CN1_VIRTUAL_THREADS
 
 #if defined(__APPLE__)

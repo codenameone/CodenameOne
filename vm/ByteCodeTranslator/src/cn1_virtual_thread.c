@@ -21,8 +21,9 @@
  * need additional information or have any questions.
  */
 
-/* BACKEND ONLY -- see cn1_virtual_thread.h. Off-target this file is empty and
- * the header supplies no-op stubs, so nothing references the assembly. */
+/* See cn1_virtual_thread.h for the capability gate. On a target the switch is not
+ * written for, this file is empty and the header supplies no-op stubs, so nothing
+ * references the assembly. */
 #include "cn1_virtual_thread.h"
 #ifdef CN1_VIRTUAL_THREADS
 
