@@ -253,9 +253,7 @@ public class KotlinStdlibAlignment {
                 if (!callsStrictly(lines[j]) || !namesBaseStdlib(lines[j])) {
                     continue;
                 }
-                String version = strictVersionIn(lines[j]);
-                if (version == null
-                        || compareVersions(version, MERGED_STDLIB_FLOOR) < 0) {
+                if (belowTheFloor(strictVersionIn(lines[j]))) {
                     return true;
                 }
             }
@@ -298,6 +296,43 @@ public class KotlinStdlibAlignment {
             at = statement.indexOf(STRICTLY, at + 1);
         }
         return null;
+    }
+
+    /**
+     * Whether a strict version is below the floor the shims depend on.
+     *
+     * <p>A prerelease of the floor is below it. {@code 1.8.0-RC2} is a
+     * published Kotlin version, and its numeric part compares equal to
+     * {@code 1.8.0} -- so without this it read as "at the floor" and the block
+     * was written, whereupon the shims request the FINAL 1.8.0 and cannot
+     * coexist with the app's strict prerelease. A qualifier on any other
+     * version is ignored, because rounding {@code 1.9.22-RC} up to
+     * {@code 1.9.22} keeps it above the floor either way.</p>
+     *
+     * <p>Unreadable counts as below, because the failure it guards against
+     * cannot be worked around by the app while the duplicate class it risks
+     * instead can.</p>
+     */
+    private static boolean belowTheFloor(String version) {
+        if (version == null) {
+            return true;
+        }
+        int compared = compareVersions(version, MERGED_STDLIB_FLOOR);
+        if (compared != 0) {
+            return compared < 0;
+        }
+        return hasQualifier(version);
+    }
+
+    /** Whether the version carries anything after its numeric segments. */
+    private static boolean hasQualifier(String version) {
+        for (int i = 0; i < version.length(); i++) {
+            char c = version.charAt(i);
+            if (c != '.' && !Character.isDigit(c)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Numeric dotted version compare; a missing segment counts as zero. */
@@ -565,27 +600,63 @@ public class KotlinStdlibAlignment {
 
     /** Whether this line declares on {@code configuration}, as a whole token. */
     private static boolean declaresOn(String configuration, String line) {
-        int at = line.indexOf(configuration);
-        while (at >= 0) {
-            boolean startsToken = at == 0
-                    || !Character.isLetterOrDigit(line.charAt(at - 1));
-            int after = at + configuration.length();
-            // A closing quote ends the token too, for the map-free
-            // dependencies.add("runtimeOnly", "group:artifact:version") spelling.
-            // Safe to accept: a quoted configuration name only decides anything on a
-            // statement that also carries the artifact coordinate, and a statement
-            // carrying both is a declaration however it is spelled.
-            boolean endsToken = after < line.length()
-                    && (line.charAt(after) == ' ' || line.charAt(after) == '('
-                            || line.charAt(after) == '\t'
-                            || line.charAt(after) == '"'
-                            || line.charAt(after) == '\'');
-            if (startsToken && endsToken) {
-                return true;
+        char quote = 0;
+        int stringStart = -1;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (quote != 0) {
+                if (c == '\\' && i + 1 < line.length()) {
+                    i++;
+                } else if (c == quote) {
+                    // A configuration name inside a string counts in one place only:
+                    // as the first argument of dependencies.add("runtimeOnly", "..").
+                    // Accepting any quoted occurrence read the word in a reason --
+                    // because 'implementation workaround' -- as a main-variant
+                    // declaration, which suppressed the constraint for a dependency
+                    // that only affects debug.
+                    if (line.substring(stringStart + 1, i).equals(configuration)
+                            && isAddCallArgument(line, stringStart)) {
+                        return true;
+                    }
+                    quote = 0;
+                }
+                continue;
             }
-            at = line.indexOf(configuration, at + 1);
+            if (c == '\'' || c == '"') {
+                quote = c;
+                stringStart = i;
+                continue;
+            }
+            if (line.startsWith(configuration, i)) {
+                boolean startsToken = i == 0
+                        || !Character.isLetterOrDigit(line.charAt(i - 1));
+                int after = i + configuration.length();
+                boolean endsToken = after < line.length()
+                        && (line.charAt(after) == ' ' || line.charAt(after) == '('
+                                || line.charAt(after) == '\t');
+                if (startsToken && endsToken) {
+                    return true;
+                }
+            }
         }
         return false;
+    }
+
+    /** Whether the string literal opening at {@code quoteAt} is an add() argument. */
+    private static boolean isAddCallArgument(String line, int quoteAt) {
+        int i = quoteAt - 1;
+        while (i >= 0 && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+            i--;
+        }
+        if (i < 0 || line.charAt(i) != '(') {
+            return false;
+        }
+        i--;
+        while (i >= 0 && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+            i--;
+        }
+        return i >= 2 && "add".equals(line.substring(i - 2, i + 1))
+                && (i - 3 < 0 || !Character.isLetterOrDigit(line.charAt(i - 3)));
     }
 
     /**

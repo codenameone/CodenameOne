@@ -401,6 +401,49 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A prerelease of the floor is below the floor. 1.8.0-RC2 is a published
+     * Kotlin version whose numeric part compares equal to 1.8.0, so it read as
+     * "at the floor" and the block was written -- whereupon the shims request
+     * the FINAL 1.8.0 and cannot coexist with the strict prerelease.
+     */
+    @Test
+    public void aPrereleaseOfTheFloorCountsAsBelowIt() {
+        String rc = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.8.0-RC2') "
+                + "{ version { strictly '1.8.0-RC2' } }\n");
+        check("".equals(rc), "a strict prerelease of the floor suppresses the block");
+
+        // A qualifier above the floor changes nothing: rounding up keeps it above.
+        String later = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.9.22-RC') "
+                + "{ version { strictly '1.9.22-RC' } }\n");
+        check(later.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a prerelease above the floor still gets the constraints");
+    }
+
+    /**
+     * A configuration name inside a reason string is prose. Accepting any
+     * quoted occurrence -- which the dependencies.add spelling needed -- read
+     * `because 'implementation workaround'` as a main-variant declaration and
+     * suppressed the constraint for a dependency affecting only debug.
+     */
+    @Test
+    public void aConfigurationNameInAReasonStringIsNotADeclaration() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    debugImplementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ because 'implementation workaround' }\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a reason mentioning the configuration does not make it a declaration");
+
+        // and the add() spelling it was widened for still works
+        String add = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    dependencies.add(\"runtimeOnly\", "
+                + "\"org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22\")\n");
+        check(!add.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the add() spelling is still recognised");
+    }
+
+    /**
      * kotlin-stdlib is a prefix of kotlin-stdlib-jdk8, so the base match has to
      * be exact. A loose one would read every shim declaration as a pin on the
      * base library and switch the whole block off.
