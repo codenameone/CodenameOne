@@ -7318,11 +7318,25 @@ public class AndroidGradleBuilder extends Executor {
                         // at the top, then the dependencies block in its own order, then
                         // xgradle after it. Listing them in any other order lost a
                         // definition that the real script would have had in scope.
+                        //
+                        // EVERY fragment of that block, including the ones this builder
+                        // writes itself. kotlinRuntimeDependency is the reason: it carries
+                        // requireKotlinStdlib, so an app asking for 1.7.22!! has a strict
+                        // pre-merge pin on the base library that nothing here could see,
+                        // and the constraint went in beside it. The other two cannot
+                        // currently name a Kotlin artifact, and are passed anyway rather
+                        // than judged -- the judging belongs in the helper, and a list of
+                        // "fragments worth reading" is exactly what was wrong before.
+                        // KotlinStdlibAlignmentTest reads this call against the generated
+                        // block and fails if the two ever disagree.
                         request.getArg("android.gradlePlugin", ""),
+                        coreLibraryDesugaringDependency,
                         request.getArg("android.supportv4Dep", ""),
+                        kotlinRuntimeDependency,
                         additionalDependencies,
                         aiExtraGradleDependencies.toString(),
                         request.getArg("android.gradleDep", ""),
+                        aarDependencies,
                         request.getArg("android.xgradle", ""));
             } catch (RuntimeException e) {
                 // The alignment reads the app's Gradle text to decide whether the app

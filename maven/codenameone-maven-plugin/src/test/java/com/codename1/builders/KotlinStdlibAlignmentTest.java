@@ -458,6 +458,82 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Every fragment the generated dependencies block is built from is handed
+     * to the alignment, and in the same order.
+     *
+     * <p>Read off the builder's own concatenation rather than listed here,
+     * because a list here is a second copy of the truth and it was already
+     * wrong: kotlinRuntimeDependency carries requireKotlinStdlib, so an app
+     * asking for {@code 1.7.22!!} had a strict pre-merge pin on the base
+     * library that nothing in the scan could see. Two more fragments were
+     * missing beside it. A test that enumerates cannot go stale the way the
+     * list did.</p>
+     */
+    @Test
+    public void everyFragmentOfTheGeneratedBlockIsScanned() throws Exception {
+        byte[] bytes = java.nio.file.Files.readAllBytes(new java.io.File(
+                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath());
+        String builderSrc = new String(bytes, "UTF-8");
+        int at = builderSrc.indexOf("KotlinStdlibAlignment.constraintsBlock(");
+        check(at >= 0, "the builder calls the alignment");
+        String call = builderSrc.substring(at, builderSrc.indexOf(";", at))
+                .replaceAll("//[^\n]*", "");
+
+        int blockAt = builderSrc.indexOf("\"dependencies {");
+        check(blockAt >= 0, "the generated dependencies block is found");
+        int blockEnd = builderSrc.indexOf("+ \"}\\n\"", blockAt);
+        check(blockEnd > blockAt, "and its end");
+        String block = builderSrc.substring(blockAt, blockEnd).replaceAll("//[^\n]*", "");
+
+        // What the block is concatenated FROM: java expressions, not literals.
+        // Keyed by where they appear, because the two spellings have to come back
+        // interleaved: collecting all the hints and then all the locals produced a
+        // list in neither the script's order nor the call's, and the order half of
+        // this test then failed on a call that was right.
+        java.util.TreeMap<Integer, String> byPosition = new java.util.TreeMap<Integer, String>();
+        java.util.regex.Matcher hint = java.util.regex.Pattern
+                .compile("getArg\\(\"([a-zA-Z0-9._]+)\"").matcher(block);
+        while (hint.find()) {
+            byPosition.put(Integer.valueOf(hint.start()), "getArg(\"" + hint.group(1) + "\"");
+        }
+        java.util.regex.Matcher name = java.util.regex.Pattern
+                .compile("\\+\\s*(?:addNewlineIfMissing\\()?([a-z][a-zA-Z0-9]*)\\b")
+                .matcher(block);
+        while (name.find()) {
+            String token = name.group(1);
+            // The configuration itself is passed as the first argument, and the
+            // block this test is about is the alignment's own output.
+            if ("compile".equals(token) || "kotlinStdlibConstraints".equals(token)
+                    || "addNewlineIfMissing".equals(token)) {
+                continue;
+            }
+            // `request` in request.getArg("x") is the receiver, not a fragment --
+            // that one is already counted under its hint name. Matched on the call
+            // rather than the name, so a local that merely has methods on it
+            // (aiExtraGradleDependencies.toString()) still counts.
+            if (block.startsWith(".getArg(", name.end(1))) {
+                continue;
+            }
+            byPosition.put(Integer.valueOf(name.start(1)), token);
+        }
+        java.util.List<String> fragments =
+                new java.util.ArrayList<String>(byPosition.values());
+        check(fragments.size() >= 6,
+                "the block really was parsed, found " + fragments);
+
+        int previous = -1;
+        for (int i = 0; i < fragments.size(); i++) {
+            String fragment = fragments.get(i);
+            int passed = call.indexOf(fragment);
+            check(passed >= 0, "the alignment is given " + fragment
+                    + ", which the generated block contains but the call does not");
+            check(passed > previous, fragment
+                    + " is passed in the order the script emits it");
+            previous = passed;
+        }
+    }
+
+    /**
      * The alignment can never fail a build. It reads developer-authored Groovy
      * with a hand-written scanner, on every AndroidX build there is, to decide
      * something that is an optimisation over a build which already worked --
@@ -485,6 +561,62 @@ public class KotlinStdlibAlignmentTest {
                 "which falls back to emitting nothing");
         check(body.indexOf("log(") >= 0,
                 "and says so, rather than swallowing the defect");
+    }
+
+    /**
+     * A coordinate may carry a classifier and an {@code @extension} after its
+     * version, and neither is part of the version. Returning them made
+     * {@code 1.7.22!!@jar} not end in the strict marker, so a strict pre-merge
+     * pin read as an ordinary one and the constraint went in beside it.
+     */
+    @Test
+    public void aModifierAfterTheVersionIsNotPartOfIt() {
+        String[] pinned = {
+            "org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!@jar",
+            "org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!:sources",
+            "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!@aar",
+        };
+        for (int i = 0; i < pinned.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation '" + pinned[i] + "'\n");
+            check("".equals(out),
+                    "the strict marker is still read in <<" + pinned[i]
+                            + ">>, got <<" + out + ">>");
+        }
+
+        // And a merged-era one with the same modifiers is still merged-era.
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22@jar'\n");
+        check(!modern.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a modern version is read past its modifier too, got <<" + modern + ">>");
+    }
+
+    /**
+     * A slashy literal may follow a keyword. Division needs a value on its
+     * left and a keyword is not one, so `return /can't/` opens a literal for
+     * the same reason `= /can't/` does -- and read as a quote instead, the
+     * apostrophe swallows whatever declaration follows it.
+     */
+    @Test
+    public void aSlashyLiteralMayFollowAKeyword() {
+        String[] keywords = {"return", "in", "new"};
+        for (int k = 0; k < keywords.length; k++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    def note = { " + keywords[k] + " /can't/ }; "
+                    + "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                    + "{ version { strictly '1.7.22' } }\n");
+            check("".equals(out),
+                    "a slashy literal after " + keywords[k]
+                            + " does not hide the pin, got <<" + out + ">>");
+        }
+
+        // A word that is not a keyword is a variable, and dividing it is division.
+        String division = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def ratio = total / count; "
+                + "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check("".equals(division),
+                "and dividing a variable is still division, got <<" + division + ">>");
     }
 
     /**
@@ -738,6 +870,8 @@ public class KotlinStdlibAlignmentTest {
                     String on = configurations[c];
                     String[] forms = {
                         on + "(" + u + coordinate + ":1.7.22!!" + u + ")",
+                        // A classifier or @extension sits after the version, not in it.
+                        on + "(" + u + coordinate + ":1.7.22!!@jar" + u + ")",
                         on + " " + u + coordinate + ":1.7.22!!" + u,
                         on + "(" + u + coordinate + u + ") { version { strictly "
                                 + u + "1.7.22" + u + " } }",
@@ -864,33 +998,6 @@ public class KotlinStdlibAlignmentTest {
                 + "{ version { strictly '1.7.22' } }\n");
         check("".equals(out),
                 "the strict pin after a dollar-slashy literal is still seen");
-    }
-
-    /**
-     * The builder hands the fragments over in the order the generated script
-     * emits them, because a definition is only in scope for what follows it.
-     */
-    @Test
-    public void theBuilderPassesFragmentsInGeneratedOrder() throws Exception {
-        byte[] bytes = java.nio.file.Files.readAllBytes(new java.io.File(
-                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath());
-        String builderSrc = new String(bytes, "UTF-8");
-        int at = builderSrc.indexOf("KotlinStdlibAlignment.constraintsBlock(");
-        check(at >= 0, "the builder calls the alignment");
-        String call = builderSrc.substring(at, builderSrc.indexOf(";", at));
-        // The call carries a comment naming those same hints, in an order that
-        // has nothing to do with the arguments -- read the arguments only.
-        call = call.replaceAll("//[^\n]*", "");
-        int plugin = call.indexOf("getArg(\"android.gradlePlugin\"");
-        int support = call.indexOf("getArg(\"android.supportv4Dep\"");
-        int additional = call.indexOf("additionalDependencies");
-        int dep = call.indexOf("getArg(\"android.gradleDep\"");
-        int xgradle = call.indexOf("getArg(\"android.xgradle\"");
-        check(plugin >= 0 && support >= 0 && additional >= 0 && dep >= 0 && xgradle >= 0,
-                "every app-controlled fragment is passed");
-        check(plugin < support && support < additional && additional < dep
-                        && dep < xgradle,
-                "and in the order the generated script emits them");
     }
 
     /**

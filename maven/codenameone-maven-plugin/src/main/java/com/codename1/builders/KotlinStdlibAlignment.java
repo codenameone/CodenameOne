@@ -312,7 +312,7 @@ public class KotlinStdlibAlignment {
             int end = endOfStringLiteral(line, i);
             String literal = stringLiteralContent(line, i);
             if (literal.startsWith(coordinate) && !hasWhitespace(literal)) {
-                return literal.substring(coordinate.length());
+                return versionComponentOf(literal.substring(coordinate.length()));
             }
             i = end;
         }
@@ -341,6 +341,29 @@ public class KotlinStdlibAlignment {
      * suppressed. Same rule as the coordinate matcher beside it, which is
      * where this had drifted apart from.</p>
      */
+    /**
+     * The version out of what follows {@code group:name:} in a coordinate.
+     *
+     * <p>Gradle's notation carries two optional modifiers after the version --
+     * a classifier as a fourth colon-separated part, and an {@code @extension}
+     * -- and both were being returned as part of the version. That leaves
+     * {@code 1.7.22!!@jar}, which does not end in the strict marker, so a
+     * strict pre-merge pin read as an ordinary one and the constraint was
+     * written beside it.</p>
+     */
+    private static String versionComponentOf(String remainder) {
+        int end = remainder.length();
+        int at = remainder.indexOf('@');
+        if (at >= 0) {
+            end = at;
+        }
+        int classifier = remainder.indexOf(':');
+        if (classifier >= 0 && classifier < end) {
+            end = classifier;
+        }
+        return remainder.substring(0, end);
+    }
+
     private static String mapEntryValue(String line, String key) {
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
@@ -1042,8 +1065,33 @@ public class KotlinStdlibAlignment {
         if (i < 0) {
             return true;
         }
-        return SLASHY_OPENER_POSITIONS.indexOf(text.charAt(i)) >= 0;
+        if (SLASHY_OPENER_POSITIONS.indexOf(text.charAt(i)) >= 0) {
+            return true;
+        }
+        // Division needs a VALUE on its left, and a keyword is not one. `return
+        // /can't/` is a literal for the same reason `= /can't/` is, so the test is
+        // not "is the previous character an identifier character" but "is the
+        // previous TOKEN something that can be divided". A word that is not a
+        // keyword is a variable, and dividing it is exactly what a build script
+        // does.
+        if (!isIdentifierChar(text.charAt(i))) {
+            return false;
+        }
+        int tokenEnd = i + 1;
+        while (i >= 0 && isIdentifierChar(text.charAt(i))) {
+            i--;
+        }
+        String token = text.substring(i + 1, tokenEnd);
+        return EXPRESSION_KEYWORDS.indexOf(" " + token + " ") >= 0;
     }
+
+    /**
+     * Groovy words after which an expression begins, so a slash is a literal
+     * rather than a division. Reserved words cannot be variables, which is why
+     * this can be read off the language rather than guessed at.
+     */
+    private static final String EXPRESSION_KEYWORDS =
+            " return new in case else do while if throw assert yield instanceof ";
 
     /**
      * The characters an expression may follow. Deliberately does not include
