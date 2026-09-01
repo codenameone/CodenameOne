@@ -401,6 +401,33 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * An underscore is an identifier character. A configuration named
+     * custom_implementation ended its embedded "implementation" on a boundary
+     * that looked clean, so it read as the main configuration and suppressed a
+     * constraint for a configuration that reaches nothing.
+     */
+    @Test
+    public void aCustomConfigurationIsNotTheMainOne() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    custom_implementation "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "custom_implementation is not the configuration being constrained");
+
+        String suffixed = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation_extra "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n");
+        check(suffixed.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "nor is implementation_extra");
+
+        // and the real one still is
+        String real = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n");
+        check(!real.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the main configuration still counts");
+    }
+
+    /**
      * A trailing closure may sit on the line after the call's closing
      * parenthesis. Gradle accepts it and the {@code strictly} inside really
      * does apply -- checked by watching a competing higher requirement fail

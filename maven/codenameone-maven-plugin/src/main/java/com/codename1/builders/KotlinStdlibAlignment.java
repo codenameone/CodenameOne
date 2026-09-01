@@ -525,7 +525,7 @@ public class KotlinStdlibAlignment {
             }
             if (statement.startsWith(STRICTLY, i)) {
                 boolean startsToken = i == 0
-                        || !Character.isLetterOrDigit(statement.charAt(i - 1));
+                        || !isIdentifierChar(statement.charAt(i - 1));
                 int after = i + STRICTLY.length();
                 boolean endsToken = after < statement.length()
                         && (statement.charAt(after) == ' '
@@ -555,7 +555,7 @@ public class KotlinStdlibAlignment {
         int at = line.indexOf(key);
         while (at >= 0) {
             boolean startsToken = at == 0
-                    || !Character.isLetterOrDigit(line.charAt(at - 1));
+                    || !isIdentifierChar(line.charAt(at - 1));
             if (startsToken) {
                 int i = skipBlanks(line, at + key.length());
                 if (i < line.length() && line.charAt(i) == ':') {
@@ -573,6 +573,19 @@ public class KotlinStdlibAlignment {
             at = line.indexOf(key, at + 1);
         }
         return false;
+    }
+
+    /**
+     * Whether this character can be part of a Groovy identifier.
+     *
+     * <p>Not {@code isLetterOrDigit}: an underscore is neither, so a
+     * configuration called {@code custom_implementation} ended its embedded
+     * {@code implementation} on a boundary that looked clean and was read as
+     * the main configuration -- suppressing a constraint for a configuration
+     * that reaches nothing.</p>
+     */
+    private static boolean isIdentifierChar(char c) {
+        return Character.isLetterOrDigit(c) || c == '_' || c == '$';
     }
 
     private static int skipBlanks(String line, int from) {
@@ -676,7 +689,7 @@ public class KotlinStdlibAlignment {
             }
             if (line.startsWith(configuration, i)) {
                 boolean startsToken = i == 0
-                        || !Character.isLetterOrDigit(line.charAt(i - 1));
+                        || !isIdentifierChar(line.charAt(i - 1));
                 int after = i + configuration.length();
                 boolean endsToken = after < line.length()
                         && (line.charAt(after) == ' ' || line.charAt(after) == '('
@@ -703,7 +716,7 @@ public class KotlinStdlibAlignment {
             i--;
         }
         return i >= 2 && "add".equals(line.substring(i - 2, i + 1))
-                && (i - 3 < 0 || !Character.isLetterOrDigit(line.charAt(i - 3)));
+                && (i - 3 < 0 || !isIdentifierChar(line.charAt(i - 3)));
     }
 
     /**
