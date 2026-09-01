@@ -998,18 +998,25 @@ public class CertificateWizard extends Lifecycle {
     }
 
     private void certificateDialog() {
+        certificateDialog("IOS_DISTRIBUTION");
+    }
+
+    /// Generates a certificate, opening on `initialType`.
+    ///
+    /// Every type [WizardDecisions#requiredCertificateType] can ask for has to be offered here,
+    /// or a caller sent to this dialog to satisfy that requirement cannot satisfy it.
+    /// MAC_APP_DEVELOPMENT was missing, which is exactly what a Mac Development profile needs.
+    private void certificateDialog(String initialType) {
         InteractionDialog d = modal("Generate certificate");
-        final String[] type = {"IOS_DISTRIBUTION"};
+        final String[] type = {initialType == null ? "IOS_DISTRIBUTION" : initialType};
         label(d, "Certificate type", "CWFieldLabel");
-        Button dist = segment("iOS Distribution", true);
-        Button dev = segment("iOS Development", false);
-        Button macStore = segment("Mac App Store", false);
-        Button developerId = segment("Developer ID", false);
-        Button installer = segment("Mac Installer", false);
-        Button[] typeButtons = {dist, dev, macStore, developerId, installer};
-        String[] typeValues = {"IOS_DISTRIBUTION", "IOS_DEVELOPMENT", "MAC_APP_DISTRIBUTION",
-                "DEVELOPER_ID_APPLICATION", "MAC_INSTALLER_DISTRIBUTION"};
+        String[] typeValues = WizardDecisions.GENERATABLE_CERTIFICATE_TYPES;
+        Button[] typeButtons = new Button[typeValues.length];
+        for (int i = 0; i < typeValues.length; i++) {
+            typeButtons[i] = segment(WizardDecisions.GENERATABLE_CERTIFICATE_LABELS[i], false);
+        }
         for (int i = 0; i < typeButtons.length; i++) {
+            typeButtons[i].setName("pick.certType." + typeValues[i].toLowerCase());
             final int typeIndex = i;
             typeButtons[i].addActionListener(e -> {
                 type[0] = typeValues[typeIndex];
@@ -1017,9 +1024,12 @@ public class CertificateWizard extends Lifecycle {
                 d.revalidate();
             });
         }
+        updateSegmentButtons(typeButtons, typeValues, type[0]);
         TextField name = field("Display name", "App Store Distribution");
-        d.add(actionRow(Component.LEFT, dist, dev, macStore));
-        d.add(actionRow(Component.LEFT, developerId, installer));
+        name.setName("field.certName");
+        name.setText(typeLabel(type[0]));
+        d.add(actionRow(Component.LEFT, typeButtons[0], typeButtons[1], typeButtons[2]));
+        d.add(actionRow(Component.LEFT, typeButtons[3], typeButtons[4], typeButtons[5]));
         label(d, "Display name", "CWFieldLabel");
         d.add(name);
         Button gen = primary("Generate", "modal.generateCert.submit");
@@ -1226,8 +1236,12 @@ public class CertificateWizard extends Lifecycle {
             if (usable.isEmpty()) {
                 label(c, "No active " + typeLabel(WizardDecisions.requiredCertificateType(profileType[0]))
                         + " certificate. Generate one first.", "CWCardMeta");
+                // Opens on the type this profile needs. It used to open on the dialog's own
+                // default, and for Mac Development that type was not even offered there -- the
+                // suggested remedy led back to the same disabled form.
+                final String needed = WizardDecisions.requiredCertificateType(profileType[0]);
                 Button makeCert = outline("Generate certificate", "btn.profileNeedsCert");
-                makeCert.addActionListener(e -> { d.dispose(); certificateDialog(); });
+                makeCert.addActionListener(e -> { d.dispose(); certificateDialog(needed); });
                 c.add(makeCert);
             }
 
@@ -1237,7 +1251,7 @@ public class CertificateWizard extends Lifecycle {
                 // names one, so the picker offers exactly what deviceIdsFor sends. Listing them
                 // and letting "select all" sweep them in made one click enough to build a
                 // request that could not succeed.
-                final List<SigningState.Device> devices = WizardDecisions.usableDevices(state);
+                final List<SigningState.Device> devices = WizardDecisions.usableDevices(state, profileType[0]);
                 final List<CheckBox> deviceBoxes = new ArrayList<CheckBox>();
                 Button all = outline("Select all", "modal.profile.selectAllDevices");
                 Button none = outline("Clear", "modal.profile.clearDevices");
@@ -1278,7 +1292,8 @@ public class CertificateWizard extends Lifecycle {
                     c.add(cb);
                 }
                 if (devices.isEmpty()) {
-                    label(c, "No enabled devices. Register one before creating this profile type.",
+                    label(c, "No enabled " + ("MAC_OS".equals(WizardDecisions.devicePlatformFor(profileType[0]))
+                            ? "Mac" : "iOS") + " devices. Register one before creating this profile type.",
                             "CWCardMeta");
                 }
             } else {
@@ -2086,7 +2101,7 @@ public class CertificateWizard extends Lifecycle {
         if (!WizardDecisions.profileRequiresDevices(profileType)) {
             return out;
         }
-        for (SigningState.Device d : WizardDecisions.usableDevices(state)) {
+        for (SigningState.Device d : WizardDecisions.usableDevices(state, profileType)) {
             out.add(d.id());
         }
         return out;

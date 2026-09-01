@@ -178,18 +178,53 @@ public final class WizardDecisions {
         return out;
     }
 
-    /// Whether Apple will accept this device in a new profile. A device that has been disabled is
-    /// still listed on the account, and putting its ID in the request gets the whole request
-    /// rejected -- so the same predicate has to decide what a picker OFFERS and what automatic
-    /// setup SENDS, or a "select all" quietly builds a request that cannot succeed.
-    public static boolean isUsableDevice(SigningState.Device device) {
-        return device != null && ("ENABLED".equals(device.status()) || "ACTIVE".equals(device.status()));
+    /// The certificate types the wizard can generate, and how they are labelled.
+    ///
+    /// Kept here rather than inside the dialog so the set is one thing: every type
+    /// [#requiredCertificateType] can ask for has to appear in it, or a picker that sends someone
+    /// to the certificate dialog to satisfy that requirement leads them nowhere.
+    public static final String[] GENERATABLE_CERTIFICATE_TYPES = {
+        "IOS_DISTRIBUTION", "IOS_DEVELOPMENT", "MAC_APP_DISTRIBUTION",
+        "MAC_APP_DEVELOPMENT", "DEVELOPER_ID_APPLICATION", "MAC_INSTALLER_DISTRIBUTION"};
+
+    public static final String[] GENERATABLE_CERTIFICATE_LABELS = {
+        "iOS Distribution", "iOS Development", "Mac App Store",
+        "Mac Development", "Developer ID", "Mac Installer"};
+
+    /// Apple's BundleIdPlatform for the devices a profile of this type can name.
+    public static String devicePlatformFor(String profileType) {
+        return profileType != null
+                && (profileType.startsWith("MAC_APP_") || profileType.startsWith("MAC_CATALYST_APP_"))
+                ? "MAC_OS" : "IOS";
     }
 
-    public static List<SigningState.Device> usableDevices(SigningState state) {
+    /// Whether Apple will accept this device in a new profile of this type. A device that has been
+    /// disabled is still listed on the account, and naming it gets the whole request rejected --
+    /// so the same predicate has to decide what a picker OFFERS and what automatic setup SENDS, or
+    /// a "select all" quietly builds a request that cannot succeed. The platform matters the same
+    /// way: an iPhone cannot be named in a Mac development profile.
+    ///
+    /// Note the platform test excludes the KNOWN WRONG one rather than requiring the known right
+    /// one. The field is an untyped string in the API, documented only as "Apple
+    /// BundleIdPlatform", so a value we did not anticipate -- UNIVERSAL, empty, something added
+    /// later -- must not silently empty the picker and make a profile type uncreatable. Offering
+    /// one device too many costs a rejected request; offering none costs the whole flow.
+    public static boolean isUsableDevice(SigningState.Device device, String profileType) {
+        if (device == null || !("ENABLED".equals(device.status()) || "ACTIVE".equals(device.status()))) {
+            return false;
+        }
+        String platform = device.platform();
+        if (platform == null || platform.trim().isEmpty()) {
+            return true;
+        }
+        String wrong = "MAC_OS".equals(devicePlatformFor(profileType)) ? "IOS" : "MAC_OS";
+        return !wrong.equals(platform.trim());
+    }
+
+    public static List<SigningState.Device> usableDevices(SigningState state, String profileType) {
         List<SigningState.Device> out = new ArrayList<SigningState.Device>();
         for (SigningState.Device d : state.devices) {
-            if (isUsableDevice(d)) {
+            if (isUsableDevice(d, profileType)) {
                 out.add(d);
             }
         }

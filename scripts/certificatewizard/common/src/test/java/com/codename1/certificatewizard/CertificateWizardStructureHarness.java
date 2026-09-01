@@ -90,6 +90,9 @@ public final class CertificateWizardStructureHarness {
         Runnable[] stages = {
             new Runnable() { public void run() { checkShell(app[0]); } },
             new Runnable() { public void run() { checkNewProfileDialog(app[0]); } },
+            new Runnable() { public void run() { checkMacDevelopmentRemedy(app[0]); } },
+            new Runnable() { public void run() { checkMacDevelopmentDeadEnd(app[0]); } },
+            new Runnable() { public void run() { checkCertificateDialogOpensOnTheNeededType(app[0]); } },
             new Runnable() { public void run() { checkRemainingSections(app[0]); } },
         };
         for (Runnable stage : stages) {
@@ -212,6 +215,35 @@ public final class CertificateWizardStructureHarness {
         fire(form, "modal.profile.clearDevices");
         check(!selectedCheckBox(form, "pick.device.DEV_1"), "clear unchecks every device");
         check(!enabled(form, "modal.profile.submit"), "create disables again with no devices");
+        fire(form, "modal.cancel");
+    }
+
+    private static void checkMacDevelopmentRemedy(CertificateWizard app) {
+        Form form = app.getForm();
+        fire(form, "btn.newProfile");
+    }
+
+    /// The account has no Mac development certificate and no Mac device, so this profile type is
+    /// the one whose empty states have to lead somewhere. The remedy used to open the certificate
+    /// dialog on a type list that did not contain the required one.
+    private static void checkMacDevelopmentDeadEnd(CertificateWizard app) {
+        Form form = app.getForm();
+        fire(form, "pick.type.mac_app_development");
+        check(find(form, "pick.cert.3") == null, "a Mac App Store certificate is not a Mac development one");
+        check(find(form, "btn.profileNeedsCert") != null, "the missing certificate is called out");
+        check(find(form, "pick.device.DEV_1") == null, "an iPhone is not offered for a Mac profile");
+        // and says so, rather than the section simply not being drawn -- which is the reading
+        // that would make the check above pass for the wrong reason
+        check(findTextContaining(form, "No enabled Mac devices") != null,
+                "the empty device list names the platform it wanted");
+        fire(form, "btn.profileNeedsCert");
+    }
+
+    private static void checkCertificateDialogOpensOnTheNeededType(CertificateWizard app) {
+        Form form = app.getForm();
+        check(find(form, "modal.generateCert.submit") != null, "the remedy opens the certificate dialog");
+        check(selectedSegment(form, "pick.certType.mac_app_development"),
+                "and opens it on the type the profile actually needs");
         fire(form, "modal.cancel");
     }
 

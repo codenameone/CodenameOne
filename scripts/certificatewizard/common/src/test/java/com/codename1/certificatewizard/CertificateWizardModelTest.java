@@ -119,24 +119,64 @@ class CertificateWizardModelTest {
     }
 
     /// What the picker offers and what automatic setup sends have to be the same set, or a
-    /// "select all" builds a request naming a disabled device, which Apple rejects whole.
+    /// "select all" builds a request naming a disabled or wrong-platform device, which Apple
+    /// rejects whole.
     @Test
-    void onlyEnabledDevicesAreOffered() {
+    void onlyEnabledDevicesOfTheProfilePlatformAreOffered() {
         List<SigningState.Device> devices = new ArrayList<SigningState.Device>();
         devices.add(new SigningState.Device("DEV_1", "QA iPhone", "UDID1", "IOS", "ENABLED"));
         devices.add(new SigningState.Device("DEV_2", "Old iPad", "UDID2", "IOS", "DISABLED"));
-        devices.add(new SigningState.Device("DEV_3", "Bench Mac", "UDID3", "MAC", "ACTIVE"));
+        devices.add(new SigningState.Device("DEV_3", "Bench Mac", "UDID3", "MAC_OS", "ACTIVE"));
         SigningState state = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
                 null, null, devices, null, null, null);
 
-        List<SigningState.Device> usable = WizardDecisions.usableDevices(state);
+        List<SigningState.Device> ios = WizardDecisions.usableDevices(state, "IOS_APP_DEVELOPMENT");
+        assertEquals(1, ios.size());
+        assertEquals("DEV_1", ios.get(0).id());
 
-        assertEquals(2, usable.size());
-        assertEquals("DEV_1", usable.get(0).id());
-        assertEquals("DEV_3", usable.get(1).id());
-        assertTrue(WizardDecisions.isUsableDevice(devices.get(0)));
-        assertFalse(WizardDecisions.isUsableDevice(devices.get(1)));
-        assertFalse(WizardDecisions.isUsableDevice(null));
+        List<SigningState.Device> mac = WizardDecisions.usableDevices(state, "MAC_APP_DEVELOPMENT");
+        assertEquals(1, mac.size());
+        assertEquals("DEV_3", mac.get(0).id());
+
+        assertEquals("IOS", WizardDecisions.devicePlatformFor("IOS_APP_ADHOC"));
+        assertEquals("MAC_OS", WizardDecisions.devicePlatformFor("MAC_APP_DEVELOPMENT"));
+        assertEquals("MAC_OS", WizardDecisions.devicePlatformFor("MAC_CATALYST_APP_DEVELOPMENT"));
+        assertFalse(WizardDecisions.isUsableDevice(null, "IOS_APP_DEVELOPMENT"));
+    }
+
+    /// The platform field is an untyped string in the API, so an unanticipated value must not
+    /// empty the picker and make a profile type uncreatable -- the rule excludes the known wrong
+    /// platform rather than demanding the known right one.
+    @Test
+    void anUnknownDevicePlatformIsOfferedRatherThanHidden() {
+        List<SigningState.Device> devices = new ArrayList<SigningState.Device>();
+        devices.add(new SigningState.Device("DEV_1", "Universal", "UDID1", "UNIVERSAL", "ENABLED"));
+        devices.add(new SigningState.Device("DEV_2", "No platform", "UDID2", null, "ENABLED"));
+        devices.add(new SigningState.Device("DEV_3", "Blank platform", "UDID3", "  ", "ENABLED"));
+        SigningState state = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, devices, null, null, null);
+
+        assertEquals(3, WizardDecisions.usableDevices(state, "IOS_APP_DEVELOPMENT").size());
+        assertEquals(3, WizardDecisions.usableDevices(state, "MAC_APP_DEVELOPMENT").size());
+    }
+
+    /// Sending someone to the certificate dialog to satisfy requiredCertificateType only helps if
+    /// that dialog can actually produce the type. MAC_APP_DEVELOPMENT could not be, so the Mac
+    /// Development profile's only suggested remedy led straight back to the disabled form.
+    @Test
+    void everyRequiredCertificateTypeCanBeGenerated() {
+        String[] profileTypes = {"IOS_APP_STORE", "IOS_APP_ADHOC", "IOS_APP_DEVELOPMENT",
+                "MAC_APP_STORE", "MAC_APP_DIRECT", "MAC_APP_DEVELOPMENT",
+                "MAC_CATALYST_APP_STORE", "MAC_CATALYST_APP_DIRECT", "MAC_CATALYST_APP_DEVELOPMENT"};
+        // the very array the dialog builds its segments from, so this cannot drift away from it
+        List<String> offered = java.util.Arrays.asList(WizardDecisions.GENERATABLE_CERTIFICATE_TYPES);
+        assertEquals(WizardDecisions.GENERATABLE_CERTIFICATE_TYPES.length,
+                WizardDecisions.GENERATABLE_CERTIFICATE_LABELS.length, "every type needs a label");
+        for (String profileType : profileTypes) {
+            String required = WizardDecisions.requiredCertificateType(profileType);
+            assertTrue(offered.contains(required),
+                    profileType + " requires " + required + ", which the certificate dialog must offer");
+        }
     }
 
     /// The create action is disabled until the request is complete, and the reporter of issue
