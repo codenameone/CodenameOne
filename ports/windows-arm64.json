@@ -1,48 +1,48 @@
 {
-  "commit": "66b82a0f4db7c5c340432d3022f43e860992c8a3",
-  "generated_at": "2026-08-31T14:01:15Z",
+  "commit": "08ca62dff0a5e28bfcd8cb8cd6645c0049c2f33f",
+  "generated_at": "2026-09-01T05:16:43Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 170728000
+        "duration_ns": 170774000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 24746000
+        "duration_ns": 24630000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 55155000
+        "duration_ns": 55340000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 62749000
+        "duration_ns": 62875000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 39283000
+        "duration_ns": 39274000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 219953000
+        "duration_ns": 223253000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 500079000
+        "duration_ns": 522237000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 94918000
+        "duration_ns": 93869000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 133649000
+        "duration_ns": 133021000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 51649000
+        "duration_ns": 56300000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,13 +52,13 @@
     "suite_checksum": 0
   },
   "port": "windows-arm64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33397322935",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33471092911",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 185,
+    "pass": 186,
     "skip": 3
   },
   "tests": {
@@ -797,6 +797,10 @@
     },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
+      "status": "pass"
+    },
+    "WindowDialogTest": {
+      "feature": "multi-window",
       "status": "pass"
     },
     "WindowEditingTest": {
