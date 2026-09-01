@@ -90,6 +90,226 @@ class CertificateWizardModelTest {
         assertFalse(WizardDecisions.canCreateProfile("IOS_APP_STORE", "BID1", certs, devices, ""));
     }
 
+    /// Creating a profile sends the certificate's Apple ID and nothing else, so the picker must
+    /// not apply the export-time private-key rule that compatibleCertificates does -- that hid a
+    /// valid certificate synced from Apple and told its owner to make a second one. The type
+    /// match is a different matter and stays: Apple rejects the wrong kind outright.
+    @Test
+    void profileCertificateChoicesKeepCertificatesWithNoStoredPrivateKey() {
+        long now = System.currentTimeMillis();
+        List<SigningState.Certificate> certs = new ArrayList<SigningState.Certificate>();
+        certs.add(new SigningState.Certificate(1L, "APPLE_NO_KEY", "IOS_DISTRIBUTION",
+                "Synced App Store Certificate", "SER1", now + 300L * 86400000L, "ACTIVE", false));
+        certs.add(new SigningState.Certificate(2L, "APPLE_EXPORTABLE", "IOS_DISTRIBUTION",
+                "Exportable App Store Certificate", "SER2", now + 300L * 86400000L, "ACTIVE", true));
+        certs.add(new SigningState.Certificate(3L, "APPLE_REVOKED", "IOS_DISTRIBUTION",
+                "Revoked", "SER3", now + 300L * 86400000L, "REVOKED", true));
+        certs.add(new SigningState.Certificate(4L, "APPLE_MAC", "MAC_APP_DISTRIBUTION",
+                "Mac App Store", "SER4", now + 300L * 86400000L, "ACTIVE", true));
+        SigningState state = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                certs, null, null, null, null, null);
+
+        List<SigningState.Certificate> choices = WizardDecisions.profileCertificateChoices(state, "IOS_APP_STORE");
+
+        assertEquals(2, choices.size(), "both active iOS distribution certificates are offered");
+        assertEquals("APPLE_NO_KEY", choices.get(0).appleCertId());
+        assertEquals("APPLE_EXPORTABLE", choices.get(1).appleCertId());
+        // and the export path is unchanged, because THAT one really does need the key
+        assertEquals(1, WizardDecisions.compatibleCertificates(state, "IOS_APP_STORE").size());
+    }
+
+    /// What the picker offers and what automatic setup sends have to be the same set, or a
+    /// "select all" builds a request naming a disabled or wrong-platform device, which Apple
+    /// rejects whole.
+    @Test
+    void onlyEnabledDevicesOfTheProfilePlatformAreOffered() {
+        List<SigningState.Device> devices = new ArrayList<SigningState.Device>();
+        devices.add(new SigningState.Device("DEV_1", "QA iPhone", "UDID1", "IOS", "ENABLED"));
+        devices.add(new SigningState.Device("DEV_2", "Old iPad", "UDID2", "IOS", "DISABLED"));
+        devices.add(new SigningState.Device("DEV_3", "Bench Mac", "UDID3", "MAC_OS", "ACTIVE"));
+        SigningState state = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, devices, null, null, null);
+
+        List<SigningState.Device> ios = WizardDecisions.usableDevices(state, "IOS_APP_DEVELOPMENT");
+        assertEquals(1, ios.size());
+        assertEquals("DEV_1", ios.get(0).id());
+
+        List<SigningState.Device> mac = WizardDecisions.usableDevices(state, "MAC_APP_DEVELOPMENT");
+        assertEquals(1, mac.size());
+        assertEquals("DEV_3", mac.get(0).id());
+
+        assertEquals("IOS", WizardDecisions.devicePlatformFor("IOS_APP_ADHOC"));
+        assertEquals("MAC_OS", WizardDecisions.devicePlatformFor("MAC_APP_DEVELOPMENT"));
+        assertEquals("MAC_OS", WizardDecisions.devicePlatformFor("MAC_CATALYST_APP_DEVELOPMENT"));
+        assertFalse(WizardDecisions.isUsableDevice(null, "IOS_APP_DEVELOPMENT"));
+    }
+
+    /// The platform field is an untyped string in the API, so an unanticipated value must not
+    /// empty the picker and make a profile type uncreatable -- the rule excludes the known wrong
+    /// platform rather than demanding the known right one.
+    @Test
+    void anUnknownDevicePlatformIsOfferedRatherThanHidden() {
+        List<SigningState.Device> devices = new ArrayList<SigningState.Device>();
+        devices.add(new SigningState.Device("DEV_1", "Universal", "UDID1", "UNIVERSAL", "ENABLED"));
+        devices.add(new SigningState.Device("DEV_2", "No platform", "UDID2", null, "ENABLED"));
+        devices.add(new SigningState.Device("DEV_3", "Blank platform", "UDID3", "  ", "ENABLED"));
+        SigningState state = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, devices, null, null, null);
+
+        assertEquals(3, WizardDecisions.usableDevices(state, "IOS_APP_DEVELOPMENT").size());
+        assertEquals(3, WizardDecisions.usableDevices(state, "MAC_APP_DEVELOPMENT").size());
+    }
+
+    /// Apple Development and Apple Distribution supersede the platform-specific certificate types
+    /// and are valid wherever those are. An exact type match sent an account holding only those to
+    /// generate a redundant certificate. The widening stops there: two other certificate types are
+    /// also "distribution" and neither signs what the other is for.
+    @Test
+    void appleGenericCertificateTypesSatisfyTheirPlatformSpecificRequirement() {
+        assertTrue(WizardDecisions.certificateTypeSatisfies("IOS_DEVELOPMENT", "DEVELOPMENT"));
+        assertTrue(WizardDecisions.certificateTypeSatisfies("MAC_APP_DEVELOPMENT", "DEVELOPMENT"));
+        assertTrue(WizardDecisions.certificateTypeSatisfies("IOS_DISTRIBUTION", "DISTRIBUTION"));
+        assertTrue(WizardDecisions.certificateTypeSatisfies("MAC_APP_DISTRIBUTION", "DISTRIBUTION"));
+        assertTrue(WizardDecisions.certificateTypeSatisfies("IOS_DISTRIBUTION", "IOS_DISTRIBUTION"));
+
+        assertFalse(WizardDecisions.certificateTypeSatisfies("DEVELOPER_ID_APPLICATION", "DISTRIBUTION"),
+                "Developer ID is not what Apple Distribution replaced");
+        assertFalse(WizardDecisions.certificateTypeSatisfies("IOS_DISTRIBUTION", "MAC_INSTALLER_DISTRIBUTION"),
+                "an installer certificate signs an installer, not an app");
+        assertFalse(WizardDecisions.certificateTypeSatisfies("IOS_DISTRIBUTION", "DEVELOPMENT"));
+        assertFalse(WizardDecisions.certificateTypeSatisfies("IOS_DEVELOPMENT", "DISTRIBUTION"));
+        assertFalse(WizardDecisions.certificateTypeSatisfies(null, "DISTRIBUTION"));
+        assertFalse(WizardDecisions.certificateTypeSatisfies("IOS_DISTRIBUTION", null));
+    }
+
+    /// The picker and automatic setup read one predicate, so an account can never be offered a
+    /// certificate the automatic path would then refuse, or the other way round.
+    @Test
+    void aGenericCertificateReachesBothThePickerAndAutomaticSetup() {
+        long now = System.currentTimeMillis();
+        List<SigningState.Certificate> certs = new ArrayList<SigningState.Certificate>();
+        certs.add(new SigningState.Certificate(1L, "APPLE_GENERIC", "DISTRIBUTION",
+                "Apple Distribution", "SER1", now + 300L * 86400000L, "ACTIVE", true));
+        certs.add(new SigningState.Certificate(2L, "APPLE_INSTALLER", "MAC_INSTALLER_DISTRIBUTION",
+                "Mac Installer", "SER2", now + 300L * 86400000L, "ACTIVE", true));
+        SigningState state = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                certs, null, null, null, null, null);
+
+        List<SigningState.Certificate> offered = WizardDecisions.profileCertificateChoices(state, "IOS_APP_STORE");
+        assertEquals(1, offered.size());
+        assertEquals("APPLE_GENERIC", offered.get(0).appleCertId());
+
+        List<SigningState.Certificate> auto = WizardDecisions.compatibleCertificates(state, "IOS_APP_STORE");
+        assertEquals(1, auto.size());
+        assertEquals("APPLE_GENERIC", auto.get(0).appleCertId());
+    }
+
+    /// A device selection outlives the profile type it was made under. Once the picker started
+    /// hiding devices of the wrong platform, a stale selection became invisible AND still counted:
+    /// canCreateProfile saw the requirement met and the request named iPhones in a Mac profile.
+    @Test
+    void deviceSelectionDoesNotSurviveAChangeOfProfilePlatform() {
+        List<SigningState.Device> devices = new ArrayList<SigningState.Device>();
+        devices.add(new SigningState.Device("DEV_1", "QA iPhone", "UDID1", "IOS", "ENABLED"));
+        devices.add(new SigningState.Device("DEV_2", "Retired iPhone", "UDID2", "IOS", "DISABLED"));
+        devices.add(new SigningState.Device("DEV_3", "Bench Mac", "UDID3", "MAC_OS", "ENABLED"));
+        SigningState state = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, devices, null, null, null);
+        List<String> selected = new ArrayList<String>();
+        selected.add("DEV_1");
+        selected.add("DEV_3");
+
+        List<String> forIos = WizardDecisions.retainUsableDevices(state, "IOS_APP_DEVELOPMENT", selected);
+        assertEquals(1, forIos.size());
+        assertEquals("DEV_1", forIos.get(0));
+
+        List<String> forMac = WizardDecisions.retainUsableDevices(state, "MAC_APP_DEVELOPMENT", selected);
+        assertEquals(1, forMac.size());
+        assertEquals("DEV_3", forMac.get(0));
+
+        // and a type that names no devices at all must not carry one along
+        assertTrue(WizardDecisions.retainUsableDevices(state, "IOS_APP_STORE", selected).isEmpty());
+        assertTrue(WizardDecisions.retainUsableDevices(state, "IOS_APP_DEVELOPMENT", null).isEmpty());
+
+        // the whole point: only a selection that survives may satisfy the create check
+        List<String> certs = new ArrayList<String>();
+        certs.add("CERT1");
+        assertTrue(WizardDecisions.canCreateProfile("MAC_APP_DEVELOPMENT", "BID1", certs, forMac, "N"),
+                "the Mac device that survived the switch is a real selection");
+        List<String> onlyIos = new ArrayList<String>();
+        onlyIos.add("DEV_1");
+        assertFalse(WizardDecisions.canCreateProfile("MAC_APP_DEVELOPMENT", "BID1", certs,
+                        WizardDecisions.retainUsableDevices(state, "MAC_APP_DEVELOPMENT", onlyIos), "N"),
+                "a selection of iPhones must not satisfy a Mac profile's device requirement");
+    }
+
+    /// Sending someone to the certificate dialog to satisfy requiredCertificateType only helps if
+    /// that dialog can actually produce the type. MAC_APP_DEVELOPMENT could not be, so the Mac
+    /// Development profile's only suggested remedy led straight back to the disabled form.
+    @Test
+    void everyRequiredCertificateTypeCanBeGenerated() {
+        String[] profileTypes = {"IOS_APP_STORE", "IOS_APP_ADHOC", "IOS_APP_DEVELOPMENT",
+                "MAC_APP_STORE", "MAC_APP_DIRECT", "MAC_APP_DEVELOPMENT",
+                "MAC_CATALYST_APP_STORE", "MAC_CATALYST_APP_DIRECT", "MAC_CATALYST_APP_DEVELOPMENT"};
+        // the very array the dialog builds its segments from, so this cannot drift away from it
+        List<String> offered = java.util.Arrays.asList(WizardDecisions.GENERATABLE_CERTIFICATE_TYPES);
+        assertEquals(WizardDecisions.GENERATABLE_CERTIFICATE_TYPES.length,
+                WizardDecisions.GENERATABLE_CERTIFICATE_LABELS.length, "every type needs a label");
+        for (String profileType : profileTypes) {
+            String required = WizardDecisions.requiredCertificateType(profileType);
+            assertTrue(offered.contains(required),
+                    profileType + " requires " + required + ", which the certificate dialog must offer");
+        }
+    }
+
+    /// The create action is disabled until the request is complete, and the reporter of issue
+    /// #5636 could not tell which of four sections was the incomplete one. The message names the
+    /// FIRST thing missing, reading down the dialog, so following it always moves forward.
+    @Test
+    void missingProfileInputIsNamedInDialogOrder() {
+        List<String> certs = new ArrayList<String>();
+        List<String> devices = new ArrayList<String>();
+        assertTrue(WizardDecisions.describeMissingProfileInput(null, null, certs, devices, "")
+                .contains("profile type"));
+        assertTrue(WizardDecisions.describeMissingProfileInput("IOS_APP_STORE", null, certs, devices, "")
+                .contains("bundle ID"));
+        assertTrue(WizardDecisions.describeMissingProfileInput("IOS_APP_STORE", "BID1", certs, devices, "")
+                .contains("certificate"));
+        certs.add("CERT1");
+        assertTrue(WizardDecisions.describeMissingProfileInput("IOS_APP_STORE", "BID1", certs, devices, "")
+                .contains("name"));
+        assertTrue(WizardDecisions.describeMissingProfileInput("IOS_APP_ADHOC", "BID1", certs, devices, "Adhoc")
+                .contains("device"));
+        devices.add("DEV1");
+        assertNull(WizardDecisions.describeMissingProfileInput("IOS_APP_ADHOC", "BID1", certs, devices, "Adhoc"));
+        assertNull(WizardDecisions.describeMissingProfileInput("IOS_APP_STORE", "BID1", certs, null, "Store"));
+    }
+
+    /// Nothing may report a blocker while canCreateProfile says the request is complete, or the
+    /// dialog would explain a button that is already enabled.
+    @Test
+    void missingProfileInputAgreesWithCreateProfileValidation() {
+        List<String> certs = new ArrayList<String>();
+        certs.add("CERT1");
+        List<String> devices = new ArrayList<String>();
+        devices.add("DEV1");
+        String[] types = {"IOS_APP_STORE", "IOS_APP_ADHOC", "IOS_APP_DEVELOPMENT", "MAC_APP_STORE",
+                "MAC_APP_DIRECT", "MAC_APP_DEVELOPMENT", null};
+        String[] bundles = {null, "BID1"};
+        String[] names = {"", "Profile"};
+        for (String type : types) {
+            for (String bundle : bundles) {
+                for (String name : names) {
+                    for (List<String> devs : java.util.Arrays.asList(new ArrayList<String>(), devices)) {
+                        boolean ok = WizardDecisions.canCreateProfile(type, bundle, certs, devs, name);
+                        String missing = WizardDecisions.describeMissingProfileInput(type, bundle, certs, devs, name);
+                        assertEquals(ok, missing == null, type + "/" + bundle + "/" + name + "/" + devs.size());
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     void projectBindingParsesDescriptor() {
         ProjectBinding b = ProjectBinding.parse("projectDir=/p\nsettings=/p/codenameone_settings.properties\n"

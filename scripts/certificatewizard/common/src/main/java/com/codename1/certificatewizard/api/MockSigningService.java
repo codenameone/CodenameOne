@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.certificatewizard.api;
 
 import com.codename1.util.OnComplete;
@@ -29,11 +51,18 @@ public final class MockSigningService implements SigningService {
                 "Mac App Store Distribution", "MACD1140AA92", now + 300L * 86400000L, "ACTIVE", true));
         certificates.add(new SigningState.Certificate(4L, "CERTDEV1", "DEVELOPER_ID_APPLICATION",
                 "Developer ID Application", "DEVID140AA92", now + 300L * 86400000L, "ACTIVE", true));
+        // Reconciled from Apple, so the cloud holds no private key for it. A profile can still be
+        // created against it -- only exporting the .p12 afterwards needs the key.
+        certificates.add(new SigningState.Certificate(5L, "CERTSYNC", "IOS_DISTRIBUTION",
+                "Synced App Store Distribution", "5A3C0D8E22A1", now + 200L * 86400000L, "ACTIVE", false));
         bundles.add(new SigningState.BundleId("BID_A1", "com.example.myapp", "My App", "IOS", true));
         bundles.add(new SigningState.BundleId("BID_B2", "com.example.watch", "Watch App", "IOS", false));
         bundles.add(new SigningState.BundleId("BID_MAC", "com.example.myapp", "My App Mac", "MAC_OS", true));
         devices.add(new SigningState.Device("DEV_1", "Shai's iPhone", "00008120-000A1C3E0C68201E", "IOS", "ENABLED"));
         devices.add(new SigningState.Device("DEV_2", "QA iPad", "00008027-0004450E2688002E", "IOS", "ENABLED"));
+        // A retired device is still on the account and Apple rejects a profile request naming it,
+        // so the pickers have to leave it out.
+        devices.add(new SigningState.Device("DEV_3", "Retired iPhone", "00008030-001A2B3C4D5E6F70", "IOS", "DISABLED"));
         profiles.add(new SigningState.Profile(1L, "PRF_STORE", "My App App Store", "IOS_APP_STORE",
                 "com.example.myapp", "STORE-UUID", now + 312L * 86400000L, "ACTIVE"));
         profiles.add(new SigningState.Profile(2L, "PRF_DEV", "My App Development", "IOS_APP_DEVELOPMENT",

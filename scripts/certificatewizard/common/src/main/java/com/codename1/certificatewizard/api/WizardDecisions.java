@@ -112,13 +112,171 @@ public final class WizardDecisions {
         return "IOS_DISTRIBUTION";
     }
 
+    /// Whether a certificate of this type can sign a profile that requires `required`.
+    ///
+    /// Not an equality test, because Apple's generic "Apple Development" (DEVELOPMENT) and "Apple
+    /// Distribution" (DISTRIBUTION) types supersede the platform-specific ones and are valid
+    /// wherever those are. An account whose certificates came back from a reconcile holding only
+    /// those was told it had no compatible certificate at all and sent off to generate a
+    /// redundant one. isDevelopmentCertificate in the wizard already counts DEVELOPMENT as a
+    /// development certificate for both platforms, so this is the same reading applied to the
+    /// distribution half.
+    ///
+    /// Deliberately not a "kind" test: DEVELOPER_ID_APPLICATION and MAC_INSTALLER_DISTRIBUTION are
+    /// distribution certificates too, and neither can sign what the other is for. Only the two
+    /// generic types widen anything.
+    public static boolean certificateTypeSatisfies(String required, String certificateType) {
+        if (required == null || certificateType == null) {
+            return false;
+        }
+        if (required.equals(certificateType)) {
+            return true;
+        }
+        if ("DEVELOPMENT".equals(certificateType)) {
+            return "IOS_DEVELOPMENT".equals(required) || "MAC_APP_DEVELOPMENT".equals(required);
+        }
+        if ("DISTRIBUTION".equals(certificateType)) {
+            return "IOS_DISTRIBUTION".equals(required) || "MAC_APP_DISTRIBUTION".equals(required);
+        }
+        return false;
+    }
+
     public static List<SigningState.Certificate> compatibleCertificates(SigningState state, String profileType) {
         String required = requiredCertificateType(profileType);
         List<SigningState.Certificate> out = new ArrayList<SigningState.Certificate>();
         for (SigningState.Certificate c : state.certificates) {
-            if ("ACTIVE".equals(c.status()) && required.equals(c.certificateType())
+            if ("ACTIVE".equals(c.status()) && certificateTypeSatisfies(required, c.certificateType())
                     && c.appleCertId() != null && c.privateKeyPresent()) {
                 out.add(c);
+            }
+        }
+        return out;
+    }
+
+    /// The one input still missing before a profile can be created, phrased for the user, or null
+    /// when nothing is. Reported in the same order the dialog lays the sections out, so the
+    /// message always points at the first thing above the button rather than at whichever check
+    /// happens to be written first.
+    public static String describeMissingProfileInput(String profileType, String bundleId,
+                                                     List<String> certificateIds, List<String> deviceIds,
+                                                     String name) {
+        if (profileType == null) {
+            return "Choose a profile type to continue.";
+        }
+        if (bundleId == null) {
+            return "Choose the bundle ID this profile is for.";
+        }
+        if (certificateIds == null || certificateIds.isEmpty()) {
+            return "Choose a " + humanCertificateType(requiredCertificateType(profileType)) + " certificate.";
+        }
+        if (profileRequiresDevices(profileType) && (deviceIds == null || deviceIds.isEmpty())) {
+            return "Select at least one device for this profile type.";
+        }
+        if (name == null || name.trim().isEmpty()) {
+            return "Enter a name for the profile.";
+        }
+        return null;
+    }
+
+    private static String humanCertificateType(String certificateType) {
+        if (certificateType == null) {
+            return "signing";
+        }
+        return certificateType.replace("IOS_", "").replace("MAC_", "Mac ")
+                .replace("DEVELOPER_ID_", "Developer ID ").replace('_', ' ').toLowerCase();
+    }
+
+    /// The certificates a profile of this type may be created against.
+    ///
+    /// Deliberately weaker than [#compatibleCertificates]: creating a profile sends only the
+    /// certificate's Apple ID, so a locally stored private key is not needed for it. That key is
+    /// needed to EXPORT the .p12 afterwards, which is why the auto-setup and reuse path insists
+    /// on it -- but insisting on it here hides a perfectly valid certificate that came back from
+    /// a sync with Apple and tells its owner to generate a second one they do not need.
+    ///
+    /// The type match is kept, because that one is not a preference: Apple rejects a profile
+    /// whose certificate is the wrong kind for it.
+    public static List<SigningState.Certificate> profileCertificateChoices(SigningState state, String profileType) {
+        String required = requiredCertificateType(profileType);
+        List<SigningState.Certificate> out = new ArrayList<SigningState.Certificate>();
+        for (SigningState.Certificate c : state.certificates) {
+            if ("ACTIVE".equals(c.status()) && certificateTypeSatisfies(required, c.certificateType())
+                    && c.appleCertId() != null) {
+                out.add(c);
+            }
+        }
+        return out;
+    }
+
+    /// The certificate types the wizard can generate, and how they are labelled.
+    ///
+    /// Kept here rather than inside the dialog so the set is one thing: every type
+    /// [#requiredCertificateType] can ask for has to appear in it, or a picker that sends someone
+    /// to the certificate dialog to satisfy that requirement leads them nowhere.
+    public static final String[] GENERATABLE_CERTIFICATE_TYPES = {
+        "IOS_DISTRIBUTION", "IOS_DEVELOPMENT", "MAC_APP_DISTRIBUTION",
+        "MAC_APP_DEVELOPMENT", "DEVELOPER_ID_APPLICATION", "MAC_INSTALLER_DISTRIBUTION"};
+
+    public static final String[] GENERATABLE_CERTIFICATE_LABELS = {
+        "iOS Distribution", "iOS Development", "Mac App Store",
+        "Mac Development", "Developer ID", "Mac Installer"};
+
+    /// Apple's BundleIdPlatform for the devices a profile of this type can name.
+    public static String devicePlatformFor(String profileType) {
+        return profileType != null
+                && (profileType.startsWith("MAC_APP_") || profileType.startsWith("MAC_CATALYST_APP_"))
+                ? "MAC_OS" : "IOS";
+    }
+
+    /// Whether Apple will accept this device in a new profile of this type. A device that has been
+    /// disabled is still listed on the account, and naming it gets the whole request rejected --
+    /// so the same predicate has to decide what a picker OFFERS and what automatic setup SENDS, or
+    /// a "select all" quietly builds a request that cannot succeed. The platform matters the same
+    /// way: an iPhone cannot be named in a Mac development profile.
+    ///
+    /// Note the platform test excludes the KNOWN WRONG one rather than requiring the known right
+    /// one. The field is an untyped string in the API, documented only as "Apple
+    /// BundleIdPlatform", so a value we did not anticipate -- UNIVERSAL, empty, something added
+    /// later -- must not silently empty the picker and make a profile type uncreatable. Offering
+    /// one device too many costs a rejected request; offering none costs the whole flow.
+    public static boolean isUsableDevice(SigningState.Device device, String profileType) {
+        if (device == null || !("ENABLED".equals(device.status()) || "ACTIVE".equals(device.status()))) {
+            return false;
+        }
+        String platform = device.platform();
+        if (platform == null || platform.trim().isEmpty()) {
+            return true;
+        }
+        String wrong = "MAC_OS".equals(devicePlatformFor(profileType)) ? "IOS" : "MAC_OS";
+        return !wrong.equals(platform.trim());
+    }
+
+    /// The subset of `selectedIds` that a profile of this type may still name.
+    ///
+    /// A selection outlives the profile type it was made under: pick devices for iOS Development,
+    /// switch to Mac Development, and the picker correctly stops showing those iPhones while the
+    /// selection quietly keeps them. canCreateProfile then reads a satisfied device requirement
+    /// and the request goes to Apple naming devices of the wrong platform -- invisible, because
+    /// nothing on screen shows them any more.
+    public static List<String> retainUsableDevices(SigningState state, String profileType,
+                                                   List<String> selectedIds) {
+        List<String> out = new ArrayList<String>();
+        if (selectedIds == null || !profileRequiresDevices(profileType)) {
+            return out;
+        }
+        for (SigningState.Device d : usableDevices(state, profileType)) {
+            if (selectedIds.contains(d.id())) {
+                out.add(d.id());
+            }
+        }
+        return out;
+    }
+
+    public static List<SigningState.Device> usableDevices(SigningState state, String profileType) {
+        List<SigningState.Device> out = new ArrayList<SigningState.Device>();
+        for (SigningState.Device d : state.devices) {
+            if (isUsableDevice(d, profileType)) {
+                out.add(d);
             }
         }
         return out;

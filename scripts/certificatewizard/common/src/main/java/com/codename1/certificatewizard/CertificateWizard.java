@@ -141,6 +141,7 @@ public class CertificateWizard extends Lifecycle {
         darkMode = Preferences.get(PREF_DARK_MODE, Boolean.TRUE.equals(CN.isDarkMode()));
         fontDeltaPx = Preferences.get(PREF_FONT_DELTA, 0);
         CN.setDarkMode(Boolean.valueOf(darkMode));
+        applyThemeForCurrentScheme();
         binding = ProjectIO.loadBinding();
         userEmail = firstNonEmpty(System.getProperty("certificatewizard.user"),
                 binding == null ? null : binding.user(), "Not signed in");
@@ -186,6 +187,29 @@ public class CertificateWizard extends Lifecycle {
         buildShell();
         form.show();
         reload();
+    }
+
+    /// Refreshes the theme once the dark flag is known, and on the desktop restores the scrollbar
+    /// the generated stub already asks for.
+    ///
+    /// The stub calls JavaSEPort.setDesktopInteractiveScrollbars(true), and the port injects
+    /// @interactiveScrollBool into the NATIVE theme. This app's theme is a CSS theme that does not
+    /// layer the native one, so installing it replaced the whole property table and took that
+    /// constant with it -- the look and feel then fell back to the thin mobile overlay bar you
+    /// cannot grab, on a desktop tool whose lists are long enough to need one.
+    ///
+    /// The refresh has to come after CN.setDarkMode: the look and feel bakes the check box glyphs
+    /// from the CheckBox style at refresh time, and which of CheckBox / $DarkCheckBox that resolves
+    /// to is read from the dark flag right then. Refreshing earlier coloured the boxes for the
+    /// scheme the platform reported rather than the one the stored preference selects.
+    private void applyThemeForCurrentScheme() {
+        if (!CN.isDesktop()) {
+            UIManager.getInstance().refreshTheme();
+            return;
+        }
+        java.util.Hashtable<String, String> props = new java.util.Hashtable<String, String>();
+        props.put("@interactiveScrollBool", "true");
+        UIManager.getInstance().addThemeProps(props);
     }
 
     private void seedCredentialState() {
@@ -974,28 +998,61 @@ public class CertificateWizard extends Lifecycle {
     }
 
     private void certificateDialog() {
+        certificateDialog("IOS_DISTRIBUTION");
+    }
+
+    /// Generates a certificate, opening on `initialType`.
+    ///
+    /// Every type [WizardDecisions#requiredCertificateType] can ask for has to be offered here,
+    /// or a caller sent to this dialog to satisfy that requirement cannot satisfy it.
+    /// MAC_APP_DEVELOPMENT was missing, which is exactly what a Mac Development profile needs.
+    private void certificateDialog(String initialType) {
         InteractionDialog d = modal("Generate certificate");
-        final String[] type = {"IOS_DISTRIBUTION"};
+        final String[] type = {initialType == null ? "IOS_DISTRIBUTION" : initialType};
         label(d, "Certificate type", "CWFieldLabel");
-        Button dist = segment("iOS Distribution", true);
-        Button dev = segment("iOS Development", false);
-        Button macStore = segment("Mac App Store", false);
-        Button developerId = segment("Developer ID", false);
-        Button installer = segment("Mac Installer", false);
-        Button[] typeButtons = {dist, dev, macStore, developerId, installer};
-        String[] typeValues = {"IOS_DISTRIBUTION", "IOS_DEVELOPMENT", "MAC_APP_DISTRIBUTION",
-                "DEVELOPER_ID_APPLICATION", "MAC_INSTALLER_DISTRIBUTION"};
+        String[] typeValues = WizardDecisions.GENERATABLE_CERTIFICATE_TYPES;
+        Button[] typeButtons = new Button[typeValues.length];
+        for (int i = 0; i < typeValues.length; i++) {
+            typeButtons[i] = segment(WizardDecisions.GENERATABLE_CERTIFICATE_LABELS[i], false);
+        }
+        updateSegmentButtons(typeButtons, typeValues, type[0]);
+        final TextField name = field("Display name", "App Store Distribution");
+        name.setName("field.certName");
+        // The suggested name follows the type until the user writes their own. A suggestion that
+        // stays behind is worse than no suggestion: it puts a certificate labelled "DISTRIBUTION"
+        // on the account that is nothing of the kind. settingName guards against
+        // TextField.setText firing the listener and marking the suggestion as the user's edit.
+        final boolean[] nameEdited = {false};
+        final boolean[] settingName = {false};
+        final Runnable suggestName = () -> {
+            if (nameEdited[0]) {
+                return;
+            }
+            settingName[0] = true;
+            try {
+                name.setText(typeLabel(type[0]));
+            } finally {
+                settingName[0] = false;
+            }
+        };
+        suggestName.run();
+        name.addDataChangedListener((changeType, index) -> {
+            if (!settingName[0]) {
+                nameEdited[0] = true;
+            }
+        });
         for (int i = 0; i < typeButtons.length; i++) {
+            typeButtons[i].setName("pick.certType." + typeValues[i].toLowerCase());
             final int typeIndex = i;
             typeButtons[i].addActionListener(e -> {
                 type[0] = typeValues[typeIndex];
                 updateSegmentButtons(typeButtons, typeValues, type[0]);
+                suggestName.run();
                 d.revalidate();
             });
         }
-        TextField name = field("Display name", "App Store Distribution");
-        d.add(actionRow(Component.LEFT, dist, dev, macStore));
-        d.add(actionRow(Component.LEFT, developerId, installer));
+        d.add(actionRow(Component.LEFT, typeButtons[0], typeButtons[1], typeButtons[2]));
+        d.add(actionRow(Component.LEFT, typeButtons[3], typeButtons[4], typeButtons[5]));
         label(d, "Display name", "CWFieldLabel");
         d.add(name);
         Button gen = primary("Generate", "modal.generateCert.submit");
@@ -1090,106 +1147,226 @@ public class CertificateWizard extends Lifecycle {
     }
 
     private void newProfileDialog() {
-        InteractionDialog d = modalFrame("New provisioning profile");
-        Container content = new Container(BoxLayout.y());
+        final InteractionDialog d = modalFrame("New provisioning profile");
+        final Container content = new Container(BoxLayout.y());
         content.setScrollableY(true);
         content.setUIID(uiid("CWDialogContent"));
         d.add(BorderLayout.CENTER, content);
 
-        final String[] profileType = {null};
+        // The dialog opens with App Store selected, and now says so in the model as well as on
+        // the segment. It used to paint that segment selected while profileType held null, so
+        // "Create" stayed disabled until you clicked the segment that already looked chosen --
+        // and clicking it a second time silently went back to null. That is the "no combination
+        // of buttons enables Create" half of issue #5636.
+        final String[] profileType = {PROFILE_APP_STORE};
         final String[] bundleId = {null};
         final String[] certificateId = {null};
-        final String[] profileName = {projectDefaults().appName + " App Store"};
         final List<String> certs = new ArrayList<String>();
         final List<String> devs = new ArrayList<String>();
-        final Button[] createRef = new Button[1];
+        // nameEdited: the suggested name follows the profile type until the user writes their own.
+        // settingName: TextField.setText fires the data changed listener, so the suggestion would
+        // otherwise mark itself as the user's edit and stop following after one type change.
+        final boolean[] nameEdited = {false};
+        final boolean[] settingName = {false};
 
-        Button store = segment("iOS App Store", true);
-        Button adhoc = segment("iOS Ad Hoc", false);
-        Button dev = segment("iOS Development", false);
-        Button macStore = segment("Mac App Store", false);
-        Button macDirect = segment("Mac Direct", false);
-        Button macDev = segment("Mac Development", false);
-        Button[] typeButtons = {store, adhoc, dev, macStore, macDirect, macDev};
-        String[] typeValues = {"IOS_APP_STORE", "IOS_APP_ADHOC", "IOS_APP_DEVELOPMENT",
-                "MAC_APP_STORE", "MAC_APP_DIRECT", "MAC_APP_DEVELOPMENT"};
-        label(content, "Profile type", "CWFieldLabel");
-        content.add(actionRow(Component.LEFT, store, adhoc, dev));
-        content.add(actionRow(Component.LEFT, macStore, macDirect, macDev));
+        final Button create = primary("Create", "modal.profile.submit");
+        final TextField name = field("Profile name", "My App App Store");
+        name.setName("field.profileName");
+        name.setText(defaultProfileName(profileType[0]));
+        final Label requirement = new Label("");
+        requirement.setUIID(uiid("CWFieldLabel"));
+        requirement.setName("modal.profile.requirement");
+        requirement.setTextSelectionEnabled(true);
 
-        label(content, "Bundle ID", "CWFieldLabel");
-        List<Button> bundleButtons = new ArrayList<Button>();
-        for (SigningState.BundleId b : state.bundleIds) {
-            Button pick = choice(b.identifier(), b.name(), false);
-            pick.setName("pick.bundle." + b.id());
-            bundleButtons.add(pick);
-            pick.addActionListener(e -> {
-                bundleId[0] = b.id().equals(bundleId[0]) ? null : b.id();
-                updateChoiceButtons(bundleButtons, bundleId[0]);
-                updateCreateProfileButton(createRef[0], profileType[0], bundleId[0], certs, devs, profileName[0]);
-            });
-            content.add(pick);
-        }
-        if (state.bundleIds.isEmpty()) {
-            Button createBundle = outline("Register bundle ID first", "btn.profileNeedsBundle");
-            createBundle.addActionListener(e -> { d.dispose(); bundleDialog(null, null); });
-            content.add(createBundle);
+        final Button[] typeButtons = {
+                segment("iOS App Store", false), segment("iOS Ad Hoc", false), segment("iOS Development", false),
+                segment("Mac App Store", false), segment("Mac Direct", false), segment("Mac Development", false)};
+        final String[] typeValues = {PROFILE_APP_STORE, "IOS_APP_ADHOC", PROFILE_DEVELOPMENT,
+                PROFILE_MAC_STORE, PROFILE_MAC_DIRECT, "MAC_APP_DEVELOPMENT"};
+        for (int i = 0; i < typeButtons.length; i++) {
+            typeButtons[i].setName("pick.type." + typeValues[i].toLowerCase());
         }
 
-        label(content, "Certificate", "CWFieldLabel");
-        List<Button> certButtons = new ArrayList<Button>();
-        for (SigningState.Certificate c : state.certificates) {
-            Button pick = choice(c.displayName(), typeLabel(c.certificateType()), false);
-            pick.setName("pick.cert." + c.id());
-            certButtons.add(pick);
-            pick.addActionListener(e -> {
-                certs.clear();
-                String id = String.valueOf(c.id());
-                if (!id.equals(certificateId[0])) {
+        final Runnable[] rebuild = new Runnable[1];
+        final Runnable revalidate = () -> {
+            updateCreateProfileButton(create, requirement, profileType[0], bundleId[0], certs, devs, name.getText());
+        };
+
+        rebuild[0] = () -> {
+            Container c = content;
+            c.removeAll();
+            // removeAll detaches the rows, not what is inside them, and the segment buttons and
+            // the name field outlive a rebuild so their listeners and typed text survive it.
+            // Re-adding one that still names its old row as its parent is rejected outright.
+            for (Button b : typeButtons) {
+                b.remove();
+            }
+            name.remove();
+            // A device selection outlives the type it was made under, and the picker no longer
+            // shows the ones that stopped being valid -- so it is dropped here, at the one place
+            // every type change goes through, rather than in the click handler that happens to be
+            // the way the type changed today.
+            List<String> stillValid = WizardDecisions.retainUsableDevices(state, profileType[0], devs);
+            devs.clear();
+            devs.addAll(stillValid);
+            updateSegmentButtons(typeButtons, typeValues, profileType[0]);
+            label(c, "Profile type", "CWFieldLabel");
+            c.add(actionRow(Component.LEFT, typeButtons[0], typeButtons[1], typeButtons[2]));
+            c.add(actionRow(Component.LEFT, typeButtons[3], typeButtons[4], typeButtons[5]));
+
+            label(c, "Bundle ID", "CWFieldLabel");
+            final List<Button> bundleButtons = new ArrayList<Button>();
+            for (SigningState.BundleId b : state.bundleIds) {
+                Button pick = choice(b.identifier(), b.name(), b.id().equals(bundleId[0]));
+                pick.setName("pick.bundle." + b.id());
+                bundleButtons.add(pick);
+                pick.addActionListener(e -> {
+                    // Single select, and re-picking the current one is a no-op rather than a
+                    // silent deselect -- a second click on a chosen row used to clear it.
+                    bundleId[0] = b.id();
+                    updateChoiceButtons(bundleButtons, bundleId[0]);
+                    revalidate.run();
+                });
+                c.add(pick);
+            }
+            if (state.bundleIds.isEmpty()) {
+                Button createBundle = outline("Register bundle ID first", "btn.profileNeedsBundle");
+                createBundle.addActionListener(e -> { d.dispose(); bundleDialog(null, null); });
+                c.add(createBundle);
+            }
+
+            label(c, "Certificate", "CWFieldLabel");
+            // Only the certificates this profile type can actually be signed with. Offering all
+            // of them let a Mac Installer certificate be picked for an iOS App Store profile,
+            // which Apple rejects at creation time -- long after the wizard said it was fine.
+            // Note this is NOT compatibleCertificates: that one also demands a stored private
+            // key, which creating a profile does not need and which a certificate synced from
+            // Apple often does not have.
+            List<SigningState.Certificate> usable = WizardDecisions.profileCertificateChoices(state, profileType[0]);
+            final List<Button> certButtons = new ArrayList<Button>();
+            for (SigningState.Certificate cert : usable) {
+                String id = String.valueOf(cert.id());
+                // The list is already filtered to one certificate type, so repeating that type on
+                // every row says nothing. The private key is the thing that differs between them,
+                // and saying so here beats discovering it at install time -- the one step that
+                // actually needs it. A Button clips rather than wraps, so this stays short.
+                String detail = cert.privateKeyPresent() ? null : "no stored private key";
+                Button pick = choice(cert.displayName(), detail, id.equals(certificateId[0]));
+                pick.setName("pick.cert." + cert.id());
+                certButtons.add(pick);
+                pick.addActionListener(e -> {
+                    certs.clear();
                     certificateId[0] = id;
-                    certs.add(c.appleCertId());
-                } else {
-                    certificateId[0] = null;
-                }
-                updateChoiceButtons(certButtons, certificateId[0]);
-                updateCreateProfileButton(createRef[0], profileType[0], bundleId[0], certs, devs, profileName[0]);
-            });
-            content.add(pick);
-        }
-        label(content, "Devices", "CWFieldLabel");
-        for (SigningState.Device device : state.devices) {
-            CheckBox cb = new CheckBox(device.name());
-            cb.setName("pick.device." + device.id());
-            cb.setUIID(uiid("CWFieldLabel"));
-            cb.addActionListener(e -> {
-                if (cb.isSelected()) {
-                    if (!devs.contains(device.id())) {
-                        devs.add(device.id());
+                    certs.add(cert.appleCertId());
+                    updateChoiceButtons(certButtons, certificateId[0]);
+                    revalidate.run();
+                });
+                c.add(pick);
+            }
+            if (usable.isEmpty()) {
+                label(c, "No active " + typeLabel(WizardDecisions.requiredCertificateType(profileType[0]))
+                        + " certificate. Generate one first.", "CWCardMeta");
+                // Opens on the type this profile needs. It used to open on the dialog's own
+                // default, and for Mac Development that type was not even offered there -- the
+                // suggested remedy led back to the same disabled form.
+                final String needed = WizardDecisions.requiredCertificateType(profileType[0]);
+                Button makeCert = outline("Generate certificate", "btn.profileNeedsCert");
+                makeCert.addActionListener(e -> { d.dispose(); certificateDialog(needed); });
+                c.add(makeCert);
+            }
+
+            if (WizardDecisions.profileRequiresDevices(profileType[0])) {
+                label(c, "Devices", "CWFieldLabel");
+                // Disabled devices are still on the account and Apple rejects a request that
+                // names one, so the picker offers exactly what deviceIdsFor sends. Listing them
+                // and letting "select all" sweep them in made one click enough to build a
+                // request that could not succeed.
+                final List<SigningState.Device> devices = WizardDecisions.usableDevices(state, profileType[0]);
+                final List<CheckBox> deviceBoxes = new ArrayList<CheckBox>();
+                Button all = outline("Select all", "modal.profile.selectAllDevices");
+                Button none = outline("Clear", "modal.profile.clearDevices");
+                all.addActionListener(e -> {
+                    devs.clear();
+                    for (SigningState.Device dev : devices) {
+                        devs.add(dev.id());
                     }
-                } else {
-                    devs.remove(device.id());
+                    for (CheckBox box : deviceBoxes) {
+                        box.setSelected(true);
+                    }
+                    revalidate.run();
+                });
+                none.addActionListener(e -> {
+                    devs.clear();
+                    for (CheckBox box : deviceBoxes) {
+                        box.setSelected(false);
+                    }
+                    revalidate.run();
+                });
+                c.add(actionRow(Component.LEFT, all, none));
+                for (SigningState.Device device : devices) {
+                    CheckBox cb = new CheckBox(device.name() + "   " + device.udid());
+                    cb.setName("pick.device." + device.id());
+                    cb.setUIID(uiid("CWFieldLabel"));
+                    cb.setSelected(devs.contains(device.id()));
+                    deviceBoxes.add(cb);
+                    cb.addActionListener(e -> {
+                        if (cb.isSelected()) {
+                            if (!devs.contains(device.id())) {
+                                devs.add(device.id());
+                            }
+                        } else {
+                            devs.remove(device.id());
+                        }
+                        revalidate.run();
+                    });
+                    c.add(cb);
                 }
-                updateCreateProfileButton(createRef[0], profileType[0], bundleId[0], certs, devs, profileName[0]);
-            });
-            content.add(cb);
-        }
-        TextField name = field("Profile name", "My App App Store");
-        name.setText(profileName[0]);
-        content.add(name);
-        Button create = primary("Create", "modal.profile.submit");
-        createRef[0] = create;
+                if (devices.isEmpty()) {
+                    label(c, "No enabled " + ("MAC_OS".equals(WizardDecisions.devicePlatformFor(profileType[0]))
+                            ? "Mac" : "iOS") + " devices. Register one before creating this profile type.",
+                            "CWCardMeta");
+                }
+            } else {
+                // An App Store or Developer ID profile is not device limited, and the device list
+                // used to be rendered anyway: a screen of check boxes that changed nothing, in
+                // front of the profile name field you actually had to reach.
+                label(c, "Devices", "CWFieldLabel");
+                label(c, profileTypeName(profileType[0])
+                        + " profiles are not limited to specific devices.", "CWCardMeta");
+            }
+
+            label(c, "Profile name", "CWFieldLabel");
+            c.add(name);
+            revalidate.run();
+            c.revalidate();
+        };
+
         name.addDataChangedListener((type, index) -> {
-            profileName[0] = name.getText();
-            updateCreateProfileButton(create, profileType[0], bundleId[0], certs, devs, profileName[0]);
+            if (!settingName[0]) {
+                nameEdited[0] = true;
+            }
+            revalidate.run();
         });
         for (int i = 0; i < typeButtons.length; i++) {
-            final int typeIndex = i;
-            typeButtons[i].setUIID(uiid("CWSegment"));
+            final String value = typeValues[i];
             typeButtons[i].addActionListener(e -> {
-                profileType[0] = typeValues[typeIndex].equals(profileType[0]) ? null : typeValues[typeIndex];
-                updateSegmentButtons(typeButtons, typeValues, profileType[0]);
-                updateCreateProfileButton(create, profileType[0], bundleId[0], certs, devs, name.getText());
-                d.revalidate();
+                if (value.equals(profileType[0])) {
+                    return;
+                }
+                profileType[0] = value;
+                // The certificate list is type specific, so a selection that no longer belongs
+                // has to go with it rather than quietly staying in the request.
+                certificateId[0] = null;
+                certs.clear();
+                if (!nameEdited[0]) {
+                    settingName[0] = true;
+                    try {
+                        name.setText(defaultProfileName(value));
+                    } finally {
+                        settingName[0] = false;
+                    }
+                }
+                rebuild[0].run();
             });
         }
         create.addActionListener(e -> {
@@ -1200,9 +1377,40 @@ public class CertificateWizard extends Lifecycle {
             service.createProfile(name.getText(), profileType[0], bundleId[0], certs, devs,
                     r -> afterMutation(r, "Profile created"));
         });
-        updateCreateProfileButton(create, profileType[0], bundleId[0], certs, devs, name.getText());
-        addDialogFooter(d, create);
+        rebuild[0].run();
+        addDialogFooter(d, create, requirement);
         showLargeModal(d);
+    }
+
+    /// The name a fresh profile of this type gets, so the field is never blank on arrival and
+    /// stops tracking the type the moment the user types their own.
+    private String defaultProfileName(String profileType) {
+        return projectDefaults().appName + " " + profileTypeName(profileType);
+    }
+
+    /// The profile type as a person writes it. [#profileTypeLabel] is the table spelling: it
+    /// strips the platform prefix, so IOS_APP_STORE reduces to "STORE", which is fine in a column
+    /// headed "Type" and reads as a mistake in a sentence or in a suggested profile name.
+    private String profileTypeName(String profileType) {
+        if (PROFILE_APP_STORE.equals(profileType)) {
+            return "App Store";
+        }
+        if ("IOS_APP_ADHOC".equals(profileType)) {
+            return "Ad Hoc";
+        }
+        if (PROFILE_DEVELOPMENT.equals(profileType)) {
+            return "Development";
+        }
+        if (PROFILE_MAC_STORE.equals(profileType)) {
+            return "Mac App Store";
+        }
+        if (PROFILE_MAC_DIRECT.equals(profileType)) {
+            return "Mac Developer ID";
+        }
+        if ("MAC_APP_DEVELOPMENT".equals(profileType)) {
+            return "Mac Development";
+        }
+        return profileTypeLabel(profileType);
     }
 
     private void autoSetupCurrentProject() {
@@ -1923,10 +2131,8 @@ public class CertificateWizard extends Lifecycle {
         if (!WizardDecisions.profileRequiresDevices(profileType)) {
             return out;
         }
-        for (SigningState.Device d : state.devices) {
-            if ("ENABLED".equals(d.status()) || "ACTIVE".equals(d.status())) {
-                out.add(d.id());
-            }
+        for (SigningState.Device d : WizardDecisions.usableDevices(state, profileType)) {
+            out.add(d.id());
         }
         return out;
     }
@@ -2444,11 +2650,26 @@ public class CertificateWizard extends Lifecycle {
     }
 
     private void addDialogFooter(InteractionDialog d, Button primaryAction) {
+        addDialogFooter(d, primaryAction, null);
+    }
+
+    /// The footer of a framed dialog. The note sits beside the buttons rather than at the end of
+    /// the scrolling body, so an explanation of why the action is disabled cannot itself be
+    /// below the fold.
+    private void addDialogFooter(InteractionDialog d, Button primaryAction, Component note) {
         Button cancel = outline("Cancel", "modal.cancel");
         cancel.addActionListener(e -> d.dispose());
         Container actions = actionRow(Component.RIGHT, cancel, primaryAction);
         actions.setUIID(uiid("CWDialogActions"));
-        d.add(BorderLayout.SOUTH, actions);
+        if (note == null) {
+            d.add(BorderLayout.SOUTH, actions);
+            return;
+        }
+        Container footer = new Container(new BorderLayout());
+        footer.setUIID(uiid("CWDialogActions"));
+        footer.add(BorderLayout.CENTER, note);
+        footer.add(BorderLayout.EAST, actions);
+        d.add(BorderLayout.SOUTH, footer);
     }
 
     private void showModal(InteractionDialog d) {
@@ -2782,10 +3003,23 @@ public class CertificateWizard extends Lifecycle {
         return button(text, name, "CWDanger");
     }
 
+    /// A single select row. The two halves used to be joined with a newline, which a Button does
+    /// not render -- "com.example.myapp" and "My App" came out as one run of text with no gap.
+    /// The leading glyph is what makes the chosen row obvious at a glance; the tinted background
+    /// alone was easy to miss on a list of rows that already have backgrounds.
     private Button choice(String title, String desc, boolean selected) {
-        Button b = new Button(title + "\n" + desc);
+        String text = desc == null || desc.trim().isEmpty() ? title : title + "   " + desc.trim();
+        Button b = new Button(text);
         b.setUIID(uiid(selected ? "CWChoiceSelected" : "CWChoice"));
+        b.setAlignment(Component.LEFT);
+        b.getAllStyles().setAlignment(Component.LEFT);
+        applyChoiceIcon(b, selected);
         return b;
+    }
+
+    private void applyChoiceIcon(Button b, boolean selected) {
+        FontImage.setMaterialIcon(b, selected ? FontImage.MATERIAL_RADIO_BUTTON_CHECKED
+                : FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, 3.0f);
     }
 
     private Button segment(String text, boolean selected) {
@@ -2803,17 +3037,24 @@ public class CertificateWizard extends Lifecycle {
             String name = b.getName();
             boolean selected = selectedId != null && name != null && name.endsWith("." + selectedId);
             setScaledUIID(b, selected ? "CWChoiceSelected" : "CWChoice");
+            applyChoiceIcon(b, selected);
         }
     }
 
-    private void updateCreateProfileButton(Button create, String profileType, String bundleId, List<String> certs,
-                                           List<String> devs, String name) {
-        if (create == null) {
-            return;
-        }
+    /// Keeps the create action and the line under it in step. A disabled button with nothing
+    /// saying why is what the reporter of issue #5636 ran into: the only feedback was that
+    /// clicking it did nothing, and the missing input was two sections further up the dialog.
+    private void updateCreateProfileButton(Button create, Label requirement, String profileType, String bundleId,
+                                           List<String> certs, List<String> devs, String name) {
         boolean enabled = WizardDecisions.canCreateProfile(profileType, bundleId, certs, devs, name);
-        create.setEnabled(enabled);
-        setScaledUIID(create, enabled ? "CWPrimary" : "CWDisabled");
+        if (create != null) {
+            create.setEnabled(enabled);
+            setScaledUIID(create, enabled ? "CWPrimary" : "CWDisabled");
+        }
+        if (requirement != null) {
+            String missing = WizardDecisions.describeMissingProfileInput(profileType, bundleId, certs, devs, name);
+            requirement.setText(missing == null ? "" : missing);
+        }
     }
 
     private void setScaledUIID(Component c, String id) {
