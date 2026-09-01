@@ -60,6 +60,17 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
     /// ready the port answers a placeholder size, which is what this reads.
     /// Every other port decodes synchronously and answers true on the first
     /// call.
+    /// Note the `encoded` half of this is not a decode test and cannot be made into
+    /// one: `EncodedImage.createFromImage` assigns the width from the source picture
+    /// at construction, so `getWidth()` answers from that field and never reaches the
+    /// decode. It stays here to say the object exists. What keeps this picture
+    /// deterministic is that `createFromImage` also caches the source image, so
+    /// `getInternal()` reuses it rather than handing the bytes back to the browser --
+    /// which is the whole of it, and is why a port whose soft-reference cache never
+    /// returned anything (the JavaScript one, until HTML5Implementation stopped
+    /// sending every non-JSObject down a WeakReference that holds nothing) redrew
+    /// this cell from a fresh asynchronous decode on every single paint and left it
+    /// blank whenever the shot beat the decode.
     private boolean asyncImagesReady(int size) {
         return fromBytes != null && encoded != null
                 && fromBytes.getWidth() == size && encoded.getWidth() == size;

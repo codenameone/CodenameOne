@@ -144,6 +144,7 @@ public abstract class UITestBase {
     @AfterEach
     protected void tearDownDisplay() throws Exception {
         DisplayTest.flushEdt();
+        disposeLeftoverWindows();
         resetUIManager();
         com.codename1.ui.Toolbar.setGlobalToolbar(false);
         if (implementation != null) {
@@ -182,6 +183,68 @@ public abstract class UITestBase {
         // the singleton reset above cannot reach.
         resetDisplayBooleanArrayField("selectionPressed");
         resetDisplayIntField("dragPathLength", 0);
+    }
+
+    /// Takes down any native window the test left open.
+    ///
+    /// `Desktop` is a process-wide singleton (`Desktop.INSTANCE`) holding one
+    /// mutable `windows` list, and nothing else here clears it. A test that opens
+    /// a window and does not dispose it -- because it asserted its way out early,
+    /// or because the dispose it asked for was marshalled onto the dispatch thread
+    /// and had not run yet -- therefore hands its window to every test that follows,
+    /// in this class and in every class after it in the same JVM. The next test to
+    /// count windows counts one too many, which is how WindowTest failed on master
+    /// at 66b82a0f with `anOwnedWindowIsDisposedWithItsOwner` expecting 2 and
+    /// getting 3, while the commits either side of it passed on identical code.
+    ///
+    /// A leaked window is worse than a wrong count when it is modal: it holds the
+    /// release the dispatch thread is waiting for, so the serial-call queue stops
+    /// draining and the next class reports every test as
+    /// "FormTest timed out after 5000ms" with a `pendingSerialCalls` count that
+    /// climbs test by test -- a live dispatch thread with nothing getting through.
+    ///
+    /// Runs before `implementation.reset()`, which nulls the window manager that
+    /// `dispose()` needs to reach the peer, and is followed by another flush
+    /// because disposing fires window events and those listeners queue work.
+    private void disposeLeftoverWindows() throws Exception {
+        if (!Display.isInitialized() || !Display.getInstance().isEdt()) {
+            // dispose() marshals itself onto the dispatch thread when called from
+            // anywhere else, so off-EDT the disposal would land after the next test
+            // has already started -- exactly the leak this exists to close.
+            return;
+        }
+        com.codename1.ui.Window[] open = com.codename1.ui.Desktop.getInstance().getWindows();
+        if (open.length == 0) {
+            return;
+        }
+        for (com.codename1.ui.Window w : open) {
+            try {
+                w.dispose();
+            } catch (RuntimeException ignored) {
+                // A window whose peer never opened can throw on the way down. It is
+                // the registry entry that has to go, and the loop below removes it
+                // whether or not dispose() got that far.
+            }
+        }
+        // dispose() deregisters, so this is normally empty already. It is not when a
+        // window failed to open and was registered without a peer to tear down, and
+        // leaving that entry behind would defeat the whole method.
+        Field windows = com.codename1.ui.Desktop.class.getDeclaredField("windows");
+        windows.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<Object> registry = (List<Object>) windows.get(com.codename1.ui.Desktop.getInstance());
+        if (registry != null) {
+            synchronized (registry) {
+                registry.clear();
+            }
+        }
+        // deregisterWindow() drops the focus alongside the registry entry; clearing
+        // the list behind its back would leave a disposed window still answering
+        // Desktop.getFocusedWindow(), which is what a Dialog resolves its host from.
+        Field focused = com.codename1.ui.Desktop.class.getDeclaredField("focusedWindow");
+        focused.setAccessible(true);
+        focused.set(com.codename1.ui.Desktop.getInstance(), null);
+        DisplayTest.flushEdt();
     }
 
     private void resetDisplayBooleanArrayField(String name) {
