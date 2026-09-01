@@ -9,17 +9,18 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CertificateWizardDarkThemeTest {
-    private static final String DARK_BG_APP = "#071B4D";
-    private static final String DARK_BG_PANEL = "#102B66";
-    private static final String DARK_BG_SUBTLE = "#163575";
-    private static final String DARK_BG_INPUT = "#0E2A61";
-    private static final String DARK_BORDER = "#33518C";
-    private static final String DARK_TEXT = "#F5F8FF";
-    private static final String DARK_TEXT_MUTED = "#A8B8DA";
-    private static final String DARK_ACCENT = "#4D86FF";
+    private static final String DARK_BG_APP = "#0F1626";
+    private static final String DARK_BG_PANEL = "#1A2233";
+    private static final String DARK_BG_SUBTLE = "#26314A";
+    private static final String DARK_BG_INPUT = "#141B2B";
+    private static final String DARK_BORDER = "#3A465E";
+    private static final String DARK_TEXT = "#EEF2F8";
+    private static final String DARK_TEXT_MUTED = "#A9B6CC";
+    private static final String DARK_ACCENT = "#5C93FF";
     private static final String DARK_LIME = "#B8D532";
     private static final String DARK_DANGER = "#FF7A7A";
 
@@ -97,6 +98,74 @@ class CertificateWizardDarkThemeTest {
         }
     }
 
+    /// The look and feel asks for these UIIDs by name, so the app's "Dark" prefix scheme cannot
+    /// reach them. Left undeclared they came from the blank-theme defaults -- a white track with a
+    /// black thumb, which is the inverted scrollbar of issue #5636 -- so both schemes have to
+    /// declare them, dark through the prefers-color-scheme block the compiler turns into $Dark
+    /// entries.
+    @Test
+    void fixedLookAndFeelUiidsAreThemedInBothSchemes() throws IOException {
+        String css = themeCss();
+        String light = css.substring(0, darkBlockStart(css));
+        // Past the "@media (...) {" itself: the block scanner reads brace pairs flat, so leaving
+        // the wrapper in would pair the media brace with the first rule's closing one and swallow
+        // that rule whole.
+        String dark = css.substring(css.indexOf('{', darkBlockStart(css)) + 1);
+        for (String scheme : new String[] {"light", "dark"}) {
+            String part = "light".equals(scheme) ? light : dark;
+            for (String uiid : new String[] {"Scroll", "HorizontalScroll", "DesktopScroll",
+                    "DesktopHorizontalScroll"}) {
+                assertEquals("transparent", property(part, uiid, "background-color"),
+                        scheme + " " + uiid + " track must not paint over the page");
+            }
+            for (String uiid : new String[] {"ScrollThumb", "HorizontalScrollThumb", "DesktopScrollThumb",
+                    "DesktopHorizontalScrollThumb"}) {
+                String thumb = property(part, uiid, "background-color");
+                assertTrue(thumb.startsWith("#"), scheme + " " + uiid + " needs an explicit colour");
+                assertTrue(contrast(thumb, "light".equals(scheme) ? "#FFFFFF" : DARK_BG_PANEL) >= 1.3,
+                        scheme + " " + uiid + " must be visible against the surface it scrolls");
+            }
+            assertTrue(property(part, "CheckBox", "color").startsWith("#"),
+                    scheme + " unchecked check box colour");
+            assertTrue(property(part, "CheckBox.selected", "color").startsWith("#"),
+                    scheme + " checked check box colour");
+            assertNotEquals(property(part, "CheckBox", "color"), property(part, "CheckBox.selected", "color"),
+                    scheme + " checked and unchecked check boxes must not be the same colour");
+        }
+        assertTrue(css.contains("checkBoxIconSizeMM"),
+                "the check box is sized off the label font without this constant, so it ends up "
+                        + "smaller than the word beside it");
+    }
+
+    /// The primary action is a lime pill. White on it lands near 2:1, which is a label you have to
+    /// hunt for rather than read.
+    @Test
+    void primaryButtonLabelIsReadableOnLime() throws IOException {
+        String css = themeCss();
+        for (String uiid : new String[] {"CWPrimary", "DarkCWPrimary"}) {
+            assertTrue(contrast(property(css, uiid, "color"), property(css, uiid, "background-color")) >= 4.5,
+                    uiid + " label contrast");
+        }
+    }
+
+    /// A segmented control that resizes when you select it slides its neighbours out from under
+    /// the pointer, which is why selecting a profile type took a dozen clicks.
+    @Test
+    void segmentKeepsItsBoxWhenSelected() throws IOException {
+        String css = themeCss();
+        for (String prefix : new String[] {"", "Dark"}) {
+            assertEquals(property(css, prefix + "CWSegment", "border").replaceAll("#[0-9A-Fa-f]{6}", ""),
+                    property(css, prefix + "CWSegmentSelected", "border").replaceAll("#[0-9A-Fa-f]{6}", ""),
+                    prefix + "CWSegmentSelected must occupy the same box as " + prefix + "CWSegment");
+        }
+    }
+
+    private static int darkBlockStart(String css) {
+        int i = css.indexOf("@media");
+        assertTrue(i > 0, "prefers-color-scheme block missing");
+        return i;
+    }
+
     @Test
     void darkThemeTextContrastStaysUsable() {
         assertTrue(contrast(DARK_TEXT, DARK_BG_PANEL) >= 7.0, "main text contrast");
@@ -171,7 +240,29 @@ class CertificateWizardDarkThemeTest {
         if (!Files.exists(p)) {
             p = Paths.get(System.getProperty("user.dir"), "src/main/css/theme.css").normalize();
         }
-        return new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
+        return stripComments(new String(Files.readAllBytes(p), StandardCharsets.UTF_8));
+    }
+
+    /// The block scanner below reads a rule's selectors as everything between the previous "}" and
+    /// the next "{", so a comment sitting in that gap becomes part of the first selector and the
+    /// rule stops being found at all.
+    private static String stripComments(String css) {
+        StringBuilder out = new StringBuilder();
+        int pos = 0;
+        while (pos < css.length()) {
+            int start = css.indexOf("/*", pos);
+            if (start < 0) {
+                out.append(css.substring(pos));
+                break;
+            }
+            out.append(css, pos, start);
+            int end = css.indexOf("*/", start + 2);
+            if (end < 0) {
+                break;
+            }
+            pos = end + 2;
+        }
+        return out.toString();
     }
 
     private static double contrast(String foreground, String background) {

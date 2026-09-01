@@ -3,16 +3,25 @@
  * CN1 CSS uses UIIDs, not web selectors; sizes are density-independent mm.
  */
 
+#Constants {
+    /* A desktop tool wants a scrollbar that stays where you can grab it, not one
+       that fades out the moment scrolling stops. */
+    fadeScrollBarBool: false;
+    /* Size the check box in millimetres instead of letting it inherit the label
+       font height, which made it smaller than the word next to it. */
+    checkBoxIconSizeMM: "3.6";
+}
+
 Form, CWForm {
     background-color: #F3F4F7;
     color: #112247;
     font-family: "native:MainRegular";
-    font-size: 2.75mm;
+    font-size: 2.9mm;
 }
 Label, Button, TextField, TextArea, CheckBox {
     color: #112247;
     font-family: "native:MainRegular";
-    font-size: 2.75mm;
+    font-size: 2.9mm;
 }
 CWChrome {
     background-color: #FFFFFF;
@@ -40,7 +49,7 @@ CWStatus {
     padding: 1.0mm 2.5mm 1.0mm 2.5mm;
     margin: 0.3mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
 }
 CWStatusOff {
     background: cn1-pill-border;
@@ -49,7 +58,7 @@ CWStatusOff {
     padding: 1.0mm 2.5mm 1.0mm 2.5mm;
     margin: 0.3mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
 }
 CWToolbarButton {
     background-color: #FFFFFF;
@@ -67,7 +76,7 @@ CWToolbarActions {
 CWEmail {
     background-color: transparent;
     color: #7F8AA3;
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     padding: 1mm;
 }
 CWBody {
@@ -82,7 +91,7 @@ CWNavLabel {
     background-color: transparent;
     color: #A0A8BA;
     font-family: "native:MainBold";
-    font-size: 2.1mm;
+    font-size: 2.3mm;
     padding: 2.2mm 1.4mm 0.8mm 1.4mm;
 }
 CWNav {
@@ -91,7 +100,7 @@ CWNav {
     padding: 1.7mm 1.8mm 1.7mm 1.8mm;
     margin: 0.25mm 0 0.25mm 0;
     border-radius: 1.6mm;
-    font-size: 2.65mm;
+    font-size: 2.8mm;
 }
 CWNavSelected {
     background-color: #E8F0FF;
@@ -100,7 +109,7 @@ CWNavSelected {
     margin: 0.25mm 0 0.25mm 0;
     border-radius: 1.6mm;
     font-family: "native:MainBold";
-    font-size: 2.65mm;
+    font-size: 2.8mm;
 }
 CWPage {
     background-color: #F3F4F7;
@@ -116,7 +125,7 @@ CWPageTitle {
 CWSub {
     background-color: transparent;
     color: #7F8AA3;
-    font-size: 2.55mm;
+    font-size: 2.7mm;
     padding: 0 0 2.2mm 0;
 }
 CWCard {
@@ -136,7 +145,7 @@ CWCardTitle {
 CWCardMeta {
     background-color: transparent;
     color: #7F8AA3;
-    font-size: 2.35mm;
+    font-size: 2.55mm;
     padding: 0.2mm 0 0.2mm 0;
 }
 CWCardRow {
@@ -161,7 +170,7 @@ CWMetricNumber {
 CWMetricLabel {
     background-color: transparent;
     color: #7F8AA3;
-    font-size: 2.35mm;
+    font-size: 2.55mm;
     padding: 0.4mm 0 0 0;
 }
 CWActionRow {
@@ -177,11 +186,11 @@ CWActionGrid {
 CWPrimary {
     background: cn1-pill-border;
     background-color: #B8D532;
-    color: #FFFFFF;
+    color: #16220A;
     padding: 1.35mm 3.1mm 1.35mm 3.1mm;
     margin: 0.4mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     border-radius: 3.2mm;
     text-align: center;
 }
@@ -192,7 +201,7 @@ CWAccent {
     padding: 1.35mm 3.1mm 1.35mm 3.1mm;
     margin: 0.4mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     border-radius: 3.2mm;
     text-align: center;
 }
@@ -205,7 +214,7 @@ CWOutline {
     padding: 1.25mm 2.8mm 1.25mm 2.8mm;
     margin: 0.4mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     text-align: center;
 }
 CWDanger {
@@ -217,7 +226,7 @@ CWDanger {
     padding: 1.25mm 2.8mm 1.25mm 2.8mm;
     margin: 0.4mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     text-align: center;
 }
 CWDisabled {
@@ -229,7 +238,7 @@ CWDisabled {
     padding: 1.35mm 3.1mm 1.35mm 3.1mm;
     margin: 0.4mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     text-align: center;
 }
 CWField {
@@ -244,12 +253,12 @@ CWFieldHint {
     background-color: transparent;
     color: #A0A8BA;
     padding: 1.4mm;
-    font-size: 2.75mm;
+    font-size: 2.9mm;
 }
 CWFieldLabel {
     background-color: transparent;
     color: #7F8AA3;
-    font-size: 2.35mm;
+    font-size: 2.55mm;
     padding: 0.7mm 0 0.4mm 0;
 }
 CWFilterRow {
@@ -269,7 +278,7 @@ CWFilterField {
     border: none;
     padding: 1.1mm 1.4mm 1.1mm 1.4mm;
     margin: 0;
-    font-size: 2.45mm;
+    font-size: 2.6mm;
 }
 CWFilterClear {
     background-color: transparent;
@@ -286,7 +295,7 @@ CWTableHeader {
     background-color: transparent;
     color: #7F8AA3;
     font-family: "native:MainBold";
-    font-size: 2.1mm;
+    font-size: 2.3mm;
     padding: 1.0mm 1.2mm 1.2mm 1.2mm;
 }
 CWRow {
@@ -302,12 +311,12 @@ CWCellMain {
     background-color: transparent;
     color: #112247;
     font-family: "native:MainBold";
-    font-size: 2.65mm;
+    font-size: 2.8mm;
 }
 CWCellSub {
     background-color: transparent;
     color: #7F8AA3;
-    font-size: 2.25mm;
+    font-size: 2.45mm;
 }
 CWPillOk {
     background-color: #E7F4EC;
@@ -315,7 +324,7 @@ CWPillOk {
     padding: 0.8mm 1.9mm 0.8mm 1.9mm;
     border-radius: 1.4mm;
     font-family: "native:MainBold";
-    font-size: 2.2mm;
+    font-size: 2.4mm;
 }
 CWPillWarn {
     background-color: #FDF1DC;
@@ -323,7 +332,7 @@ CWPillWarn {
     padding: 0.8mm 1.9mm 0.8mm 1.9mm;
     border-radius: 1.4mm;
     font-family: "native:MainBold";
-    font-size: 2.2mm;
+    font-size: 2.4mm;
 }
 CWPillBad {
     background-color: #FBE9E9;
@@ -331,7 +340,7 @@ CWPillBad {
     padding: 0.8mm 1.9mm 0.8mm 1.9mm;
     border-radius: 1.4mm;
     font-family: "native:MainBold";
-    font-size: 2.2mm;
+    font-size: 2.4mm;
 }
 CWPillMuted {
     background-color: #F7F8FB;
@@ -339,7 +348,7 @@ CWPillMuted {
     padding: 0.8mm 1.9mm 0.8mm 1.9mm;
     border-radius: 1.4mm;
     font-family: "native:MainBold";
-    font-size: 2.2mm;
+    font-size: 2.4mm;
 }
 CWBanner {
     background-color: #E8F0FF;
@@ -386,7 +395,7 @@ CWChoice {
     border-radius: 1.8mm;
     padding: 1.8mm;
     margin: 0.7mm 0 0.7mm 0;
-    font-size: 2.55mm;
+    font-size: 2.7mm;
 }
 CWChoiceSelected {
     background-color: #E8F0FF;
@@ -395,7 +404,7 @@ CWChoiceSelected {
     border-radius: 1.8mm;
     padding: 1.8mm;
     margin: 0.7mm 0 0.7mm 0;
-    font-size: 2.55mm;
+    font-size: 2.7mm;
 }
 CWSegment {
     background: cn1-pill-border;
@@ -406,18 +415,19 @@ CWSegment {
     padding: 1.15mm 2.4mm 1.15mm 2.4mm;
     margin: 0.25mm;
     font-family: "native:MainBold";
-    font-size: 2.35mm;
+    font-size: 2.55mm;
     text-align: center;
 }
 CWSegmentSelected {
     background: cn1-pill-border;
     background-color: #2F6BFF;
     color: #FFFFFF;
+    border: 0.25mm solid #2F6BFF;
     border-radius: 3.2mm;
     padding: 1.15mm 2.4mm 1.15mm 2.4mm;
     margin: 0.25mm;
     font-family: "native:MainBold";
-    font-size: 2.35mm;
+    font-size: 2.55mm;
     text-align: center;
 }
 
@@ -429,62 +439,62 @@ CWDarkToggle {
     padding: 1.0mm 2.0mm 1.0mm 2.0mm;
     margin: 0.3mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     text-align: center;
 }
 
 DarkForm, DarkCWForm {
-    background-color: #071B4D;
-    color: #F5F8FF;
+    background-color: #0F1626;
+    color: #EEF2F8;
     font-family: "native:MainRegular";
-    font-size: 2.75mm;
+    font-size: 2.9mm;
 }
 DarkLabel, DarkButton, DarkTextField, DarkTextArea, DarkCheckBox {
-    color: #F5F8FF;
+    color: #EEF2F8;
     font-family: "native:MainRegular";
-    font-size: 2.75mm;
+    font-size: 2.9mm;
 }
 DarkCWChrome {
-    background-color: #102B66;
-    border-bottom: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    border-bottom: 0.25mm solid #3A465E;
     padding: 1.5mm 2.8mm 1.5mm 2.8mm;
 }
 DarkCWTitle {
     background-color: transparent;
-    color: #F5F8FF;
+    color: #EEF2F8;
     font-family: "native:MainBold";
     font-size: 3.0mm;
     padding: 0.6mm 1.5mm 0.6mm 1.5mm;
 }
 DarkCWLogo {
     background-color: transparent;
-    color: #F5F8FF;
+    color: #EEF2F8;
     font-family: "native:MainBold";
     font-size: 3.1mm;
     padding: 0.8mm 1mm 0.8mm 0;
 }
 DarkCWStatus {
     background: cn1-pill-border;
-    background-color: #143B66;
-    color: #5FD08A;
+    background-color: #1F3329;
+    color: #6FDC9A;
     padding: 1.0mm 2.5mm 1.0mm 2.5mm;
     margin: 0.3mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
 }
 DarkCWStatusOff {
     background: cn1-pill-border;
-    background-color: #173A7A;
-    color: #A8B8DA;
+    background-color: #26314A;
+    color: #A9B6CC;
     padding: 1.0mm 2.5mm 1.0mm 2.5mm;
     margin: 0.3mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
 }
 DarkCWToolbarButton {
-    background-color: #102B66;
-    color: #F5F8FF;
-    border: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    color: #EEF2F8;
+    border: 0.25mm solid #3A465E;
     border-radius: 1.6mm;
     padding: 1.2mm;
     margin: 0.45mm;
@@ -496,102 +506,102 @@ DarkCWToolbarActions {
 }
 DarkCWEmail {
     background-color: transparent;
-    color: #A8B8DA;
-    font-size: 2.45mm;
+    color: #A9B6CC;
+    font-size: 2.6mm;
     padding: 1mm;
 }
 DarkCWBody {
-    background-color: #071B4D;
+    background-color: #0F1626;
 }
 DarkCWSidebar {
-    background-color: #102B66;
-    border-right: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    border-right: 0.25mm solid #3A465E;
     padding: 2.0mm 1.5mm 2.0mm 1.5mm;
 }
 DarkCWNavLabel {
     background-color: transparent;
-    color: #7E93BC;
+    color: #8B98AE;
     font-family: "native:MainBold";
-    font-size: 2.1mm;
+    font-size: 2.3mm;
     padding: 2.2mm 1.4mm 0.8mm 1.4mm;
 }
 DarkCWNav {
-    background-color: #102B66;
-    color: #A8B8DA;
+    background-color: #1A2233;
+    color: #A9B6CC;
     padding: 1.7mm 1.8mm 1.7mm 1.8mm;
     margin: 0.25mm 0 0.25mm 0;
     border-radius: 1.6mm;
-    font-size: 2.65mm;
+    font-size: 2.8mm;
 }
 DarkCWNavSelected {
-    background-color: #173A7A;
-    color: #4D86FF;
+    background-color: #26314A;
+    color: #5C93FF;
     padding: 1.7mm 1.8mm 1.7mm 1.8mm;
     margin: 0.25mm 0 0.25mm 0;
     border-radius: 1.6mm;
     font-family: "native:MainBold";
-    font-size: 2.65mm;
+    font-size: 2.8mm;
 }
 DarkCWPage {
-    background-color: #071B4D;
+    background-color: #0F1626;
     padding: 4.0mm 5.0mm 6.0mm 5.0mm;
 }
 DarkCWPageTitle {
     background-color: transparent;
-    color: #F5F8FF;
+    color: #EEF2F8;
     font-family: "native:MainBold";
     font-size: 4.5mm;
     padding: 0 0 0.5mm 0;
 }
 DarkCWSub {
     background-color: transparent;
-    color: #A8B8DA;
-    font-size: 2.55mm;
+    color: #A9B6CC;
+    font-size: 2.7mm;
     padding: 0 0 2.2mm 0;
 }
 DarkCWCard {
-    background-color: #102B66;
-    border: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    border: 0.25mm solid #3A465E;
     border-radius: 1.8mm;
     padding: 2.4mm;
     margin: 1.0mm 0 1.4mm 0;
 }
 DarkCWCardTitle {
     background-color: transparent;
-    color: #F5F8FF;
+    color: #EEF2F8;
     font-family: "native:MainBold";
     font-size: 2.8mm;
     padding: 0.5mm 0 0.4mm 0;
 }
 DarkCWCardMeta {
     background-color: transparent;
-    color: #A8B8DA;
-    font-size: 2.35mm;
+    color: #A9B6CC;
+    font-size: 2.55mm;
     padding: 0.2mm 0 0.2mm 0;
 }
 DarkCWCardRow {
-    background-color: #102B66;
-    border-top: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    border-top: 0.25mm solid #3A465E;
     padding: 1.0mm 0 1.0mm 0;
     margin: 0;
 }
 DarkCWMetric {
-    background-color: #102B66;
-    border: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    border: 0.25mm solid #3A465E;
     border-radius: 1.8mm;
     padding: 2.5mm;
     margin: 0.8mm;
 }
 DarkCWMetricNumber {
     background-color: transparent;
-    color: #F5F8FF;
+    color: #EEF2F8;
     font-family: "native:MainBold";
     font-size: 5.2mm;
 }
 DarkCWMetricLabel {
     background-color: transparent;
-    color: #A8B8DA;
-    font-size: 2.35mm;
+    color: #A9B6CC;
+    font-size: 2.55mm;
     padding: 0.4mm 0 0 0;
 }
 DarkCWActionRow {
@@ -607,79 +617,79 @@ DarkCWActionGrid {
 DarkCWPrimary {
     background: cn1-pill-border;
     background-color: #B8D532;
-    color: #FFFFFF;
+    color: #16220A;
     padding: 1.35mm 3.1mm 1.35mm 3.1mm;
     margin: 0.4mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     border-radius: 3.2mm;
     text-align: center;
 }
 DarkCWAccent {
     background: cn1-pill-border;
-    background-color: #4D86FF;
+    background-color: #5C93FF;
     color: #FFFFFF;
     padding: 1.35mm 3.1mm 1.35mm 3.1mm;
     margin: 0.4mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     border-radius: 3.2mm;
     text-align: center;
 }
 DarkCWOutline {
     background: cn1-pill-border;
-    background-color: #102B66;
-    color: #F5F8FF;
-    border: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    color: #EEF2F8;
+    border: 0.25mm solid #3A465E;
     border-radius: 3.2mm;
     padding: 1.25mm 2.8mm 1.25mm 2.8mm;
     margin: 0.4mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     text-align: center;
 }
 DarkCWDanger {
     background: cn1-pill-border;
-    background-color: #102B66;
+    background-color: #1A2233;
     color: #FF7A7A;
-    border: 0.25mm solid #33518C;
+    border: 0.25mm solid #3A465E;
     border-radius: 3.2mm;
     padding: 1.25mm 2.8mm 1.25mm 2.8mm;
     margin: 0.4mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     text-align: center;
 }
 DarkCWDisabled {
     background: cn1-pill-border;
-    background-color: #163575;
-    color: #7890C0;
-    border: 0.25mm solid #33518C;
+    background-color: #26314A;
+    color: #8B98AE;
+    border: 0.25mm solid #3A465E;
     border-radius: 3.2mm;
     padding: 1.35mm 3.1mm 1.35mm 3.1mm;
     margin: 0.4mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     text-align: center;
 }
 DarkCWField {
-    background-color: #0E2A61;
-    color: #F5F8FF;
-    border: 0.25mm solid #33518C;
+    background-color: #141B2B;
+    color: #EEF2F8;
+    border: 0.25mm solid #3A465E;
     border-radius: 1.4mm;
     padding: 1.4mm;
     margin: 0.5mm 0 1.2mm 0;
 }
 DarkCWFieldHint {
     background-color: transparent;
-    color: #A8B8DA;
+    color: #A9B6CC;
     padding: 1.4mm;
-    font-size: 2.75mm;
+    font-size: 2.9mm;
 }
 DarkCWFieldLabel {
     background-color: transparent;
-    color: #A8B8DA;
-    font-size: 2.35mm;
+    color: #A9B6CC;
+    font-size: 2.55mm;
     padding: 0.7mm 0 0.4mm 0;
 }
 DarkCWFilterRow {
@@ -687,23 +697,23 @@ DarkCWFilterRow {
     padding: 0 0 1.2mm 0;
 }
 DarkCWFilterWrap {
-    background-color: #0E2A61;
-    border: 0.25mm solid #33518C;
+    background-color: #141B2B;
+    border: 0.25mm solid #3A465E;
     border-radius: 1.4mm;
     padding: 0;
     margin: 0.4mm 0.8mm 0.4mm 0;
 }
 DarkCWFilterField {
-    background-color: #0E2A61;
-    color: #F5F8FF;
+    background-color: #141B2B;
+    color: #EEF2F8;
     border: none;
     padding: 1.1mm 1.4mm 1.1mm 1.4mm;
     margin: 0;
-    font-size: 2.45mm;
+    font-size: 2.6mm;
 }
 DarkCWFilterClear {
     background-color: transparent;
-    color: #A8B8DA;
+    color: #A9B6CC;
     padding: 1.0mm;
     margin: 0;
 }
@@ -714,14 +724,14 @@ DarkCWTableBody {
 }
 DarkCWTableHeader {
     background-color: transparent;
-    color: #A8B8DA;
+    color: #A9B6CC;
     font-family: "native:MainBold";
-    font-size: 2.1mm;
+    font-size: 2.3mm;
     padding: 1.0mm 1.2mm 1.2mm 1.2mm;
 }
 DarkCWRow {
-    background-color: #102B66;
-    border-top: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    border-top: 0.25mm solid #3A465E;
     padding: 1.5mm 1.2mm 1.5mm 1.2mm;
 }
 DarkCWTableCell {
@@ -730,65 +740,65 @@ DarkCWTableCell {
 }
 DarkCWCellMain {
     background-color: transparent;
-    color: #F5F8FF;
+    color: #EEF2F8;
     font-family: "native:MainBold";
-    font-size: 2.65mm;
+    font-size: 2.8mm;
 }
 DarkCWCellSub {
     background-color: transparent;
-    color: #A8B8DA;
-    font-size: 2.25mm;
+    color: #A9B6CC;
+    font-size: 2.45mm;
 }
 DarkCWPillOk {
-    background-color: #143B66;
-    color: #5FD08A;
+    background-color: #1F3329;
+    color: #6FDC9A;
     padding: 0.8mm 1.9mm 0.8mm 1.9mm;
     border-radius: 1.4mm;
     font-family: "native:MainBold";
-    font-size: 2.2mm;
+    font-size: 2.4mm;
 }
 DarkCWPillWarn {
-    background-color: #173A7A;
-    color: #A8B8DA;
+    background-color: #3A2E14;
+    color: #E8B15A;
     padding: 0.8mm 1.9mm 0.8mm 1.9mm;
     border-radius: 1.4mm;
     font-family: "native:MainBold";
-    font-size: 2.2mm;
+    font-size: 2.4mm;
 }
 DarkCWPillBad {
-    background-color: #3A2442;
-    color: #FF7A7A;
+    background-color: #3A2024;
+    color: #FF8A8A;
     padding: 0.8mm 1.9mm 0.8mm 1.9mm;
     border-radius: 1.4mm;
     font-family: "native:MainBold";
-    font-size: 2.2mm;
+    font-size: 2.4mm;
 }
 DarkCWPillMuted {
-    background-color: #163575;
-    color: #A8B8DA;
+    background-color: #26314A;
+    color: #A9B6CC;
     padding: 0.8mm 1.9mm 0.8mm 1.9mm;
     border-radius: 1.4mm;
     font-family: "native:MainBold";
-    font-size: 2.2mm;
+    font-size: 2.4mm;
 }
 DarkCWBanner {
-    background-color: #173A7A;
-    color: #F5F8FF;
+    background-color: #26314A;
+    color: #EEF2F8;
     border-radius: 1.8mm;
     padding: 2.0mm;
     margin: 0 0 2.2mm 0;
 }
 DarkCWBannerWarn {
-    background-color: #34355E;
-    color: #E0A94E;
-    border: 0.25mm solid #735F38;
+    background-color: #3A2E14;
+    color: #E8B15A;
+    border: 0.25mm solid #5C4820;
     border-radius: 1.8mm;
     padding: 2.0mm;
     margin: 0 0 2.2mm 0;
 }
 DarkCWModal {
-    background-color: #102B66;
-    border: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    border: 0.25mm solid #3A465E;
     border-radius: 2.2mm;
     padding: 2.6mm;
 }
@@ -799,7 +809,7 @@ DarkCWDialogContent {
 }
 DarkCWModalTitle {
     background-color: transparent;
-    color: #F5F8FF;
+    color: #EEF2F8;
     font-family: "native:MainBold";
     font-size: 3.4mm;
     padding: 0 0 1.4mm 0;
@@ -810,54 +820,141 @@ DarkCWDialogActions {
     margin: 1.0mm 0 0 0;
 }
 DarkCWChoice {
-    background-color: #102B66;
-    color: #F5F8FF;
-    border: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    color: #EEF2F8;
+    border: 0.25mm solid #3A465E;
     border-radius: 1.8mm;
     padding: 1.8mm;
     margin: 0.7mm 0 0.7mm 0;
-    font-size: 2.55mm;
+    font-size: 2.7mm;
 }
 DarkCWChoiceSelected {
-    background-color: #173A7A;
-    color: #F5F8FF;
-    border: 0.25mm solid #33518C;
+    background-color: #26314A;
+    color: #EEF2F8;
+    border: 0.25mm solid #3A465E;
     border-radius: 1.8mm;
     padding: 1.8mm;
     margin: 0.7mm 0 0.7mm 0;
-    font-size: 2.55mm;
+    font-size: 2.7mm;
 }
 DarkCWSegment {
     background: cn1-pill-border;
-    background-color: #102B66;
-    color: #F5F8FF;
-    border: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    color: #EEF2F8;
+    border: 0.25mm solid #3A465E;
     border-radius: 3.2mm;
     padding: 1.15mm 2.4mm 1.15mm 2.4mm;
     margin: 0.25mm;
     font-family: "native:MainBold";
-    font-size: 2.35mm;
+    font-size: 2.55mm;
     text-align: center;
 }
 DarkCWSegmentSelected {
     background: cn1-pill-border;
-    background-color: #4D86FF;
+    background-color: #5C93FF;
     color: #FFFFFF;
+    border: 0.25mm solid #5C93FF;
     border-radius: 3.2mm;
     padding: 1.15mm 2.4mm 1.15mm 2.4mm;
     margin: 0.25mm;
     font-family: "native:MainBold";
-    font-size: 2.35mm;
+    font-size: 2.55mm;
     text-align: center;
 }
 DarkCWDarkToggle {
-    background-color: #102B66;
-    color: #F5F8FF;
-    border: 0.25mm solid #33518C;
+    background-color: #1A2233;
+    color: #EEF2F8;
+    border: 0.25mm solid #3A465E;
     border-radius: 1.6mm;
     padding: 1.0mm 2.0mm 1.0mm 2.0mm;
     margin: 0.3mm;
     font-family: "native:MainBold";
-    font-size: 2.45mm;
+    font-size: 2.6mm;
     text-align: center;
+}
+
+/* Components whose UIID the look and feel fixes by name.
+ *
+ * Everything above comes in a light UIID and a "Dark" twin the app swaps
+ * between, because the app owns those UIIDs. These it does not: the look and
+ * feel asks the theme for "Scroll"/"ScrollThumb" (and "DesktopScroll"/
+ * "DesktopScrollThumb" once the port turns on interactive scrollbars) and for
+ * "CheckBox" by those exact names, so a Dark twin would never be looked up.
+ * Their dark values live in the prefers-color-scheme block at the end of this
+ * file, which the CSS compiler emits as $Dark<UIID> entries -- the form the
+ * runtime consults when CN.isDarkMode() is true.
+ *
+ * With no rule at all they were drawn from the blank-theme defaults: a WHITE
+ * track with a BLACK thumb. On a dark page that reads as an inverted bar whose
+ * empty part looks like the thumb, which is issue #5636.
+ */
+Scroll, HorizontalScroll, DesktopScroll, DesktopHorizontalScroll {
+    background-color: transparent;
+    padding: 0 0.9mm 0 0.9mm;
+    margin: 0;
+}
+ScrollThumb, HorizontalScrollThumb, DesktopScrollThumb, DesktopHorizontalScrollThumb {
+    background-color: #AEB7C7;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopScrollThumb.selected, DesktopHorizontalScrollThumb.selected {
+    background-color: #8791A6;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+DesktopScrollThumb.pressed, DesktopHorizontalScrollThumb.pressed {
+    background-color: #2F6BFF;
+    cn1-background-type: cn1-round-border;
+    padding: 0;
+    margin: 0;
+}
+/* The check box glyph is built from the CheckBox style, never from the UIID the
+ * component carries, so these colours are the box and not the label. Unchecked
+ * is a grey outline and checked is the accent fill: at the label's own font
+ * height the two were the same small square in the same colour, which is why a
+ * list of unchecked devices looked like a list of checked ones. */
+CheckBox {
+    color: #8791A6;
+    background-color: transparent;
+}
+CheckBox.selected {
+    color: #2F6BFF;
+    background-color: transparent;
+}
+
+@media (prefers-color-scheme: dark) {
+    Scroll, HorizontalScroll, DesktopScroll, DesktopHorizontalScroll {
+        background-color: transparent;
+        padding: 0 0.9mm 0 0.9mm;
+        margin: 0;
+    }
+    ScrollThumb, HorizontalScrollThumb, DesktopScrollThumb, DesktopHorizontalScrollThumb {
+        background-color: #4E5A72;
+        cn1-background-type: cn1-round-border;
+        padding: 0;
+        margin: 0;
+    }
+    DesktopScrollThumb.selected, DesktopHorizontalScrollThumb.selected {
+        background-color: #6E7C97;
+        cn1-background-type: cn1-round-border;
+        padding: 0;
+        margin: 0;
+    }
+    DesktopScrollThumb.pressed, DesktopHorizontalScrollThumb.pressed {
+        background-color: #5C93FF;
+        cn1-background-type: cn1-round-border;
+        padding: 0;
+        margin: 0;
+    }
+    CheckBox {
+        color: #8B98AE;
+        background-color: transparent;
+    }
+    CheckBox.selected {
+        color: #5C93FF;
+        background-color: transparent;
+    }
 }

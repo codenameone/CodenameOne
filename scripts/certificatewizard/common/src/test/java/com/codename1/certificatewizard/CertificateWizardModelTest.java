@@ -90,6 +90,54 @@ class CertificateWizardModelTest {
         assertFalse(WizardDecisions.canCreateProfile("IOS_APP_STORE", "BID1", certs, devices, ""));
     }
 
+    /// The create action is disabled until the request is complete, and the reporter of issue
+    /// #5636 could not tell which of four sections was the incomplete one. The message names the
+    /// FIRST thing missing, reading down the dialog, so following it always moves forward.
+    @Test
+    void missingProfileInputIsNamedInDialogOrder() {
+        List<String> certs = new ArrayList<String>();
+        List<String> devices = new ArrayList<String>();
+        assertTrue(WizardDecisions.describeMissingProfileInput(null, null, certs, devices, "")
+                .contains("profile type"));
+        assertTrue(WizardDecisions.describeMissingProfileInput("IOS_APP_STORE", null, certs, devices, "")
+                .contains("bundle ID"));
+        assertTrue(WizardDecisions.describeMissingProfileInput("IOS_APP_STORE", "BID1", certs, devices, "")
+                .contains("certificate"));
+        certs.add("CERT1");
+        assertTrue(WizardDecisions.describeMissingProfileInput("IOS_APP_STORE", "BID1", certs, devices, "")
+                .contains("name"));
+        assertTrue(WizardDecisions.describeMissingProfileInput("IOS_APP_ADHOC", "BID1", certs, devices, "Adhoc")
+                .contains("device"));
+        devices.add("DEV1");
+        assertNull(WizardDecisions.describeMissingProfileInput("IOS_APP_ADHOC", "BID1", certs, devices, "Adhoc"));
+        assertNull(WizardDecisions.describeMissingProfileInput("IOS_APP_STORE", "BID1", certs, null, "Store"));
+    }
+
+    /// Nothing may report a blocker while canCreateProfile says the request is complete, or the
+    /// dialog would explain a button that is already enabled.
+    @Test
+    void missingProfileInputAgreesWithCreateProfileValidation() {
+        List<String> certs = new ArrayList<String>();
+        certs.add("CERT1");
+        List<String> devices = new ArrayList<String>();
+        devices.add("DEV1");
+        String[] types = {"IOS_APP_STORE", "IOS_APP_ADHOC", "IOS_APP_DEVELOPMENT", "MAC_APP_STORE",
+                "MAC_APP_DIRECT", "MAC_APP_DEVELOPMENT", null};
+        String[] bundles = {null, "BID1"};
+        String[] names = {"", "Profile"};
+        for (String type : types) {
+            for (String bundle : bundles) {
+                for (String name : names) {
+                    for (List<String> devs : java.util.Arrays.asList(new ArrayList<String>(), devices)) {
+                        boolean ok = WizardDecisions.canCreateProfile(type, bundle, certs, devs, name);
+                        String missing = WizardDecisions.describeMissingProfileInput(type, bundle, certs, devs, name);
+                        assertEquals(ok, missing == null, type + "/" + bundle + "/" + name + "/" + devs.size());
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     void projectBindingParsesDescriptor() {
         ProjectBinding b = ProjectBinding.parse("projectDir=/p\nsettings=/p/codenameone_settings.properties\n"

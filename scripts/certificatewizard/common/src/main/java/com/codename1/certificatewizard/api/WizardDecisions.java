@@ -124,6 +124,39 @@ public final class WizardDecisions {
         return out;
     }
 
+    /// The one input still missing before a profile can be created, phrased for the user, or null
+    /// when nothing is. Reported in the same order the dialog lays the sections out, so the
+    /// message always points at the first thing above the button rather than at whichever check
+    /// happens to be written first.
+    public static String describeMissingProfileInput(String profileType, String bundleId,
+                                                     List<String> certificateIds, List<String> deviceIds,
+                                                     String name) {
+        if (profileType == null) {
+            return "Choose a profile type to continue.";
+        }
+        if (bundleId == null) {
+            return "Choose the bundle ID this profile is for.";
+        }
+        if (certificateIds == null || certificateIds.isEmpty()) {
+            return "Choose a " + humanCertificateType(requiredCertificateType(profileType)) + " certificate.";
+        }
+        if (profileRequiresDevices(profileType) && (deviceIds == null || deviceIds.isEmpty())) {
+            return "Select at least one device for this profile type.";
+        }
+        if (name == null || name.trim().isEmpty()) {
+            return "Enter a name for the profile.";
+        }
+        return null;
+    }
+
+    private static String humanCertificateType(String certificateType) {
+        if (certificateType == null) {
+            return "signing";
+        }
+        return certificateType.replace("IOS_", "").replace("MAC_", "Mac ")
+                .replace("DEVELOPER_ID_", "Developer ID ").replace('_', ' ').toLowerCase();
+    }
+
     public static boolean canCreateProfile(String profileType, String bundleId, List<String> certificateIds,
                                            List<String> deviceIds, String name) {
         if (profileType == null || bundleId == null || certificateIds == null || certificateIds.isEmpty()) {
