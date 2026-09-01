@@ -68,6 +68,15 @@ public final class Double extends Number implements Comparable<Double> {
         return 0l; //TODO codavaj!!
     }
 
+    /// Returns the raw IEEE 754 double-precision bit pattern of a double,
+    /// without collapsing NaN payloads to the canonical
+    /// 0x7ff8000000000000L. Present so pushed programs can round-trip a
+    /// noncanonical NaN payload the JVM preserves -- the device runtime uses
+    /// this to write double slots and read them back.
+    public static long doubleToRawLongBits(double value){
+        return 0l; //TODO codavaj!!
+    }
+
     /// Returns the double value of this Double.
     public double doubleValue(){
         return 0.0d; //TODO codavaj!!

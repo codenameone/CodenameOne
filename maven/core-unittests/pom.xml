@@ -199,5 +199,17 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!--
+          The device-runtime conformance tests drive the real bundle pipeline:
+          javac, then the translator's InterpBundleWriter, then the runtime's
+          reader. Testing the runtime against a bundle built by anything else
+          would leave the two ends of the format free to disagree.
+        -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-parparvm</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

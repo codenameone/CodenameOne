@@ -1,0 +1,18 @@
+# Types that cannot be subclassed by generated code for a reason no compiler
+# reports. This file should stay one or two lines long.
+#
+# Anything javac can detect is NOT listed here -- a shim that fails to compile
+# is a generator bug and the build fails so it gets fixed. Anything Java forbids
+# structurally (a package-private abstract method, no reachable constructor) is
+# detected by the generator, which names the blocking method when it skips.
+#
+# What is left is semantic contracts, which only a downstream gate sees.
+#
+# Format: one shim name per line, '#' comments ignored.
+
+# Simd.alloca* are stack-allocation intrinsics whose results must not escape the
+# frame that allocated them. A shim's super_ bridge returns one to its caller,
+# which the bytecode compliance gate rejects -- correctly, since escaping is
+# precisely what the intrinsic forbids. Subclassing a bag of intrinsics is
+# meaningless anyway.
+Interp_util_Simd

@@ -157,16 +157,71 @@ public class BytecodeMethod implements SignatureSet {
      */
     static boolean onDeviceDebug;
 
+    /**
+     * When true the translator is building the CN1 device runtime host app --
+     * the app that loads and interprets bytecode bundles pushed from a
+     * developer's machine. That app is not a normal CN1 app: it has to keep the
+     * entire API surface reachable (pushed code may call anything) and it has
+     * to let the interpreter patch vtable slots so an interpreted subclass of a
+     * framework class gets its overrides invoked by AOT callers.
+     *
+     * Implies {@link #onDeviceDebug} (we reuse the invoke thunks, field tables
+     * and symbol table it emits) and forces the optimizer off, since
+     * devirtualization and inlining would bypass the very vtable slots the
+     * interpreter needs to patch. Toggled via the cn1.interpHost system
+     * property. Never set for a normal app build.
+     */
+    static boolean interpHost;
+
     static {
         String op = System.getProperty("optimizer");
         optimizerOn = op == null || op.equalsIgnoreCase("on");
         //optimizerOn = false;
 
         onDeviceDebug = "true".equalsIgnoreCase(System.getProperty("cn1.onDeviceDebug", "false"));
+
+        interpHost = "true".equalsIgnoreCase(System.getProperty("cn1.interpHost", "false"));
+        if (interpHost) {
+            // Order matters: both of these deliberately override whatever the
+            // properties above resolved to. An interp-host build that silently
+            // kept the optimizer on would devirtualize the calls the
+            // interpreter patches and fail in a way that's very hard to
+            // diagnose from the C output, so make it impossible to ask for.
+            onDeviceDebug = true;
+            optimizerOn = false;
+        }
     }
 
     public static boolean isOnDeviceDebug() {
         return onDeviceDebug;
+    }
+
+    /**
+     * True when building the device runtime host app. See {@link #interpHost}.
+     */
+    public static boolean isInterpHost() {
+        return interpHost;
+    }
+
+    /**
+     * Whether an interp-host build may keep treating this class as closed --
+     * inferring finality and devirtualizing calls to it -- because no
+     * interpreted subclass of it can exist.
+     *
+     * <p>Interpreted code extends framework classes: Form, Component, a Layout.
+     * It has no reason to extend the platform implementation layer, and the
+     * generated-metadata skip list in
+     * {@link ByteCodeClass#appendOnDeviceDebugInvokeThunks} already excludes
+     * the same package for the same reason.</p>
+     *
+     * <p>Keeping the optimization here is not merely a saving. Every method of
+     * a class like {@code com.codename1.impl.ios.IOSNative} is native, and
+     * several have no Objective-C body in the port -- unreachable ones nothing
+     * ever called. Giving them vtable slots makes {@code __INIT_VTABLE_} take
+     * their addresses, which turns "never called" into "does not link".</p>
+     */
+    public static boolean isInterpOpaqueClass(String clsName) {
+        return clsName != null && clsName.startsWith("com_codename1_impl_");
     }
 
     public boolean isBarebone() {
@@ -2549,12 +2604,13 @@ public class BytecodeMethod implements SignatureSet {
      */
     public void appendOnDeviceDebugInvokeThunk(String declaringClsName, StringBuilder b) {
         String symbol = declaringClsName + "_";
-        if ("<init>".equals(methodName)) {
-            // skipped at caller, but defensive
-            return;
-        } else if ("<clinit>".equals(methodName)) {
+        // Class initializers have no callable form. Constructors DO get a thunk
+        // under an interp-host build (the interpreter needs `new Form()`), and
+        // are handled below; the caller decides whether to ask for one.
+        if ("<clinit>".equals(methodName) || "__CLINIT__".equals(methodName)) {
             return;
         }
+        boolean ctor = isConstructor();
         symbol += getCMethodName();
         // Append the descriptor suffix the translator uses
         // (args + _R<return> for non-void).
@@ -2572,7 +2628,18 @@ public class BytecodeMethod implements SignatureSet {
         // class is final, so the dispatch was constant-folded) have no
         // virtual_ alias in their header, and the thunk has to call the
         // plain symbol or the C file won't compile.
-        boolean useVirtualPrefix = !staticMethod && !privateMethod && !virtualOverriden;
+        // java.lang.Class has no vtable of its own -- it is the one class whose
+        // objects have no class -- so ByteCodeClass emits only three
+        // hand-written virtual_ wrappers for it (equals/getClass/hashCode,
+        // inherited from Object) and none for the methods Class declares. Those
+        // declared methods are exactly the ones a thunk is generated for, and
+        // each has a direct symbol, so call that. Ordinary builds never hit this
+        // because dead code elimination removes most Class thunks first.
+        boolean noVirtualAlias = "java_lang_Class".equals(declaringClsName);
+        // Constructors are never dispatched virtually, so they have no
+        // virtual_ alias even though they are non-static and non-private.
+        boolean useVirtualPrefix = !ctor && !noVirtualAlias
+                && !staticMethod && !privateMethod && !virtualOverriden;
         String callSymbol = useVirtualPrefix ? ("virtual_" + fullSymbol) : fullSymbol;
         int mid = methodOffset;
 
@@ -2590,7 +2657,22 @@ public class BytecodeMethod implements SignatureSet {
         b.append("        threadStateData->tryBlockOffset++;\n");
         // Emit the actual call
         b.append("        ");
-        if (returnType.isVoid()) {
+        if (ctor) {
+            // Allocate first, then run <init> against the fresh object and hand
+            // it back as the result -- so the interpreter gets `new Foo(args)`
+            // as a single invoke rather than having to model NEW/DUP/INVOKESPECIAL.
+            //
+            // __r is a plain C local across the <init> call, which can allocate
+            // and therefore trigger a collection. That is safe because the
+            // collector conservatively scans each thread's native C stack
+            // (cn1GcScanThreadNativeStack, unconditional via
+            // CN1_CONSERVATIVE_GC_ROOTS in cn1_globals.h) in addition to the
+            // precise threadObjectStack walk -- the same property frameless
+            // frames rely on. Do not "optimize" __r into a reused slot.
+            b.append("JAVA_OBJECT __r = __NEW_").append(declaringClsName)
+             .append("(threadStateData);\n        ");
+            b.append(callSymbol).append("(threadStateData, __r");
+        } else if (returnType.isVoid()) {
             b.append(callSymbol).append("(threadStateData");
         } else {
             // Capture return into a typed temp, then pack.
@@ -2602,7 +2684,8 @@ public class BytecodeMethod implements SignatureSet {
             else b.append("JAVA_INT __r = ");
             b.append(callSymbol).append("(threadStateData");
         }
-        if (!staticMethod) {
+        if (!staticMethod && !ctor) {
+            // the ctor path already passed the freshly allocated __r as the receiver
             b.append(", thisObj");
         }
         for (int i = 0; i < arguments.size(); i++) {
@@ -2620,7 +2703,12 @@ public class BytecodeMethod implements SignatureSet {
         b.append(");\n");
         // Pop our try block (no exception path) and store the result.
         b.append("        threadStateData->tryBlockOffset--;\n");
-        if (returnType.isVoid()) {
+        if (ctor) {
+            // A constructor's Java return type is void, but the thunk's value
+            // is the constructed object -- that is the whole point of it.
+            b.append("        result->type = 'L';\n");
+            b.append("        result->value.o = __r;\n");
+        } else if (returnType.isVoid()) {
             b.append("        result->type = 'V';\n");
         } else {
             char rq = returnType.getQualifier();

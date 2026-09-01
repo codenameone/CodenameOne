@@ -108,6 +108,15 @@ public final class Float extends Number implements Comparable<Float> {
     public native static int floatToIntBits(float value);
 
     /**
+     * Returns the raw IEEE 754 single-precision bit pattern of a float, without
+     * collapsing NaN payloads to the canonical 0x7fc00000 the way
+     * {@link #floatToIntBits} does. The device runtime uses this to store
+     * float slots so a pushed program that got a noncanonical NaN from a
+     * host call can read the same bits back out.
+     */
+    public native static int floatToRawIntBits(float value);
+
+    /**
      * Returns the float value of this Float object.
      */
     public float floatValue(){

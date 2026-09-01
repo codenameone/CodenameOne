@@ -91,6 +91,15 @@ public final class Double extends Number implements Comparable<Double> {
     public native static long doubleToLongBits(double value);
 
     /**
+     * Returns the raw IEEE 754 double-precision bit pattern of a double,
+     * without collapsing NaN payloads to the canonical 0x7ff8000000000000L
+     * the way {@link #doubleToLongBits} does. The device runtime uses this
+     * to store double slots so a pushed program that got a noncanonical NaN
+     * from a host call can read the same bits back out.
+     */
+    public native static long doubleToRawLongBits(double value);
+
+    /**
      * Returns the double value of this Double.
      */
     public double doubleValue(){

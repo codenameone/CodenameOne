@@ -1,0 +1,23 @@
+A development tool for people building Codename One applications.
+
+Install it once on a device you are developing against. From then on, your
+project runs here directly from your IDE: press run on your computer and the
+application appears on the device in seconds, with no build, no signing and no
+reinstall between edits.
+
+The device and your computer find each other on your local network. Pairing is
+explicit -- your IDE shows a six digit code that you type on the device -- and
+every later connection is approved on the device itself. You can revoke a
+computer at any time.
+
+The source of whatever is running is always visible and editable on the device,
+under "View source".
+
+This is a debugging tool, not a way to distribute software. It runs only what
+you push to it from a computer you have paired, over your own network. It has
+no catalogue, no store, no browsing and no download of code from anywhere else.
+Interpreted code is slower than a compiled build, so it is for developing
+application logic and user interface, not for measuring performance.
+
+Requires a Codename One project on your computer. See the documentation for the
+push tooling.
