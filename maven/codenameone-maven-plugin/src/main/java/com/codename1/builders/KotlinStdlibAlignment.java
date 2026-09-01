@@ -264,7 +264,12 @@ public class KotlinStdlibAlignment {
                 if (!namesArtifactAnywhere(lines[j], artifact)) {
                     continue;
                 }
-                if (belowTheFloor(declaredVersionOf(lines[j], artifact))) {
+                String declared = declaredVersionOf(lines[j], artifact);
+                if (declared != null && declared.endsWith(STRICT_SUFFIX)) {
+                    declared = declared.substring(0,
+                            declared.length() - STRICT_SUFFIX.length());
+                }
+                if (belowTheFloor(declared)) {
                     return true;
                 }
             }
@@ -300,25 +305,44 @@ public class KotlinStdlibAlignment {
         return mapEntryValue(line, "version");
     }
 
-    /** The value of a {@code key: 'value'} map entry, or null. */
+    /**
+     * The value of a {@code key: 'value'} map entry, or null.
+     *
+     * <p>The KEY is looked for outside string literals only. A reason quoting
+     * the map form -- {@code because "avoid group: 'org.jetbrains.kotlin',
+     * name: 'kotlin-stdlib-jdk8'"} -- otherwise read as a declaration of that
+     * artifact, and since prose carries no version the whole block was
+     * suppressed. Same rule as the coordinate matcher beside it, which is
+     * where this had drifted apart from.</p>
+     */
     private static String mapEntryValue(String line, String key) {
-        int at = line.indexOf(key);
-        while (at >= 0) {
-            boolean startsToken = at == 0 || !isIdentifierChar(line.charAt(at - 1));
-            if (startsToken) {
-                int i = skipBlanks(line, at + key.length());
-                if (i < line.length() && line.charAt(i) == ':') {
-                    i = skipBlanks(line, i + 1);
-                    if (i < line.length()
-                            && (line.charAt(i) == '\'' || line.charAt(i) == '"')) {
-                        int end = endOfStringLiteral(line, i);
-                        if (end < line.length()) {
-                            return line.substring(i + 1, end);
-                        }
-                    }
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '\'' || c == '"') {
+                i = endOfStringLiteral(line, i);
+                continue;
+            }
+            if (!line.startsWith(key, i)) {
+                continue;
+            }
+            boolean startsToken = i == 0 || !isIdentifierChar(line.charAt(i - 1));
+            int after = i + key.length();
+            if (!startsToken || (after < line.length()
+                    && isIdentifierChar(line.charAt(after)))) {
+                continue;
+            }
+            int j = skipBlanks(line, after);
+            if (j >= line.length() || line.charAt(j) != ':') {
+                continue;
+            }
+            j = skipBlanks(line, j + 1);
+            if (j < line.length() && (line.charAt(j) == '\'' || line.charAt(j) == '"')) {
+                int end = endOfStringLiteral(line, j);
+                if (end < line.length()) {
+                    return line.substring(j + 1, end);
                 }
             }
-            at = line.indexOf(key, at + 1);
+            i = j;
         }
         return null;
     }
@@ -345,16 +369,46 @@ public class KotlinStdlibAlignment {
         for (int i = 0; i < appGradleFragments.length; i++) {
             String[] lines = activeLines(appGradleFragments[i]);
             for (int j = 0; j < lines.length; j++) {
-                if (!callsStrictly(lines[j]) || !namesBaseStdlib(lines[j])) {
+                if (!namesBaseStdlib(lines[j])) {
                     continue;
                 }
-                if (belowTheFloor(strictVersionIn(lines[j]))) {
+                String strict = strictVersionOfBaseStdlib(lines[j]);
+                if (strict != null && belowTheFloor(strict)) {
                     return true;
                 }
             }
         }
         return false;
     }
+
+    /**
+     * The version this statement strictly holds {@code kotlin-stdlib} at, or
+     * null when it does not hold it strictly.
+     *
+     * <p>Two spellings mean the same thing. The {@code strictly} call is one;
+     * Gradle's {@code !!} suffix on the version is the other, and missing it
+     * was not a near miss. Measured with Gradle: an app writing
+     * {@code 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!'} beside a
+     * pre-merge jdk8 resolves the coherent 1.7.22 family on its own, and with
+     * this block's constraints added resolves kotlin-stdlib 1.7.22 beside
+     * jdk7/jdk8 1.8.0 -- the EMPTY shims. The jdk extension classes are then
+     * supplied by neither jar, and the app fails at runtime with a missing
+     * class rather than at build time with a duplicate one. That is the worst
+     * outcome available here, so the suffix is read as what it is.</p>
+     */
+    private static String strictVersionOfBaseStdlib(String line) {
+        if (callsStrictly(line)) {
+            return strictVersionIn(line);
+        }
+        String declared = declaredVersionOf(line, BASE_STDLIB);
+        if (declared != null && declared.endsWith(STRICT_SUFFIX)) {
+            return declared.substring(0, declared.length() - STRICT_SUFFIX.length());
+        }
+        return null;
+    }
+
+    /** Gradle's strict-version shorthand, written after the version. */
+    private static final String STRICT_SUFFIX = "!!";
 
     /** Whether the statement names {@code kotlin-stdlib} and not a longer name. */
     private static boolean namesBaseStdlib(String line) {
@@ -671,27 +725,8 @@ public class KotlinStdlibAlignment {
      * failed resolution.</p>
      */
     private static boolean declaresMapEntry(String line, String key, String value) {
-        int at = line.indexOf(key);
-        while (at >= 0) {
-            boolean startsToken = at == 0
-                    || !isIdentifierChar(line.charAt(at - 1));
-            if (startsToken) {
-                int i = skipBlanks(line, at + key.length());
-                if (i < line.length() && line.charAt(i) == ':') {
-                    i = skipBlanks(line, i + 1);
-                    if (i < line.length()
-                            && (line.charAt(i) == '\'' || line.charAt(i) == '"')) {
-                        char q = line.charAt(i);
-                        int end = line.indexOf(q, i + 1);
-                        if (end > i && line.substring(i + 1, end).equals(value)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            at = line.indexOf(key, at + 1);
-        }
-        return false;
+        String found = mapEntryValue(line, key);
+        return found != null && found.equals(value);
     }
 
     /**

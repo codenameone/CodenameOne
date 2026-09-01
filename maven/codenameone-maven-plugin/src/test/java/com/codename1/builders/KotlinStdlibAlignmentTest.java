@@ -458,6 +458,59 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Gradle's {@code !!} suffix is the strict-version shorthand, and missing
+     * it produced the worst outcome available here. Measured: an app writing
+     * kotlin-stdlib:1.7.22!! beside a pre-merge jdk8 resolves the coherent
+     * 1.7.22 family on its own; with these constraints added it resolves
+     * kotlin-stdlib 1.7.22 beside jdk7/jdk8 1.8.0, the EMPTY shims -- so the
+     * jdk extension classes come from neither jar and the app fails at runtime
+     * with a missing class instead of at build time with a duplicate one.
+     */
+    @Test
+    public void theStrictShorthandCountsAsAStrictPin() {
+        String base = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!'\n");
+        check("".equals(base),
+                "a !! pin on the base stdlib suppresses both shims");
+
+        String shim = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n");
+        check("".equals(shim), "and a !! pin on a shim does too");
+
+        // Above the floor the shorthand changes nothing: the constraints are still
+        // satisfiable, so they are still written.
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22!!'\n");
+        check(modern.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a merged-era !! pin does not need the block suppressed");
+    }
+
+    /**
+     * Map notation quoted inside a reason is prose too. The coordinate matcher
+     * had been taught to skip string literals and the map matcher beside it
+     * had not, so a reason naming the artifact in map form read as a
+     * declaration -- and since prose carries no version, the whole block was
+     * suppressed rather than one artifact.
+     */
+    @Test
+    public void mapNotationInsideAReasonIsStillProse() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('com.example:other:1.0') { because "
+                + "\"avoid group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8'\" }\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "quoted map notation does not suppress");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and does not take the whole block with it");
+
+        // the real map form still counts
+        String real = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation group: 'org.jetbrains.kotlin', "
+                + "name: 'kotlin-stdlib-jdk8', version: '1.9.22'\n");
+        check(!real.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a real map declaration still pins jdk8");
+    }
+
+    /**
      * A reason that OPENS with the coordinate is still a reason. Accepting any
      * literal starting with one let a warning about the duplicate
      * -- because 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22 causes
