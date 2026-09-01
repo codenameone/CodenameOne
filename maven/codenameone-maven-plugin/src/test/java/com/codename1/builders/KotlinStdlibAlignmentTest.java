@@ -458,6 +458,91 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * The map form has to match the declared GROUP, not the group appearing
+     * anywhere. A fork under another group whose reason merely mentions
+     * org.jetbrains.kotlin combined with an unrelated artifact name and read
+     * as a Kotlin shim -- and since its version was below the floor, both
+     * constraints went.
+     */
+    @Test
+    public void theMapFormMatchesTheDeclaredGroup() {
+        String fork = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation(group: 'com.example', name: 'kotlin-stdlib-jdk8', "
+                + "version: '1.0') { because 'fork of org.jetbrains.kotlin' }\n");
+        check(fork.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "another group's artifact is not our shim");
+        check(fork.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and it does not take the block with it");
+
+        // the real map form still counts
+        String real = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation group: 'org.jetbrains.kotlin', "
+                + "name: 'kotlin-stdlib-jdk8', version: '1.9.22'\n");
+        check(!real.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the real group still pins jdk8");
+    }
+
+    /**
+     * A rich-version closure can say what version is meant with a keyword
+     * other than strictly. Reading only strictly left `version { require }`
+     * with no version, which the conservative path treated as below the floor
+     * -- dropping both constraints for a declaration already merged-era.
+     */
+    @Test
+    public void aRequiredRichVersionIsAVersionToo() {
+        String required = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7') "
+                + "{ version { require '1.9.22' } }\n");
+        check(required.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a required merged-era version leaves the sibling constrained");
+
+        String preferred = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7') "
+                + "{ version { prefer '1.9.22' } }\n");
+        check(preferred.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "and so does a preferred one");
+
+        // below the floor it still takes both
+        String old = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7') "
+                + "{ version { require '1.7.22' } }\n");
+        check("".equals(old), "a required pre-merge version still suppresses both");
+    }
+
+    /**
+     * Gradle accepts more than a literal version, and each shape parsed as
+     * zero before -- classifying a merged-era declaration as pre-merge and
+     * dropping BOTH constraints, including the sibling's, which is the one
+     * such a graph still needs. What matters is the lowest version the
+     * selector can resolve to.
+     */
+    @Test
+    public void aVersionSelectorIsReadByItsLowerBound() {
+        // exact range at the floor: not below it
+        String exact = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:[1.8.0]'\n");
+        check(exact.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an exact merged-era range leaves the sibling constrained");
+
+        // dynamic selector that cannot go below the floor
+        String dynamic = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.+'\n");
+        check(dynamic.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "1.8.+ cannot resolve below the floor");
+
+        // range whose low end IS below the floor: conservative, both go
+        String spanning = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:[1.7.0,1.9.0)'\n");
+        check("".equals(spanning),
+                "a range reaching below the floor is treated as below it");
+
+        // and a dynamic selector below the floor likewise
+        String oldDynamic = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.7.+'\n");
+        check("".equals(oldDynamic), "1.7.+ is below the floor");
+    }
+
+    /**
      * Whether a declaration is strict and what version it is strict AT are two
      * questions. Asking only the second let `version { strictly kotlinVersion }`
      * read as not strict at all -- the opposite of the conservative path

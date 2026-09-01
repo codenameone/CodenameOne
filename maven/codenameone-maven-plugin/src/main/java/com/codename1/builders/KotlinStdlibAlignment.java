@@ -280,7 +280,8 @@ public class KotlinStdlibAlignment {
     /** Whether the statement names the artifact, in either spelling. */
     private static boolean namesArtifactAnywhere(String line, String artifact) {
         return namesCoordinate(line, artifact)
-                || (line.contains(KOTLIN_GROUP) && declaresMapEntry(line, "name", artifact));
+                || (declaresMapEntry(line, "group", KOTLIN_GROUP)
+                && declaresMapEntry(line, "name", artifact));
     }
 
     /**
@@ -312,8 +313,9 @@ public class KotlinStdlibAlignment {
         //   }
         // Returning null there made a merged-era declaration read as below the floor
         // and took the sibling's constraint down with it, which is the one the graph
-        // still needed.
-        return strictVersionIn(line);
+        // still needed. Any of the rich-version keywords answers "what version", not
+        // only the one that also decides strictness.
+        return richVersionIn(line);
     }
 
     /**
@@ -439,7 +441,7 @@ public class KotlinStdlibAlignment {
     /** Whether the statement names {@code kotlin-stdlib} and not a longer name. */
     private static boolean namesBaseStdlib(String line) {
         return namesCoordinate(line, BASE_STDLIB)
-                || (line.contains(KOTLIN_GROUP)
+                || (declaresMapEntry(line, "group", KOTLIN_GROUP)
                         && declaresMapEntry(line, "name", BASE_STDLIB));
     }
 
@@ -505,6 +507,34 @@ public class KotlinStdlibAlignment {
 
     /** The version inside this statement's {@code strictly} call, or null. */
     private static String strictVersionIn(String statement) {
+        return versionInCall(statement, STRICTLY);
+    }
+
+    /**
+     * The version a rich-version closure declares, whichever keyword carries
+     * it.
+     *
+     * <p>{@code strictly} is the one that changes whether the constraints can
+     * coexist with the app's, but it is not the only one that says what version
+     * is meant. Reading only it left {@code version { require '1.9.22' } }
+     * with no version at all, which the conservative path then treated as
+     * below the floor -- dropping BOTH constraints for a declaration that was
+     * already merged-era and needed only its sibling left alone.</p>
+     */
+    private static String richVersionIn(String statement) {
+        String strict = versionInCall(statement, STRICTLY);
+        if (strict != null) {
+            return strict;
+        }
+        String required = versionInCall(statement, "require");
+        if (required != null) {
+            return required;
+        }
+        return versionInCall(statement, "prefer");
+    }
+
+    /** The quoted argument of {@code call}, found outside string literals. */
+    private static String versionInCall(String statement, String call) {
         // The same syntax-level call callsStrictly validated, not any occurrence of
         // the word: a reason reading `because "strictly '1.7.22' is not intended"`
         // otherwise supplies the version for a declaration whose real strict version
@@ -516,14 +546,14 @@ public class KotlinStdlibAlignment {
                 i = endOfStringLiteral(statement, i);
                 continue;
             }
-            if (!statement.startsWith(STRICTLY, i)) {
+            if (!statement.startsWith(call, i)) {
                 continue;
             }
             boolean startsToken = i == 0 || !isIdentifierChar(statement.charAt(i - 1));
             if (!startsToken) {
                 continue;
             }
-            int after = skipBlanks(statement, i + STRICTLY.length());
+            int after = skipBlanks(statement, i + call.length());
             if (after < statement.length() && statement.charAt(after) == '(') {
                 after = skipBlanks(statement, after + 1);
             }
@@ -559,20 +589,61 @@ public class KotlinStdlibAlignment {
         if (version == null) {
             return true;
         }
-        int compared = compareVersions(version, MERGED_STDLIB_FLOOR);
+        String lowerBound = lowerBoundOf(version);
+        if (lowerBound == null) {
+            return true;
+        }
+        int compared = compareVersions(lowerBound, MERGED_STDLIB_FLOOR);
         if (compared != 0) {
             return compared < 0;
         }
-        return hasQualifier(version);
+        // At the floor numerically, only a PRERELEASE is below it. A dynamic marker
+        // is not: 1.8.+ cannot resolve lower than 1.8.0, so it is at the floor and
+        // the constraints are still satisfiable.
+        return isPrerelease(lowerBound);
     }
 
-    /** Whether the version carries anything after its numeric segments. */
-    private static boolean hasQualifier(String version) {
+    /**
+     * The lowest version a selector can resolve to, as far as the text says.
+     *
+     * <p>Gradle accepts more than a literal here, and each shape was read as
+     * zero before: {@code [1.8.0]} is an exact range whose bracket stopped the
+     * numeric parse, {@code [1.7.0,1.9.0)} is a range whose LOW end is what
+     * matters for this question, and {@code 1.8.+} is a dynamic selector that
+     * cannot go below 1.8.0. Reading any of them as zero classified a
+     * merged-era declaration as pre-merge and dropped both constraints,
+     * including the sibling's -- which is the one such a graph still needs.</p>
+     */
+    private static String lowerBoundOf(String version) {
+        String selector = version.trim();
+        if (selector.length() == 0) {
+            return null;
+        }
+        char opening = selector.charAt(0);
+        if (opening == '[' || opening == '(') {
+            selector = selector.substring(1);
+            int to = 0;
+            while (to < selector.length() && ",])".indexOf(selector.charAt(to)) < 0) {
+                to++;
+            }
+            selector = selector.substring(0, to);
+        }
+        selector = selector.trim();
+        return selector.length() == 0 ? null : selector;
+    }
+
+    /**
+     * Whether this version is a prerelease of its own numeric version, as
+     * opposed to a dynamic selector. {@code 1.8.0-RC2} sorts below
+     * {@code 1.8.0}; {@code 1.8.+} does not.
+     */
+    private static boolean isPrerelease(String version) {
         for (int i = 0; i < version.length(); i++) {
             char c = version.charAt(i);
-            if (c != '.' && !Character.isDigit(c)) {
-                return true;
+            if (c == '.' || Character.isDigit(c)) {
+                continue;
             }
+            return c != '+';
         }
         return false;
     }
@@ -701,7 +772,8 @@ public class KotlinStdlibAlignment {
             return true;
         }
         // group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8', version: '...'
-        return line.contains(KOTLIN_GROUP) && declaresMapEntry(line, "name", artifact);
+        return declaresMapEntry(line, "group", KOTLIN_GROUP)
+                && declaresMapEntry(line, "name", artifact);
     }
 
     /**
