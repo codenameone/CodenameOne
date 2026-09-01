@@ -642,6 +642,59 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Line endings do not change what a map entry says, here either. The call
+     * detector had already learned that and this shared skip had not, so a
+     * CRLF fragment that split an entry after its colon found no value at all.
+     */
+    @Test
+    public void aMapEntryMayBeSplitByAnyLineEnding() {
+        String[] endings = {"\r\n", "\n", "\r"};
+        for (int i = 0; i < endings.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation(group:" + endings[i]
+                    + " 'org.jetbrains.kotlin', name:" + endings[i]
+                    + " 'kotlin-stdlib-jdk8', version:" + endings[i]
+                    + " '1.7.22')" + endings[i]);
+            check("".equals(out),
+                    "the map entry survives the line ending, got <<" + out + ">>");
+        }
+    }
+
+    /**
+     * A name a nested scope introduced goes away with it. A `def` inside a
+     * closure or a method is local to it, and keeping that value afterwards
+     * made an unrelated later use look like a declaration of whatever the
+     * nested one held -- so that artifact's constraint was skipped as already
+     * satisfied while its sibling was raised around it.
+     */
+    @Test
+    public void aNameIntroducedInsideAScopeLeavesWithIt() {
+        String nested = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = 'com.example:other:1.0'\n"
+                + "    def helper() {\n"
+                + "        def dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n"
+                + "    }\n"
+                + "    implementation(dep)\n");
+        check(nested.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the nested local does not reach the statement after it, got <<"
+                        + nested + ">>");
+
+        // An ASSIGNMENT inside a block is a different thing: it updates the binding
+        // it found, so it does reach what follows. This is the distinction the fix
+        // rests on, and it is asserted so a later "just clear the scope" cannot
+        // quietly take it away.
+        String assigned = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = 'com.example:other:1.0'\n"
+                + "    if (legacy) {\n"
+                + "        dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n"
+                + "    }\n"
+                + "    implementation(dep)\n");
+        check(!assigned.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an assignment inside a block still reaches what follows, got <<"
+                        + assigned + ">>");
+    }
+
+    /**
      * A value that is only assigned is not a declaration. A definition naming
      * the artifact and carrying a strict marker suppressed the whole block on
      * that basis alone, for a value never added to any configuration -- and a

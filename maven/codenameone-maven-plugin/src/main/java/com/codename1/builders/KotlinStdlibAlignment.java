@@ -1503,7 +1503,15 @@ public class KotlinStdlibAlignment {
 
     private static int skipBlanks(String line, int from) {
         int i = from;
-        while (i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+        // isBlank, not a second opinion about what whitespace is. Spelled out as
+        // space-or-tab here while the call detector had already learned about line
+        // endings, so a CRLF fragment that split a map entry after its colon --
+        //   implementation(group:
+        //           'org.jetbrains.kotlin', ...
+        // -- found no value at all, and the strict pin in that declaration went
+        // unread. A statement can legitimately contain a newline; the splitter has
+        // already decided where statements end before anything gets here.
+        while (i < line.length() && isBlank(line.charAt(i))) {
             i++;
         }
         return i;
@@ -1919,6 +1927,7 @@ public class KotlinStdlibAlignment {
         // still recorded at any depth, which is why a `def` inside dependencies { }
         // keeps working.
         int braceDepth = 0;
+        ScopedNames scope = new ScopedNames();
         for (int i = 0; i < statements.size(); i++) {
             String statement = statements.get(i);
             out.add(literals.isEmpty()
@@ -1926,7 +1935,7 @@ public class KotlinStdlibAlignment {
                     : withLiteralsInlined(statement, literals));
             boolean opensExt = extDepth == 0 && opensAnExtraPropertiesBlock(statement);
             updateLiteralDefinitions(statement, literals, extDepth > 0 || opensExt,
-                    braceDepth > 0);
+                    braceDepth > 0, braceDepth, scope);
             if (extDepth > 0 || opensExt) {
                 extDepth += braceBalance(statement);
                 if (extDepth < 0) {
@@ -1937,6 +1946,7 @@ public class KotlinStdlibAlignment {
             if (braceDepth < 0) {
                 braceDepth = 0;
             }
+            scope.leaving(braceDepth, literals);
         }
         return out;
     }
@@ -1987,9 +1997,51 @@ public class KotlinStdlibAlignment {
         return false;
     }
 
+    /**
+     * The names a scope introduced, so they can be taken back when it closes.
+     *
+     * <p>A `def` inside a closure or a method is local to it, and a single flat
+     * map kept that value after the scope ended -- so an unrelated later
+     * `implementation(dep)` was read as a declaration of whatever the nested
+     * one held, and the constraint for that artifact was skipped as already
+     * satisfied. Only DECLARATIONS are taken back: a bare assignment inside a
+     * block updates the binding it found, which is why
+     * `if (legacy) { dep = '...' }` still reaches the statements after it.</p>
+     */
+    private static final class ScopedNames {
+        private final List<Object[]> introduced = new ArrayList<Object[]>();
+
+        void declared(int depth, String name, Map<String, String> literals) {
+            if (depth <= 0) {
+                return;
+            }
+            introduced.add(new Object[] {
+                Integer.valueOf(depth), name,
+                literals.containsKey(name) ? Boolean.TRUE : Boolean.FALSE,
+                literals.get(name)
+            });
+        }
+
+        void leaving(int depth, Map<String, String> literals) {
+            for (int i = introduced.size() - 1; i >= 0; i--) {
+                Object[] entry = introduced.get(i);
+                if (((Integer) entry[0]).intValue() <= depth) {
+                    break;
+                }
+                introduced.remove(i);
+                String name = (String) entry[1];
+                if (Boolean.TRUE.equals(entry[2])) {
+                    literals.put(name, (String) entry[3]);
+                } else {
+                    literals.remove(name);
+                }
+            }
+        }
+    }
+
     private static void updateLiteralDefinitions(String statement,
             Map<String, String> literals, boolean insideExtraProperties,
-            boolean conditional) {
+            boolean conditional, int depth, ScopedNames scope) {
         if (insideExtraProperties) {
             // The assignment may share the line with the brace that opened the block,
             // as `ext { kotlinVersion = '1.9.22' }` does, so read from after it.
@@ -2064,6 +2116,9 @@ public class KotlinStdlibAlignment {
         String name = statement.substring(nameStart, i);
         if (!declared && !literals.containsKey(name)) {
             return;
+        }
+        if (declared) {
+            scope.declared(depth, name, literals);
         }
         i = skipBlanks(statement, i);
         if (i >= statement.length() || statement.charAt(i) != '='
