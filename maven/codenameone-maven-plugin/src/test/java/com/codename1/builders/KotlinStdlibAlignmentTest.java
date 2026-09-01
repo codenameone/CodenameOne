@@ -564,6 +564,74 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A resolution rule's {@code useVersion} rewrites what was requested,
+     * silently, on the way through -- so it holds the library as firmly as a
+     * force does. Such a rule names its artifact by comparing the parts, which
+     * is neither a coordinate nor a map entry, and was read as naming nothing.
+     */
+    @Test
+    public void aResolutionRuleHoldsWhatItRewrites() {
+        String rule = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.eachDependency { d -> "
+                + "if (d.requested.group == 'org.jetbrains.kotlin' && "
+                + "d.requested.name == 'kotlin-stdlib') d.useVersion '1.7.22' } }\n");
+        check("".equals(rule),
+                "a rule pinning the base library pre-merge suppresses, got <<"
+                        + rule + ">>");
+
+        // Rewriting it to a merged-era version takes nothing away.
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.eachDependency { d -> "
+                + "if (d.requested.group == 'org.jetbrains.kotlin' && "
+                + "d.requested.name == 'kotlin-stdlib') d.useVersion '1.9.22' } }\n");
+        check(modern.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a merged-era rule keeps the alignment, got <<" + modern + ">>");
+    }
+
+    /**
+     * A variable declared without a value is still a name this knows, and
+     * recording it is what lets a later assignment be recognised as one.
+     */
+    @Test
+    public void aDeclarationWithoutAValueIsStillADeclaration() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep\n"
+                + "    if (legacy) {\n"
+                + "        dep = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n"
+                + "    }\n"
+                + "    implementation(dep) { version { strictly '1.7.22' } }\n");
+        check("".equals(out),
+                "the conditional assignment is seen, got <<" + out + ">>");
+    }
+
+    /**
+     * A qualified type is one token. Stopping at its first dot read
+     * {@code java} as the type and {@code lang} as the name, so the variable
+     * was never recorded -- while {@code ext.kotlinVersion}, which is a dotted
+     * TARGET rather than a dotted type, still has to be read the other way.
+     */
+    @Test
+    public void aQualifiedTypeIsOneToken() {
+        String[] types = {"java.lang.String", "String", "final java.lang.String"};
+        for (int i = 0; i < types.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    " + types[i]
+                    + " dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
+                    + "    implementation(dep) { version { strictly '1.7.22' } }\n");
+            check("".equals(out),
+                    "a local of type " + types[i] + " is recorded, got <<" + out + ">>");
+        }
+
+        // The dotted extra property is still a property, not a type.
+        String ext = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    ext.kotlinVersion = '1.9.22'\n"
+                + "    implementation \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion\"\n");
+        check(ext.contains("kotlin-stdlib-jdk8:1.8.0")
+                        && !ext.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "ext.kotlinVersion still binds its name, got <<" + ext + ">>");
+    }
+
+    /**
      * An assignment inside ANY open brace is one whose execution this cannot
      * establish, closures included: {@code def mutate = { dep = '...' }} runs
      * only if something calls it. Named control structures were listed here

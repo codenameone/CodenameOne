@@ -294,7 +294,32 @@ public class KotlinStdlibAlignment {
     private static boolean namesArtifactAnywhere(String line, String artifact) {
         return namesCoordinate(line, artifact)
                 || (declaresMapEntry(line, "group", KOTLIN_GROUP)
-                && declaresMapEntry(line, "name", artifact));
+                && declaresMapEntry(line, "name", artifact))
+                || (holdsLiteral(line, KOTLIN_GROUP) && holdsLiteral(line, artifact));
+    }
+
+    /**
+     * Whether the statement contains {@code value} as a literal of its own.
+     *
+     * <p>A resolution rule names an artifact by comparing its parts --
+     * {@code d.requested.group == 'org.jetbrains.kotlin' && d.requested.name ==
+     * 'kotlin-stdlib'} -- which is neither a coordinate nor a map entry, so
+     * neither of the shapes above saw it and a useVersion rewriting the base
+     * library went unread.</p>
+     */
+    private static boolean holdsLiteral(String line, String value) {
+        for (int i = 0; i < line.length(); i++) {
+            if (!isLiteralStart(line, i)) {
+                continue;
+            }
+            int end = endOfStringLiteral(line, i);
+            if (value.equals(stringLiteralContent(line, i))
+                    && !isReasonArgument(line, i)) {
+                return true;
+            }
+            i = end;
+        }
+        return false;
     }
 
     /**
@@ -509,9 +534,7 @@ public class KotlinStdlibAlignment {
 
     /** Whether the statement names {@code kotlin-stdlib} and not a longer name. */
     private static boolean namesBaseStdlib(String line) {
-        return namesCoordinate(line, BASE_STDLIB)
-                || (declaresMapEntry(line, "group", KOTLIN_GROUP)
-                        && declaresMapEntry(line, "name", BASE_STDLIB));
+        return namesArtifactAnywhere(line, BASE_STDLIB);
     }
 
     /**
@@ -653,8 +676,16 @@ public class KotlinStdlibAlignment {
         if (strict != null) {
             return strict;
         }
+        // A resolution rule's useVersion is as authoritative as either: it rewrites
+        // what was requested, silently, on the way through.
+        String ruled = versionInCall(statement, USE_VERSION);
+        if (ruled != null) {
+            return ruled;
+        }
         return versionInCall(statement, "require");
     }
+
+    private static final String USE_VERSION = "useVersion";
 
     /** The quoted argument of {@code call}, found outside string literals. */
     private static String versionInCall(String statement, String call) {
@@ -1023,7 +1054,8 @@ public class KotlinStdlibAlignment {
      */
     private static boolean callsForce(String statement) {
         // The method forms, which callsNamed now distinguishes from an assignment.
-        if (callsNamed(statement, "force") || callsNamed(statement, "setForcedModules")) {
+        if (callsNamed(statement, "force") || callsNamed(statement, "setForcedModules")
+                || callsNamed(statement, USE_VERSION)) {
             return true;
         }
         // forcedModules is only ever written as an assignment, and assigning it any
@@ -1884,21 +1916,29 @@ public class KotlinStdlibAlignment {
             // last of them, exactly one is an assignment.
             int scan = i;
             int lastTokenStart = i;
+            int lastTokenEnd = i;
             int tokens = 0;
             while (scan < statement.length() && isIdentifierChar(statement.charAt(scan))) {
                 lastTokenStart = scan;
                 tokens++;
+                // A qualified name is ONE token: java.lang.String dep = '...' is a
+                // declaration whose type happens to have dots in it, and stopping at
+                // the first one read `java` as the type and `lang` as the name, so
+                // dep was never recorded and the pin it carried never seen.
                 while (scan < statement.length()
-                        && isIdentifierChar(statement.charAt(scan))) {
+                        && (isIdentifierChar(statement.charAt(scan))
+                                || (statement.charAt(scan) == '.'
+                                        && scan + 1 < statement.length()
+                                        && isIdentifierChar(statement.charAt(scan + 1))))) {
                     scan++;
                 }
+                lastTokenEnd = scan;
                 scan = skipBlanks(statement, scan);
             }
             if (tokens > 1) {
                 declared = true;
                 i = lastTokenStart;
-            } else if (tokens == 1 && scan < statement.length()
-                    && statement.charAt(scan) == '.') {
+            } else if (tokens == 1) {
                 // ext.kotlinVersion = '1.9.22' -- Gradle's extra properties, which is
                 // how a project-wide version is nearly always written, and which
                 // really does bind the bare name the interpolation then reads.
@@ -1906,12 +1946,11 @@ public class KotlinStdlibAlignment {
                 // assignment would let `somePlugin.version = '1.0'` supply the value
                 // for an unrelated $version and turn an unreadable version into a
                 // confidently wrong one, which is the direction that under-suppresses.
-                int nameStart = skipBlanks(statement, scan + 1);
-                if (EXTRA_PROPERTIES.equals(statement.substring(lastTokenStart, scan).trim())
-                        && nameStart < statement.length()
-                        && isIdentifierChar(statement.charAt(nameStart))) {
+                String only = statement.substring(lastTokenStart, lastTokenEnd);
+                int dot = only.lastIndexOf('.');
+                if (dot > 0 && EXTRA_PROPERTIES.equals(only.substring(0, dot))) {
                     declared = true;
-                    i = nameStart;
+                    i = lastTokenStart + dot + 1;
                 }
             }
         }
@@ -1929,6 +1968,15 @@ public class KotlinStdlibAlignment {
         i = skipBlanks(statement, i);
         if (i >= statement.length() || statement.charAt(i) != '='
                 || (i + 1 < statement.length() && statement.charAt(i + 1) == '=')) {
+            if (declared) {
+                // `def dep` with no value yet is still a name this knows about, and
+                // recording it is what lets a later assignment be recognised as one.
+                // Without it, `def dep` then `if (legacy) { dep = '...' }` left the
+                // assignment looking like a write to something unrelated, so the
+                // coordinate it carried was never learned. A null value inlines as
+                // the name itself, which is what an unset variable should look like.
+                literals.put(name, null);
+            }
             return;
         }
         i = skipBlanks(statement, i + 1);
