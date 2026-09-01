@@ -564,6 +564,55 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * An assignment inside ANY open brace is one whose execution this cannot
+     * establish, closures included: {@code def mutate = { dep = '...' }} runs
+     * only if something calls it. Named control structures were listed here
+     * once and the list was already missing this.
+     */
+    @Test
+    public void anAssignmentInsideAClosureDoesNotHideAPin() {
+        String multiLine = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
+                + "    def mutate = {\n"
+                + "        dep = 'com.example:other:1.0'\n"
+                + "    }\n"
+                + "    implementation(dep) { version { strictly '1.7.22' } }\n");
+        check("".equals(multiLine),
+                "the pin survives an uninvoked closure, got <<" + multiLine + ">>");
+
+        // A first definition is still recorded at any depth, which is what keeps a
+        // `def` inside dependencies { } working.
+        String nested = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    dependencies {\n"
+                + "        def dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
+                + "        implementation(dep) { version { strictly '1.7.22' } }\n"
+                + "    }\n");
+        check("".equals(nested),
+                "a definition inside a block is still read, got <<" + nested + ">>");
+    }
+
+    /**
+     * A release candidate of the floor is below the floor, wherever it appears.
+     * As a range's inclusive ceiling it was compared numerically and read as
+     * reaching the floor, so the constraints went in with nothing to resolve
+     * to.
+     */
+    @Test
+    public void aPrereleaseCeilingDoesNotReachTheFloor() {
+        String rc = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib') "
+                + "{ version { strictly '[1.7.0,1.8.0-RC2]' } }\n");
+        check("".equals(rc),
+                "a prerelease ceiling cannot reach the floor, got <<" + rc + ">>");
+
+        // The release itself can, and does.
+        String release = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:[1.7.0,1.8.0]'\n");
+        check(release.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an inclusive release ceiling does, got <<" + release + ">>");
+    }
+
+    /**
      * A coordinate concatenated onto a partial literal has no version here,
      * and unreadable is the honest answer -- reading the empty string as a
      * version put it below the floor and suppressed the block for a

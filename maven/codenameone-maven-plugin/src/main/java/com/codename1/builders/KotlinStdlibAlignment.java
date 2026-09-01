@@ -763,10 +763,17 @@ public class KotlinStdlibAlignment {
             // [1.7.0,) has no ceiling at all.
             return false;
         }
-        int compared = compareVersions(upper, MERGED_STDLIB_FLOOR);
         char closing = selector.charAt(selector.length() - 1);
-        boolean excludesTheBound = closing == ')' || closing == '[';
-        return excludesTheBound ? compared <= 0 : compared < 0;
+        if (closing == ')' || closing == '[') {
+            // Excluding its bound, the range stops short of it: at or below the floor
+            // numerically means nothing at or above the floor is selectable.
+            return compareVersions(upper, MERGED_STDLIB_FLOOR) <= 0;
+        }
+        // Including it, the bound itself is selectable -- so the question is exactly
+        // the one asked of a plain version, prerelease and all. Comparing numerically
+        // here read [1.7.0,1.8.0-RC2] as reaching the floor, when a release candidate
+        // of it is below it and the constraint had nothing to resolve to.
+        return literalBelowTheFloor(upper);
     }
 
     /** A plain version, with a prerelease at the floor counting as below it. */
@@ -1765,32 +1772,38 @@ public class KotlinStdlibAlignment {
         // nothing this can follow, and reading it as a definition would supply a
         // version to an unrelated $version.
         int extDepth = 0;
-        // Whether a conditional branch runs is decided at evaluation time and cannot
-        // be read here, so a name assigned inside one may hold either value. The
+        // Whether a nested block runs is decided at evaluation time and cannot be
+        // read here, so a name assigned inside one may hold either value. The
         // ambiguity is resolved toward suppression: emitting beside a pin this could
         // not see is the failure that reaches the device, while suppressing costs an
         // app the duplicate it already had.
-        int conditionalDepth = 0;
+        //
+        // ANY open brace, not a list of the constructs that open one. That list was
+        // if/else/while/for/switch/try/catch and it was already missing the closure
+        // -- `def mutate = { dep = ... }` runs only if something calls it. Depth is
+        // the closed half of the question: at the top level a statement runs, and
+        // inside anything at all this cannot say. Costless to be wrong about, too,
+        // since the flag only refuses to DISCARD a coordinate; a first definition is
+        // still recorded at any depth, which is why a `def` inside dependencies { }
+        // keeps working.
+        int braceDepth = 0;
         for (int i = 0; i < statements.size(); i++) {
             String statement = statements.get(i);
             out.add(literals.isEmpty()
                     ? statement
                     : withLiteralsInlined(statement, literals));
             boolean opensExt = extDepth == 0 && opensAnExtraPropertiesBlock(statement);
-            boolean opensConditional = opensAConditional(statement);
             updateLiteralDefinitions(statement, literals, extDepth > 0 || opensExt,
-                    conditionalDepth > 0 || opensConditional);
+                    braceDepth > 0);
             if (extDepth > 0 || opensExt) {
                 extDepth += braceBalance(statement);
                 if (extDepth < 0) {
                     extDepth = 0;
                 }
             }
-            if (conditionalDepth > 0 || opensConditional) {
-                conditionalDepth += braceBalance(statement);
-                if (conditionalDepth < 0) {
-                    conditionalDepth = 0;
-                }
+            braceDepth += braceBalance(statement);
+            if (braceDepth < 0) {
+                braceDepth = 0;
             }
         }
         return out;
@@ -1802,30 +1815,6 @@ public class KotlinStdlibAlignment {
      * reassignment to something unreadable, which forgets it rather than
      * leaving a stale value behind.
      */
-    /**
-     * Whether the statement opens a control structure whose body may not run.
-     *
-     * <p>Note the single-line spelling of one -- {@code if (c) { dep = '...' }} --
-     * never reached this: braces do not split statements, so the whole
-     * conditional arrives as one statement whose first token is {@code if} and
-     * which therefore assigns nothing. Only the multi-line form, where the
-     * assignment is a statement of its own, was ever applied unconditionally.
-     * Checked both ways before writing this.</p>
-     */
-    private static boolean opensAConditional(String statement) {
-        for (int k = 0; k < CONTROL_KEYWORDS.length; k++) {
-            if (callsNamed(statement, CONTROL_KEYWORDS[k])) {
-                return braceBalance(statement) > 0;
-            }
-        }
-        return false;
-    }
-
-    /** Groovy's control structures, whose bodies are not known to run. */
-    private static final String[] CONTROL_KEYWORDS = {
-        "if", "else", "while", "for", "switch", "try", "catch"
-    };
-
     /**
      * Records a definition, or forgets it, unless doing so under a condition
      * would throw away the value that decides suppression.
