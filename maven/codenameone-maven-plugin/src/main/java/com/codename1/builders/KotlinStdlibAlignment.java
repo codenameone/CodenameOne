@@ -251,11 +251,8 @@ public class KotlinStdlibAlignment {
      */
     private static boolean declaredBelowTheFloor(String artifact, String configuration,
             String[] appGradleFragments) {
-        if (appGradleFragments == null) {
-            return false;
-        }
-        for (int i = 0; i < appGradleFragments.length; i++) {
-            String[] lines = activeLines(appGradleFragments[i]);
+        String[] lines = activeLines(combined(appGradleFragments));
+        {
             for (int j = 0; j < lines.length; j++) {
                 // The configuration actually being constrained, rather than the two
                 // that used to be named here. That was reported as letting a
@@ -305,7 +302,7 @@ public class KotlinStdlibAlignment {
                 continue;
             }
             int end = endOfStringLiteral(line, i);
-            String literal = line.substring(i + 1, Math.min(end, line.length()));
+            String literal = stringLiteralContent(line, i);
             if (literal.startsWith(coordinate) && !hasWhitespace(literal)) {
                 return literal.substring(coordinate.length());
             }
@@ -384,11 +381,8 @@ public class KotlinStdlibAlignment {
      * duplicate class it risks instead can.</p>
      */
     private static boolean strictlyPinsBaseStdlibBelowTheFloor(String[] appGradleFragments) {
-        if (appGradleFragments == null) {
-            return false;
-        }
-        for (int i = 0; i < appGradleFragments.length; i++) {
-            String[] lines = activeLines(appGradleFragments[i]);
+        String[] lines = activeLines(combined(appGradleFragments));
+        {
             for (int j = 0; j < lines.length; j++) {
                 if (!namesBaseStdlib(lines[j])) {
                     continue;
@@ -494,7 +488,7 @@ public class KotlinStdlibAlignment {
                 if (c == '\\' && i + 1 < line.length()) {
                     i++;
                 } else if (c == quote) {
-                    String literal = line.substring(stringStart + 1, i);
+                    String literal = stringLiteralContent(line, stringStart);
                     // Dependency notation carries no whitespace; a reason sentence
                     // does. Without that, a reason that merely OPENS with the
                     // coordinate -- because 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:
@@ -503,7 +497,8 @@ public class KotlinStdlibAlignment {
                     // have prevented exactly what it describes.
                     if ((literal.equals(coordinate)
                             || literal.startsWith(coordinate + ":"))
-                            && !hasWhitespace(literal)) {
+                            && !hasWhitespace(literal)
+                            && !isReasonArgument(line, stringStart)) {
                         return true;
                     }
                     quote = 0;
@@ -516,6 +511,60 @@ public class KotlinStdlibAlignment {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether the literal opening at {@code quoteAt} is the argument of a
+     * reason rather than a dependency.
+     *
+     * <p>A reason is usually prose and the whitespace rule catches it, but a
+     * reason can be nothing BUT a coordinate -- {@code because
+     * 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'} names the artifact it
+     * is warning about and has no whitespace at all. Read as a declaration, it
+     * supplied a pre-merge version and suppressed the entire block: the
+     * comment describing the duplicate switched off the constraint that
+     * prevents it.</p>
+     */
+    private static boolean isReasonArgument(String line, int quoteAt) {
+        int i = quoteAt - 1;
+        while (i >= 0 && (line.charAt(i) == ' ' || line.charAt(i) == '\t'
+                || line.charAt(i) == '(')) {
+            i--;
+        }
+        int end = i + 1;
+        while (i >= 0 && isIdentifierChar(line.charAt(i))) {
+            i--;
+        }
+        return end > i + 1 && BECAUSE.equals(line.substring(i + 1, end));
+    }
+
+    private static final String BECAUSE = "because";
+
+    /**
+     * The app's fragments as the one script they become.
+     *
+     * <p>They are separate build hints but the builder concatenates them into
+     * a single generated {@code build.gradle}, so a {@code def} written in one
+     * is in scope for the next. Reading them apart lost the definition at the
+     * boundary and a strict pin behind it went unseen -- which is the failure
+     * this must never produce, since a constraint cannot coexist with a strict
+     * version.</p>
+     */
+    private static String combined(String[] appGradleFragments) {
+        if (appGradleFragments == null) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < appGradleFragments.length; i++) {
+            if (appGradleFragments[i] == null) {
+                continue;
+            }
+            if (out.length() > 0) {
+                out.append('\n');
+            }
+            out.append(appGradleFragments[i]);
+        }
+        return out.toString();
     }
 
     /** Whether the text contains any whitespace. */
@@ -744,11 +793,8 @@ public class KotlinStdlibAlignment {
      */
     private static boolean declaresArtifact(String artifact, String configuration,
             String[] appGradleFragments) {
-        if (appGradleFragments == null) {
-            return false;
-        }
-        for (int i = 0; i < appGradleFragments.length; i++) {
-            String[] lines = activeLines(appGradleFragments[i]);
+        String[] lines = activeLines(combined(appGradleFragments));
+        {
             for (int j = 0; j < lines.length; j++) {
                 if (declaresArtifactOnLine(artifact, configuration, lines[j])) {
                     return true;
@@ -875,6 +921,32 @@ public class KotlinStdlibAlignment {
      * brace counter that did the same swallowed a declaration's closing brace.
      * They call this now, so a fix reaches all of them.</p>
      */
+    /**
+     * The content of the literal opening at {@code quoteAt}, without its
+     * delimiters.
+     *
+     * <p>Stripping one character from each end is wrong for a triple-quoted
+     * literal, and every caller was doing exactly that: a coordinate written
+     * with the long delimiter came back still wearing two quotes at each end,
+     * so it had no readable version and the declaration was classified
+     * pre-merge -- taking the whole block with it.</p>
+     */
+    private static String stringLiteralContent(String text, int quoteAt) {
+        int end = endOfStringLiteral(text, quoteAt);
+        int delimiter = delimiterLength(text, quoteAt);
+        int from = Math.min(quoteAt + delimiter, text.length());
+        int to = Math.max(from, Math.min(end + 1 - delimiter, text.length()));
+        return text.substring(from, to);
+    }
+
+    /** 3 for a triple-quoted literal, 1 otherwise. */
+    private static int delimiterLength(String text, int quoteAt) {
+        char quote = text.charAt(quoteAt);
+        return quoteAt + 2 < text.length()
+                && text.charAt(quoteAt + 1) == quote
+                && text.charAt(quoteAt + 2) == quote ? 3 : 1;
+    }
+
     private static int endOfStringLiteral(String text, int quoteAt) {
         char quote = text.charAt(quoteAt);
         // Groovy's triple-quoted literals are a different delimiter, not three of
@@ -1463,8 +1535,7 @@ public class KotlinStdlibAlignment {
                 continue;
             }
             int end = endOfStringLiteral(statement, i);
-            if (statement.substring(i + 1, Math.min(end, statement.length()))
-                    .startsWith(KOTLIN_GROUP)) {
+            if (stringLiteralContent(statement, i).startsWith(KOTLIN_GROUP)) {
                 return braceBalance(statement.substring(Math.min(end + 1,
                         statement.length())));
             }

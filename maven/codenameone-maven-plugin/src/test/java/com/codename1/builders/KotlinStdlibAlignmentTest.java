@@ -458,6 +458,53 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A reason can be nothing BUT a coordinate, so the whitespace rule does not
+     * catch it. `because 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'`
+     * names the artifact it warns about; read as a declaration it supplied a
+     * pre-merge version and suppressed the whole block -- the comment
+     * describing the duplicate switching off the constraint that prevents it.
+     */
+    @Test
+    public void aReasonThatIsOnlyACoordinateIsStillAReason() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('com.example:other:1.0') "
+                + "{ because 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22' }\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a bare-coordinate reason does not declare anything");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and does not take the block with it");
+    }
+
+    /**
+     * A triple-quoted coordinate keeps its version. Stripping one character
+     * per side left the long delimiter's extra quotes on the content, so the
+     * version was unreadable and the declaration read as pre-merge.
+     */
+    @Test
+    public void aTripleQuotedCoordinateKeepsItsVersion() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation '''org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'''\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a merged-era triple-quoted declaration leaves the sibling constrained");
+        check(!out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and pins its own artifact");
+    }
+
+    /**
+     * The fragments are separate build hints but one generated script, so a
+     * def written in one is in scope for the next. Reading them apart lost the
+     * definition at the boundary and the strict pin behind it went unseen.
+     */
+    @Test
+    public void aDefinitionCrossesTheFragmentBoundary() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def stdlib = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n",
+                "    implementation(stdlib) { version { strictly '1.7.22' } }\n");
+        check("".equals(out),
+                "a definition in one fragment reaches a use in the next");
+    }
+
+    /**
      * A triple-quoted literal is a different delimiter, not three of the same
      * one. Reading its opener as a single quote made it close on the first
      * apostrophe inside it and threw every following statement out of step, so
