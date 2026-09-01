@@ -303,6 +303,15 @@ public class KotlinStdlibAlignment {
      * Null when neither is readable, which callers treat as below the floor.
      */
     private static String declaredVersionOf(String line, String artifact) {
+        // A rich version OVERRIDES the coordinate's own, so it is read first.
+        //   implementation('...:kotlin-stdlib-jdk7:1.9.22') { version { strictly '1.7.22' } }
+        // resolves strictly to 1.7.22, and reporting 1.9.22 read a pre-merge pin as
+        // merged-era: the jdk7 constraint was skipped as already satisfied while jdk8
+        // and the base were raised around it.
+        String rich = richVersionIn(line);
+        if (rich != null) {
+            return rich;
+        }
         String coordinate = KOTLIN_GROUP + ":" + artifact + ":";
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
@@ -325,15 +334,7 @@ public class KotlinStdlibAlignment {
         if (mapped != null) {
             return mapped;
         }
-        // A rich-version closure carries the version instead of the coordinate:
-        //   implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7') {
-        //       version { strictly '1.9.22' }
-        //   }
-        // Returning null there made a merged-era declaration read as below the floor
-        // and took the sibling's constraint down with it, which is the one the graph
-        // still needed. Any of the rich-version keywords answers "what version", not
-        // only the one that also decides strictness.
-        return richVersionIn(line);
+        return null;
     }
 
     /**
@@ -706,18 +707,88 @@ public class KotlinStdlibAlignment {
         if (version == null) {
             return true;
         }
-        String lowerBound = lowerBoundOf(version);
-        if (lowerBound == null) {
+        String selector = version.trim();
+        if (selector.length() == 0) {
             return true;
         }
-        int compared = compareVersions(lowerBound, MERGED_STDLIB_FLOOR);
+        // "Below the floor" means "cannot resolve to the floor or above", which is
+        // not the same as "starts below it". A range [1.7.0,1.9.0) begins below and
+        // still selects a merged-era shim, so our constraint intersects it rather
+        // than conflicting; reading the lower endpoint suppressed the block for a
+        // declaration Gradle would have satisfied. Each selector shape answers the
+        // question its own way, which is why they are separated here rather than
+        // funnelled through one bound.
+        char opening = selector.charAt(0);
+        if (opening == '[' || opening == '(' || opening == ']') {
+            return rangeCannotReachTheFloor(selector);
+        }
+        int dynamic = selector.indexOf(".+");
+        if (dynamic >= 0) {
+            // 1.7.+ cannot leave 1.7, so it is below. 1.+ can reach 1.9, so it is not.
+            String prefix = selector.substring(0, dynamic);
+            return compareVersions(prefix,
+                    truncatedToSameDepth(MERGED_STDLIB_FLOOR, prefix)) < 0;
+        }
+        if ("+".equals(selector)) {
+            return false;
+        }
+        return literalBelowTheFloor(selector);
+    }
+
+    /** Whether a range excludes every version at or above the floor. */
+    private static boolean rangeCannotReachTheFloor(String selector) {
+        int comma = selector.indexOf(',');
+        if (comma < 0) {
+            // [1.8.0] is an exact version written as a range.
+            String exact = selector.substring(1,
+                    Math.max(1, selector.length() - 1)).trim();
+            return exact.length() == 0 || literalBelowTheFloor(exact);
+        }
+        String upper = selector.substring(comma + 1,
+                Math.max(comma + 1, selector.length() - 1)).trim();
+        if (upper.length() == 0) {
+            // [1.7.0,) has no ceiling at all.
+            return false;
+        }
+        int compared = compareVersions(upper, MERGED_STDLIB_FLOOR);
+        char closing = selector.charAt(selector.length() - 1);
+        boolean excludesTheBound = closing == ')' || closing == '[';
+        return excludesTheBound ? compared <= 0 : compared < 0;
+    }
+
+    /** A plain version, with a prerelease at the floor counting as below it. */
+    private static boolean literalBelowTheFloor(String version) {
+        int compared = compareVersions(version, MERGED_STDLIB_FLOOR);
         if (compared != 0) {
             return compared < 0;
         }
         // At the floor numerically, only a PRERELEASE is below it. A dynamic marker
         // is not: 1.8.+ cannot resolve lower than 1.8.0, so it is at the floor and
         // the constraints are still satisfiable.
-        return isPrerelease(lowerBound);
+        return isPrerelease(version);
+    }
+
+    /** {@code version} cut to as many components as {@code sample} has. */
+    private static String truncatedToSameDepth(String version, String sample) {
+        int depth = 1;
+        for (int i = 0; i < sample.length(); i++) {
+            if (sample.charAt(i) == '.') {
+                depth++;
+            }
+        }
+        StringBuilder out = new StringBuilder();
+        int seen = 0;
+        for (int i = 0; i < version.length() && seen < depth; i++) {
+            char c = version.charAt(i);
+            if (c == '.') {
+                seen++;
+                if (seen >= depth) {
+                    break;
+                }
+            }
+            out.append(c);
+        }
+        return out.toString();
     }
 
     /**
@@ -731,24 +802,6 @@ public class KotlinStdlibAlignment {
      * merged-era declaration as pre-merge and dropped both constraints,
      * including the sibling's -- which is the one such a graph still needs.</p>
      */
-    private static String lowerBoundOf(String version) {
-        String selector = version.trim();
-        if (selector.length() == 0) {
-            return null;
-        }
-        char opening = selector.charAt(0);
-        if (opening == '[' || opening == '(') {
-            selector = selector.substring(1);
-            int to = 0;
-            while (to < selector.length() && ",])".indexOf(selector.charAt(to)) < 0) {
-                to++;
-            }
-            selector = selector.substring(0, to);
-        }
-        selector = selector.trim();
-        return selector.length() == 0 ? null : selector;
-    }
-
     /**
      * Whether this version is a prerelease of its own numeric version, as
      * opposed to a dynamic selector. {@code 1.8.0-RC2} sorts below
@@ -1888,7 +1941,17 @@ public class KotlinStdlibAlignment {
             }
             String token = statement.substring(i, end);
             String literal = literals.get(token);
-            out.append(literal == null ? token : literal);
+            // A map KEY is not an expression, so it is not substituted. A local
+            // named after the DSL key it supplies -- def group = '...'; then
+            // implementation(group: group, ...) -- had both occurrences replaced,
+            // turning `group:` into a quoted string and losing the map form
+            // entirely, strict pin and all. Groovy's named arguments are exactly
+            // "identifier immediately followed by a colon", which is what this asks.
+            boolean isMapKey = end < statement.length()
+                    && statement.charAt(end) == ':'
+                    && (end + 1 >= statement.length()
+                            || statement.charAt(end + 1) != ':');
+            out.append(literal == null || isMapKey ? token : literal);
             i = end - 1;
         }
         return out.toString();

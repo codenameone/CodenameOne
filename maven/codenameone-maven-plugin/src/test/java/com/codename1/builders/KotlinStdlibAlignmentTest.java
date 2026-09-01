@@ -564,6 +564,54 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A local may be named after the DSL key it supplies. Substituting every
+     * occurrence turned {@code group:} into a quoted string and lost the map
+     * form entirely, taking the strict pin inside it with it.
+     */
+    @Test
+    public void aLocalNamedAfterAMapKeyDoesNotReplaceTheKey() {
+        String[] keys = {"group", "name", "version"};
+        for (int k = 0; k < keys.length; k++) {
+            String value = "version".equals(keys[k]) ? "1.7.22"
+                    : "name".equals(keys[k]) ? "kotlin-stdlib-jdk8"
+                    : "org.jetbrains.kotlin";
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    def " + keys[k] + " = '" + value + "'\n"
+                    + "    implementation(group: "
+                    + ("group".equals(keys[k]) ? "group" : "'org.jetbrains.kotlin'")
+                    + ", name: "
+                    + ("name".equals(keys[k]) ? "name" : "'kotlin-stdlib-jdk8'")
+                    + ", version: "
+                    + ("version".equals(keys[k]) ? "version" : "'1.7.22'")
+                    + ")\n");
+            check("".equals(out),
+                    "the map form survives a local called " + keys[k]
+                            + ", got <<" + out + ">>");
+        }
+    }
+
+    /**
+     * A rich version overrides the coordinate's own. Reporting the coordinate
+     * read a pre-merge pin as merged-era, so its own constraint was skipped as
+     * already satisfied while the sibling and the base were raised around it.
+     */
+    @Test
+    public void aRichVersionOverridesTheCoordinate() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check("".equals(out),
+                "the strict 1.7.22 is what decides, got <<" + out + ">>");
+
+        // And the other way round: a merged-era rich version over an old coordinate.
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.7.22') "
+                + "{ version { require '1.9.22' } }\n");
+        check(modern.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a required 1.9.22 is read past the old coordinate, got <<" + modern + ">>");
+    }
+
+    /**
      * Setting a property is not calling a method. {@code { force = false }}
      * explicitly turns forcing OFF, and reading the word as a force turned an
      * ordinary version request into an absolute pin -- suppressing the block
@@ -1568,11 +1616,44 @@ public class KotlinStdlibAlignmentTest {
         check(dynamic.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "1.8.+ cannot resolve below the floor");
 
-        // range whose low end IS below the floor: conservative, both go
+        // A range that STARTS below the floor but can still select above it keeps
+        // the alignment. This was the conservative case once, on the grounds that
+        // the range reaches below the floor at all; the question that decides
+        // resolution is the other end. Gradle picks the highest version satisfying
+        // every constraint, so [1.7.0,1.9.0) selects a merged-era shim and our
+        // constraint on the SIBLING intersects that rather than conflicting with it
+        // -- and suppressing instead left an old transitive jdk8 unaligned beside a
+        // merged stdlib, which is the duplicate this class exists to prevent.
+        //
+        // The residual case is a range whose upper versions do not exist in the
+        // repository, where Gradle falls back to something pre-merge and the
+        // duplicate returns. That fails loudly in checkDuplicateClasses, which is
+        // where the app already was, so it is the better of the two.
         String spanning = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:[1.7.0,1.9.0)'\n");
-        check("".equals(spanning),
-                "a range reaching below the floor is treated as below it");
+        check(spanning.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a range that can select above the floor keeps the sibling aligned, got <<"
+                        + spanning + ">>");
+
+        // A range that CANNOT reach the floor still suppresses: the constraint would
+        // have nothing to resolve to and the build would fail outright.
+        String capped = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:[1.6.0,1.8.0)'\n");
+        check("".equals(capped),
+                "a range capped below the floor suppresses, got <<" + capped + ">>");
+
+        String low = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:[1.6.0,1.7.9]'\n");
+        check("".equals(low), "and so does one entirely below it, got <<" + low + ">>");
+
+        // 1.7.+ cannot leave 1.7; 1.+ can reach 1.9.
+        String narrow = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.7.+'\n");
+        check("".equals(narrow), "1.7.+ cannot reach the floor, got <<" + narrow + ">>");
+        String wide = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.+'\n");
+        check(wide.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "1.+ can, got <<" + wide + ">>");
 
         // and a dynamic selector below the floor likewise
         String oldDynamic = KotlinStdlibAlignment.constraintsBlock("implementation",
