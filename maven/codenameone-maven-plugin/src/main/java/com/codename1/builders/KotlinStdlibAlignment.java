@@ -491,35 +491,31 @@ public class KotlinStdlibAlignment {
      */
     private static boolean namesCoordinate(String line, String artifact) {
         String coordinate = KOTLIN_GROUP + ":" + artifact;
-        char quote = 0;
-        int stringStart = -1;
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
-            if (quote != 0) {
-                if (c == '\\' && i + 1 < line.length()) {
-                    i++;
-                } else if (c == quote) {
-                    String literal = stringLiteralContent(line, stringStart);
-                    // Dependency notation carries no whitespace; a reason sentence
-                    // does. Without that, a reason that merely OPENS with the
-                    // coordinate -- because 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:
-                    // 1.7.22 causes duplicate classes' -- read as the declaration it
-                    // was warning about, and switched off the constraint that would
-                    // have prevented exactly what it describes.
-                    if ((literal.equals(coordinate)
-                            || literal.startsWith(coordinate + ":"))
-                            && !hasWhitespace(literal)
-                            && !isReasonArgument(line, stringStart)) {
-                        return true;
-                    }
-                    quote = 0;
-                }
+            if (c != '\'' && c != '"') {
                 continue;
             }
-            if (c == '\'' || c == '"') {
-                quote = c;
-                stringStart = i;
+            // The shared rule. This was the last scanner still tracking a single
+            // delimiter character of its own: it closed a triple-quoted literal on
+            // the second of the three, then read the third as a new opener, so a
+            // reason written '''...''' lost its `because` and was taken for the
+            // declaration it was warning about.
+            int end = endOfStringLiteral(line, i);
+            String literal = stringLiteralContent(line, i);
+            // Dependency notation carries no whitespace; a reason sentence
+            // does. Without that, a reason that merely OPENS with the
+            // coordinate -- because 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:
+            // 1.7.22 causes duplicate classes' -- read as the declaration it
+            // was warning about, and switched off the constraint that would
+            // have prevented exactly what it describes.
+            if ((literal.equals(coordinate)
+                    || literal.startsWith(coordinate + ":"))
+                    && !hasWhitespace(literal)
+                    && !isReasonArgument(line, i)) {
+                return true;
             }
+            i = end;
         }
         return false;
     }
@@ -878,11 +874,18 @@ public class KotlinStdlibAlignment {
                 && !declaresOnTheConstrainedConfiguration(configuration, line)) {
             return false;
         }
-        if (!bindsAVersion(line, artifact)) {
+        if (!holdsStrictly(line, artifact) && !bindsAVersion(line, artifact)) {
             // A declaration that pins nothing cannot stand in for the constraint. The
             // clearest case is a lone preference: our floor overrides it, so emitting
             // is harmless, while suppressing leaves a transitive pre-merge shim free
             // to win. A declaration with no version at all is the same argument.
+            //
+            // A STRICT pin is exempt, readable or not. `strictly kotlinVersion` takes
+            // its version from a property this cannot evaluate, and reading that as
+            // "binds nothing" emitted the constraint beside a pin that may well be
+            // pre-merge -- the one direction that fails at runtime rather than in the
+            // build. Unreadable falls back to the conservative answer here for the
+            // same reason it does in belowTheFloor.
             return false;
         }
         if (namesCoordinate(line, artifact)) {
@@ -1299,6 +1302,18 @@ public class KotlinStdlibAlignment {
         int depth = 0;
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
+            if (c == '$' && i + 1 < text.length() && text.charAt(i + 1) == '/') {
+                // Groovy's dollar-slashy literal, recognised here as well as in the
+                // comment scanner. Fixing only that one left this scanner reading an
+                // apostrophe inside $/can't/$ as an opening quote, which swallowed
+                // the strict pin that followed on the same line. The same rule in two
+                // scanners is the shape this class keeps getting wrong.
+                int slashy = text.indexOf("/$", i + 2);
+                int stop = slashy < 0 ? text.length() : slashy + 2;
+                current.append(text, i, stop);
+                i = stop - 1;
+                continue;
+            }
             if (c == '\'' || c == '"') {
                 // The shared rule: escapes and triple quotes handled in one place.
                 // A literal that closed early here merged statements that must stay
@@ -1450,19 +1465,44 @@ public class KotlinStdlibAlignment {
             i = skipBlanks(statement, at + DEF.length());
         } else {
             i = skipBlanks(statement, 0);
-            // A typed local declares just as much as def does: `String dep = '...'`.
-            // Two identifiers before the '=' is a declaration, one is an assignment,
-            // and only the first token differs.
-            int typeEnd = i;
-            while (typeEnd < statement.length()
-                    && isIdentifierChar(statement.charAt(typeEnd))) {
-                typeEnd++;
+            // A typed local declares just as much as def does, and it is written
+            // with however many modifiers the author felt like: `String dep = ...`,
+            // `final String dep = ...`, `private static final String dep = ...`.
+            // Counting exactly two tokens read `String` as the name of a `final
+            // String dep` and never recorded dep at all. So walk every identifier
+            // token before the '=': more than one is a declaration whose name is the
+            // last of them, exactly one is an assignment.
+            int scan = i;
+            int lastTokenStart = i;
+            int tokens = 0;
+            while (scan < statement.length() && isIdentifierChar(statement.charAt(scan))) {
+                lastTokenStart = scan;
+                tokens++;
+                while (scan < statement.length()
+                        && isIdentifierChar(statement.charAt(scan))) {
+                    scan++;
+                }
+                scan = skipBlanks(statement, scan);
             }
-            int afterType = skipBlanks(statement, typeEnd);
-            if (typeEnd > i && afterType < statement.length()
-                    && isIdentifierChar(statement.charAt(afterType))) {
+            if (tokens > 1) {
                 declared = true;
-                i = afterType;
+                i = lastTokenStart;
+            } else if (tokens == 1 && scan < statement.length()
+                    && statement.charAt(scan) == '.') {
+                // ext.kotlinVersion = '1.9.22' -- Gradle's extra properties, which is
+                // how a project-wide version is nearly always written, and which
+                // really does bind the bare name the interpolation then reads.
+                // Restricted to that one prefix on purpose: recording ANY dotted
+                // assignment would let `somePlugin.version = '1.0'` supply the value
+                // for an unrelated $version and turn an unreadable version into a
+                // confidently wrong one, which is the direction that under-suppresses.
+                int nameStart = skipBlanks(statement, scan + 1);
+                if (EXTRA_PROPERTIES.equals(statement.substring(lastTokenStart, scan).trim())
+                        && nameStart < statement.length()
+                        && isIdentifierChar(statement.charAt(nameStart))) {
+                    declared = true;
+                    i = nameStart;
+                }
             }
         }
         int nameStart = i;
@@ -1575,6 +1615,9 @@ public class KotlinStdlibAlignment {
     }
 
     private static final String DEF = "def";
+
+    /** Gradle's extra-properties prefix, the one dotted assignment worth reading. */
+    private static final String EXTRA_PROPERTIES = "ext";
 
     /** Whether the text so far ends with a comma, ignoring trailing blanks. */
     private static boolean endsWithComma(StringBuilder text) {

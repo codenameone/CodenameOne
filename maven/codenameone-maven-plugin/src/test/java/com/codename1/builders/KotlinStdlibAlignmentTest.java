@@ -488,6 +488,55 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Gradle's extra properties are how a project-wide Kotlin version is
+     * nearly always written, and the bare name the interpolation reads really
+     * is bound by them. Stopping at {@code ext} left the version unreadable,
+     * which counts as below the floor -- so a project already on a merged-era
+     * Kotlin had the whole block suppressed and kept whatever pre-merge shim a
+     * transitive dependency dragged in.
+     */
+    @Test
+    public void anExtraPropertyDefinesTheVersionItInterpolates() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    ext.kotlinVersion = '1.9.22'\n"
+                + "    implementation \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion\"\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the sibling is still aligned, got <<" + out + ">>");
+        check(!out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and the merged-era declaration is left alone, got <<" + out + ">>");
+
+        // Only that one prefix: any dotted assignment would let an unrelated
+        // property supply a version it does not bind, which turns an unreadable
+        // version into a confidently wrong one.
+        String unrelated = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    somePlugin.kotlinVersion = '1.9.22'\n"
+                + "    implementation \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion\"\n");
+        check("".equals(unrelated),
+                "an unrelated dotted assignment stays unreadable, got <<" + unrelated + ">>");
+    }
+
+    /**
+     * A reason is prose however it is quoted. Read as a declaration, the
+     * comment describing the duplicate switches off the constraint that
+     * prevents it -- which is the whole block gone because of a warning about
+     * the thing the block exists to fix.
+     */
+    @Test
+    public void aReasonIsProseInEveryDelimiter() {
+        String[] quotes = {"'", "\"", "'''", "\"\"\""};
+        for (int q = 0; q < quotes.length; q++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation('com.example:other:1.0') { because " + quotes[q]
+                            + "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22"
+                            + quotes[q] + " }\n");
+            check(out.contains("kotlin-stdlib-jdk7:1.8.0")
+                            && out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                    "a reason quoted with " + quotes[q]
+                            + " is not a declaration, got <<" + out + ">>");
+        }
+    }
+
+    /**
      * How a literal is delimited changes nothing about what it says, so the
      * same declaration written four ways produces the same block. Asserted as
      * an equivalence rather than case by case because the strict sweep already
@@ -620,7 +669,24 @@ public class KotlinStdlibAlignmentTest {
                         "def v = " + u + "1.7.22" + u + "\n" + on + "(\""
                                 + coordinate + ":$v!!\")",
                         "def d = " + u + coordinate + ":1.7.22!!" + u + "\n" + on + "(d)",
-                        "String d = " + u + coordinate + ":1.7.22!!" + u + "; " + on + "(d)",
+                        // A strict pin whose version this cannot evaluate is still a
+                        // strict pin; unreadable has to fall to the conservative side.
+                        on + "(" + u + coordinate + u + ") { version { strictly kotlinVersion } }",
+                        // The definition carries the coordinate and NOTHING else --
+                        // no version, no !! -- so the only thing that can suppress is
+                        // the name being carried across to the strict usage. Written
+                        // with the marker in the definition instead, these passed with
+                        // the inlining switched off: that line names the artifact and
+                        // ends in !!, so it suppressed on its own and the test proved
+                        // nothing. However many modifiers the local was written with:
+                        "String d = " + u + coordinate + u + "; " + on
+                                + "(d) { version { strictly " + u + "1.7.22" + u + " } }",
+                        "final String d = " + u + coordinate + u + "; " + on
+                                + "(d) { version { strictly " + u + "1.7.22" + u + " } }",
+                        "private static final String d = " + u + coordinate + u + "; " + on
+                                + "(d) { version { strictly " + u + "1.7.22" + u + " } }",
+                        // An apostrophe inside a dollar-slashy literal is not a quote.
+                        "def m = $/can't/$; " + on + "(" + u + coordinate + ":1.7.22!!" + u + ")",
                     };
                     for (int f = 0; f < forms.length; f++) {
                         String[] decorated = {
