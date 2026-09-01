@@ -401,6 +401,68 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A trailing closure may sit on the line after the call's closing
+     * parenthesis. Gradle accepts it and the {@code strictly} inside really
+     * does apply -- checked by watching a competing higher requirement fail
+     * against it -- but the parenthesis depth is back to zero there, so the
+     * closure landed in its own statement and its version was never
+     * associated with the coordinate above it.
+     */
+    @Test
+    public void aTrailingClosureOnTheNextLineBelongsToTheDeclaration() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation(\n"
+                + "        'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n"
+                + "    )\n"
+                + "    { version { strictly '1.7.22' } }\n");
+        check("".equals(out),
+                "the strict pin in a next-line closure still suppresses the block");
+    }
+
+    /**
+     * A coordinate inside a reason is prose. A coordinate lives in a string,
+     * so "outside a string" cannot be the test here the way it is for
+     * strictly -- what separates them is that a declaration's string OPENS
+     * with the coordinate while prose merely contains it.
+     */
+    @Test
+    public void aCoordinateInsideAReasonIsNotADeclaration() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('com.example:other:1.0') "
+                + "{ because 'avoid org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22' }\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a coordinate mentioned in a reason does not count as a pin");
+
+        // the real notation still does
+        String real = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check(!real.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the dependency notation itself still counts");
+    }
+
+    /**
+     * A qualified segment keeps its number. Reading {@code 20-RC} as zero made
+     * 1.8.20-RC compare equal to the floor, and the qualifier rule then
+     * classified a version well ABOVE the floor as below it -- suppressing an
+     * alignment that was needed.
+     */
+    @Test
+    public void aQualifiedSegmentKeepsItsNumber() {
+        String above = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.8.20-RC') "
+                + "{ version { strictly '1.8.20-RC' } }\n");
+        check(above.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a prerelease above the floor still gets the constraints");
+
+        // and the prerelease OF the floor is still below it
+        String atTheFloor = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.8.0-RC2') "
+                + "{ version { strictly '1.8.0-RC2' } }\n");
+        check("".equals(atTheFloor),
+                "a prerelease of the floor is still below it");
+    }
+
+    /**
      * A prerelease of the floor is below the floor. 1.8.0-RC2 is a published
      * Kotlin version whose numeric part compares equal to 1.8.0, so it read as
      * "at the floor" and the block was written -- whereupon the shims request

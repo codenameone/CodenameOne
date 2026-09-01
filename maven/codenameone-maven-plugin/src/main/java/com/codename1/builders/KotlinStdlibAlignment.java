@@ -263,18 +263,52 @@ public class KotlinStdlibAlignment {
 
     /** Whether the statement names {@code kotlin-stdlib} and not a longer name. */
     private static boolean namesBaseStdlib(String line) {
-        String coordinate = KOTLIN_GROUP + ":" + BASE_STDLIB;
-        int at = line.indexOf(coordinate);
-        while (at >= 0) {
-            int after = at + coordinate.length();
-            if (after < line.length()
-                    && (line.charAt(after) == ':' || line.charAt(after) == '\''
-                            || line.charAt(after) == '"')) {
-                return true;
+        return namesCoordinate(line, BASE_STDLIB)
+                || (line.contains(KOTLIN_GROUP)
+                        && declaresMapEntry(line, "name", BASE_STDLIB));
+    }
+
+    /**
+     * Whether a string literal in this statement IS the dependency notation
+     * for {@code artifact}, rather than merely mentioning it.
+     *
+     * <p>A coordinate lives inside a string, so "outside a string" cannot be
+     * the test the way it is for {@code strictly} or a configuration name.
+     * What separates the two is where in the string it sits:
+     * {@code 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'} opens with it,
+     * while {@code because 'avoid org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'}
+     * is prose that happens to contain it -- and reading that prose as a
+     * declaration dropped the constraint for an artifact nobody had pinned.</p>
+     *
+     * <p>The artifact is matched exactly: {@code kotlin-stdlib} is a prefix of
+     * {@code kotlin-stdlib-jdk8}, so what follows the name has to be the
+     * version separator or the end of the literal.</p>
+     */
+    private static boolean namesCoordinate(String line, String artifact) {
+        String coordinate = KOTLIN_GROUP + ":" + artifact;
+        char quote = 0;
+        int stringStart = -1;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (quote != 0) {
+                if (c == '\\' && i + 1 < line.length()) {
+                    i++;
+                } else if (c == quote) {
+                    String literal = line.substring(stringStart + 1, i);
+                    if (literal.equals(coordinate)
+                            || literal.startsWith(coordinate + ":")) {
+                        return true;
+                    }
+                    quote = 0;
+                }
+                continue;
             }
-            at = line.indexOf(coordinate, at + 1);
+            if (c == '\'' || c == '"') {
+                quote = c;
+                stringStart = i;
+            }
         }
-        return line.contains(KOTLIN_GROUP) && declaresMapEntry(line, "name", BASE_STDLIB);
+        return false;
     }
 
     /** The version inside this statement's {@code strictly} call, or null. */
@@ -350,10 +384,23 @@ public class KotlinStdlibAlignment {
         return 0;
     }
 
+    /**
+     * A version segment's leading digits. {@code 20-RC} is 20, not zero:
+     * reading it as zero made {@code 1.8.20-RC} compare equal to the 1.8.0
+     * floor, and the qualifier rule then classified a version well ABOVE the
+     * floor as below it, suppressing an alignment that was needed.
+     */
     private static int parseSegment(String segment) {
+        int to = 0;
+        while (to < segment.length() && Character.isDigit(segment.charAt(to))) {
+            to++;
+        }
+        if (to == 0) {
+            return 0;
+        }
         try {
-            return Integer.parseInt(segment);
-        } catch (NumberFormatException notANumber) {
+            return Integer.parseInt(segment.substring(0, to));
+        } catch (NumberFormatException tooLong) {
             return 0;
         }
     }
@@ -442,7 +489,7 @@ public class KotlinStdlibAlignment {
                 && !declaresOnTheConstrainedConfiguration(configuration, line)) {
             return false;
         }
-        if (line.contains(KOTLIN_GROUP + ":" + artifact)) {
+        if (namesCoordinate(line, artifact)) {
             return true;
         }
         // group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8', version: '...'
@@ -839,6 +886,16 @@ public class KotlinStdlibAlignment {
         for (int i = 0; i < out.size(); i++) {
             String statement = out.get(i);
             if (statement.contains(KOTLIN_GROUP)) {
+                // A trailing closure may sit on the line AFTER the call's closing
+                // parenthesis -- Gradle accepts it and the strictly inside really does
+                // apply, checked by watching a competing higher requirement fail
+                // against it. The parenthesis depth is already back to zero there, so
+                // without this the closure lands in its own statement and the version
+                // it carries is never associated with the coordinate above it.
+                while (i + 1 < out.size() && opensAClosure(out.get(i + 1))) {
+                    i++;
+                    statement = statement + " " + out.get(i);
+                }
                 int braces = braceBalance(statement);
                 while (braces > 0 && i + 1 < out.size()) {
                     i++;
@@ -849,6 +906,12 @@ public class KotlinStdlibAlignment {
             merged.add(statement);
         }
         return merged.toArray(new String[merged.size()]);
+    }
+
+    /** Whether the statement is nothing but the start of a closure. */
+    private static boolean opensAClosure(String statement) {
+        String trimmed = statement.trim();
+        return trimmed.startsWith("{");
     }
 
     /** How far a statement opens or closes braces, ignoring those in strings. */
