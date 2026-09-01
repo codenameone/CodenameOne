@@ -107,6 +107,9 @@ package com.codename1.builders;
  * Gradle run and so the BuildDaemon copy stays trivially diffable --
  * <b>keep this file in sync with its twin in the other repository</b>.</p>
  */
+import java.util.ArrayList;
+import java.util.List;
+
 public class KotlinStdlibAlignment {
 
     /**
@@ -172,6 +175,9 @@ public class KotlinStdlibAlignment {
     private static final String KOTLIN_BOM_COORDINATE =
             "org.jetbrains.kotlin:kotlin-bom:";
 
+    /** The group every artifact this class reasons about belongs to. */
+    private static final String KOTLIN_GROUP = "org.jetbrains.kotlin";
+
     private KotlinStdlibAlignment() {
     }
 
@@ -203,7 +209,7 @@ public class KotlinStdlibAlignment {
         if (configuration == null || configuration.trim().length() == 0) {
             return "";
         }
-        if (contains(KOTLIN_BOM, appGradleFragments)
+        if (declaresArtifact(KOTLIN_BOM, appGradleFragments)
                 && atOrPastTheMerge(
                         declaredVersion(KOTLIN_BOM_COORDINATE, appGradleFragments))) {
             return "";
@@ -218,7 +224,7 @@ public class KotlinStdlibAlignment {
                 + "empty shims to avoid a duplicate class in checkDuplicateClasses";
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
-            if (contains(ALIGNED_ARTIFACTS[i], appGradleFragments)) {
+            if (declaresArtifact(ALIGNED_ARTIFACTS[i], appGradleFragments)) {
                 continue;
             }
             out.append("        ").append(config)
@@ -283,40 +289,132 @@ public class KotlinStdlibAlignment {
             return null;
         }
         for (int i = 0; i < appGradleFragments.length; i++) {
-            String fragment = appGradleFragments[i];
-            if (fragment == null) {
-                continue;
+            // The same active text the declaration check reads, so a commented-out
+            // BOM cannot supply the version that suppresses the block.
+            String[] lines = activeLines(appGradleFragments[i]);
+            for (int j = 0; j < lines.length; j++) {
+                String fragment = lines[j];
+                int at = fragment.indexOf(coordinate);
+                if (at < 0) {
+                    continue;
+                }
+                int from = at + coordinate.length();
+                int to = from;
+                while (to < fragment.length()
+                        && "0123456789.".indexOf(fragment.charAt(to)) >= 0) {
+                    to++;
+                }
+                while (to > from && fragment.charAt(to - 1) == '.') {
+                    to--;
+                }
+                return to > from ? fragment.substring(from, to) : null;
             }
-            int at = fragment.indexOf(coordinate);
-            if (at < 0) {
-                continue;
-            }
-            int from = at + coordinate.length();
-            int to = from;
-            while (to < fragment.length()
-                    && "0123456789.".indexOf(fragment.charAt(to)) >= 0) {
-                to++;
-            }
-            while (to > from && fragment.charAt(to - 1) == '.') {
-                to--;
-            }
-            return to > from ? fragment.substring(from, to) : null;
         }
         return null;
     }
 
-    /** Whether any fragment names this coordinate. */
-    private static boolean contains(String marker, String[] appGradleFragments) {
+    /**
+     * Whether the app actively declares this {@code org.jetbrains.kotlin}
+     * artifact, rather than merely mentioning its name somewhere in a Gradle
+     * fragment.
+     *
+     * <p>The difference is the whole point, because both near misses produce
+     * the failure this class exists to prevent -- suppressing the constraint
+     * for an app that never pinned anything:</p>
+     *
+     * <pre>
+     * // implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')
+     * exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+     * </pre>
+     *
+     * <p>The first is not a declaration at all. The second is the opposite of
+     * one: a Gradle exclusion applies only to the dependency edge it is
+     * written on, so an independent path can still bring the class-bearing jar
+     * it names. Neither may switch the alignment off.</p>
+     *
+     * <p>Two spellings count as a declaration -- the colon-joined coordinate
+     * and the map form -- because those are what a pin is actually written as.
+     * Anything else falls through to "not declared", which is the safe
+     * direction: emitting a constraint the app did not need only raises an
+     * artifact to a shim, while skipping one it did need fails the build.</p>
+     */
+    private static boolean declaresArtifact(String artifact, String[] appGradleFragments) {
         if (appGradleFragments == null) {
             return false;
         }
         for (int i = 0; i < appGradleFragments.length; i++) {
-            String fragment = appGradleFragments[i];
-            if (fragment != null && fragment.contains(marker)) {
-                return true;
+            String[] lines = activeLines(appGradleFragments[i]);
+            for (int j = 0; j < lines.length; j++) {
+                if (declaresArtifactOnLine(artifact, lines[j])) {
+                    return true;
+                }
             }
         }
         return false;
+    }
+
+    private static boolean declaresArtifactOnLine(String artifact, String line) {
+        if (line.contains(KOTLIN_GROUP + ":" + artifact)) {
+            return true;
+        }
+        // group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8', version: '...'
+        return line.contains(KOTLIN_GROUP)
+                && (line.contains("name: '" + artifact + "'")
+                        || line.contains("name: \"" + artifact + "\""));
+    }
+
+    /**
+     * A fragment's lines with comments removed and exclusions dropped -- the
+     * text that actually declares something.
+     *
+     * <p>A line comment is only a comment when the {@code //} does not follow
+     * a colon: {@code maven { url 'https://...' }} is an ordinary declaration
+     * that a naive strip would cut in half, and these fragments really do
+     * carry repository URLs.</p>
+     */
+    private static String[] activeLines(String fragment) {
+        if (fragment == null) {
+            return new String[0];
+        }
+        StringBuilder out = new StringBuilder();
+        boolean inBlockComment = false;
+        for (int i = 0; i < fragment.length(); i++) {
+            char c = fragment.charAt(i);
+            if (inBlockComment) {
+                if (c == '*' && i + 1 < fragment.length() && fragment.charAt(i + 1) == '/') {
+                    inBlockComment = false;
+                    i++;
+                } else if (c == '\n') {
+                    out.append(c);
+                }
+                continue;
+            }
+            if (c == '/' && i + 1 < fragment.length()) {
+                char next = fragment.charAt(i + 1);
+                if (next == '*') {
+                    inBlockComment = true;
+                    i++;
+                    continue;
+                }
+                if (next == '/' && (i == 0 || fragment.charAt(i - 1) != ':')) {
+                    while (i < fragment.length() && fragment.charAt(i) != '\n') {
+                        i++;
+                    }
+                    out.append('\n');
+                    continue;
+                }
+            }
+            out.append(c);
+        }
+        String[] lines = out.toString().split("\n");
+        List<String> kept = new ArrayList<String>();
+        for (int i = 0; i < lines.length; i++) {
+            if (lines[i].contains("exclude")) {
+                continue;
+            }
+            kept.add(lines[i]);
+        }
+        return kept.toArray(new String[kept.size()]);
     }
 
     /** Numeric dotted version compare; a missing segment counts as zero. */

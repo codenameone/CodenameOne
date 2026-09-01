@@ -246,6 +246,69 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A commented-out declaration is not a declaration. The same hazard the
+     * VPN manifest checks cover, in the same builder's hint text: a developer
+     * parks a line with {@code //} and the substring match reads it as a live
+     * pin, switching off the alignment for an app that pinned nothing.
+     */
+    @Test
+    public void aCommentedOutDeclarationIsNotADeclaration() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    // implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n"
+                + "    // implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"), "a commented-out BOM does not suppress");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"), "a commented-out pin does not suppress");
+
+        String blockComment = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    /* implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22' */\n");
+        check(blockComment.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a block-commented pin does not suppress");
+    }
+
+    /**
+     * An exclusion is the opposite of a pin. It applies only to the dependency
+     * edge it is written on, so an independent path still brings the
+     * class-bearing jar -- reading it as "the app manages this" removes the
+     * constraint precisely where it is still needed.
+     */
+    @Test
+    public void anExclusionIsNotAPin() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    implementation('com.example:thing:1.0') {\n"
+                + "        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'\n"
+                + "    }\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "excluding jdk8 on one edge does not switch its constraint off");
+    }
+
+    /**
+     * The map form is a real pin and is honoured, so the stricter matching did
+     * not simply narrow to one spelling.
+     */
+    @Test
+    public void theMapFormCountsAsAPin() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    implementation group: 'org.jetbrains.kotlin', "
+                + "name: 'kotlin-stdlib-jdk8', version: '1.9.22'\n");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"), "the map form pins jdk8");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"), "and leaves jdk7 constrained");
+    }
+
+    /**
+     * A repository URL is not a comment. Stripping from every {@code //} would
+     * cut {@code maven { url 'https://...' }} in half, and these fragments do
+     * carry repository URLs.
+     */
+    @Test
+    public void aUrlIsNotAComment() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    maven { url 'https://example.com/repo' }\n"
+                + "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the pin after a URL line is still seen");
+    }
+
+    /**
      * The fragments arrive straight from build hints, so an unset hint shows
      * up as an empty string and an absent one can be null. Neither is a
      * reason to skip the alignment, and neither may throw.
