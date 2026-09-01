@@ -31,9 +31,23 @@ public class WeakReference extends java.lang.ref.Reference{
     
     /**
      * Creates a new weak reference that refers to the given object.
+     * <p>
+     * Note that ParparVM's collector has no notion of a weak root: it never
+     * clears this field, so the referent lives exactly as long as the
+     * reference object does and {@link #get()} keeps answering it until
+     * {@link Reference#clear()} is called by hand. That is a legal (if
+     * pessimistic) implementation of the contract -- "may be cleared" is not
+     * "must be cleared" -- and it is what the callers need. What is NOT legal
+     * is the reverse: this constructor used to assign the field to itself
+     * ({@code this.objReference = objReference}) and drop {@code ref} on the
+     * floor, so every reference was born empty and {@code get()} was hardwired
+     * to null. Everything built on
+     * {@code CodenameOneImplementation.createSoftWeakRef} -- the EncodedImage
+     * decode cache, Image's scale cache, Border's round-rect cache -- was then
+     * a cache that could never hit.
      */
     public WeakReference(java.lang.Object ref){
-         this.objReference = objReference;
+         this.objReference = ref;
     }
 
     Object getImpl() {

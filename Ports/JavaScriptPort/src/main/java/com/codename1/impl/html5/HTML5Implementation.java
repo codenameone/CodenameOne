@@ -11043,12 +11043,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
     }
 
-    /// Caches any object, not just a `JSObject`.
+    /// Caches any object, not just a `JSObject`, behind a reference the browser's
+    /// collector is genuinely free to clear.
+    ///
+    /// Two things had to be true for this to mean anything, and neither was.
     ///
     /// The cached value used to have to be a `JSObject` and everything else fell
     /// through to `super`, which answers `new WeakReference(o)`. ParparVM's
-    /// `WeakReference` never holds what it was constructed with, so that branch is a
-    /// reference that is empty the moment it is made -- and the framework's caches
+    /// `WeakReference` never held what it was constructed with, so that branch was a
+    /// reference that was empty the moment it was made -- and the framework's caches
     /// are built on ordinary Java objects, not `JSObject`s, so that was every one of
     /// them. `EncodedImage` was the visible casualty: `getInternal()` keeps the
     /// decoded picture in one of these, so a permanent miss made it hand the bytes
@@ -11058,17 +11061,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
     /// about a third of runs, each run missing a different subset of the cells that
     /// draw the same EncodedImage.
     ///
-    /// A Java object reaches a `@JSBody` script as its own JS representation, which
-    /// is a perfectly good WeakMap value, so nothing about the mechanism needed the
-    /// `JSObject` bound -- only the declared type did.
+    /// The JS side was then built on a `WeakMap` keyed by a throwaway token, with the
+    /// referent as the map VALUE. A `WeakMap` holds keys weakly and values strongly,
+    /// so the referent was reachable for exactly as long as the token this method
+    /// returns -- which is to say, for exactly as long as an ordinary strong field.
+    /// Nothing was reclaimable, and the callers that own the token map rather than
+    /// borrow it (`CacheMap.weakCache`, `com.codename1.ui.util.WeakHashMap`, both
+    /// plain hashtables that drop an entry only on explicit remove/clear) grew
+    /// without bound. The token is now a `WeakRef`, whose `deref()` is `get()`.
     @Override
     public Object createSoftWeakRef(Object o) {
         if (useES6WeakRefs()) {
             if (o == null) {
                 return new JSObjectWrapper();
             }
+            JSObject token = createSoftWeakRefImpl(o);
+            if (token == null) {
+                // The native declined this referent (no WeakRef in this realm, or a
+                // shape it cannot target). Falling back is the difference between a
+                // strong ref that works and a token that reads back null forever,
+                // which is an invisible permanent cache miss.
+                return super.createSoftWeakRef(o);
+            }
             JSObjectWrapper keyOut = new JSObjectWrapper();
-            keyOut.o = createSoftWeakRefImpl(o);
+            keyOut.o = token;
             return keyOut;
         } else {
             return super.createSoftWeakRef(o);
@@ -11077,13 +11093,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     /// Reads back whatever `#createSoftWeakRef(Object)` handed out.
     ///
-    /// Dispatches on the shape of the token rather than on the WeakMap being
-    /// available now, which is what the two used to disagree about: create fell
-    /// through to `super` for anything it could not put in the map, extract did not,
-    /// so a `super` token came back null however alive its referent was. The token is
-    /// the only thing that says which side made it, so it is the only thing worth
-    /// asking. Tested with `instanceof` rather than a cast because a failed cast does
-    /// not throw under ParparVM.
+    /// Dispatches on the shape of the token rather than on `WeakRef` being available
+    /// now, which is what the two used to disagree about: create fell through to
+    /// `super` for anything it could not store, extract did not, so a `super` token
+    /// came back null however alive its referent was. The token is the only thing
+    /// that says which side made it, so it is the only thing worth asking. Tested
+    /// with `instanceof` rather than a cast because a failed cast does not throw
+    /// under ParparVM.
     @Override
     public Object extractHardRef(Object o) {
         if (o == null) {
@@ -11096,25 +11112,45 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return super.extractHardRef(o);
     }
 
-    /// Whether the ES6 WeakMap path is both wanted and available.
+    /// Whether the ES6 weak-reference path is both wanted and available.
+    ///
+    /// Resolved once. The callers are hot -- `Image`'s scale cache, `Border`'s
+    /// round-rect cache and every `EncodedImage` decode go through
+    /// `createSoftWeakRef` -- and this was a `Display.getProperty` string compare
+    /// plus a native call on every single one of them. A benign race between two
+    /// threads resolving it costs one extra probe and reaches the same answer.
     private boolean useES6WeakRefs() {
-        return Display.getInstance().getProperty("javascript.useES6WeakRefs", "true").equals("true")
-                && isWeakMapSupported();
+        if (!weakRefsResolved) {
+            weakRefsUsable = Display.getInstance().getProperty("javascript.useES6WeakRefs", "true").equals("true")
+                    && isWeakRefSupported();
+            weakRefsResolved = true;
+        }
+        return weakRefsUsable;
     }
-    
-    
-    
+
+    private boolean weakRefsResolved;
+    private boolean weakRefsUsable;
+
     private static class JSObjectWrapper {
         JSObject o;
     }
-    
-    @JSBody(params={}, script="return window.WeakMap !== undefined;")
-    private static native boolean isWeakMapSupported();
-    
-    @JSBody(params={"o"}, script="var key={}; window.cn1GlobalWeakMap.set(key, o); return key;")
+
+    // These three @JSBody scripts are shadowed at runtime: port.js binds the same
+    // natives with bindNative and its override replaces the emitted body. They are
+    // kept, and kept correct, precisely because that binding is by mangled name --
+    // a signature drift silently un-binds it, and what runs then is whatever is
+    // written here. The previous versions could not survive that: they reached for
+    // `window.cn1GlobalWeakMap`, a global that only ever existed on the main thread
+    // while these natives run in the worker, so an un-binding turned a cache miss
+    // into a thrown TypeError. The translator unwraps object arguments and wraps the
+    // result on this path, so the script sees and returns plain JS values.
+    @JSBody(params={}, script="return typeof WeakRef === 'function';")
+    private static native boolean isWeakRefSupported();
+
+    @JSBody(params={"o"}, script="return (typeof WeakRef === 'function' && o != null && (typeof o === 'object' || typeof o === 'function')) ? new WeakRef(o) : null;")
     private native static JSObject createSoftWeakRefImpl(Object o);
-    
-    @JSBody(params={"key"}, script="return window.cn1GlobalWeakMap.has(key) ? window.cn1GlobalWeakMap.get(key) : null")
+
+    @JSBody(params={"key"}, script="if(key == null || typeof key.deref !== 'function') { return null; } var v = key.deref(); return v === undefined ? null : v;")
     private native static Object extractHardRefImpl(JSObject key);
     
     @JSBody(params={}, script="return window.cn1IsPreview === true")

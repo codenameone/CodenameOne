@@ -676,7 +676,6 @@ window.console = window.console || {
   log: function () {}
 };
 
-window.cn1GlobalWeakMap = (window.WeakMap === undefined) ? null : new WeakMap();
 window.cn1_native_interfaces = {};
 window.cn1_get_native_interfaces = function() {
   return window.cn1_native_interfaces;  
