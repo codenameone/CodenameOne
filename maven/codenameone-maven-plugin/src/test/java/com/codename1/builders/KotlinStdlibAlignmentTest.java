@@ -642,6 +642,56 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * The backward scans know what whitespace is too. Three of them stopped at
+     * a space or a tab, so a fragment with Windows line endings put a carriage
+     * return where they were looking and the token behind it stopped being
+     * found -- a `because` on the line above its argument, for one, which then
+     * read as a declaration rather than as prose.
+     */
+    @Test
+    public void aTokenIsStillFoundAcrossAnyLineEnding() {
+        String[] endings = {"\r\n", "\n", "\r"};
+        for (int i = 0; i < endings.length; i++) {
+            String reason = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation('com.example:other:1.0') { because" + endings[i]
+                    + " 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22' }\n");
+            check(reason.contains("kotlin-stdlib-jdk8:1.8.0"),
+                    "the reason is still prose across " + endings[i].length()
+                            + " line-ending chars, got <<" + reason + ">>");
+
+            String added = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    dependencies.add(" + endings[i]
+                    + " 'implementation'," + endings[i]
+                    + " 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22')\n");
+            check("".equals(added),
+                    "and an add() call is still an add() call, got <<" + added + ">>");
+        }
+    }
+
+    /**
+     * {@code +=} assigns too: forcedModules += ['...'] applies the force just
+     * as an ordinary assignment does.
+     */
+    @Test
+    public void anAdditiveAssignmentStillAssigns() {
+        String[] operators = {"=", "+="};
+        for (int i = 0; i < operators.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    configurations.all { resolutionStrategy.forcedModules "
+                    + operators[i] + " ['org.jetbrains.kotlin:kotlin-stdlib:1.7.22'] }\n");
+            check("".equals(out),
+                    "forcedModules " + operators[i] + " is a force, got <<" + out + ">>");
+        }
+
+        // A comparison is not an assignment, and neither reads as a force.
+        String compared = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    if (resolutionStrategy.forcedModules == "
+                + "['org.jetbrains.kotlin:kotlin-stdlib:1.7.22']) { }\n");
+        check(compared.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a comparison is not a force, got <<" + compared + ">>");
+    }
+
+    /**
      * A declaration may be annotated. A script field is written
      * {@code @groovy.transform.Field String dep = '...'}, and the walk that
      * reads modifiers and a type stopped dead on the {@code @}.

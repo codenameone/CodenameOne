@@ -632,10 +632,7 @@ public class KotlinStdlibAlignment {
      * another.</p>
      */
     private static boolean isAssignedValue(String line, int quoteAt) {
-        int i = quoteAt - 1;
-        while (i >= 0 && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
-            i--;
-        }
+        int i = skipBlanksBackward(line, quoteAt - 1);
         return i >= 0 && line.charAt(i) == '='
                 && (i == 0 || line.charAt(i - 1) != '=')
                 && (i + 1 >= line.length() || line.charAt(i + 1) != '=');
@@ -655,8 +652,7 @@ public class KotlinStdlibAlignment {
      */
     private static boolean isReasonArgument(String line, int quoteAt) {
         int i = quoteAt - 1;
-        while (i >= 0 && (line.charAt(i) == ' ' || line.charAt(i) == '\t'
-                || line.charAt(i) == '(')) {
+        while (i >= 0 && (isBlank(line.charAt(i)) || line.charAt(i) == '(')) {
             i--;
         }
         int end = i + 1;
@@ -1168,6 +1164,12 @@ public class KotlinStdlibAlignment {
                 continue;
             }
             int at = skipBlanks(statement, after);
+            // += assigns too. forcedModules += ['...'] applies the force just as
+            // forcedModules = ['...'] does, and requiring the bare = missed it.
+            if (at + 1 < statement.length() && statement.charAt(at) == '+'
+                    && statement.charAt(at + 1) == '=') {
+                at++;
+            }
             if (at >= statement.length() || statement.charAt(at) != '='
                     || (at + 1 < statement.length() && statement.charAt(at + 1) == '=')) {
                 continue;
@@ -1363,11 +1365,7 @@ public class KotlinStdlibAlignment {
                 && (text.charAt(at + 1) == '/' || text.charAt(at + 1) == '*')) {
             return false;
         }
-        int i = at - 1;
-        while (i >= 0 && (text.charAt(i) == ' ' || text.charAt(i) == '\t'
-                || text.charAt(i) == '\r' || text.charAt(i) == '\n')) {
-            i--;
-        }
+        int i = skipBlanksBackward(text, at - 1);
         if (i < 0) {
             return true;
         }
@@ -1501,6 +1499,21 @@ public class KotlinStdlibAlignment {
         return text.length();
     }
 
+    /**
+     * The nearest index at or before {@code from} that is not whitespace, or
+     * -1. The backward half of skipBlanks, and shared for the same reason: it
+     * had been written out four times, three of them stopping at a space or a
+     * tab, so a fragment with Windows line endings put a carriage return where
+     * one of them was looking and the token behind it stopped being found.
+     */
+    private static int skipBlanksBackward(String text, int from) {
+        int i = from;
+        while (i >= 0 && isBlank(text.charAt(i))) {
+            i--;
+        }
+        return i;
+    }
+
     private static int skipBlanks(String line, int from) {
         int i = from;
         // isBlank, not a second opinion about what whitespace is. Spelled out as
@@ -1627,15 +1640,9 @@ public class KotlinStdlibAlignment {
      * rejected a declaration that was carrying an explicit strict pin.</p>
      */
     private static boolean isAddCallArgument(String line, int quoteAt) {
-        int i = quoteAt - 1;
-        while (i >= 0 && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
-            i--;
-        }
+        int i = skipBlanksBackward(line, quoteAt - 1);
         if (i >= 0 && line.charAt(i) == '(') {
-            i--;
-            while (i >= 0 && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
-                i--;
-            }
+            i = skipBlanksBackward(line, i - 1);
         }
         return i >= 2 && "add".equals(line.substring(i - 2, i + 1))
                 && (i - 3 < 0 || !isIdentifierChar(line.charAt(i - 3)));
@@ -2372,7 +2379,7 @@ public class KotlinStdlibAlignment {
     private static boolean endsWithComma(StringBuilder text) {
         for (int i = text.length() - 1; i >= 0; i--) {
             char c = text.charAt(i);
-            if (c == ' ' || c == '\t' || c == '\r') {
+            if (isBlank(c)) {
                 continue;
             }
             return c == ',';
