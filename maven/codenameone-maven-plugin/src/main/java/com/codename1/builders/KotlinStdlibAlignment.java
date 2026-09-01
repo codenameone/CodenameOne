@@ -71,12 +71,27 @@ package com.codename1.builders;
  * version would instead override a newer one the app deliberately asked
  * for.</p>
  *
- * <p><b>Why the Kotlin Gradle plugin only sometimes excuses this.</b> From
- * 1.8.0 the plugin aligns the jdk variants itself, so the block would be a
- * no-op and is skipped. An older plugin does not, and skipping there was a
- * real bug: the versions were resolved with Gradle rather than reasoned
- * about, and a project on the {@code android.useGradle8=false} path -- where
- * this builder selects Kotlin 1.7.22 -- resolves like this:</p>
+ * <p><b>Why the Kotlin Gradle plugin does not excuse this.</b> From 1.8.0
+ * the plugin aligns the jdk variants itself, so it was tempting to skip the
+ * block whenever a new enough one was applied. That skip is gone, for two
+ * reasons that point the same way. It was never load-bearing: measured
+ * against a graph carrying billing 9.1.0 and appcompat 1.6.1, adding this
+ * block alongside plugin 1.9.22 and 1.8.22 produced byte-identical
+ * resolution, because the plugin's alignment already lands at or above this
+ * floor and a constraint never lowers a version. And it was not sound
+ * either -- the plugin's alignment can be turned off with
+ * {@code kotlin.stdlib.jdk.variants.version.alignment=false}, which this
+ * builder preserves out of a project's existing gradle.properties, so
+ * "a new enough plugin is applied" was never the same question as "the jdk
+ * variants are aligned".</p>
+ *
+ * <p>Deleting the skip answers both at once and takes with it the version
+ * parsing, the reading of {@code android.topDependency} and the hazard that
+ * a commented-out plugin declaration above an active one decided the
+ * outcome. An older plugin gets the block for the reason it always did:
+ * the 1.7 line ADDS {@code kotlin-stdlib-jdk8} at its own pre-merge version,
+ * so the class-bearing jar is guaranteed present and any dependency reaching
+ * a merged stdlib collides with it --</p>
  *
  * <pre>
  * plugin 1.7.22 alone            stdlib 1.7.22 + jdk7/jdk8 1.7.22   no duplicate
@@ -84,24 +99,14 @@ package com.codename1.builders;
  * the same, with this block      stdlib 1.8.22 + jdk7/jdk8 1.8.0    fixed
  * </pre>
  *
- * <p>Note the middle row is worse than a transitive accident: the 1.7.x
- * plugin <i>adds</i> {@code kotlin-stdlib-jdk8} at its own version, so the
- * older real jar is guaranteed present rather than merely possible, and any
- * dependency that reaches a merged stdlib collides with it. Hence the test
- * is the applied plugin's version, not whether a plugin is applied at all,
- * and an unreadable version counts as "does not align" so the block is
- * written rather than skipped.</p>
- *
- * <p><b>The cost of that, stated plainly.</b> On the same pre-1.8 plugin
- * path, an app whose graph contains no merged stdlib (the first row above)
- * did not need the block, and gets its stdlib family raised to
+ * <p><b>The cost of that, stated plainly.</b> On that pre-1.8 plugin path,
+ * an app whose graph contains no merged stdlib (the first row above) did not
+ * need the block, and gets its stdlib family raised to
  * {@value #MERGED_STDLIB_FLOOR} anyway -- newer than the compiler in use,
  * which Kotlin warns about. That is deliberate. Gradle cannot express a
- * constraint conditional on what another module resolved to, so the choice
- * is between a warning in the case that did not need help and a failed build
- * in the case that did, and a warning is the better of the two. Raising the
- * builder's own pre-Gradle-8 Kotlin default would remove even that, and is a
- * bigger change than this one should carry.</p>
+ * constraint conditional on what another module resolved to, so the choice is
+ * between a warning in the case that did not need help and a failed build in
+ * the case that did, and a warning is the better of the two.</p>
  *
  * <p>Extracted into a pure static helper so it is unit-testable without a
  * Gradle run and so the BuildDaemon copy stays trivially diffable --
@@ -190,11 +195,6 @@ public class KotlinStdlibAlignment {
      *   constraints on, {@code implementation} on any AndroidX project. The
      *   caller passes the same name it uses for the rest of the block so a
      *   legacy {@code compile} project stays consistent with itself.
-     * @param appliedKotlinPluginVersion the version of the Kotlin Gradle
-     *   plugin this build applies, or null/empty when it applies none. Only
-     *   {@value #MERGED_STDLIB_FLOOR} and newer align the jdk variants
-     *   themselves; anything older, or anything this cannot read, is treated
-     *   as not aligning and the block is written.
      * @param appGradleFragments the Gradle text the app itself contributed
      *   ({@code gradleDependencies}, {@code android.gradleDep} and the like).
      *   An artifact the app names there is left to the app; the Kotlin BOM
@@ -202,10 +202,7 @@ public class KotlinStdlibAlignment {
      * @return the block, newline terminated, or {@code ""}
      */
     public static String constraintsBlock(String configuration,
-            String appliedKotlinPluginVersion, String... appGradleFragments) {
-        if (alignsItsOwnJdkVariants(appliedKotlinPluginVersion)) {
-            return "";
-        }
+            String... appGradleFragments) {
         if (configuration == null || configuration.trim().length() == 0) {
             return "";
         }
@@ -237,20 +234,6 @@ public class KotlinStdlibAlignment {
             return "";
         }
         return "    constraints {\n" + out + "    }\n";
-    }
-
-    /**
-     * Whether a Kotlin Gradle plugin of this version aligns the jdk stdlib
-     * variants on its own, making this class's block a no-op.
-     *
-     * <p>Answered from the version rather than from "is a plugin applied",
-     * because the two differ exactly where it matters. Unknown reads as
-     * false: a version that cannot be parsed -- an app declaring
-     * {@code kotlin-gradle-plugin:$kotlin_version} produces one -- must not
-     * silently switch the alignment off.</p>
-     */
-    public static boolean alignsItsOwnJdkVariants(String kotlinPluginVersion) {
-        return atOrPastTheMerge(kotlinPluginVersion);
     }
 
     /**
@@ -371,6 +354,24 @@ public class KotlinStdlibAlignment {
         // it, so a strict pin ends the question regardless of which configuration
         // carries it. A strict version at or above the floor loses nothing by this:
         // it is already a shim.
+        //
+        // Reviewed twice as too broad -- a strict pin on debugImplementation or
+        // compileOnly does not manage releaseRuntimeClasspath, so suppressing the
+        // whole artifact leaves the release graph unaligned. That is true, and it is
+        // still the better of the two outcomes, because the constraint this block
+        // writes is NOT release-scoped: it is declared on `implementation`, which
+        // every variant inherits. There is no version of "constrain release but not
+        // debug" available from one implementation constraint. So the choice for an
+        // app with a strict pre-1.8 pin on a non-release configuration is:
+        //   suppress   -- release keeps a duplicate it already had before this change
+        //   emit       -- debug stops resolving, which it did fine before this change
+        // The second breaks a build that works today, and this class has taken the
+        // first everywhere else it has had to choose. Scoping the constraint to
+        // `releaseImplementation` would satisfy both, and is deliberately not done:
+        // naming a variant configuration that a given build type set may not have
+        // fails the whole script at evaluation, which is a far larger blast radius
+        // than the case it fixes. Revisit only with a project that actually has this
+        // shape.
         if (!line.contains("strictly")
                 && !declaresOnTheConstrainedConfiguration(configuration, line)) {
             return false;
@@ -462,26 +463,6 @@ public class KotlinStdlibAlignment {
             at = line.indexOf(configuration, at + 1);
         }
         return false;
-    }
-
-    /**
-     * A Gradle fragment with its comments removed, for a caller that has to
-     * read a version out of it.
-     *
-     * <p>Exposed because the builder parses {@code android.topDependency} for
-     * the Kotlin plugin version with a helper that takes the first bare
-     * substring match, so a commented-out declaration above an active one wins
-     * and decides the alignment. Same hazard as the one this class already
-     * guards against on its own fragments, reached through a different
-     * parser.</p>
-     */
-    public static String activeText(String fragment) {
-        String[] lines = activeLines(fragment);
-        StringBuilder out = new StringBuilder();
-        for (int i = 0; i < lines.length; i++) {
-            out.append(lines[i]).append('\n');
-        }
-        return out.toString();
     }
 
     /**

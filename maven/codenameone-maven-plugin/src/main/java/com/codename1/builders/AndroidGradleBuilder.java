@@ -7290,33 +7290,11 @@ public class AndroidGradleBuilder extends Executor {
         // are not symmetrical: too narrow leaves an ancient build with a failure it
         // already had, too wide breaks a build that currently succeeds. Raise this
         // gate only with a reproduction on that path.
-        // The Kotlin Gradle plugin version this build actually applies, empty when it
-        // applies none. Which version matters: only 1.8 and newer align the jdk stdlib
-        // variants themselves. An app that declares its own kotlin-gradle-plugin wins,
-        // because the generator then skips its own plugin line -- and a declaration
-        // whose version is a Gradle variable parses to null, which reads downstream as
-        // "cannot tell" and therefore as "does not align", so the block is written.
-        String appliedKotlinPlugin = "";
-        if (hasKotlinSources) {
-            appliedKotlinPlugin = kotlinVersion;
-            // Comments stripped first: HealthManifestFragments reads the FIRST bare
-            // substring match, so a commented-out 1.8+ plugin sitting above an active
-            // 1.7.x one is read as the applied version, and the alignment is then
-            // skipped for a build whose real plugin does not align.
-            String kotlinTopDependency = KotlinStdlibAlignment.activeText(
-                    request.getArg("android.topDependency", ""));
-            if (HealthManifestFragments.declaresKotlinPlugin(kotlinTopDependency)) {
-                String declared = HealthManifestFragments
-                        .declaredKotlinPluginVersion(kotlinTopDependency);
-                appliedKotlinPlugin = declared == null ? "" : declared;
-            }
-        }
         String kotlinStdlibConstraints = "";
         if (useAndroidX && gradleVersionInt >= 6
                 && request.getArg("android.kotlinStdlibAlignment", "true").equals("true")) {
             kotlinStdlibConstraints = KotlinStdlibAlignment.constraintsBlock(
                     compile,
-                    appliedKotlinPlugin,
                     // Every app-controlled fragment that reaches the generated
                     // dependencies block. Read off ShieldInjector's GRADLE_TEXT_HINTS,
                     // which is this tree's enumeration of hints interpolated into a

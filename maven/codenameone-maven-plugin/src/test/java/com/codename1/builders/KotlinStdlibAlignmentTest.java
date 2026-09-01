@@ -34,14 +34,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the alignment lands in the dependency graph of every AndroidX app, so the
  * cases that must produce nothing matter more than the one that must produce
  * something. The two that must NOT produce nothing --
- * {@link #aPreMergeKotlinPluginStillGetsTheAlignment()} and
+ * {@link #aKotlinPluginNoLongerExcusesTheBlock()} and
  * {@link #pinningOneJdkArtifactLeavesTheOtherConstrained()} -- are the ones
  * that caught a real over-suppression, so treat a change that makes either
  * pass vacuously as a regression.</p>
  */
 public class KotlinStdlibAlignmentTest {
     private static String block() {
-        return KotlinStdlibAlignment.constraintsBlock("implementation", null);
+        return KotlinStdlibAlignment.constraintsBlock("implementation");
     }
 
     /**
@@ -104,60 +104,22 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
-     * From 1.8.0 the Kotlin Gradle plugin aligns the jdk variants itself, so
-     * the block would be a no-op.
+     * A Kotlin plugin no longer excuses the block, whatever its version.
+     *
+     * <p>Skipping for a 1.8+ plugin was never load-bearing -- measured against
+     * a graph carrying billing 9.1.0 and appcompat 1.6.1, adding this block
+     * alongside plugin 1.9.22 and 1.8.22 produced byte-identical resolution --
+     * and it was not sound either, because the plugin's alignment can be
+     * turned off with kotlin.stdlib.jdk.variants.version.alignment=false,
+     * which this builder preserves out of a project's gradle.properties.
+     * Emitting unconditionally answers both, and takes the version parsing and
+     * the commented-plugin hazard with it.</p>
      */
     @Test
-    public void skipsOnlyAKotlinPluginThatAlignsItself() {
-        check("".equals(KotlinStdlibAlignment.constraintsBlock(
-                "implementation", "1.8.0")),
-                "the release that starts aligning is skipped");
-        check("".equals(KotlinStdlibAlignment.constraintsBlock(
-                "implementation", "1.9.22")),
-                "a newer plugin is skipped");
-        check(KotlinStdlibAlignment.alignsItsOwnJdkVariants("2.0.0"),
-                "a major bump still aligns");
-        check(KotlinStdlibAlignment.alignsItsOwnJdkVariants("1.9.22-RC2"),
-                "a qualifier does not hide an aligning version");
-    }
-
-    /**
-     * The case that made this a version test rather than an is-a-plugin-applied
-     * test. On the {@code android.useGradle8=false} path the builder selects
-     * Kotlin 1.7.22, which predates the merge and does not align. Worse, the
-     * 1.7 plugin ADDS {@code kotlin-stdlib-jdk8} at its own version, so the
-     * pre-merge real jar is guaranteed present; any dependency reaching a
-     * merged stdlib then collides with it. Measured with Gradle: plugin 1.7.22
-     * plus billing 9.1.0 resolves kotlin-stdlib 1.8.22 beside jdk7/jdk8
-     * 1.7.22, which is the duplicate. Skipping there shipped the bug.
-     */
-    @Test
-    public void aPreMergeKotlinPluginStillGetsTheAlignment() {
-        check(KotlinStdlibAlignment.constraintsBlock("implementation", "1.7.22")
-                .contains("kotlin-stdlib-jdk8"),
-                "a pre-merge plugin still gets the alignment");
-        check(!KotlinStdlibAlignment.alignsItsOwnJdkVariants("1.7.22"),
-                "1.7.22 does not align");
-        check(!KotlinStdlibAlignment.alignsItsOwnJdkVariants("1.6.21"),
-                "1.6.21 does not align");
-    }
-
-    /**
-     * An app declaring {@code kotlin-gradle-plugin:$kotlin_version} parses to
-     * nothing. Unknown must read as "does not align" -- guessing the other way
-     * switches the fix off silently.
-     */
-    @Test
-    public void anUnreadablePluginVersionStillGetsTheAlignment() {
-        check(!KotlinStdlibAlignment.alignsItsOwnJdkVariants(""),
-                "no plugin does not align");
-        check(!KotlinStdlibAlignment.alignsItsOwnJdkVariants(null),
-                "a null version does not align");
-        check(!KotlinStdlibAlignment.alignsItsOwnJdkVariants("$kotlin_version"),
-                "a Gradle variable does not read as aligning");
-        check(KotlinStdlibAlignment.constraintsBlock(
-                "implementation", "$kotlin_version").contains("kotlin-stdlib-jdk8"),
-                "an unreadable version still gets the alignment");
+    public void aKotlinPluginNoLongerExcusesTheBlock() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"), "jdk7 is aligned regardless");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"), "jdk8 is aligned regardless");
     }
 
     /**
@@ -169,7 +131,7 @@ public class KotlinStdlibAlignmentTest {
     @Test
     public void pinningOneJdkArtifactLeavesTheOtherConstrained() {
         String pinnedJdk7 = KotlinStdlibAlignment.constraintsBlock(
-                "implementation", null,
+                "implementation",
                 "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'\n");
         check(pinnedJdk7.contains("kotlin-stdlib-jdk8"),
                 "pinning jdk7 leaves jdk8 constrained");
@@ -177,7 +139,7 @@ public class KotlinStdlibAlignmentTest {
                 "the artifact the app pinned is left to the app");
 
         String pinnedJdk8 = KotlinStdlibAlignment.constraintsBlock(
-                "implementation", null,
+                "implementation",
                 "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
         check(pinnedJdk8.contains("kotlin-stdlib-jdk7"),
                 "pinning jdk8 leaves jdk7 constrained");
@@ -185,7 +147,7 @@ public class KotlinStdlibAlignmentTest {
                 "the artifact the app pinned is left to the app");
 
         String pinnedBoth = KotlinStdlibAlignment.constraintsBlock(
-                "implementation", null,
+                "implementation",
                 "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'\n"
                 + "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
         check("".equals(pinnedBoth),
@@ -207,11 +169,11 @@ public class KotlinStdlibAlignmentTest {
     @Test
     public void emitsNothingWhenTheAppUsesTheKotlinBom() {
         check("".equals(KotlinStdlibAlignment.constraintsBlock(
-                "implementation", null,
+                "implementation",
                 "    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n")),
                 "an app using a merged-era Kotlin BOM is left alone");
         check("".equals(KotlinStdlibAlignment.constraintsBlock(
-                "implementation", null,
+                "implementation",
                 "    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.0')\n")),
                 "the BOM at the merge itself is enough");
     }
@@ -224,7 +186,7 @@ public class KotlinStdlibAlignmentTest {
     @Test
     public void aPreMergeKotlinBomStillGetsTheAlignment() {
         String out = KotlinStdlibAlignment.constraintsBlock(
-                "implementation", null,
+                "implementation",
                 "    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.7.22')\n");
         check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
                 "a pre-merge BOM still gets jdk7 aligned");
@@ -239,7 +201,7 @@ public class KotlinStdlibAlignmentTest {
     @Test
     public void anUnreadableBomVersionStillGetsTheAlignment() {
         String out = KotlinStdlibAlignment.constraintsBlock(
-                "implementation", null,
+                "implementation",
                 "    implementation platform(\"org.jetbrains.kotlin:kotlin-bom:$kotlinVersion\")\n");
         check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "an unreadable BOM version still gets the alignment");
@@ -294,42 +256,16 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void aCommentedOutDeclarationIsNotADeclaration() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    // implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n"
                 + "    // implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
         check(out.contains("kotlin-stdlib-jdk7:1.8.0"), "a commented-out BOM does not suppress");
         check(out.contains("kotlin-stdlib-jdk8:1.8.0"), "a commented-out pin does not suppress");
 
-        String blockComment = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String blockComment = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    /* implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22' */\n");
         check(blockComment.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "a block-commented pin does not suppress");
-    }
-
-    /**
-     * activeText strips comments, and the builder has to use it on
-     * android.topDependency before the plugin version is parsed out of it.
-     * HealthManifestFragments takes the FIRST bare substring match, so a
-     * commented-out 1.8+ plugin above an active 1.7.x one is read as the
-     * applied version and the alignment is skipped for a build that needs it.
-     */
-    @Test
-    public void aCommentedOutPluginIsNotTheAppliedPlugin() throws Exception {
-        String topDependency =
-                "// classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22'\n"
-                + "classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.7.22'\n";
-        check(KotlinStdlibAlignment.activeText(topDependency)
-                .indexOf("1.9.22") < 0,
-                "the commented plugin is gone from the active text");
-        check(KotlinStdlibAlignment.activeText(topDependency)
-                .indexOf("1.7.22") >= 0,
-                "the active plugin survives");
-
-        byte[] bytes = java.nio.file.Files.readAllBytes(new java.io.File(
-                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath());
-        String builderSrc = new String(bytes, "UTF-8");
-        check(builderSrc.contains("KotlinStdlibAlignment.activeText("),
-                "the builder strips comments before reading the plugin version");
     }
 
     /**
@@ -341,17 +277,17 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void aVariantOnlyDeclarationDoesNotSuppress() {
-        String debugBom = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String debugBom = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    debugImplementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n");
         check(debugBom.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "a debug-only BOM does not suppress the main variant");
 
-        String testPin = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String testPin = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    testImplementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
         check(testPin.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "a test-only pin does not suppress the main variant");
 
-        String releasePin = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String releasePin = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    releaseImplementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
         check(releasePin.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "even a release-only pin is not the configuration being constrained");
@@ -369,7 +305,7 @@ public class KotlinStdlibAlignmentTest {
         String[] configurations = {"implementation", "api", "runtimeOnly",
             "compile", "runtime"};
         for (String configuration : configurations) {
-            String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                     "    " + configuration
                     + "('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22')\n");
             check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
@@ -388,7 +324,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void aCompileOnlyDeclarationDoesNotManageTheRuntimeGraph() {
-        String bom = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String bom = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    compileOnly platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n");
         check(bom.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "a compileOnly BOM does not align the runtime graph");
@@ -404,7 +340,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void aStrictPinIsHonouredOnAnyConfiguration() {
-        String releaseStrict = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String releaseStrict = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    releaseImplementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') {\n"
                 + "        version { strictly '1.7.22' }\n"
                 + "    }\n");
@@ -412,7 +348,7 @@ public class KotlinStdlibAlignmentTest {
                 "a strict release pin is left to the app");
 
         String compileOnlyStrict = KotlinStdlibAlignment.constraintsBlock(
-                "implementation", null,
+                "implementation",
                 "    compileOnly('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
                 + "{ version { strictly '1.7.22' } }\n");
         check(!compileOnlyStrict.contains("kotlin-stdlib-jdk8:1.8.0"),
@@ -426,7 +362,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void anUnrelatedBlockDoesNotSwallowTheFragment() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "dependencies {\n"
                 + "    implementation('com.example:thing:1.0') { version { strictly '1.0' } }\n"
                 + "    debugImplementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n"
@@ -444,7 +380,7 @@ public class KotlinStdlibAlignmentTest {
         String[] variants = {"testRuntimeOnly", "debugRuntimeOnly", "androidTestImplementation",
             "releaseCompileOnly", "debugApi", "testCompile"};
         for (String variant : variants) {
-            String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                     "    " + variant
                     + "('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22')\n");
             check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
@@ -458,7 +394,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void anApiDeclarationCountsAsAPin() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    api 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
         check(!out.contains("kotlin-stdlib-jdk8:1.8.0"), "api pins jdk8");
         check(out.contains("kotlin-stdlib-jdk7:1.8.0"), "and leaves jdk7 constrained");
@@ -472,7 +408,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void anExclusionIsNotAPin() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation('com.example:thing:1.0') {\n"
                 + "        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'\n"
                 + "    }\n");
@@ -489,7 +425,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void aDeclarationSplitAcrossLinesIsStillAPin() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation(\n"
                 + "        'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
                 + "    )\n");
@@ -506,7 +442,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void anInlineExclusionDoesNotCancelTheDeclaration() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
                 + "{ exclude group: 'com.example', module: 'thing' }\n");
         check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
@@ -519,7 +455,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void aStandaloneExclusionIsStillNotAPin() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation('com.example:thing:1.0') {\n"
                 + "        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'\n"
                 + "    }\n");
@@ -537,7 +473,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void aSemicolonEndsAStatement() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation 'com.android.billingclient:billing:9.1.0'; "
                 + "debugImplementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n");
         check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
@@ -546,7 +482,7 @@ public class KotlinStdlibAlignmentTest {
 
         // The same shape where the pin IS on the main variant still suppresses, so
         // the split did not simply stop every semicolon-separated value from working.
-        String pinned = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String pinned = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation 'com.android.billingclient:billing:9.1.0'; "
                 + "implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
         check(!pinned.contains("kotlin-stdlib-jdk8:1.8.0"),
@@ -558,14 +494,14 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void aSemicolonInsideAStringOrParensIsNotASeparator() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation(\n"
                 + "        'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
                 + "    )\n");
         check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "a wrapped declaration still pins");
 
-        String quoted = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String quoted = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22' "
                 + "// note; with a semicolon\n");
         check(!quoted.contains("kotlin-stdlib-jdk8:1.8.0"),
@@ -580,7 +516,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void unbalancedParenthesesDoNotGlueStatementsTogether() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation(\n"
                 + "    testImplementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n");
         check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
@@ -593,7 +529,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void theMapFormCountsAsAPin() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation group: 'org.jetbrains.kotlin', "
                 + "name: 'kotlin-stdlib-jdk8', version: '1.9.22'\n");
         check(!out.contains("kotlin-stdlib-jdk8:1.8.0"), "the map form pins jdk8");
@@ -607,7 +543,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void aUrlIsNotAComment() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    maven { url 'https://example.com/repo' }\n"
                 + "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
         check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
@@ -621,7 +557,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void ignoresEmptyAndNullFragments() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "", null, "    implementation 'androidx.appcompat:appcompat:1.6.1'\n");
         check(out.contains("kotlin-stdlib-jdk8"),
                 "an empty or absent hint is not a pin");
@@ -635,7 +571,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void anUnrelatedKotlinDependencyIsNotAPin() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4'\n");
         check(out.contains("kotlin-stdlib-jdk8"),
                 "a coroutines dependency does not switch the alignment off");
@@ -648,7 +584,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void usesTheConfigurationItWasGiven() {
-        String out = KotlinStdlibAlignment.constraintsBlock("compile", null);
+        String out = KotlinStdlibAlignment.constraintsBlock("compile");
         check(out.contains("compile('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0')"),
                 "the caller's configuration is used");
         check(!out.contains("implementation("),
@@ -657,9 +593,9 @@ public class KotlinStdlibAlignmentTest {
 
     @Test
     public void emitsNothingWithoutAConfiguration() {
-        check("".equals(KotlinStdlibAlignment.constraintsBlock(null, null)),
+        check("".equals(KotlinStdlibAlignment.constraintsBlock(null)),
                 "a null configuration writes nothing");
-        check("".equals(KotlinStdlibAlignment.constraintsBlock("   ", null)),
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("   ")),
                 "a blank configuration writes nothing");
     }
 
