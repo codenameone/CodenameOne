@@ -24,8 +24,6 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -35,34 +33,32 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Every case here is about restraint rather than about the block's text:
  * the alignment lands in the dependency graph of every AndroidX app, so the
  * cases that must produce nothing matter more than the one that must produce
- * something. The floor gets a test of its own because 1.8.0 is not a
- * preference -- it is the release where the two artifacts became empty
- * shims, and lowering it would reintroduce the duplicate class the block
- * exists to prevent.</p>
+ * something. The two that must NOT produce nothing --
+ * {@link #aPreMergeKotlinPluginStillGetsTheAlignment()} and
+ * {@link #pinningOneJdkArtifactLeavesTheOtherConstrained()} -- are the ones
+ * that caught a real over-suppression, so treat a change that makes either
+ * pass vacuously as a regression.</p>
  */
 public class KotlinStdlibAlignmentTest {
-
     private static String block() {
-        return KotlinStdlibAlignment.constraintsBlock("implementation", false);
-    }
-
-    @Test
-    public void constrainsBothJdkArtifactsToTheShimFloor() {
-        String out = block();
-        assertTrue(out.contains(
-                "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0')"));
-        assertTrue(out.contains(
-                "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0')"));
+        return KotlinStdlibAlignment.constraintsBlock("implementation", null);
     }
 
     /**
-     * jdk8 is the artifact that shows up in the duplicate class reports, but
-     * it depends on jdk7, so leaving jdk7 alone would move the same failure
-     * onto {@code kotlin.jdk7.AutoCloseableKt} rather than remove it.
+     * jdk8 is the artifact the duplicate class reports name, but the real
+     * graph resolves both to the same old version, so aligning jdk8 alone
+     * would move the failure onto {@code kotlin.jdk7.AutoCloseableKt} rather
+     * than remove it.
      */
     @Test
-    public void doesNotAlignJdk8Alone() {
-        assertTrue(block().contains("kotlin-stdlib-jdk7"));
+    public void constrainsBothJdkArtifactsToTheShimFloor() {
+        String out = block();
+        check(out.contains(
+                "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0')"),
+                "jdk7 is aligned");
+        check(out.contains(
+                "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0')"),
+                "jdk8 is aligned");
     }
 
     /**
@@ -71,15 +67,16 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void theFloorIsTheVersionWhereTheClassesMoved() {
-        assertEquals("1.8.0", KotlinStdlibAlignment.MERGED_STDLIB_FLOOR);
+        check("1.8.0".equals(KotlinStdlibAlignment.MERGED_STDLIB_FLOOR),
+                "the floor is the version where the classes moved");
     }
 
     /** It is a constraints block, not a dependency declaration or a force. */
     @Test
     public void declaresConstraintsRatherThanDependencies() {
         String out = block();
-        assertTrue(out.contains("constraints {"));
-        assertFalse(out.contains("force"));
+        check(out.contains("constraints {"), "it is a constraints block");
+        check(!out.contains("force"), "it constrains rather than forces");
         int open = 0;
         int close = 0;
         for (int i = 0; i < out.length(); i++) {
@@ -89,7 +86,7 @@ public class KotlinStdlibAlignmentTest {
                 close++;
             }
         }
-        assertEquals(open, close);
+        check(open == close, "the block's braces balance");
     }
 
     /**
@@ -101,37 +98,110 @@ public class KotlinStdlibAlignmentTest {
     @Test
     public void everyConstraintCarriesAReason() {
         String out = block();
-        assertEquals(2, countOccurrences(out, "because '"));
-        assertTrue(out.contains("Codename One"));
+        check(countOccurrences(out, "because '") == 2,
+                "both constraints say why they are there");
+        check(out.contains("Codename One"), "the reason names who wrote it");
     }
 
     /**
-     * The Kotlin Gradle plugin performs the same alignment itself, and the
-     * Kotlin version a build compiles with can be older than the floor, so
-     * pushing a newer stdlib underneath it would only earn a warning.
+     * From 1.8.0 the Kotlin Gradle plugin aligns the jdk variants itself, so
+     * the block would be a no-op.
      */
     @Test
-    public void emitsNothingWhenTheKotlinGradlePluginIsApplied() {
-        assertEquals("", KotlinStdlibAlignment.constraintsBlock("implementation", true));
+    public void skipsOnlyAKotlinPluginThatAlignsItself() {
+        check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                "implementation", "1.8.0")),
+                "the release that starts aligning is skipped");
+        check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                "implementation", "1.9.22")),
+                "a newer plugin is skipped");
+        check(KotlinStdlibAlignment.alignsItsOwnJdkVariants("2.0.0"),
+                "a major bump still aligns");
+        check(KotlinStdlibAlignment.alignsItsOwnJdkVariants("1.9.22-RC2"),
+                "a qualifier does not hide an aligning version");
     }
 
+    /**
+     * The case that made this a version test rather than an is-a-plugin-applied
+     * test. On the {@code android.useGradle8=false} path the builder selects
+     * Kotlin 1.7.22, which predates the merge and does not align. Worse, the
+     * 1.7 plugin ADDS {@code kotlin-stdlib-jdk8} at its own version, so the
+     * pre-merge real jar is guaranteed present; any dependency reaching a
+     * merged stdlib then collides with it. Measured with Gradle: plugin 1.7.22
+     * plus billing 9.1.0 resolves kotlin-stdlib 1.8.22 beside jdk7/jdk8
+     * 1.7.22, which is the duplicate. Skipping there shipped the bug.
+     */
     @Test
-    public void emitsNothingWhenTheAppPinsAJdkArtifactItself() {
-        assertEquals("", KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n"));
-        assertEquals("", KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'\n"));
+    public void aPreMergeKotlinPluginStillGetsTheAlignment() {
+        check(KotlinStdlibAlignment.constraintsBlock("implementation", "1.7.22")
+                .contains("kotlin-stdlib-jdk8"),
+                "a pre-merge plugin still gets the alignment");
+        check(!KotlinStdlibAlignment.alignsItsOwnJdkVariants("1.7.22"),
+                "1.7.22 does not align");
+        check(!KotlinStdlibAlignment.alignsItsOwnJdkVariants("1.6.21"),
+                "1.6.21 does not align");
+    }
+
+    /**
+     * An app declaring {@code kotlin-gradle-plugin:$kotlin_version} parses to
+     * nothing. Unknown must read as "does not align" -- guessing the other way
+     * switches the fix off silently.
+     */
+    @Test
+    public void anUnreadablePluginVersionStillGetsTheAlignment() {
+        check(!KotlinStdlibAlignment.alignsItsOwnJdkVariants(""),
+                "no plugin does not align");
+        check(!KotlinStdlibAlignment.alignsItsOwnJdkVariants(null),
+                "a null version does not align");
+        check(!KotlinStdlibAlignment.alignsItsOwnJdkVariants("$kotlin_version"),
+                "a Gradle variable does not read as aligning");
+        check(KotlinStdlibAlignment.constraintsBlock(
+                "implementation", "$kotlin_version").contains("kotlin-stdlib-jdk8"),
+                "an unreadable version still gets the alignment");
+    }
+
+    /**
+     * Suppression is per artifact. jdk8 depends on jdk7, so an app pinning
+     * jdk8 raises jdk7 with it -- but an app pinning jdk7 leaves jdk8 exactly
+     * where the graph put it, and dropping the whole block there would leave
+     * the original duplicate intact with its fix switched off.
+     */
+    @Test
+    public void pinningOneJdkArtifactLeavesTheOtherConstrained() {
+        String pinnedJdk7 = KotlinStdlibAlignment.constraintsBlock(
+                "implementation", null,
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'\n");
+        check(pinnedJdk7.contains("kotlin-stdlib-jdk8"),
+                "pinning jdk7 leaves jdk8 constrained");
+        check(!pinnedJdk7.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "the artifact the app pinned is left to the app");
+
+        String pinnedJdk8 = KotlinStdlibAlignment.constraintsBlock(
+                "implementation", null,
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check(pinnedJdk8.contains("kotlin-stdlib-jdk7"),
+                "pinning jdk8 leaves jdk7 constrained");
+        check(!pinnedJdk8.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the artifact the app pinned is left to the app");
+
+        String pinnedBoth = KotlinStdlibAlignment.constraintsBlock(
+                "implementation", null,
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'\n"
+                + "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check("".equals(pinnedBoth),
+                "an app managing both gets no block at all, not an empty one");
     }
 
     /**
      * A BOM aligns the whole {@code org.jetbrains.kotlin} group, which is a
-     * superset of this block, so an app using one has already answered the
-     * question.
+     * superset of this block, so it is the one marker that suppresses both.
      */
     @Test
     public void emitsNothingWhenTheAppUsesTheKotlinBom() {
-        assertEquals("", KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                "    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n"));
+        check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                "implementation", null,
+                "    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n")),
+                "an app using the Kotlin BOM is left alone");
     }
 
     /**
@@ -141,23 +211,24 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void ignoresEmptyAndNullFragments() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", false,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
                 "", null, "    implementation 'androidx.appcompat:appcompat:1.6.1'\n");
-        assertTrue(out.contains("kotlin-stdlib-jdk8"));
-        assertFalse(KotlinStdlibAlignment.appManagesKotlinStdlib((String[]) null));
+        check(out.contains("kotlin-stdlib-jdk8"),
+                "an empty or absent hint is not a pin");
     }
 
     /**
-     * An unrelated Kotlin coordinate is not a pin. Only the two jdk
-     * artifacts and the BOM decide who owns the alignment; matching
-     * "kotlin" loosely would silently switch the fix off for any app that
-     * happens to use a Kotlin library.
+     * An unrelated Kotlin coordinate is not a pin. Only the two jdk artifacts
+     * and the BOM decide who owns the alignment; matching "kotlin" loosely
+     * would silently switch the fix off for any app that happens to use a
+     * Kotlin library.
      */
     @Test
     public void anUnrelatedKotlinDependencyIsNotAPin() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", false,
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
                 "    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4'\n");
-        assertTrue(out.contains("kotlin-stdlib-jdk8"));
+        check(out.contains("kotlin-stdlib-jdk8"),
+                "a coroutines dependency does not switch the alignment off");
     }
 
     /**
@@ -167,15 +238,19 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void usesTheConfigurationItWasGiven() {
-        String out = KotlinStdlibAlignment.constraintsBlock("compile", false);
-        assertTrue(out.contains("compile('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0')"));
-        assertFalse(out.contains("implementation("));
+        String out = KotlinStdlibAlignment.constraintsBlock("compile", null);
+        check(out.contains("compile('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0')"),
+                "the caller's configuration is used");
+        check(!out.contains("implementation("),
+                "no other configuration is assumed");
     }
 
     @Test
     public void emitsNothingWithoutAConfiguration() {
-        assertEquals("", KotlinStdlibAlignment.constraintsBlock(null, false));
-        assertEquals("", KotlinStdlibAlignment.constraintsBlock("   ", false));
+        check("".equals(KotlinStdlibAlignment.constraintsBlock(null, null)),
+                "a null configuration writes nothing");
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("   ", null)),
+                "a blank configuration writes nothing");
     }
 
     /**
@@ -186,8 +261,18 @@ public class KotlinStdlibAlignmentTest {
     @Test
     public void isNewlineTerminatedForConcatenation() {
         String out = block();
-        assertTrue(out.endsWith("}\n"));
-        assertTrue(out.startsWith("    constraints {\n"));
+        check(out.endsWith("}\n"), "it ends its own line");
+        check(out.startsWith("    constraints {\n"), "it starts its own line");
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        int at = haystack.indexOf(needle);
+        while (at >= 0) {
+            count++;
+            at = haystack.indexOf(needle, at + needle.length());
+        }
+        return count;
     }
 
     /**
@@ -212,13 +297,7 @@ public class KotlinStdlibAlignmentTest {
         assertTrue(block.contains("+ kotlinStdlibConstraints"));
     }
 
-    private static int countOccurrences(String haystack, String needle) {
-        int count = 0;
-        int at = haystack.indexOf(needle);
-        while (at >= 0) {
-            count++;
-            at = haystack.indexOf(needle, at + needle.length());
-        }
-        return count;
+    private static void check(boolean condition, String message) {
+        assertTrue(condition, message);
     }
 }

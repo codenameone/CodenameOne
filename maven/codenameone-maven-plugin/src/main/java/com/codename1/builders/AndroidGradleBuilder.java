@@ -7282,13 +7282,28 @@ public class AndroidGradleBuilder extends Executor {
         // configuration and Gradle's constraints DSL only arrived in 4.6; the
         // legacy support-library templates predate both, and predate the AndroidX
         // releases that produce the clash.
+        // The Kotlin Gradle plugin version this build actually applies, empty when it
+        // applies none. Which version matters: only 1.8 and newer align the jdk stdlib
+        // variants themselves. An app that declares its own kotlin-gradle-plugin wins,
+        // because the generator then skips its own plugin line -- and a declaration
+        // whose version is a Gradle variable parses to null, which reads downstream as
+        // "cannot tell" and therefore as "does not align", so the block is written.
+        String appliedKotlinPlugin = "";
+        if (hasKotlinSources) {
+            appliedKotlinPlugin = kotlinVersion;
+            String kotlinTopDependency = request.getArg("android.topDependency", "");
+            if (HealthManifestFragments.declaresKotlinPlugin(kotlinTopDependency)) {
+                String declared = HealthManifestFragments
+                        .declaredKotlinPluginVersion(kotlinTopDependency);
+                appliedKotlinPlugin = declared == null ? "" : declared;
+            }
+        }
         String kotlinStdlibConstraints = "";
         if (useAndroidX && gradleVersionInt >= 6
                 && request.getArg("android.kotlinStdlibAlignment", "true").equals("true")) {
             kotlinStdlibConstraints = KotlinStdlibAlignment.constraintsBlock(
                     compile,
-                    hasKotlinSources || request.getArg("android.topDependency", "")
-                            .contains("kotlin-gradle-plugin"),
+                    appliedKotlinPlugin,
                     additionalDependencies,
                     aiExtraGradleDependencies.toString(),
                     request.getArg("android.gradleDep", ""),
