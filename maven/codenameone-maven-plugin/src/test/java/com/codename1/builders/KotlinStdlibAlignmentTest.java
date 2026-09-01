@@ -564,6 +564,74 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Line endings are not this class's business to have an opinion about. A
+     * fragment written on Windows put a carriage return after
+     * {@code strictly}, and the token-end test accepted only a space, a tab or
+     * an open parenthesis -- so the call stopped being a call and the pin
+     * behind it was never read.
+     */
+    @Test
+    public void aCarriageReturnSeparatesTokensLikeAnyOtherBlank() {
+        String[] endings = {"\r\n", "\n", "\r"};
+        for (int i = 0; i < endings.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation('org.jetbrains.kotlin:kotlin-stdlib')" + endings[i]
+                    + "    { version { strictly" + endings[i] + "        '1.7.22' } }"
+                    + endings[i]);
+            check("".equals(out),
+                    "the strict call survives the line ending, got <<" + out + ">>");
+        }
+    }
+
+    /**
+     * A trailing closure still belongs to its call with a blank line between
+     * them. Comment stripping leaves an empty statement where a comment-only
+     * line was, and looking at only the very next statement left the closure
+     * -- and the strict version inside it -- attached to nothing.
+     */
+    @Test
+    public void aTrailingClosureSurvivesABlankLine() {
+        String[] between = {
+            "\n",
+            "\n    // why this pin is here\n",
+            "\n\n    /* and a block one */\n\n",
+        };
+        for (int i = 0; i < between.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.7.22')"
+                    + between[i]
+                    + "    { version { strictly '1.7.22' } }\n");
+            check("".equals(out),
+                    "the closure is still the call's, across <<"
+                            + between[i].replace("\n", "\\n") + ">>, got <<" + out + ">>");
+        }
+    }
+
+    /**
+     * Inside a dollar-slashy literal the dollar escapes itself and a slash, so
+     * {@code $/} is a slash and not the closer. Taking the first {@code /$}
+     * substring ended the literal early and put the scanner back into code
+     * halfway through a string.
+     */
+    @Test
+    public void aDollarEscapeDoesNotCloseADollarSlashyLiteral() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def marker = $/not closed $/$ can't/$; "
+                + "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check("".equals(out),
+                "the escaped delimiter did not end the literal, got <<" + out + ">>");
+
+        // And $$ is a dollar, not the start of one.
+        String dollars = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def marker = $/cost $$5 can't/$; "
+                + "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check("".equals(dollars),
+                "an escaped dollar is content, got <<" + dollars + ">>");
+    }
+
+    /**
      * Removing a comment leaves the whitespace it was. A comment separates
      * tokens in the language, so deleting it outright joined them:
      * {@code strictly/* pin *}{@code /'1.7.22'} became strictly'1.7.22', which

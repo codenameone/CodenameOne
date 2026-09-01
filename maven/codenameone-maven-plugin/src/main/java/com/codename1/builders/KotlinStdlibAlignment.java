@@ -965,9 +965,8 @@ public class KotlinStdlibAlignment {
                         || !isIdentifierChar(statement.charAt(i - 1));
                 int after = i + call.length();
                 boolean endsToken = after < statement.length()
-                        && (statement.charAt(after) == ' '
-                                || statement.charAt(after) == '('
-                                || statement.charAt(after) == '\t');
+                        && (isBlank(statement.charAt(after))
+                                || statement.charAt(after) == '(');
                 if (startsToken && endsToken) {
                     return true;
                 }
@@ -1002,6 +1001,18 @@ public class KotlinStdlibAlignment {
      * the main configuration -- suppressing a constraint for a configuration
      * that reaches nothing.</p>
      */
+    /**
+     * Whether the character is whitespace that separates tokens.
+     *
+     * <p>Spelled out as space-or-tab in two places, which meant a fragment with
+     * Windows line endings put a carriage return after {@code strictly} and the
+     * call stopped being a call. Line endings are not this class's business to
+     * have an opinion about.</p>
+     */
+    private static boolean isBlank(char c) {
+        return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+    }
+
     private static boolean isIdentifierChar(char c) {
         return Character.isLetterOrDigit(c) || c == '_' || c == '$';
     }
@@ -1150,9 +1161,23 @@ public class KotlinStdlibAlignment {
         char quote = text.charAt(quoteAt);
         if (quote == '$') {
             // $/ ... /$ -- the closer is two characters, and the content may hold
-            // anything at all, which is the point of the form.
-            int close = text.indexOf("/$", quoteAt + 2);
-            return close < 0 ? text.length() : close + 1;
+            // anything at all, which is the point of the form. Almost anything: the
+            // dollar escapes itself and a slash, so $$ is a dollar and $/ is a
+            // slash. Searching for the first "/$" substring found the slash of an
+            // escaped $/ instead of the closer and ended the literal early, which
+            // put the scanner back into code halfway through a string.
+            for (int i = quoteAt + 2; i < text.length(); i++) {
+                char c = text.charAt(i);
+                if (c == '$' && i + 1 < text.length()
+                        && (text.charAt(i + 1) == '$' || text.charAt(i + 1) == '/')) {
+                    i++;
+                    continue;
+                }
+                if (c == '/' && i + 1 < text.length() && text.charAt(i + 1) == '$') {
+                    return i + 1;
+                }
+            }
+            return text.length();
         }
         if (quote == '/') {
             // Groovy's slashy literals MAY span lines, so the closing slash is looked
@@ -1304,8 +1329,7 @@ public class KotlinStdlibAlignment {
                         || !isIdentifierChar(line.charAt(i - 1));
                 int after = i + configuration.length();
                 boolean endsToken = after < line.length()
-                        && (line.charAt(after) == ' ' || line.charAt(after) == '('
-                                || line.charAt(after) == '\t');
+                        && (isBlank(line.charAt(after)) || line.charAt(after) == '(');
                 if (startsToken && endsToken) {
                     return true;
                 }
@@ -1535,9 +1559,23 @@ public class KotlinStdlibAlignment {
                 // against it. The parenthesis depth is already back to zero there, so
                 // without this the closure lands in its own statement and the version
                 // it carries is never associated with the coordinate above it.
-                while (i + 1 < defined.size() && opensAClosure(defined.get(i + 1))) {
-                    i++;
+                // Past anything blank in between. A comment-only line leaves an empty
+                // statement behind it, and looking only at the very next one left the
+                // closure -- and the strict version inside it -- attached to nothing.
+                int next = i + 1;
+                while (next < defined.size() && defined.get(next).trim().length() == 0) {
+                    next++;
+                }
+                while (next < defined.size() && opensAClosure(defined.get(next))) {
+                    while (i < next) {
+                        i++;
+                    }
                     statement = statement + " " + defined.get(i);
+                    next = i + 1;
+                    while (next < defined.size()
+                            && defined.get(next).trim().length() == 0) {
+                        next++;
+                    }
                 }
                 int braces = trailingBraceBalance(statement);
                 while (braces > 0 && i + 1 < defined.size()) {
