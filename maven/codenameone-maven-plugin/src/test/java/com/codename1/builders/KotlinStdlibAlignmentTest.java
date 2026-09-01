@@ -564,6 +564,59 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Every spelling Gradle has for a force is a force. {@code force} is the
+     * method, {@code setForcedModules} its setter, {@code forcedModules} the
+     * property, and all three hold a module absolutely -- so all three leave
+     * these constraints raising the shims to empty jars beside a base library
+     * that stayed pre-merge.
+     */
+    @Test
+    public void everySpellingOfAForceIsAForce() {
+        String[] spellings = {
+            "    configurations.all { resolutionStrategy.force "
+                    + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22' }\n",
+            "    configurations.all { resolutionStrategy.setForcedModules("
+                    + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22') }\n",
+            "    configurations.all { resolutionStrategy.forcedModules = "
+                    + "['org.jetbrains.kotlin:kotlin-stdlib:1.7.22'] }\n",
+            "    configurations.all { resolutionStrategy.forcedModules="
+                    + "['org.jetbrains.kotlin:kotlin-stdlib:1.7.22'] }\n",
+        };
+        for (int i = 0; i < spellings.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    spellings[i]);
+            check("".equals(out),
+                    "the force is read from <<" + spellings[i] + ">>, got <<" + out + ">>");
+        }
+    }
+
+    /**
+     * A definition may interpolate an earlier one. Recorded as written, the
+     * version stayed the text {@code $v} -- no version, so below the floor,
+     * so the whole block suppressed for a project that was already
+     * merged-era and still had a duplicate to fix.
+     */
+    @Test
+    public void aDefinitionMayInterpolateAnEarlierOne() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def v = '1.9.22'\n"
+                + "    def dep = \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$v\"\n"
+                + "    implementation dep\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the sibling is still aligned, got <<" + out + ">>");
+        check(!out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and the merged-era declaration is left alone, got <<" + out + ">>");
+
+        // The same chain below the floor is still below it.
+        String old = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def v = '1.7.22'\n"
+                + "    def dep = \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$v\"\n"
+                + "    implementation dep\n");
+        check("".equals(old),
+                "a pre-merge chain still suppresses, got <<" + old + ">>");
+    }
+
+    /**
      * Line endings are not this class's business to have an opinion about. A
      * fragment written on Windows put a carriage return after
      * {@code strictly}, and the token-end test accepted only a space, a tab or

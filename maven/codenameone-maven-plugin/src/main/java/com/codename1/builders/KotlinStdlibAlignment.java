@@ -944,17 +944,38 @@ public class KotlinStdlibAlignment {
      * forced version is read exactly like a strict one.</p>
      */
     private static boolean callsForce(String statement) {
-        return callsNamed(statement, FORCE);
+        for (int i = 0; i < FORCE_SPELLINGS.length; i++) {
+            if (callsNamed(statement, FORCE_SPELLINGS[i], true)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private static final String FORCE = "force";
+    /**
+     * Gradle's spellings of the same thing. {@code force} is the method,
+     * {@code setForcedModules} its setter and {@code forcedModules} the
+     * property, and all three pin a module absolutely. This is a list of API
+     * names rather than a guess at syntax, which is why it can be one.
+     */
+    private static final String[] FORCE_SPELLINGS = {
+        "force",
+        "setForcedModules",
+        "forcedModules"
+    };
 
     private static boolean callsStrictly(String statement) {
-        return callsNamed(statement, STRICTLY);
+        return callsNamed(statement, STRICTLY, false);
     }
 
-    /** Whether {@code call} appears as a call, rather than inside a literal. */
-    private static boolean callsNamed(String statement, String call) {
+    /**
+     * Whether {@code call} appears as a call, rather than inside a literal.
+     *
+     * <p>{@code assigned} also accepts the property form, {@code name = ...},
+     * which only Gradle's forcedModules is written as. It is not offered to
+     * every caller because `def strictly = false` is not a strict pin.</p>
+     */
+    private static boolean callsNamed(String statement, String call, boolean assigned) {
         for (int i = 0; i < statement.length(); i++) {
             if (isLiteralStart(statement, i)) {
                 i = endOfStringLiteral(statement, i);
@@ -966,7 +987,8 @@ public class KotlinStdlibAlignment {
                 int after = i + call.length();
                 boolean endsToken = after < statement.length()
                         && (isBlank(statement.charAt(after))
-                                || statement.charAt(after) == '(');
+                                || statement.charAt(after) == '('
+                                || (assigned && statement.charAt(after) == '='));
                 if (startsToken && endsToken) {
                     return true;
                 }
@@ -1756,11 +1778,34 @@ public class KotlinStdlibAlignment {
                 && isLiteralStart(statement, i)) {
             int end = endOfStringLiteral(statement, i);
             if (end < statement.length()) {
-                literals.put(name, statement.substring(i, end + 1));
+                literals.put(name, expandedLiteral(statement, i, end, literals));
                 return;
             }
         }
         literals.remove(name);
+    }
+
+    /**
+     * The literal at {@code from}, with any definitions it interpolates already
+     * expanded.
+     *
+     * <p>A definition may refer to an earlier one --
+     * {@code def v = '1.8.0'; def dep = "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$v"}
+     * -- and storing it as written made the version the text {@code $v}, which
+     * reads as no version and therefore as below the floor, suppressing the
+     * block for a project that was already merged-era.</p>
+     *
+     * <p>The VALUE only. Expanding the whole statement first was tried and
+     * substituted the NAME being assigned as well, so an unreadable
+     * reassignment stopped forgetting the literal it replaced -- the same
+     * mistake in the opposite direction, and the suite said so.</p>
+     */
+    private static String expandedLiteral(String text, int from, int end,
+            Map<String, String> literals) {
+        String literal = text.substring(from, end + 1);
+        return text.charAt(from) == '"'
+                ? withInterpolationsExpanded(literal, literals)
+                : literal;
     }
 
     /** The statement with known definition names replaced by their literals. */
@@ -1868,7 +1913,7 @@ public class KotlinStdlibAlignment {
         if (i < body.length() && isLiteralStart(body, i)) {
             int end = endOfStringLiteral(body, i);
             if (end < body.length()) {
-                literals.put(name, body.substring(i, end + 1));
+                literals.put(name, expandedLiteral(body, i, end, literals));
             }
         }
     }
