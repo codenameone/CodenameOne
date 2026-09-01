@@ -112,11 +112,40 @@ public final class WizardDecisions {
         return "IOS_DISTRIBUTION";
     }
 
+    /// Whether a certificate of this type can sign a profile that requires `required`.
+    ///
+    /// Not an equality test, because Apple's generic "Apple Development" (DEVELOPMENT) and "Apple
+    /// Distribution" (DISTRIBUTION) types supersede the platform-specific ones and are valid
+    /// wherever those are. An account whose certificates came back from a reconcile holding only
+    /// those was told it had no compatible certificate at all and sent off to generate a
+    /// redundant one. isDevelopmentCertificate in the wizard already counts DEVELOPMENT as a
+    /// development certificate for both platforms, so this is the same reading applied to the
+    /// distribution half.
+    ///
+    /// Deliberately not a "kind" test: DEVELOPER_ID_APPLICATION and MAC_INSTALLER_DISTRIBUTION are
+    /// distribution certificates too, and neither can sign what the other is for. Only the two
+    /// generic types widen anything.
+    public static boolean certificateTypeSatisfies(String required, String certificateType) {
+        if (required == null || certificateType == null) {
+            return false;
+        }
+        if (required.equals(certificateType)) {
+            return true;
+        }
+        if ("DEVELOPMENT".equals(certificateType)) {
+            return "IOS_DEVELOPMENT".equals(required) || "MAC_APP_DEVELOPMENT".equals(required);
+        }
+        if ("DISTRIBUTION".equals(certificateType)) {
+            return "IOS_DISTRIBUTION".equals(required) || "MAC_APP_DISTRIBUTION".equals(required);
+        }
+        return false;
+    }
+
     public static List<SigningState.Certificate> compatibleCertificates(SigningState state, String profileType) {
         String required = requiredCertificateType(profileType);
         List<SigningState.Certificate> out = new ArrayList<SigningState.Certificate>();
         for (SigningState.Certificate c : state.certificates) {
-            if ("ACTIVE".equals(c.status()) && required.equals(c.certificateType())
+            if ("ACTIVE".equals(c.status()) && certificateTypeSatisfies(required, c.certificateType())
                     && c.appleCertId() != null && c.privateKeyPresent()) {
                 out.add(c);
             }
@@ -171,7 +200,8 @@ public final class WizardDecisions {
         String required = requiredCertificateType(profileType);
         List<SigningState.Certificate> out = new ArrayList<SigningState.Certificate>();
         for (SigningState.Certificate c : state.certificates) {
-            if ("ACTIVE".equals(c.status()) && required.equals(c.certificateType()) && c.appleCertId() != null) {
+            if ("ACTIVE".equals(c.status()) && certificateTypeSatisfies(required, c.certificateType())
+                    && c.appleCertId() != null) {
                 out.add(c);
             }
         }

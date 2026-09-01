@@ -160,6 +160,50 @@ class CertificateWizardModelTest {
         assertEquals(3, WizardDecisions.usableDevices(state, "MAC_APP_DEVELOPMENT").size());
     }
 
+    /// Apple Development and Apple Distribution supersede the platform-specific certificate types
+    /// and are valid wherever those are. An exact type match sent an account holding only those to
+    /// generate a redundant certificate. The widening stops there: two other certificate types are
+    /// also "distribution" and neither signs what the other is for.
+    @Test
+    void appleGenericCertificateTypesSatisfyTheirPlatformSpecificRequirement() {
+        assertTrue(WizardDecisions.certificateTypeSatisfies("IOS_DEVELOPMENT", "DEVELOPMENT"));
+        assertTrue(WizardDecisions.certificateTypeSatisfies("MAC_APP_DEVELOPMENT", "DEVELOPMENT"));
+        assertTrue(WizardDecisions.certificateTypeSatisfies("IOS_DISTRIBUTION", "DISTRIBUTION"));
+        assertTrue(WizardDecisions.certificateTypeSatisfies("MAC_APP_DISTRIBUTION", "DISTRIBUTION"));
+        assertTrue(WizardDecisions.certificateTypeSatisfies("IOS_DISTRIBUTION", "IOS_DISTRIBUTION"));
+
+        assertFalse(WizardDecisions.certificateTypeSatisfies("DEVELOPER_ID_APPLICATION", "DISTRIBUTION"),
+                "Developer ID is not what Apple Distribution replaced");
+        assertFalse(WizardDecisions.certificateTypeSatisfies("IOS_DISTRIBUTION", "MAC_INSTALLER_DISTRIBUTION"),
+                "an installer certificate signs an installer, not an app");
+        assertFalse(WizardDecisions.certificateTypeSatisfies("IOS_DISTRIBUTION", "DEVELOPMENT"));
+        assertFalse(WizardDecisions.certificateTypeSatisfies("IOS_DEVELOPMENT", "DISTRIBUTION"));
+        assertFalse(WizardDecisions.certificateTypeSatisfies(null, "DISTRIBUTION"));
+        assertFalse(WizardDecisions.certificateTypeSatisfies("IOS_DISTRIBUTION", null));
+    }
+
+    /// The picker and automatic setup read one predicate, so an account can never be offered a
+    /// certificate the automatic path would then refuse, or the other way round.
+    @Test
+    void aGenericCertificateReachesBothThePickerAndAutomaticSetup() {
+        long now = System.currentTimeMillis();
+        List<SigningState.Certificate> certs = new ArrayList<SigningState.Certificate>();
+        certs.add(new SigningState.Certificate(1L, "APPLE_GENERIC", "DISTRIBUTION",
+                "Apple Distribution", "SER1", now + 300L * 86400000L, "ACTIVE", true));
+        certs.add(new SigningState.Certificate(2L, "APPLE_INSTALLER", "MAC_INSTALLER_DISTRIBUTION",
+                "Mac Installer", "SER2", now + 300L * 86400000L, "ACTIVE", true));
+        SigningState state = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                certs, null, null, null, null, null);
+
+        List<SigningState.Certificate> offered = WizardDecisions.profileCertificateChoices(state, "IOS_APP_STORE");
+        assertEquals(1, offered.size());
+        assertEquals("APPLE_GENERIC", offered.get(0).appleCertId());
+
+        List<SigningState.Certificate> auto = WizardDecisions.compatibleCertificates(state, "IOS_APP_STORE");
+        assertEquals(1, auto.size());
+        assertEquals("APPLE_GENERIC", auto.get(0).appleCertId());
+    }
+
     /// A device selection outlives the profile type it was made under. Once the picker started
     /// hiding devices of the wrong platform, a stale selection became invisible AND still counted:
     /// canCreateProfile saw the requirement met and the request named iPhones in a Mac profile.
