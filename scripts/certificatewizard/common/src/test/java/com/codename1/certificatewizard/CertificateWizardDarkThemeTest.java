@@ -139,6 +139,19 @@ class CertificateWizardDarkThemeTest {
                     "DesktopHorizontalScroll"}) {
                 assertEquals("transparent", property(part, uiid, "background-color"),
                         scheme + " " + uiid + " track must not paint over the page");
+                // The track's padding is what sizes the bar, on the axis across it:
+                // getVerticalScrollWidth sums left and right, getHorizontalScrollHeight top and
+                // bottom. Zero on that axis is a bar with no thickness -- drawn, and impossible to
+                // grab -- which is what one rule shared by both axes produced.
+                String[] pad = property(part, uiid, "padding").trim().split("\\s+");
+                assertEquals(4, pad.length, scheme + " " + uiid + " padding needs all four sides");
+                boolean horizontal = uiid.contains("Horizontal");
+                String across = horizontal ? pad[0] : pad[1];
+                String along = horizontal ? pad[1] : pad[0];
+                assertTrue(millimetres(across) > 0,
+                        scheme + " " + uiid + " needs thickness on the axis across the bar");
+                assertEquals(0.0, millimetres(along), 0.0001,
+                        scheme + " " + uiid + " must not pad along the bar");
             }
             for (String uiid : new String[] {"ScrollThumb", "HorizontalScrollThumb", "DesktopScrollThumb",
                     "DesktopHorizontalScrollThumb"}) {
@@ -180,6 +193,14 @@ class CertificateWizardDarkThemeTest {
                     property(css, prefix + "CWSegmentSelected", "border").replaceAll("#[0-9A-Fa-f]{6}", ""),
                     prefix + "CWSegmentSelected must occupy the same box as " + prefix + "CWSegment");
         }
+    }
+
+    private static double millimetres(String value) {
+        String v = value.trim();
+        if (v.endsWith("mm")) {
+            return Double.parseDouble(v.substring(0, v.length() - 2).trim());
+        }
+        return Double.parseDouble(v);
     }
 
     private static int darkBlockStart(String css) {

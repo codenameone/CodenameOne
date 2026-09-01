@@ -910,9 +910,18 @@ DarkCWDarkToggle {
  * track with a BLACK thumb. On a dark page that reads as an inverted bar whose
  * empty part looks like the thumb, which is issue #5636.
  */
-Scroll, HorizontalScroll, DesktopScroll, DesktopHorizontalScroll {
+/* The track's padding is what SIZES the bar: getVerticalScrollWidth sums the left
+   and right, getHorizontalScrollHeight the top and bottom. One shared rule cannot
+   serve both -- giving the horizontal track the vertical one's padding left it
+   zero pixels high, present but impossible to grab. */
+Scroll, DesktopScroll {
     background-color: transparent;
     padding: 0 0.9mm 0 0.9mm;
+    margin: 0;
+}
+HorizontalScroll, DesktopHorizontalScroll {
+    background-color: transparent;
+    padding: 0.9mm 0 0.9mm 0;
     margin: 0;
 }
 ScrollThumb, HorizontalScrollThumb, DesktopScrollThumb, DesktopHorizontalScrollThumb {
@@ -948,9 +957,14 @@ CheckBox.selected {
 }
 
 @media (prefers-color-scheme: dark) {
-    Scroll, HorizontalScroll, DesktopScroll, DesktopHorizontalScroll {
+    Scroll, DesktopScroll {
         background-color: transparent;
         padding: 0 0.9mm 0 0.9mm;
+        margin: 0;
+    }
+    HorizontalScroll, DesktopHorizontalScroll {
+        background-color: transparent;
+        padding: 0.9mm 0 0.9mm 0;
         margin: 0;
     }
     ScrollThumb, HorizontalScrollThumb, DesktopScrollThumb, DesktopHorizontalScrollThumb {
