@@ -167,6 +167,30 @@ public class PlayBillingVersionsTest {
         check(src.contains("BillingClient.ProductType"), "it uses ProductType");
     }
 
+    /**
+     * BillingSupport is excluded from compilation in three places that each
+     * claim to mirror the other two -- the maven compiler plugin, the ant
+     * javac and the NetBeans project. Missing one is not a local mistake:
+     * the BuildDaemon CI builds this port with ant, so the maven exclusion
+     * alone left that build compiling the ProductDetails source against the
+     * billing 4.0.0 jar, which is how this was found.
+     */
+    @Test
+    public void everyBuildThatCompilesThePortExcludesBillingSupport() throws Exception {
+        String[] mirrors = {
+            "../android/pom.xml",
+            "../../Ports/Android/build.xml",
+            "../../Ports/Android/nbproject/project.properties",
+        };
+        for (String mirror : mirrors) {
+            byte[] bytes = java.nio.file.Files.readAllBytes(new java.io.File(mirror).toPath());
+            String src = new String(bytes, "UTF-8");
+            check(src.contains("com/codename1/impl/android/BillingSupport.java"),
+                    mirror + " still compiles BillingSupport; it needs a billing "
+                    + "dependency this tree does not carry");
+        }
+    }
+
     /** Java source with block and line comments removed. */
     private static String stripComments(String src) {
         StringBuilder out = new StringBuilder();
