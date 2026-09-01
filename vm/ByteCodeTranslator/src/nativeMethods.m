@@ -2077,6 +2077,7 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
     // malloc'd, not zeroed. The forced-stop scan guards on these being non-zero
     // before it marks [sp, base), so garbage here would pass that guard and hand
     // the conservative scan a bogus range.
+    i->gcStopFailures = 0;
     i->gcSigStackBase = 0;
     i->gcSigStackSize = 0;
     i->gcSigRegsLen = 0;

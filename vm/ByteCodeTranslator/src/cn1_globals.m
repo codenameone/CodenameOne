@@ -8539,9 +8539,24 @@ void cn1GcInstallSignalHandler(void) {
 
 // Signal-stop one thread, returning its captured SP (or 0 on failure/timeout). The
 // resolver snapshot MUST already be built (we do not realloc after the thread freezes).
-static char* cn1GcSignalStopOne(struct ThreadLocalData* t) {
+/* maySkip: whether this caller tolerates the unresponsive-thread throttle below. The
+   per-cycle native-stack scan does -- a thread it cannot stop is one it does not scan
+   either way. The FORCED-STOP ESCALATION does NOT: it retries every
+   CN1_GC_SAFEPOINT_WAIT_MAX_US precisely to ride out a transient or descheduled
+   handler, and throttling those retries would leave the collector waiting on
+   threadActive for tens of seconds, turning a recoverable timeout into the whole-VM
+   pause the escalation exists to prevent. */
+static char* cn1GcSignalStopOneImpl(struct ThreadLocalData* t, int maySkip) {
 #if !defined(_WIN32)
     if(!t->gcPthreadValid) return 0;
+    // SKIP a thread that has proved unresponsive rather than waiting on it again.
+    // Re-probe every 64th attempt so one that becomes responsive is picked back up.
+    if(maySkip && t->gcStopFailures >= 3) {
+        if(t->gcStopFailures < 1000000000) { t->gcStopFailures++; }
+        if((t->gcStopFailures & 63) != 0) {
+            return 0;
+        }
+    }
     // Next generation for this thread (only the GC thread writes it). gcSigRelease
     // is MONOTONIC and never reset -- see the handler's generation handshake.
     int gen = (int)t->gcSigStopGen + 1;
@@ -8558,6 +8573,9 @@ static char* cn1GcSignalStopOne(struct ThreadLocalData* t) {
         if((spins & 1023) == 0) usleep(50);
     }
     if((int)t->gcSigStopped != gen) {
+        // Counted only for the caller that can act on it: an escalation timeout says the
+        // thread was busy for 250ms, not that it never answers.
+        if(maySkip && t->gcStopFailures < 1000000) { t->gcStopFailures++; }
         // Abandon: the signal may still be pending, and the handler may ALREADY be
         // past its request gate about to park. PRE-RELEASE the generation so that
         // park (whenever it happens) exits immediately instead of spinning forever
@@ -8566,10 +8584,21 @@ static char* cn1GcSignalStopOne(struct ThreadLocalData* t) {
         t->gcSigStopRequest = 0;
         return 0;
     }
+    t->gcStopFailures = 0;      // answered: stop skipping it
     return (char*)t->gcSigStackPointer;
 #else
     return 0;
 #endif
+}
+
+/* Per-cycle native-stack scan: may skip a thread that has proved unresponsive. */
+static char* cn1GcSignalStopOne(struct ThreadLocalData* t) {
+    return cn1GcSignalStopOneImpl(t, 1);
+}
+
+/* Forced-stop escalation: never skips -- see the note on the impl. */
+static char* cn1GcSignalStopOneForEscalation(struct ThreadLocalData* t) {
+    return cn1GcSignalStopOneImpl(t, 0);
 }
 
 static void cn1GcSignalReleaseOne(struct ThreadLocalData* t) {
@@ -8619,9 +8648,11 @@ static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t) {
     // decline). Sized well above one thread's plausible adoption count per cycle.
     cn1GcAdoptReserve(16384);
 #endif
-    if(cn1GcSignalStopOne(t) == 0) {
-        // Timed out. cn1GcSignalStopOne has already pre-released the generation, so
-        // nothing is left stranded.
+    if(cn1GcSignalStopOneForEscalation(t) == 0) {
+        // Timed out. cn1GcSignalStopOneImpl has already pre-released the generation,
+        // so nothing is left stranded. This caller does NOT skip on repeated timeouts
+        // -- see the maySkip note on the impl -- so the CN1_GC_SAFEPOINT_WAIT_MAX_US
+        // (250ms) retry loop above keeps signalling until the thread answers.
         return JAVA_FALSE;
     }
 #ifdef CN1_NURSERY

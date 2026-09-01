@@ -1368,6 +1368,12 @@ struct ThreadLocalData {
     volatile sig_atomic_t gcSigStopped;     // handler publishes the gen it parked for
     volatile sig_atomic_t gcSigRelease;     // GC publishes highest released gen (monotonic)
     volatile sig_atomic_t gcSigStopGen;     // generation counter (GC thread writes only)
+    /* Consecutive cn1GcSignalStopOne timeouts for this thread. A thread that never
+       answers the stop signal is not scanned either way -- the caller returns without
+       reading its stack -- so signalling it at all, and then waiting, buys nothing.
+       One such thread cost 267ms of a 280ms mark, every cycle. Stop attempting it once
+       it has proved unresponsive, and clear this the moment it answers. */
+    int gcStopFailures;
     void* volatile gcSigStackPointer;        // SP captured inside the signal handler
     // [sp,base) high bound and stack size, resolved BEFORE a forced freeze and reused
     // while it is held. cn1GcStackBase must not be called under one: it is two plain
