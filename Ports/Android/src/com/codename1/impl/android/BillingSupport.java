@@ -205,14 +205,15 @@ public class BillingSupport implements IBillingSupport {
     /// The price to show for a product, as the old {@code SkuDetails.getPrice()} did.
     ///
     /// The ProductDetails API has no single price, because a product carries offers and
-    /// a subscription's offer carries pricing phases. A one-time product has one offer;
+    /// a subscription's offer carries pricing phases. A one-time product is quoted at
+    /// the offer {@link #selectedOneTimeOffer} picks, which is the same offer the
+    /// purchase flow launches, so the price shown is the price charged;
     /// a subscription is quoted at the first phase of its first offer, which is the
     /// introductory price when there is one and the recurring price otherwise. Returns
     /// null rather than a fabricated string when Play sends neither, so a caller shows
     /// no price instead of a wrong one.
     private static String formattedPrice(ProductDetails details) {
-        ProductDetails.OneTimePurchaseOfferDetails oneTime =
-                details.getOneTimePurchaseOfferDetails();
+        ProductDetails.OneTimePurchaseOfferDetails oneTime = selectedOneTimeOffer(details);
         if (oneTime != null) {
             return oneTime.getFormattedPrice();
         }
@@ -251,18 +252,34 @@ public class BillingSupport implements IBillingSupport {
             }
             return emptyToNull(offers.get(0).getOfferToken());
         }
+        ProductDetails.OneTimePurchaseOfferDetails oneTime = selectedOneTimeOffer(details);
+        return oneTime == null ? null : emptyToNull(oneTime.getOfferToken());
+    }
+
+    /// The one-time offer this build both quotes and buys.
+    ///
+    /// Chosen once, and used for the price as well as the token, because those two
+    /// answers have to come from the same offer. Reading the default offer for the
+    /// price while the flow launched the first tokenized offer from the list showed
+    /// the user one price and charged another.
+    ///
+    /// The default offer wins when Play sends one: it is what buying with no token
+    /// selects, and what the removed setSkuDetails call would have bought. Only when
+    /// there is no default -- a product configured with offers and no base -- does the
+    /// list decide, and then the same entry supplies both answers.
+    private static ProductDetails.OneTimePurchaseOfferDetails selectedOneTimeOffer(
+            ProductDetails details) {
         ProductDetails.OneTimePurchaseOfferDetails preferred =
                 details.getOneTimePurchaseOfferDetails();
-        if (preferred != null && emptyToNull(preferred.getOfferToken()) != null) {
-            return preferred.getOfferToken();
+        if (preferred != null) {
+            return preferred;
         }
         List<ProductDetails.OneTimePurchaseOfferDetails> offers =
                 details.getOneTimePurchaseOfferDetailsList();
         if (offers != null) {
             for (ProductDetails.OneTimePurchaseOfferDetails offer : offers) {
-                String token = offer == null ? null : emptyToNull(offer.getOfferToken());
-                if (token != null) {
-                    return token;
+                if (offer != null) {
+                    return offer;
                 }
             }
         }
