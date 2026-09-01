@@ -261,6 +261,13 @@ Or, if the provider exposes a discovery document:
 
 `OidcTokens#toAccessToken()` returns a `com.codename1.io.AccessToken`, so callers that already deal in `AccessToken` (most subclasses of `com.codename1.social.Login`) can adopt `OidcClient` without changing their token type.
 
+[[verifying-a-phone-number]]
+=== Verifying a phone number
+
+Signing a user in by phone number is a flow of its own rather than an OpenID Connect one: your server sends a code to the number and checks the code the user types back, and the device's part is entering the number, entering the code, and letting the platform offer the code out of the arriving message so the user never types it.
+
+`com.codename1.components.PhoneVerification` is that screen, and `com.codename1.ui.TextArea#ONE_TIME_CODE` is the hint that makes the platform offer the code without any messaging permission. See <<Phone Number Verification>>.
+
 === A universal sign-in demo
 
 A complete sample is included under `samples/UniversalSignInDemo` in the repository. It renders one button per provider (Apple, Google, Microsoft, Facebook, Auth0, Firebase, generic OIDC) and dumps the resulting tokens to a `TextArea` so you can inspect them. See its `README.md` for the credentials wiring.

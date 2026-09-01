@@ -40,6 +40,11 @@
 @property (nonatomic) UITextSpellCheckingType spellCheckingType;
 @property (nonatomic, getter=isSecureTextEntry) BOOL secureTextEntry;
 @property (nonatomic) BOOL multiline;
+/// What the field holds, when that is something the platform can offer to fill: a one-time
+/// code from an arriving message, currently. Typed as NSString rather than UITextContentType
+/// so the declaration carries no availability of its own -- the value is what is guarded, and
+/// a deployment target older than the constant simply never assigns one.
+@property (nonatomic, copy) NSString *textContentType;
 /// The TextInputConfig.ACTION_* code delivered through tiEditorAction when Return is pressed on a
 /// single line field.
 @property (nonatomic) int actionType;

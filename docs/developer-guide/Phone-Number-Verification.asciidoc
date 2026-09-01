@@ -1,0 +1,168 @@
+== Phone Number Verification
+
+Signing a user in by phone number, or proving that a number they typed is theirs, is the same two steps everywhere: send a code to the number, then check the code they type back. This chapter covers the device half of that -- entering the number, entering the code, and letting the platform hand the code over so the user never types it.
+
+=== Who does what
+
+Codename One doesn't send the message. The service that does is yours, and which one you use (Twilio, Vonage, AWS SNS, Firebase Phone Auth, your own SMPP gateway) is a decision the framework has no part in. It also doesn't judge a code: the code exists on your server, and a client that could check it could also be persuaded to lie.
+
+[cols="1,1"]
+|===
+| Your server | Codename One
+
+| Generates the code, sends the message, expires it, rate limits it
+| Collects the number in E.164 form
+
+| Decides whether a submitted code is correct
+| Collects the code, and accepts the one the platform offers
+
+| Issues whatever session or token follows
+| Owns the screen: the two stages, the resend wait, the way back to a mistyped number, and the errors your server reports
+|===
+
+=== Quick start
+
+`com.codename1.components.PhoneVerification` is the whole screen. You supply the two server calls:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PhoneNumberVerificationJava001Snippet.java[tag=phone-number-verification-java-001,indent=0]
+----
+
+That's a working verification screen. It starts on the number, moves to the code once your server accepts the number, submits the code as soon as the last box is filled, and reports the result.
+
+=== The code arrives by itself
+
+The field the code goes into carries `com.codename1.ui.TextArea#ONE_TIME_CODE`. The constraint has no behaviour of its own -- it's a statement about what the field holds, and it's what makes the platform offer the arriving code:
+
+[cols="1,2"]
+|===
+| Platform | What the hint buys
+
+| iOS
+| The keyboard's suggestion bar offers the code from Messages, above the number pad.
+
+| Android
+| The autofill service offers the code from the SMS on the field.
+
+| Web
+| The input is marked `one-time-code`, which is what a password manager matches on, and what puts the code in iOS Safari's suggestion bar.
+
+| Desktop and everywhere else
+| Nothing changes. The user types the code.
+|===
+
+None of these routes reads messages, and none asks for a messaging permission. Your application says what the field is for; the platform decides what to offer, and the user decides whether to accept it.
+
+WARNING: A field without the hint is offered nothing, on every platform. The only alternative left is reading the SMS yourself, which on Android means holding `READ_SMS` -- a permission Google Play restricts to applications whose core function is messaging, and one that has sunk more than one app review.
+
+The constraint is worth setting on any field of your own that holds a code, even outside this flow:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PhoneNumberVerificationJava002Snippet.java[tag=phone-number-verification-java-002,indent=0]
+----
+
+=== The code field
+
+`com.codename1.components.OtpField` draws the code one box per digit and tells you when it's complete:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PhoneNumberVerificationJava003Snippet.java[tag=phone-number-verification-java-003,indent=0]
+----
+
+`getText()` returns what has been entered so far, `isComplete()` says whether every box is filled, `clear()` empties the field and puts the caret back at the start, and `startEditing()` opens the keyboard, which saves the user a tap on a screen that exists for one purpose.
+
+The boxes are drawn, and one field behind them holds the whole code. That's what lets an offered code land in a single step, and it's not an implementation detail you can ignore if you build your own: a code is one value, both mobile ports enforce a field's maximum length as a hard native filter, and a six-character code offered to a row of one-character fields is truncated to its first digit. `getBox(int)` returns the box that displays a character, for theming; the value is read and written through the field.
+
+=== Entering the number
+
+`com.codename1.components.PhoneNumberField` pairs a country selector with a number field and produces one E.164 string -- a leading `+`, the calling code, then the national number, digits only:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PhoneNumberVerificationJava004Snippet.java[tag=phone-number-verification-java-004,indent=0]
+----
+
+It starts on the country the device reports and offers every calling code in a searchable list. An application that serves three countries has no reason to show two hundred, and one that already knows the number can set it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PhoneNumberVerificationJava005Snippet.java[tag=phone-number-verification-java-005,indent=0]
+----
+
+Country names are English, and each is looked up in the theme's resource bundle first under `Country.` plus the ISO 3166 code, so an application that ships translations gets them without replacing the list.
+
+Two things the field doesn't do, by design:
+
+* **It doesn't strip a national trunk prefix.** A leading `0` is a trunk prefix in Israel and part of the number in Italy, and telling them apart is a per-country rule this field doesn't carry. Users type their number the way they know it; your sending service normalizes.
+* **It doesn't decide a number exists.** `isValid()` checks the shape -- a national part that's present and short enough to keep the whole number inside E.164's fifteen digits -- and that's all a client can check. The service that sends the message is the authority, and its refusal reaches the user like any other failure.
+
+Several countries share a calling code: `+1` covers the United States, Canada and much of the Caribbean, which the North American area code tells apart and this field doesn't. `setE164` keeps the country already selected when its code matches, and otherwise takes the first country listed for that code.
+
+=== The flow in detail
+
+Each server call is handed a `PhoneVerification.Response` and calls exactly one of `succeeded()` or `failed(String)` when the server answers. Either may be called from any thread, so a callback on a networking thread needs no hop of its own.
+
+Three behaviours are worth knowing, because they're the ones that get rewritten by hand on every verification screen:
+
+* **A request in flight disables the button that started it,** so a second tap can't send a second message. It's re-enabled when the response arrives.
+* **A second answer to the same request is ignored** rather than rejected. A server wrapper that answers twice on a retry is a nuisance, not a reason to leave a screen stuck.
+* **An answer to a request the user has moved past is dropped.** If they gave up waiting, went back, corrected the number and sent again, the first server's answer no longer describes the screen they're looking at, and applying it would move them somewhere they didn't ask to go.
+
+A failure message you pass to `failed(String)` is shown to the user as-is, so it should be something a user can act on; passing null shows a generic message instead. `addFailedListener` reports the same failures to your code, for counting attempts or logging them.
+
+Resend is held back for `setResendDelay(int)` seconds -- 60 by default -- with the remaining time shown on the button. Zero offers it at once.
+
+You don't have to use the built-in buttons. `requestCode(String)`, `submitCode()`, `showCodeStage(String)` and `showNumberStage()` are public, so a screen with its own layout can drive the same flow, and an application that sent the message itself can start at the second stage:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PhoneNumberVerificationJava006Snippet.java[tag=phone-number-verification-java-006,indent=0]
+----
+
+=== Talking to your server
+
+The two callbacks are where your API lives. A typical pair over REST:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PhoneNumberVerificationJava007Snippet.java[tag=phone-number-verification-java-007,indent=0]
+----
+
+A few things belong on the server side of that boundary rather than in the app:
+
+* Rate limit by number and by device. An unthrottled send endpoint is a way to bill you for somebody else's messages.
+* Expire codes, and cap attempts per code. A six-digit code is a million guesses, which isn't many.
+* Never return the code to the client, in any field, for any reason.
+* Treat the number as unverified until your own check passes. The client says what the user typed, and a client can be modified.
+
+=== Trying it without a device
+
+In the simulator and on the desktop ports the hint changes nothing -- no message is arriving, so nothing is offered and the code is typed. Everything else works there: the stages, the countdown, the errors, and the field itself.
+
+`Samples/samples/PhoneVerificationSample` runs the whole flow against a fake server that accepts any number and one code, so the screen can be driven without a backend. On a device it's also how to exercise the platform's offer: send yourself a message with a code in it while the second stage is showing.
+
+=== Styling
+
+|===
+| UIID | Applies to
+
+| `OtpField`
+| The code field as a whole.
+
+| `OtpDigit`
+| One box of the code.
+
+| `PhoneNumberField`, `PhoneNumberCountry`, `PhoneNumberText`
+| The number entry, its country selector and its number field.
+
+| `PhoneVerification`, `PhoneVerificationText`, `PhoneVerificationError`
+| The flow, its explanatory line and its error line.
+
+| `PhoneVerificationButton`, `PhoneVerificationLink`
+| The send and verify buttons, and the resend and change-number buttons.
+|===
+
+The shipped native themes style these. A theme of your own that doesn't define `OtpDigit` gets the theme's default component style for the boxes, which is seldom what you want -- derive it from `TextField`.

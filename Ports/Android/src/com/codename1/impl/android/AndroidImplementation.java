@@ -402,6 +402,167 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return activeInputClient != null;
     }
 
+    /// The Android autofill hint for a one-time code, spelled out rather than referenced as
+    /// `View.AUTOFILL_HINT_SMS_OTP` because the constant is newer than the SDK this port
+    /// compiles against. The string is the contract: it is what an autofill service matches on.
+    private static final String AUTOFILL_HINT_SMS_OTP = "smsOTPCode";
+
+    /// What the platform may fill into the currently bound field, or null when it is not a field
+    /// the platform can fill.
+    ///
+    /// Only the one-time code is offered. The rendering surface is a single view standing in for
+    /// whichever field is being edited, so claiming a hint puts the whole surface forward as that
+    /// kind of field -- true only while the code field holds the session, which is why the hint is
+    /// applied when a session starts and dropped when it ends.
+    private static String[] editorAutofillHints() {
+        com.codename1.ui.TextInputConfig cfg = activeInputConfig;
+        if (cfg != null && (cfg.getConstraint() & com.codename1.ui.TextArea.ONE_TIME_CODE) != 0) {
+            return new String[]{AUTOFILL_HINT_SMS_OTP};
+        }
+        return null;
+    }
+
+    /// Puts the surface forward as an autofillable field, or withdraws it, to match the field the
+    /// input session is bound to. Called on the UI thread as a session starts and stops.
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the rendering view
+    ///
+    /// - `sessionActive`: true while a client is bound
+    static void updateEditorAutofill(android.view.View v, boolean sessionActive) {
+        if (v == null || android.os.Build.VERSION.SDK_INT < 26) {
+            return;
+        }
+        android.view.autofill.AutofillManager afm =
+                (android.view.autofill.AutofillManager) v.getContext()
+                        .getSystemService(android.view.autofill.AutofillManager.class);
+        String[] hints = sessionActive ? editorAutofillHints() : null;
+        if (hints == null) {
+            v.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_NO);
+            v.setAutofillHints((String[]) null);
+            if (afm != null) {
+                afm.notifyViewExited(v);
+            }
+            return;
+        }
+        v.setAutofillHints(hints);
+        v.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_YES);
+        if (afm != null) {
+            // the session only starts once the framework is told the view was entered; a view
+            // that merely carries hints is never offered anything
+            afm.notifyViewEntered(v);
+        }
+    }
+
+    /// Applies a value the platform filled in, replacing whatever the field held. Called by the
+    /// rendering view on the UI thread; the edit itself belongs to the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value the autofill service supplied
+    ///
+    /// #### Returns
+    ///
+    /// true when the value was taken
+    static boolean autofillEditor(android.view.autofill.AutofillValue value) {
+        final com.codename1.ui.TextInputClient client = activeInputClient;
+        if (client == null || value == null || !value.isText()) {
+            return false;
+        }
+        // Only into a field that asked for this. The hint lives on the surface and is put
+        // there and taken away on Android's UI thread, while the session it describes changes
+        // on the EDT, so for a moment after the user moves from a code field to an ordinary
+        // one the view still advertises smsOTPCode while the session behind it is something
+        // else. A fill delivered in that gap would otherwise land a code in whatever the user
+        // tapped into. Asking what the CURRENT session advertises closes it: the answer is
+        // read from the same field the identity check below uses.
+        if (editorAutofillHints() == null) {
+            return false;
+        }
+        com.codename1.ui.Display.getInstance().callSerially(
+                new ApplyAutofilledText(client, value.getTextValue().toString()));
+        return true;
+    }
+
+    /// Named rather than anonymous on purpose. An anonymous class here takes a number from the
+    /// same sequence as every other one in this file, so adding one renumbers the ones below it
+    /// and the cast-semantics baseline stops matching methods nobody touched.
+    private static final class ApplyAutofilledText implements Runnable {
+        private final com.codename1.ui.TextInputClient client;
+        private final String text;
+
+        ApplyAutofilledText(com.codename1.ui.TextInputClient client, String text) {
+            this.client = client;
+            this.text = text;
+        }
+
+        public void run() {
+            // The session may be gone: the platform fills on the UI thread and this runs a hop
+            // later on the EDT, and in between the user can have moved to another field or left
+            // the screen. Applying it then would edit a field nothing is bound to any more and
+            // fire its listeners -- and an OtpField's completion listener submits a code, so a
+            // late fill would verify one for a flow the user has already left. The rest of this
+            // bridge guards its callbacks the same way.
+            if (client != activeInputClient || editorAutofillHints() == null) {
+                return;
+            }
+            // A filled value replaces the field rather than being inserted at the caret: the
+            // platform is answering "the value is this", not typing into what is there. It
+            // still arrives as a commit rather than a raw range replacement, because a field
+            // filters what it accepts and a filled value has no more right to bypass that
+            // than a typed one -- an OTP field asked for six digits and can be handed
+            // "123-456" by an autofill service that kept the separator, and a replacement
+            // would leave the field holding a value it would never have let anyone type,
+            // never reaching the length that completes it.
+            // Ending any composition first. A commit replaces the composed range in
+            // preference to the selection, so selecting the whole field is not enough to
+            // replace the whole field while an input method is mid-word: the filled value
+            // would land inside the composition and leave whatever surrounded it, which
+            // for a code field means a full-length wrong code that submits itself.
+            client.finishComposing();
+            client.setSelectionRange(0, client.getTextLength());
+            client.commitText(text);
+        }
+    }
+
+    /// The value the platform should see for the bound field, or null when nothing is bound.
+    ///
+    /// Answered from the state snapshot rather than the editor itself. This runs on Android's UI
+    /// thread whenever an autofill service asks what the field holds, while the document belongs
+    /// to the EDT, and reading a length and then a range out of a document another thread is
+    /// editing is two reads of something that can change in between. Clamped offsets would not
+    /// rescue it either, since the buffer underneath can be restructured mid-read. The snapshot
+    /// is immutable and is what the rest of this bridge already uses to answer the platform
+    /// across that boundary; a value one edit out of date is the correct trade against a crash
+    /// inside somebody else's autofill query.
+    static android.view.autofill.AutofillValue editorAutofillValue() {
+        // Read the state AFTER the guards and confirm the session did not move under it.
+        // The three fields are assigned separately on the EDT, so taking the state first
+        // and validating afterwards can pair one field's text with the next field's
+        // configuration -- and the pairing that matters is a password field's text with a
+        // code field's hint. One session snapshot would express this better than three
+        // fields and a re-check, but that is the whole input bridge's shape rather than
+        // this method's, and the property needed here is only that nothing is returned
+        // for a session other than the one that was checked.
+        //
+        // Gated the same way the write path is, and for a sharper reason: between the EDT
+        // moving to another field and the UI thread taking the hint off the view, the
+        // surface still looks like a code field over a session that is something else --
+        // and answering this query then would hand that field's text to an SMS autofill
+        // service. The field after a code field is as likely to be a password as anything.
+        com.codename1.ui.TextInputClient client = activeInputClient;
+        if (client == null || editorAutofillHints() == null) {
+            return null;
+        }
+        com.codename1.ui.TextInputState state = activeInputState;
+        if (state == null || client != activeInputClient) {
+            return null;
+        }
+        String text = state.getText();
+        return android.view.autofill.AutofillValue.forText(text == null ? "" : text);
+    }
+
     private static void configureEditorInfo(android.view.inputmethod.EditorInfo editorInfo, com.codename1.ui.TextInputConfig cfg) {
         int constraint = cfg == null ? 0 : cfg.getConstraint();
         int inputType;
@@ -449,6 +610,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (!password && cfg != null && cfg.isAutoCapitalize()) {
                 inputType |= android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;
             }
+        }
+        if ((constraint & com.codename1.ui.TextArea.ONE_TIME_CODE) != 0 && text) {
+            // a code is not a word: prediction would offer completions for it and, worse, learn it
+            inputType |= android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
         }
         editorInfo.inputType = inputType;
         editorInfo.imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI;
@@ -521,6 +686,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     imm.restartInput(v);
                     imm.showSoftInput(v, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
                 }
+                updateEditorAutofill(v, true);
             }
         });
         return client;
@@ -579,6 +745,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     imm.hideSoftInputFromWindow(view.getAndroidView().getWindowToken(), 0);
                     imm.restartInput(view.getAndroidView());
                 }
+                updateEditorAutofill(view.getAndroidView(), false);
             }
         });
     }

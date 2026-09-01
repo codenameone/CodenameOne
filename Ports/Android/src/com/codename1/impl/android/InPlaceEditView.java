@@ -192,6 +192,79 @@ public class InPlaceEditView extends FrameLayout{
     private boolean hasConstraint(int inputType, int constraint) {
         return ((inputType & constraint) == constraint);
     }
+
+    /// The Android autofill hint for a one-time code. Spelled out rather than referenced as
+    /// `View.AUTOFILL_HINT_SMS_OTP`, which is newer than the SDK this port compiles against; the
+    /// string is the contract an autofill service matches on.
+    private static final String AUTOFILL_HINT_SMS_OTP = "smsOTPCode";
+
+    /// Whether the field this editor last opened was a one-time code, so that a change of
+    /// purpose on a reused native field can be told to the autofill framework and an
+    /// unchanged one can be left alone.
+    private boolean lastWasOneTimeCode;
+
+    /// Tells the platform whether this field holds a code that arrived by message, which is what
+    /// makes an autofill service offer that code on it. A field without the hint is offered
+    /// nothing, and the application would be left reading SMS itself to fill it -- with the
+    /// permission that implies. Suggestions are turned off with it: a code is not a word, and
+    /// predictive input has no business learning one.
+    ///
+    /// Set AND cleared, because the native field outlives the Codename One field it is editing.
+    /// Tapping from one field straight into another reuses this same EditText through
+    /// switchToTextArea rather than building a new one, so a hint left behind by a code field
+    /// would still be on the view when the next field opens, and the platform would offer the
+    /// next arriving code to whatever the user tapped into. Clearing restores what a freshly
+    /// constructed EditText carries: no hints, and AUTO rather than NO -- an ordinary field is
+    /// autofillable, and turning that off here would stop a password manager filling the
+    /// username and password fields it is the whole point of.
+    ///
+    /// The input type needs no such undo: it is recomputed and assigned in full above rather
+    /// than amended, so the no-suggestions flag cannot survive into the next field.
+    ///
+    /// #### Parameters
+    ///
+    /// - `edit`: the native field being opened
+    ///
+    /// - `codenameOneInputType`: the Codename One constraint the field carries
+    private void updateOneTimeCodeHint(AutoCompleteTextView edit, int codenameOneInputType) {
+        boolean oneTimeCode = hasConstraint(codenameOneInputType, TextArea.ONE_TIME_CODE);
+        if (oneTimeCode) {
+            edit.setInputType(edit.getInputType() | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        }
+        if (android.os.Build.VERSION.SDK_INT < 26) {
+            return;
+        }
+        if (oneTimeCode) {
+            edit.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_YES);
+            edit.setAutofillHints(new String[]{AUTOFILL_HINT_SMS_OTP});
+        } else {
+            edit.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_AUTO);
+            edit.setAutofillHints((String[]) null);
+        }
+        // And tell the autofill framework, because setting the hints does not.
+        //
+        // The session is opened when the view is entered, which is the focus call further
+        // down this method -- before this point on a new field, and not at all on a reused
+        // one, since tapping from one Codename One field straight into another keeps the
+        // same EditText and merely re-points it. Either way the session was opened while
+        // the view described the previous field, so a code field would be offered nothing
+        // and the field after a code field would be offered the code. Leaving and
+        // re-entering re-opens it against what the view says now.
+        //
+        // Only when the purpose actually changed: re-entering on every field open would
+        // restart sessions that are working, which is how a password manager loses track
+        // of the pair it was filling.
+        if (lastWasOneTimeCode != oneTimeCode) {
+            android.view.autofill.AutofillManager afm =
+                    (android.view.autofill.AutofillManager) edit.getContext()
+                            .getSystemService(android.view.autofill.AutofillManager.class);
+            if (afm != null) {
+                afm.notifyViewExited(edit);
+                afm.notifyViewEntered(edit);
+            }
+        }
+        lastWasOneTimeCode = oneTimeCode;
+    }
     private boolean isNonPredictive(int inputType) {
         return hasConstraint(inputType, TextArea.NON_PREDICTIVE) || hasConstraint(inputType, TextArea.SENSITIVE);
     }
@@ -997,6 +1070,8 @@ public class InPlaceEditView extends FrameLayout{
             mEditText.setInputType(type | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
             mEditText.setTransformationMethod(new MyPasswordTransformationMethod());
         }
+
+        updateOneTimeCodeHint(mEditText, codenameOneInputType);
 
         int maxLength = textArea.maxSize;
         InputFilter[] FilterArray = new InputFilter[1];

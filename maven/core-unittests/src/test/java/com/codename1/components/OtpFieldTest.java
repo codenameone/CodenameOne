@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -24,7 +24,16 @@ package com.codename1.components;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.EditField;
+import com.codename1.ui.Container;
+import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextInputConfig;
+import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
@@ -33,10 +42,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Exercises {@link OtpField} through its public API: construction guards,
- * value get/set, box structure, the auto-advance / backspace editing logic,
- * paste distribution and the completion-listener firing. All driven on the
- * EDT (via {@link FormTest}) since the boxes call {@code startEditingAsync}.
+ * Exercises {@link OtpField} through its public API: construction guards, the
+ * value, the boxes that display it, and the single field that owns it --
+ * including the path a platform-offered code takes, which is the reason the
+ * whole code lands in one field rather than one character per box.
  */
 class OtpFieldTest extends UITestBase {
 
@@ -46,7 +55,7 @@ class OtpFieldTest extends UITestBase {
     void defaultConstructorIsSixNumericBoxes() {
         OtpField f = new OtpField();
         assertEquals(6, f.getLength());
-        assertEquals(6, f.getComponentCount());
+        assertTrue(f.isNumericOnly());
         assertEquals("OtpField", f.getUIID());
         assertEquals("OtpDigit", f.getBox(0).getUIID());
     }
@@ -55,20 +64,9 @@ class OtpFieldTest extends UITestBase {
     void lengthConstructorHonoursLength() {
         OtpField f = new OtpField(4);
         assertEquals(4, f.getLength());
-        assertEquals(4, f.getComponentCount());
         for (int i = 0; i < 4; i++) {
             assertNotNull(f.getBox(i));
-            assertSame(f.getBox(i), f.getComponentAt(i));
         }
-    }
-
-    @FormTest
-    void numericConstructorAppliesNumericConstraint() {
-        OtpField numeric = new OtpField(4, true);
-        assertEquals(TextField.NUMERIC, numeric.getBox(0).getConstraint());
-
-        OtpField anyChar = new OtpField(4, false);
-        assertEquals(0, anyChar.getBox(0).getConstraint());
     }
 
     @FormTest
@@ -85,6 +83,32 @@ class OtpFieldTest extends UITestBase {
     void boundaryLengthsAreAccepted() {
         assertEquals(2, new OtpField(2).getLength());
         assertEquals(16, new OtpField(16).getLength());
+    }
+
+    // ---- the hint that makes the platform offer the code -------------
+
+    @FormTest
+    void inputCarriesTheOneTimeCodeHint() {
+        EditField input = new OtpField(6).getInputField();
+        assertNotEquals(0, input.getConstraint() & TextArea.ONE_TIME_CODE,
+                "without the hint no platform offers the code from the SMS");
+        assertNotEquals(0, input.getConstraint() & TextArea.NUMERIC);
+    }
+
+    @FormTest
+    void nonNumericFieldStillCarriesTheHint() {
+        EditField input = new OtpField(6, false).getInputField();
+        assertNotEquals(0, input.getConstraint() & TextArea.ONE_TIME_CODE);
+        assertEquals(0, input.getConstraint() & TextArea.NUMERIC);
+    }
+
+    @FormTest
+    void theKeyboardIsNotAllowedToCorrectOrCapitaliseTheCode() {
+        // the platform applies both before the value ever reaches the field, so a
+        // corrected code is a code the user typed correctly and the server rejects
+        TextInputConfig cfg = new OtpField(6, false).getInputField().getConfig();
+        assertFalse(cfg.isAutoCorrect());
+        assertFalse(cfg.isAutoCapitalize());
     }
 
     // ---- value get / set --------------------------------------------
@@ -115,7 +139,7 @@ class OtpFieldTest extends UITestBase {
     }
 
     @FormTest
-    void setTextNullClearsAllBoxes() {
+    void setTextNullClears() {
         OtpField f = new OtpField(4);
         f.setText("1234");
         f.setText(null);
@@ -123,12 +147,10 @@ class OtpFieldTest extends UITestBase {
     }
 
     @FormTest
-    void getTextOmitsEmptyBoxesForPartialEntry() {
-        OtpField f = new OtpField(6);
-        f.getBox(0).setText("9");
-        f.getBox(2).setText("7");
-        // boxes 1, 3, 4, 5 left empty -> concatenation skips them
-        assertEquals("97", f.getText());
+    void setTextDropsCharactersTheFieldDoesNotAccept() {
+        OtpField f = new OtpField(4);
+        f.setText("1a2b3c4d");
+        assertEquals("1234", f.getText());
     }
 
     @FormTest
@@ -137,49 +159,45 @@ class OtpFieldTest extends UITestBase {
         f.setText("424242");
         f.clear();
         assertEquals("", f.getText());
+        assertEquals("", f.getBox(0).getText());
+        assertFalse(f.isComplete());
     }
 
-    // ---- editing behaviour (data-changed driven) --------------------
+    @FormTest
+    void setTextLeavesTheCaretAfterTheLastCharacter() {
+        OtpField f = new OtpField(6);
+        f.setText("12");
+        assertEquals(2, f.getInputField().getCaretOffset(),
+                "typing continues after what was set, not in front of it");
+    }
+
+    // ---- typing, pasting, and a code the platform offers -------------
 
     @FormTest
-    void typingSingleCharAdvancesAndFinalKeyCompletes() {
+    void typingOneDigitAtATimeFillsTheBoxesInOrder() {
         OtpField f = new OtpField(3);
+        EditField input = f.getInputField();
+        input.insertText("1");
+        assertEquals("1", f.getBox(0).getText());
+        assertEquals("", f.getBox(1).getText());
+        input.insertText("2");
+        input.insertText("3");
+        assertEquals("123", f.getText());
+        assertEquals("3", f.getBox(2).getText());
+    }
+
+    @FormTest
+    void wholeCodeArrivingAtOnceFillsEveryBox() {
+        // this is the platform offering the code out of the SMS, and it is also
+        // a paste: both arrive as one commit of the whole value
+        OtpField f = new OtpField(6);
         AtomicInteger fired = new AtomicInteger();
         f.addCompleteListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
                 fired.incrementAndGet();
             }
         });
-        // Type one digit at a time; each setText triggers the DataChangedListener.
-        f.getBox(0).setText("1");
-        f.getBox(1).setText("2");
-        assertEquals(0, fired.get(), "must not fire until the last box is filled");
-        f.getBox(2).setText("3");
-        assertEquals("123", f.getText());
-        assertEquals(1, fired.get(), "completion fires exactly once when the field is full");
-    }
-
-    @FormTest
-    void backspaceOnEmptyBoxDoesNotFireOrThrow() {
-        OtpField f = new OtpField(3);
-        AtomicInteger fired = new AtomicInteger();
-        f.addCompleteListener(evt -> fired.incrementAndGet());
-        f.getBox(2).setText("3");
-        // emptying a box (backspace) steps back; must not complete
-        f.getBox(2).setText("");
-        assertEquals(0, fired.get());
-        assertEquals("", f.getText());
-    }
-
-    // ---- paste distribution -----------------------------------------
-
-    @FormTest
-    void pasteIntoFirstBoxSpreadsAcrossBoxesAndCompletes() {
-        OtpField f = new OtpField(6);
-        AtomicInteger fired = new AtomicInteger();
-        f.addCompleteListener(evt -> fired.incrementAndGet());
-        // simulate a paste of the whole code into the first box
-        f.getBox(0).setText("135790");
+        f.getInputField().insertText("135790");
         assertEquals("135790", f.getText());
         assertEquals("1", f.getBox(0).getText());
         assertEquals("0", f.getBox(5).getText());
@@ -187,63 +205,370 @@ class OtpFieldTest extends UITestBase {
     }
 
     @FormTest
-    void pasteSkipsNonDigitsWhenNumeric() {
-        OtpField f = new OtpField(4, true);
-        f.getBox(0).setText("1a2b3c4d");
-        // non-digit chars are skipped, leaving the four digits
+    void charactersPastTheLastBoxAreDropped() {
+        OtpField f = new OtpField(4);
+        f.getInputField().insertText("123456789");
         assertEquals("1234", f.getText());
     }
 
     @FormTest
-    void pasteKeepsNonDigitsWhenNotNumeric() {
+    void typingSkipsNonDigitsWhenNumeric() {
+        OtpField f = new OtpField(4, true);
+        f.getInputField().insertText("1a2b3c4d");
+        assertEquals("1234", f.getText());
+    }
+
+    @FormTest
+    void typingKeepsNonDigitsWhenNotNumeric() {
         OtpField f = new OtpField(4, false);
-        f.getBox(0).setText("ab12");
+        f.getInputField().insertText("ab12");
         assertEquals("ab12", f.getText());
     }
 
     @FormTest
-    void pasteStartingMidFieldOnlyFillsFromThatIndex() {
-        OtpField f = new OtpField(6);
-        f.getBox(2).setText("789");
-        assertEquals("", f.getBox(0).getText());
-        assertEquals("", f.getBox(1).getText());
-        assertEquals("7", f.getBox(2).getText());
-        assertEquals("9", f.getBox(4).getText());
-        assertEquals("789", f.getText());
+    void lineBreaksNeverEnterTheCode() {
+        // a code pasted out of a message often carries the rest of the line
+        OtpField f = new OtpField(4, false);
+        f.getInputField().insertText("12\n34");
+        assertEquals("1234", f.getText());
     }
 
-    // ---- listener management ----------------------------------------
+    // ---- what the platform hands over -----------------------------------
 
     @FormTest
-    void removedListenerIsNotInvoked() {
-        OtpField f = new OtpField(2);
+    void aCodeCommittedByThePlatformIsFilteredLikeATypedOne() {
+        // The Android autofill path commits the whole value into the field. An
+        // autofill service that keeps the message's separators hands over
+        // something the user could never have typed, and a field left holding it
+        // never reaches the length that completes it.
+        OtpField f = new OtpField(6);
         AtomicInteger fired = new AtomicInteger();
-        ActionListener l = evt -> fired.incrementAndGet();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        f.getInputField().commitText("123-456");
+        assertEquals("123456", f.getText());
+        assertTrue(f.isComplete());
+        assertEquals(1, fired.get());
+    }
+
+    @FormTest
+    void aCommittedCodeReplacesWhateverWasThereRatherThanAppending() {
+        // the platform is answering "the value is this", so a half typed code is
+        // replaced rather than prefixed onto the offer
+        OtpField f = new OtpField(6);
+        f.setText("99");
+        EditField input = f.getInputField();
+        input.finishComposing();
+        input.setSelectionRange(0, input.getText().length());
+        input.commitText("123456");
+        assertEquals("123456", f.getText());
+    }
+
+    @FormTest
+    void composedTextIsFilteredWhileItIsStillBeingComposed() {
+        // Dictation, handwriting and an IME all build text as a composition before
+        // committing it, and a composition writes to the document directly rather
+        // than through the typed-text path. Unfiltered, a numeric code field would
+        // hold letters for as long as the composition lasted.
+        OtpField f = new OtpField(6);
+        f.getInputField().setComposingText("12a3", 0);
+        assertEquals("123", f.getText());
+    }
+
+    @FormTest
+    void aCommitThatFinalizesACompositionIsFilteredToo() {
+        // the commit that ends a composition replaces the composed range directly,
+        // which is the one commit that never reaches the typed-text hook
+        OtpField f = new OtpField(6);
+        EditField input = f.getInputField();
+        input.setComposingText("12", 0);
+        input.commitText("12b345");
+        assertEquals("12345", f.getText());
+    }
+
+    @FormTest
+    void composedTextCannotOverfillTheField() {
+        OtpField f = new OtpField(4);
+        f.getInputField().setComposingText("123456789", 0);
+        assertEquals("1234", f.getText());
+    }
+
+    // ---- tapping a box --------------------------------------------------
+
+    @FormTest
+    void tappingABoxPutsTheCaretInThatBox() {
+        // The inherited hit test measures the field's own text layout, which sits at
+        // the field's left edge and is never painted. A tap has to answer with the box
+        // the user aimed at, or a correction lands on the wrong digit.
+        OtpField f = new OtpField(6);
+        Form form = new Form("t", BoxLayout.y());
+        form.add(f);
+        form.show();
+        form.revalidate();
+        f.setText("123456");
+        form.revalidate();
+
+        EditField input = f.getInputField();
+        for (int i = 0; i < 6; i++) {
+            TextField box = f.getBox(i);
+            int x = box.getAbsoluteX() + box.getWidth() / 2;
+            int y = box.getAbsoluteY() + box.getHeight() / 2;
+            assertEquals(i, input.offsetAtPoint(x, y), "tap on box " + i);
+        }
+        TextField last = f.getBox(5);
+        assertEquals(6, input.offsetAtPoint(last.getAbsoluteX() + last.getWidth() + 40,
+                last.getAbsoluteY() + 1), "a tap past the last box means the end");
+    }
+
+    @FormTest
+    void tappingAnEmptyBoxMeansTheEndOfWhatWasEntered() {
+        // the caller assigns this offset to the caret without clamping it, so an
+        // offset past the text would put the caret outside the document
+        OtpField f = new OtpField(6);
+        Form form = new Form("t", BoxLayout.y());
+        form.add(f);
+        form.show();
+        form.revalidate();
+        f.setText("12");
+        form.revalidate();
+
+        TextField box = f.getBox(5);
+        assertEquals(2, f.getInputField().offsetAtPoint(box.getAbsoluteX() + 1,
+                box.getAbsoluteY() + 1));
+    }
+
+    @FormTest
+    void theBoxesReadLeftToRightOnARightToLeftForm() {
+        // A code is digits, and digits read left to right everywhere; BoxLayout
+        // reverses its children on an RTL form, which would draw the first digit
+        // on the right and show the whole code backwards. The hit test walks the
+        // boxes in order, so it depends on this too.
+        LookAndFeel laf = UIManager.getInstance().getLookAndFeel();
+        boolean wasRtl = laf.isRTL();
+        laf.setRTL(true);
+        try {
+            OtpField f = new OtpField(6);
+            Form form = new Form("t", BoxLayout.y());
+            form.add(f);
+            form.show();
+            form.revalidate();
+            f.setText("123456");
+            form.revalidate();
+
+            for (int i = 1; i < 6; i++) {
+                assertTrue(f.getBox(i - 1).getAbsoluteX() < f.getBox(i).getAbsoluteX(),
+                        "box " + (i - 1) + " must sit left of box " + i);
+            }
+            TextField third = f.getBox(2);
+            assertEquals(2, f.getInputField().offsetAtPoint(
+                    third.getAbsoluteX() + third.getWidth() / 2,
+                    third.getAbsoluteY() + third.getHeight() / 2),
+                    "a tap must still land on the box it hit");
+        } finally {
+            laf.setRTL(wasRtl);
+        }
+    }
+
+    @FormTest
+    void everyBoxSurvivesALongCodeOnANarrowScreen() {
+        // A box row gives what is left of the width to one child and zero to every
+        // child after it, so the last boxes of a long code vanish on a narrow screen
+        // while the field still expects those characters.
+        OtpField f = new OtpField(16);
+        Form form = new Form("t", BoxLayout.y());
+        form.add(f);
+        form.show();
+        form.revalidate();
+
+        // The row holding the boxes is what runs out of width, so squeeze that
+        // directly: laying out an ancestor would not re-lay its grandchildren, and a
+        // test that only resizes an ancestor passes whatever the row does.
+        Container row = f.getBox(0).getParent();
+        assertTrue(row.getPreferredW() > 240, "the row has to be squeezed to mean anything");
+        row.setWidth(240);
+        // the layout manager directly: layoutContainer() is a no-op on a container that
+        // is not dirty, so a test that called it would lay nothing out and pass whatever
+        // the row does
+        row.getLayout().layoutContainer(row);
+
+        for (int i = 0; i < 16; i++) {
+            assertTrue(f.getBox(i).getWidth() > 0,
+                    "box " + i + " was squeezed out of existence");
+        }
+    }
+
+    @FormTest
+    void aFilledValueReplacesTheWholeFieldEvenMidComposition() {
+        // The sequence the Android autofill bridge drives. A commit replaces the composed
+        // range in preference to the selection, so without ending the composition first
+        // the filled code lands inside it and keeps what surrounded it -- here that would
+        // leave "991234", a full length wrong code that submits itself.
+        OtpField f = new OtpField(6);
+        EditField input = f.getInputField();
+        input.commitText("99");
+        input.setComposingText("12", 0);
+        assertEquals("9912", f.getText());
+
+        input.finishComposing();
+        input.setSelectionRange(0, input.getText().length());
+        input.commitText("123456");
+
+        assertEquals("123456", f.getText());
+    }
+
+    @FormTest
+    void aRangeReplacementIsFilteredLikeEverythingElse() {
+        // iOS delivers edits through UITextInput as range replacements, which reach
+        // neither the typed-text hook nor the commit
+        OtpField f = new OtpField(6);
+        f.setText("12");
+        f.getInputField().replaceRange(2, 2, "a3");
+        assertEquals("123", f.getText());
+    }
+
+    @FormTest
+    void aRangeReplacementCannotOverfillTheField() {
+        OtpField f = new OtpField(6);
+        f.getInputField().replaceRange(0, 0, "123456789");
+        assertEquals("123456", f.getText());
+        assertTrue(f.isComplete());
+    }
+
+    // ---- completion ---------------------------------------------------
+
+    @FormTest
+    void completionFiresOnceWhenTheLastBoxFills() {
+        OtpField f = new OtpField(3);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        EditField input = f.getInputField();
+        input.insertText("1");
+        input.insertText("2");
+        assertEquals(0, fired.get(), "must not fire until the last box is filled");
+        input.insertText("3");
+        assertEquals(1, fired.get());
+        assertTrue(f.isComplete());
+    }
+
+    @FormTest
+    void completionFiresAgainAfterTheCodeIsCorrected() {
+        OtpField f = new OtpField(3);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        f.setText("123");
+        assertEquals(1, fired.get());
+        f.setText("12");
+        assertFalse(f.isComplete());
+        assertEquals(1, fired.get());
+        f.setText("124");
+        assertEquals(2, fired.get(), "a corrected code is a new attempt");
+    }
+
+    @FormTest
+    void aCompositionDoesNotCompleteUntilItIsFinal() {
+        // An input method builds text before committing it. Firing on the provisional
+        // value submits a code it is still editing, and the flow that acts on it is
+        // busy by the time the corrected one arrives.
+        OtpField f = new OtpField(6);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        EditField input = f.getInputField();
+
+        input.setComposingText("123456", 0);
+        assertEquals("123456", f.getText(), "the boxes still show what is being composed");
+        assertEquals(0, fired.get(), "but a provisional value is not an answer");
+
+        input.setComposingText("123457", 0);
+        assertEquals(0, fired.get());
+
+        input.commitText("123457");
+        assertEquals("123457", f.getText());
+        assertEquals(1, fired.get(), "the committed value completes it, once");
+    }
+
+    @FormTest
+    void aCompositionFinishedWithoutACommitStillCompletes() {
+        // finishComposing changes no text, so nothing else would tell the field to look
+        OtpField f = new OtpField(6);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        EditField input = f.getInputField();
+        input.setComposingText("123456", 0);
+        assertEquals(0, fired.get());
+        input.finishComposing();
+        assertEquals(1, fired.get());
+    }
+
+    @FormTest
+    void replacingOneFullCodeWithAnotherIsANewAttempt() {
+        // The offered code accepted over a wrong one that was typed: full to full in a
+        // single edit, with no partial value in between. A flow that submits from this
+        // listener has to hear about the second one.
+        OtpField f = new OtpField(6);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        f.setText("123456");
+        assertEquals(1, fired.get());
+        f.setText("654321");
+        assertEquals(2, fired.get(), "a different full code is a new attempt");
+        f.setText("654321");
+        assertEquals(2, fired.get(), "the same one is not");
+    }
+
+    @FormTest
+    void aRangeReplacementEndingACompositionDoesNotSuppressCompletionForever() {
+        // iOS sends a range replacement that ends its marked text with no finishComposing
+        // behind it, so a provisional flag left standing would silence the field
+        OtpField f = new OtpField(6);
+        AtomicInteger fired = new AtomicInteger();
+        f.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        });
+        EditField input = f.getInputField();
+        input.setComposingText("12", 0);
+        assertEquals(0, fired.get());
+        input.replaceRange(2, 2, "3456");
+        assertEquals("123456", f.getText());
+        assertEquals(1, fired.get(), "the field has to speak again after a range edit");
+    }
+
+    @FormTest
+    void removedListenerStopsFiring() {
+        OtpField f = new OtpField(3);
+        AtomicInteger fired = new AtomicInteger();
+        ActionListener l = new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                fired.incrementAndGet();
+            }
+        };
         f.addCompleteListener(l);
         f.removeCompleteListener(l);
-        f.getBox(0).setText("1");
-        f.getBox(1).setText("2");
+        f.setText("123");
         assertEquals(0, fired.get());
-    }
-
-    @FormTest
-    void nullListenerIsIgnored() {
-        OtpField f = new OtpField(2);
-        f.addCompleteListener(null);
-        // no NPE when the field fills
-        f.setText("12");
-        f.getBox(1).setText("3"); // re-trigger a change on the last box
-        assertEquals("13", f.getText());
-    }
-
-    @FormTest
-    void consumingListenerStopsLaterListeners() {
-        OtpField f = new OtpField(2);
-        AtomicInteger second = new AtomicInteger();
-        f.addCompleteListener(ActionEvent::consume);
-        f.addCompleteListener(evt -> second.incrementAndGet());
-        f.getBox(0).setText("1");
-        f.getBox(1).setText("2");
-        assertEquals(0, second.get(), "second listener skipped once the event is consumed");
     }
 }

@@ -1062,6 +1062,34 @@ PopupContent {
     border-radius: 4mm;
 }
 
+/* Phone number verification: the number field, and the code entry that renders
+   one box per digit. The boxes are field-shaped cells so the code reads as a row
+   of slots; the field that actually holds the code sits over them and draws only
+   the caret, which is why OtpFieldInput contributes no chrome of its own. */
+OtpField { background-color: transparent; padding: 1mm 0; margin: 0; }
+OtpDigit {
+    cn1-derive: TextField;
+    text-align: center;
+    font-size: 4mm;
+    padding: 2mm 1mm;
+    margin: 0.5mm;
+}
+OtpFieldInput { background-color: transparent; padding: 0; margin: 0; }
+PhoneNumberField { background-color: transparent; padding: 0; margin: 0; }
+PhoneNumberCountry { cn1-derive: FlatButton; margin: 1mm 0 1mm 2mm; }
+PhoneNumberText { cn1-derive: TextField; }
+PhoneVerification { background-color: transparent; padding: 1mm 2mm; margin: 0; }
+PhoneVerificationText { cn1-derive: Label; text-align: center; }
+PhoneVerificationError { cn1-derive: Label; color: #ff3b30; text-align: center; }
+PhoneVerificationButton { cn1-derive: Button; text-align: center; }
+PhoneVerificationLink {
+    cn1-derive: Label;
+    color: var(--accent-color, #007aff);
+    background-color: transparent;
+    text-align: center;
+    padding: 1.5mm;
+}
+
 @media (prefers-color-scheme: dark) {
     Component { color: #ffffff; background-color: #000000; }
     Form { background-color: #1c1c1e; padding: 0; margin: 0; }
@@ -1261,4 +1289,10 @@ PopupContent {
     ChatVoiceButton { background-color: rgba(30,30,32,0.74); cn1-background-type: cn1-pill-border; color: var(--accent-color-dark, #0a84ff); padding: 1.5mm; margin: 0.5mm; }
 
     Separator { background-color: #38383a; }
+
+    OtpDigit { background-color: #2c2c2e; color: #ffffff; }
+    PhoneNumberText { background-color: #2c2c2e; color: #ffffff; }
+    PhoneVerificationText { color: #ebebf5; }
+    PhoneVerificationError { color: #ff453a; }
+    PhoneVerificationLink { color: var(--accent-color-dark, #0a84ff); }
 }

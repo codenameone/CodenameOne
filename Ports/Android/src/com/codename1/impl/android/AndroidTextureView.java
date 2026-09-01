@@ -225,6 +225,31 @@ public class AndroidTextureView extends TextureView implements CodenameOneSurfac
         return super.onCreateInputConnection(editorInfo);
     }
 
+    /// The platform's autofill, when a pure editor holds the input session. The rendering surface
+    /// is the view an autofill service sees while a field is being edited (see
+    /// `AndroidImplementation#updateEditorAutofill(android.view.View, boolean)`), so the value it
+    /// offers -- a one-time code out of an arriving SMS -- arrives here.
+    @Override
+    public void autofill(android.view.autofill.AutofillValue value) {
+        if (!AndroidImplementation.autofillEditor(value)) {
+            super.autofill(value);
+        }
+    }
+
+    @Override
+    public int getAutofillType() {
+        if (AndroidImplementation.hasActiveInputClient()) {
+            return AUTOFILL_TYPE_TEXT;
+        }
+        return super.getAutofillType();
+    }
+
+    @Override
+    public android.view.autofill.AutofillValue getAutofillValue() {
+        android.view.autofill.AutofillValue v = AndroidImplementation.editorAutofillValue();
+        return v != null ? v : super.getAutofillValue();
+    }
+
     @Override
     public boolean onCheckIsTextEditor() {
         if (AndroidImplementation.hasActiveInputClient()) {

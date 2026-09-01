@@ -1108,6 +1108,21 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                     }
                 }
             }
+
+            // ONE_TIME_CODE, applied after the base type so it wins: it says what the
+            // value IS, where the others say how it is typed. iOS offers the code from
+            // the incoming message in the suggestion bar for a field that declares it,
+            // and offers nothing for a field that does not.
+            if((constraint & 0x1000000) == 0x1000000) {
+                if (@available(iOS 12, *)) {
+                    utf.textContentType = UITextContentTypeOneTimeCode;
+                }
+                // and no correcting or capitalizing it: the keyboard would otherwise change
+                // a code between the user reading it and the server checking it. A digit code
+                // is safe by virtue of its keypad; one that takes letters is not.
+                utf.autocorrectionType = UITextAutocorrectionTypeNo;
+                utf.autocapitalizationType = UITextAutocapitalizationTypeNone;
+            }
             if(scale != 1) {
                 float s = ((BRIDGE_CAST CN1Font*)font).pointSize / scale;
                 utf.font = [((BRIDGE_CAST CN1Font*)font) fontWithSize:s];
@@ -1331,7 +1346,22 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                     }
                 }
             }
-            
+
+            // ONE_TIME_CODE, applied after the base type so it wins: it says what the
+            // value IS, where the others say how it is typed. iOS offers the code from
+            // the incoming message in the suggestion bar for a field that declares it,
+            // and offers nothing for a field that does not.
+            if((constraint & 0x1000000) == 0x1000000) {
+                if (@available(iOS 12, *)) {
+                    utv.textContentType = UITextContentTypeOneTimeCode;
+                }
+                // and no correcting or capitalizing it: the keyboard would otherwise change
+                // a code between the user reading it and the server checking it. A digit code
+                // is safe by virtue of its keypad; one that takes letters is not.
+                utv.autocorrectionType = UITextAutocorrectionTypeNo;
+                utv.autocapitalizationType = UITextAutocapitalizationTypeNone;
+            }
+
 #if !TARGET_OS_TV
             if(showToolbar) {
                 //add navigation toolbar to the top of the keyboard

@@ -3367,7 +3367,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (config == null || lightweightTextInputElement == null) {
             return;
         }
-        lightweightTextInputElement.setAttribute("autocomplete", config.isAutoCorrect() ? "on" : "off");
+        // ONE_TIME_CODE: "one-time-code" is what a browser and a password manager match on to
+        // offer the code out of an arriving message, and on iOS Safari it is what puts the code in
+        // the keyboard's suggestion bar. It is a value of autocomplete rather than a flag beside
+        // it, so it replaces the plain on/off the rest of the fields get.
+        boolean oneTimeCode = (config.getConstraint() & TextArea.ONE_TIME_CODE) != 0;
+        lightweightTextInputElement.setAttribute("autocomplete",
+                oneTimeCode ? "one-time-code" : config.isAutoCorrect() ? "on" : "off");
         lightweightTextInputElement.setAttribute("autocorrect", config.isAutoCorrect() ? "on" : "off");
         lightweightTextInputElement.setAttribute("spellcheck", config.isAutoCorrect() ? "true" : "false");
         lightweightTextInputElement.setAttribute("autocapitalize", config.isAutoCapitalize() ? "sentences" : "off");
@@ -3389,6 +3395,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             default:
                 break;
         }
+        // Deliberately NOT forcing inputmode to numeric for a one-time code. The hint says what
+        // the value IS; the constraint beside it says how it is typed, and a code field that did
+        // not ask for NUMERIC can hold letters -- OtpField(length, false) exists for exactly
+        // that. A numeric inputmode gives a mobile browser a keypad with no route to a letter,
+        // which would make those codes impossible to enter rather than merely awkward.
         lightweightTextInputElement.setAttribute("inputmode", inputMode);
         switch (config.getActionType()) {
             case TextInputConfig.ACTION_DONE:
@@ -6186,6 +6197,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 inputMode = "url";
             }
         }
+        // As in configureLightweightTextInputElement: ONE_TIME_CODE contributes the autocomplete
+        // token and nothing about the keyboard, so an alphanumeric code keeps a keyboard that can
+        // type one.
         if (inputMode == null) {
             inputEl.removeAttribute("inputmode");
         } else {
@@ -6196,6 +6210,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String autocomplete;
         if (override != null) {
             autocomplete = override.toString();
+        } else if ((constraint & TextArea.ONE_TIME_CODE) != 0) {
+            // Ahead of every other case including SENSITIVE: a one-time code is exactly the value
+            // a browser should offer out of an arriving message, and it is worthless to a
+            // dictionary afterwards, so the token that invites the offer is the right one here.
+            autocomplete = "one-time-code";
         } else if (sensitive) {
             // Checked ahead of the password case on purpose: SENSITIVE asks that the value is
             // never retained for predictive or completing schemes, and "current-password" is an

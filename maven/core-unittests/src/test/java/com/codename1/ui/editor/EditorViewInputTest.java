@@ -25,6 +25,7 @@ package com.codename1.ui.editor;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.EditField;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextInputClient;
 import com.codename1.ui.TextInputConfig;
@@ -125,5 +126,25 @@ class EditorViewInputTest extends UITestBase {
         v.setComposingText(KANA, KANA.length());
         v.commitText(KANJI);
         assertEquals("ab" + KANJI, v.getText());
+    }
+
+    @FormTest
+    void aSecondCommitFollowsTheFirstRatherThanReplacingIt() {
+        // A commit ends the composition, and the platform bridges rely on it: UIKit's
+        // insertText: replaces marked text, and the iOS view clears its own marked range
+        // and sends a commit with no finishComposing behind it. If the composing range
+        // outlived the commit, the next commit would replace it instead of following it,
+        // and an input method that delivers a value in fragments -- dictation,
+        // handwriting -- could not build one up at all.
+        //
+        // It does not outlive it: the commit replaces the composed range through the
+        // ordinary document-change path, which clears the composition. This test exists
+        // because that is easy to doubt from reading commitText alone, where nothing
+        // clears it in view.
+        EditField f = new EditField();
+        f.setComposingText("ab", 0);
+        f.commitText("ab");
+        f.commitText("cd");
+        assertEquals("abcd", f.getText());
     }
 }
