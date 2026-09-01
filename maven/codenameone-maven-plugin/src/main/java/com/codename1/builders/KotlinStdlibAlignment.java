@@ -553,6 +553,15 @@ public class KotlinStdlibAlignment {
         if (callsStrictly(line) || callsForce(line, artifact)) {
             return true;
         }
+        // A rejection manages the version just as firmly, from the other side:
+        //   implementation('...:kotlin-stdlib-jdk8') { version { reject '[1.8.0,)' } }
+        // says every version our floor could resolve to is unacceptable, so writing
+        // the constraint anyway leaves the graph with nothing to select. Any reject
+        // counts, without reading which versions it covers -- the conservative
+        // reading, and the only one available without evaluating the rule.
+        if (callsNamed(line, "reject") || callsNamed(line, "rejectAll")) {
+            return true;
+        }
         String declared = declaredVersionOf(line, artifact);
         return declared != null && declared.endsWith(STRICT_SUFFIX);
     }
@@ -1849,6 +1858,15 @@ public class KotlinStdlibAlignment {
                     current.append(' ');
                     continue;
                 }
+                if (c == '\n' && opensAnUnbracedBody(current.toString())) {
+                    // An `if (...)` with no brace takes the next line as its body, so
+                    // splitting there put the condition in one statement and the body
+                    // in another -- and a resolution rule written that way had the
+                    // artifact named in the condition and the useVersion in the body,
+                    // so neither statement said anything and the override went unread.
+                    current.append(' ');
+                    continue;
+                }
                 out.add(current.toString().replace('\n', ' '));
                 current.setLength(0);
                 continue;
@@ -2434,6 +2452,36 @@ public class KotlinStdlibAlignment {
 
     /** Gradle's extra-properties prefix, the one dotted assignment worth reading. */
     private static final String EXTRA_PROPERTIES = "ext";
+
+    /**
+     * Whether the text so far is a control header whose body is the next line.
+     *
+     * <p>Read off the language's own keywords, which is a closed set -- unlike
+     * the earlier use of a keyword list, which was answering "might this scope
+     * run" and is better answered by counting braces. The question here is
+     * different: an unbraced body belongs to the header above it, and only
+     * these words introduce one.</p>
+     */
+    private static boolean opensAnUnbracedBody(String text) {
+        int i = skipBlanks(text, 0);
+        int end = i;
+        while (end < text.length() && isIdentifierChar(text.charAt(end))) {
+            end++;
+        }
+        String head = text.substring(i, end);
+        if (UNBRACED_HEADERS.indexOf(" " + head + " ") < 0) {
+            return false;
+        }
+        if (braceBalance(text) != 0) {
+            return false;
+        }
+        int last = skipBlanksBackward(text, text.length() - 1);
+        // `else` stands alone; the rest carry a condition in parentheses.
+        return last >= 0 && (text.charAt(last) == ')' || "else".equals(head));
+    }
+
+    /** The words that introduce a body, braced or not. */
+    private static final String UNBRACED_HEADERS = " if else while for ";
 
     /** Whether the text so far ends with a comma, ignoring trailing blanks. */
     private static boolean endsWithComma(StringBuilder text) {

@@ -182,8 +182,11 @@ public class KotlinStdlibAlignmentTest {
         // argument deleted. Checked by deleting it, which is the only way that kind of
         // vacuity shows up.
         String[] fragments = {
-            "additionalDependencies,",
-            "aiExtraGradleDependencies.toString(),",
+            // Each fragment now reaches the call wrapped in the closure that
+            // surrounds it in the generated file, so the argument text ends at the
+            // wrapper's parenthesis rather than at a comma.
+            "additionalDependencies)",
+            "aiExtraGradleDependencies.toString())",
             "request.getArg(\"android.gradleDep\", \"\")",
             "request.getArg(\"android.supportv4Dep\", \"\")",
             "request.getArg(\"android.xgradle\", \"\")",
@@ -639,6 +642,84 @@ public class KotlinStdlibAlignmentTest {
         check(modern.contains("kotlin-stdlib-jdk8:1.8.0")
                         && !modern.contains("kotlin-stdlib-jdk7:1.8.0"),
                 "the merged-era declaration is read, got <<" + modern + ">>");
+    }
+
+    /**
+     * An unbraced body belongs to the header above it. A resolution rule
+     * written that way had the artifact named in the condition and the
+     * override in the body, and splitting at the newline left neither
+     * statement saying anything.
+     */
+    @Test
+    public void anUnbracedBodyStaysWithItsCondition() {
+        String rule = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.eachDependency { d ->\n"
+                + "        if (d.requested.group == 'org.jetbrains.kotlin' "
+                + "&& d.requested.name == 'kotlin-stdlib')\n"
+                + "            d.useVersion '1.7.22'\n"
+                + "    } }\n");
+        check("".equals(rule), "the rule is read across the newline, got <<" + rule + ">>");
+
+        // Two ordinary declarations on consecutive lines are still two statements.
+        String separate = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'androidx.appcompat:appcompat:1.6.1'\n"
+                + "    implementation 'com.google.code.gson:gson:2.10.1'\n");
+        check(separate.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "ordinary lines still separate, got <<" + separate + ">>");
+    }
+
+    /**
+     * A rejection manages the version from the other side. Rejecting every
+     * version our floor could resolve to leaves the graph nothing to select,
+     * so writing the constraint anyway makes it unsatisfiable.
+     */
+    @Test
+    public void aRejectionIsVersionManagement() {
+        String[] rules = {"reject '[1.8.0,)'", "rejectAll()"};
+        for (int i = 0; i < rules.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
+                    + "{ version { " + rules[i] + " } }\n");
+            check("".equals(out),
+                    rules[i] + " suppresses the block, got <<" + out + ">>");
+        }
+    }
+
+    /**
+     * A fragment is scanned inside the closure that surrounds it in the
+     * generated file. Handed over bare, a local declared in the repositories
+     * closure outlived it and shadowed a real binding for everything after --
+     * which reads a later use as a declaration and skips that constraint.
+     */
+    @Test
+    public void aFragmentKeepsItsGeneratedScope() throws Exception {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "ext.dep = 'com.example:other:1.0'\n",
+                "repositories {\n"
+                        + "def dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n}\n",
+                "dependencies {\nimplementation(dep)\n}\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the repository-local name does not escape, got <<" + out + ">>");
+
+        // The half above proves the alignment honours a scope it is GIVEN. This half
+        // proves the builder gives it one: passing the fragments bare is what the
+        // report was about, and a test that hands over pre-wrapped text would pass
+        // with the builder unchanged -- which it did, until this was added.
+        byte[] bytes = java.nio.file.Files.readAllBytes(new java.io.File(
+                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath());
+        String builderSrc = new String(bytes, "UTF-8");
+        int at = builderSrc.indexOf("KotlinStdlibAlignment.constraintsBlock(");
+        check(at >= 0, "the builder calls the alignment");
+        String fromCall = builderSrc.substring(at).replaceAll("//[^\n]*", "");
+        String call = fromCall.substring(0, fromCall.indexOf(";"));
+        String[] scopes = {
+            "repositories {", "buildscript {", "android {", "dependencies {",
+        };
+        for (int i = 0; i < scopes.length; i++) {
+            check(call.indexOf(scopes[i]) >= 0,
+                    "fragments are handed over inside their " + scopes[i]
+                            + " scope, which the call does not show");
+        }
     }
 
     /**

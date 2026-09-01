@@ -7315,20 +7315,28 @@ public class AndroidGradleBuilder extends Executor {
                         // that keeps being wrong, and this way there is none to make.
                         // KotlinStdlibAlignmentTest reads this call against the script
                         // and fails if they ever disagree.
+                        //
+                        // Each one wrapped in the closure that surrounds it in the
+                        // generated file, because a `def` inside repositories { } is
+                        // scoped to that closure and the alignment now tracks scopes.
+                        // Handed over bare, such a local outlived its closure and
+                        // shadowed a real binding for everything after it -- which
+                        // reads a later use as a declaration and skips that
+                        // artifact's constraint.
                         request.getArg("android.gradlePlugin", ""),
-                        injectRepo,
-                        gradleDependency,
-                        request.getArg("android.gradle.androidx", ""),
+                        "repositories {\n%s\n}\n".replace("%s", injectRepo),
+                        "buildscript {\ndependencies {\n%s\n}\n}\n".replace("%s", gradleDependency),
+                        "android {\n%s\n}\n".replace("%s", request.getArg("android.gradle.androidx", "")),
                         minSDK,
                         targetNumber,
-                        request.getArg("android.xgradle_default_config", ""),
-                        coreLibraryDesugaringDependency,
-                        request.getArg("android.supportv4Dep", ""),
-                        kotlinRuntimeDependency,
-                        additionalDependencies,
-                        aiExtraGradleDependencies.toString(),
-                        request.getArg("android.gradleDep", ""),
-                        aarDependencies,
+                        "android {\ndefaultConfig {\n%s\n}\n}\n".replace("%s", request.getArg("android.xgradle_default_config", "")),
+                        "dependencies {\n%s\n}\n".replace("%s", coreLibraryDesugaringDependency),
+                        "dependencies {\n%s\n}\n".replace("%s", request.getArg("android.supportv4Dep", "")),
+                        "dependencies {\n%s\n}\n".replace("%s", kotlinRuntimeDependency),
+                        "dependencies {\n%s\n}\n".replace("%s", additionalDependencies),
+                        "dependencies {\n%s\n}\n".replace("%s", aiExtraGradleDependencies.toString()),
+                        "dependencies {\n%s\n}\n".replace("%s", request.getArg("android.gradleDep", "")),
+                        "dependencies {\n%s\n}\n".replace("%s", aarDependencies),
                         request.getArg("android.xgradle", ""));
             } catch (RuntimeException e) {
                 // The alignment reads the app's Gradle text to decide whether the app
