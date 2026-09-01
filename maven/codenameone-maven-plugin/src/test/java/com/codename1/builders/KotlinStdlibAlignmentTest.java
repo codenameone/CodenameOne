@@ -246,6 +246,47 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * The builder has to hand over every app-controlled fragment that reaches
+     * the generated dependencies block, not the ones that came to mind.
+     * android.supportv4Dep was missed that way: it is written into that block
+     * a few lines below the constraints, so an app pinning a jdk artifact
+     * through it would have had the pin ignored and the constraint written
+     * over the top.
+     *
+     * <p>The list is checked against the builder's source rather than
+     * re-derived, because the failure is an omission and an omission is
+     * invisible to a test that only exercises what is passed.</p>
+     */
+    @Test
+    public void theBuilderPassesEveryAppControlledDependencyFragment() throws Exception {
+        byte[] bytes = java.nio.file.Files.readAllBytes(new java.io.File(
+                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath());
+        String src = new String(bytes, "UTF-8");
+        int at = src.indexOf("KotlinStdlibAlignment.constraintsBlock(");
+        check(at >= 0, "the builder calls the alignment");
+        // To the statement terminator, not to "));" -- that lands on the closing paren
+        // of the LAST argument and slices it in half, so the final fragment never
+        // matched and the check failed for the wrong reason.
+        String call = src.substring(at, src.indexOf(";", at));
+        // The call form, not the bare hint name: the comment above the argument list
+        // names android.supportv4Dep too, so matching the name alone passed with the
+        // argument deleted. Checked by deleting it, which is the only way that kind of
+        // vacuity shows up.
+        String[] fragments = {
+            "additionalDependencies,",
+            "aiExtraGradleDependencies.toString(),",
+            "request.getArg(\"android.gradleDep\", \"\")",
+            "request.getArg(\"android.supportv4Dep\", \"\")",
+            "request.getArg(\"android.xgradle\", \"\")",
+        };
+        for (String fragment : fragments) {
+            check(call.contains(fragment),
+                    "the alignment is not told about " + fragment
+                    + ", which reaches the generated dependencies block");
+        }
+    }
+
+    /**
      * A commented-out declaration is not a declaration. The same hazard the
      * VPN manifest checks cover, in the same builder's hint text: a developer
      * parks a line with {@code //} and the substring match reads it as a live
