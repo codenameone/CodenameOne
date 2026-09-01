@@ -1089,18 +1089,33 @@ public class KotlinStdlibAlignment {
         if (i < 0) {
             return true;
         }
-        if (SLASHY_OPENER_POSITIONS.indexOf(text.charAt(i)) >= 0) {
-            return true;
-        }
-        // Division needs a VALUE on its left, and a keyword is not one. `return
-        // /can't/` is a literal for the same reason `= /can't/` is, so the test is
-        // not "is the previous character an identifier character" but "is the
-        // previous TOKEN something that can be divided". A word that is not a
-        // keyword is a variable, and dividing it is exactly what a build script
-        // does.
-        if (!isIdentifierChar(text.charAt(i))) {
+        // Asked the other way round, because asking it directly does not converge.
+        // "Which characters may an expression follow" was extended by review four
+        // times -- the closure arrow, the comparison, then Groovy's =~ and ==~ --
+        // and each time the set was still missing whichever operator came next.
+        // Division is the closed half: it needs a VALUE on its left, and there are
+        // only so many things a value ends with. Everything else opens a literal,
+        // including every operator nobody has thought of yet.
+        char previous = text.charAt(i);
+        if (previous == ')' || previous == ']' || previous == '}') {
             return false;
         }
+        if (previous == '\'' || previous == '"') {
+            return false;
+        }
+        if (previous >= '0' && previous <= '9') {
+            return false;
+        }
+        if ((previous == '+' || previous == '-') && i > 0
+                && text.charAt(i - 1) == previous) {
+            // a++ / b and a-- / b: the increment yields the value being divided.
+            return false;
+        }
+        if (!isIdentifierChar(previous)) {
+            return true;
+        }
+        // A word: a variable is a value and a keyword is not, which is the whole
+        // difference between `total / 2` and `return /can't/`.
         int tokenEnd = i + 1;
         while (i >= 0 && isIdentifierChar(text.charAt(i))) {
             i--;
@@ -1116,13 +1131,6 @@ public class KotlinStdlibAlignment {
      */
     private static final String EXPRESSION_KEYWORDS =
             " return new in case else do while if throw assert yield instanceof ";
-
-    /**
-     * The characters an expression may follow. Deliberately does not include
-     * an identifier character, a digit or a closing bracket: those are what
-     * division follows.
-     */
-    private static final String SLASHY_OPENER_POSITIONS = "=(,[:{&|!?+-*;<>";
 
     /** The length of the delimiter opening at {@code at}. */
     private static int delimiterLength(String text, int quoteAt) {
@@ -1380,6 +1388,12 @@ public class KotlinStdlibAlignment {
                 if (next == '*') {
                     inBlockComment = true;
                     i++;
+                    // A comment IS whitespace in the language, so removing one
+                    // without leaving any joined the tokens it separated:
+                    // `strictly/* pin */'1.7.22'` became strictly'1.7.22', which is
+                    // not a call to strictly, so the strict pin behind it was never
+                    // seen. Groovy accepts the original and records {strictly 1.7.22}.
+                    out.append(' ');
                     continue;
                 }
                 if (next == '/') {

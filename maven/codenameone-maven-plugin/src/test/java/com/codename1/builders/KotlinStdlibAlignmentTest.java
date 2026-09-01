@@ -564,6 +564,79 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Removing a comment leaves the whitespace it was. A comment separates
+     * tokens in the language, so deleting it outright joined them:
+     * {@code strictly/* pin *}{@code /'1.7.22'} became strictly'1.7.22', which
+     * is not a call to strictly, and the strict pin behind it was never seen.
+     */
+    @Test
+    public void removingACommentLeavesTheWhitespaceItWas() {
+        String[] joined = {
+            "    implementation('org.jetbrains.kotlin:kotlin-stdlib') "
+                    + "{ version { strictly/* pin */'1.7.22' } }\n",
+            "    def/* local */dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'; "
+                    + "implementation(dep) { version { strictly '1.7.22' } }\n",
+            "    implementation/* which */('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!')\n",
+        };
+        for (int i = 0; i < joined.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation", joined[i]);
+            check("".equals(out),
+                    "the comment did not join the tokens around it in <<" + joined[i]
+                            + ">>, got <<" + out + ">>");
+        }
+    }
+
+    /**
+     * A slash after anything that is not a value opens a literal.
+     *
+     * <p>Swept over the operators rather than asserted one at a time, because
+     * one at a time is how the rule was built and it took four review rounds
+     * to still be incomplete: the closure arrow, then the comparison, then
+     * Groovy's {@code =~} and {@code ==~}. The code no longer enumerates this
+     * half at all -- it enumerates the closed one, what a value can end with --
+     * so this test is where the open half is written down.</p>
+     */
+    @Test
+    public void aSlashAfterAnythingThatIsNotAValueOpensALiteral() {
+        String[] operators = {
+            "=", "=~", "==~", "~", "->", ",", "(", "[", ":", "&&", "||",
+            "!", "?", "+", "-", "*", "%", "^", "|", "&", "<", ">", "<=", ">=",
+            "==", "!=", "<<", "?:",
+        };
+        for (int i = 0; i < operators.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    def marker = [ name " + operators[i] + " /can't/ ]; "
+                    + "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                    + "{ version { strictly '1.7.22' } }\n");
+            check("".equals(out),
+                    "a slash after " + operators[i]
+                            + " opens a literal, so the pin behind it is still seen; got <<"
+                            + out + ">>");
+        }
+    }
+
+    /**
+     * And a slash after a value divides it. This is the half the code
+     * enumerates, so it is the half that must stay closed: adding to it is how
+     * a division starts swallowing the statements after it.
+     */
+    @Test
+    public void aSlashAfterAValueDividesIt() {
+        String[] values = {
+            "total", "2", "count()", "sizes[0]", "(a + b)", "1.5", "n++", "n--",
+        };
+        for (int i = 0; i < values.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    def ratio = " + values[i] + " / divisor; "
+                    + "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                    + "{ version { strictly '1.7.22' } }\n");
+            check("".equals(out),
+                    "dividing " + values[i]
+                            + " does not swallow the pin after it; got <<" + out + ">>");
+        }
+    }
+
+    /**
      * A forced version suppresses the block, like a strict one.
      *
      * <p>A force does not conflict with a constraint, it wins over it without
