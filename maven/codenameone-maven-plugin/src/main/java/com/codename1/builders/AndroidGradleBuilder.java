@@ -7300,24 +7300,45 @@ public class AndroidGradleBuilder extends Executor {
         String kotlinStdlibConstraints = "";
         if (useAndroidX && gradleVersionInt >= 6
                 && request.getArg("android.kotlinStdlibAlignment", "true").equals("true")) {
-            kotlinStdlibConstraints = KotlinStdlibAlignment.constraintsBlock(
-                    compile,
-                    // Every app-controlled fragment that reaches the generated
-                    // dependencies block. Read off ShieldInjector's GRADLE_TEXT_HINTS,
-                    // which is this tree's enumeration of hints interpolated into a
-                    // Gradle file, rather than off the ones that came to mind --
-                    // android.supportv4Dep was missed exactly that way, and so was
-                    // android.gradlePlugin: it is interpolated at top level right after
-                    // `apply plugin`, where a dependencies { } block of its own is
-                    // valid and reaches the same configurations. The rest of that list
-                    // lands in buildscript, repositories or the android block, where a
-                    // dependency cannot be declared.
-                    request.getArg("android.gradlePlugin", ""),
-                    additionalDependencies,
-                    aiExtraGradleDependencies.toString(),
-                    request.getArg("android.gradleDep", ""),
-                    request.getArg("android.supportv4Dep", ""),
-                    request.getArg("android.xgradle", ""));
+            try {
+                kotlinStdlibConstraints = KotlinStdlibAlignment.constraintsBlock(
+                        compile,
+                        // Every app-controlled fragment that reaches the generated
+                        // dependencies block. Read off ShieldInjector's GRADLE_TEXT_HINTS,
+                        // which is this tree's enumeration of hints interpolated into a
+                        // Gradle file, rather than off the ones that came to mind --
+                        // android.supportv4Dep was missed exactly that way, and so was
+                        // android.gradlePlugin: it is interpolated at top level right after
+                        // `apply plugin`, where a dependencies { } block of its own is
+                        // valid and reaches the same configurations. The rest of that list
+                        // lands in buildscript, repositories or the android block, where a
+                        // dependency cannot be declared.
+                        // In the order the generated script emits them, because a
+                        // definition is only in scope for what comes after it: gradlePlugin
+                        // at the top, then the dependencies block in its own order, then
+                        // xgradle after it. Listing them in any other order lost a
+                        // definition that the real script would have had in scope.
+                        request.getArg("android.gradlePlugin", ""),
+                        request.getArg("android.supportv4Dep", ""),
+                        additionalDependencies,
+                        aiExtraGradleDependencies.toString(),
+                        request.getArg("android.gradleDep", ""),
+                        request.getArg("android.xgradle", ""));
+            } catch (RuntimeException e) {
+                // The alignment reads the app's Gradle text to decide whether the app
+                // already manages the stdlib family, and that reading is a scanner
+                // over arbitrary developer-authored Groovy. It runs on EVERY AndroidX
+                // build, so an index defect anywhere in it would not break one app,
+                // it would break all of them -- and the whole block is an optimisation
+                // over a build that already worked apart from one duplicate class.
+                // So its worst case is made "emit nothing", which is exactly the
+                // behaviour before this feature existed, and never a failed build.
+                // Logged rather than swallowed, because a silent catch here would
+                // hide the defect for as long as nobody reported the duplicate.
+                kotlinStdlibConstraints = "";
+                log("NOTICE: skipping the Kotlin stdlib alignment, its read of the "
+                        + "project's Gradle text failed: " + e);
+            }
         }
 
         String gradleProps = "apply plugin: 'com.android.application'\n"

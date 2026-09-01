@@ -458,6 +458,299 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * The alignment can never fail a build. It reads developer-authored Groovy
+     * with a hand-written scanner, on every AndroidX build there is, to decide
+     * something that is an optimisation over a build which already worked --
+     * so an index defect in it must cost that one app its constraint, not
+     * every app its build. The guard is asserted here rather than trusted,
+     * because nothing else in the suite would notice it being refactored away.
+     */
+    @Test
+    public void theAlignmentCannotFailTheBuild() throws Exception {
+        byte[] bytes = java.nio.file.Files.readAllBytes(new java.io.File(
+                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath());
+        String builderSrc = new String(bytes, "UTF-8");
+        int at = builderSrc.indexOf("KotlinStdlibAlignment.constraintsBlock(");
+        check(at >= 0, "the builder calls the alignment");
+        String before = builderSrc.substring(0, at);
+        check(before.lastIndexOf("try {") > before.lastIndexOf("catch ("),
+                "the call is inside a try block");
+        String after = builderSrc.substring(at);
+        int handler = after.indexOf("catch (RuntimeException");
+        check(handler >= 0, "and a RuntimeException handler follows it");
+        // Past the handler's own reasoning, which is longer than the code.
+        String body = after.substring(handler,
+                Math.min(handler + 2000, after.length()));
+        check(body.indexOf("kotlinStdlibConstraints = \"\"") >= 0,
+                "which falls back to emitting nothing");
+        check(body.indexOf("log(") >= 0,
+                "and says so, rather than swallowing the defect");
+    }
+
+    /**
+     * How a literal is delimited changes nothing about what it says, so the
+     * same declaration written four ways produces the same block. Asserted as
+     * an equivalence rather than case by case because the strict sweep already
+     * passed the triple-quoted spelling for the wrong reason: the version came
+     * back as {@code ""1.9.22""}, no version parsed out of it, and an
+     * unreadable version counts as below the floor -- which happens to be the
+     * safe answer, so nothing failed while the read was wrong.
+     */
+    @Test
+    public void theDelimiterDoesNotChangeWhatADeclarationSays() {
+        String[] quotes = {"'", "\"", "'''", "\"\"\""};
+        String[] shapes = {
+            "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
+                    + "{ version { strictly %s1.9.22%s } }",
+            "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
+                    + "{ version { require %s1.9.22%s } }",
+            "implementation group: %sorg.jetbrains.kotlin%s, "
+                    + "name: %skotlin-stdlib-jdk8%s, version: '1.9.22'",
+            "dependencies.add(%simplementation%s, "
+                    + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22')",
+        };
+        for (int s = 0; s < shapes.length; s++) {
+            String expected = null;
+            for (int q = 0; q < quotes.length; q++) {
+                String text = shapes[s].replace("%s", quotes[q]);
+                String out = KotlinStdlibAlignment.constraintsBlock("implementation", text);
+                if (expected == null) {
+                    expected = out;
+                    continue;
+                }
+                check(expected.equals(out),
+                        "the delimiter does not change the answer for <<" + text
+                                + ">>: expected <<" + expected + ">> got <<" + out + ">>");
+            }
+        }
+    }
+
+    /**
+     * A pre-merge shim added through {@code dependencies.add} suppresses the
+     * block, whichever delimiter names the configuration. Emitting beside it
+     * raises kotlin-stdlib past the app's own class-bearing 1.7.22 jar, which
+     * is this block manufacturing the duplicate it exists to prevent.
+     */
+    @Test
+    public void anAddedPreMergeShimSuppressesTheBlock() {
+        String[] quotes = {"'", "\"", "'''", "\"\"\""};
+        for (int q = 0; q < quotes.length; q++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    dependencies.add(" + quotes[q] + "implementation" + quotes[q]
+                            + ", 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22')\n");
+            check("".equals(out),
+                    "an added pre-merge shim suppresses the block, named with "
+                            + quotes[q] + " but got <<" + out + ">>");
+        }
+    }
+
+    /**
+     * The complement of the sweep below, and the direction that fails in
+     * silence: an app whose Gradle text says nothing about Kotlin still gets
+     * both constraints. Every recognition rule added to this class is a new
+     * way to conclude "the app has this covered", and concluding it wrongly
+     * does not fail anything -- it just hands the duplicate class back to the
+     * app this whole change exists to fix, with no signal anywhere.
+     */
+    @Test
+    public void ordinaryProjectTextStillGetsTheAlignment() {
+        String[] ordinary = {
+            "implementation 'androidx.appcompat:appcompat:1.6.1'",
+            "implementation('com.android.billingclient:billing:9.1.0')",
+            "implementation group: 'com.google.android.material', name: 'material', "
+                    + "version: '1.11.0'",
+            "def v = '1.7.22'\nimplementation(\"com.squareup.okhttp3:okhttp:$v\")",
+            "annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'",
+            "implementation fileTree(dir: 'libs', include: ['*.jar'])",
+            // Commented out is not declared, in either comment syntax.
+            "// implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'",
+            "/* implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!' */",
+            // And a reason string is prose, not a pin.
+            "implementation('a:b:1.0') { because 'strictly 1.7.22 was never wanted' }",
+            "testImplementation 'junit:junit:4.13.2'",
+            "",
+        };
+        String[] decorations = {
+            "%s", "    %s", "dependencies {\n%s\n}", "%s // note",
+            "%s\nimplementation 'com.google.code.gson:gson:2.10.1'",
+        };
+        for (int o = 0; o < ordinary.length; o++) {
+            for (int d = 0; d < decorations.length; d++) {
+                String text = decorations[d].replace("%s", ordinary[o]);
+                String out = KotlinStdlibAlignment.constraintsBlock("implementation", text);
+                check(out.contains("kotlin-stdlib-jdk7:1.8.0")
+                                && out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                        "both constraints are still written for <<" + text
+                                + ">> but got <<" + out + ">>");
+            }
+        }
+    }
+
+    /**
+     * Every equivalent way of writing a strict pre-merge pin suppresses the
+     * block. This is a sweep rather than an example, because the examples were
+     * being found one review comment at a time while the same defect sat in
+     * three different places: a triple-quoted definition expanded to
+     * {@code ""1.7.22""}, no version was parsed out of it, and the constraint
+     * went in beside the strict pin -- which does not fail the build, it
+     * silently strips the classes and throws NoClassDefFoundError on the
+     * device. That is the one outcome this class must never produce, so the
+     * property is asserted over the whole spelling space and not over the
+     * spellings somebody happened to think of.
+     */
+    @Test
+    public void everySpellingOfAStrictPreMergePinSuppressesTheBlock() {
+        String[] artifacts = {"kotlin-stdlib", "kotlin-stdlib-jdk7", "kotlin-stdlib-jdk8"};
+        String[] quotes = {"'", "\"", "'''", "\"\"\""};
+        String[] configurations = {"implementation", "api", "compile"};
+        int checked = 0;
+        for (int a = 0; a < artifacts.length; a++) {
+            String coordinate = "org.jetbrains.kotlin:" + artifacts[a];
+            for (int q = 0; q < quotes.length; q++) {
+                String u = quotes[q];
+                for (int c = 0; c < configurations.length; c++) {
+                    String on = configurations[c];
+                    String[] forms = {
+                        on + "(" + u + coordinate + ":1.7.22!!" + u + ")",
+                        on + " " + u + coordinate + ":1.7.22!!" + u,
+                        on + "(" + u + coordinate + u + ") { version { strictly "
+                                + u + "1.7.22" + u + " } }",
+                        on + "(" + u + coordinate + u + ")\n{ version { strictly "
+                                + u + "1.7.22" + u + " } }",
+                        "def v = " + u + "1.7.22" + u + "\n" + on + "(\""
+                                + coordinate + ":$v!!\")",
+                        "def d = " + u + coordinate + ":1.7.22!!" + u + "\n" + on + "(d)",
+                        "String d = " + u + coordinate + ":1.7.22!!" + u + "; " + on + "(d)",
+                    };
+                    for (int f = 0; f < forms.length; f++) {
+                        String[] decorated = {
+                            forms[f],
+                            "    " + forms[f],
+                            "\t" + forms[f] + "   ",
+                            forms[f] + " // a note",
+                            "/* lead */ " + forms[f],
+                            "dependencies {\n" + forms[f] + "\n}",
+                            "repositories { mavenCentral() }\n" + forms[f],
+                            forms[f] + "\nimplementation 'androidx.appcompat:appcompat:1.6.1'",
+                            "implementation 'androidx.appcompat:appcompat:1.6.1'\n" + forms[f],
+                        };
+                        for (int d = 0; d < decorated.length; d++) {
+                            checked++;
+                            String out = KotlinStdlibAlignment.constraintsBlock(
+                                    "implementation", decorated[d]);
+                            check("".equals(out),
+                                    "a strict pre-merge pin suppresses the block, written as <<"
+                                            + decorated[d] + ">> but got <<" + out + ">>");
+                        }
+                    }
+                }
+            }
+        }
+        check(checked > 2000, "the sweep really ran over the matrix: " + checked);
+    }
+
+    /**
+     * A preference is soft: Gradle takes it only when nothing stronger is in
+     * play, so a transitive requirement for a pre-merge shim beats it. Reading
+     * one as proof the artifact cannot resolve below the floor suppressed the
+     * constraint that was the only thing standing between that graph and the
+     * duplicate.
+     */
+    @Test
+    public void aPreferenceDoesNotStandInForTheConstraint() {
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
+                + "{ version { prefer '1.9.22' } }\n");
+        check(modern.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a preferred version does not suppress the constraint");
+
+        String old = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
+                + "{ version { prefer '1.7.22' } }\n");
+        check(old.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "and neither does an old one, which the floor simply overrides");
+
+        // a required version still does
+        String required = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
+                + "{ version { require '1.9.22' } }\n");
+        check(!required.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a required version still binds");
+    }
+
+    /**
+     * A map value written with the long delimiter keeps its content. Stripping
+     * one character per side left the group and name wearing two quotes, so
+     * both failed their exact match and the declaration was ignored.
+     */
+    @Test
+    public void aTripleQuotedMapValueKeepsItsContent() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation group: '''org.jetbrains.kotlin''', "
+                + "name: '''kotlin-stdlib-jdk8''', version: '1.9.22'\n");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a triple-quoted map declaration still pins its artifact");
+    }
+
+    /**
+     * A typed local declares as much as def does.
+     */
+    @Test
+    public void aTypedLocalDefinesACoordinate() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    String dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
+                + "    implementation(dep) { version { strictly '1.7.22' } }\n");
+        check("".equals(out), "a typed local carries the coordinate too");
+    }
+
+    /**
+     * Groovy's dollar-slashy literal may open with a slash, which the comment
+     * scanner read as a line comment and used to discard the rest of the
+     * fragment, strict pin included. The PLAIN slashy form is deliberately not
+     * recognised -- a lone slash is also division and both comment kinds --
+     * and that limit has its own assertion below.
+     */
+    @Test
+    public void aDollarSlashyLiteralDoesNotOpenAComment() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                // On one line, because a line comment only reaches the end of its
+                // own line: put the pin on the next one and the test passes with
+                // the literal unrecognised, which proves nothing.
+                "    def marker = $//*/$; "
+                + "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check("".equals(out),
+                "the strict pin after a dollar-slashy literal is still seen");
+    }
+
+    /**
+     * The builder hands the fragments over in the order the generated script
+     * emits them, because a definition is only in scope for what follows it.
+     */
+    @Test
+    public void theBuilderPassesFragmentsInGeneratedOrder() throws Exception {
+        byte[] bytes = java.nio.file.Files.readAllBytes(new java.io.File(
+                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath());
+        String builderSrc = new String(bytes, "UTF-8");
+        int at = builderSrc.indexOf("KotlinStdlibAlignment.constraintsBlock(");
+        check(at >= 0, "the builder calls the alignment");
+        String call = builderSrc.substring(at, builderSrc.indexOf(";", at));
+        // The call carries a comment naming those same hints, in an order that
+        // has nothing to do with the arguments -- read the arguments only.
+        call = call.replaceAll("//[^\n]*", "");
+        int plugin = call.indexOf("getArg(\"android.gradlePlugin\"");
+        int support = call.indexOf("getArg(\"android.supportv4Dep\"");
+        int additional = call.indexOf("additionalDependencies");
+        int dep = call.indexOf("getArg(\"android.gradleDep\"");
+        int xgradle = call.indexOf("getArg(\"android.xgradle\"");
+        check(plugin >= 0 && support >= 0 && additional >= 0 && dep >= 0 && xgradle >= 0,
+                "every app-controlled fragment is passed");
+        check(plugin < support && support < additional && additional < dep
+                        && dep < xgradle,
+                "and in the order the generated script emits them");
+    }
+
+    /**
      * A reason can be nothing BUT a coordinate, so the whitespace rule does not
      * catch it. `because 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'`
      * names the artifact it warns about; read as a declaration it supplied a

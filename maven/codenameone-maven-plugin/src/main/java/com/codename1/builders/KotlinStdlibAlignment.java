@@ -282,6 +282,14 @@ public class KotlinStdlibAlignment {
         return false;
     }
 
+    /**
+     * Whether this statement establishes a version for {@code artifact} that
+     * Gradle will actually hold it to.
+     */
+    private static boolean bindsAVersion(String line, String artifact) {
+        return declaredVersionOf(line, artifact) != null;
+    }
+
     /** Whether the statement names the artifact, in either spelling. */
     private static boolean namesArtifactAnywhere(String line, String artifact) {
         return namesCoordinate(line, artifact)
@@ -355,9 +363,12 @@ public class KotlinStdlibAlignment {
             }
             j = skipBlanks(line, j + 1);
             if (j < line.length() && (line.charAt(j) == '\'' || line.charAt(j) == '"')) {
-                int end = endOfStringLiteral(line, j);
-                if (end < line.length()) {
-                    return line.substring(j + 1, end);
+                if (endOfStringLiteral(line, j) < line.length()) {
+                    // The real delimiter length, as the coordinate path does. Stripping
+                    // one character per side left a triple-quoted group or name wearing
+                    // two quotes, so both failed their exact match and the declaration
+                    // was ignored -- strict pin and all.
+                    return stringLiteralContent(line, j);
                 }
             }
             i = j;
@@ -592,17 +603,20 @@ public class KotlinStdlibAlignment {
      * with no version at all, which the conservative path then treated as
      * below the floor -- dropping BOTH constraints for a declaration that was
      * already merged-era and needed only its sibling left alone.</p>
+     *
+     * <p>{@code prefer} is deliberately NOT read here. A preference is soft:
+     * Gradle takes it only when nothing stronger is in play, so a transitive
+     * requirement for a pre-merge shim beats it and the class-bearing jar wins
+     * anyway. Treating a preference as proof the artifact cannot resolve below
+     * the floor suppressed the constraint that was the only thing standing
+     * between that graph and the duplicate.</p>
      */
     private static String richVersionIn(String statement) {
         String strict = versionInCall(statement, STRICTLY);
         if (strict != null) {
             return strict;
         }
-        String required = versionInCall(statement, "require");
-        if (required != null) {
-            return required;
-        }
-        return versionInCall(statement, "prefer");
+        return versionInCall(statement, "require");
     }
 
     /** The quoted argument of {@code call}, found outside string literals. */
@@ -634,7 +648,12 @@ public class KotlinStdlibAlignment {
                             || statement.charAt(after) == '"')) {
                 int end = endOfStringLiteral(statement, after);
                 if (end < statement.length()) {
-                    return statement.substring(after + 1, end);
+                    // The literal's own delimiters, however many it has. Written
+                    // strictly """1.7.22""", the one-per-side slice returned
+                    // ""1.7.22"" -- which parsed as no version at all and only
+                    // reached the right answer because an unreadable version counts
+                    // as below the floor. Correct by accident is not correct.
+                    return stringLiteralContent(statement, after);
                 }
             }
             i = after;
@@ -833,8 +852,37 @@ public class KotlinStdlibAlignment {
         // fails the whole script at evaluation, which is a far larger blast radius
         // than the case it fixes. Revisit only with a project that actually has this
         // shape.
+        //
+        // Reviewed a third time with a sharper argument: a pin on a DETACHED
+        // configuration -- annotationProcessor, kapt, ksp -- genuinely cannot
+        // conflict, because unlike the variant configurations those do not extend
+        // implementation, so suppressing on one leaves the release runtime graph
+        // unaligned for nothing. The Gradle fact is right. What it asks for is not
+        // available here: acting on it means deciding from a configuration's NAME
+        // whether it shares a classpath with the one being constrained, and
+        //   - Android synthesises a configuration per build type and flavour, so the
+        //     names are open-ended: debugAnnotationProcessor, freeReleaseImplementation,
+        //     and whatever the next plugin adds,
+        //   - "does not extend implementation" is not the same question as "cannot
+        //     conflict": compileOnly does not extend it either, yet compileClasspath
+        //     extends both, so a strict pin there does conflict.
+        // A name list that gets this wrong is not wrong symmetrically. Classifying a
+        // conflicting configuration as detached emits the constraint beside a live
+        // strict pin, which is measured to fail resolution outright -- and for the
+        // `1.7.22!!` spelling to resolve quietly to the empty shims and throw
+        // NoClassDefFoundError on the device instead. Classifying a detached one as
+        // conflicting costs an app that had already pinned the family the duplicate
+        // it already had. So this stays until the classification can be read from
+        // something better than a name.
         if (!holdsStrictly(line, artifact)
                 && !declaresOnTheConstrainedConfiguration(configuration, line)) {
+            return false;
+        }
+        if (!bindsAVersion(line, artifact)) {
+            // A declaration that pins nothing cannot stand in for the constraint. The
+            // clearest case is a lone preference: our floor overrides it, so emitting
+            // is harmless, while suppressing leaves a transitive pre-merge shim free
+            // to win. A declaration with no version at all is the same argument.
             return false;
         }
         if (namesCoordinate(line, artifact)) {
@@ -1052,31 +1100,26 @@ public class KotlinStdlibAlignment {
 
     /** Whether this line declares on {@code configuration}, as a whole token. */
     private static boolean declaresOn(String configuration, String line) {
-        char quote = 0;
-        int stringStart = -1;
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
-            if (quote != 0) {
-                if (c == '\\' && i + 1 < line.length()) {
-                    i++;
-                } else if (c == quote) {
-                    // A configuration name inside a string counts in one place only:
-                    // as the first argument of dependencies.add("runtimeOnly", "..").
-                    // Accepting any quoted occurrence read the word in a reason --
-                    // because 'implementation workaround' -- as a main-variant
-                    // declaration, which suppressed the constraint for a dependency
-                    // that only affects debug.
-                    if (line.substring(stringStart + 1, i).equals(configuration)
-                            && isAddCallArgument(line, stringStart)) {
-                        return true;
-                    }
-                    quote = 0;
-                }
-                continue;
-            }
             if (c == '\'' || c == '"') {
-                quote = c;
-                stringStart = i;
+                // The shared rule rather than a third hand-rolled quote scanner. This
+                // one tracked a single delimiter character, so a triple-quoted name
+                // was read as an empty string followed by unquoted text -- the same
+                // defect that was live in the map-value and interpolation paths.
+                int end = endOfStringLiteral(line, i);
+                // A configuration name inside a string counts in one place only:
+                // as the first argument of dependencies.add("runtimeOnly", "..").
+                // Accepting any quoted occurrence read the word in a reason --
+                // because 'implementation workaround' -- as a main-variant
+                // declaration, which suppressed the constraint for a dependency
+                // that only affects debug.
+                if (end < line.length()
+                        && stringLiteralContent(line, i).equals(configuration)
+                        && isAddCallArgument(line, i)) {
+                    return true;
+                }
+                i = end;
                 continue;
             }
             if (line.startsWith(configuration, i)) {
@@ -1151,6 +1194,24 @@ public class KotlinStdlibAlignment {
                 } else if (c == '\n') {
                     out.append(c);
                 }
+                continue;
+            }
+            if (c == '$' && i + 1 < fragment.length() && fragment.charAt(i + 1) == '/') {
+                // Groovy's dollar-slashy literal. Its opener is unambiguous, and its
+                // content may start with a slash -- $/ /* /$ -- which the comment
+                // scanner below read as a line comment and used to discard the rest
+                // of the fragment, strict pin included.
+                //
+                // The PLAIN slashy form, /.../, is deliberately not recognised: a lone
+                // slash is also division and the start of both comment kinds, so
+                // telling them apart needs to know whether an expression is expected
+                // here, which is parsing rather than scanning. Guessing wrong there
+                // would swallow ordinary text, which is the failure this whole method
+                // exists to avoid.
+                int end = fragment.indexOf("/$", i + 2);
+                int stop = end < 0 ? fragment.length() : end + 2;
+                out.append(fragment, i, stop);
+                i = stop - 1;
                 continue;
             }
             if (c == '\'' || c == '"') {
@@ -1389,6 +1450,20 @@ public class KotlinStdlibAlignment {
             i = skipBlanks(statement, at + DEF.length());
         } else {
             i = skipBlanks(statement, 0);
+            // A typed local declares just as much as def does: `String dep = '...'`.
+            // Two identifiers before the '=' is a declaration, one is an assignment,
+            // and only the first token differs.
+            int typeEnd = i;
+            while (typeEnd < statement.length()
+                    && isIdentifierChar(statement.charAt(typeEnd))) {
+                typeEnd++;
+            }
+            int afterType = skipBlanks(statement, typeEnd);
+            if (typeEnd > i && afterType < statement.length()
+                    && isIdentifierChar(statement.charAt(afterType))) {
+                declared = true;
+                i = afterType;
+            }
         }
         int nameStart = i;
         while (i < statement.length() && isIdentifierChar(statement.charAt(i))) {
@@ -1485,8 +1560,15 @@ public class KotlinStdlibAlignment {
                 out.append(c);
                 continue;
             }
-            // Stored with its quotes, which do not belong inside another string.
-            out.append(value, 1, value.length() - 1);
+            // Stored with its quotes, which do not belong inside another string --
+            // and with however many of them the literal was written with. Stripping
+            // one per side left a triple-quoted definition expanding to ""1.7.22"",
+            // no version parsed out of it, and the constraint written beside a
+            // strict pre-merge pin: the one outcome that fails at RUNTIME rather
+            // than in the build. Found by sweeping equivalent spellings of a strict
+            // pin, not by reading this line; the same one-character assumption was
+            // live in two other places.
+            out.append(stringLiteralContent(value, 0));
             i = braced ? nameEnd : nameEnd - 1;
         }
         return out.toString();
