@@ -401,6 +401,45 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * The version comes from the strict call, not from a reason that mentions
+     * one. Finding the call correctly and then reading the version with a
+     * plain search let prose supply it, so a declaration whose real strict
+     * version is compatible was judged on a number from its own comment.
+     */
+    @Test
+    public void theStrictVersionComesFromTheCallNotTheProse() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.9.22') "
+                + "{ because \"strictly '1.7.22' is not intended\"; "
+                + "version { strictly '1.9.22' } }\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the real strict version is above the floor, so the block is written");
+    }
+
+    /**
+     * Brace balancing honours escapes, as the statement scanner does. A
+     * declaration whose closure contained an escaped apostrophe had its real
+     * closing brace ignored, so following dependencies merged into it and an
+     * unrelated strict pin could be read as one on kotlin-stdlib.
+     */
+    @Test
+    public void anEscapedQuoteDoesNotSwallowAClosingBrace() {
+        // The base stdlib named without a strict version, then an UNRELATED strict
+        // pin. Correct: neither suppresses, so the block is written. With the escape
+        // mishandled the two statements merge, the merged statement both names
+        // kotlin-stdlib and calls strictly '1.7.22', and the whole block disappears.
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib:1.9.22') "
+                + "{ because 'can\\'t' }\n"
+                + "    implementation('com.example:other:1.0') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an unrelated strict pin does not merge into the Kotlin declaration");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and the block is written in full");
+    }
+
+    /**
      * An underscore is an identifier character. A configuration named
      * custom_implementation ended its embedded "implementation" on a boundary
      * that looked clean, so it read as the main configuration and suppressed a

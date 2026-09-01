@@ -313,21 +313,37 @@ public class KotlinStdlibAlignment {
 
     /** The version inside this statement's {@code strictly} call, or null. */
     private static String strictVersionIn(String statement) {
-        int at = statement.indexOf(STRICTLY);
-        while (at >= 0) {
-            int i = skipBlanks(statement, at + STRICTLY.length());
-            if (i < statement.length() && statement.charAt(i) == '(') {
-                i = skipBlanks(statement, i + 1);
+        // The same syntax-level call callsStrictly validated, not any occurrence of
+        // the word: a reason reading `because "strictly '1.7.22' is not intended"`
+        // otherwise supplies the version for a declaration whose real strict version
+        // is something else entirely, and the wrong one decides whether the block is
+        // written.
+        for (int i = 0; i < statement.length(); i++) {
+            char c = statement.charAt(i);
+            if (c == '\'' || c == '"') {
+                i = endOfStringLiteral(statement, i);
+                continue;
             }
-            if (i < statement.length()
-                    && (statement.charAt(i) == '\'' || statement.charAt(i) == '"')) {
-                char q = statement.charAt(i);
-                int end = statement.indexOf(q, i + 1);
-                if (end > i) {
-                    return statement.substring(i + 1, end);
+            if (!statement.startsWith(STRICTLY, i)) {
+                continue;
+            }
+            boolean startsToken = i == 0 || !isIdentifierChar(statement.charAt(i - 1));
+            if (!startsToken) {
+                continue;
+            }
+            int after = skipBlanks(statement, i + STRICTLY.length());
+            if (after < statement.length() && statement.charAt(after) == '(') {
+                after = skipBlanks(statement, after + 1);
+            }
+            if (after < statement.length()
+                    && (statement.charAt(after) == '\''
+                            || statement.charAt(after) == '"')) {
+                int end = endOfStringLiteral(statement, after);
+                if (end < statement.length()) {
+                    return statement.substring(after + 1, end);
                 }
             }
-            at = statement.indexOf(STRICTLY, at + 1);
+            i = after;
         }
         return null;
     }
@@ -508,19 +524,10 @@ public class KotlinStdlibAlignment {
      * syntax.</p>
      */
     private static boolean callsStrictly(String statement) {
-        char quote = 0;
         for (int i = 0; i < statement.length(); i++) {
             char c = statement.charAt(i);
-            if (quote != 0) {
-                if (c == '\\' && i + 1 < statement.length()) {
-                    i++;
-                } else if (c == quote) {
-                    quote = 0;
-                }
-                continue;
-            }
             if (c == '\'' || c == '"') {
-                quote = c;
+                i = endOfStringLiteral(statement, i);
                 continue;
             }
             if (statement.startsWith(STRICTLY, i)) {
@@ -586,6 +593,31 @@ public class KotlinStdlibAlignment {
      */
     private static boolean isIdentifierChar(char c) {
         return Character.isLetterOrDigit(c) || c == '_' || c == '$';
+    }
+
+    /**
+     * The index of the quote closing the literal that opens at
+     * {@code quoteAt}, or the text length when nothing closes it.
+     *
+     * <p>One implementation because there were several, and they drifted. Each
+     * scanner in this class had its own copy of "walk to the closing quote",
+     * some honouring backslash escapes and some not, and every divergence
+     * turned into a defect: a statement scanner that stopped at the apostrophe
+     * inside {@code 'can\'t'} merged statements that must stay apart, and a
+     * brace counter that did the same swallowed a declaration's closing brace.
+     * They call this now, so a fix reaches all of them.</p>
+     */
+    private static int endOfStringLiteral(String text, int quoteAt) {
+        char quote = text.charAt(quoteAt);
+        for (int i = quoteAt + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c == quote) {
+                return i;
+            }
+        }
+        return text.length();
     }
 
     private static int skipBlanks(String line, int from) {
@@ -930,15 +962,10 @@ public class KotlinStdlibAlignment {
     /** How far a statement opens or closes braces, ignoring those in strings. */
     private static int braceBalance(String statement) {
         int depth = 0;
-        char quote = 0;
         for (int i = 0; i < statement.length(); i++) {
             char c = statement.charAt(i);
-            if (quote != 0) {
-                if (c == quote) {
-                    quote = 0;
-                }
-            } else if (c == '\'' || c == '"') {
-                quote = c;
+            if (c == '\'' || c == '"') {
+                i = endOfStringLiteral(statement, i);
             } else if (c == '{') {
                 depth++;
             } else if (c == '}') {
