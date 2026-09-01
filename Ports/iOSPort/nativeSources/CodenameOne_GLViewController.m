@@ -5136,37 +5136,6 @@ BOOL prefersStatusBarHidden = NO;
         [renderingView prepareRetainedFramebufferForDrawRect:rect displayWidth:displayWidth displayHeight:displayHeight];
     }
 #endif
-    // How much of the screen does a frame actually repaint? The offscreen
-    // screenTexture exists so a frame can repaint only its dirty region and keep
-    // the rest; it costs a full-screen texture to do that. If frames repaint
-    // most of the screen anyway, that texture is buying very little.
-    // CN1_REPAINT_RATIO reports it; costs one cached getenv otherwise.
-    {
-        static int repaintRatioOn = -1;
-        if(repaintRatioOn < 0) {
-            repaintRatioOn = getenv("CN1_REPAINT_RATIO") ? 1 : 0;
-        }
-        if(repaintRatioOn) {
-            static long frames = 0;
-            static double areaSum = 0;
-            static long fullFrames = 0;
-            double full = (double)displayWidth * (double)displayHeight;
-            double area = (double)rect.size.width * (double)rect.size.height;
-            if(full > 0) {
-                double frac = area / full;
-                if(frac > 1.0) frac = 1.0;
-                frames++;
-                areaSum += frac;
-                if(frac > 0.95) fullFrames++;
-                if((frames % 5) == 0) {
-                    fprintf(stderr, "BENCH:REPAINT frames=%ld mean=%.1f%% full(>95%%)=%ld (%.0f%%)\n",
-                            frames, 100.0 * areaSum / (double)frames, fullFrames,
-                            100.0 * (double)fullFrames / (double)frames);
-                    fflush(stderr);
-                }
-            }
-        }
-    }
     [renderingView setFramebuffer];
     GLErrorLog;
     BOOL drewContentOps = NO;
