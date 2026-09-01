@@ -144,12 +144,33 @@ public class KotlinStdlibAlignment {
     };
 
     /**
-     * The marker that suppresses the whole block rather than one artifact.
-     * A BOM aligns every module in the {@code org.jetbrains.kotlin} group,
-     * which is a superset of what this class does, so an app using one has
-     * already answered the question for both artifacts.
+     * The marker that can suppress the whole block rather than one artifact.
+     * A BOM manages every module in the {@code org.jetbrains.kotlin} group,
+     * jdk7 and jdk8 included, so a new enough one answers the question for
+     * both artifacts at once.
+     *
+     * <p><b>Only a new enough one.</b> A BOM raises the jdk artifacts but
+     * cannot pull {@code kotlin-stdlib} back down, because a platform
+     * contributes constraints and the highest version still wins. So a
+     * pre-merge BOM leaves exactly the arrangement this class exists to
+     * prevent -- measured, with the same graph as the class comment's
+     * table:</p>
+     *
+     * <pre>
+     * no BOM           stdlib 1.8.22 + jdk7/jdk8 1.6.21   duplicate
+     * kotlin-bom 1.7.22  stdlib 1.8.22 + jdk7/jdk8 1.7.22   STILL a duplicate
+     * kotlin-bom 1.9.22  all 1.9.22, jdk artifacts shims    safe
+     * </pre>
+     *
+     * <p>The BOM is therefore tested by version, exactly like the Kotlin
+     * Gradle plugin above it, and for the same reason: presence is not
+     * alignment.</p>
      */
     private static final String KOTLIN_BOM = "kotlin-bom";
+
+    /** The coordinate a BOM's version is read from. */
+    private static final String KOTLIN_BOM_COORDINATE =
+            "org.jetbrains.kotlin:kotlin-bom:";
 
     private KotlinStdlibAlignment() {
     }
@@ -182,7 +203,9 @@ public class KotlinStdlibAlignment {
         if (configuration == null || configuration.trim().length() == 0) {
             return "";
         }
-        if (contains(KOTLIN_BOM, appGradleFragments)) {
+        if (contains(KOTLIN_BOM, appGradleFragments)
+                && atOrPastTheMerge(
+                        declaredVersion(KOTLIN_BOM_COORDINATE, appGradleFragments))) {
             return "";
         }
         String config = configuration.trim();
@@ -221,18 +244,65 @@ public class KotlinStdlibAlignment {
      * silently switch the alignment off.</p>
      */
     public static boolean alignsItsOwnJdkVariants(String kotlinPluginVersion) {
-        if (kotlinPluginVersion == null) {
+        return atOrPastTheMerge(kotlinPluginVersion);
+    }
+
+    /**
+     * Whether a Kotlin version is at or past the release that merged the jdk
+     * artifacts away, and therefore aligns them wherever it is in force --
+     * as the Gradle plugin's version or as a BOM's.
+     *
+     * <p>Unknown reads as false everywhere it is used. A version that cannot
+     * be parsed -- {@code kotlin-gradle-plugin:$kotlin_version} and
+     * {@code kotlin-bom:$kotlinVersion} both produce one -- must not silently
+     * switch the alignment off.</p>
+     */
+    private static boolean atOrPastTheMerge(String kotlinVersion) {
+        if (kotlinVersion == null) {
             return false;
         }
         // Shared with the Health Connect floor check rather than parsed again here:
         // it already drops a qualifier, which rounds a prerelease up to its release
         // and is the forgiving direction for a floor.
         String numeric = HealthManifestFragments.numericVersionPrefix(
-                kotlinPluginVersion.trim());
+                kotlinVersion.trim());
         if (numeric == null) {
             return false;
         }
         return compareVersions(numeric, MERGED_STDLIB_FLOOR) >= 0;
+    }
+
+    /**
+     * The version an app's own Gradle text declares immediately after
+     * {@code coordinate}, or null when it declares none there or writes one
+     * this cannot read -- a Gradle variable rather than a literal.
+     */
+    private static String declaredVersion(String coordinate,
+            String[] appGradleFragments) {
+        if (appGradleFragments == null) {
+            return null;
+        }
+        for (int i = 0; i < appGradleFragments.length; i++) {
+            String fragment = appGradleFragments[i];
+            if (fragment == null) {
+                continue;
+            }
+            int at = fragment.indexOf(coordinate);
+            if (at < 0) {
+                continue;
+            }
+            int from = at + coordinate.length();
+            int to = from;
+            while (to < fragment.length()
+                    && "0123456789.".indexOf(fragment.charAt(to)) >= 0) {
+                to++;
+            }
+            while (to > from && fragment.charAt(to - 1) == '.') {
+                to--;
+            }
+            return to > from ? fragment.substring(from, to) : null;
+        }
+        return null;
     }
 
     /** Whether any fragment names this coordinate. */

@@ -193,15 +193,56 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
-     * A BOM aligns the whole {@code org.jetbrains.kotlin} group, which is a
-     * superset of this block, so it is the one marker that suppresses both.
+     * A BOM manages the whole {@code org.jetbrains.kotlin} group, jdk7 and
+     * jdk8 included, so a new enough one is the single marker that suppresses
+     * both constraints.
+     *
+     * <p>New enough is the whole point. A BOM raises the jdk artifacts but
+     * cannot pull {@code kotlin-stdlib} down -- a platform contributes
+     * constraints and the highest version still wins -- so a pre-merge BOM
+     * leaves a merged stdlib beside class-bearing jdk jars, which is the
+     * duplicate. Measured: kotlin-bom 1.7.22 against a graph wanting stdlib
+     * 1.8.22 resolves jdk7/jdk8 to 1.7.22, still class-bearing.</p>
      */
     @Test
     public void emitsNothingWhenTheAppUsesTheKotlinBom() {
         check("".equals(KotlinStdlibAlignment.constraintsBlock(
                 "implementation", null,
                 "    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n")),
-                "an app using the Kotlin BOM is left alone");
+                "an app using a merged-era Kotlin BOM is left alone");
+        check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                "implementation", null,
+                "    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.0')\n")),
+                "the BOM at the merge itself is enough");
+    }
+
+    /**
+     * The counterpart, and the reason the BOM is read by version rather than
+     * by presence: a pre-merge BOM does not make the graph safe, so it must
+     * not switch the block off.
+     */
+    @Test
+    public void aPreMergeKotlinBomStillGetsTheAlignment() {
+        String out = KotlinStdlibAlignment.constraintsBlock(
+                "implementation", null,
+                "    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.7.22')\n");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a pre-merge BOM still gets jdk7 aligned");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a pre-merge BOM still gets jdk8 aligned");
+    }
+
+    /**
+     * A BOM whose version is a Gradle variable reads as unknown, and unknown
+     * must not suppress -- the same fail-safe the plugin version gets.
+     */
+    @Test
+    public void anUnreadableBomVersionStillGetsTheAlignment() {
+        String out = KotlinStdlibAlignment.constraintsBlock(
+                "implementation", null,
+                "    implementation platform(\"org.jetbrains.kotlin:kotlin-bom:$kotlinVersion\")\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an unreadable BOM version still gets the alignment");
     }
 
     /**
