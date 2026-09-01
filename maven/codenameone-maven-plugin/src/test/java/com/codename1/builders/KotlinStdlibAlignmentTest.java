@@ -564,6 +564,89 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A coordinate concatenated onto a partial literal has no version here,
+     * and unreadable is the honest answer -- reading the empty string as a
+     * version put it below the floor and suppressed the block for a
+     * declaration that may well be merged-era.
+     */
+    @Test
+    public void aConcatenatedVersionIsNotAnEmptyOne() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation(\"org.jetbrains.kotlin:kotlin-stdlib-jdk7:\" "
+                + "+ kotlinVersion)\n");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "both constraints are written, got <<" + out + ">>");
+    }
+
+    /**
+     * Gradle's status selectors have no ceiling, so they can select a
+     * merged-era shim. Compared as literals they parsed as zero, which is the
+     * oldest version there is.
+     */
+    @Test
+    public void aStatusSelectorCanReachTheFloor() {
+        String[] selectors = {"latest.release", "latest.integration", "+"};
+        for (int i = 0; i < selectors.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:"
+                    + selectors[i] + "'\n");
+            check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                    selectors[i] + " keeps the sibling aligned, got <<" + out + ">>");
+        }
+    }
+
+    /**
+     * A name assigned inside a conditional may hold either value, because
+     * whether the branch runs is decided at evaluation time. The ambiguity is
+     * resolved toward suppression: emitting beside a pin this could not see is
+     * the failure that reaches the device.
+     *
+     * <p>The single-line spelling was never affected -- braces do not split
+     * statements, so {@code if (c) { dep = '...' }} arrives as one statement
+     * that assigns nothing -- and it is asserted here so the difference is not
+     * mistaken for a gap later.</p>
+     */
+    @Test
+    public void aConditionalReassignmentDoesNotHideAPin() {
+        String multiLine = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n"
+                + "    if (project.hasProperty('other')) {\n"
+                + "        dep = 'com.example:other:1.0'\n"
+                + "    }\n"
+                + "    implementation(dep) { version { strictly '1.7.22' } }\n");
+        check("".equals(multiLine),
+                "the pin survives a conditional reassignment, got <<" + multiLine + ">>");
+
+        String oneLine = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'; "
+                + "if (project.hasProperty('other')) { dep = 'com.example:other:1.0' }; "
+                + "implementation(dep) { version { strictly '1.7.22' } }\n");
+        check("".equals(oneLine),
+                "and the one-line form, which never assigned at all, got <<"
+                        + oneLine + ">>");
+
+        // The other direction was already safe and stays that way: a conditional
+        // assignment TO a Kotlin coordinate is taken, because taking it suppresses.
+        String gained = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = 'com.example:other:1.0'\n"
+                + "    if (project.hasProperty('old')) {\n"
+                + "        dep = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n"
+                + "    }\n"
+                + "    implementation(dep) { version { strictly '1.7.22' } }\n");
+        check("".equals(gained),
+                "a conditional assignment to a coordinate is seen, got <<" + gained + ">>");
+
+        // Unconditionally, a reassignment still replaces what it replaces.
+        String plain = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n"
+                + "    dep = 'com.example:other:1.0'\n"
+                + "    implementation(dep)\n");
+        check(plain.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an unconditional reassignment still applies, got <<" + plain + ">>");
+    }
+
+    /**
      * A local may be named after the DSL key it supplies. Substituting every
      * occurrence turned {@code group:} into a quoted string and lost the map
      * form entirely, taking the strict pin inside it with it.

@@ -320,7 +320,16 @@ public class KotlinStdlibAlignment {
             }
             int end = endOfStringLiteral(line, i);
             String literal = stringLiteralContent(line, i);
-            if (literal.startsWith(coordinate) && !hasWhitespace(literal)
+            // A literal ending AT the version separator carries no version: the
+            // rest is concatenated on, as in ("...:kotlin-stdlib-jdk7:" + version).
+            // Returning the empty string there read as a version below the floor and
+            // suppressed the block for a declaration that may well be merged-era.
+            // Unreadable is the honest answer, and it leaves both constraints to be
+            // written -- which cannot conflict with a plain requirement, only with a
+            // strict pin, and those are read before this.
+            if (literal.startsWith(coordinate)
+                    && literal.length() > coordinate.length()
+                    && !hasWhitespace(literal)
                     && !isReasonArgument(line, i)) {
                 // A reason can be nothing but a coordinate, and this scan reached it
                 // before the map's own version: entry. namesCoordinate learned to
@@ -729,7 +738,11 @@ public class KotlinStdlibAlignment {
             return compareVersions(prefix,
                     truncatedToSameDepth(MERGED_STDLIB_FLOOR, prefix)) < 0;
         }
-        if ("+".equals(selector)) {
+        if ("+".equals(selector) || selector.startsWith("latest.")) {
+            // `+` and Gradle's status selectors -- latest.release, latest.integration
+            // -- have no ceiling at all, so they can always select a merged-era shim.
+            // Compared as a literal, latest.release parsed as zero and read as the
+            // oldest version there is.
             return false;
         }
         return literalBelowTheFloor(selector);
@@ -1752,17 +1765,31 @@ public class KotlinStdlibAlignment {
         // nothing this can follow, and reading it as a definition would supply a
         // version to an unrelated $version.
         int extDepth = 0;
+        // Whether a conditional branch runs is decided at evaluation time and cannot
+        // be read here, so a name assigned inside one may hold either value. The
+        // ambiguity is resolved toward suppression: emitting beside a pin this could
+        // not see is the failure that reaches the device, while suppressing costs an
+        // app the duplicate it already had.
+        int conditionalDepth = 0;
         for (int i = 0; i < statements.size(); i++) {
             String statement = statements.get(i);
             out.add(literals.isEmpty()
                     ? statement
                     : withLiteralsInlined(statement, literals));
             boolean opensExt = extDepth == 0 && opensAnExtraPropertiesBlock(statement);
-            updateLiteralDefinitions(statement, literals, extDepth > 0 || opensExt);
+            boolean opensConditional = opensAConditional(statement);
+            updateLiteralDefinitions(statement, literals, extDepth > 0 || opensExt,
+                    conditionalDepth > 0 || opensConditional);
             if (extDepth > 0 || opensExt) {
                 extDepth += braceBalance(statement);
                 if (extDepth < 0) {
                     extDepth = 0;
+                }
+            }
+            if (conditionalDepth > 0 || opensConditional) {
+                conditionalDepth += braceBalance(statement);
+                if (conditionalDepth < 0) {
+                    conditionalDepth = 0;
                 }
             }
         }
@@ -1775,6 +1802,50 @@ public class KotlinStdlibAlignment {
      * reassignment to something unreadable, which forgets it rather than
      * leaving a stale value behind.
      */
+    /**
+     * Whether the statement opens a control structure whose body may not run.
+     *
+     * <p>Note the single-line spelling of one -- {@code if (c) { dep = '...' }} --
+     * never reached this: braces do not split statements, so the whole
+     * conditional arrives as one statement whose first token is {@code if} and
+     * which therefore assigns nothing. Only the multi-line form, where the
+     * assignment is a statement of its own, was ever applied unconditionally.
+     * Checked both ways before writing this.</p>
+     */
+    private static boolean opensAConditional(String statement) {
+        for (int k = 0; k < CONTROL_KEYWORDS.length; k++) {
+            if (callsNamed(statement, CONTROL_KEYWORDS[k])) {
+                return braceBalance(statement) > 0;
+            }
+        }
+        return false;
+    }
+
+    /** Groovy's control structures, whose bodies are not known to run. */
+    private static final String[] CONTROL_KEYWORDS = {
+        "if", "else", "while", "for", "switch", "try", "catch"
+    };
+
+    /**
+     * Records a definition, or forgets it, unless doing so under a condition
+     * would throw away the value that decides suppression.
+     */
+    private static void recordDefinition(Map<String, String> literals, String name,
+            String value, boolean conditional) {
+        if (conditional) {
+            String known = literals.get(name);
+            if (known != null && known.indexOf(KOTLIN_GROUP) >= 0
+                    && (value == null || value.indexOf(KOTLIN_GROUP) < 0)) {
+                return;
+            }
+        }
+        if (value == null) {
+            literals.remove(name);
+        } else {
+            literals.put(name, value);
+        }
+    }
+
     /**
      * Whether the statement opens a Gradle {@code ext { }} block, as a whole
      * token so that a dependency on {@code com.example:extras} does not.
@@ -1796,7 +1867,8 @@ public class KotlinStdlibAlignment {
     }
 
     private static void updateLiteralDefinitions(String statement,
-            Map<String, String> literals, boolean insideExtraProperties) {
+            Map<String, String> literals, boolean insideExtraProperties,
+            boolean conditional) {
         if (insideExtraProperties) {
             // The assignment may share the line with the brace that opened the block,
             // as `ext { kotlinVersion = '1.9.22' }` does, so read from after it.
@@ -1875,11 +1947,12 @@ public class KotlinStdlibAlignment {
                 && isLiteralStart(statement, i)) {
             int end = endOfStringLiteral(statement, i);
             if (end < statement.length()) {
-                literals.put(name, expandedLiteral(statement, i, end, literals));
+                recordDefinition(literals, name,
+                        expandedLiteral(statement, i, end, literals), conditional);
                 return;
             }
         }
-        literals.remove(name);
+        recordDefinition(literals, name, null, conditional);
     }
 
     /**
