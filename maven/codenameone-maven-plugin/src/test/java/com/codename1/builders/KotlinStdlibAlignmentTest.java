@@ -564,6 +564,58 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A map key may be quoted. Skipping every literal meant the key was never
+     * seen, so a declaration written that way named no artifact at all and the
+     * strict pin inside it went with it.
+     */
+    @Test
+    public void aMapKeyMayBeQuoted() {
+        String[] quotes = {"'", "\"", "'''", "\"\"\""};
+        for (int q = 0; q < quotes.length; q++) {
+            String u = quotes[q];
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation(" + u + "group" + u + ": 'org.jetbrains.kotlin', "
+                    + u + "name" + u + ": 'kotlin-stdlib-jdk8', "
+                    + u + "version" + u + ": '1.7.22')\n");
+            check("".equals(out),
+                    "a key quoted with " + u + " is still a key, got <<" + out + ">>");
+        }
+
+        // Mixed spellings in one declaration, which Groovy also accepts.
+        String mixed = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('group': 'org.jetbrains.kotlin', "
+                + "name: 'kotlin-stdlib-jdk8', \"version\": '1.7.22')\n");
+        check("".equals(mixed), "mixed key spellings, got <<" + mixed + ">>");
+
+        // And a merged-era one written the same way keeps the sibling aligned.
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('group': 'org.jetbrains.kotlin', "
+                + "'name': 'kotlin-stdlib-jdk7', 'version': '1.9.22')\n");
+        check(modern.contains("kotlin-stdlib-jdk8:1.8.0")
+                        && !modern.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "the merged-era declaration is read, got <<" + modern + ">>");
+    }
+
+    /**
+     * {@code useTarget} replaces the whole coordinate rather than the version,
+     * and overrides just as absolutely as {@code useVersion} does.
+     */
+    @Test
+    public void aRuleThatRetargetsIsStillARule() {
+        String old = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.eachDependency { d -> "
+                + "d.useTarget 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22' } }\n");
+        check("".equals(old),
+                "retargeting the base library pre-merge suppresses, got <<" + old + ">>");
+
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.eachDependency { d -> "
+                + "d.useTarget 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22' } }\n");
+        check(modern.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a merged-era retarget keeps the alignment, got <<" + modern + ">>");
+    }
+
+    /**
      * A resolution rule's {@code useVersion} rewrites what was requested,
      * silently, on the way through -- so it holds the library as firmly as a
      * force does. Such a rule names its artifact by comparing the parts, which

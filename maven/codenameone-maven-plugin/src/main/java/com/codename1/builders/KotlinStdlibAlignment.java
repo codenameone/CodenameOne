@@ -408,7 +408,20 @@ public class KotlinStdlibAlignment {
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
             if (isLiteralStart(line, i)) {
-                i = endOfStringLiteral(line, i);
+                // Groovy lets a map key be quoted -- ('group': '...', 'name': '...') --
+                // and skipping every literal meant the key was never seen, so a
+                // declaration written that way named no artifact at all.
+                int quoted = endOfStringLiteral(line, i);
+                if (key.equals(stringLiteralContent(line, i))) {
+                    int at = skipBlanks(line, quoted + 1);
+                    if (at < line.length() && line.charAt(at) == ':') {
+                        String value = valueAfterColon(line, at);
+                        if (value != null) {
+                            return value;
+                        }
+                    }
+                }
+                i = quoted;
                 continue;
             }
             if (!line.startsWith(key, i)) {
@@ -424,17 +437,28 @@ public class KotlinStdlibAlignment {
             if (j >= line.length() || line.charAt(j) != ':') {
                 continue;
             }
-            j = skipBlanks(line, j + 1);
-            if (j < line.length() && isLiteralStart(line, j)) {
-                if (endOfStringLiteral(line, j) < line.length()) {
-                    // The real delimiter length, as the coordinate path does. Stripping
-                    // one character per side left a triple-quoted group or name wearing
-                    // two quotes, so both failed their exact match and the declaration
-                    // was ignored -- strict pin and all.
-                    return stringLiteralContent(line, j);
-                }
+            String value = valueAfterColon(line, j);
+            if (value != null) {
+                return value;
             }
             i = j;
+        }
+        return null;
+    }
+
+    /**
+     * The literal following the colon at {@code colonAt}, or null.
+     *
+     * <p>Shared by both spellings of a key, bare and quoted, so the delimiter
+     * rule is read once. Stripping one character per side used to leave a
+     * triple-quoted group or name wearing two quotes, and both then failed
+     * their exact match.</p>
+     */
+    private static String valueAfterColon(String line, int colonAt) {
+        int at = skipBlanks(line, colonAt + 1);
+        if (at < line.length() && isLiteralStart(line, at)
+                && endOfStringLiteral(line, at) < line.length()) {
+            return stringLiteralContent(line, at);
         }
         return null;
     }
@@ -1054,8 +1078,19 @@ public class KotlinStdlibAlignment {
      */
     private static boolean callsForce(String statement) {
         // The method forms, which callsNamed now distinguishes from an assignment.
+        // Gradle's ways of overriding a selected version: force and its setter, and a
+        // resolution rule's useVersion (a bare version) or useTarget (a whole
+        // coordinate). All of them win silently over a constraint.
+        //
+        // dependencySubstitution's `substitute ... using ...` is deliberately NOT
+        // here. It names TWO coordinates and the version scan takes the first
+        // literal, which is the one being replaced -- so a substitution raising the
+        // library to a merged-era version would read as pinning it to the old one.
+        // Wrong in the harmless direction, but wrong, and it can be added when the
+        // scan can tell the sides apart.
         if (callsNamed(statement, "force") || callsNamed(statement, "setForcedModules")
-                || callsNamed(statement, USE_VERSION)) {
+                || callsNamed(statement, USE_VERSION)
+                || callsNamed(statement, "useTarget")) {
             return true;
         }
         // forcedModules is only ever written as an assignment, and assigning it any
