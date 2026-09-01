@@ -638,6 +638,23 @@ final class BuildHintsAndroid {
                 .doc("Boolean true/false defaults to true. Toggles the new async keyboard mode that leaves the "
                         + "keyboard open while you move between text components"));
 
+        h.add(new Hint("android.kotlinStdlibAlignment")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("android")
+                .doc("Boolean true/false defaults to true. Keeps `kotlin-stdlib-jdk7` and "
+                        + "`kotlin-stdlib-jdk8` at 1.8.0 or newer, the versions where both became empty "
+                        + "shims because their classes moved into `kotlin-stdlib`. Without it a graph "
+                        + "that reaches `kotlin-stdlib` 1.8 or newer through one dependency and an older "
+                        + "`kotlin-stdlib-jdk8` through another gets two jars carrying the same classes, "
+                        + "and the build fails in `checkReleaseDuplicateClasses` naming Kotlin artifacts "
+                        + "the app never asked for. It is expressed as a Gradle constraint, so it adds "
+                        + "nothing to an app with no Kotlin anywhere in its dependencies and never "
+                        + "lowers a version. Set to false only to manage those coordinates yourself; "
+                        + "declaring `kotlin-stdlib-jdk7`, `kotlin-stdlib-jdk8` or `kotlin-bom` in your "
+                        + "own Gradle build hints already switches it off."));
+
         h.add(new Hint("android.largeScreens")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)

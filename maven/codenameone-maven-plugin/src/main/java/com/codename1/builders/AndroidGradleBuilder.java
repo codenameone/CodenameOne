@@ -7270,6 +7270,31 @@ public class AndroidGradleBuilder extends Executor {
             namespace = "namespace '"+request.getPackageName()+"'\n";
         }
 
+        // Kotlin stdlib alignment, emitted for every AndroidX build rather than
+        // for Kotlin-shaped apps: the duplicate class it prevents is produced by
+        // ordinary AndroidX and Play dependencies, not by anything the app wrote.
+        // See KotlinStdlibAlignment for the mechanism and for why Gradle cannot
+        // work it out for itself on the kotlin-stdlib 1.8.x line. A constraint
+        // adds nothing to a graph that has no Kotlin in it, so an app that could
+        // never hit the clash resolves exactly as it did before.
+        //
+        // Gated on AndroidX because the block is written on the implementation
+        // configuration and Gradle's constraints DSL only arrived in 4.6; the
+        // legacy support-library templates predate both, and predate the AndroidX
+        // releases that produce the clash.
+        String kotlinStdlibConstraints = "";
+        if (useAndroidX && gradleVersionInt >= 6
+                && request.getArg("android.kotlinStdlibAlignment", "true").equals("true")) {
+            kotlinStdlibConstraints = KotlinStdlibAlignment.constraintsBlock(
+                    compile,
+                    hasKotlinSources || request.getArg("android.topDependency", "")
+                            .contains("kotlin-gradle-plugin"),
+                    additionalDependencies,
+                    aiExtraGradleDependencies.toString(),
+                    request.getArg("android.gradleDep", ""),
+                    request.getArg("android.xgradle", ""));
+        }
+
         String gradleProps = "apply plugin: 'com.android.application'\n"
                 + kotlinPluginApply
                 + request.getArg("android.gradlePlugin", "")
@@ -7361,6 +7386,7 @@ public class AndroidGradleBuilder extends Executor {
                 + addNewlineIfMissing(aiExtraGradleDependencies.toString())
                 + addNewlineIfMissing(request.getArg("android.gradleDep", ""))
                 + addNewlineIfMissing(aarDependencies)
+                + kotlinStdlibConstraints
                 + "}\n"
                 + request.getArg("android.xgradle", "");
 
