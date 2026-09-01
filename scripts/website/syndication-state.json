@@ -1822,6 +1822,18 @@
         "url": "https://medium.com/p/61e028cda09b/edit",
         "syndicated_at": "2026-09-01T06:30:36+00:00"
       }
+    },
+    "tapjacking-protection": {
+      "hashnode": {
+        "url": "https://debugagent.com/tapjacking-protection-rejecting-android-touches-behind-an-overlay",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a96e880aac3136983326e16",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-01T15:01:14+00:00"
+      }
     }
   }
 }
