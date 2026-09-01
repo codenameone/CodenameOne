@@ -92,6 +92,30 @@ public class PlayBillingVersionsTest {
     }
 
     /**
+     * A Gradle dynamic selector keeps its shape in the generated dependency, so
+     * "8.+" is resolved by Gradle at build time and can land on any 8.x. Its
+     * numeric prefix reads as "8", which a range check would answer with the
+     * 8.0.0-only floor of 21 while the build actually resolves a release that
+     * declares 23 -- and the manifest merge fails on exactly that mismatch.
+     * Anything that is not literally 8.0.0 takes the high floor.
+     */
+    @Test
+    public void aDynamicSelectorTakesTheHighFloor() {
+        check("23".equals(PlayBillingVersions.minimumSdk("8.+")),
+                "8.+ can resolve a release needing 23");
+        check("23".equals(PlayBillingVersions.minimumSdk("8.0.+")),
+                "8.0.+ can resolve past 8.0.0");
+        check("23".equals(PlayBillingVersions.minimumSdk("[8.0.0,9.0.0)")),
+                "a version range takes the high floor");
+        check("23".equals(PlayBillingVersions.minimumSdk("latest.release")),
+                "latest.release takes the high floor");
+        // And the one version that really does declare 21 still gets it, so the
+        // exact match did not simply collapse everything to 23.
+        check("21".equals(PlayBillingVersions.minimumSdk("8.0.0")),
+                "8.0.0 itself still takes 21");
+    }
+
+    /**
      * Unknown guesses high. Guessing low turns into a manifest merge failure;
      * guessing high only narrows the device range of an app already on a
      * release that requires API 23.

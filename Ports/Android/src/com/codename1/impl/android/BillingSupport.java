@@ -228,18 +228,49 @@ public class BillingSupport implements IBillingSupport {
         return null;
     }
 
-    /// The offer token launchBillingFlow needs for a subscription, or null when this is
-    /// a one-time product or Play returned no offer.
+    /// The offer token launchBillingFlow needs, or null when Play offered none.
     ///
-    /// A one-time product must NOT carry one -- the flow rejects a token it did not ask
-    /// for -- which is why this returns null for it rather than an empty string.
-    private static String subscriptionOfferToken(ProductDetails details) {
-        List<ProductDetails.SubscriptionOfferDetails> offers =
-                details.getSubscriptionOfferDetails();
-        if (offers == null || offers.isEmpty()) {
-            return null;
+    /// Both product types can carry one. A subscription is always bought through an
+    /// offer and the flow rejects it without a token. A one-time product can now carry
+    /// offers too -- `getOneTimePurchaseOfferDetailsList` -- and one configured with
+    /// more than a base offer has to name which is being bought, or the flow is
+    /// rejected the same way. That is not a subscription-only concern, which is what
+    /// the first version of this assumed.
+    ///
+    /// The default offer is preferred over the list for a one-time product, because
+    /// that is the one the removed `setSkuDetails` call would have bought; the list is
+    /// only consulted when Play sends no default. A token is returned only when Play
+    /// actually supplied one, so a product with no offers still launches the flow with
+    /// no token, exactly as before.
+    private static String offerToken(ProductDetails details, String type) {
+        if (BillingClient.ProductType.SUBS.equals(type)) {
+            List<ProductDetails.SubscriptionOfferDetails> offers =
+                    details.getSubscriptionOfferDetails();
+            if (offers == null || offers.isEmpty()) {
+                return null;
+            }
+            return emptyToNull(offers.get(0).getOfferToken());
         }
-        return offers.get(0).getOfferToken();
+        ProductDetails.OneTimePurchaseOfferDetails preferred =
+                details.getOneTimePurchaseOfferDetails();
+        if (preferred != null && emptyToNull(preferred.getOfferToken()) != null) {
+            return preferred.getOfferToken();
+        }
+        List<ProductDetails.OneTimePurchaseOfferDetails> offers =
+                details.getOneTimePurchaseOfferDetailsList();
+        if (offers != null) {
+            for (ProductDetails.OneTimePurchaseOfferDetails offer : offers) {
+                String token = offer == null ? null : emptyToNull(offer.getOfferToken());
+                if (token != null) {
+                    return token;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String emptyToNull(String value) {
+        return value == null || value.length() == 0 ? null : value;
     }
 
     private static boolean isFailure(BillingResult billingResult) {
@@ -528,11 +559,10 @@ public class BillingSupport implements IBillingSupport {
                             inventory.add(details, type.equals(BillingClient.ProductType.SUBS) );
                         }
                         final ProductDetails details = list.iterator().next();
-                        // A subscription is bought through one of its offers, not through the
-                        // product: launchBillingFlow rejects a subscription with no offer token.
-                        // The first offer is the one Play lists first for this user, which is
-                        // what the old setSkuDetails call resolved to as well.
-                        final String offerToken = subscriptionOfferToken(details);
+                        // Both product types can need an offer token; see offerToken. A
+                        // subscription with none is not purchasable at all, so that stays a
+                        // reported error rather than a flow that opens and is rejected.
+                        final String offerToken = offerToken(details, type);
                         if (type.equals(BillingClient.ProductType.SUBS) && offerToken == null) {
                             final PurchaseCallback pc = getPurchaseCallback();
                             if (pc == null) {

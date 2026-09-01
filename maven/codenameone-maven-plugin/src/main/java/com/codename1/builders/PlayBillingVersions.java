@@ -57,8 +57,10 @@ package com.codename1.builders;
  * 8.1.0, 8.2.1, 8.3.0, 9.0.0, 9.1.0   23
  * </pre>
  *
- * <p>So the floor is not "the 8 line needs 21" -- 8.0.0 alone needs 21 and
- * every release after it needs 23. The build raises {@code minSdk} to match
+ * <p>So the floor is not "the 8 line needs 21" -- 8.0.0 alone needs 21, and
+ * it is matched exactly rather than as a range, because a dynamic selector
+ * like {@code 8.+} reads as "8" and would take the low floor while resolving
+ * to a release that needs the high one. The build raises {@code minSdk} to match
  * rather than letting the merge fail, which is what the Android Auto
  * dependency in this builder already does for the same reason. A version
  * newer than anything listed here is assumed to need the highest floor known;
@@ -128,11 +130,15 @@ public class PlayBillingVersions {
             // billing release requiring API 23.
             return "23";
         }
-        if (compareVersions(numeric, "8.1.0") >= 0) {
-            return "23";
-        }
+        // 8.0.0 is the ONLY version at or above the floor that declares 21, so it is
+        // matched exactly rather than as a range. A dynamic selector is why: Gradle
+        // accepts "8.+" here and the generated dependency keeps it, so the build
+        // resolves 8.3.0 while the numeric prefix reads as "8" -- a range check gives
+        // that 21 and the manifest merge then fails against the library's own 23. An
+        // exact match sends everything that is not literally 8.0.0 to the high floor,
+        // which is also the right answer for a version this has never seen.
         if (compareVersions(numeric, "8.0.0") >= 0) {
-            return "21";
+            return "8.0.0".equals(numeric) ? "21" : "23";
         }
         // Below the supported floor the build is refused before this matters; the
         // old AAR's own value is returned so nothing is raised on the way to that
