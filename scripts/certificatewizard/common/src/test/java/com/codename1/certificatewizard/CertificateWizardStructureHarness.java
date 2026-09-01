@@ -244,6 +244,17 @@ public final class CertificateWizardStructureHarness {
         check(find(form, "modal.generateCert.submit") != null, "the remedy opens the certificate dialog");
         check(selectedSegment(form, "pick.certType.mac_app_development"),
                 "and opens it on the type the profile actually needs");
+        String suggested = text(form, "field.certName");
+        check(suggested.contains("MAC APP DEVELOPMENT"),
+                "the suggested name describes that type, not the dialog's old default");
+        fire(form, "pick.certType.ios_development");
+        check(!text(form, "field.certName").equals(suggested),
+                "and follows the type when it changes, instead of labelling one kind of "
+                        + "certificate with the name of another");
+        setText(form, "field.certName", "My own name");
+        fire(form, "pick.certType.ios_distribution");
+        check("My own name".equals(text(form, "field.certName")),
+                "but stops following once the user has written their own");
         fire(form, "modal.cancel");
     }
 
@@ -392,6 +403,16 @@ public final class CertificateWizardStructureHarness {
         } else {
             fail.add("cannot fire " + name);
         }
+    }
+
+    private static String text(Container root, String name) {
+        Component c = find(root, name);
+        if (c instanceof TextField) {
+            String t = ((TextField)c).getText();
+            return t == null ? "" : t;
+        }
+        fail.add("no text field named " + name);
+        return "";
     }
 
     private static void setText(Container root, String name, String value) {

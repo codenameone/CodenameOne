@@ -1015,19 +1015,42 @@ public class CertificateWizard extends Lifecycle {
         for (int i = 0; i < typeValues.length; i++) {
             typeButtons[i] = segment(WizardDecisions.GENERATABLE_CERTIFICATE_LABELS[i], false);
         }
+        updateSegmentButtons(typeButtons, typeValues, type[0]);
+        final TextField name = field("Display name", "App Store Distribution");
+        name.setName("field.certName");
+        // The suggested name follows the type until the user writes their own. A suggestion that
+        // stays behind is worse than no suggestion: it puts a certificate labelled "DISTRIBUTION"
+        // on the account that is nothing of the kind. settingName guards against
+        // TextField.setText firing the listener and marking the suggestion as the user's edit.
+        final boolean[] nameEdited = {false};
+        final boolean[] settingName = {false};
+        final Runnable suggestName = () -> {
+            if (nameEdited[0]) {
+                return;
+            }
+            settingName[0] = true;
+            try {
+                name.setText(typeLabel(type[0]));
+            } finally {
+                settingName[0] = false;
+            }
+        };
+        suggestName.run();
+        name.addDataChangedListener((changeType, index) -> {
+            if (!settingName[0]) {
+                nameEdited[0] = true;
+            }
+        });
         for (int i = 0; i < typeButtons.length; i++) {
             typeButtons[i].setName("pick.certType." + typeValues[i].toLowerCase());
             final int typeIndex = i;
             typeButtons[i].addActionListener(e -> {
                 type[0] = typeValues[typeIndex];
                 updateSegmentButtons(typeButtons, typeValues, type[0]);
+                suggestName.run();
                 d.revalidate();
             });
         }
-        updateSegmentButtons(typeButtons, typeValues, type[0]);
-        TextField name = field("Display name", "App Store Distribution");
-        name.setName("field.certName");
-        name.setText(typeLabel(type[0]));
         d.add(actionRow(Component.LEFT, typeButtons[0], typeButtons[1], typeButtons[2]));
         d.add(actionRow(Component.LEFT, typeButtons[3], typeButtons[4], typeButtons[5]));
         label(d, "Display name", "CWFieldLabel");
@@ -1179,6 +1202,13 @@ public class CertificateWizard extends Lifecycle {
                 b.remove();
             }
             name.remove();
+            // A device selection outlives the type it was made under, and the picker no longer
+            // shows the ones that stopped being valid -- so it is dropped here, at the one place
+            // every type change goes through, rather than in the click handler that happens to be
+            // the way the type changed today.
+            List<String> stillValid = WizardDecisions.retainUsableDevices(state, profileType[0], devs);
+            devs.clear();
+            devs.addAll(stillValid);
             updateSegmentButtons(typeButtons, typeValues, profileType[0]);
             label(c, "Profile type", "CWFieldLabel");
             c.add(actionRow(Component.LEFT, typeButtons[0], typeButtons[1], typeButtons[2]));

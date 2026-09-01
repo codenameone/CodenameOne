@@ -160,6 +160,45 @@ class CertificateWizardModelTest {
         assertEquals(3, WizardDecisions.usableDevices(state, "MAC_APP_DEVELOPMENT").size());
     }
 
+    /// A device selection outlives the profile type it was made under. Once the picker started
+    /// hiding devices of the wrong platform, a stale selection became invisible AND still counted:
+    /// canCreateProfile saw the requirement met and the request named iPhones in a Mac profile.
+    @Test
+    void deviceSelectionDoesNotSurviveAChangeOfProfilePlatform() {
+        List<SigningState.Device> devices = new ArrayList<SigningState.Device>();
+        devices.add(new SigningState.Device("DEV_1", "QA iPhone", "UDID1", "IOS", "ENABLED"));
+        devices.add(new SigningState.Device("DEV_2", "Retired iPhone", "UDID2", "IOS", "DISABLED"));
+        devices.add(new SigningState.Device("DEV_3", "Bench Mac", "UDID3", "MAC_OS", "ENABLED"));
+        SigningState state = new SigningState(new SigningState.Credential(true, "KEY", "ISSUER"),
+                null, null, devices, null, null, null);
+        List<String> selected = new ArrayList<String>();
+        selected.add("DEV_1");
+        selected.add("DEV_3");
+
+        List<String> forIos = WizardDecisions.retainUsableDevices(state, "IOS_APP_DEVELOPMENT", selected);
+        assertEquals(1, forIos.size());
+        assertEquals("DEV_1", forIos.get(0));
+
+        List<String> forMac = WizardDecisions.retainUsableDevices(state, "MAC_APP_DEVELOPMENT", selected);
+        assertEquals(1, forMac.size());
+        assertEquals("DEV_3", forMac.get(0));
+
+        // and a type that names no devices at all must not carry one along
+        assertTrue(WizardDecisions.retainUsableDevices(state, "IOS_APP_STORE", selected).isEmpty());
+        assertTrue(WizardDecisions.retainUsableDevices(state, "IOS_APP_DEVELOPMENT", null).isEmpty());
+
+        // the whole point: only a selection that survives may satisfy the create check
+        List<String> certs = new ArrayList<String>();
+        certs.add("CERT1");
+        assertTrue(WizardDecisions.canCreateProfile("MAC_APP_DEVELOPMENT", "BID1", certs, forMac, "N"),
+                "the Mac device that survived the switch is a real selection");
+        List<String> onlyIos = new ArrayList<String>();
+        onlyIos.add("DEV_1");
+        assertFalse(WizardDecisions.canCreateProfile("MAC_APP_DEVELOPMENT", "BID1", certs,
+                        WizardDecisions.retainUsableDevices(state, "MAC_APP_DEVELOPMENT", onlyIos), "N"),
+                "a selection of iPhones must not satisfy a Mac profile's device requirement");
+    }
+
     /// Sending someone to the certificate dialog to satisfy requiredCertificateType only helps if
     /// that dialog can actually produce the type. MAC_APP_DEVELOPMENT could not be, so the Mac
     /// Development profile's only suggested remedy led straight back to the disabled form.

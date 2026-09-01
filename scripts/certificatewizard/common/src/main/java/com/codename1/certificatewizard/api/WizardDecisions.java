@@ -221,6 +221,27 @@ public final class WizardDecisions {
         return !wrong.equals(platform.trim());
     }
 
+    /// The subset of `selectedIds` that a profile of this type may still name.
+    ///
+    /// A selection outlives the profile type it was made under: pick devices for iOS Development,
+    /// switch to Mac Development, and the picker correctly stops showing those iPhones while the
+    /// selection quietly keeps them. canCreateProfile then reads a satisfied device requirement
+    /// and the request goes to Apple naming devices of the wrong platform -- invisible, because
+    /// nothing on screen shows them any more.
+    public static List<String> retainUsableDevices(SigningState state, String profileType,
+                                                   List<String> selectedIds) {
+        List<String> out = new ArrayList<String>();
+        if (selectedIds == null || !profileRequiresDevices(profileType)) {
+            return out;
+        }
+        for (SigningState.Device d : usableDevices(state, profileType)) {
+            if (selectedIds.contains(d.id())) {
+                out.add(d.id());
+            }
+        }
+        return out;
+    }
+
     public static List<SigningState.Device> usableDevices(SigningState state, String profileType) {
         List<SigningState.Device> out = new ArrayList<SigningState.Device>();
         for (SigningState.Device d : state.devices) {
