@@ -326,6 +326,56 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * The English word is not the Gradle call. A reason string reading
+     * "not strictly required outside debug" is prose, and reading it as a
+     * strict version let a variant-only dependency switch the alignment off
+     * for the release build -- the unsafe direction.
+     */
+    @Test
+    public void theWordStrictlyInsideAStringIsNotAStrictPin() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    debugImplementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ because 'not strictly required outside debug' }\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a reason mentioning the word does not suppress the release constraint");
+
+        // and the real call still does, so the tightening did not disarm it
+        String real = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    debugImplementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check(!real.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an actual strict call is still honoured");
+    }
+
+    /**
+     * Groovy allows whitespace around a map entry's colon, and the exact
+     * substring match missed it. It matters because the same declaration can
+     * carry a strict version, and missing it turns the constraint into a
+     * failed resolution rather than an override.
+     */
+    @Test
+    public void aMapEntryMayHaveSpaceAroundItsColon() {
+        String spaced = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation(group : 'org.jetbrains.kotlin', "
+                + "name : 'kotlin-stdlib-jdk8', version : '1.7.22')\n");
+        check(!spaced.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a spaced map entry still pins jdk8");
+
+        String doubleQuoted = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation(group: \"org.jetbrains.kotlin\", "
+                + "name:\"kotlin-stdlib-jdk8\", version: \"1.7.22\")\n");
+        check(!doubleQuoted.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "and so does an unspaced double-quoted one");
+
+        // A different artifact in the same shape must still not count.
+        String other = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation(group : 'org.jetbrains.kotlin', "
+                + "name : 'kotlin-reflect', version : '1.9.22')\n");
+        check(other.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "naming a different Kotlin artifact does not pin jdk8");
+    }
+
+    /**
      * The block absorbed for that check belongs to the declaration that opened
      * it and no further. A dependencies or android block must not swallow the
      * fragment: only a statement already naming the Kotlin group absorbs one.
@@ -339,6 +389,37 @@ public class KotlinStdlibAlignmentTest {
                 + "}\n");
         check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "an unrelated strict block does not suppress, and the debug BOM still does not");
+    }
+
+    /**
+     * The quoted spelling counts as well. Gradle's
+     * {@code dependencies.add("runtimeOnly", "group:artifact:version")} names
+     * the configuration as a string, so the token ends at a quote rather than
+     * a space or a parenthesis, and the escape hatch has to recognise it for
+     * the same reason it recognises the others.
+     */
+    @Test
+    public void theQuotedAddSpellingCountsAsAPin() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    dependencies.add(\"runtimeOnly\", "
+                + "\"org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22\")\n");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a quoted configuration name still pins jdk8");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and leaves jdk7 constrained");
+    }
+
+    /**
+     * A quoted configuration name on its own decides nothing, because it takes
+     * the artifact coordinate on the same statement to make a declaration.
+     */
+    @Test
+    public void aQuotedConfigurationNameAloneIsNotAPin() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def cfg = \"runtimeOnly\"\n"
+                + "    implementation 'com.example:thing:1.0'\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "naming a configuration in a string does not suppress anything");
     }
 
     /**

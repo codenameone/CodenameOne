@@ -285,7 +285,7 @@ public class KotlinStdlibAlignment {
         // fails the whole script at evaluation, which is a far larger blast radius
         // than the case it fixes. Revisit only with a project that actually has this
         // shape.
-        if (!line.contains("strictly")
+        if (!callsStrictly(line)
                 && !declaresOnTheConstrainedConfiguration(configuration, line)) {
             return false;
         }
@@ -293,9 +293,94 @@ public class KotlinStdlibAlignment {
             return true;
         }
         // group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8', version: '...'
-        return line.contains(KOTLIN_GROUP)
-                && (line.contains("name: '" + artifact + "'")
-                        || line.contains("name: \"" + artifact + "\""));
+        return line.contains(KOTLIN_GROUP) && declaresMapEntry(line, "name", artifact);
+    }
+
+    /**
+     * Whether the statement calls Gradle's {@code strictly}, as opposed to
+     * merely containing the English word.
+     *
+     * <p>{@code because 'not strictly required outside debug'} is a reason
+     * string, not a version constraint, and reading it as one let a
+     * variant-only dependency switch the alignment off for the release build.
+     * The discriminator is the one already used for comment delimiters and
+     * statement separators: inside a string it is prose, outside it is
+     * syntax.</p>
+     */
+    private static boolean callsStrictly(String statement) {
+        char quote = 0;
+        for (int i = 0; i < statement.length(); i++) {
+            char c = statement.charAt(i);
+            if (quote != 0) {
+                if (c == '\\' && i + 1 < statement.length()) {
+                    i++;
+                } else if (c == quote) {
+                    quote = 0;
+                }
+                continue;
+            }
+            if (c == '\'' || c == '"') {
+                quote = c;
+                continue;
+            }
+            if (statement.startsWith(STRICTLY, i)) {
+                boolean startsToken = i == 0
+                        || !Character.isLetterOrDigit(statement.charAt(i - 1));
+                int after = i + STRICTLY.length();
+                boolean endsToken = after < statement.length()
+                        && (statement.charAt(after) == ' '
+                                || statement.charAt(after) == '('
+                                || statement.charAt(after) == '\t');
+                if (startsToken && endsToken) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static final String STRICTLY = "strictly";
+
+    /**
+     * Whether the statement carries the Groovy map entry
+     * {@code key: 'value'}, with whatever spacing the author used.
+     *
+     * <p>{@code name : 'kotlin-stdlib-jdk8'} is as valid as
+     * {@code name: 'kotlin-stdlib-jdk8'}, and matching the exact substring
+     * missed it -- which matters because the same declaration can carry a
+     * strict version, and missing it turns this class's constraint into a
+     * failed resolution.</p>
+     */
+    private static boolean declaresMapEntry(String line, String key, String value) {
+        int at = line.indexOf(key);
+        while (at >= 0) {
+            boolean startsToken = at == 0
+                    || !Character.isLetterOrDigit(line.charAt(at - 1));
+            if (startsToken) {
+                int i = skipBlanks(line, at + key.length());
+                if (i < line.length() && line.charAt(i) == ':') {
+                    i = skipBlanks(line, i + 1);
+                    if (i < line.length()
+                            && (line.charAt(i) == '\'' || line.charAt(i) == '"')) {
+                        char q = line.charAt(i);
+                        int end = line.indexOf(q, i + 1);
+                        if (end > i && line.substring(i + 1, end).equals(value)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            at = line.indexOf(key, at + 1);
+        }
+        return false;
+    }
+
+    private static int skipBlanks(String line, int from) {
+        int i = from;
+        while (i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+            i++;
+        }
+        return i;
     }
 
     /**
@@ -367,9 +452,16 @@ public class KotlinStdlibAlignment {
             boolean startsToken = at == 0
                     || !Character.isLetterOrDigit(line.charAt(at - 1));
             int after = at + configuration.length();
+            // A closing quote ends the token too, for the map-free
+            // dependencies.add("runtimeOnly", "group:artifact:version") spelling.
+            // Safe to accept: a quoted configuration name only decides anything on a
+            // statement that also carries the artifact coordinate, and a statement
+            // carrying both is a declaration however it is spelled.
             boolean endsToken = after < line.length()
                     && (line.charAt(after) == ' ' || line.charAt(after) == '('
-                            || line.charAt(after) == '\t');
+                            || line.charAt(after) == '\t'
+                            || line.charAt(after) == '"'
+                            || line.charAt(after) == '\'');
             if (startsToken && endsToken) {
                 return true;
             }
