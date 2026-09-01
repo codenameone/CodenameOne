@@ -401,6 +401,81 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A reason that OPENS with the coordinate is still a reason. Accepting any
+     * literal starting with one let a warning about the duplicate
+     * -- because 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22 causes
+     * duplicate classes' -- switch off the constraint that prevents exactly
+     * what it describes. Dependency notation carries no whitespace.
+     */
+    @Test
+    public void aReasonOpeningWithTheCoordinateIsStillProse() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('com.example:foo:1.0') { because "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22 causes duplicate classes' }\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a reason opening with the coordinate does not suppress");
+    }
+
+    /**
+     * A coordinate may sit one hop away behind a def. Neither statement
+     * carries both the configuration and the coordinate, so the strict pin was
+     * invisible and the constraint made the build stop resolving.
+     */
+    @Test
+    public void aCoordinateBehindADefIsStillADeclaration() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def jdk8 = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
+                + "    implementation(jdk8) { version { strictly '1.7.22' } }\n");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the strict pin behind a def is honoured");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and jdk7 is still constrained");
+    }
+
+    /**
+     * The boundary, stated as a case so it is a decision rather than an
+     * oversight. An interpolated VERSION is still recognised -- the artifact
+     * name is literal there, and naming the artifact is what matters -- but a
+     * coordinate assembled by concatenation is not in the text as a coordinate
+     * at all, and recovering it needs Gradle to evaluate the script. The block
+     * is written, which is the safe direction for everything except a strict
+     * pin; a strict pin hidden this way is beyond what reading build-hint text
+     * can reach, and the design that does not need to find the declaration is
+     * the answer to that class rather than another pass here.
+     */
+    @Test
+    public void aConcatenatedCoordinateIsNotRecovered() {
+        // An interpolated version still names the artifact, so it IS recognised.
+        String interpolatedVersion = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation(\"org.jetbrains.kotlin:kotlin-stdlib-jdk8:$v\")\n");
+        check(!interpolatedVersion.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an interpolated version still names the artifact");
+
+        // A coordinate assembled by concatenation is not a coordinate in the text.
+        String concatenated = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:' + 'kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check(concatenated.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a concatenated coordinate is left unrecognised, by design");
+    }
+
+    /**
+     * A def that is not a string literal defines nothing here, and must not
+     * corrupt the statement that uses the name.
+     */
+    @Test
+    public void aNonLiteralDefIsIgnored() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def jdk8 = someFunction()\n"
+                + "    implementation(jdk8)\n"
+                + "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22'\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an unresolvable def leaves jdk8 constrained");
+        check(!out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and the real jdk7 declaration beside it still counts");
+    }
+
+    /**
      * Groovy's parenthesis-free map notation spreads one declaration over
      * several lines, held together by trailing commas. Splitting at those
      * newlines left the configuration, the group, the artifact and the closure

@@ -126,7 +126,9 @@ package com.codename1.builders;
  * <b>keep this file in sync with its twin in the other repository</b>.</p>
  */
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class KotlinStdlibAlignment {
 
@@ -295,8 +297,15 @@ public class KotlinStdlibAlignment {
                     i++;
                 } else if (c == quote) {
                     String literal = line.substring(stringStart + 1, i);
-                    if (literal.equals(coordinate)
-                            || literal.startsWith(coordinate + ":")) {
+                    // Dependency notation carries no whitespace; a reason sentence
+                    // does. Without that, a reason that merely OPENS with the
+                    // coordinate -- because 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:
+                    // 1.7.22 causes duplicate classes' -- read as the declaration it
+                    // was warning about, and switched off the constraint that would
+                    // have prevented exactly what it describes.
+                    if ((literal.equals(coordinate)
+                            || literal.startsWith(coordinate + ":"))
+                            && !hasWhitespace(literal)) {
                         return true;
                     }
                     quote = 0;
@@ -306,6 +315,16 @@ public class KotlinStdlibAlignment {
             if (c == '\'' || c == '"') {
                 quote = c;
                 stringStart = i;
+            }
+        }
+        return false;
+    }
+
+    /** Whether the text contains any whitespace. */
+    private static boolean hasWhitespace(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (Character.isWhitespace(text.charAt(i))) {
+                return true;
             }
         }
         return false;
@@ -962,8 +981,116 @@ public class KotlinStdlibAlignment {
             }
             merged.add(statement);
         }
-        return merged.toArray(new String[merged.size()]);
+        return inlineLiteralDefinitions(merged);
     }
+
+    /**
+     * Statements with {@code def name = 'literal'} definitions folded into the
+     * places that use them.
+     *
+     * <p>A coordinate can sit one hop away:</p>
+     *
+     * <pre>
+     * def jdk8 = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'
+     * implementation(jdk8) { version { strictly '1.7.22' } }
+     * </pre>
+     *
+     * <p>Neither statement carries both the configuration and the coordinate,
+     * so the strict pin was invisible and the constraint made the build stop
+     * resolving. One hop through a string literal is recoverable from the text
+     * and is recovered here.</p>
+     *
+     * <p><b>Where this stops, deliberately.</b> A value built by
+     * interpolation, by concatenation, from a map or a list, or returned by a
+     * method is not in the text at all -- reading it needs Gradle to evaluate
+     * the script, which nothing here can do. Those forms are left unrecognised
+     * rather than guessed at, and that is a real limit of reading declarations
+     * out of build-hint text rather than something another pass would fix. The
+     * design that does not need to find the declaration at all -- constraining
+     * unless a strict version says otherwise -- is the answer to that class,
+     * and it is a decision about documented behaviour rather than a defect to
+     * patch here.</p>
+     */
+    private static String[] inlineLiteralDefinitions(List<String> statements) {
+        Map<String, String> literals = new LinkedHashMap<String, String>();
+        for (int i = 0; i < statements.size(); i++) {
+            collectLiteralDefinition(statements.get(i), literals);
+        }
+        String[] out = new String[statements.size()];
+        for (int i = 0; i < statements.size(); i++) {
+            out[i] = literals.isEmpty()
+                    ? statements.get(i)
+                    : withLiteralsInlined(statements.get(i), literals);
+        }
+        return out;
+    }
+
+    /** Records a {@code def name = 'literal'} definition, if this is one. */
+    private static void collectLiteralDefinition(String statement,
+            Map<String, String> literals) {
+        int at = statement.indexOf(DEF);
+        if (at < 0) {
+            return;
+        }
+        boolean startsToken = at == 0 || !isIdentifierChar(statement.charAt(at - 1));
+        if (!startsToken) {
+            return;
+        }
+        int i = skipBlanks(statement, at + DEF.length());
+        int nameStart = i;
+        while (i < statement.length() && isIdentifierChar(statement.charAt(i))) {
+            i++;
+        }
+        if (i == nameStart) {
+            return;
+        }
+        String name = statement.substring(nameStart, i);
+        i = skipBlanks(statement, i);
+        if (i >= statement.length() || statement.charAt(i) != '=') {
+            return;
+        }
+        i = skipBlanks(statement, i + 1);
+        if (i >= statement.length()
+                || (statement.charAt(i) != '\'' && statement.charAt(i) != '"')) {
+            return;
+        }
+        int end = endOfStringLiteral(statement, i);
+        if (end >= statement.length()) {
+            return;
+        }
+        literals.put(name, statement.substring(i, end + 1));
+    }
+
+    /** The statement with known definition names replaced by their literals. */
+    private static String withLiteralsInlined(String statement,
+            Map<String, String> literals) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < statement.length(); i++) {
+            char c = statement.charAt(i);
+            if (c == '\'' || c == '"') {
+                int end = endOfStringLiteral(statement, i);
+                out.append(statement, i, Math.min(end + 1, statement.length()));
+                i = end;
+                continue;
+            }
+            if (!isIdentifierChar(c)
+                    || (i > 0 && isIdentifierChar(statement.charAt(i - 1)))) {
+                out.append(c);
+                continue;
+            }
+            int end = i;
+            while (end < statement.length() && isIdentifierChar(statement.charAt(end))) {
+                end++;
+            }
+            String token = statement.substring(i, end);
+            String literal = literals.get(token);
+            out.append(literal == null ? token : literal);
+            i = end - 1;
+        }
+        return out.toString();
+    }
+
+    private static final String DEF = "def";
 
     /** Whether the text so far ends with a comma, ignoring trailing blanks. */
     private static boolean endsWithComma(StringBuilder text) {
