@@ -7303,43 +7303,24 @@ public class AndroidGradleBuilder extends Executor {
             try {
                 kotlinStdlibConstraints = KotlinStdlibAlignment.constraintsBlock(
                         compile,
-                        // Every app-controlled fragment that reaches the generated
-                        // dependencies block. Read off ShieldInjector's GRADLE_TEXT_HINTS,
-                        // which is this tree's enumeration of hints interpolated into a
-                        // Gradle file, rather than off the ones that came to mind --
-                        // android.supportv4Dep was missed exactly that way, and so was
-                        // android.gradlePlugin: it is interpolated at top level right after
-                        // `apply plugin`, where a dependencies { } block of its own is
-                        // valid and reaches the same configurations. The rest of that list
-                        // lands in buildscript, repositories or the android block, where a
-                        // dependency cannot be declared.
                         // In the order the generated script emits them, because a
-                        // definition is only in scope for what comes after it: gradlePlugin
-                        // at the top, then the dependencies block in its own order, then
-                        // xgradle after it. Listing them in any other order lost a
-                        // definition that the real script would have had in scope.
-                        //
-                        // EVERY app-controlled fragment of the whole script, not of the
-                        // dependencies block. The block was the wrong boundary: a rule
-                        // like project.configurations.all { resolutionStrategy.force ... }
-                        // is accepted and executed from inside android { }, so a fragment
-                        // interpolated there can hold an override that decides what
-                        // resolves. Which is to say the earlier reasoning -- "the rest
-                        // lands where a dependency cannot be declared" -- was about
-                        // DECLARATIONS and missed rules entirely.
-                        //
-                        // writes itself. kotlinRuntimeDependency is the reason: it carries
-                        // requireKotlinStdlib, so an app asking for 1.7.22!! has a strict
-                        // pre-merge pin on the base library that nothing here could see,
-                        // and the constraint went in beside it. The other two cannot
-                        // currently name a Kotlin artifact, and are passed anyway rather
-                        // than judged -- the judging belongs in the helper, and a list of
-                        // "fragments worth reading" is exactly what was wrong before.
-                        // KotlinStdlibAlignmentTest reads this call against the generated
-                        // block and fails if the two ever disagree.
+                        // definition is only in scope for what comes after it, and
+                        // EVERY fragment carrying app-supplied text -- read straight
+                        // from a hint, or held by a local that was assigned from one.
+                        // Bounding this at the dependencies block was wrong twice: a
+                        // rule reaches the app's configurations from the android block
+                        // and from the repositories closure just as well. The scalars
+                        // ride along rather than being filtered out, because deciding
+                        // which hints are text and which are values is the judgement
+                        // that keeps being wrong, and this way there is none to make.
+                        // KotlinStdlibAlignmentTest reads this call against the script
+                        // and fails if they ever disagree.
                         request.getArg("android.gradlePlugin", ""),
+                        injectRepo,
                         gradleDependency,
                         request.getArg("android.gradle.androidx", ""),
+                        minSDK,
+                        targetNumber,
                         request.getArg("android.xgradle_default_config", ""),
                         coreLibraryDesugaringDependency,
                         request.getArg("android.supportv4Dep", ""),

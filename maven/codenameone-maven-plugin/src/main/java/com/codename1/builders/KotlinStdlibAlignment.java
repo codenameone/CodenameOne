@@ -523,7 +523,7 @@ public class KotlinStdlibAlignment {
         if (callsStrictly(line)) {
             return strictVersionIn(line);
         }
-        if (callsForce(line)) {
+        if (callsForce(line, BASE_STDLIB)) {
             return declaredVersionOf(line, BASE_STDLIB);
         }
         String declared = declaredVersionOf(line, BASE_STDLIB);
@@ -550,7 +550,7 @@ public class KotlinStdlibAlignment {
      * requirement that had resolved fine before it.</p>
      */
     private static boolean holdsStrictly(String line, String artifact) {
-        if (callsStrictly(line) || callsForce(line)) {
+        if (callsStrictly(line) || callsForce(line, artifact)) {
             return true;
         }
         String declared = declaredVersionOf(line, artifact);
@@ -604,12 +604,41 @@ public class KotlinStdlibAlignment {
             if ((literal.equals(coordinate)
                     || literal.startsWith(coordinate + ":"))
                     && !hasWhitespace(literal)
-                    && !isReasonArgument(line, i)) {
+                    && !isReasonArgument(line, i)
+                    && !isAssignedValue(line, i)) {
                 return true;
             }
             i = end;
         }
         return false;
+    }
+
+    /**
+     * Whether the literal opening at {@code quoteAt} is being assigned to
+     * something rather than handed to a dependency.
+     *
+     * <p>{@code def legacy = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'}
+     * names the artifact and carries a strict marker, and on that basis alone
+     * it suppressed the whole block -- for a value that is never added to any
+     * configuration and decides nothing. A definition becomes a declaration
+     * when it is USED, and by then the name has been inlined and the usage is
+     * what this reads.</p>
+     *
+     * <p>Narrower than requiring a configuration, which was the other way to
+     * fix this and would have undone something deliberate: a strict pin on a
+     * variant configuration still shares a classpath with the one being
+     * constrained, so it suppresses on purpose. The distinction here is
+     * between a value and a call, not between one configuration and
+     * another.</p>
+     */
+    private static boolean isAssignedValue(String line, int quoteAt) {
+        int i = quoteAt - 1;
+        while (i >= 0 && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+            i--;
+        }
+        return i >= 0 && line.charAt(i) == '='
+                && (i == 0 || line.charAt(i - 1) != '=')
+                && (i + 1 >= line.length() || line.charAt(i + 1) != '=');
     }
 
     /**
@@ -1080,7 +1109,7 @@ public class KotlinStdlibAlignment {
      * jar at all. Nothing fails in the build; it throws on the device. So a
      * forced version is read exactly like a strict one.</p>
      */
-    private static boolean callsForce(String statement) {
+    private static boolean callsForce(String statement, String artifact) {
         // The method forms, which callsNamed now distinguishes from an assignment.
         // Gradle's ways of overriding a selected version: force and its setter, a
         // resolution rule's useVersion (a bare version) or useTarget (a whole
@@ -1094,9 +1123,19 @@ public class KotlinStdlibAlignment {
         // ordinary spelling, `substitute module('g:a') using module('g:a:1.7.22')`.
         if (callsNamed(statement, "force") || callsNamed(statement, "setForcedModules")
                 || callsNamed(statement, USE_VERSION)
-                || callsNamed(statement, "useTarget")
-                || callsNamed(statement, "substitute")) {
+                || callsNamed(statement, "useTarget")) {
             return true;
+        }
+        if (callsNamed(statement, "substitute")) {
+            // A substitution overrides only what it substitutes AWAY from. With the
+            // artifact as the TARGET -- substitute module('com.example:source')
+            // using module('...:kotlin-stdlib:1.7.22') -- the replacement is still
+            // subject to ordinary conflict resolution, so an existing 1.8.22
+            // requirement raises it and nothing is pinned; reading that as absolute
+            // suppressed the block for a graph that had not been pinned at all.
+            int using = afterCall(statement, "using");
+            String replaced = using < 0 ? statement : statement.substring(0, using);
+            return namesArtifactAnywhere(replaced, artifact);
         }
         // forcedModules is only ever written as an assignment, and assigning it any
         // module list is a force. `force` as a property is the one that has to be

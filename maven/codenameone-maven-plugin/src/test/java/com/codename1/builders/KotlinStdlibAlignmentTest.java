@@ -476,8 +476,11 @@ public class KotlinStdlibAlignmentTest {
         String builderSrc = new String(bytes, "UTF-8");
         int at = builderSrc.indexOf("KotlinStdlibAlignment.constraintsBlock(");
         check(at >= 0, "the builder calls the alignment");
-        String call = builderSrc.substring(at, builderSrc.indexOf(";", at))
-                .replaceAll("//[^\n]*", "");
+        // Comments go first, THEN the terminator is found: a semicolon inside the
+        // call's own explanatory comment truncated this slice and the test then
+        // reported arguments missing that were plainly there.
+        String fromCall = builderSrc.substring(at).replaceAll("//[^\n]*", "");
+        String call = fromCall.substring(0, fromCall.indexOf(";"));
 
         // The WHOLE generated script, not just its dependencies block. The block was
         // the wrong boundary: android.gradle.androidx is interpolated inside
@@ -501,12 +504,30 @@ public class KotlinStdlibAlignmentTest {
         while (hint.find()) {
             byPosition.put(Integer.valueOf(hint.start()), "getArg(\"" + hint.group(1) + "\"");
         }
-        // Only the getArg fragments are required across the whole script. Those are
-        // app-supplied Gradle TEXT by definition, so the rule needs no judgement
-        // about which of them could matter -- which is the judgement that was wrong
-        // twice. The script's other locals are builder-computed values (a version
-        // number, a namespace, a repository block); the ones inside the dependencies
-        // block are separately required below because they carry app text too.
+        // Every fragment that carries app-supplied text, by either route: a getArg
+        // read straight into the script, or a local that was ASSIGNED from one.
+        // Requiring only the direct reads missed injectRepo, which holds
+        // android.repositories and is interpolated into the repositories closure --
+        // where a project.configurations.all { force } runs perfectly well. The
+        // locals are found by looking at how they are built, not by knowing their
+        // names, because knowing their names is what keeps being wrong.
+        java.util.Set<String> carriesAppText = new java.util.HashSet<String>();
+        java.util.regex.Matcher assigned = java.util.regex.Pattern
+                .compile("\\b([a-z][a-zA-Z0-9]*)\\s*(?:=|\\+=)[^;\n]*getArg\\(")
+                .matcher(builderSrc);
+        while (assigned.find()) {
+            carriesAppText.add(assigned.group(1));
+        }
+        check(carriesAppText.contains("injectRepo"),
+                "the scan for hint-carrying locals works: " + carriesAppText);
+        java.util.regex.Matcher carrier = java.util.regex.Pattern
+                .compile("\\+\\s*(?:addNewlineIfMissing\\()?([a-z][a-zA-Z0-9]*)\\b")
+                .matcher(block);
+        while (carrier.find()) {
+            if (carriesAppText.contains(carrier.group(1))) {
+                byPosition.put(Integer.valueOf(carrier.start(1)), carrier.group(1));
+            }
+        }
         int dependenciesAt = block.indexOf("\"dependencies {");
         check(dependenciesAt >= 0, "the dependencies block is inside the script");
         java.util.regex.Matcher name = java.util.regex.Pattern
@@ -532,8 +553,16 @@ public class KotlinStdlibAlignmentTest {
             }
             byPosition.put(Integer.valueOf(name.start(1)), token);
         }
-        java.util.List<String> fragments =
-                new java.util.ArrayList<String>(byPosition.values());
+        // By name, keeping where it FIRST appears: a fragment may be interpolated
+        // more than once -- injectRepo goes into the buildscript repositories and
+        // the project ones -- and requiring a strictly later position for each
+        // occurrence asked the call to repeat an argument it passes once.
+        java.util.List<String> fragments = new java.util.ArrayList<String>();
+        for (String fragment : byPosition.values()) {
+            if (!fragments.contains(fragment)) {
+                fragments.add(fragment);
+            }
+        }
         check(fragments.size() >= 6,
                 "the block really was parsed, found " + fragments);
 
@@ -610,6 +639,54 @@ public class KotlinStdlibAlignmentTest {
         check(modern.contains("kotlin-stdlib-jdk8:1.8.0")
                         && !modern.contains("kotlin-stdlib-jdk7:1.8.0"),
                 "the merged-era declaration is read, got <<" + modern + ">>");
+    }
+
+    /**
+     * A value that is only assigned is not a declaration. A definition naming
+     * the artifact and carrying a strict marker suppressed the whole block on
+     * that basis alone, for a value never added to any configuration -- and a
+     * definition becomes a declaration when it is USED, by which point the
+     * name has been inlined and the usage is what gets read.
+     */
+    @Test
+    public void anAssignedValueIsNotADeclaration() {
+        String unused = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def legacy = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n"
+                + "    implementation 'androidx.appcompat:appcompat:1.6.1'\n");
+        check(unused.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && unused.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an unused definition decides nothing, got <<" + unused + ">>");
+
+        // Used, it decides everything.
+        String used = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def legacy = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n"
+                + "    implementation legacy\n");
+        check("".equals(used), "the same value, used, suppresses; got <<" + used + ">>");
+    }
+
+    /**
+     * A substitution overrides only what it substitutes AWAY from. With the
+     * artifact as the target the replacement still goes through ordinary
+     * conflict resolution, so an existing requirement raises it and nothing is
+     * pinned -- reading that as absolute suppressed the block for a graph that
+     * had not been pinned at all.
+     */
+    @Test
+    public void aSubstitutionOverridesOnlyItsSource() {
+        String source = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.dependencySubstitution { "
+                + "substitute module('org.jetbrains.kotlin:kotlin-stdlib') "
+                + "using module('org.jetbrains.kotlin:kotlin-stdlib:1.7.22') } }\n");
+        check("".equals(source),
+                "substituting the stdlib itself is an override, got <<" + source + ">>");
+
+        String target = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.dependencySubstitution { "
+                + "substitute module('com.example:source') "
+                + "using module('org.jetbrains.kotlin:kotlin-stdlib:1.7.22') } }\n");
+        check(target.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && target.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the stdlib merely as a target is not, got <<" + target + ">>");
     }
 
     /**
