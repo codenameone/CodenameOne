@@ -397,6 +397,12 @@ public class FloatingActionButton extends Button {
         // -- open.
         Dialog enclosing = enclosingDialog(this);
         if (enclosing != null) {
+            // Disposed before the dispatch below, and the command still lands on it.
+            // Disposing takes the dialog out of the layer it was in, which leaves it
+            // parentless -- and a parentless Form is a command host -- so the walk up
+            // from this button in Button.fireActionEvent still reaches the dialog and
+            // records the command there, which is what a modal showDialog() returns.
+            // Guarded by aFabCommandInsideAHostedDialogIsStillRecordedOnIt.
             enclosing.dispose();
         } else {
             // Nothing encloses it, so the only dialog it can mean is one showing over

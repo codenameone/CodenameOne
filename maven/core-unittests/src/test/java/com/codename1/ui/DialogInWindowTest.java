@@ -3889,4 +3889,57 @@ class DialogInWindowTest extends UITestBase {
         }
     }
 
+    /// The dialog's recorded command, via reflection.
+    private static Command lastCommandPressedOf(Dialog d) {
+        try {
+            java.lang.reflect.Field f = Dialog.class.getDeclaredField("lastCommandPressed");
+            f.setAccessible(true);
+            return (Command) f.get(d);
+        } catch (Exception err) {
+            throw new IllegalStateException(err);
+        }
+    }
+
+    /// A FAB closes the dialog it is in, and the dialog still records its command.
+    ///
+    /// The button disposes its enclosing dialog before dispatching, so the question is
+    /// whether the command still finds a host afterwards. It does: disposing takes the
+    /// dialog out of the window's layer, which leaves it parentless -- and a parentless
+    /// Form is a command host, so the walk up from the button reaches the dialog it
+    /// just closed and records the command there.
+    @FormTest
+    void aFabCommandInsideAHostedDialogIsStillRecordedOnIt() {
+        implementation.setMultiWindowSupported(true);
+        new Form("main", new BorderLayout()).show();
+        DisplayTest.flushEdt();
+        Window w = new Window("host", new BorderLayout());
+        w.setWindowSize(500, 400);
+        w.show();
+        DisplayTest.flushEdt();
+
+        Dialog d = new Dialog("confirm");
+        d.setLayout(new BorderLayout());
+        Command ok = new Command("OK");
+        com.codename1.components.FloatingActionButton fab =
+                com.codename1.components.FloatingActionButton.createFAB(
+                        com.codename1.ui.FontImage.MATERIAL_ADD);
+        fab.setCommand(ok);
+        d.add(BorderLayout.CENTER, fab.bindFabToContainer(new Label("body")));
+        d.setTopLevelHost(w);
+        d.showModeless();
+        DisplayTest.flushEdt();
+        assertTrue(isUnder(w, d), "precondition: the dialog is up on the window");
+
+        fab.pressed();
+        fab.released();
+        DisplayTest.flushEdt();
+
+        assertTrue(d.isDisposed(), "the FAB closes the dialog it sits in");
+        assertSame(ok, lastCommandPressedOf(d),
+                "and the dialog it closed still records the command, or a modal"
+                        + " showDialog() hands its caller null instead of the command");
+        w.dispose();
+        DisplayTest.flushEdt();
+    }
+
 }
