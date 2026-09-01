@@ -564,6 +564,79 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A forced version suppresses the block, like a strict one.
+     *
+     * <p>A force does not conflict with a constraint, it wins over it without
+     * a word: force the base library to 1.7.22 and these constraints still
+     * raise the shims to their EMPTY 1.8.0 jars, so the jdk7/jdk8 classes are
+     * in no selected jar at all. The build is green and the app throws on the
+     * device, which is the one outcome worth all of this machinery.</p>
+     */
+    @Test
+    public void aForcedVersionIsHeldAsFirmlyAsAStrictOne() {
+        String[] forced = {
+            "    configurations.all { resolutionStrategy.force "
+                    + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22' }\n",
+            "    configurations.all { resolutionStrategy { force "
+                    + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22' } }\n",
+            "    configurations.all {\n        resolutionStrategy {\n"
+                    + "            force 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n"
+                    + "        }\n    }\n",
+        };
+        for (int i = 0; i < forced.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation", forced[i]);
+            check("".equals(out),
+                    "a forced pre-merge version suppresses the block, from <<"
+                            + forced[i] + ">> got <<" + out + ">>");
+        }
+
+        // A force at or above the floor takes nothing away: it is already a shim.
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.force "
+                + "'org.jetbrains.kotlin:kotlin-stdlib:1.9.22' }\n");
+        check(modern.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a merged-era force still gets the alignment, got <<" + modern + ">>");
+
+        // And the word in a reason is prose, as everywhere else.
+        String prose = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('com.example:other:1.0') "
+                + "{ because 'we force nothing here' }\n");
+        check(prose.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the word force in prose is not a force, got <<" + prose + ">>");
+    }
+
+    /**
+     * A slashy literal may open after a closure arrow, and may run past the
+     * end of its line -- but only when it actually closes. An opener misread
+     * with no closing slash anywhere would swallow every statement after it,
+     * and a suppression reached that way says nothing about the app.
+     */
+    @Test
+    public void aSlashyLiteralSpansLinesOnlyWhenItCloses() {
+        String afterArrow = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def marker = { -> /can't/ }; "
+                + "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check("".equals(afterArrow),
+                "a slashy literal after a closure arrow, got <<" + afterArrow + ">>");
+
+        String multiline = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def marker = /first\n        still can't/\n"
+                + "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check("".equals(multiline),
+                "a literal that spans lines keeps its content, got <<" + multiline + ">>");
+
+        // Unterminated: whatever that slash was, it does not reach the next line.
+        String unterminated = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def ratio = a / b\n"
+                + "    implementation 'androidx.appcompat:appcompat:1.6.1'\n");
+        check(unterminated.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && unterminated.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an unclosed slash stops at its line, got <<" + unterminated + ">>");
+    }
+
+    /**
      * A coordinate may carry a classifier and an {@code @extension} after its
      * version, and neither is part of the version. Returning them made
      * {@code 1.7.22!!@jar} not end in the strict marker, so a strict pre-merge

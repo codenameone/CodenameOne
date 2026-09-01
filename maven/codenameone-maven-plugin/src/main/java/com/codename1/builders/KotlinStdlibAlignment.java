@@ -455,6 +455,9 @@ public class KotlinStdlibAlignment {
         if (callsStrictly(line)) {
             return strictVersionIn(line);
         }
+        if (callsForce(line)) {
+            return declaredVersionOf(line, BASE_STDLIB);
+        }
         String declared = declaredVersionOf(line, BASE_STDLIB);
         if (declared != null && declared.endsWith(STRICT_SUFFIX)) {
             return declared.substring(0, declared.length() - STRICT_SUFFIX.length());
@@ -479,7 +482,7 @@ public class KotlinStdlibAlignment {
      * requirement that had resolved fine before it.</p>
      */
     private static boolean holdsStrictly(String line, String artifact) {
-        if (callsStrictly(line)) {
+        if (callsStrictly(line) || callsForce(line)) {
             return true;
         }
         String declared = declaredVersionOf(line, artifact);
@@ -929,17 +932,38 @@ public class KotlinStdlibAlignment {
      * statement separators: inside a string it is prose, outside it is
      * syntax.</p>
      */
+    /**
+     * Whether the statement calls Gradle's {@code force}.
+     *
+     * <p>A force is as absolute as a strict pin and worse to get wrong. It
+     * does not conflict with a constraint, it silently wins: with
+     * {@code resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'}
+     * the base library stays pre-merge while these constraints raise the shims
+     * to their EMPTY 1.8.0 jars, so the jdk7/jdk8 classes end up in no selected
+     * jar at all. Nothing fails in the build; it throws on the device. So a
+     * forced version is read exactly like a strict one.</p>
+     */
+    private static boolean callsForce(String statement) {
+        return callsNamed(statement, FORCE);
+    }
+
+    private static final String FORCE = "force";
+
     private static boolean callsStrictly(String statement) {
+        return callsNamed(statement, STRICTLY);
+    }
+
+    /** Whether {@code call} appears as a call, rather than inside a literal. */
+    private static boolean callsNamed(String statement, String call) {
         for (int i = 0; i < statement.length(); i++) {
-            char c = statement.charAt(i);
             if (isLiteralStart(statement, i)) {
                 i = endOfStringLiteral(statement, i);
                 continue;
             }
-            if (statement.startsWith(STRICTLY, i)) {
+            if (statement.startsWith(call, i)) {
                 boolean startsToken = i == 0
                         || !isIdentifierChar(statement.charAt(i - 1));
-                int after = i + STRICTLY.length();
+                int after = i + call.length();
                 boolean endsToken = after < statement.length()
                         && (statement.charAt(after) == ' '
                                 || statement.charAt(after) == '('
@@ -1098,7 +1122,7 @@ public class KotlinStdlibAlignment {
      * an identifier character, a digit or a closing bracket: those are what
      * division follows.
      */
-    private static final String SLASHY_OPENER_POSITIONS = "=(,[:{&|!?+-*;";
+    private static final String SLASHY_OPENER_POSITIONS = "=(,[:{&|!?+-*;<>";
 
     /** The length of the delimiter opening at {@code at}. */
     private static int delimiterLength(String text, int quoteAt) {
@@ -1123,20 +1147,24 @@ public class KotlinStdlibAlignment {
             return close < 0 ? text.length() : close + 1;
         }
         if (quote == '/') {
+            // Groovy's slashy literals MAY span lines, so the closing slash is looked
+            // for across them -- but only a literal that actually closes gets to. An
+            // opener this misread, with no closing slash anywhere, would otherwise
+            // swallow every statement after it, and a suppression reached that way is
+            // the outcome this class must never produce. So: close where it closes,
+            // and failing that, stop at the line it started on.
+            int firstNewline = -1;
             for (int i = quoteAt + 1; i < text.length(); i++) {
                 char c = text.charAt(i);
                 if (c == '\\') {
                     i++;
                 } else if (c == '/') {
                     return i;
-                } else if (c == '\n') {
-                    // A slashy literal does not cross a line; treating an unterminated
-                    // one as running to the end of the fragment would swallow every
-                    // statement after it.
-                    return i - 1;
+                } else if (c == '\n' && firstNewline < 0) {
+                    firstNewline = i;
                 }
             }
-            return text.length();
+            return firstNewline < 0 ? text.length() : firstNewline - 1;
         }
         // Groovy's triple-quoted literals are a different delimiter, not three of
         // this one. Treating the opener as a single quote made a triple-quoted note
