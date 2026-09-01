@@ -3424,7 +3424,13 @@ public class Window extends Container implements TopLevelContainer {
             endGesture(releasing);
             return;
         }
-        Component target = releasingDragged != null ? releasingDragged : releasingPressed;
+        // A wheel notch is a scroll, never a tap, exactly as in Form: the synthetic
+        // gesture the implementation plays for it activates no drag when there is
+        // nothing left to scroll, and the release then reached the pressed component
+        // and acted like a click on it (issue #5655). The dragged component still gets
+        // its release -- that one IS the scroll, and it has momentum to settle.
+        Component target = releasingDragged != null ? releasingDragged
+                : (Display.impl.isScrollWheeling() ? null : releasingPressed);
         if (target != null) {
             if (releasingDragged != null && releasingDragged.isDragAndDropInitialized()) {
                 // An activated drag ends with dragFinished, not pointerReleased.

@@ -4588,6 +4588,35 @@ public class Form extends Container implements TopLevelContainer {
             setPressedCmp(null);
             boolean isScrollWheeling = Display.impl.isScrollWheeling();
             Container actual = getActualPane(formLayeredPane, x, y);
+            // A wheel notch is a scroll, never a tap. The gesture the implementation
+            // plays for it is a synthetic press/drag/release, and that only reads as a
+            // scroll while something actually scrolls: over content already fully
+            // visible no drag is ever activated, so the release fell through to the
+            // component under the cursor and activated it. Wheeling over a table row
+            // opened its details dialog (issue #5655). Button already refuses to fire
+            // while wheeling, but a pointerReleased LISTENER had no such guard, and
+            // neither does any component that acts on the release itself.
+            //
+            // The drag half is still delivered: that is the scroll, and the container
+            // it was played into needs its release to settle the momentum. Only the
+            // paths that treat a release as a click are skipped -- which is also why
+            // the tap dispatches below no longer test isScrollWheeling before moving
+            // focus: none of them is reachable during a wheel gesture any more.
+            if (isScrollWheeling) {
+                fireReleaseListeners(x, y);
+                if (dragged != null) {
+                    if (dragged.isDragAndDropInitialized()) {
+                        LeadUtil.dragFinished(dragged, x, y);
+                    } else {
+                        LeadUtil.pointerReleased(dragged, x, y);
+                    }
+                    dragged = null;
+                }
+                stickyDrag = null;
+                dragStopFlag = false;
+                releaseComponentsAwaitingRelease();
+                return;
+            }
             if (componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
                 // special case allowing drag within a button
                 Component atXY = actual.getComponentAt(x, y);
@@ -4673,7 +4702,7 @@ public class Form extends Container implements TopLevelContainer {
                     }
                     cmp = LeadUtil.leadParentImpl(cmp);
                     if (cmp.isEnabled()) {
-                        if (!isScrollWheeling && cmp.isFocusable()) {
+                        if (cmp.isFocusable()) {
                             setFocused(cmp);
                         }
                         LeadUtil.pointerReleased(cmp, x, y);
@@ -4699,7 +4728,7 @@ public class Form extends Container implements TopLevelContainer {
                             cmp = LeadUtil.leadParentImpl(cmp);
 
                             if (cmp.isEnabled()) {
-                                if (!isScrollWheeling && cmp.isFocusable()) {
+                                if (cmp.isFocusable()) {
                                     setFocused(cmp);
                                 }
                                 LeadUtil.pointerReleased(cmp, x, y);
@@ -4715,7 +4744,7 @@ public class Form extends Container implements TopLevelContainer {
                             if (cmp != null) {
                                 cmp = LeadUtil.leadParentImpl(cmp);
 
-                                if (cmp.isEnabled() && !isScrollWheeling && cmp.isFocusable()) {
+                                if (cmp.isEnabled() && cmp.isFocusable()) {
                                     setFocused(cmp);
                                 }
                                 LeadUtil.pointerReleased(cmp, x, y);
@@ -4731,7 +4760,7 @@ public class Form extends Container implements TopLevelContainer {
 
                                     cmp = LeadUtil.leadParentImpl(cmp);
 
-                                    if (!isScrollWheeling && cmp.isEnabled() && cmp.isFocusable()) {
+                                    if (cmp.isEnabled() && cmp.isFocusable()) {
                                         setFocused(cmp);
                                     }
                                     LeadUtil.pointerReleased(cmp, x, y);
@@ -4751,17 +4780,25 @@ public class Form extends Container implements TopLevelContainer {
                 }
             }
             stickyDrag = null;
-            if (componentsAwaitingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
-                for (Component c : componentsAwaitingRelease) {
-                    if (LeadUtil.leadComponentImpl(c) instanceof ReleasableComponent) {
-                        ReleasableComponent rc = (ReleasableComponent) LeadUtil.leadComponentImpl(c);
-                        rc.setReleased();
-                    }
-                }
-                componentsAwaitingRelease = null;
-            }
+            releaseComponentsAwaitingRelease();
         } finally {
             currentPointerPress = null;
+        }
+    }
+
+    /// Clears the pressed look of everything still waiting for this gesture's release.
+    /// Shared with the scroll-wheel path above, which returns before the end of
+    /// `#pointerReleased(int, int)` and would otherwise leave a component painted
+    /// pressed until the next gesture.
+    private void releaseComponentsAwaitingRelease() {
+        if (componentsAwaitingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
+            for (Component c : componentsAwaitingRelease) {
+                if (LeadUtil.leadComponentImpl(c) instanceof ReleasableComponent) {
+                    ReleasableComponent rc = (ReleasableComponent) LeadUtil.leadComponentImpl(c);
+                    rc.setReleased();
+                }
+            }
+            componentsAwaitingRelease = null;
         }
     }
 

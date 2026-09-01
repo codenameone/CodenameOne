@@ -208,6 +208,56 @@ public final class WizardDecisions {
         return out;
     }
 
+    /// The App IDs that belong to the project the wizard was opened from: its own bundle
+    /// identifier, and the ones the wizard derives from it for the extensions a build
+    /// generates (`.CN1Widgets`, `.CN1Documents`).
+    ///
+    /// An account accumulates App IDs -- one per app, per test, per colleague -- and the
+    /// profile dialog offered all of them with equal weight, which is a list to search
+    /// rather than a choice to make when exactly one of them can sign this project
+    /// (issue #5654). The full list stays one click away rather than being removed: a
+    /// profile for a bundle the project does not declare is unusual, not wrong.
+    ///
+    /// Empty when the project's identifier is not registered at all, so a caller can tell
+    /// "nothing to narrow to" from "narrowed to one" and fall back to the whole list
+    /// instead of showing an empty picker.
+    public static List<SigningState.BundleId> projectBundleIds(List<SigningState.BundleId> all,
+                                                               String projectBundleId) {
+        List<SigningState.BundleId> out = new ArrayList<SigningState.BundleId>();
+        if (all == null || projectBundleId == null || projectBundleId.trim().isEmpty()) {
+            return out;
+        }
+        String wanted = projectBundleId.trim();
+        for (SigningState.BundleId b : all) {
+            String identifier = b.identifier() == null ? null : b.identifier().trim();
+            if (identifier == null) {
+                continue;
+            }
+            if (identifier.equals(wanted) || identifier.startsWith(wanted + ".")) {
+                out.add(b);
+            }
+        }
+        return out;
+    }
+
+    /// Whether an App ID registered for `platform` covers a profile that needs `required`.
+    ///
+    /// Apple's App ID identifiers are unique across the whole account rather than per
+    /// platform, so an identifier already registered for iOS cannot be registered a
+    /// second time for macOS -- the attempt comes back as "An App ID with Identifier
+    /// '...' is not available. Please enter a different string." (issue #5652). A
+    /// registration marked UNIVERSAL already covers both, and one whose platform the
+    /// service does not report cannot be told apart from it, so both count: reading them
+    /// as "not the platform I need" is what sent automatic setup off to create the
+    /// duplicate Apple always refuses.
+    public static boolean bundlePlatformSatisfies(String required, String platform) {
+        if (required == null || platform == null || platform.trim().isEmpty()) {
+            return true;
+        }
+        String actual = platform.trim();
+        return required.equals(actual) || "UNIVERSAL".equals(actual);
+    }
+
     /// The certificate types the wizard can generate, and how they are labelled.
     ///
     /// Kept here rather than inside the dialog so the set is one thing: every type
@@ -220,6 +270,17 @@ public final class WizardDecisions {
     public static final String[] GENERATABLE_CERTIFICATE_LABELS = {
         "iOS Distribution", "iOS Development", "Mac App Store",
         "Mac Development", "Developer ID", "Mac Installer"};
+
+    /// Whether a project's `ios.includePush` hint asks for push notifications.
+    ///
+    /// Read exactly the way IPhoneBuilder reads it -- absent is off, and only a trimmed,
+    /// case-insensitive "true" is on -- because the App ID capability and the entitlement
+    /// the build stamps on the app have to agree. Automatic setup used to pass a hardcoded
+    /// true instead, so a project that never asked for push got an App ID carrying the
+    /// capability, and every profile issued from it carried it too (issue #5657).
+    public static boolean pushRequested(String includePushHint) {
+        return includePushHint != null && "true".equalsIgnoreCase(includePushHint.trim());
+    }
 
     /// Apple's BundleIdPlatform for the devices a profile of this type can name.
     public static String devicePlatformFor(String profileType) {

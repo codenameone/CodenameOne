@@ -592,6 +592,106 @@ class CertificateWizardModelTest {
     }
 
     @Test
+    void distributionProfilesDoNotAskForDevices() {
+        // Every profile type that names devices, and every one that does not. A device
+        // limited profile is a development or ad hoc one; the store and Developer ID types
+        // cover whatever installs the build, and offering a device picker for them is a
+        // screen of check boxes that changes nothing (issue #5653).
+        assertFalse(WizardDecisions.profileRequiresDevices("IOS_APP_STORE"));
+        assertFalse(WizardDecisions.profileRequiresDevices("MAC_APP_STORE"));
+        assertFalse(WizardDecisions.profileRequiresDevices("MAC_APP_DIRECT"));
+        assertFalse(WizardDecisions.profileRequiresDevices(null));
+        assertTrue(WizardDecisions.profileRequiresDevices("IOS_APP_ADHOC"));
+        assertTrue(WizardDecisions.profileRequiresDevices("IOS_APP_DEVELOPMENT"));
+        assertTrue(WizardDecisions.profileRequiresDevices("MAC_APP_DEVELOPMENT"));
+
+        // And a selection made under a device limited type cannot survive into one that
+        // takes no devices, or canCreateProfile would read a satisfied requirement and the
+        // request would name devices for a profile Apple does not accept them on.
+        SigningState state = stateWithDevices();
+        List<String> picked = new ArrayList<String>();
+        picked.add("DEV_1");
+        assertTrue(WizardDecisions.retainUsableDevices(state, "IOS_APP_DEVELOPMENT", picked).contains("DEV_1"));
+        assertTrue(WizardDecisions.retainUsableDevices(state, "IOS_APP_STORE", picked).isEmpty());
+    }
+
+    @Test
+    void theProfileDialogNarrowsToTheProjectsOwnBundleIds() {
+        // The project's App ID and the ones the wizard derives from it for the extensions a
+        // build generates. Everything else on the account is a different app (issue #5654).
+        List<SigningState.BundleId> all = new ArrayList<SigningState.BundleId>();
+        all.add(new SigningState.BundleId("1", "com.example.app", "App", "IOS", null));
+        all.add(new SigningState.BundleId("2", "com.example.app.CN1Widgets", "Widgets", "IOS", null));
+        all.add(new SigningState.BundleId("3", "com.example.other", "Other", "IOS", null));
+        // Not a prefix match on the raw string: com.example.apparel is a different app that
+        // merely starts with the same letters, which is why the dot is part of the test.
+        all.add(new SigningState.BundleId("4", "com.example.apparel", "Apparel", "IOS", null));
+        all.add(new SigningState.BundleId("5", "com.example.app", "App for Mac", "MAC_OS", null));
+
+        List<SigningState.BundleId> own = WizardDecisions.projectBundleIds(all, "com.example.app");
+        assertEquals(3, own.size());
+        assertEquals("1", own.get(0).id());
+        assertEquals("2", own.get(1).id());
+        assertEquals("5", own.get(2).id());
+
+        // Empty rather than everything when the project's identifier is not registered: the
+        // caller needs to tell "narrowed to nothing" apart from "nothing to narrow", and show
+        // the whole account rather than an empty picker.
+        assertTrue(WizardDecisions.projectBundleIds(all, "com.example.unregistered").isEmpty());
+        assertTrue(WizardDecisions.projectBundleIds(all, null).isEmpty());
+        assertTrue(WizardDecisions.projectBundleIds(null, "com.example.app").isEmpty());
+    }
+
+    @Test
+    void anAppIdIdentifierIsOwnedByTheAccountRatherThanByAPlatform() {
+        // Apple registers an identifier once, so a registration that already covers the
+        // platform -- explicitly, universally, or because the service did not say -- has to
+        // count. Reading those as "not what I need" is what sent automatic setup off to
+        // create a duplicate Apple always refuses, with its refusal reported as a failure of
+        // the run (issue #5652).
+        assertTrue(WizardDecisions.bundlePlatformSatisfies("MAC_OS", "MAC_OS"));
+        assertTrue(WizardDecisions.bundlePlatformSatisfies("MAC_OS", "UNIVERSAL"));
+        assertTrue(WizardDecisions.bundlePlatformSatisfies("IOS", "UNIVERSAL"));
+        assertTrue(WizardDecisions.bundlePlatformSatisfies("MAC_OS", null));
+        assertTrue(WizardDecisions.bundlePlatformSatisfies("MAC_OS", "  "));
+        assertTrue(WizardDecisions.bundlePlatformSatisfies(null, "IOS"));
+        assertFalse(WizardDecisions.bundlePlatformSatisfies("MAC_OS", "IOS"));
+        assertFalse(WizardDecisions.bundlePlatformSatisfies("IOS", "MAC_OS"));
+    }
+
+    @Test
+    void anAppIdWhoseCapabilitiesAreUnknownDoesNotClaimPushIsOff() {
+        // The bundle-id listing carries the identifier, name and platform and nothing else,
+        // so the wizard cannot know whether push is enabled. It used to fill that silence in
+        // with false and print "Push: Off" beside an App ID whose profiles Apple shows
+        // carrying Push Notifications (issue #5657).
+        assertNull(new SigningState.BundleId("1", "com.example.app", "App", "IOS", null).pushEnabled());
+        assertEquals(Boolean.TRUE,
+                new SigningState.BundleId("1", "com.example.app", "App", "IOS", true).pushEnabled());
+    }
+
+    @Test
+    void pushIsRequestedOnlyWhenTheProjectAsksForIt() {
+        // Read the way IPhoneBuilder reads the same hint: absent is off, and only a trimmed
+        // case-insensitive "true" is on. Automatic setup used to pass a hardcoded true, so
+        // every App ID it created carried the capability and so did every profile issued
+        // from it (issue #5657).
+        assertTrue(WizardDecisions.pushRequested("true"));
+        assertTrue(WizardDecisions.pushRequested(" TRUE "));
+        assertFalse(WizardDecisions.pushRequested(null));
+        assertFalse(WizardDecisions.pushRequested(""));
+        assertFalse(WizardDecisions.pushRequested("false"));
+        assertFalse(WizardDecisions.pushRequested("yes"));
+    }
+
+    private static SigningState stateWithDevices() {
+        List<SigningState.Device> devices = new ArrayList<SigningState.Device>();
+        devices.add(new SigningState.Device("DEV_1", "iPhone", "UDID_1", "IOS", "ENABLED"));
+        return new SigningState(new SigningState.Credential(true, "K", "I"), null, null, devices,
+                null, null, null);
+    }
+
+    @Test
     void cloudServiceUsesGeneratedClientForClearSigningData() throws Exception {
         Path sourcePath = Paths.get("src/main/java/com/codename1/certificatewizard/api/CloudSigningService.java");
         if (!Files.exists(sourcePath)) {
