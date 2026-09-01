@@ -1833,6 +1833,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-01T15:01:14+00:00"
+      },
+      "devto": {
+        "id": 4548796,
+        "url": "https://dev.to/codenameone/tapjacking-protection-rejecting-android-touches-behind-an-overlay-4h0b",
+        "syndicated_at": "2026-09-01T17:19:38+00:00"
       }
     }
   }
