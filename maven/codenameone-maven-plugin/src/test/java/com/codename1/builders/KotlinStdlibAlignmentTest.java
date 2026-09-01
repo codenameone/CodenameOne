@@ -488,6 +488,83 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A coordinate keeps its meaning in every literal form Groovy has, the
+     * slashy ones included. Recognising a form in the scanners but not in the
+     * matchers left the pin visible to neither.
+     */
+    @Test
+    public void aSlashyCoordinateIsStillACoordinate() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation($/org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22/$) "
+                + "{ version { strictly '1.7.22' } }\n");
+        check("".equals(out), "a dollar-slashy coordinate is read, got <<" + out + ">>");
+
+        String plain = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def marker = /can't/; "
+                + "implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check("".equals(plain),
+                "an apostrophe inside a slashy literal is not a quote, got <<" + plain + ">>");
+    }
+
+    /**
+     * Division is not a literal. The slashy form is only recognised where an
+     * expression may begin, because reading `total / 2` as an opener would
+     * swallow everything up to the next slash -- which is the same failure,
+     * from the opposite direction, as not recognising the literal at all.
+     */
+    @Test
+    public void divisionIsNotASlashyLiteral() {
+        String[] arithmetic = {
+            "def half = total / 2",
+            "def part = (a + b) / 2",
+            "def ratio = sizes[0] / sizes[1]",
+        };
+        for (int i = 0; i < arithmetic.length; i++) {
+            // On ONE line with the pin, because a slashy literal stops at the end of
+            // its line: put the pin on the next one and a swallowed division costs
+            // nothing, which is a test that passes with the guard removed.
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    " + arithmetic[i]
+                    + "; implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                    + "{ version { strictly '1.7.22' } }\n");
+            check("".equals(out),
+                    "division does not swallow what follows <<" + arithmetic[i]
+                            + ">>, got <<" + out + ">>");
+        }
+    }
+
+    /**
+     * Extra properties are written as a closure at least as often as with a
+     * dot, and inside one a bare assignment really does bind the name the
+     * interpolation reads.
+     */
+    @Test
+    public void anExtraPropertiesClosureDefinesItsNames() {
+        String[] spellings = {
+            "    ext { kotlinVersion = '1.9.22' }\n",
+            "    ext {\n        kotlinVersion = '1.9.22'\n    }\n",
+            "    ext {\n        kotlinVersion = '1.9.22'\n        somethingElse = 'x'\n    }\n",
+        };
+        for (int i = 0; i < spellings.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    spellings[i]
+                    + "    implementation \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion\"\n");
+            check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                    "the sibling is aligned for <<" + spellings[i] + ">>, got <<" + out + ">>");
+            check(!out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "and the merged-era declaration is left alone, got <<" + out + ">>");
+        }
+
+        // Outside such a block a bare assignment binds nothing this can follow.
+        String elsewhere = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    android { kotlinVersion = '1.9.22' }\n"
+                + "    implementation \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion\"\n");
+        check("".equals(elsewhere),
+                "an assignment outside ext stays unreadable, got <<" + elsewhere + ">>");
+    }
+
+    /**
      * Gradle's extra properties are how a project-wide Kotlin version is
      * nearly always written, and the bare name the interpolation reads really
      * is bound by them. Stopping at {@code ext} left the version unreadable,
@@ -772,9 +849,9 @@ public class KotlinStdlibAlignmentTest {
     /**
      * Groovy's dollar-slashy literal may open with a slash, which the comment
      * scanner read as a line comment and used to discard the rest of the
-     * fragment, strict pin included. The PLAIN slashy form is deliberately not
-     * recognised -- a lone slash is also division and both comment kinds --
-     * and that limit has its own assertion below.
+     * fragment, strict pin included. The plain slashy form is recognised too
+     * now, positionally -- see divisionIsNotASlashyLiteral for the half of
+     * that rule which says what is NOT a literal.
      */
     @Test
     public void aDollarSlashyLiteralDoesNotOpenAComment() {

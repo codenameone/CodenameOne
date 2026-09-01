@@ -306,7 +306,7 @@ public class KotlinStdlibAlignment {
         String coordinate = KOTLIN_GROUP + ":" + artifact + ":";
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
-            if (c != '\'' && c != '"') {
+            if (!isLiteralStart(line, i)) {
                 continue;
             }
             int end = endOfStringLiteral(line, i);
@@ -344,7 +344,7 @@ public class KotlinStdlibAlignment {
     private static String mapEntryValue(String line, String key) {
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
-            if (c == '\'' || c == '"') {
+            if (isLiteralStart(line, i)) {
                 i = endOfStringLiteral(line, i);
                 continue;
             }
@@ -362,7 +362,7 @@ public class KotlinStdlibAlignment {
                 continue;
             }
             j = skipBlanks(line, j + 1);
-            if (j < line.length() && (line.charAt(j) == '\'' || line.charAt(j) == '"')) {
+            if (j < line.length() && isLiteralStart(line, j)) {
                 if (endOfStringLiteral(line, j) < line.length()) {
                     // The real delimiter length, as the coordinate path does. Stripping
                     // one character per side left a triple-quoted group or name wearing
@@ -493,7 +493,7 @@ public class KotlinStdlibAlignment {
         String coordinate = KOTLIN_GROUP + ":" + artifact;
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
-            if (c != '\'' && c != '"') {
+            if (!isLiteralStart(line, i)) {
                 continue;
             }
             // The shared rule. This was the last scanner still tracking a single
@@ -624,7 +624,7 @@ public class KotlinStdlibAlignment {
         // written.
         for (int i = 0; i < statement.length(); i++) {
             char c = statement.charAt(i);
-            if (c == '\'' || c == '"') {
+            if (isLiteralStart(statement, i)) {
                 i = endOfStringLiteral(statement, i);
                 continue;
             }
@@ -640,8 +640,7 @@ public class KotlinStdlibAlignment {
                 after = skipBlanks(statement, after + 1);
             }
             if (after < statement.length()
-                    && (statement.charAt(after) == '\''
-                            || statement.charAt(after) == '"')) {
+                    && isLiteralStart(statement, after)) {
                 int end = endOfStringLiteral(statement, after);
                 if (end < statement.length()) {
                     // The literal's own delimiters, however many it has. Written
@@ -910,7 +909,7 @@ public class KotlinStdlibAlignment {
     private static boolean callsStrictly(String statement) {
         for (int i = 0; i < statement.length(); i++) {
             char c = statement.charAt(i);
-            if (c == '\'' || c == '"') {
+            if (isLiteralStart(statement, i)) {
                 i = endOfStringLiteral(statement, i);
                 continue;
             }
@@ -990,9 +989,78 @@ public class KotlinStdlibAlignment {
         return text.substring(from, to);
     }
 
-    /** 3 for a triple-quoted literal, 1 otherwise. */
+    /**
+     * Whether a string literal opens at {@code at}, in any spelling Groovy has
+     * for one.
+     *
+     * <p>This question is asked in eleven places, and the answer used to be
+     * spelled out at each of them as "a quote is here". Every literal form
+     * added since arrived as a review comment against one of those eleven --
+     * triple quotes, then dollar-slashy in the comment scanner, then
+     * dollar-slashy in the statement scanner, then dollar-slashy in the
+     * coordinate matcher -- because teaching one site never taught the rest.
+     * The form belongs here, once, where every scanner reads it.</p>
+     */
+    private static boolean isLiteralStart(String text, int at) {
+        char c = text.charAt(at);
+        if (c == '\'' || c == '"') {
+            return true;
+        }
+        if (c == '$') {
+            return at + 1 < text.length() && text.charAt(at + 1) == '/';
+        }
+        return c == '/' && opensASlashyLiteral(text, at);
+    }
+
+    /**
+     * Whether a {@code /} at {@code at} opens a slashy literal rather than
+     * dividing or opening a comment.
+     *
+     * <p>Declined once, on the grounds that telling these apart needs to know
+     * whether an expression is expected here, which is parsing rather than
+     * scanning. That was raised again with a better argument: NOT recognizing
+     * the literal fails in the SAME direction as recognizing one that is not
+     * there -- an apostrophe inside {@code /can't/} puts the quote scanner out
+     * of step and hides whatever follows, exactly as swallowing a division
+     * would. Given both mistakes cost the same, the question is only which is
+     * likelier, and that is decidable: a literal can only open where an
+     * expression may begin. After an identifier, a number or a closing
+     * bracket -- which is every division a build script actually contains,
+     * {@code total / 2}, {@code (a + b) / 2} -- it is division. The two
+     * comment openers are excluded outright.</p>
+     */
+    private static boolean opensASlashyLiteral(String text, int at) {
+        if (at + 1 < text.length()
+                && (text.charAt(at + 1) == '/' || text.charAt(at + 1) == '*')) {
+            return false;
+        }
+        int i = at - 1;
+        while (i >= 0 && (text.charAt(i) == ' ' || text.charAt(i) == '\t'
+                || text.charAt(i) == '\r' || text.charAt(i) == '\n')) {
+            i--;
+        }
+        if (i < 0) {
+            return true;
+        }
+        return SLASHY_OPENER_POSITIONS.indexOf(text.charAt(i)) >= 0;
+    }
+
+    /**
+     * The characters an expression may follow. Deliberately does not include
+     * an identifier character, a digit or a closing bracket: those are what
+     * division follows.
+     */
+    private static final String SLASHY_OPENER_POSITIONS = "=(,[:{&|!?+-*;";
+
+    /** The length of the delimiter opening at {@code at}. */
     private static int delimiterLength(String text, int quoteAt) {
         char quote = text.charAt(quoteAt);
+        if (quote == '$') {
+            return 2;
+        }
+        if (quote == '/') {
+            return 1;
+        }
         return quoteAt + 2 < text.length()
                 && text.charAt(quoteAt + 1) == quote
                 && text.charAt(quoteAt + 2) == quote ? 3 : 1;
@@ -1000,6 +1068,28 @@ public class KotlinStdlibAlignment {
 
     private static int endOfStringLiteral(String text, int quoteAt) {
         char quote = text.charAt(quoteAt);
+        if (quote == '$') {
+            // $/ ... /$ -- the closer is two characters, and the content may hold
+            // anything at all, which is the point of the form.
+            int close = text.indexOf("/$", quoteAt + 2);
+            return close < 0 ? text.length() : close + 1;
+        }
+        if (quote == '/') {
+            for (int i = quoteAt + 1; i < text.length(); i++) {
+                char c = text.charAt(i);
+                if (c == '\\') {
+                    i++;
+                } else if (c == '/') {
+                    return i;
+                } else if (c == '\n') {
+                    // A slashy literal does not cross a line; treating an unterminated
+                    // one as running to the end of the fragment would swallow every
+                    // statement after it.
+                    return i - 1;
+                }
+            }
+            return text.length();
+        }
         // Groovy's triple-quoted literals are a different delimiter, not three of
         // this one. Treating the opener as a single quote made a triple-quoted note
         // close on the first apostrophe it contains -- can't, in the case that found
@@ -1105,7 +1195,7 @@ public class KotlinStdlibAlignment {
     private static boolean declaresOn(String configuration, String line) {
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
-            if (c == '\'' || c == '"') {
+            if (isLiteralStart(line, i)) {
                 // The shared rule rather than a third hand-rolled quote scanner. This
                 // one tracked a single delimiter character, so a triple-quoted name
                 // was read as an empty string followed by unquoted text -- the same
@@ -1199,25 +1289,7 @@ public class KotlinStdlibAlignment {
                 }
                 continue;
             }
-            if (c == '$' && i + 1 < fragment.length() && fragment.charAt(i + 1) == '/') {
-                // Groovy's dollar-slashy literal. Its opener is unambiguous, and its
-                // content may start with a slash -- $/ /* /$ -- which the comment
-                // scanner below read as a line comment and used to discard the rest
-                // of the fragment, strict pin included.
-                //
-                // The PLAIN slashy form, /.../, is deliberately not recognised: a lone
-                // slash is also division and the start of both comment kinds, so
-                // telling them apart needs to know whether an expression is expected
-                // here, which is parsing rather than scanning. Guessing wrong there
-                // would swallow ordinary text, which is the failure this whole method
-                // exists to avoid.
-                int end = fragment.indexOf("/$", i + 2);
-                int stop = end < 0 ? fragment.length() : end + 2;
-                out.append(fragment, i, stop);
-                i = stop - 1;
-                continue;
-            }
-            if (c == '\'' || c == '"') {
+            if (isLiteralStart(fragment, i)) {
                 // The shared rule, so triple-quoted literals and escapes are the
                 // same thing here as everywhere else. This scanner and the statement
                 // scanner below kept their own copies through the consolidation, and
@@ -1302,19 +1374,7 @@ public class KotlinStdlibAlignment {
         int depth = 0;
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
-            if (c == '$' && i + 1 < text.length() && text.charAt(i + 1) == '/') {
-                // Groovy's dollar-slashy literal, recognised here as well as in the
-                // comment scanner. Fixing only that one left this scanner reading an
-                // apostrophe inside $/can't/$ as an opening quote, which swallowed
-                // the strict pin that followed on the same line. The same rule in two
-                // scanners is the shape this class keeps getting wrong.
-                int slashy = text.indexOf("/$", i + 2);
-                int stop = slashy < 0 ? text.length() : slashy + 2;
-                current.append(text, i, stop);
-                i = stop - 1;
-                continue;
-            }
-            if (c == '\'' || c == '"') {
+            if (isLiteralStart(text, i)) {
                 // The shared rule: escapes and triple quotes handled in one place.
                 // A literal that closed early here merged statements that must stay
                 // apart, which lets one statement's configuration pair with another
@@ -1437,12 +1497,27 @@ public class KotlinStdlibAlignment {
         // made the LAST statement read as a main-variant Kotlin declaration.
         Map<String, String> literals = new LinkedHashMap<String, String>();
         List<String> out = new ArrayList<String>();
+        // Gradle's extra properties are written both ways -- ext.kotlinVersion = '..'
+        // and ext { kotlinVersion = '..' } -- and the closure form is at least as
+        // common. Inside it a bare assignment really does bind a project-wide name,
+        // which is exactly what the interpolation reads, so it is a definition there
+        // and nowhere else: a bare `version = '1.0'` in an android block binds
+        // nothing this can follow, and reading it as a definition would supply a
+        // version to an unrelated $version.
+        int extDepth = 0;
         for (int i = 0; i < statements.size(); i++) {
             String statement = statements.get(i);
             out.add(literals.isEmpty()
                     ? statement
                     : withLiteralsInlined(statement, literals));
-            updateLiteralDefinitions(statement, literals);
+            boolean opensExt = extDepth == 0 && opensAnExtraPropertiesBlock(statement);
+            updateLiteralDefinitions(statement, literals, extDepth > 0 || opensExt);
+            if (extDepth > 0 || opensExt) {
+                extDepth += braceBalance(statement);
+                if (extDepth < 0) {
+                    extDepth = 0;
+                }
+            }
         }
         return out;
     }
@@ -1453,8 +1528,35 @@ public class KotlinStdlibAlignment {
      * reassignment to something unreadable, which forgets it rather than
      * leaving a stale value behind.
      */
+    /**
+     * Whether the statement opens a Gradle {@code ext { }} block, as a whole
+     * token so that a dependency on {@code com.example:extras} does not.
+     */
+    private static boolean opensAnExtraPropertiesBlock(String statement) {
+        int at = statement.indexOf(EXTRA_PROPERTIES);
+        while (at >= 0) {
+            int after = at + EXTRA_PROPERTIES.length();
+            boolean startsToken = at == 0 || !isIdentifierChar(statement.charAt(at - 1));
+            int brace = skipBlanks(statement, after);
+            if (startsToken && (after >= statement.length()
+                    || !isIdentifierChar(statement.charAt(after)))
+                    && brace < statement.length() && statement.charAt(brace) == '{') {
+                return true;
+            }
+            at = statement.indexOf(EXTRA_PROPERTIES, at + 1);
+        }
+        return false;
+    }
+
     private static void updateLiteralDefinitions(String statement,
-            Map<String, String> literals) {
+            Map<String, String> literals, boolean insideExtraProperties) {
+        if (insideExtraProperties) {
+            // The assignment may share the line with the brace that opened the block,
+            // as `ext { kotlinVersion = '1.9.22' }` does, so read from after it.
+            int brace = statement.indexOf('{');
+            String body = brace >= 0 ? statement.substring(brace + 1) : statement;
+            recordBareAssignment(body, literals);
+        }
         int i = 0;
         boolean declared = false;
         int at = statement.indexOf(DEF);
@@ -1523,7 +1625,7 @@ public class KotlinStdlibAlignment {
         }
         i = skipBlanks(statement, i + 1);
         if (i < statement.length()
-                && (statement.charAt(i) == '\'' || statement.charAt(i) == '"')) {
+                && isLiteralStart(statement, i)) {
             int end = endOfStringLiteral(statement, i);
             if (end < statement.length()) {
                 literals.put(name, statement.substring(i, end + 1));
@@ -1539,7 +1641,7 @@ public class KotlinStdlibAlignment {
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < statement.length(); i++) {
             char c = statement.charAt(i);
-            if (c == '\'' || c == '"') {
+            if (isLiteralStart(statement, i)) {
                 int end = endOfStringLiteral(statement, i);
                 String literal = statement.substring(i,
                         Math.min(end + 1, statement.length()));
@@ -1614,6 +1716,35 @@ public class KotlinStdlibAlignment {
         return out.toString();
     }
 
+    /**
+     * Records {@code name = 'literal'} as a definition. Only ever called for
+     * the inside of an extra-properties block, where a bare assignment does
+     * bind a name the rest of the script can read.
+     */
+    private static void recordBareAssignment(String body, Map<String, String> literals) {
+        int i = skipBlanks(body, 0);
+        int nameStart = i;
+        while (i < body.length() && isIdentifierChar(body.charAt(i))) {
+            i++;
+        }
+        if (i == nameStart) {
+            return;
+        }
+        String name = body.substring(nameStart, i);
+        i = skipBlanks(body, i);
+        if (i >= body.length() || body.charAt(i) != '='
+                || (i + 1 < body.length() && body.charAt(i + 1) == '=')) {
+            return;
+        }
+        i = skipBlanks(body, i + 1);
+        if (i < body.length() && isLiteralStart(body, i)) {
+            int end = endOfStringLiteral(body, i);
+            if (end < body.length()) {
+                literals.put(name, body.substring(i, end + 1));
+            }
+        }
+    }
+
     private static final String DEF = "def";
 
     /** Gradle's extra-properties prefix, the one dotted assignment worth reading. */
@@ -1656,7 +1787,7 @@ public class KotlinStdlibAlignment {
         // version -- and counting after those missed the closure's own opening brace.
         for (int i = 0; i < statement.length(); i++) {
             char c = statement.charAt(i);
-            if (c != '\'' && c != '"') {
+            if (!isLiteralStart(statement, i)) {
                 continue;
             }
             int end = endOfStringLiteral(statement, i);
@@ -1674,7 +1805,7 @@ public class KotlinStdlibAlignment {
         int depth = 0;
         for (int i = 0; i < statement.length(); i++) {
             char c = statement.charAt(i);
-            if (c == '\'' || c == '"') {
+            if (isLiteralStart(statement, i)) {
                 i = endOfStringLiteral(statement, i);
             } else if (c == '{') {
                 depth++;
