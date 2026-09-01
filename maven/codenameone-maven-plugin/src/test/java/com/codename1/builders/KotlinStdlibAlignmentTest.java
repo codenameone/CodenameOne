@@ -358,6 +358,45 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Every main-variant configuration reaches a classpath the constraint also
+     * reaches, so a pin on any of them is the app managing the artifact.
+     * runtimeOnly is the one that made this a list rather than two names: a
+     * strict pin there did not get overridden by the emitted 1.8.0 constraint,
+     * it made the resolution fail outright.
+     */
+    @Test
+    public void aPinOnAnyMainConfigurationSuppresses() {
+        String[] configurations = {"implementation", "api", "compileOnly", "runtimeOnly",
+            "compile", "runtime"};
+        for (String configuration : configurations) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                    "    " + configuration
+                    + "('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22')\n");
+            check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                    "a pin on " + configuration + " is the app managing jdk8");
+            check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "and jdk7 is still constrained after a " + configuration + " pin");
+        }
+    }
+
+    /**
+     * And their variant and test forms still do not, which is the property the
+     * whole-token lowercase match buys without listing a single variant name.
+     */
+    @Test
+    public void theVariantFormsOfThoseConfigurationsStillDoNot() {
+        String[] variants = {"testRuntimeOnly", "debugRuntimeOnly", "androidTestImplementation",
+            "releaseCompileOnly", "debugApi", "testCompile"};
+        for (String variant : variants) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                    "    " + variant
+                    + "('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22')\n");
+            check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                    variant + " does not reach the constrained configuration");
+        }
+    }
+
+    /**
      * api is a real pin on the main variant and is honoured, so the
      * configuration filter did not narrow to a single keyword.
      */
@@ -430,6 +469,51 @@ public class KotlinStdlibAlignmentTest {
                 + "    }\n");
         check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "an exclusion on its own line is still not a pin");
+    }
+
+    /**
+     * A semicolon ends a statement, because this builder tells developers to
+     * separate android.gradleDep statements "with ';' or a newline" -- two
+     * declarations on one line is the documented shape, not an edge case.
+     * Splitting on newlines alone let the first statement's configuration
+     * token pair with the second statement's coordinate, so a debug-only BOM
+     * read as a main-variant one and suppressed everything.
+     */
+    @Test
+    public void aSemicolonEndsAStatement() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    implementation 'com.android.billingclient:billing:9.1.0'; "
+                + "debugImplementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a debug BOM after a semicolon does not borrow the previous "
+                + "statement's configuration");
+
+        // The same shape where the pin IS on the main variant still suppresses, so
+        // the split did not simply stop every semicolon-separated value from working.
+        String pinned = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    implementation 'com.android.billingclient:billing:9.1.0'; "
+                + "implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check(!pinned.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a real pin after a semicolon is still a pin");
+    }
+
+    /**
+     * A semicolon inside a string or inside parentheses is not a separator.
+     */
+    @Test
+    public void aSemicolonInsideAStringOrParensIsNotASeparator() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    implementation(\n"
+                + "        'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
+                + "    )\n");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a wrapped declaration still pins");
+
+        String quoted = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22' "
+                + "// note; with a semicolon\n");
+        check(!quoted.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a semicolon in a trailing comment does not split the declaration off");
     }
 
     /**

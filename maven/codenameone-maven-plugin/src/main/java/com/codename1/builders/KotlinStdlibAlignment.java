@@ -385,28 +385,67 @@ public class KotlinStdlibAlignment {
      * and the release build is the one that ships.</p>
      *
      * <p>The variant forms camel-case the configuration they derive from, so
-     * requiring the configuration's own lowercase spelling excludes
-     * {@code debugImplementation}, {@code releaseImplementation} and
+     * requiring the configuration's own lowercase spelling as a whole token
+     * excludes {@code debugImplementation}, {@code releaseImplementation} and
      * {@code testImplementation} without listing them, and cannot be defeated
-     * by a variant name nobody thought of. {@code api} is accepted alongside
-     * it because an api declaration is a real pin on the main variant; its
-     * variant forms are camel-cased in the same way.</p>
+     * by a variant name nobody thought of. The other main-variant
+     * configurations are accepted alongside the one being written on; see
+     * {@link #MAIN_CONFIGURATIONS}.</p>
      */
     private static boolean declaresOnTheConstrainedConfiguration(String configuration,
             String line) {
-        if (line.contains(configuration)) {
+        if (declaresOn(configuration, line)) {
             return true;
         }
-        int at = line.indexOf("api");
+        for (int i = 0; i < MAIN_CONFIGURATIONS.length; i++) {
+            if (declaresOn(MAIN_CONFIGURATIONS[i], line)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The dependency configurations of the main variant, which is the one the
+     * constraints are written on.
+     *
+     * <p>Every one of these reaches a classpath the {@code implementation}
+     * constraint also reaches, so a pin declared on any of them is the app
+     * managing the artifact. Getting the list short was a bug rather than a
+     * simplification: a {@code runtimeOnly} pin was read as unmanaged, and if
+     * it carried {@code strictly} the emitted 1.8.0 constraint did not override
+     * it but made the resolution fail outright -- worse than the override this
+     * class already tries to avoid.</p>
+     *
+     * <p>Their variant and test forms camel-case the configuration they derive
+     * from -- {@code testRuntimeOnly}, {@code debugCompileOnly},
+     * {@code releaseApi} -- so matching the lowercase spelling as a whole token
+     * accepts the main ones and excludes the rest without listing any of them,
+     * whatever a variant happens to be called.</p>
+     */
+    private static final String[] MAIN_CONFIGURATIONS = {
+        "implementation",
+        "api",
+        "compileOnly",
+        "runtimeOnly",
+        "compile",
+        "runtime"
+    };
+
+    /** Whether this line declares on {@code configuration}, as a whole token. */
+    private static boolean declaresOn(String configuration, String line) {
+        int at = line.indexOf(configuration);
         while (at >= 0) {
-            boolean startsToken = at == 0 || !Character.isLetterOrDigit(line.charAt(at - 1));
-            int after = at + "api".length();
+            boolean startsToken = at == 0
+                    || !Character.isLetterOrDigit(line.charAt(at - 1));
+            int after = at + configuration.length();
             boolean endsToken = after < line.length()
-                    && (line.charAt(after) == ' ' || line.charAt(after) == '(');
+                    && (line.charAt(after) == ' ' || line.charAt(after) == '('
+                            || line.charAt(after) == '\t');
             if (startsToken && endsToken) {
                 return true;
             }
-            at = line.indexOf("api", at + 1);
+            at = line.indexOf(configuration, at + 1);
         }
         return false;
     }
@@ -477,7 +516,7 @@ public class KotlinStdlibAlignment {
             }
             out.append(c);
         }
-        return statements(out.toString().split("\n"));
+        return statements(out.toString());
     }
 
     /**
@@ -505,53 +544,31 @@ public class KotlinStdlibAlignment {
      * part that must not count. A bare {@code exclude} line truncates to
      * nothing and so is still not a pin.</p>
      *
+     * <p>A statement ends at a newline or at a semicolon, whichever comes
+     * first, and neither ends one inside parentheses or inside a string. The
+     * semicolon is not a nicety: this builder tells developers to separate
+     * {@code android.gradleDep} statements "with ';' or a newline", so a hint
+     * holding two declarations on one line is the documented shape. Splitting
+     * on newlines alone let the configuration token of the first statement pair
+     * with the coordinate of the second, which reads
+     * {@code implementation 'x'; debugImplementation platform('...kotlin-bom')}
+     * as a main-variant BOM and suppresses everything.</p>
+     *
      * <p>Joining stops at the end of the fragment: text left with parentheses
      * open is unbalanced Gradle, and rather than glue the remainder into one
      * long line -- which would make unrelated statements look like a single
      * declaration, and suppression is the direction that must never be reached
      * by accident -- its lines are kept as they were.</p>
      */
-    private static String[] statements(String[] lines) {
-        List<String> joined = new ArrayList<String>();
-        StringBuilder pending = new StringBuilder();
-        int depth = 0;
-        for (int i = 0; i < lines.length; i++) {
-            if (pending.length() > 0) {
-                pending.append(' ');
-            }
-            pending.append(lines[i]);
-            depth += parenBalance(lines[i]);
-            if (depth <= 0) {
-                joined.add(pending.toString());
-                pending.setLength(0);
-                depth = 0;
-            }
-        }
-        if (pending.length() > 0) {
-            // Unbalanced: keep the tail as separate lines rather than as one.
-            for (int i = joined.size(); i < lines.length; i++) {
-                joined.add(lines[i]);
-            }
-        }
-        List<String> kept = new ArrayList<String>();
-        for (int i = 0; i < joined.size(); i++) {
-            String statement = joined.get(i);
-            int at = statement.indexOf("exclude");
-            kept.add(at < 0 ? statement : statement.substring(0, at));
-        }
-        return kept.toArray(new String[kept.size()]);
-    }
-
-    /**
-     * How far a line opens or closes parentheses, ignoring those inside string
-     * literals so a coordinate carrying one cannot unbalance the count.
-     */
-    private static int parenBalance(String line) {
+    private static String[] statements(String text) {
+        List<String> out = new ArrayList<String>();
+        StringBuilder current = new StringBuilder();
         int depth = 0;
         char quote = 0;
-        for (int i = 0; i < line.length(); i++) {
-            char c = line.charAt(i);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
             if (quote != 0) {
+                current.append(c);
                 if (c == quote) {
                     quote = 0;
                 }
@@ -562,10 +579,37 @@ public class KotlinStdlibAlignment {
             } else if (c == '(') {
                 depth++;
             } else if (c == ')') {
-                depth--;
+                if (depth > 0) {
+                    depth--;
+                }
+            } else if ((c == '\n' || c == ';') && depth == 0) {
+                out.add(current.toString().replace('\n', ' '));
+                current.setLength(0);
+                continue;
+            }
+            current.append(c);
+        }
+        if (current.length() > 0) {
+            if (depth > 0) {
+                // Unbalanced: keep the tail's physical lines apart rather than as one
+                // statement. Gluing them would let a configuration from one and a
+                // coordinate from another read as a single declaration, and
+                // suppression is the direction that must never be reached by accident.
+                String[] dangling = current.toString().split("\n");
+                for (int i = 0; i < dangling.length; i++) {
+                    out.add(dangling[i]);
+                }
+            } else {
+                out.add(current.toString().replace('\n', ' '));
             }
         }
-        return depth;
+        List<String> kept = new ArrayList<String>();
+        for (int i = 0; i < out.size(); i++) {
+            String statement = out.get(i);
+            int at = statement.indexOf("exclude");
+            kept.add(at < 0 ? statement : statement.substring(0, at));
+        }
+        return kept.toArray(new String[kept.size()]);
     }
 
     /** Numeric dotted version compare; a missing segment counts as zero. */
