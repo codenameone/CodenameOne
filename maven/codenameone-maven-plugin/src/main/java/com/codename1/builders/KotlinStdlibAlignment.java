@@ -2059,6 +2059,41 @@ public class KotlinStdlibAlignment {
             i = skipBlanks(statement, at + DEF.length());
         } else {
             i = skipBlanks(statement, 0);
+            // Past any annotations first. A script field is written
+            // `@groovy.transform.Field String dep = '...'`, and the walk below reads
+            // identifier tokens -- so it stopped dead on the `@`, recorded nothing,
+            // and the strict pin the field carried was never seen.
+            while (i < statement.length() && statement.charAt(i) == '@') {
+                i++;
+                while (i < statement.length()
+                        && (isIdentifierChar(statement.charAt(i))
+                                || (statement.charAt(i) == '.'
+                                        && i + 1 < statement.length()
+                                        && isIdentifierChar(statement.charAt(i + 1))))) {
+                    i++;
+                }
+                i = skipBlanks(statement, i);
+                if (i < statement.length() && statement.charAt(i) == '(') {
+                    // An annotation may carry arguments, and they may nest.
+                    int open = 0;
+                    while (i < statement.length()) {
+                        char c = statement.charAt(i);
+                        if (isLiteralStart(statement, i)) {
+                            i = endOfStringLiteral(statement, i);
+                        } else if (c == '(') {
+                            open++;
+                        } else if (c == ')') {
+                            open--;
+                            if (open == 0) {
+                                i++;
+                                break;
+                            }
+                        }
+                        i++;
+                    }
+                    i = skipBlanks(statement, i);
+                }
+            }
             // A typed local declares just as much as def does, and it is written
             // with however many modifiers the author felt like: `String dep = ...`,
             // `final String dep = ...`, `private static final String dep = ...`.
@@ -2134,17 +2169,49 @@ public class KotlinStdlibAlignment {
             }
             return;
         }
-        i = skipBlanks(statement, i + 1);
-        if (i < statement.length()
-                && isLiteralStart(statement, i)) {
-            int end = endOfStringLiteral(statement, i);
-            if (end < statement.length()) {
-                recordDefinition(literals, name,
-                        expandedLiteral(statement, i, end, literals), conditional);
+        // Every declarator, not just the first: `def marker = 'x', dep = 'coord'`
+        // declares two names, and stopping after one left the second unknown -- so
+        // the strict pin the second carried was invisible to the statement using it.
+        while (true) {
+            i = skipBlanks(statement, i + 1);
+            int end = -1;
+            String value = null;
+            if (i < statement.length() && isLiteralStart(statement, i)) {
+                int closes = endOfStringLiteral(statement, i);
+                if (closes < statement.length()) {
+                    end = closes;
+                    value = expandedLiteral(statement, i, closes, literals);
+                }
+            }
+            recordDefinition(literals, name, value, conditional);
+            if (end < 0) {
                 return;
             }
+            int comma = skipBlanks(statement, end + 1);
+            if (comma >= statement.length() || statement.charAt(comma) != ',') {
+                return;
+            }
+            int nextName = skipBlanks(statement, comma + 1);
+            int nextEnd = nextName;
+            while (nextEnd < statement.length()
+                    && isIdentifierChar(statement.charAt(nextEnd))) {
+                nextEnd++;
+            }
+            if (nextEnd == nextName) {
+                return;
+            }
+            name = statement.substring(nextName, nextEnd);
+            int assign = skipBlanks(statement, nextEnd);
+            if (assign >= statement.length() || statement.charAt(assign) != '='
+                    || (assign + 1 < statement.length()
+                            && statement.charAt(assign + 1) == '=')) {
+                return;
+            }
+            if (declared) {
+                scope.declared(depth, name, literals);
+            }
+            i = assign;
         }
-        recordDefinition(literals, name, null, conditional);
     }
 
     /**

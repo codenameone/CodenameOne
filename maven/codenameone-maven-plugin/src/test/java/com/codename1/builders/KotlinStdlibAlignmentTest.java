@@ -642,6 +642,61 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A declaration may be annotated. A script field is written
+     * {@code @groovy.transform.Field String dep = '...'}, and the walk that
+     * reads modifiers and a type stopped dead on the {@code @}.
+     */
+    @Test
+    public void aDeclarationMayBeAnnotated() {
+        String[] annotations = {
+            "@groovy.transform.Field",
+            "@Field",
+            "@SuppressWarnings('unused')",
+            "@groovy.transform.Field @SuppressWarnings('unused')",
+        };
+        for (int i = 0; i < annotations.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    " + annotations[i]
+                    + " String dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
+                    + "    implementation(dep) { version { strictly '1.7.22' } }\n");
+            check("".equals(out),
+                    "the field annotated " + annotations[i] + " is recorded, got <<"
+                            + out + ">>");
+        }
+    }
+
+    /**
+     * A declaration may introduce several names at once, and the one that
+     * matters is not always the first.
+     */
+    @Test
+    public void everyDeclaratorIsRecorded() {
+        String second = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def marker = 'x', dep = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n"
+                + "    implementation(dep) { version { strictly '1.7.22' } }\n");
+        check("".equals(second), "the second declarator is recorded, got <<" + second + ">>");
+
+        String third = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def a = 'x', b = 'y', "
+                + "dep = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n"
+                + "    implementation(dep) { version { strictly '1.7.22' } }\n");
+        check("".equals(third), "and the third, got <<" + third + ">>");
+
+        // The first still is, and a declarator list does not invent bindings: a name
+        // that was never declared stays unknown.
+        String first = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22', marker = 'x'\n"
+                + "    implementation(dep) { version { strictly '1.7.22' } }\n");
+        check("".equals(first), "the first is unaffected, got <<" + first + ">>");
+
+        String unknown = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def marker = 'x', other = 'y'\n"
+                + "    implementation(dep)\n");
+        check(unknown.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an undeclared name is still unknown, got <<" + unknown + ">>");
+    }
+
+    /**
      * Line endings do not change what a map entry says, here either. The call
      * detector had already learned that and this shared skip had not, so a
      * CRLF fragment that split an entry after its colon found no value at all.
