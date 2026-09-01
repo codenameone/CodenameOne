@@ -4604,6 +4604,37 @@ public class AndroidGradleBuilder extends Executor {
             throw new BuildException("Failed to generate icon files", ex);
         }
 
+        // The Play Billing version, resolved here rather than beside the gradle
+        // dependency it feeds, because it also moves minSdk and the manifest that
+        // carries minSdkVersion is written further down this method. Resolving it
+        // late put the raised floor in build.gradle and left the manifest saying 19,
+        // which is the merge failure it was meant to prevent.
+        String billingClientVersion = null;
+        if (purchasePermissions) {
+            billingClientVersion = request.getArg("android.billingclient.version",
+                    PlayBillingVersions.DEFAULT_VERSION);
+            // The port's BillingSupport is written against the ProductDetails API, which
+            // the pre-8 releases do not have. Say so in a sentence rather than letting
+            // javac emit two dozen "cannot find symbol" errors against an injected file
+            // the developer never wrote.
+            String billingRefusal = PlayBillingVersions.refusalFor(billingClientVersion);
+            if (billingRefusal != null) {
+                log(billingRefusal);
+                return false;
+            }
+            // The billing AAR declares its own minSdkVersion and the manifest merge
+            // fails against a lower one, so raise the floor the way the Android Auto
+            // dependency already does.
+            String billingMinSdk = PlayBillingVersions.minimumSdk(billingClientVersion);
+            String billingRaisedMinSdk = maxInt(billingMinSdk, minSDK);
+            if (!billingRaisedMinSdk.equals(minSDK)) {
+                log("Play Billing " + billingClientVersion + " requires minSdk "
+                        + billingMinSdk + "; raising android.min_sdk_version from "
+                        + minSDK + " to " + billingRaisedMinSdk);
+            }
+            minSDK = billingRaisedMinSdk;
+        }
+
         if (!purchasePermissions) {
             File billingSupport = new File(srcDir, path("com", "codename1", "impl", "android", "BillingSupport.java"));
             if (billingSupport.exists()) {
@@ -6964,7 +6995,9 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         if (purchasePermissions) {
-            String billingClientVersion = request.getArg("android.billingclient.version", "4.0.0");
+
+            // Resolved earlier, with the minSdk raise, because the manifest that carries
+            // minSdkVersion is written before this point.
             additionalDependencies += " implementation 'com.android.billingclient:billing:"+billingClientVersion+"'\n";
         }
 

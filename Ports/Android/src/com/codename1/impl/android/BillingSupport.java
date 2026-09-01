@@ -32,9 +32,12 @@ import com.android.billingclient.api.ConsumeResponseListener;
 import com.android.billingclient.api.Purchase;
 import com.android.billingclient.api.PurchasesResponseListener;
 import com.android.billingclient.api.PurchasesUpdatedListener;
-import com.android.billingclient.api.SkuDetails;
-import com.android.billingclient.api.SkuDetailsParams;
-import com.android.billingclient.api.SkuDetailsResponseListener;
+import com.android.billingclient.api.PendingPurchasesParams;
+import com.android.billingclient.api.ProductDetails;
+import com.android.billingclient.api.ProductDetailsResponseListener;
+import com.android.billingclient.api.QueryProductDetailsParams;
+import com.android.billingclient.api.QueryProductDetailsResult;
+import com.android.billingclient.api.QueryPurchasesParams;
 import com.codename1.payment.PendingPurchaseCallback;
 import com.codename1.payment.Product;
 import com.codename1.payment.PurchaseCallback;
@@ -61,8 +64,8 @@ import java.util.logging.Logger;
 
 
 /**
- * A utility class including all of the billing related functionality for the Play billing library
- * version 4.  {@link CodenameOneActivity} can be overridden to return an instance of this in
+ * A utility class including all of the billing related functionality for the Play billing
+ * library.  {@link CodenameOneActivity} can be overridden to return an instance of this in
  * {@link CodenameOneActivity#createBillingSupport()}.   The default implementation returns null
  * which disables billing support.
  *
@@ -141,7 +144,9 @@ public class BillingSupport implements IBillingSupport {
         if (billingClient == null) {
             billingClient= BillingClient.newBuilder(activity)
                     .setListener(purchasesUpdatedListener)
-                    .enablePendingPurchases()
+                    .enablePendingPurchases(PendingPurchasesParams.newBuilder()
+                            .enableOneTimeProducts()
+                            .build())
                     .build();
         }
         
@@ -182,6 +187,61 @@ public class BillingSupport implements IBillingSupport {
     }
 
 
+    /// The query the ProductDetails API takes, built from the plain sku strings the
+    /// Codename One payment API deals in. One product type per query: unlike the SKU
+    /// API, Play rejects a query mixing INAPP and SUBS products.
+    private static QueryProductDetailsParams productQuery(String type, List<String> skus) {
+        List<QueryProductDetailsParams.Product> products =
+                new ArrayList<QueryProductDetailsParams.Product>();
+        for (String sku : skus) {
+            products.add(QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(sku)
+                    .setProductType(type)
+                    .build());
+        }
+        return QueryProductDetailsParams.newBuilder().setProductList(products).build();
+    }
+
+    /// The price to show for a product, as the old {@code SkuDetails.getPrice()} did.
+    ///
+    /// The ProductDetails API has no single price, because a product carries offers and
+    /// a subscription's offer carries pricing phases. A one-time product has one offer;
+    /// a subscription is quoted at the first phase of its first offer, which is the
+    /// introductory price when there is one and the recurring price otherwise. Returns
+    /// null rather than a fabricated string when Play sends neither, so a caller shows
+    /// no price instead of a wrong one.
+    private static String formattedPrice(ProductDetails details) {
+        ProductDetails.OneTimePurchaseOfferDetails oneTime =
+                details.getOneTimePurchaseOfferDetails();
+        if (oneTime != null) {
+            return oneTime.getFormattedPrice();
+        }
+        List<ProductDetails.SubscriptionOfferDetails> offers =
+                details.getSubscriptionOfferDetails();
+        if (offers != null && !offers.isEmpty()) {
+            ProductDetails.PricingPhases phases = offers.get(0).getPricingPhases();
+            if (phases != null && phases.getPricingPhaseList() != null
+                    && !phases.getPricingPhaseList().isEmpty()) {
+                return phases.getPricingPhaseList().get(0).getFormattedPrice();
+            }
+        }
+        return null;
+    }
+
+    /// The offer token launchBillingFlow needs for a subscription, or null when this is
+    /// a one-time product or Play returned no offer.
+    ///
+    /// A one-time product must NOT carry one -- the flow rejects a token it did not ask
+    /// for -- which is why this returns null for it rather than an empty string.
+    private static String subscriptionOfferToken(ProductDetails details) {
+        List<ProductDetails.SubscriptionOfferDetails> offers =
+                details.getSubscriptionOfferDetails();
+        if (offers == null || offers.isEmpty()) {
+            return null;
+        }
+        return offers.get(0).getOfferToken();
+    }
+
     private static boolean isFailure(BillingResult billingResult) {
         return (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK);
     }
@@ -202,7 +262,11 @@ public class BillingSupport implements IBillingSupport {
     public void consumeAndAcknowlegePurchases() {
         runWithConnection(new Runnable() {
             public void run() {
-                billingClient.queryPurchasesAsync(BillingClient.SkuType.INAPP, new PurchasesResponseListener() {
+                billingClient.queryPurchasesAsync(
+                        QueryPurchasesParams.newBuilder()
+                                .setProductType(BillingClient.ProductType.INAPP)
+                                .build(),
+                        new PurchasesResponseListener() {
                     @Override
                     public void onQueryPurchasesResponse(BillingResult billingResult, List<Purchase> purchases) {
                         if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK) {
@@ -233,7 +297,7 @@ public class BillingSupport implements IBillingSupport {
                 final PendingPurchaseCallback ppc = (PendingPurchaseCallback)pc;
                 CN.callSerially(new Runnable() {
                     public void run() {
-                        for (String sku : purchase.getSkus()) {
+                        for (String sku : purchase.getProducts()) {
                             ppc.itemPurchaseError(sku, "Invalid developer payload");
                         }
 
@@ -251,7 +315,7 @@ public class BillingSupport implements IBillingSupport {
                 CN.callSerially(new Runnable() {
                     @Override
                     public void run() {
-                        ppc.itemPurchasePending(purchase.getSkus().iterator().next());
+                        ppc.itemPurchasePending(purchase.getProducts().iterator().next());
                     }
                 });
             }
@@ -261,7 +325,7 @@ public class BillingSupport implements IBillingSupport {
         }
 
 
-        final String sku = purchase.getSkus().iterator().next();
+        final String sku = purchase.getProducts().iterator().next();
 
         final Runnable onPurchaseAcknowledged = new Runnable() {
             public void run() {
@@ -401,16 +465,16 @@ public class BillingSupport implements IBillingSupport {
 
     @Override
     public void purchase(final String item) {
-        _purchase(item, BillingClient.SkuType.INAPP);
+        _purchase(item, BillingClient.ProductType.INAPP);
     }
 
     @Override
     public void subscribe(final String item) {
-        _purchase(item, BillingClient.SkuType.SUBS);
+        _purchase(item, BillingClient.ProductType.SUBS);
     }
 
     public void _purchase(final String item, final String type) {
-        if (!areSubscriptionsSupported() && type.equals(BillingClient.SkuType.SUBS)) {
+        if (!areSubscriptionsSupported() && type.equals(BillingClient.ProductType.SUBS)) {
             final PurchaseCallback pc = getPurchaseCallback();
             if (pc == null) {
                 return;
@@ -427,9 +491,10 @@ public class BillingSupport implements IBillingSupport {
 
         runWithConnection(new Runnable() {
             public void run() {
-                billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(type).setSkusList((List<String>) Arrays.asList(item)).build(), new SkuDetailsResponseListener() {
+                billingClient.queryProductDetailsAsync(productQuery(type, Arrays.asList(item)), new ProductDetailsResponseListener() {
                     @Override
-                    public void onSkuDetailsResponse(final BillingResult billingResult, final List<SkuDetails> list) {
+                    public void onProductDetailsResponse(final BillingResult billingResult, final QueryProductDetailsResult productDetailsResult) {
+                        final List<ProductDetails> list = productDetailsResult.getProductDetailsList();
                         if (isFailure(billingResult)) {
                             final PurchaseCallback pc = getPurchaseCallback();
                             if (pc == null) {
@@ -459,16 +524,42 @@ public class BillingSupport implements IBillingSupport {
                             });
                             return;
                         }
-                        for (SkuDetails details : list) {
-                            inventory.add(details, type.equals(BillingClient.SkuType.SUBS) );
+                        for (ProductDetails details : list) {
+                            inventory.add(details, type.equals(BillingClient.ProductType.SUBS) );
+                        }
+                        final ProductDetails details = list.iterator().next();
+                        // A subscription is bought through one of its offers, not through the
+                        // product: launchBillingFlow rejects a subscription with no offer token.
+                        // The first offer is the one Play lists first for this user, which is
+                        // what the old setSkuDetails call resolved to as well.
+                        final String offerToken = subscriptionOfferToken(details);
+                        if (type.equals(BillingClient.ProductType.SUBS) && offerToken == null) {
+                            final PurchaseCallback pc = getPurchaseCallback();
+                            if (pc == null) {
+                                return;
+                            }
+                            CN.callSerially(new Runnable() {
+                                @Override
+                                public void run() {
+                                    pc.itemPurchaseError(item, "No purchasable offer is available for subscription " + item);
+                                }
+                            });
+                            return;
                         }
                         activity.runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                
+                                BillingFlowParams.ProductDetailsParams.Builder productParams =
+                                        BillingFlowParams.ProductDetailsParams.newBuilder()
+                                                .setProductDetails(details);
+                                if (offerToken != null) {
+                                    productParams.setOfferToken(offerToken);
+                                }
                                 billingClient.launchBillingFlow(activity,
                                         BillingFlowParams.newBuilder()
-                                                .setSkuDetails(list.iterator().next()).build()
+                                                .setProductDetailsParamsList(
+                                                        Arrays.asList(productParams.build()))
+                                                .build()
                                 );
 
                             }
@@ -496,20 +587,20 @@ public class BillingSupport implements IBillingSupport {
             products.put(sku, product);
         }
 
-        public synchronized void add(SkuDetails details) {
+        public synchronized void add(ProductDetails details) {
             add(details, false);
         }
 
-        public synchronized void add(SkuDetails details, boolean subscription) {
+        public synchronized void add(ProductDetails details, boolean subscription) {
             Product p = new Product();
-            p.setSku(details.getSku());
+            p.setSku(details.getProductId());
             p.setDescription(details.getDescription());
             p.setDisplayName(details.getTitle());
-            p.setLocalizedPrice(details.getPrice());
-            add(details.getSku(), p);
+            p.setLocalizedPrice(formattedPrice(details));
+            add(details.getProductId(), p);
             if (subscription) {
 
-                subscriptions.add(details.getSku());
+                subscriptions.add(details.getProductId());
             }
         }
 
@@ -537,7 +628,7 @@ public class BillingSupport implements IBillingSupport {
 
 
 
-        public synchronized void loadSkuDetailsAsync() {
+        public synchronized void loadProductDetailsAsync() {
             final Set<String> skus = new HashSet<String>();
             skus.addAll(purchases.keySet());
             skus.removeAll(products.keySet());
@@ -545,11 +636,12 @@ public class BillingSupport implements IBillingSupport {
             if (!skus.isEmpty()) {
                 runWithConnection(new Runnable() {
                     public void run() {
-                        billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.INAPP).setSkusList(new ArrayList<String>(skus)).build(), new SkuDetailsResponseListener() {
+                        billingClient.queryProductDetailsAsync(productQuery(BillingClient.ProductType.INAPP, new ArrayList<String>(skus)), new ProductDetailsResponseListener() {
                             @Override
-                            public void onSkuDetailsResponse( BillingResult billingResult,  List<SkuDetails> list) {
+                            public void onProductDetailsResponse( BillingResult billingResult,  QueryProductDetailsResult productDetailsResult) {
+                                List<ProductDetails> list = productDetailsResult.getProductDetailsList();
                                 if (list != null && !list.isEmpty()) {
-                                    for (SkuDetails details : list) {
+                                    for (ProductDetails details : list) {
                                         add(details);
 
                                     }
@@ -557,11 +649,12 @@ public class BillingSupport implements IBillingSupport {
                             }
                         });
                         if (areSubscriptionsSupported()) {
-                            billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.SUBS).setSkusList(new ArrayList<String>(skus)).build(), new SkuDetailsResponseListener() {
+                            billingClient.queryProductDetailsAsync(productQuery(BillingClient.ProductType.SUBS, new ArrayList<String>(skus)), new ProductDetailsResponseListener() {
                                 @Override
-                                public void onSkuDetailsResponse( BillingResult billingResult,  List<SkuDetails> list) {
+                                public void onProductDetailsResponse( BillingResult billingResult,  QueryProductDetailsResult productDetailsResult) {
+                                    List<ProductDetails> list = productDetailsResult.getProductDetailsList();
                                     if (list != null && !list.isEmpty()) {
-                                        for (SkuDetails details : list) {
+                                        for (ProductDetails details : list) {
 
                                             add(details, true);
 
@@ -617,9 +710,10 @@ public class BillingSupport implements IBillingSupport {
                 final Object lock = new Object();
                 runWithConnection(new Runnable() {
                     public void run() {
-                        billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.INAPP).setSkusList((List<String>) moreskusList).build(), new SkuDetailsResponseListener() {
+                        billingClient.queryProductDetailsAsync(productQuery(BillingClient.ProductType.INAPP, (List<String>) moreskusList), new ProductDetailsResponseListener() {
                             @Override
-                            public void onSkuDetailsResponse( BillingResult billingResult, List<SkuDetails> list) {
+                            public void onProductDetailsResponse( BillingResult billingResult, QueryProductDetailsResult productDetailsResult) {
+                                List<ProductDetails> list = productDetailsResult.getProductDetailsList();
                                 synchronized (lock) {
                                     if (isFailure(billingResult)) {
                                         complete[0]++;
@@ -627,7 +721,7 @@ public class BillingSupport implements IBillingSupport {
                                         return;
                                     }
 
-                                    for (SkuDetails details : list) {
+                                    for (ProductDetails details : list) {
 
                                         inventory.add(details);
 
@@ -653,9 +747,10 @@ public class BillingSupport implements IBillingSupport {
                 if (areSubscriptionsSupported()) {
                     runWithConnection(new Runnable() {
                         public void run() {
-                            billingClient.querySkuDetailsAsync(SkuDetailsParams.newBuilder().setType(BillingClient.SkuType.SUBS).setSkusList((List<String>) moreskusList).build(), new SkuDetailsResponseListener() {
+                            billingClient.queryProductDetailsAsync(productQuery(BillingClient.ProductType.SUBS, (List<String>) moreskusList), new ProductDetailsResponseListener() {
                                 @Override
-                                public void onSkuDetailsResponse( BillingResult billingResult, List<SkuDetails> list) {
+                                public void onProductDetailsResponse( BillingResult billingResult, QueryProductDetailsResult productDetailsResult) {
+                                    List<ProductDetails> list = productDetailsResult.getProductDetailsList();
                                     synchronized (lock) {
                                         if (isFailure(billingResult)) {
                                             complete[0]++;
@@ -663,7 +758,7 @@ public class BillingSupport implements IBillingSupport {
                                             return;
                                         }
 
-                                        for (SkuDetails details : list) {
+                                        for (ProductDetails details : list) {
 
                                             inventory.add(details, true);
 
