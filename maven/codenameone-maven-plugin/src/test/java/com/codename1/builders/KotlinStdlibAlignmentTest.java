@@ -386,6 +386,68 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A declaration wrapped across lines is still a declaration. The
+     * configuration and the coordinate land on different physical lines, and
+     * reading them separately ignored an explicit pin and wrote the constraint
+     * over it -- the opposite of what naming the artifact in a build hint is
+     * documented to do.
+     */
+    @Test
+    public void aDeclarationSplitAcrossLinesIsStillAPin() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    implementation(\n"
+                + "        'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
+                + "    )\n");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a wrapped declaration pins jdk8");
+        check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and leaves jdk7 constrained");
+    }
+
+    /**
+     * An inline exclusion on a declaring line does not cancel the declaration.
+     * Dropping the whole line for containing "exclude" threw away a real pin;
+     * only what follows the exclusion has to be ignored.
+     */
+    @Test
+    public void anInlineExclusionDoesNotCancelTheDeclaration() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ exclude group: 'com.example', module: 'thing' }\n");
+        check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the declaration survives its own inline exclusion");
+    }
+
+    /**
+     * And the standalone exclusion still is not a pin -- truncating at
+     * "exclude" leaves nothing in front of it.
+     */
+    @Test
+    public void aStandaloneExclusionIsStillNotAPin() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    implementation('com.example:thing:1.0') {\n"
+                + "        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'\n"
+                + "    }\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an exclusion on its own line is still not a pin");
+    }
+
+    /**
+     * Unbalanced parentheses must not glue the fragment into one line: that
+     * would let a configuration from one statement and a coordinate from
+     * another read as a single declaration, and suppression is the direction
+     * that must never be reached by accident.
+     */
+    @Test
+    public void unbalancedParenthesesDoNotGlueStatementsTogether() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    implementation(\n"
+                + "    testImplementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a dangling paren does not turn a test-only pin into a main-variant one");
+    }
+
+    /**
      * The map form is a real pin and is honoured, so the stricter matching did
      * not simply narrow to one spelling.
      */

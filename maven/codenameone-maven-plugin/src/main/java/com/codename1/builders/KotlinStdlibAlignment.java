@@ -439,6 +439,9 @@ public class KotlinStdlibAlignment {
      * a colon: {@code maven { url 'https://...' }} is an ordinary declaration
      * that a naive strip would cut in half, and these fragments really do
      * carry repository URLs.</p>
+     *
+     * <p>Regrouping into statements is {@link #statements}; this method only
+     * removes the comments.</p>
      */
     private static String[] activeLines(String fragment) {
         if (fragment == null) {
@@ -474,15 +477,95 @@ public class KotlinStdlibAlignment {
             }
             out.append(c);
         }
-        String[] lines = out.toString().split("\n");
-        List<String> kept = new ArrayList<String>();
+        return statements(out.toString().split("\n"));
+    }
+
+    /**
+     * Physical lines regrouped into the statements a declaration check can
+     * actually read.
+     *
+     * <p>Two things a per-physical-line check gets wrong, both of which end
+     * with an app's explicit pin ignored and the constraint written over the
+     * top of it -- the opposite of what naming the artifact in a build hint
+     * is documented to do:</p>
+     *
+     * <pre>
+     * implementation(                                  configuration and coordinate
+     *     'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'    land on different lines
+     * )
+     *
+     * implementation('...kotlin-stdlib-jdk8:1.7.22') { exclude group: 'x' }
+     *                                                  a real pin, dropped whole
+     *                                                  for containing "exclude"
+     * </pre>
+     *
+     * <p>So a line whose parentheses are still open is joined to the next, and
+     * a statement is truncated at {@code exclude} rather than discarded -- what
+     * precedes the exclusion is the declaration, and what follows it is the
+     * part that must not count. A bare {@code exclude} line truncates to
+     * nothing and so is still not a pin.</p>
+     *
+     * <p>Joining stops at the end of the fragment: text left with parentheses
+     * open is unbalanced Gradle, and rather than glue the remainder into one
+     * long line -- which would make unrelated statements look like a single
+     * declaration, and suppression is the direction that must never be reached
+     * by accident -- its lines are kept as they were.</p>
+     */
+    private static String[] statements(String[] lines) {
+        List<String> joined = new ArrayList<String>();
+        StringBuilder pending = new StringBuilder();
+        int depth = 0;
         for (int i = 0; i < lines.length; i++) {
-            if (lines[i].contains("exclude")) {
-                continue;
+            if (pending.length() > 0) {
+                pending.append(' ');
             }
-            kept.add(lines[i]);
+            pending.append(lines[i]);
+            depth += parenBalance(lines[i]);
+            if (depth <= 0) {
+                joined.add(pending.toString());
+                pending.setLength(0);
+                depth = 0;
+            }
+        }
+        if (pending.length() > 0) {
+            // Unbalanced: keep the tail as separate lines rather than as one.
+            for (int i = joined.size(); i < lines.length; i++) {
+                joined.add(lines[i]);
+            }
+        }
+        List<String> kept = new ArrayList<String>();
+        for (int i = 0; i < joined.size(); i++) {
+            String statement = joined.get(i);
+            int at = statement.indexOf("exclude");
+            kept.add(at < 0 ? statement : statement.substring(0, at));
         }
         return kept.toArray(new String[kept.size()]);
+    }
+
+    /**
+     * How far a line opens or closes parentheses, ignoring those inside string
+     * literals so a coordinate carrying one cannot unbalance the count.
+     */
+    private static int parenBalance(String line) {
+        int depth = 0;
+        char quote = 0;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (quote != 0) {
+                if (c == quote) {
+                    quote = 0;
+                }
+                continue;
+            }
+            if (c == '\'' || c == '"') {
+                quote = c;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            }
+        }
+        return depth;
     }
 
     /** Numeric dotted version compare; a missing segment counts as zero. */
