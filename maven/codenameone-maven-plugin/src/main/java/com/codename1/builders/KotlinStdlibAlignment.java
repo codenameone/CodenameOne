@@ -362,7 +362,17 @@ public class KotlinStdlibAlignment {
 
     private static boolean declaresArtifactOnLine(String artifact, String configuration,
             String line) {
-        if (!declaresOnTheConstrainedConfiguration(configuration, line)) {
+        // A strict version is honoured wherever it is declared, because a constraint
+        // cannot coexist with one on any classpath both reach: measured, an app
+        // strictly pinning jdk8 to 1.7.22 resolves fine on its own and fails outright
+        // with this block's constraint added --
+        //   Could not resolve org.jetbrains.kotlin:kotlin-stdlib-jdk8:{strictly 1.7.22}
+        // That is worse than the duplicate class, because the app cannot work around
+        // it, so a strict pin ends the question regardless of which configuration
+        // carries it. A strict version at or above the floor loses nothing by this:
+        // it is already a shim.
+        if (!line.contains("strictly")
+                && !declaresOnTheConstrainedConfiguration(configuration, line)) {
             return false;
         }
         if (line.contains(KOTLIN_GROUP + ":" + artifact)) {
@@ -409,13 +419,18 @@ public class KotlinStdlibAlignment {
      * The dependency configurations of the main variant, which is the one the
      * constraints are written on.
      *
-     * <p>Every one of these reaches a classpath the {@code implementation}
-     * constraint also reaches, so a pin declared on any of them is the app
-     * managing the artifact. Getting the list short was a bug rather than a
-     * simplification: a {@code runtimeOnly} pin was read as unmanaged, and if
-     * it carried {@code strictly} the emitted 1.8.0 constraint did not override
-     * it but made the resolution fail outright -- worse than the override this
-     * class already tries to avoid.</p>
+     * <p>Every one of these reaches the release RUNTIME classpath, which is the
+     * one {@code checkReleaseDuplicateClasses} reads and therefore the only one
+     * whose contents this class is trying to fix. {@code runtimeOnly} belongs
+     * here for exactly that reason.</p>
+     *
+     * <p>{@code compileOnly} does not, and putting it here was a mistake made
+     * by symmetry: a {@code compileOnly platform('...kotlin-bom')} is absent
+     * from the runtime graph, so treating it as the app managing that graph
+     * dropped the constraint from a classpath the app had not touched and left
+     * the duplicate in place. A compile-only declaration that would collide
+     * with the constraint is caught by the strict-version rule below instead,
+     * which is where that concern actually belongs.</p>
      *
      * <p>Their variant and test forms camel-case the configuration they derive
      * from -- {@code testRuntimeOnly}, {@code debugCompileOnly},
@@ -426,7 +441,6 @@ public class KotlinStdlibAlignment {
     private static final String[] MAIN_CONFIGURATIONS = {
         "implementation",
         "api",
-        "compileOnly",
         "runtimeOnly",
         "compile",
         "runtime"
@@ -603,13 +617,52 @@ public class KotlinStdlibAlignment {
                 out.add(current.toString().replace('\n', ' '));
             }
         }
-        List<String> kept = new ArrayList<String>();
+        // A declaration's own configuration block belongs to it: the version that
+        // decides this is written as `version { strictly '1.7.22' }` on the line after
+        // the coordinate. Only a statement that already names the Kotlin group absorbs
+        // its block, so a `dependencies {` or `android {` opening cannot swallow the
+        // fragment -- the blast radius is one declaration, never the file.
+        List<String> merged = new ArrayList<String>();
         for (int i = 0; i < out.size(); i++) {
             String statement = out.get(i);
+            if (statement.contains(KOTLIN_GROUP)) {
+                int braces = braceBalance(statement);
+                while (braces > 0 && i + 1 < out.size()) {
+                    i++;
+                    statement = statement + " " + out.get(i);
+                    braces += braceBalance(out.get(i));
+                }
+            }
+            merged.add(statement);
+        }
+        List<String> kept = new ArrayList<String>();
+        for (int i = 0; i < merged.size(); i++) {
+            String statement = merged.get(i);
             int at = statement.indexOf("exclude");
             kept.add(at < 0 ? statement : statement.substring(0, at));
         }
         return kept.toArray(new String[kept.size()]);
+    }
+
+    /** How far a statement opens or closes braces, ignoring those in strings. */
+    private static int braceBalance(String statement) {
+        int depth = 0;
+        char quote = 0;
+        for (int i = 0; i < statement.length(); i++) {
+            char c = statement.charAt(i);
+            if (quote != 0) {
+                if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '\'' || c == '"') {
+                quote = c;
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+            }
+        }
+        return depth;
     }
 
     /** Numeric dotted version compare; a missing segment counts as zero. */

@@ -366,7 +366,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void aPinOnAnyMainConfigurationSuppresses() {
-        String[] configurations = {"implementation", "api", "compileOnly", "runtimeOnly",
+        String[] configurations = {"implementation", "api", "runtimeOnly",
             "compile", "runtime"};
         for (String configuration : configurations) {
             String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
@@ -377,6 +377,62 @@ public class KotlinStdlibAlignmentTest {
             check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
                     "and jdk7 is still constrained after a " + configuration + " pin");
         }
+    }
+
+    /**
+     * compileOnly is NOT one of them, and adding it by symmetry was the
+     * mistake. A compileOnly declaration is absent from the release runtime
+     * classpath, which is the one checkReleaseDuplicateClasses reads, so
+     * treating it as management of that graph drops the constraint from a
+     * classpath the app never touched and leaves the duplicate in place.
+     */
+    @Test
+    public void aCompileOnlyDeclarationDoesNotManageTheRuntimeGraph() {
+        String bom = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    compileOnly platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n");
+        check(bom.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a compileOnly BOM does not align the runtime graph");
+    }
+
+    /**
+     * A strict version ends the question wherever it is declared, because a
+     * constraint cannot coexist with one on any classpath both reach.
+     * Measured with Gradle: the same graph resolves on its own and fails with
+     * this block's constraint added --
+     * "Could not resolve kotlin-stdlib-jdk8:{strictly 1.7.22}". That is worse
+     * than the duplicate, because the app cannot work around it.
+     */
+    @Test
+    public void aStrictPinIsHonouredOnAnyConfiguration() {
+        String releaseStrict = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "    releaseImplementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') {\n"
+                + "        version { strictly '1.7.22' }\n"
+                + "    }\n");
+        check(!releaseStrict.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a strict release pin is left to the app");
+
+        String compileOnlyStrict = KotlinStdlibAlignment.constraintsBlock(
+                "implementation", null,
+                "    compileOnly('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { strictly '1.7.22' } }\n");
+        check(!compileOnlyStrict.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a strict compileOnly pin is honoured even though compileOnly alone is not");
+    }
+
+    /**
+     * The block absorbed for that check belongs to the declaration that opened
+     * it and no further. A dependencies or android block must not swallow the
+     * fragment: only a statement already naming the Kotlin group absorbs one.
+     */
+    @Test
+    public void anUnrelatedBlockDoesNotSwallowTheFragment() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", null,
+                "dependencies {\n"
+                + "    implementation('com.example:thing:1.0') { version { strictly '1.0' } }\n"
+                + "    debugImplementation platform('org.jetbrains.kotlin:kotlin-bom:1.9.22')\n"
+                + "}\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an unrelated strict block does not suppress, and the debug BOM still does not");
     }
 
     /**
