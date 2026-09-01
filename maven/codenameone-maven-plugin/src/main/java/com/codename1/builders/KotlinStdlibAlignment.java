@@ -338,7 +338,11 @@ public class KotlinStdlibAlignment {
             return rich;
         }
         String coordinate = KOTLIN_GROUP + ":" + artifact + ":";
-        for (int i = 0; i < line.length(); i++) {
+        // Past `using`, when there is one: a substitution names the replaced module
+        // first and the replacement second, and it is the replacement that decides
+        // what resolves.
+        int from = afterCall(line, "using");
+        for (int i = from < 0 ? 0 : from; i < line.length(); i++) {
             char c = line.charAt(i);
             if (!isLiteralStart(line, i)) {
                 continue;
@@ -1078,19 +1082,20 @@ public class KotlinStdlibAlignment {
      */
     private static boolean callsForce(String statement) {
         // The method forms, which callsNamed now distinguishes from an assignment.
-        // Gradle's ways of overriding a selected version: force and its setter, and a
+        // Gradle's ways of overriding a selected version: force and its setter, a
         // resolution rule's useVersion (a bare version) or useTarget (a whole
-        // coordinate). All of them win silently over a constraint.
+        // coordinate), and a dependency substitution. All of them win silently over
+        // a constraint.
         //
-        // dependencySubstitution's `substitute ... using ...` is deliberately NOT
-        // here. It names TWO coordinates and the version scan takes the first
-        // literal, which is the one being replaced -- so a substitution raising the
-        // library to a merged-era version would read as pinning it to the old one.
-        // Wrong in the harmless direction, but wrong, and it can be added when the
-        // scan can tell the sides apart.
+        // A substitution names TWO coordinates, which is why it was left out once:
+        // the version scan takes the first literal, and that is the side being
+        // REPLACED. The scan reads from after `using` now, so it takes the
+        // replacement -- which is also the only side that carries a version in the
+        // ordinary spelling, `substitute module('g:a') using module('g:a:1.7.22')`.
         if (callsNamed(statement, "force") || callsNamed(statement, "setForcedModules")
                 || callsNamed(statement, USE_VERSION)
-                || callsNamed(statement, "useTarget")) {
+                || callsNamed(statement, "useTarget")
+                || callsNamed(statement, "substitute")) {
             return true;
         }
         // forcedModules is only ever written as an assignment, and assigning it any
@@ -1149,6 +1154,27 @@ public class KotlinStdlibAlignment {
      * which only Gradle's forcedModules is written as. It is not offered to
      * every caller because `def strictly = false` is not a strict pin.</p>
      */
+    /** Where {@code call}'s arguments begin, or -1 if it is not called here. */
+    private static int afterCall(String statement, String call) {
+        for (int i = 0; i < statement.length(); i++) {
+            if (isLiteralStart(statement, i)) {
+                i = endOfStringLiteral(statement, i);
+                continue;
+            }
+            if (!statement.startsWith(call, i)) {
+                continue;
+            }
+            boolean startsToken = i == 0 || !isIdentifierChar(statement.charAt(i - 1));
+            int after = i + call.length();
+            if (startsToken && after < statement.length()
+                    && (isBlank(statement.charAt(after))
+                            || statement.charAt(after) == '(')) {
+                return after;
+            }
+        }
+        return -1;
+    }
+
     private static boolean callsNamed(String statement, String call) {
         for (int i = 0; i < statement.length(); i++) {
             if (isLiteralStart(statement, i)) {

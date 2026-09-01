@@ -479,9 +479,14 @@ public class KotlinStdlibAlignmentTest {
         String call = builderSrc.substring(at, builderSrc.indexOf(";", at))
                 .replaceAll("//[^\n]*", "");
 
-        int blockAt = builderSrc.indexOf("\"dependencies {");
-        check(blockAt >= 0, "the generated dependencies block is found");
-        int blockEnd = builderSrc.indexOf("+ \"}\\n\"", blockAt);
+        // The WHOLE generated script, not just its dependencies block. The block was
+        // the wrong boundary: android.gradle.androidx is interpolated inside
+        // android { }, where a project.configurations.all { ... force } is accepted
+        // and executed, so a fragment there decides what resolves just as much as a
+        // declaration does. Bounding this test at the block is what let that through.
+        int blockAt = builderSrc.indexOf("String gradleProps = ");
+        check(blockAt >= 0, "the generated script is found");
+        int blockEnd = builderSrc.indexOf("Gradle File start", blockAt);
         check(blockEnd > blockAt, "and its end");
         String block = builderSrc.substring(blockAt, blockEnd).replaceAll("//[^\n]*", "");
 
@@ -496,11 +501,22 @@ public class KotlinStdlibAlignmentTest {
         while (hint.find()) {
             byPosition.put(Integer.valueOf(hint.start()), "getArg(\"" + hint.group(1) + "\"");
         }
+        // Only the getArg fragments are required across the whole script. Those are
+        // app-supplied Gradle TEXT by definition, so the rule needs no judgement
+        // about which of them could matter -- which is the judgement that was wrong
+        // twice. The script's other locals are builder-computed values (a version
+        // number, a namespace, a repository block); the ones inside the dependencies
+        // block are separately required below because they carry app text too.
+        int dependenciesAt = block.indexOf("\"dependencies {");
+        check(dependenciesAt >= 0, "the dependencies block is inside the script");
         java.util.regex.Matcher name = java.util.regex.Pattern
                 .compile("\\+\\s*(?:addNewlineIfMissing\\()?([a-z][a-zA-Z0-9]*)\\b")
                 .matcher(block);
         while (name.find()) {
             String token = name.group(1);
+            if (name.start(1) < dependenciesAt) {
+                continue;
+            }
             // The configuration itself is passed as the first argument, and the
             // block this test is about is the alignment's own output.
             if ("compile".equals(token) || "kotlinStdlibConstraints".equals(token)
@@ -594,6 +610,39 @@ public class KotlinStdlibAlignmentTest {
         check(modern.contains("kotlin-stdlib-jdk8:1.8.0")
                         && !modern.contains("kotlin-stdlib-jdk7:1.8.0"),
                 "the merged-era declaration is read, got <<" + modern + ">>");
+    }
+
+    /**
+     * A rule reaches the app's configurations from inside the android block
+     * too, so a fragment interpolated there decides what resolves just as much
+     * as a declaration does. This is the shape the alignment could not see when
+     * only the dependencies block was scanned.
+     */
+    @Test
+    public void aRuleInsideTheAndroidBlockIsStillARule() {
+        String force = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    project.configurations.all { resolutionStrategy.force "
+                + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22' }\n");
+        check("".equals(force),
+                "a project-qualified force suppresses, got <<" + force + ">>");
+
+        String substitution = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.dependencySubstitution { "
+                + "substitute module('org.jetbrains.kotlin:kotlin-stdlib') "
+                + "using module('org.jetbrains.kotlin:kotlin-stdlib:1.7.22') } }\n");
+        check("".equals(substitution),
+                "a substitution onto a pre-merge version suppresses, got <<"
+                        + substitution + ">>");
+
+        // The replacement is what decides, not the module being replaced: this one
+        // raises the library and takes nothing away.
+        String raising = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.dependencySubstitution { "
+                + "substitute module('org.jetbrains.kotlin:kotlin-stdlib:1.7.22') "
+                + "using module('org.jetbrains.kotlin:kotlin-stdlib:1.9.22') } }\n");
+        check(raising.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a substitution raising the library keeps the alignment, got <<"
+                        + raising + ">>");
     }
 
     /**

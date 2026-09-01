@@ -7319,7 +7319,15 @@ public class AndroidGradleBuilder extends Executor {
                         // xgradle after it. Listing them in any other order lost a
                         // definition that the real script would have had in scope.
                         //
-                        // EVERY fragment of that block, including the ones this builder
+                        // EVERY app-controlled fragment of the whole script, not of the
+                        // dependencies block. The block was the wrong boundary: a rule
+                        // like project.configurations.all { resolutionStrategy.force ... }
+                        // is accepted and executed from inside android { }, so a fragment
+                        // interpolated there can hold an override that decides what
+                        // resolves. Which is to say the earlier reasoning -- "the rest
+                        // lands where a dependency cannot be declared" -- was about
+                        // DECLARATIONS and missed rules entirely.
+                        //
                         // writes itself. kotlinRuntimeDependency is the reason: it carries
                         // requireKotlinStdlib, so an app asking for 1.7.22!! has a strict
                         // pre-merge pin on the base library that nothing here could see,
@@ -7330,6 +7338,9 @@ public class AndroidGradleBuilder extends Executor {
                         // KotlinStdlibAlignmentTest reads this call against the generated
                         // block and fails if the two ever disagree.
                         request.getArg("android.gradlePlugin", ""),
+                        gradleDependency,
+                        request.getArg("android.gradle.androidx", ""),
+                        request.getArg("android.xgradle_default_config", ""),
                         coreLibraryDesugaringDependency,
                         request.getArg("android.supportv4Dep", ""),
                         kotlinRuntimeDependency,
