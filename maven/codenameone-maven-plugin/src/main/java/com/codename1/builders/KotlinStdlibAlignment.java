@@ -220,7 +220,7 @@ public class KotlinStdlibAlignment {
         // class-bearing jdk8 1.7.22 jar. That is this block MAKING the duplicate it
         // exists to prevent, in a graph the app had arranged correctly.
         for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
-            if (declaredBelowTheFloor(ALIGNED_ARTIFACTS[i], appGradleFragments)) {
+            if (declaredBelowTheFloor(ALIGNED_ARTIFACTS[i], config, appGradleFragments)) {
                 return "";
             }
         }
@@ -249,7 +249,7 @@ public class KotlinStdlibAlignment {
      * the worst is an alignment not written for an app that had already sorted
      * itself out, against a duplicate class manufactured in one that had.</p>
      */
-    private static boolean declaredBelowTheFloor(String artifact,
+    private static boolean declaredBelowTheFloor(String artifact, String configuration,
             String[] appGradleFragments) {
         if (appGradleFragments == null) {
             return false;
@@ -257,8 +257,16 @@ public class KotlinStdlibAlignment {
         for (int i = 0; i < appGradleFragments.length; i++) {
             String[] lines = activeLines(appGradleFragments[i]);
             for (int j = 0; j < lines.length; j++) {
-                if (!declaresArtifactOnLine(artifact, "implementation", lines[j])
-                        && !declaresArtifactOnLine(artifact, "api", lines[j])) {
+                // The configuration actually being constrained, rather than the two
+                // that used to be named here. That was reported as letting a
+                // runtimeOnly pre-merge pin suppress its own constraint and not its
+                // sibling's; it did not, because declaresOnTheConstrainedConfiguration
+                // ORs in every MAIN_CONFIGURATIONS entry whatever it is passed, so the
+                // hard-coded names never restricted anything. Checked by putting them
+                // back: the behaviour is identical. Passing the real configuration
+                // regardless, because two names that look like a filter and are not
+                // one will be read as a filter by the next person.
+                if (!declaresArtifactOnLine(artifact, configuration, lines[j])) {
                     continue;
                 }
                 if (!namesArtifactAnywhere(lines[j], artifact)) {
@@ -428,10 +436,25 @@ public class KotlinStdlibAlignment {
 
     /** Whether the statement holds the base library strictly, in either spelling. */
     private static boolean holdsBaseStdlibStrictly(String line) {
+        return holdsStrictly(line, BASE_STDLIB);
+    }
+
+    /**
+     * Whether the statement holds {@code artifact} strictly, in either
+     * spelling.
+     *
+     * <p>One predicate because there were two, and they diverged: the bypass
+     * that lets a strict pin escape the configuration filter asked only about
+     * the {@code strictly} keyword, so
+     * {@code debugImplementation '...jdk8:1.7.22!!'} was filtered out as a
+     * variant declaration and got the constraint anyway -- against a strict
+     * requirement that had resolved fine before it.</p>
+     */
+    private static boolean holdsStrictly(String line, String artifact) {
         if (callsStrictly(line)) {
             return true;
         }
-        String declared = declaredVersionOf(line, BASE_STDLIB);
+        String declared = declaredVersionOf(line, artifact);
         return declared != null && declared.endsWith(STRICT_SUFFIX);
     }
 
@@ -764,7 +787,7 @@ public class KotlinStdlibAlignment {
         // fails the whole script at evaluation, which is a far larger blast radius
         // than the case it fixes. Revisit only with a project that actually has this
         // shape.
-        if (!callsStrictly(line)
+        if (!holdsStrictly(line, artifact)
                 && !declaresOnTheConstrainedConfiguration(configuration, line)) {
             return false;
         }
@@ -854,6 +877,26 @@ public class KotlinStdlibAlignment {
      */
     private static int endOfStringLiteral(String text, int quoteAt) {
         char quote = text.charAt(quoteAt);
+        // Groovy's triple-quoted literals are a different delimiter, not three of
+        // this one. Treating the opener as a single quote made a triple-quoted note
+        // close on the first apostrophe it contains -- can't, in the case that found
+        // this -- and threw the rest of the fragment out of step, so a strict pin
+        // after it was never seen.
+        boolean tripled = quoteAt + 2 < text.length()
+                && text.charAt(quoteAt + 1) == quote
+                && text.charAt(quoteAt + 2) == quote;
+        if (tripled) {
+            for (int i = quoteAt + 3; i + 2 < text.length(); i++) {
+                char c = text.charAt(i);
+                if (c == '\\') {
+                    i++;
+                } else if (c == quote && text.charAt(i + 1) == quote
+                        && text.charAt(i + 2) == quote) {
+                    return i + 2;
+                }
+            }
+            return text.length();
+        }
         for (int i = quoteAt + 1; i < text.length(); i++) {
             char c = text.charAt(i);
             if (c == '\\') {
@@ -1027,7 +1070,6 @@ public class KotlinStdlibAlignment {
         }
         StringBuilder out = new StringBuilder();
         boolean inBlockComment = false;
-        char quote = 0;
         for (int i = 0; i < fragment.length(); i++) {
             char c = fragment.charAt(i);
             if (inBlockComment) {
@@ -1039,19 +1081,14 @@ public class KotlinStdlibAlignment {
                 }
                 continue;
             }
-            if (quote != 0) {
-                out.append(c);
-                if (c == '\\' && i + 1 < fragment.length()) {
-                    out.append(fragment.charAt(i + 1));
-                    i++;
-                } else if (c == quote) {
-                    quote = 0;
-                }
-                continue;
-            }
             if (c == '\'' || c == '"') {
-                quote = c;
-                out.append(c);
+                // The shared rule, so triple-quoted literals and escapes are the
+                // same thing here as everywhere else. This scanner and the statement
+                // scanner below kept their own copies through the consolidation, and
+                // the triple-quote fix reached neither until now.
+                int end = endOfStringLiteral(fragment, i);
+                out.append(fragment, i, Math.min(end + 1, fragment.length()));
+                i = end;
                 continue;
             }
             if (c == '/' && i + 1 < fragment.length()) {
@@ -1127,27 +1164,19 @@ public class KotlinStdlibAlignment {
         List<String> out = new ArrayList<String>();
         StringBuilder current = new StringBuilder();
         int depth = 0;
-        char quote = 0;
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
-            if (quote != 0) {
-                current.append(c);
-                // Escapes, because the comment stripper beside this already handles
-                // them: 'can\'t' otherwise closes the string on the apostrophe it is
-                // escaping, and every following newline is read as being inside a
-                // string rather than ending a statement -- which merges statements
-                // that must stay apart.
-                if (c == '\\' && i + 1 < text.length()) {
-                    current.append(text.charAt(i + 1));
-                    i++;
-                } else if (c == quote) {
-                    quote = 0;
-                }
+            if (c == '\'' || c == '"') {
+                // The shared rule: escapes and triple quotes handled in one place.
+                // A literal that closed early here merged statements that must stay
+                // apart, which lets one statement's configuration pair with another
+                // statement's coordinate.
+                int end = endOfStringLiteral(text, i);
+                current.append(text, i, Math.min(end + 1, text.length()));
+                i = end;
                 continue;
             }
-            if (c == '\'' || c == '"') {
-                quote = c;
-            } else if (c == '(') {
+            if (c == '(') {
                 depth++;
             } else if (c == ')') {
                 if (depth > 0) {

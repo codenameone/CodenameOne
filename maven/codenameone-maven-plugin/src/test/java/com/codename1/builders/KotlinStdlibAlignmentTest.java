@@ -458,6 +458,61 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A triple-quoted literal is a different delimiter, not three of the same
+     * one. Reading its opener as a single quote made it close on the first
+     * apostrophe inside it and threw every following statement out of step, so
+     * a strict pin after it was never seen.
+     */
+    @Test
+    public void aTripleQuotedLiteralDoesNotEndOnItsOwnApostrophe() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def note = '''can't stop'''\n"
+                + "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n");
+        check("".equals(out),
+                "the strict pin after a triple-quoted note is still seen");
+    }
+
+    /**
+     * A runtimeOnly pre-merge pin suppresses both constraints.
+     *
+     * <p>This pins existing behaviour rather than verifying a fix: it was
+     * reported as broken, and reverting the change it prompted leaves this
+     * passing, because the configuration predicate accepts every main
+     * configuration whatever it is handed. Kept because the behaviour is worth
+     * holding, and labelled so nobody reads it as proof of something it does
+     * not test.</p>
+     */
+    @Test
+    public void aRuntimeOnlyPreMergePinSuppressesBoth() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    runtimeOnly 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n");
+        check("".equals(out),
+                "a runtimeOnly pre-merge pin takes the sibling constraint with it");
+    }
+
+    /**
+     * The strict bypass reads both spellings. Asking only about the strictly
+     * keyword let a !! pin on a variant configuration be filtered out as a
+     * variant declaration and get the constraint anyway -- against a strict
+     * requirement that resolved fine before it.
+     */
+    @Test
+    public void aShorthandPinOnAVariantIsStillStrict() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    debugImplementation "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n");
+        check("".equals(out),
+                "a !! pin on a variant configuration is honoured like a strictly call");
+
+        // and a variant declaration that is NOT strict still does not suppress
+        String plain = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    debugImplementation "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n");
+        check(plain.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a plain variant declaration still does not suppress");
+    }
+
+    /**
      * A known definition referred to as $name inside a double-quoted string is
      * the same one hop already followed for a bare token. Reading it as
      * unreadable made a merged-era version look pre-merge and took the
