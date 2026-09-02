@@ -120,8 +120,20 @@ def is_published(meta: dict[str, object], today: str) -> bool:
     """
     if str(meta.get("draft", "")).strip().strip("\"'").lower() in {"true", "yes"}:
         return False
-    date = str(meta.get("date", "")).strip().strip("\"'")
-    return not (re.match(r"^\d{4}-\d{2}-\d{2}", date) and date[:10] > today)
+
+    def day(key: str) -> str | None:
+        value = str(meta.get(key, "")).strip().strip("\"'")
+        return value[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", value) else None
+
+    # Hugo builds neither a future page nor an expired one. publishDate overrides
+    # date for scheduling, and expiryDate withdraws a page that was published; a
+    # date-only expiry lapses at midnight, so the day itself is already too late.
+    for key in ("date", "publishDate"):
+        scheduled = day(key)
+        if scheduled and scheduled > today:
+            return False
+    expiry = day("expiryDate")
+    return not (expiry and expiry <= today)
 
 
 def normalize_path(value: str) -> str:
@@ -164,6 +176,10 @@ def redirect_pattern(source: str) -> tuple[re.Pattern[str], list[str]] | None:
 # tree is derivable from the repository without building it.
 JAVADOC_SOURCE_ROOTS = ("CodenameOne/src", "Ports/CLDC11/src")
 # Pages javadoc emits for a package rather than for a type.
+# build_javadocs.sh filters these out of its source list, passes -exclude for them
+# and then guards that they never reached the output. Recording them here would
+# accept a link to a page the published tree deliberately does not contain.
+JAVADOC_EXCLUDED_PACKAGES = ("com/codename1/impl",)
 JAVADOC_PACKAGE_PAGES = {
     "package-summary.html",
     "package-frame.html",
@@ -187,6 +203,11 @@ def javadoc_index(repo_root: Path) -> tuple[set[str], set[str]]:
         for source in root.rglob("*.java"):
             relative = source.relative_to(root)
             package = relative.parent.as_posix()
+            if any(
+                package == excluded or package.startswith(excluded + "/")
+                for excluded in JAVADOC_EXCLUDED_PACKAGES
+            ):
+                continue
             packages.add(package)
             classes.add(f"{package}/{relative.stem}")
     _javadoc_index = (packages, classes)
