@@ -691,7 +691,12 @@ class CertificateWizardModelTest {
         // compiled classes; the wizard has none, but a project that declares the voip
         // background mode has said so in the settings file.
         assertTrue(WizardDecisions.pushRequested(null, "voip"));
-        assertTrue(WizardDecisions.pushRequested("", "audio, voip"));
+        // Present and empty is not absent: IPhoneBuilder reads it as false and skips the
+        // same inference, so provisioning push here would change the App ID -- and
+        // reissue its profiles -- for a build that will not ask for it.
+        assertFalse(WizardDecisions.pushRequested("", "audio, voip"));
+        assertFalse(WizardDecisions.pushRequested("   ", "voip"));
+        assertTrue(WizardDecisions.pushRequested(null, "audio, voip"));
         assertTrue(WizardDecisions.pushRequested(null, "voip fetch"));
         assertFalse(WizardDecisions.pushRequested(null, "remote-notification"));
         assertFalse(WizardDecisions.pushRequested(null, null));

@@ -317,8 +317,13 @@ public final class WizardDecisions {
     /// declaring the voip background mode, which is the same statement made in the
     /// settings file, and provisions it without inferring anything.
     ///
-    /// Only when the hint is absent. An explicit value is the project speaking, and the
-    /// builder refuses a VoIP app that turned push off rather than overriding it.
+    /// Only when the hint is absent, and absent means the key is not there at all.
+    /// `ios.includePush=` with nothing after it is the project speaking, not silence:
+    /// IPhoneBuilder normalises every non-null value that is not a trimmed "true" to
+    /// "false", and makes this inference only when the argument is null -- an empty value
+    /// is preserved by getArg, so the build it produces does not request push. Reading it
+    /// as absent here would put the capability on the App ID, and invalidate and reissue
+    /// every profile under it, for a build that never asks for push.
     ///
     /// The residue is a VoIP app that declares neither: the builder infers push for it
     /// from the class scan and the App ID will not grant it. That one is fixed by setting
@@ -328,8 +333,7 @@ public final class WizardDecisions {
         if (pushRequested(includePushHint)) {
             return true;
         }
-        boolean hintAbsent = includePushHint == null || includePushHint.trim().isEmpty();
-        return hintAbsent && declaresVoipBackgroundMode(backgroundModesHint);
+        return includePushHint == null && declaresVoipBackgroundMode(backgroundModesHint);
     }
 
     /// Whether a macOS build will carry the APNs entitlement, from the hint that decides
