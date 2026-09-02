@@ -52,14 +52,21 @@ package com.codename1.builders;
  * this class has no inputs.</p>
  *
  * <p><b>Measured, not reasoned.</b> The emitted script was run against real
- * Gradle 6.5 (the builder's default) and 8.5, resolving against Maven Central:</p>
+ * Gradle 6.5 (the builder's default) and 8.5 resolving from Maven Central, and
+ * end to end through {@code checkDebugDuplicateClasses} in a real Android
+ * project on AGP 8.1.4:</p>
  *
  * <ul>
- *   <li>stdlib 1.8.10 with {@code kotlin-stdlib-jdk8:1.6.21} -- the duplicate,
- *       reproduced; the shims are dropped and it resolves.</li>
+ *   <li>stdlib 1.8.10 with {@code kotlin-stdlib-jdk8:1.6.21} -- the customer's
+ *       failure, reproduced exactly: "Duplicate class
+ *       kotlin.collections.jdk8.CollectionsJDK8Kt found in modules
+ *       kotlin-stdlib-1.8.10 and kotlin-stdlib-jdk8-1.6.21". The task fails
+ *       without this script and passes with it.</li>
  *   <li>the same, with the shim pinned {@code strictly}, or with
- *       {@code reject '[1.8.0,)'} -- resolves. The constraint version failed
- *       both.</li>
+ *       {@code reject '[1.8.0,)'} -- resolves, and the Android build succeeds.
+ *       The constraint version this replaced failed both, in the Android build
+ *       too: "Could not resolve org.jetbrains.kotlin:kotlin-stdlib-jdk8:
+ *       {strictly 1.6.21}". That is the whole reason for the change.</li>
  *   <li>an all-1.7 project -- untouched, because the capability is only
  *       declared from the floor up, so shims that still carry real classes stay.
  *       This is also why a Kotlin compiler older than the floor is not a
