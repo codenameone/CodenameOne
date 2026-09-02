@@ -678,41 +678,52 @@ public class KotlinStdlibAlignmentTest {
 
     /**
      * Rejections accumulate -- reject takes varargs and may be called again -- and
-     * Gradle applies every selector. Asked one at a time, two that jointly leave
-     * the constraint nothing to resolve to each looked harmless.
+     * Gradle applies every selector, so every one is asked whether it removes the
+     * floor. Reading only the first missed a pair whose second selector was the
+     * one that removed it.
      */
     @Test
     public void rejectionsAreCombinedBeforeTheFloorIsCalledReachable() {
-        String[] jointlyFatal = {
-            "reject '1.8.0', '(1.8.0,)'",
+        // What this block writes is a constraint on exactly 1.8.0, so a rejection
+        // that removes the floor removes the only version it can resolve to --
+        // whether or not it leaves higher ones. Written second, the selector that
+        // removes it was not being read at all.
+        String[] removeTheFloor = {
+            "reject '1.8.0'",
+            "reject '[1.8.0]'",
+            "reject '(1.8.0,)', '1.8.0'",
             "reject('1.8.0', '(1.8.0,)')",
-            "reject '[1.8.0]', '(1.8.0,)'",
+            "reject '[1.8.0,)'",
+            "reject '(1.7.0,)'",
+            "reject '[1.7.0,1.9.0]'",
+            "reject '[1.7.0,1.8.0]'",
+            "reject '[1.7.0,1.8.5]', '[1.8.6,1.9.0]'",
             "reject '1.8.0'\n            reject '(1.8.0,)'",
         };
-        for (int i = 0; i < jointlyFatal.length; i++) {
+        for (int i = 0; i < removeTheFloor.length; i++) {
             check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
-                            rejecting(jointlyFatal[i]))),
-                    "<<" + jointlyFatal[i] + ">> leaves nothing at the floor");
+                            rejecting(removeTheFloor[i]))),
+                    "<<" + removeTheFloor[i] + ">> takes the floor away");
         }
 
-        // Each half alone leaves the constraint somewhere to land, and so do
-        // rejections that never reach the floor -- reading any of these as
-        // management would leave the duplicate this block exists to prevent.
-        String[] survivable = {
-            "reject '1.8.0'",
+        // And these leave it exactly where the constraint needs it. Reading any of
+        // them as management would leave the duplicate this block exists to
+        // prevent -- an exclusive bound does not reject the bound itself.
+        String[] leaveTheFloor = {
             "reject '(1.8.0,)'",
             "reject '[1.9.0,)'",
-            "reject '[1.7.0,1.9.0]'",
-            "reject '[1.7.0,1.8.5]', '[1.8.6,1.9.0]'",
+            "reject '[1.7.0,1.8.0)'",
+            "reject '(1.8.0,1.9.0]'",
+            "reject '[1.7.0,1.7.9]', '[1.8.1,1.9.0]'",
             "reject '1.7.0'",
             // A prerelease of the floor is a different version from the floor.
             "reject '1.8.0-RC2', '(1.8.0,)'",
         };
-        for (int i = 0; i < survivable.length; i++) {
+        for (int i = 0; i < leaveTheFloor.length; i++) {
             check(KotlinStdlibAlignment.constraintsBlock("implementation",
-                            rejecting(survivable[i]))
+                            rejecting(leaveTheFloor[i]))
                             .contains("kotlin-stdlib-jdk7:1.8.0"),
-                    "<<" + survivable[i] + ">> still leaves the floor selectable");
+                    "<<" + leaveTheFloor[i] + ">> still leaves the floor selectable");
         }
     }
 
@@ -720,6 +731,45 @@ public class KotlinStdlibAlignmentTest {
     private static String rejecting(String rejections) {
         return "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') {\n"
                 + "        version { require '1.+'; " + rejections + " }\n    }\n";
+    }
+
+    /**
+     * A type is a type however it is spelled. The walk that separates a
+     * declaration from an assignment stopped at the first character that is not
+     * part of an identifier, so a generic or array type ended the statement and
+     * the name it declared -- and the pin that name held -- was never recorded.
+     */
+    @Test
+    public void aTypeMayBeGenericOrAnArray() {
+        String map = "[group: 'org.jetbrains.kotlin', "
+                + "name: 'kotlin-stdlib-jdk8', version: '1.7.22']";
+        String use = "    implementation(dep) { version { strictly '1.7.22' } }\n";
+        String[] types = {
+            "def", "String", "Map", "Map<String, String>", "HashMap<String,String>",
+            "java.util.Map<java.lang.String, String>", "Map<String, ? extends Object>",
+            "List<Map<String, String>>", "final Map<String, String>", "String[]",
+            "Map<String, String[]>", "String[][]",
+        };
+        for (int i = 0; i < types.length; i++) {
+            check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            "    " + types[i] + " dep = " + map + "\n" + use)),
+                    "<<" + types[i] + ">> declares dep");
+        }
+
+        // The angle bracket really has to be a type argument list. A comparison is
+        // not one, and swallowing it would take the rest of the statement with it;
+        // neither is a subscript with something in it, which is how an extra
+        // property is named.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    if (someVersion < 5) { }\n"
+                        + "    implementation('org.jetbrains.kotlin:"
+                        + "kotlin-stdlib-jdk8:1.9.22')\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a comparison is not a type argument list");
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    ext['dep'] = 'org.jetbrains.kotlin:"
+                        + "kotlin-stdlib-jdk8:1.7.22'\n" + use)),
+                "and a subscript with a name in it still names a property");
     }
 
     /**
@@ -890,7 +940,7 @@ public class KotlinStdlibAlignmentTest {
      */
     @Test
     public void aRejectionCountsOnlyWhenItReachesTheFloor() {
-        String[] closing = {"reject '[1.8.0,)'", "rejectAll()"};
+        String[] closing = {"reject '[1.8.0,)'", "rejectAll()", "reject '(,1.8.0]'"};
         for (int i = 0; i < closing.length; i++) {
             String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                     "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
@@ -899,7 +949,10 @@ public class KotlinStdlibAlignmentTest {
                     closing[i] + " leaves nothing at the floor, got <<" + out + ">>");
         }
 
-        String[] leaving = {"reject '1.7.0'", "reject '[1.9.0,)'", "reject '(,1.8.0]'"};
+        // `(,1.8.0]` was once here, on the reasoning that it leaves 1.8.1 -- but
+        // it INCLUDES the floor, and the floor is the only version a constraint
+        // written at exactly 1.8.0 can resolve to.
+        String[] leaving = {"reject '1.7.0'", "reject '[1.9.0,)'", "reject '(,1.8.0)'"};
         for (int i = 0; i < leaving.length; i++) {
             String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                     "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "

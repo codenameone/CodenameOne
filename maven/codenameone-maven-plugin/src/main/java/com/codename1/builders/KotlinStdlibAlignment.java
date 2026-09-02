@@ -941,6 +941,37 @@ public class KotlinStdlibAlignment {
     }
 
     /**
+     * The index just past a type-argument list starting at {@code at}, or
+     * {@code at} when there is not one there.
+     *
+     * <p>Only identifiers, dots, commas, wildcards and array brackets may
+     * appear inside, and the angle brackets have to balance. A `&lt;` that is
+     * really the comparison operator fails both tests, so it is left where it
+     * is rather than swallowing the rest of the statement.</p>
+     */
+    private static int endOfTypeArguments(String statement, int at) {
+        if (at >= statement.length() || statement.charAt(at) != '<') {
+            return at;
+        }
+        int depth = 0;
+        for (int i = at; i < statement.length(); i++) {
+            char c = statement.charAt(i);
+            if (c == '<') {
+                depth++;
+            } else if (c == '>') {
+                depth--;
+                if (depth == 0) {
+                    return i + 1;
+                }
+            } else if (!isIdentifierChar(c) && c != '.' && c != ',' && c != '?'
+                    && c != '[' && c != ']' && !Character.isWhitespace(c)) {
+                return at;
+            }
+        }
+        return at;
+    }
+
+    /**
      * Whether a dotted Gradle path ends in the given segment.
      *
      * <p>`ext`, `project.ext` and `rootProject.ext` all name the one extra
@@ -979,24 +1010,26 @@ public class KotlinStdlibAlignment {
         if (callsNamed(line, "rejectAll")) {
             return true;
         }
-        // Rejections ACCUMULATE, and Gradle applies every one of them. Asked one
-        // selector at a time, `reject '1.8.0', '(1.8.0,)'` looked harmless twice
-        // over -- the exact rejection still leaves 1.8.1, the open range still
-        // leaves 1.8.0 -- while together they leave the constraint nothing to
-        // resolve to at all, and the block was written into a graph that could not
-        // resolve it. So the question is split in two and each half is asked of the
-        // whole list: something has to remove the floor itself, and something has
-        // to remove everything past it.
+        // Rejections ACCUMULATE -- reject takes varargs and may be called again --
+        // and Gradle applies every one of them, so every selector is asked, not
+        // just the first. Read one at a time, a pair that jointly removes the floor
+        // looked harmless twice over.
+        //
+        // The question asked of each is only whether it removes the floor ITSELF.
+        // It once also demanded that everything past the floor be gone, on the
+        // reasoning that a higher version was still selectable -- but what this
+        // block writes is a constraint on exactly 1.8.0, so the floor is the only
+        // version whose availability it depends on. An app that rejects 1.8.0 has
+        // said it does not want the version this pins to, which is the whole
+        // signal this scan exists to read, and writing the constraint anyway asks
+        // its graph to resolve to a version it excluded.
         List<String> rejected = versionsInCall(line, "reject");
-        boolean floorRemoved = false;
-        boolean pastTheFloorRemoved = false;
         for (int i = 0; i < rejected.size(); i++) {
-            String selector = rejected.get(i).trim();
-            floorRemoved = floorRemoved || rejectionRemovesTheFloor(selector);
-            pastTheFloorRemoved = pastTheFloorRemoved
-                    || rejectionRemovesPastTheFloor(selector);
+            if (rejectionRemovesTheFloor(rejected.get(i).trim())) {
+                return true;
+            }
         }
-        return floorRemoved && pastTheFloorRemoved;
+        return false;
     }
 
     /**
@@ -1039,39 +1072,6 @@ public class KotlinStdlibAlignment {
             }
         }
         return true;
-    }
-
-    /**
-     * Whether one rejection selector removes every version PAST the floor.
-     *
-     * <p>Only an open-ended range can. A bounded one always leaves whatever is
-     * past its ceiling, and no number of bounded ranges covers an unbounded
-     * tail, so there is nothing here for several of them to do jointly.</p>
-     */
-    private static boolean rejectionRemovesPastTheFloor(String selector) {
-        if (selector.length() == 0) {
-            return false;
-        }
-        char opening = selector.charAt(0);
-        if (opening != '[' && opening != '(' && opening != ']') {
-            return false;
-        }
-        int comma = selector.indexOf(',');
-        if (comma < 0) {
-            return false;
-        }
-        String upper = selector.substring(comma + 1,
-                Math.max(comma + 1, selector.length() - 1)).trim();
-        if (upper.length() != 0) {
-            // Bounded above, so something past the floor survives it.
-            return false;
-        }
-        String lower = selector.substring(1, comma).trim();
-        // Whether its own bound is included does not matter here: the question is
-        // what is left ABOVE the floor, and both `[1.8.0,)` and `(1.8.0,)` take
-        // all of that.
-        return lower.length() == 0
-                || compareVersions(lower, MERGED_STDLIB_FLOOR) <= 0;
     }
 
     /** Whether a plain version literal IS the floor, prerelease and all. */
@@ -2456,6 +2456,29 @@ public class KotlinStdlibAlignment {
                                         && scan + 1 < statement.length()
                                         && isIdentifierChar(statement.charAt(scan + 1))))) {
                     scan++;
+                }
+                // A type's arguments belong to the type: `Map<String, String> dep`
+                // is a declaration whose type happens to be generic, and stopping at
+                // the `<` read `Map` as the whole statement -- so dep was never
+                // recorded and the strict pin the map held was never seen.
+                int generics = endOfTypeArguments(statement, scan);
+                if (generics > scan) {
+                    scan = generics;
+                }
+                // And its dimensions, for the same reason: `String[] dep` is a
+                // declaration too. Only an EMPTY pair, which nothing but an array
+                // type is -- a subscript with something in it is `ext['dep']` or
+                // `deps[0]`, and swallowing those would take the name with them.
+                while (true) {
+                    int empty = skipBlanks(statement, scan);
+                    if (empty >= statement.length() || statement.charAt(empty) != '[') {
+                        break;
+                    }
+                    int close = skipBlanks(statement, empty + 1);
+                    if (close >= statement.length() || statement.charAt(close) != ']') {
+                        break;
+                    }
+                    scan = close + 1;
                 }
                 lastTokenEnd = scan;
                 scan = skipBlanks(statement, scan);
