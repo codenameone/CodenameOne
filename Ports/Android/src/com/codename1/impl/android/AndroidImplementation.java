@@ -10718,7 +10718,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             try {
                 Uri uri = item.getUri();
                 if (uri != null) {
-                    String type = getContext().getContentResolver().getType(uri);
+                    // Without the parameters, because a bare MIME type is what everything here
+                    // compares against: a provider answering "text/plain; charset=utf-8" would
+                    // file the document under a type no target asks for, and would slip past
+                    // the MIME_TEXT check below that stops the synthesized empty text from
+                    // overwriting it.
+                    String type = bareMimeType(getContext().getContentResolver().getType(uri));
                     if (type != null && type.startsWith("image/")) {
                         try {
                             InputStream in = getContext().getContentResolver().openInputStream(uri);
@@ -10736,7 +10741,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             com.codename1.io.Log.e(t);
                         }
                     } else if (type != null && type.length() > 0
-                            && !"application/octet-stream".equals(type.toLowerCase())) {
+                            && !"application/octet-stream".equals(type)) {
                         // A typed URI is a file reference *and* that type. Reducing it to a file
                         // alone let a target filtering on, say, application/pdf accept the hover
                         // -- the description advertised the type -- and then be refused the
@@ -10744,7 +10749,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         // longer had it. The bytes are promised rather than read: a target that
                         // only wants the path should not pay for a document it never opens.
                         if (!content.hasMimeType(type)) {
-                            content.setDataProvider(type.toLowerCase(), uriBytesProvider(uri));
+                            content.setDataProvider(type, uriBytesProvider(uri));
                         }
                     } else {
                         unnamedUris.add(uri);
@@ -10780,16 +10785,38 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
         if (html != null) {
+            // A value the clip's own item published, so it wins over a URI the resolver happened
+            // to type text/html -- an .html file being dragged. Same rule as the text below,
+            // and the reason that one needs a guard and this one does not: there is no
+            // synthesized empty HTML to write over a representation that already answered.
             content.setData(ClipboardContent.MIME_HTML, html);
         }
         if (!fileUris.isEmpty()) {
             content.setFiles(fileUris.toArray(new String[fileUris.size()]));
         }
-        content.setData(ClipboardContent.MIME_TEXT, plain == null ? "" : plain);
+        if (plain != null) {
+            content.setData(ClipboardContent.MIME_TEXT, plain);
+        } else if (!content.hasMimeType(ClipboardContent.MIME_TEXT)) {
+            // Every clip reports text, so a target asking for it gets "" rather than nothing --
+            // but only when nothing else has supplied it. A URI the resolver typed text/plain,
+            // which is what a dragged .txt is, has already registered the document's own
+            // contents, and writing over that handed the target an empty document.
+            content.setData(ClipboardContent.MIME_TEXT, "");
+        }
         if (description != null) {
             fillAdvertisedTypes(content, description, plain, fileUris, unnamedUris);
         }
         return content;
+    }
+
+    /// A MIME type without its parameters, lower case, or null when there is none.
+    private static String bareMimeType(String type) {
+        if (type == null) {
+            return null;
+        }
+        int semicolon = type.indexOf(';');
+        String bare = (semicolon < 0 ? type : type.substring(0, semicolon)).trim().toLowerCase();
+        return bare.length() == 0 ? null : bare;
     }
 
     /// Reads a content URI's bytes when something actually asks for them.

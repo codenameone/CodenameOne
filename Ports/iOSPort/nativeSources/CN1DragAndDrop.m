@@ -470,6 +470,29 @@ void CN1CancelNativeDrag(void) {
 
 @end
 
+/// Copies a file a drop handed over into somewhere that outlives the handler, and returns the
+/// path -- or nil when the copy failed.
+///
+/// Every URL an NSItemProvider produces is valid only for the duration of the completion handler
+/// it arrives in, so a path handed to the framework without copying is unreadable by the time
+/// the event dispatch thread sees it. The name is kept because a receiver commonly shows it.
+static NSString* cn1CopyDroppedFile(NSURL* url) {
+    NSString* name = url.lastPathComponent;
+    if (name == nil || name.length == 0) {
+        name = @"dropped";
+    }
+    NSString* target = [NSTemporaryDirectory() stringByAppendingPathComponent:
+                        [NSString stringWithFormat:@"cn1-drop-%@-%@",
+                         [[NSUUID UUID] UUIDString], name]];
+    NSError* copyError = nil;
+    if (![[NSFileManager defaultManager] copyItemAtURL:url
+                                                 toURL:[NSURL fileURLWithPath:target]
+                                                 error:&copyError]) {
+        return nil;
+    }
+    return target;
+}
+
 API_AVAILABLE(ios(11.0))
 @interface CN1DragAndDropDelegate : NSObject <UIDragInteractionDelegate, UIDropInteractionDelegate>
 @end
@@ -545,6 +568,13 @@ API_AVAILABLE(ios(11.0))
             // Given a file and a text fallback, adding a second item made UIKit expose them as
             // two dragged things, so a receiver could import the document *and* a stray piece
             // of text instead of choosing the best form of one.
+            //
+            // Note the one case this cannot express: a declared type whose UTI is also the
+            // file's own -- a text/plain fallback beside a .txt -- registers a second
+            // representation under an identifier the provider already vends, and which of the
+            // two a receiver gets is NSItemProvider's choice rather than ours. Both are
+            // honestly that type, so neither answer is wrong; there is simply no way to say
+            // which was meant.
             registerDeclared(provider);
             declaredAttached = YES;
         }
@@ -682,8 +712,10 @@ API_AVAILABLE(ios(11.0))
     // would give the application several drops for one gesture, each missing the others.
     NSMutableDictionary* collected = [[NSMutableDictionary alloc] init];
     NSMutableArray* files = [[NSMutableArray alloc] init];
-    // The representations a file-vending provider also advertises, named against the copy of
-    // its file rather than loaded: pairs of {MIME type, path}.
+    // The representations a file-vending provider also advertises, each named against a file on
+    // disk rather than read into memory: pairs of {MIME type, path}. One that is another name
+    // for the document shares the document's own copy; one that is a representation of its own
+    // gets a copy of its own.
     NSMutableArray* fileBacked = [[NSMutableArray alloc] init];
     dispatch_group_t group = dispatch_group_create();
 
@@ -694,9 +726,7 @@ API_AVAILABLE(ios(11.0))
             // A document provider commonly offers both a file URL and the document's own
             // content type. Taking only the file made cn1MimesForSession advertise a type the
             // drop could not then produce, so a target filtered to it accepted the hover and
-            // was refused the drop. The other types are named against the copied file below
-            // rather than loaded, because they all describe that same file and reading a large
-            // one into memory on top of copying it is how an application runs out of it.
+            // was refused the drop.
             dispatch_group_enter(group);
             [provider loadFileRepresentationForTypeIdentifier:@"public.file-url"
                                            completionHandler:^(NSURL* url, NSError* error) {
@@ -704,20 +734,16 @@ API_AVAILABLE(ios(11.0))
                     // The URL is only valid inside this handler, so the file is copied out
                     // before it is named to the application. A path handed over without
                     // copying is unreadable by the time the event dispatch thread sees it.
-                    NSString* name = url.lastPathComponent;
-                    if (name == nil || name.length == 0) {
-                        name = @"dropped";
-                    }
-                    NSString* target = [NSTemporaryDirectory() stringByAppendingPathComponent:
-                                        [NSString stringWithFormat:@"cn1-drop-%@-%@",
-                                         [[NSUUID UUID] UUIDString], name]];
-                    NSError* copyError = nil;
-                    if ([[NSFileManager defaultManager] copyItemAtURL:url
-                                                                toURL:[NSURL fileURLWithPath:target]
-                                                                error:&copyError]) {
+                    NSString* target = cn1CopyDroppedFile(url);
+                    if (target != nil) {
                         @synchronized (files) {
                             [files addObject:target];
                         }
+                        // The document's own location, which is what tells one of its other
+                        // names apart from a representation of its own.
+                        NSString* documentPath = url.path;
+                        // Issued from in here, rather than beside the file load, so that
+                        // comparison is possible at all.
                         for (NSString* uti in provider.registeredTypeIdentifiers) {
                             if ([uti isEqualToString:@"public.file-url"]) {
                                 continue;
@@ -726,17 +752,36 @@ API_AVAILABLE(ios(11.0))
                             if (mime == nil) {
                                 continue;
                             }
-                            @synchronized (fileBacked) {
-                                [fileBacked addObject:@[mime, target]];
-                            }
+                            dispatch_group_enter(group);
+                            // As a file rather than as data, deliberately: a representation
+                            // that really is the document would otherwise be read whole into
+                            // memory on top of the copy, which is how an application runs out
+                            // of it. Naming every one of them against the document instead --
+                            // which is what this did -- is wrong the other way: a drag that
+                            // offers a file *and* something else, as this framework's own
+                            // source does for a file with a text fallback, then served the
+                            // file's bytes under the fallback's type.
+                            [provider loadFileRepresentationForTypeIdentifier:uti
+                                                           completionHandler:^(NSURL* alt, NSError* altError) {
+                                if (alt != nil) {
+                                    NSString* altTarget = (documentPath != nil
+                                            && [alt.path isEqualToString:documentPath])
+                                            ? target             // another name for the document
+                                            : cn1CopyDroppedFile(alt);
+                                    if (altTarget != nil) {
+                                        @synchronized (fileBacked) {
+                                            [fileBacked addObject:@[mime, altTarget]];
+                                        }
+                                    }
+                                }
+                                dispatch_group_leave(group);
+                            }];
                         }
                     }
                 }
                 dispatch_group_leave(group);
             }];
-        }
-        if (vendsFile) {
-            // Its other representations are the file, handled above.
+            // Its other representations were loaded above, where the document is known.
             continue;
         }
         for (NSString* uti in provider.registeredTypeIdentifiers) {
