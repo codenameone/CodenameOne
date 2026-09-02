@@ -584,6 +584,45 @@ public class LocalContinuityTest extends UITestBase {
                 "the polls requested during the first fetch were dropped rather than coalesced");
     }
 
+    /**
+     * On iOS the external-change observer is installed the first time the platform store is
+     * resolved, and enable() does not resolve it. An application that only registers a listener
+     * and waits to read values inside the callback was therefore never told about a change made
+     * on another device until some unrelated read or write happened to bring the store up.
+     */
+    @EdtTest
+    public void registeringAStoreListenerResolvesThePlatformStore() {
+        CountingStoreBridge counting = new CountingStoreBridge();
+        Continuity.setBridge(counting);
+        SyncedStoreListener l = new SyncedStoreListener() {
+            public void storeChanged() {
+            }
+        };
+        registered.add(l);
+
+        SyncedStore.addChangeListener(l);
+
+        assertTrue(counting.storeQueries() > 0,
+                "registering a listener never reached the platform store, so on iOS no observer "
+                        + "would exist and a remote change could not call the listener");
+    }
+
+    /** A LocalContinuityBridge that counts how often the synced store was resolved. */
+    static class CountingStoreBridge extends LocalContinuityBridge {
+        private final java.util.concurrent.atomic.AtomicInteger queries =
+                new java.util.concurrent.atomic.AtomicInteger();
+
+        @Override
+        public boolean isSyncedStoreSupported() {
+            queries.incrementAndGet();
+            return super.isSyncedStoreSupported();
+        }
+
+        int storeQueries() {
+            return queries.get();
+        }
+    }
+
     /** Holds every fetch until released, and records how many ran at once. */
     static class BlockingFetchRelay implements StateRelay {
         private final java.util.concurrent.CountDownLatch gate =

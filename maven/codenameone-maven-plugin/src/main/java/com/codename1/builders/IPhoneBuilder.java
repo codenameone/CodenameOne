@@ -11729,6 +11729,78 @@ public class IPhoneBuilder extends Executor {
     /// @param plist the fragment
     /// @param key the key name
     /// @return the index of the live key element, or -1
+    /// The dictionary nesting depth of `at`, counting live tags only.
+    ///
+    /// The fragment `ios.plistInject` supplies is a sequence of the ROOT dictionary's own
+    /// members, so depth 0 is the plist's root. A member's value may itself be a `<dict>`, and a
+    /// key inside one belongs to that dictionary rather than to the plist. iOS reads
+    /// NSUserActivityTypes at the root and nowhere else, so treating a nested one as the app's
+    /// declaration merged the continuity type into a dictionary nobody reads for it AND skipped
+    /// appending the root key -- an app whose Handoff simply never gets advertised, with an
+    /// unrelated property quietly rewritten, and nothing logged either way.
+    static int plistDictDepth(String plist, int at) {
+        int depth = 0;
+        int i = 0;
+        while (i < at) {
+            int open = plist.indexOf('<', i);
+            if (open < 0 || open >= at) {
+                break;
+            }
+            if (plist.startsWith("<!--", open)) {
+                // A comment's contents are not structure. An unterminated one swallows the rest,
+                // which is what a parser does with it too -- see plistWithoutComments.
+                int commentEnd = plist.indexOf("-->", open + 4);
+                if (commentEnd < 0) {
+                    break;
+                }
+                i = commentEnd + 3;
+                continue;
+            }
+            int end = plist.indexOf('>', open);
+            if (end < 0) {
+                break;
+            }
+            String tag = plist.substring(open, end + 1);
+            if ("dict".equals(plistTagName(tag))) {
+                if (tag.startsWith("</")) {
+                    depth--;
+                } else if (!tag.endsWith("/>")) {
+                    // "<dict/>" opens and closes in one element, so it changes nothing.
+                    depth++;
+                }
+            }
+            i = end + 1;
+        }
+        return depth;
+    }
+
+    /// The element name of a tag, without the closing slash or any attributes.
+    static String plistTagName(String tag) {
+        int from = tag.startsWith("</") ? 2 : 1;
+        int to = from;
+        while (to < tag.length()) {
+            char c = tag.charAt(to);
+            if (c == '>' || c == '/' || c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+                break;
+            }
+            to++;
+        }
+        return tag.substring(from, to);
+    }
+
+    /// The first live key at the fragment's own level, skipping any a nested dictionary owns.
+    ///
+    /// Both the branch that decides whether to append and the merge itself have to use this, or
+    /// they disagree: one sees a declaration the other cannot find, which is how a key gets
+    /// appended twice or an array gets merged into that iOS never reads.
+    static int firstLiveRootIndex(String plist, String key) {
+        int at = plistKeyIndex(plist, key);
+        while (at >= 0 && (insideComment(plist, at) || plistDictDepth(plist, at) != 0)) {
+            at = plistKeyIndex(plist, key, at + 1);
+        }
+        return at;
+    }
+
     static int firstLiveIndex(String plist, String key) {
         int at = plistKeyIndex(plist, key);
         while (at >= 0 && insideComment(plist, at)) {
@@ -11808,7 +11880,7 @@ public class IPhoneBuilder extends Executor {
         if (inject == null) {
             return null;
         }
-        int key = firstLiveIndex(inject, "NSUserActivityTypes");
+        int key = firstLiveRootIndex(inject, "NSUserActivityTypes");
         if (key < 0) {
             return inject;
         }
@@ -11846,7 +11918,7 @@ public class IPhoneBuilder extends Executor {
         // correctly saw a live key, and this then found the dead one first. The plist that
         // shipped had no continuity type in the array iOS actually reads, so Handoff was never
         // advertised and nothing anywhere said so.
-        int key = firstLiveIndex(inject, "NSUserActivityTypes");
+        int key = firstLiveRootIndex(inject, "NSUserActivityTypes");
         // The key's OWN value, not the next array anywhere after it. An unbounded search reached
         // past a NSUserActivityTypes whose value was not an array and inserted the ids into some
         // later key's array -- corrupting a property this method was never asked about, while the
@@ -14431,7 +14503,7 @@ public class IPhoneBuilder extends Executor {
             // type at all, which is Handoff and Spotlight silently doing nothing on a device.
             // The same question is asked of UIBackgroundModes a few hundred lines up, and for
             // the same reason.
-            if (plistKeyIndex(plistWithoutComments(inject), "NSUserActivityTypes") < 0) {
+            if (firstLiveRootIndex(plistWithoutComments(inject), "NSUserActivityTypes") < 0) {
                 inject += userActivityTypesKey(intentsManifest, continuityActivityType);
             } else {
                 // Merge into the array the application supplied rather than replacing it: its

@@ -203,6 +203,13 @@ public final class SyncedStore {
         // An app that only ever uses the synced store never touches Continuity itself, and would
         // otherwise register a listener nothing could ever reach.
         Continuity.enable();
+        // And this resolves the platform store, which is the half that actually creates it. On
+        // iOS the external-change observer is installed the first time the store is resolved, and
+        // enable() does not resolve it -- so an application that only registers a listener and
+        // waits to read values inside the callback was never told about a change made on another
+        // device, until some unrelated read or write happened to bring the store up. Idempotent:
+        // the port resolves it once and answers from that.
+        isSupported();
     }
 
     /// Removes a listener.

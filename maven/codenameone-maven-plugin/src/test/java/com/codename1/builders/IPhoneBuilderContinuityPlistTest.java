@@ -118,6 +118,68 @@ class IPhoneBuilderContinuityPlistTest {
     }
 
     // ------------------------------------------------------------------
+    // Only the root dictionary's own declaration counts
+    // ------------------------------------------------------------------
+
+    /**
+     * iOS reads NSUserActivityTypes at the plist root and nowhere else. Treating one that an
+     * application-defined nested dictionary happens to own as the app's declaration merged the
+     * continuity type into a dictionary nobody reads it from, AND suppressed the root key that
+     * would have advertised Handoff -- so the feature was silently inert while an unrelated
+     * property was quietly rewritten.
+     */
+    @Test
+    void aNestedActivityTypesDeclarationIsNotTheAppsDeclaration() {
+        String nested = "<key>MyFeature</key><dict>"
+                + "<key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.nested</string></array></dict>";
+
+        assertEquals(-1, IPhoneBuilder.firstLiveRootIndex(nested, "NSUserActivityTypes"), nested);
+    }
+
+    /** The root declaration is still found when a nested one precedes it. */
+    @Test
+    void theRootDeclarationIsFoundPastANestedOne() {
+        String both = "<key>MyFeature</key><dict>"
+                + "<key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.nested</string></array></dict>"
+                + "<key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.root</string></array>";
+
+        int at = IPhoneBuilder.firstLiveRootIndex(both, "NSUserActivityTypes");
+
+        assertTrue(at > both.indexOf("</dict>"), "resolved the nested key at " + at + ": " + both);
+    }
+
+    /** The merge follows the same rule, or it rewrites an array the detection branch ignored. */
+    @Test
+    void theMergeTargetsTheRootArrayNotANestedOne() {
+        String both = "<key>MyFeature</key><dict>"
+                + "<key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.nested</string></array></dict>"
+                + "<key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.root</string></array>";
+
+        String merged = IPhoneBuilder.mergeUserActivityTypes(both, noIntents(), CONTINUITY_TYPE);
+
+        int nestedEnd = merged.indexOf("</dict>");
+        assertTrue(merged.indexOf(CONTINUITY_TYPE) > nestedEnd,
+                "the continuity type landed inside the nested dictionary: " + merged);
+        assertEquals(1, occurrences(merged, CONTINUITY_TYPE), merged);
+        assertTrue(merged.contains("<string>com.example.app.nested</string>"),
+                "the nested array was rewritten: " + merged);
+    }
+
+    /** A self-closing dict is one element and must not be read as opening a nesting level. */
+    @Test
+    void aSelfClosingDictDoesNotOpenANestingLevel() {
+        String plist = "<key>Empty</key><dict/>"
+                + "<key>NSUserActivityTypes</key><array/>";
+
+        assertTrue(IPhoneBuilder.firstLiveRootIndex(plist, "NSUserActivityTypes") > 0, plist);
+    }
+
+    // ------------------------------------------------------------------
     // Merging into an array the application supplied
     // ------------------------------------------------------------------
 

@@ -1026,8 +1026,18 @@ public final class Continuity {
                                 // clear() landing after this check is the in-flight case, which
                                 // clear()'s own documentation says it cannot undo. This closes
                                 // the half that was never in flight at all.
-                                publishing = false;
-                                return;
+                                //
+                                // Back to the top rather than standing down, and the difference
+                                // is a state that never gets sent. clear() can be followed by a
+                                // checkpoint on the NEW account: publishToRelay() queues it, sees
+                                // publishing == true, and leaves it for this worker on the
+                                // understanding that a live worker always drains the slot.
+                                // Clearing the flag and returning here broke that promise and
+                                // stranded the new account's only checkpoint until something
+                                // else happened to start a publisher. The loop's first block
+                                // re-dequeues under one lock and stands down properly when there
+                                // is genuinely nothing left.
+                                continue;
                             }
                         }
                         try {
