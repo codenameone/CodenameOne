@@ -305,6 +305,15 @@ class MacNativeBuilder {
         }
     }
 
+    /// Escapes a value going into the entitlements plist.
+    ///
+    /// A container identifier is normally plain, but it is project-supplied -- an app sharing a
+    /// store with a sibling names that sibling -- and an unescaped "&" turns the whole plist into
+    /// something codesign refuses to parse, which reads as a signing failure rather than a typo.
+    private static String escapeEntitlementValue(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
     private void writeEntitlementsFile(BuildRequest request, File appSrcDir,
                                        String baseName, String channel) throws IOException {
         boolean sandbox = parseEntitlementBool(request,
@@ -384,6 +393,22 @@ class MacNativeBuilder {
                     "macNative.entitlements.personalInformation.calendars", needsCalendar)) {
                 sb.append("    <key>com.apple.security.personal-information.calendars</key>\n    <true/>\n");
             }
+        }
+        // The Catalyst archive is signed with THIS plist, and it is assembled from the
+        // macNative.entitlements.* namespace alone -- so an entitlement the iOS side generated
+        // reached the iOS slice and silently missed the Mac one. NSUbiquitousKeyValueStore then
+        // has no container in the Mac slice of the very build that switched the shared code on,
+        // and SyncedStore fails at runtime on a Mac with nothing said at build time.
+        //
+        // Read from the value the iOS side already resolved rather than through a hint of its own.
+        // There is one correct container per app, and a second place to configure it is a second
+        // place for the two slices to disagree.
+        String ubiquityKvStore = request.getArg(
+                "ios.entitlements.com.apple.developer.ubiquity-kvstore-identifier", null);
+        if (ubiquityKvStore != null && ubiquityKvStore.trim().length() > 0) {
+            sb.append("    <key>com.apple.developer.ubiquity-kvstore-identifier</key>\n    <string>")
+                    .append(escapeEntitlementValue(ubiquityKvStore.trim()))
+                    .append("</string>\n");
         }
         if (extra != null && extra.trim().length() > 0) {
             sb.append(extra);

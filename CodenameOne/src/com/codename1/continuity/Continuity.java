@@ -200,22 +200,33 @@ public final class Continuity {
             if (enabled) {
                 return;
             }
-            // Checked and set under one hold. Two callers -- an application on the EDT and
-            // setRelay() from wherever it was configured -- both saw false and both ran the rest,
-            // which installs a second callback and re-reads the sequence.
-            enabled = true;
         }
         // Registered once, and only from here, so that a build which merely links this class --
         // because something else in the framework mentions it -- never installs a callback or
         // touches storage.
         Util.register(AppState.OBJECT_ID, AppState.class);
-        // Loaded OUTSIDE the lock: both touch Preferences, and the rule for STATE_LOCK is that
-        // nothing slow happens under it.
-        String id = loadDeviceId();
+        // Loaded OUTSIDE the lock -- both touch Preferences, and nothing slow runs under
+        // STATE_LOCK -- but BEFORE `enabled` is published, which is the half that matters.
+        // Publishing the flag first let a second caller see it, return immediately, and checkpoint
+        // against an uninitialized sequence of 0: that wrote sequence 1, this thread then restored
+        // the loaded value, and the NEXT checkpoint reused 1. A receiver holding that high-water
+        // mark discards the second state as one it has already acted on, so a real update never
+        // arrives on the other device and nothing anywhere says so.
+        //
+        // getDeviceId() rather than loadDeviceId(): it is the one that mints and persists a UUID
+        // atomically, so two threads arriving here cannot end up with two different ids.
+        String id = getDeviceId();
         long seq = loadSequence();
         synchronized (STATE_LOCK) {
+            if (enabled) {
+                // Lost the race while loading. The winner's values stand, and installing a second
+                // callback over theirs is the duplicate the first check already existed to stop.
+                return;
+            }
             deviceId = id;
             sequence = seq;
+            // Published LAST, under the same hold as the state a checkpoint needs.
+            enabled = true;
         }
         ContinuityBridge b = bridgeInternal();
         if (b != null) {
@@ -817,7 +828,7 @@ public final class Continuity {
             public void run() {
                 try {
                     for (;;) {
-                        pollOnce(r);
+                        pollOnce();
                         synchronized (STATE_LOCK) {
                             if (!pollAgain) {
                                 // Observed and stood down under ONE hold, for the reason the
@@ -844,10 +855,20 @@ public final class Continuity {
 
     /// One relay fetch and, if it is worth it, one delivery. Returning early ends this attempt,
     /// never the polling loop -- which is why the stand-down lives in the caller.
-    private static void pollOnce(StateRelay r) {
+    private static void pollOnce() {
         final long era;
+        final StateRelay r;
         synchronized (STATE_LOCK) {
+            // Relay and era read as a PAIR, on every attempt. The worker used to keep the relay
+            // it was started with and refresh only the era, so a poll coalesced behind a
+            // setRelay() fetched from the endpoint that had just been REPLACED and stamped the
+            // answer with the new era -- which made the era check, whose whole job is to stop
+            // exactly that, wave it through and restore the old endpoint's data.
             era = accountEra;
+            r = relay;
+            if (r == null) {
+                return;
+            }
         }
         AppState fetched = null;
         try {

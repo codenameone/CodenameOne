@@ -555,6 +555,41 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A poll coalesced behind a setRelay() must use the NEW relay. The worker kept the one it was
+     * started with and refreshed only the era, so the second attempt fetched from the endpoint
+     * that had just been replaced and then stamped the answer with the new era -- which made the
+     * era check, whose whole job is to stop exactly that, wave it through.
+     */
+    @EdtTest
+    public void aCoalescedPollUsesTheReplacementRelay() {
+        BlockingFetchRelay old = new BlockingFetchRelay();
+        Continuity.enable();
+        Continuity.setRelay(old);
+        old.awaitInFlight();
+
+        // Queued while the old relay's fetch is still held, which is what makes it coalesce.
+        BlockingFetchRelay replacement = new BlockingFetchRelay();
+        replacement.release();
+        Continuity.setRelay(replacement);
+        old.release();
+
+        long deadline = System.currentTimeMillis() + 3000L;
+        while (replacement.fetches() == 0 && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+
+        assertEquals(1, old.fetches(),
+                "the replaced relay was asked a second time, so its answer could still be "
+                        + "restored under the new relay's era");
+        assertTrue(replacement.fetches() > 0, "the replacement relay was never asked");
+    }
+
+    /**
      * A relay holds ONE document per user, so two overlapping GETs can return DIFFERENT states --
      * the other device may replace it between them. Nothing downstream re-orders the answers:
      * lastSeen is keyed by the ORIGINATING device, so a response that left first and came back

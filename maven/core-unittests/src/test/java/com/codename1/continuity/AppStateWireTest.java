@@ -498,4 +498,33 @@ public class AppStateWireTest {
                     }
                 });
     }
+
+    /**
+     * A nested map key reaches the same writeUTF as a top-level one. Validating only the top level
+     * left a deep key able to throw inside externalize(), which persist() logs and carries on
+     * from -- so the checkpoint went to the other device and was silently absent locally.
+     */
+    @Test
+    void anOversizedNestedMapKeyIsRefused() {
+        StringBuilder huge = new StringBuilder();
+        for (int i = 0; i < 70000; i++) {
+            huge.append('k');
+        }
+        Map<String, Object> inner = new HashMap<String, Object>();
+        inner.put(huge.toString(), "value");
+        final Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("outer", inner);
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        StateCodec.requireRepresentable(payload);
+                    }
+                });
+
+        assertTrue(e.getMessage().contains("65535"), e.getMessage());
+        // The key itself is the oversized thing; the message names it without reproducing it.
+        assertTrue(e.getMessage().length() < 2000,
+                "the message reproduced the whole key: " + e.getMessage().length() + " chars");
+    }
 }

@@ -367,6 +367,15 @@ public final class StateCodec {
     /// same contract an unrepresentable type already gets.
     static final int MAX_STRING_BYTES = 65535;
 
+    /// A map key trimmed to something a message can carry.
+    ///
+    /// The key itself may be the oversized thing being reported, and reproducing all of it in the
+    /// exception would bury the sentence that names the problem.
+    private static String keyLabel(String key) {
+        return key.length() <= 64 ? key
+                : key.substring(0, 64) + "...(" + key.length() + " chars)";
+    }
+
     /// Refuses a string the local checkpoint could not store.
     static void requireWritable(String value, String path) {
         if (exceedsWritableLength(value)) {
@@ -448,7 +457,13 @@ public final class StateCodec {
                             + (key == null ? "null" : key.getClass().getName())
                             + ". Only string keys can be written to a property list or to JSON.");
                 }
-                check(entry.getValue(), path + "." + key, depth + 1);
+                // Nested keys reach Util.writeObject's writeUTF exactly as top-level ones do.
+                // Validating only the top level left a deep key able to throw inside
+                // externalize(), which Continuity.persist() logs and carries on from -- so the
+                // checkpoint went out to the other device and was silently absent from local
+                // storage, the failure this validation exists to prevent.
+                requireWritable((String) key, path + "." + keyLabel((String) key));
+                check(entry.getValue(), path + "." + keyLabel((String) key), depth + 1);
             }
             return;
         }
