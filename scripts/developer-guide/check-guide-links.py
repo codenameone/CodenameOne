@@ -356,11 +356,28 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
             url = url.rstrip(".,;:")
             split = urlsplit(url)
             host = split.hostname or ""
+            # hostname strips the port whether or not it is a number, so a typo in
+            # the authority hides behind an otherwise correct host and every check
+            # below passes on a URL no browser can open. Reading .port is what
+            # surfaces it: urlsplit defers the parse until then and raises.
+            try:
+                port = split.port
+            except ValueError:
+                out.append((url, "the port is not a number, so this cannot be opened at all"))
+                continue
             if "." not in host and host not in LOCAL_HOSTS:
                 out.append((url, f"host '{host}' has no dot in it and resolves nowhere"))
                 continue
             if split.scheme == "http" and host not in TLS_EXEMPT_HOSTS | LOCAL_HOSTS:
                 out.append((url, "plain http, not https"))
+            if host in SITE_HOSTS and port is not None:
+                # The route model below describes the site on its default port. A
+                # nonstandard port is a different endpoint that model says nothing
+                # about, so accepting the path would be accepting an unchecked URL.
+                # Local services keep their ports: http://localhost:11434 is the
+                # Ollama endpoint the AI chapter documents on purpose.
+                out.append((url, f"port {port} is not where the site is served"))
+                continue
             if host in SITE_HOSTS:
                 target = split.path.rstrip("/") or "/"
                 if split.fragment and target in SELF_PATHS:
