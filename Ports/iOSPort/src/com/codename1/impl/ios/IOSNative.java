@@ -1440,8 +1440,8 @@ public final class IOSNative {
     /** True when this build linked the synced store and the entitlement granted one. */
     native boolean continuitySyncedStoreSupported();
 
-    /** Writes a value to the synced store. */
-    native void continuitySyncedStorePut(String key, String value);
+    /** Writes a value to the synced store, answering whether the store holds it afterwards. */
+    native boolean continuitySyncedStorePut(String key, String value);
 
     /** Reads a value from the synced store, or null when the key is absent. */
     native String continuitySyncedStoreGet(String key);

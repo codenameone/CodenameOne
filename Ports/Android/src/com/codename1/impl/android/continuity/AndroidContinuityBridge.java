@@ -100,7 +100,8 @@ public class AndroidContinuityBridge implements ContinuityBridge {
     }
 
     @Override
-    public void syncedStorePut(String key, String value) {
+    public boolean syncedStorePut(String key, String value) {
+        return false;
     }
 
     @Override

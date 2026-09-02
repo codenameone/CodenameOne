@@ -143,7 +143,7 @@ public class ContinuityDegradationTest extends UITestBase {
             return false;
         }
 
-        public void syncedStorePut(String key, String value) {
+        public boolean syncedStorePut(String key, String value) {
             throw new IllegalStateException("must not be called when unsupported");
         }
 
@@ -183,7 +183,7 @@ public class ContinuityDegradationTest extends UITestBase {
             throw new IllegalStateException("boom");
         }
 
-        public void syncedStorePut(String key, String value) {
+        public boolean syncedStorePut(String key, String value) {
             throw new IllegalStateException("boom");
         }
 

@@ -161,13 +161,16 @@ public class LocalContinuityBridge implements ContinuityBridge {
     }
 
     @Override
-    public void syncedStorePut(String key, String value) {
+    public boolean syncedStorePut(String key, String value) {
         Preferences.set(PREFIX + key, value);
         List<String> keys = indexKeys();
         if (!keys.contains(key)) {
             keys.add(key);
             writeIndex(keys);
         }
+        // Read back rather than assume, so the simulation answers the same question the device
+        // does: is the value there now?
+        return value.equals(Preferences.get(PREFIX + key, null));
     }
 
     @Override

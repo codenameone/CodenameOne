@@ -68,11 +68,19 @@ public interface ContinuityBridge {
 
     /// Writes a value to the synced store, replacing any previous value for the key.
     ///
+    /// Returns whether the store took it. A void signature made `SyncedStore.put` answer true
+    /// whenever a store merely existed, so the documented fallback -- write locally when the
+    /// synced write fails -- could never run, and a value the store refused was reported saved.
+    ///
     /// #### Parameters
     ///
     /// - `key`: the key
     /// - `value`: the value
-    void syncedStorePut(String key, String value);
+    ///
+    /// #### Returns
+    ///
+    /// true when the store holds the value afterwards
+    boolean syncedStorePut(String key, String value);
 
     /// Reads a value from the synced store.
     ///

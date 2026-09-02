@@ -584,6 +584,17 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
                 // activity delivered before that finds no callback at all and is dropped -- so an
                 // app that used continuity WITHOUT intents used to lose exactly the cold launch
                 // the feature exists for.
+                //
+                // This dictionary is the LEGACY lifecycle's cold-launch path only. On the default
+                // UIScene build the activity arrives through UISceneConnectionOptions instead,
+                // and CodenameOne_GLSceneDelegate's willConnectToSession already forwards
+                // connectionOptions.userActivities to cn1ContinueUserActivity: at the end of the
+                // same method that installs the root view controller. A review read that method
+                // as not forwarding them and asked for this block to cover the scene path; it
+                // does not need to. The scene path's own ordering problem -- willConnectToSession
+                // runs before init() -- is solved on the Java side, where
+                // IOSContinuityCallbacks holds an activity that arrives before setCallback and
+                // delivers it when Continuity.enable() installs one.
                 if (![NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType]) {
                     cn1PendingLaunchActivity = [userActivity retain];
                 } else {

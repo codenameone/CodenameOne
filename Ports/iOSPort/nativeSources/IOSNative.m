@@ -20731,19 +20731,31 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported__(C
     return cn1ContinuityStore() != nil ? JAVA_TRUE : JAVA_FALSE;
 }
 
-void com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT value) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT value) {
     NSUbiquitousKeyValueStore *store = cn1ContinuityStore();
     if (store == nil || key == JAVA_NULL || value == JAVA_NULL) {
-        return;
+        return JAVA_FALSE;
     }
+    JAVA_BOOLEAN result = JAVA_FALSE;
     POOL_BEGIN();
-    [store setString:toNSString(CN1_THREAD_STATE_PASS_ARG value)
-              forKey:toNSString(CN1_THREAD_STATE_PASS_ARG key)];
-    // Asked for rather than waited on. The system syncs on its own schedule and this only moves
-    // it along; the return value says whether the store is usable at all, which cn1ContinuityStore
-    // already established.
-    [store synchronize];
+    NSString *k = toNSString(CN1_THREAD_STATE_PASS_ARG key);
+    NSString *v = toNSString(CN1_THREAD_STATE_PASS_ARG value);
+    [store setString:v forKey:k];
+    // synchronize is asked for rather than waited on -- the system syncs on its own schedule and
+    // this only moves it along -- but its answer is reported, because NO means the store is not
+    // usable and the application's write went nowhere.
+    BOOL synced = [store synchronize];
+    // Read back as well. synchronize answers about the STORE; it says nothing about whether this
+    // particular value was accepted, and a store at its key or size limit drops the write without
+    // reporting anything. What can be established here is whether the value is retrievable now.
+    // Whether iCloud goes on to propagate it is not knowable from inside this call, and the Java
+    // documentation says only what this actually checks.
+    NSString *back = [store stringForKey:k];
+    if (synced && back != nil && [back isEqualToString:v]) {
+        result = JAVA_TRUE;
+    }
     POOL_END();
+    return result;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key) {
@@ -20814,7 +20826,8 @@ void com_codename1_impl_ios_IOSNative_continuityClear__(CN1_THREAD_STATE_MULTI_A
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_FALSE;
 }
-void com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT value) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT value) {
+    return JAVA_FALSE;
 }
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key) {
     return JAVA_NULL;
@@ -20834,6 +20847,9 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySupported___R_boolean(CN
 }
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT key, JAVA_OBJECT value) {
+    return com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, key, value);
 }
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT key) {
     return com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, key);

@@ -116,14 +116,15 @@ class IOSContinuityBridge implements ContinuityBridge {
     }
 
     @Override
-    public void syncedStorePut(String key, String value) {
+    public boolean syncedStorePut(String key, String value) {
         if (!isSyncedStoreSupported()) {
-            return;
+            return false;
         }
         try {
-            nativeInterface.continuitySyncedStorePut(key, value);
+            return nativeInterface.continuitySyncedStorePut(key, value);
         } catch (Throwable t) {
             Log.e(t);
+            return false;
         }
     }
 

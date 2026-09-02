@@ -94,8 +94,8 @@ public final class SyncedStore {
     ///
     /// #### Returns
     ///
-    /// true when the value was written; false when the store is unavailable or the platform
-    /// refused it, which is what a full store looks like
+    /// true when the store holds the value afterwards; false when there is no store, or the
+    /// platform would not take it -- a key count or a size past what it allows
     public static boolean put(String key, String value) {
         requireKey(key);
         if (value == null) {
@@ -110,8 +110,7 @@ public final class SyncedStore {
             if (!b.isSyncedStoreSupported()) {
                 return false;
             }
-            b.syncedStorePut(key, value);
-            return true;
+            return b.syncedStorePut(key, value);
         } catch (Throwable t) {
             Log.e(t);
             return false;

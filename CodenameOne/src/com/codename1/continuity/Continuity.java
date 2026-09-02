@@ -656,16 +656,32 @@ public final class Continuity {
         }, "Continuity relay poll").start();
     }
 
-    /// Forgets everything: the stored checkpoint, any parked arrival, and the activity advertised
-    /// to the user's other devices.
+    /// Forgets everything: the stored checkpoint, any parked arrival, the activity advertised to
+    /// the user's other devices, and anything queued for the relay.
     ///
     /// Belongs on your logout path. The advertised activity outlives the app's own screen, so an
     /// account's work would otherwise stay offered to the devices around it after the user signed
-    /// out.
+    /// out -- and a queued relay publish would have gone out later under whatever credentials the
+    /// relay returned by then, which after a logout is the NEXT account's.
+    ///
+    /// One thing it cannot undo: a relay request already on the wire when this is called. Nothing
+    /// in this process can recall that. What this guarantees is that nothing follows it.
     public static void clear() {
         setParked(null);
         synchronized (HANDOFF_LOCK) {
             dirty = false;
+        }
+        synchronized (PUBLISH_LOCK) {
+            // Anything queued for the relay belonged to the account that just signed out, and a
+            // relay reads its credentials when the request runs rather than when it was queued --
+            // so a state left here would have gone out under the NEXT account's token. Dropped,
+            // and the era bumped so a publisher that is midway through a request stands down
+            // instead of taking the next one.
+            //
+            // The one thing this cannot recall is a request already on the wire. Nothing in this
+            // process can; what it can do is make sure nothing follows it.
+            pendingPublish = null;
+            publishEra++;
         }
         lastSeen.clear();
         clearContinuation();
@@ -780,6 +796,11 @@ public final class Continuity {
     /// True while the single publisher thread is alive. Guarded by PUBLISH_LOCK.
     private static boolean publishing;
 
+    /// Bumped by `clear()`. A publisher compares it either side of a request and stands down when
+    /// it moved, which is what stops one account's state reaching the relay under the next
+    /// account's credentials. Guarded by PUBLISH_LOCK.
+    private static long publishEra;
+
     private static final Object PUBLISH_LOCK = new Object();
 
     /// Hands a state to the relay, in order, one at a time.
@@ -806,14 +827,25 @@ public final class Continuity {
             public void run() {
                 try {
                     for (;;) {
-                        StateRelay r = relay;
+                        StateRelay r;
                         AppState next;
+                        long era;
                         synchronized (PUBLISH_LOCK) {
+                            r = relay;
                             next = pendingPublish;
+                            if (r == null || next == null) {
+                                // Observing no work and standing down happen under ONE hold of
+                                // the lock, and that is the whole correctness argument. An
+                                // earlier version cleared the flag, released, and then re-queued
+                                // what it found -- so a checkpoint landing in that gap started a
+                                // second publisher, and the re-queue then overwrote its newer
+                                // state with the older one. The relay's last value was stale and
+                                // nothing said so.
+                                publishing = false;
+                                return;
+                            }
                             pendingPublish = null;
-                        }
-                        if (r == null || next == null) {
-                            return;
+                            era = publishEra;
                         }
                         try {
                             r.publish(next);
@@ -823,19 +855,23 @@ public final class Continuity {
                             // an older state on the wire after a newer one.
                             Log.e(t);
                         }
+                        synchronized (PUBLISH_LOCK) {
+                            if (era != publishEra) {
+                                // clear() ran while that request was in flight. Whatever is
+                                // queued now belongs to a session this thread is not part of.
+                                publishing = false;
+                                return;
+                            }
+                        }
                     }
-                } finally {
-                    AppState late;
+                } catch (Throwable fatal) {
+                    // Nothing above is expected to throw -- the publish is already guarded -- but
+                    // a publisher that died holding the flag would stop every later checkpoint
+                    // from ever reaching the relay again.
                     synchronized (PUBLISH_LOCK) {
                         publishing = false;
-                        late = pendingPublish;
                     }
-                    if (late != null) {
-                        // A checkpoint landed between the last read and clearing the flag, so
-                        // nothing is publishing it. Handed back to the same entry point, which
-                        // starts one publisher and keeps the ordering total.
-                        publishToRelay(late);
-                    }
+                    Log.e(fatal);
                 }
             }
         }, "Continuity relay publish").start();

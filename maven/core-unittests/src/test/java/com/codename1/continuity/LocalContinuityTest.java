@@ -527,6 +527,41 @@ public class LocalContinuityTest extends UITestBase {
         assertFalse(new ArrayList<String>(Arrays.asList(SyncedStore.keys())).contains("theme"));
     }
 
+    /**
+     * put() used to answer true whenever a store merely existed, so the fallback the guide
+     * recommends -- write locally when the synced write fails -- could never run and a value the
+     * store refused was reported saved.
+     */
+    @EdtTest
+    public void aRefusedSyncedWriteIsReportedAsFailure() {
+        JavaSEStyleRefusingBridge refusing = new JavaSEStyleRefusingBridge();
+        Continuity.setBridge(refusing);
+
+        assertFalse(SyncedStore.put("sortOrder", "byDate"),
+                "a store that did not take the value must not report success");
+        assertEquals("byName", SyncedStore.get("sortOrder", "byName"));
+    }
+
+    /** And still answers true when the store really did take it. */
+    @EdtTest
+    public void anAcceptedSyncedWriteIsReportedAsSuccess() {
+        assertTrue(SyncedStore.put("sortOrder", "byDate"));
+        assertEquals("byDate", SyncedStore.get("sortOrder", "byName"));
+    }
+
+    /** A store that reports supported and then silently drops every write. */
+    static class JavaSEStyleRefusingBridge extends LocalContinuityBridge {
+        @Override
+        public boolean syncedStorePut(String key, String value) {
+            return false;
+        }
+
+        @Override
+        public String syncedStoreGet(String key) {
+            return null;
+        }
+    }
+
     @EdtTest
     public void aChangeMadeElsewhereReachesTheListener() {
         CountingStoreListener listener = new CountingStoreListener();

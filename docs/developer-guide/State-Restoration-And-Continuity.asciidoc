@@ -184,7 +184,9 @@ yourself as well is harmless -- a state already seen is ignored.
 
 Put `Continuity.clear()` on your logout path. The advertised activity outlives
 your app's own screen, so an account's work would otherwise stay on offer to the
-devices around it after the user signed out:
+devices around it after the user signed out -- and anything still queued for the
+relay would have gone out later under the next account's credentials, because a
+relay reads its token when the request runs:
 
 [source,java]
 ----
@@ -203,8 +205,9 @@ those devices ever being near each other.
 include::../demos/common/src/main/java/com/codenameone/developerguide/continuity/ContinuitySnippets.java[tag=syncedStore,indent=0]
 ----
 
-Note the shape: a read always has a default, and a write reports whether it
-happened. That isn't defensive style, it's the API being honest. The store is
+Note the shape: a read always has a default, and a write reports whether the
+store actually took the value -- checked by reading it back, not assumed. That
+isn't defensive style, it's the API being honest. The store is
 empty on a device that has never synced, the user can switch the whole mechanism
 off, and it exists on Apple platforms only -- so a synced value with a local
 default behind it makes the design work on every platform.
