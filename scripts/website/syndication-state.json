@@ -1854,6 +1854,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-09-02T00:01:11+00:00"
+      },
+      "devto": {
+        "id": 4557936,
+        "url": "https://dev.to/codenameone/codescannerscan-barcode-scanning-without-rebuilding-the-camera-pipeline-30pm",
+        "syndicated_at": "2026-09-02T17:09:59+00:00"
       }
     }
   }
