@@ -878,6 +878,43 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDragStartedInCodeSpendsWhatThePressStaged() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("staged by the press"));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            assertNotNull(implementation.getPreparedNativeDrag(), "the press staged one");
+
+            // A long press handler starting a drag of its own, which is what this entry point
+            // is for.
+            NativeDragOperation started = new NativeDragOperation("started in code");
+            assertTrue(NativeDragAndDrop.startDrag(source, started));
+
+            int cancelledBefore = implementation.getCancelledNativeDrags();
+            form.pointerReleased(x, y);
+            assertEquals(cancelledBefore, implementation.getCancelledNativeDrags(),
+                    "the release must not cancel the port's staging underneath a session that "
+                            + "is already running");
+            assertSame(started, NativeDragAndDrop.getActiveDrag(),
+                    "and the drag started in code is still the running one");
+        } finally {
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aTargetCannotAcceptMoreThanItDeclared() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder target = addTarget(form);

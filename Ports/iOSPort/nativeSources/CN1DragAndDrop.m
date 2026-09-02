@@ -358,10 +358,17 @@ static NSString* cn1MimesForSession(id<UIDropSession> session) {
             }
         }
         // A provider that can vend a file is a file drag whatever else it also offers, which is
-        // how a document dragged out of Files reaches a target that asked for files.
-        if ([item.itemProvider hasItemConformingToTypeIdentifier:@"public.file-url"]
-                && ![mimes containsObject:@"application/x-file-list"]) {
-            [mimes addObject:@"application/x-file-list"];
+        // how a document dragged out of Files reaches a target that asked for files. Both
+        // spellings of that, as the other two ports publish them: a component filtered to
+        // MIME_URI_LIST refused an ordinary drag out of Files while the same component took
+        // it from the Finder and from a file manager on Android.
+        if ([item.itemProvider hasItemConformingToTypeIdentifier:@"public.file-url"]) {
+            if (![mimes containsObject:@"application/x-file-list"]) {
+                [mimes addObject:@"application/x-file-list"];
+            }
+            if (![mimes containsObject:@"text/uri-list"]) {
+                [mimes addObject:@"text/uri-list"];
+            }
         }
     }
     return [mimes componentsJoinedByString:@"\n"];
@@ -957,6 +964,15 @@ API_AVAILABLE(ios(11.0))
         if (files.count > 0) {
             CN1NativeDragDeliverDropAdd(@"application/x-file-list",
                                         [files componentsJoinedByString:@"\n"], nil);
+            // The same files as a URI list, which is what the session advertised and so what
+            // a target filtered to it accepted the hover on. RFC 2483 separates them with
+            // CRLF, which is what the other ports write and read.
+            NSMutableString* uris = [NSMutableString string];
+            for (NSString* path in files) {
+                [uris appendString:[[NSURL fileURLWithPath:path] absoluteString]];
+                [uris appendString:@"\r\n"];
+            }
+            CN1NativeDragDeliverDropAdd(@"text/uri-list", uris, nil);
         }
         // An assembly overtaken by a newer session still commits. The framework keeps one hover
         // state, because one drag is what a platform runs, so a late commit does disturb a drag

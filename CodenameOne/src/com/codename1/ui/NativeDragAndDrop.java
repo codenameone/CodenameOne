@@ -216,6 +216,19 @@ public final class NativeDragAndDrop {
             // the gesture simply stays a lightweight one.
             Log.e(err);
         }
+        synchronized (LOCK) {
+            if (started) {
+                // Whatever the press staged is spent: the application has started a drag of
+                // its own and the gesture belongs to that. Leaving it staged had the release
+                // that follows cancel the port's staging underneath a session already
+                // running, and left a later press at the very same pixel looking like this
+                // one to isStagedFor -- so it skipped asking the component and dragged the
+                // stale payload.
+                pending = null;
+                pendingSource = null;
+                startOffered = false;
+            }
+        }
         if (!started) {
             synchronized (LOCK) {
                 if (active == op) { // NOPMD CompareObjectsWithEquals

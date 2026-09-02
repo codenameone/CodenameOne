@@ -681,6 +681,12 @@ final class JavaSENativeDragAndDrop {
         /// ask for a move changed nothing, because getDropAction, which is where AWT records
         /// that choice, was never read. The user's choice wins where the source allows it, and
         /// the full mask stands where it does not.
+        ///
+        /// The narrowed set is what the framework reports as
+        /// `com.codename1.ui.NativeDropEvent#getAllowedActions()`, and that is the answer that
+        /// method owes: what may be accepted here and now. Reporting the unnarrowed mask instead
+        /// would invite a target to accept the copy the user has just said they do not want, and
+        /// nothing on this side could then tell the framework which of the two to believe.
         private int allowedActionsFor(DropTargetDragEvent e) {
             int sourceActions = fromAwtActions(e.getSourceActions());
             int chosen = fromAwtActions(e.getDropAction()) & sourceActions;

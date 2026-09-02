@@ -104,7 +104,20 @@ public final class NativeDropEvent extends ActionEvent {
         return target;
     }
 
-    /// Returns the bit set of actions the drag source permits.
+    /// Returns the bit set of actions that may be agreed to here and now, which is what
+    /// `#accept(int)` will take.
+    ///
+    /// The source's permissions are where it starts, narrowed by anything that has since
+    /// narrowed them. A desktop modifier is the usual one: a source offering a copy and a
+    /// move while the user holds the key for a move is offering a move *now*, and reporting
+    /// both would invite a target to accept the copy the user has just said they do not
+    /// want. That is the question this answers -- what may be accepted -- and it is the same
+    /// answer on the enter, the over and the drop, so a target reads one thing throughout a
+    /// drag rather than one thing while hovering and another at the end.
+    ///
+    /// It is not a way to ask what the source would have permitted in the absence of the
+    /// user's choice; nothing carries that, and a target that acted on it would be acting
+    /// against the choice.
     public int getAllowedActions() {
         return allowedActions;
     }
