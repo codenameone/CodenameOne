@@ -189,6 +189,24 @@ public class FileClassIntegrationTest {
                "            if (ex.createNewFile()) throw new RuntimeException(\"second create returned true\");\n" +
                "            if (ex.length() != 4) throw new RuntimeException(\"existing file was truncated\");\n" +
                "            ex.delete();\n" +
+               // renameTo was never exercised, which is how an implementation that
+               // renamed the destination onto itself survived. Content is checked
+               // too: the aliased version reported success while moving nothing.
+               "            char[] rnChars = new char[]{'r','n','-','s','r','c'};\n" +
+               "            char[] rdChars = new char[]{'r','n','-','d','s','t','-','l','o','n','g','e','r'};\n" +
+               "            File rsrc = new File(new String(rnChars));\n" +
+               "            File rdst = new File(new String(rdChars));\n" +
+               "            if (rsrc.exists()) rsrc.delete();\n" +
+               "            if (rdst.exists()) rdst.delete();\n" +
+               "            rsrc.createNewFile();\n" +
+               "            java.io.FileOutputStream ros = new java.io.FileOutputStream(rsrc);\n" +
+               "            ros.write(new byte[]{7,7,7});\n" +
+               "            ros.close();\n" +
+               "            if (!rsrc.renameTo(rdst)) throw new RuntimeException(\"rename returned false\");\n" +
+               "            if (rsrc.exists()) throw new RuntimeException(\"source still present\");\n" +
+               "            if (!rdst.exists()) throw new RuntimeException(\"destination missing\");\n" +
+               "            if (rdst.length() != 3) throw new RuntimeException(\"content not moved\");\n" +
+               "            rdst.delete();\n" +
                "        } catch (Exception e) {\n" +
                "            // e.printStackTrace(); // Can't print stack trace without constants\n" +
                "            System.exit(1);\n" +

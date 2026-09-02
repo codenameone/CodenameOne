@@ -682,10 +682,34 @@ JAVA_BOOLEAN java_io_File_mkdirImpl___java_lang_String_R_boolean(CODENAME_ONE_TH
 
 JAVA_BOOLEAN java_io_File_renameToImpl___java_lang_String_java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path, JAVA_OBJECT dest) {
     if(path == JAVA_NULL || dest == JAVA_NULL) return JAVA_FALSE;
-    const char* p = stringToUTF8(threadStateData, path);
-    const char* d = stringToUTF8(threadStateData, dest);
-    if (rename(p, d) == 0) return JAVA_TRUE;
-    return JAVA_FALSE;
+    {
+        /* COPY THE SOURCE FIRST. stringToUTF8 hands back threadStateData->utf8Buffer
+           -- one buffer per thread, reused -- so converting dest overwrote the source
+           and rename(p, d) was rename(d, d): a no-op that reports success when the
+           destination exists and failure when it does not, with the source never
+           moved. It is not only aliasing either: the helper frees and re-allocates
+           when the second string is longer, so the first pointer can be dangling
+           rather than merely stale.
+           The only place in this file, nativeMethods.m or cn1_globals.m that converts
+           two strings in one call -- checked rather than assumed. */
+        char src[PATH_MAX];
+        const char* p = stringToUTF8(threadStateData, path);
+        const char* d;
+        size_t n;
+        if(p == NULL) {
+            return JAVA_FALSE;
+        }
+        n = strlen(p);
+        if(n >= sizeof(src)) {
+            return JAVA_FALSE;
+        }
+        memcpy(src, p, n + 1);
+        d = stringToUTF8(threadStateData, dest);
+        if(d == NULL) {
+            return JAVA_FALSE;
+        }
+        return rename(src, d) == 0 ? JAVA_TRUE : JAVA_FALSE;
+    }
 }
 
 JAVA_BOOLEAN java_io_File_setReadOnlyImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
