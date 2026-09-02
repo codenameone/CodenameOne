@@ -5,7 +5,6 @@
 3D-Graphics.asciidoc	Querying capabilities at runtime:
 3D-Graphics.asciidoc	own material, so a textured model renders with no extra setup:
 Advanced-Topics-Under-The-Hood.asciidoc	For the release build, you will also need to inject some proguard configuration so that important classes don't get stripped out at build time. The FreshDesk SDK instructions state:
-Advanced-Topics-Under-The-Hood.asciidoc	The default generated stubs for the JavaScript build look like this `com_mycompany_myapp_MyNative`:
 Advanced-Topics-Under-The-Hood.asciidoc	You can override these methods in the draggable components:
 Advertising.asciidoc	(for example "Sponsored"):
 Advertising.asciidoc	anchored at the top or bottom) and call `load()`:
@@ -75,7 +74,6 @@ Device-Input-And-Form-Factors.asciidoc	https://www.codenameone.com/javadoc/com/c
 Device-Input-And-Form-Factors.asciidoc	pointer is a stylus or eraser:
 Events.asciidoc	The pointer events (touch events) can be intercepted by overriding one or more of these methods in `Component` or `Form`. Notice that unless you want to block functionality you should probably invoke `super` when overriding:
 Events.asciidoc	Then when you need to broadcast the event use:
-Events.asciidoc	This will work great but you will still get the default error message from the EDT over that exception. To prevent the event from proceeding to the default error handling you can do this:
 Events.asciidoc	https://www.codenameone.com/javadoc/com/codename1/ui/events/StyleListener.html[StyleListener] allows components to track changes to the style objects. For example, if the developer does something like:
 Game-Assets.asciidoc	is registered as solid. Applications add their own without changing the level format:
 Game-Builder.asciidoc	Loading and playing a level at runtime is three lines:
@@ -106,7 +104,6 @@ Introduction.asciidoc	Next consider the first lifecycle method `init(Object)`. T
 Introduction.asciidoc	Now that you have a general sense of the lifecycle lets look at the last two lifecycle methods:
 Introduction.asciidoc	The hello world Java source file looks like this (removed some comments and whitespace):
 Maps.asciidoc	A native provider only renders on the platforms that ship its SDK. To show a provider's map *everywhere* -- including platforms with no native SDK for it -- register a `WebMapProvider`, which hosts the provider's JavaScript SDK inside a `BrowserComponent`:
-Maps.asciidoc	Because it needs only a web view, the web provider (id `web`) is the natural last step before the pure-vector fallback in a provider chain. The order is fully customizable from code, so you can express per-platform preferences -- for example "try the native Google SDK, then the web map, then the vector `MapView`":
 Maps.asciidoc	Every map -- vector or native -- exposes the same operations through `MapSurface`:
 Maps.asciidoc	For a real app you point `MapView` at a hosted tile service. The simplest keyless option is OpenFreeMap (OpenStreetMap-based vector tiles); for branded styles or higher quotas use a keyed provider such as MapTiler or your own self-hosted Protomaps/TileServer GL endpoint:
 Maps.asciidoc	When a provider is selected the build server injects that provider's implementation into your app and wires it in; with no provider selected (or when the provider is unavailable at runtime, for example when Google Play Services is missing) `NativeMap` simply renders the vector `MapView` fallback. You can configure the fallback basemap explicitly:
@@ -120,7 +117,6 @@ Miscellaneous-Features.asciidoc	For example: you can copy the `Image` to `Storag
 Miscellaneous-Features.asciidoc	However, it gets better, say you want to return a value:
 Miscellaneous-Features.asciidoc	If you need to apply the scale manually for custom fonts or layout calculations, read the values directly:
 Miscellaneous-Features.asciidoc	It allows formatting numbers/dates & time based on platform locale. It also provides a great deal of the information you need such as the language/locale information you need to pick the proper resource bundle:
-Miscellaneous-Features.asciidoc	Or, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder` APIs to capture audio, as a more customizable approach than using the Capture API:
 Miscellaneous-Features.asciidoc	The `Capture` API also includes a callback based API that uses the `ActionListener` interface to implement capture. For example: you can adapt the previous sample to use this API as such:
 Miscellaneous-Features.asciidoc	The following code demonstrates usage of the GeoFence API:
 Miscellaneous-Features.asciidoc	The list of available languages in the resource bundle could be retrieved like this. Notice that this a list that was set by you and doesn't need to confirm to the ISO language code standards:
@@ -158,10 +154,7 @@ Near-Field-Communication.asciidoc	For FeliCa on iOS, set the system codes in `Nf
 Near-Field-Communication.asciidoc	Host Card Emulation (HCE) lets the device pretend to be a contactless smart card. A nearby reader (Android phone, payment terminal, access control gate) sends ISO 7816 APDUs and your app responds. Subclass `HostCardEmulationService` and register the instance:
 Network-Connectivity.asciidoc	To advertise an HTTP server you wrote on port 8080:
 Network-Connectivity.asciidoc	To associate the device with a specific SSID:
-Notifications-And-Background-Execution.asciidoc	`ForegroundService` runs a long task while a persistent notification is shown:
 Notifications-And-Background-Execution.asciidoc	before; the bean has been extended with fluent, backward-compatible setters:
-Notifications-And-Background-Execution.asciidoc	reconstructed after a cold launch -- pass state through the input data, not fields):
-Notifications-And-Background-Execution.asciidoc	text, URLs, files or images shared into your app from other apps:
 Notifications-And-Background-Execution.asciidoc	then reference it from a notification with `setChannelId(...)`:
 Printing.asciidoc	`Printer.printImage(image, listener)` prints a `com.codename1.ui.Image` directly. The image is encoded to a temporary PNG file behind the scenes and the file is deleted once the print flow finishes:
 SVG-Transcoder.asciidoc	the generated class directly:
@@ -310,7 +303,6 @@ io.asciidoc	Above, if you want to select the IDs of all players that are ranked 
 io.asciidoc	Above, you globally find a lastname element with a value of ‘Hewitt’, then grab the parent node of lastname which happens to be the player node, then grab the ID attribute from the player node. Or, you could get the same result from the following simpler statement:
 io.asciidoc	Above, you selected the IDs of all ranked players. Conversely, you can select the non-ranked players like this:
 io.asciidoc	After you do that once you can write/read contacts from storage if you so want:
-io.asciidoc	All you need to do is fill in the code, for this example you will implement the first method for simplicity:
 io.asciidoc	An `Externalizable` object *must* have a *default public constructor* and must implement the following 4 methods:
 io.asciidoc	And delete an entry using:
 io.asciidoc	And vice versa:
@@ -359,7 +351,6 @@ io.asciidoc	This should display an error message to the user if there was a prob
 io.asciidoc	This simple example allows you to create a server and a client assuming the device supports both:
 io.asciidoc	This still carries most of the flexibilities of the regular binding for example: you can still get a binding object using:
 io.asciidoc	To parse a CSV use the https://www.codenameone.com/javadoc/com/codename1/io/CSVParser.html[CSVParser] class as such:
-io.asciidoc	To use the expression processor when calling a webservice, you could use something like the following to parse JSON (notice this is interchangeable between JSON and XML):
 io.asciidoc	Up until now this was pretty cool but if you looked at the UI construction code above you would see that it's pretty full of boilerplate code. The thing about boilerplate is that it shows where automation can be applied, that's the exact idea behind the magical "InstantUI" class. This means that the UI above can be generated using this code:
 io.asciidoc	When you used a POJO you did this:
 io.asciidoc	With properties you do this:

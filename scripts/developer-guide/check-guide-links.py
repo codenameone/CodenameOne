@@ -28,11 +28,11 @@ from urllib.parse import urlsplit
 
 ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
 URL_RE = re.compile(r"\bhttps?://[^\s\[\]<>\"'`)]+")
-# Trees the site serves that are produced by a build rather than by a file in
-# this repository, so nothing here can be enumerated. Everything else --
-# including /blog/ and every static asset -- is derived, because whitelisting a
-# prefix silently exempts every path under it from the check.
-GENERATED_PREFIXES = ("/javadoc/", "/developer-guide/")
+# The one tree that genuinely cannot be enumerated from this repository: the
+# Javadoc is produced from the framework sources at build time. Everything else,
+# /developer-guide/ included, is derived below -- whitelisting a prefix silently
+# exempts every path under it from the check.
+GENERATED_PREFIXES = ("/javadoc/",)
 # http:// is correct for these: RFC 3161 timestamping servers reject TLS, and
 # example.com URLs are illustrative rather than fetched.
 TLS_EXEMPT_HOSTS = {"timestamp.digicert.com", "example.com", "www.example.com"}
@@ -206,6 +206,21 @@ def site_paths(repo_root: Path) -> tuple[set[str], list]:
     # guide link targets one today. If one is ever added it will be reported as
     # broken, which is the safe direction for a gate to be wrong in.
     paths.add("/")  # Hugo always renders the home page, _index.md or not
+
+    # scripts/website/build.sh renders the guide to /developer-guide/ and rsyncs
+    # this directory alongside it so relative image links resolve, excluding the
+    # Sketch sources and the AsciiDoc itself. That makes every served path under
+    # the guide enumerable, so it does not need a blanket exemption.
+    guide = repo_root / "docs/developer-guide"
+    if guide.exists():
+        paths.add("/developer-guide")
+        for asset in guide.rglob("*"):
+            if not asset.is_file():
+                continue
+            relative = asset.relative_to(guide)
+            if relative.parts[0] == "sketch" or relative.suffix in {".asciidoc", ".adoc"}:
+                continue
+            paths.add(normalize_path("developer-guide/" + relative.as_posix()))
 
     today = datetime.date.today().isoformat()
     content = repo_root / "docs/website/content"

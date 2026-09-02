@@ -34,6 +34,13 @@ FENCE_RE = re.compile(r"^(----|\.\.\.\.|````|\+\+\+\+)\s*$")
 # Lines that end in a colon without promising a listing: headings, attributes,
 # comments, block titles, list markers, table cells and block delimiters.
 NON_PROSE_PREFIX = ("//", "|", "=", ".", ":", "*", "-", "+", "[", "<")
+# What a real block looks like when it starts. An introduction separated from its
+# listing by more than one blank line is untidy, not a hole, and reporting it
+# would make the gate reject valid AsciiDoc spacing. Deliberately conservative:
+# only unambiguous starts, so a genuine hole is never explained away.
+BLOCK_START_RE = re.compile(
+    r'^(\[[a-zA-Z%.#"]|image::|include::|\|===|(----|\.\.\.\.|````|\+\+\+\+|====|\*\*\*\*|____)\s*$)'
+)
 
 
 def normalize(line: str) -> str:
@@ -58,6 +65,11 @@ def scan(path: Path) -> list[tuple[int, str]]:
         if index + 2 >= len(lines):
             continue
         if lines[index + 1].strip() or lines[index + 2].strip():
+            continue
+        following = index + 1
+        while following < len(lines) and not lines[following].strip():
+            following += 1
+        if following < len(lines) and BLOCK_START_RE.match(lines[following].strip()):
             continue
         findings.append((index + 1, normalize(stripped)))
     return findings
