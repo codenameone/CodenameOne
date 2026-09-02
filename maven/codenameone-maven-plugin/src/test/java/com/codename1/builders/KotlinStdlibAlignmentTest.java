@@ -735,6 +735,39 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * One statement can name a module twice: {@code force} takes varargs, so
+     * {@code force 'g:a:1.9.22', 'g:a:1.7.22'} is one call listing the same
+     * module at two versions. Reading the first reported the merged-era one and
+     * wrote the shim constraints beside a base library that may be forced
+     * pre-merge -- the failure that reaches the device rather than the build.
+     */
+    @Test
+    public void aForceMayListOneModuleMoreThanOnce() {
+        String base = "org.jetbrains.kotlin:kotlin-stdlib:";
+        // Either order reaches the same verdict, because the answer does not
+        // depend on which selector Gradle keeps.
+        String[] orders = {
+            "'" + base + "1.9.22', '" + base + "1.7.22'",
+            "'" + base + "1.7.22', '" + base + "1.9.22'",
+            "'" + base + "1.9.22', '" + base + "1.7.22', '" + base + "1.9.22'",
+        };
+        for (int i = 0; i < orders.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    configurations.all { resolutionStrategy.force "
+                    + orders[i] + " }\n");
+            check("".equals(out), "<<" + orders[i]
+                    + ">> forces the base library pre-merge, got <<" + out + ">>");
+        }
+
+        // A force that never goes below the floor still leaves the block to write.
+        String merged = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.force '" + base
+                + "1.9.22', '" + base + "1.8.10' }\n");
+        check(merged.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a merged-era force leaves the alignment alone, got <<" + merged + ">>");
+    }
+
+    /**
      * The {@code !!} spelling skips the configuration check, because a strict pin
      * is honoured wherever it is declared. "Wherever" still means declared: a
      * coordinate merely passed to something -- a log line, a list -- is not a

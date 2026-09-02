@@ -406,6 +406,7 @@ public class KotlinStdlibAlignment {
         // first and the replacement second, and it is the replacement that decides
         // what resolves.
         int from = afterCall(line, "using");
+        String lowest = null;
         for (int i = from < 0 ? 0 : from; i < line.length(); i++) {
             char c = line.charAt(i);
             if (!isLiteralStart(line, i)) {
@@ -428,15 +429,48 @@ public class KotlinStdlibAlignment {
                 // before the map's own version: entry. namesCoordinate learned to
                 // skip a reason and this did not, so the comment describing an old
                 // artifact supplied the version for the declaration warning about it.
-                return versionComponentOf(literal.substring(coordinate.length()));
+                String found = versionComponentOf(literal.substring(coordinate.length()));
+                lowest = lower(lowest, found);
             }
             i = end;
+        }
+        if (lowest != null) {
+            return lowest;
         }
         String mapped = mapEntryValue(line, "version");
         if (mapped != null) {
             return mapped;
         }
         return null;
+    }
+
+    /**
+     * The lower of two versions for the same module, either of which may be
+     * null for "not seen yet".
+     *
+     * <p>One statement can name a module twice: {@code force} takes varargs, so
+     * {@code force 'g:a:1.9.22', 'g:a:1.7.22'} is one call listing the same
+     * module at two versions. Reading the first reported the merged-era one and
+     * wrote the shim constraints beside a base library that may be forced
+     * pre-merge, which is the failure that reaches the device rather than the
+     * build.</p>
+     *
+     * <p>The LOWER rather than the last. Which of two selectors for one module
+     * Gradle keeps is not something this can establish from the text, and it
+     * does not have to: the lower answer is right if Gradle takes it, and
+     * conservative if Gradle takes the other, which is how this class resolves
+     * every ambiguity it cannot evaluate. An unreadable version is already the
+     * lowest answer there is.</p>
+     */
+    private static String lower(String held, String found) {
+        if (held == null) {
+            return found;
+        }
+        if (found == null) {
+            return held;
+        }
+        return compareVersions(withoutStrictSuffix(found),
+                withoutStrictSuffix(held)) < 0 ? found : held;
     }
 
     /**
@@ -1134,6 +1168,25 @@ public class KotlinStdlibAlignment {
      * will resolve.</p>
      */
     private static boolean namesAnEnforcedKotlinPlatformBelowTheFloor(String line) {
+        // Any statement that builds one counts, including `def bom =
+        // enforcedPlatform('..')` that is never added to a configuration.
+        // Reported as too broad, and correctly on the Gradle fact: the object it
+        // returns constrains nothing until something declares it.
+        //
+        // Acting on that needs to tell "stored and never added" from "stored and
+        // added below", and the second is why anyone stores one. The definition
+        // machinery records literals and maps, not call expressions, so the name
+        // carries nothing: measured by excluding the assigned form, the
+        //   def legacyBom = enforcedPlatform('..kotlin-bom:1.7.22')
+        //   implementation(legacyBom)
+        // pair stops standing the block down and the constraints go in against a
+        // BOM that really is strict and really is pre-merge. That is a failed
+        // resolution; the cost of the present reading is the duplicate an app
+        // already had, in an app that went out of its way to name a pre-merge
+        // Kotlin BOM and then not use it.
+        //
+        // Revisit together with recording call-expression values, not before:
+        // the exclusion is only safe once the add site carries the platform.
         List<String> enforced = versionsInCall(line, ENFORCED_PLATFORM);
         for (int i = 0; i < enforced.size(); i++) {
             String coordinate = enforced.get(i).trim();
