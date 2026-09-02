@@ -461,7 +461,9 @@ NOTE: Ad hoc provisioning allows 1000 beta testers for your application but it's
 
 Before you continue with the build you should sign up at https://www.codenameone.com/build-server.html where you can soon follow the progress of your builds. You need a Codename One account to build for the device.
 
-Now that you have certificates, a device build is a single Maven goal. Run `mvn -pl common cn1:buildAndroid` for Android, or `mvn -pl common cn1:buildIos` for an iOS debug build. Each one packages the app, sends it to the Codename One build servers and reports where the result lands.
+Now that you have certificates, a device build is a single Maven goal. From the project's root directory run `mvn cn1:buildAndroid` for Android, or `mvn cn1:buildIos` for an iOS debug build. Each one packages the app, sends it to the Codename One build servers and reports where the result lands.
+
+WARNING: Run these from the root, not from a module. The build goals skip any project that isn't the execution root, so `mvn -pl common cn1:buildAndroid` prints "`Skipping execution for non-root project`" and then reports success without building anything.
 
 NOTE: The first time you send a build you will be prompted for the email and password you provided when signing up for Codename One
 
