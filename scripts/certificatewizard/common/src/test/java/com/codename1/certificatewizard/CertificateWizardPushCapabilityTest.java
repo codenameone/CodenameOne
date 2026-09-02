@@ -138,6 +138,29 @@ class CertificateWizardPushCapabilityTest {
                         + service.pushEnabledOn());
     }
 
+    @Test
+    void thePushCapabilityCanBeTurnedOnFromTheBundleIdsPage() throws Exception {
+        // What a project whose push the builders DETECT rather than read from a hint is
+        // left with: neither inference is reproducible in the wizard, so the remedy for a
+        // build whose entitlement the App ID does not grant has to be reachable by hand.
+        final MockSigningService service = new MockSigningService();
+        final CertificateWizard[] app = launchBound(service, "");
+
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "nav.bundles");
+            }
+        });
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "btn.enablePush." + EXISTING_BUNDLE_APPLE_ID);
+            }
+        });
+
+        assertTrue(service.pushEnabledOn().contains(EXISTING_BUNDLE_APPLE_ID),
+                "the action has to reach the service, got " + service.pushEnabledOn());
+    }
+
     /// Runs the wizard's Auto Setup against a project whose settings carry `extraSettings`,
     /// and hands back the service it ran through.
     private MockSigningService runAutoSetup(String extraSettings) throws Exception {
@@ -147,6 +170,29 @@ class CertificateWizardPushCapabilityTest {
     /// `macRecordFirst` puts the macOS registration of the identifier ahead of the iOS one
     /// in what the service reports, which Apple is free to do.
     private MockSigningService runAutoSetup(String extraSettings, boolean macRecordFirst) throws Exception {
+        final MockSigningService service = new MockSigningService();
+        if (macRecordFirst) {
+            service.moveBundleToFront(MAC_BUNDLE_APPLE_ID);
+        }
+        final CertificateWizard[] app = launchBound(service, extraSettings);
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "btn.autoSetup");
+            }
+        });
+        // The mock answers every call on the caller's thread, so the whole chain has run
+        // by the time the action returns. One more turn of the EDT for anything the run
+        // queued behind it.
+        onEdt(new Runnable() {
+            public void run() {
+            }
+        });
+        return service;
+    }
+
+    /// A wizard bound to a project carrying `extraSettings`, running against `service`.
+    private CertificateWizard[] launchBound(final MockSigningService service, String extraSettings)
+            throws Exception {
         Path dir = Files.createTempDirectory("cn1-cw-push");
         Path settings = dir.resolve("codenameone_settings.properties");
         Files.write(settings, ("codename1.packageName=" + EXISTING_BUNDLE + "\n"
@@ -155,11 +201,6 @@ class CertificateWizardPushCapabilityTest {
         Files.write(binding, ("projectDir=" + dir + "\nsettings=" + settings + "\noutputDir=" + dir + "\n")
                 .getBytes(StandardCharsets.UTF_8));
         System.setProperty(ProjectIO.INPUT_PROPERTY, binding.toString());
-
-        final MockSigningService service = new MockSigningService();
-        if (macRecordFirst) {
-            service.moveBundleToFront(MAC_BUNDLE_APPLE_ID);
-        }
         final CertificateWizard[] app = new CertificateWizard[1];
         try {
             onEdt(new Runnable() {
@@ -169,23 +210,11 @@ class CertificateWizardPushCapabilityTest {
                     app[0].runApp();
                 }
             });
-            onEdt(new Runnable() {
-                public void run() {
-                    fire(app[0].getForm(), "btn.autoSetup");
-                }
-            });
-            // The mock answers every call on the caller's thread, so the whole chain has
-            // run by the time the action returns. One more turn of the EDT for anything
-            // the run queued behind it.
-            onEdt(new Runnable() {
-                public void run() {
-                }
-            });
         } finally {
             System.clearProperty(ProjectIO.INPUT_PROPERTY);
             CertificateWizard.setServiceForTesting(null);
         }
-        return service;
+        return app;
     }
 
     private static void onEdt(Runnable r) {

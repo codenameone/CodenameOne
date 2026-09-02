@@ -3121,7 +3121,28 @@ public class CertificateWizard extends Lifecycle {
             r.add(detailCell(pill(b.platform(), "CWPillMuted"), () -> bundleDetails(b)));
             r.add(detailCell(pill(pushLabel(b), Boolean.TRUE.equals(b.pushEnabled()) ? "CWPillOk" : "CWPillMuted"),
                     () -> bundleDetails(b)));
-            r.add(tableCell(blankCell()));
+            // The one capability the wizard can set on an App ID it did not just create.
+            //
+            // Automatic setup provisions push from what the project DECLARES, and the
+            // builders also turn it on for what they DETECT: IPhoneBuilder infers it for an
+            // app referencing com.codename1.call.voip, and the macOS builder scans the
+            // application's compiled classes for a push registration call. Neither
+            // inference is available here -- the wizard has no bytecode reader, and it is
+            // usually run before the project has ever been compiled, so a scan would answer
+            // "no push" for exactly the projects it was meant to help and do it silently.
+            // Guessing from what an application merely names would be worse still: the
+            // macOS scanner deliberately does not count naming PushContent in a callback,
+            // because receiving a push needs no entitlement, and a cruder test would put
+            // the capability on App IDs nobody asked to change -- which is issue #5657
+            // through a different door.
+            //
+            // So the answer to a build whose entitlement the App ID does not grant is this
+            // button rather than a guess: one click, on the page that lists the App IDs,
+            // instead of a signing failure with no remedy inside the wizard at all.
+            Button enablePush = outline("Enable push", "btn.enablePush." + b.id());
+            enablePush.addActionListener(e -> service.enablePushCapability(b.id(),
+                    r2 -> afterMutation(r2, "Push notifications enabled for " + b.identifier())));
+            r.add(tableCell(actionRow(Component.RIGHT, enablePush)));
             body.add(r);
         }
     }

@@ -162,6 +162,13 @@ public final class CertificateWizardStructureHarness {
         // says so instead of filling the silence in with "Off" (issue #5657).
         check(findTextContaining(form, "Unknown") != null,
                 "an App ID whose capabilities the service did not report says push is unknown");
+        // And the capability can be turned on from here. The builders also enable push for
+        // what they DETECT -- a VoIP reference on iOS, a push registration call in the
+        // macOS class scan -- and neither inference is reproducible in the wizard, so the
+        // remedy for a build whose entitlement the App ID does not grant has to be one
+        // click rather than a guess.
+        check(find(form, "btn.enablePush.BID_A1") != null,
+                "push can be enabled on an existing App ID");
         fire(form, "btn.addBundle");
         check(Display.getInstance().getCurrent() == form, "bundle modal overlays current form");
         check(find(form, "modal.cancel") != null, "bundle modal cancel action present");

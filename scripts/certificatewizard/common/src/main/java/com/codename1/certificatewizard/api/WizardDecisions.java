@@ -342,9 +342,14 @@ public final class WizardDecisions {
     /// iOS-only push app must not put the capability on a Mac App ID, and the entitlement
     /// here is emitted for a Developer ID build too, not only a store one.
     ///
-    /// An absent hint is false, where the builder would fall back to its class scan. That
-    /// is the same residue the iOS side has and for the same reason: the wizard has no
-    /// compiled classes to scan and must not guess.
+    /// An absent hint is false, where the builder falls back to scanning the application's
+    /// compiled classes for a push registration call. That scan is not reproducible here
+    /// and deliberately not approximated: the wizard has no bytecode reader, it is usually
+    /// run before the project has ever been compiled -- so a scan would answer "no push"
+    /// for exactly the projects that need it, silently -- and a cruder test on what a class
+    /// merely names would provision App IDs nobody asked to change, which is the whole of
+    /// issue #5657. A build whose entitlement the App ID does not grant is answered by the
+    /// Enable push action on the bundle IDs page instead.
     public static boolean macPushRequested(String apsEnvironmentHint) {
         if (apsEnvironmentHint == null || apsEnvironmentHint.trim().isEmpty()) {
             return false;
