@@ -738,6 +738,56 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * {@code ext.set('dep', '...')} is the extension's own setter, and the name
+     * is its first argument. Read as a dotted assignment it recorded a property
+     * called {@code set} and lost the real one, so a later reference through the
+     * bare name named nothing -- and the constraints went in beside a force that
+     * was still in effect.
+     */
+    @Test
+    public void theExtraPropertiesSetterBindsItsFirstArgument() {
+        String pre = "org.jetbrains.kotlin:kotlin-stdlib:1.7.22";
+        String use = "    configurations.all { resolutionStrategy.force stdlib }\n";
+        String[] setters = {
+            "    ext.set('stdlib', '" + pre + "')\n",
+            "    project.ext.set('stdlib', '" + pre + "')\n",
+            "    ext.set(\"stdlib\", \"" + pre + "\")\n",
+        };
+        for (int i = 0; i < setters.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    setters[i] + use);
+            check("".equals(out), "<<" + setters[i].trim()
+                    + ">> binds stdlib, got <<" + out + ">>");
+        }
+
+        // Merged-era through the same setter leaves the alignment to be written.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    ext.set('stdlib', 'org.jetbrains.kotlin:"
+                        + "kotlin-stdlib:1.9.22')\n" + use)
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a merged-era force leaves the alignment alone");
+
+        // The property is bound under its own name, and no property called `set`
+        // is created. A soft coordinate emits either way -- the constraint raises
+        // it -- so the strict spelling is what shows the binding.
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    ext.set('stdlib', '" + pre + "!!')\n"
+                        + "    implementation stdlib\n")),
+                "the name carries the strict pin");
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    ext.set('stdlib', '" + pre + "!!')\n"
+                        + "    implementation set\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and nothing is bound under the setter's own name");
+
+        // A set() on something that is not the extension binds nothing.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    someMap.set('stdlib', '" + pre + "')\n" + use)
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "someMap.set is not the extension");
+    }
+
+    /**
      * Two calls one after another are a sequence and the last wins; two in the
      * arms of a conditional are alternatives, and which one runs is not readable
      * here. Taking the last of THOSE wrote the shim constraints beside a strict

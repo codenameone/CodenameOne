@@ -3150,6 +3150,7 @@ public class KotlinStdlibAlignment {
         int i = 0;
         boolean declared = false;
         boolean subscript = false;
+        boolean callForm = false;
         // An extra property is NOT block scoped. A local declared inside a block
         // leaves with it, which is why declarations carry their depth -- but
         // `buildscript { ext.kotlin_version = '1.9.22' }` sets a project-wide
@@ -3280,7 +3281,27 @@ public class KotlinStdlibAlignment {
                 // Addressing ANOTHER project cannot arrive here: `(` ends the token
                 // walk above, so `project(':lib').ext.dep` never reads as one token
                 // and the chain is always this script's own.
-                if (dot > 0 && !subscripted
+                int argument = skipBlanks(statement, lastTokenEnd);
+                boolean called = argument < statement.length()
+                        && statement.charAt(argument) == '(';
+                if (dot > 0 && called && "set".equals(only.substring(dot + 1))
+                        && lastSegmentIs(only.substring(0, dot), EXTRA_PROPERTIES)) {
+                    // ext.set('dep', '...') is the extension's own setter, and the
+                    // name is its first argument. Read as a dotted assignment it
+                    // recorded a property called `set` and lost the real one, so a
+                    // later force naming it through the bare name named nothing --
+                    // and the constraints went in beside a force still in effect.
+                    int nameAt = skipBlanks(statement, argument + 1);
+                    if (nameAt < statement.length()
+                            && isLiteralStart(statement, nameAt)
+                            && delimiterLength(statement, nameAt) == 1) {
+                        declared = true;
+                        subscript = true;
+                        callForm = true;
+                        extraProperty = true;
+                        i = nameAt + 1;
+                    }
+                } else if (dot > 0 && !subscripted
                         && lastSegmentIs(only.substring(0, dot), EXTRA_PROPERTIES)) {
                     declared = true;
                     extraProperty = true;
@@ -3340,7 +3361,11 @@ public class KotlinStdlibAlignment {
                     ? 0 : depthAt(statement, nameStart, depth), name, literals);
         }
         i = skipBlanks(statement, i);
-        if (i >= statement.length() || statement.charAt(i) != '='
+        // The setter's comma separates the name from the value exactly as the `=`
+        // does in every other spelling, so it stands in for one here.
+        if (callForm && i < statement.length() && statement.charAt(i) == ',') {
+            i++;
+        } else if (i >= statement.length() || statement.charAt(i) != '='
                 || (i + 1 < statement.length() && statement.charAt(i + 1) == '=')) {
             if (declared) {
                 // `def dep` with no value yet is still a name this knows about, and
