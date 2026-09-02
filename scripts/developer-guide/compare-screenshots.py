@@ -17,6 +17,12 @@ from the figure or carrying a permanently red check.
 So a figure may carry a `<name>.tolerance` sidecar, in the same key=value shape
 the CN1SS screenshot suites already use, and only then is a bounded difference
 accepted. Everything without a sidecar must still match exactly.
+
+The two bounds are applied independently, which is where this differs from the
+CN1SS comparator: `maxMismatchPercent` limits how much of the image may change at
+all, and `maxChannelDelta` caps how far any single pixel may move. Counting only
+the pixels that exceed the delta would let an unlimited number of sub-threshold
+changes through.
 """
 from __future__ import annotations
 
@@ -60,23 +66,27 @@ def compare(generated: Path, committed: Path, tolerance: tuple[int, float] | Non
         return f"size changed: generated {a.size[0]}x{a.size[1]}, committed {b.size[0]}x{b.size[1]}"
     pa, pb = a.load(), b.load()
     width, height = a.size
-    mismatched = 0
+    changed = 0
     worst = 0
     for y in range(height):
         for x in range(width):
             first, second = pa[x, y], pb[x, y]
             if first == second:
                 continue
-            delta = max(abs(first[i] - second[i]) for i in range(3))
-            worst = max(worst, delta)
-            if delta > max_delta:
-                mismatched += 1
-    percent = 100.0 * mismatched / (width * height)
+            # Every changed pixel counts toward the area budget, and the channel
+            # delta is a separate ceiling. Counting only the pixels that EXCEED
+            # the delta -- which is what the CN1SS comparator does -- leaves an
+            # unbounded hole: with maxChannelDelta=160, recolouring these figures'
+            # green #06a806 to #a608a6 moves every channel by exactly 160, so not
+            # one pixel would be counted and a completely different image would
+            # pass.
+            changed += 1
+            worst = max(worst, max(abs(first[i] - second[i]) for i in range(3)))
+    percent = 100.0 * changed / (width * height)
     if percent > max_percent:
-        return (
-            f"{percent:.3f}% of pixels exceed maxChannelDelta={max_delta} "
-            f"(allowed {max_percent}%), worst channel delta {worst}"
-        )
+        return f"{percent:.3f}% of pixels changed (allowed {max_percent}%)"
+    if worst > max_delta:
+        return f"worst channel delta {worst} exceeds maxChannelDelta={max_delta}"
     return None
 
 
