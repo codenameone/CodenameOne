@@ -638,6 +638,29 @@ final class BuildHintsAndroid {
                 .doc("Boolean true/false defaults to true. Toggles the new async keyboard mode that leaves the "
                         + "keyboard open while you move between text components"));
 
+        h.add(new Hint("android.kotlinStdlibAlignment")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("android")
+                .doc("Boolean true/false defaults to true. Kotlin 1.8.0 moved the contents of "
+                        + "`kotlin-stdlib-jdk7` and `kotlin-stdlib-jdk8` into `kotlin-stdlib` "
+                        + "and left the two shims empty. A build that reaches `kotlin-stdlib` "
+                        + "1.8 or newer through one dependency and an older "
+                        + "`kotlin-stdlib-jdk8` through another then carries the same classes "
+                        + "twice and fails in `checkReleaseDuplicateClasses`, naming Kotlin "
+                        + "artifacts you never asked for. The 1.8.x line ships no Gradle "
+                        + "module metadata to say the two overlap; from 1.9.22 JetBrains "
+                        + "ships it. This adds that missing statement, as a Gradle "
+                        + "capability: from 1.8.0 up, `kotlin-stdlib` provides what the shims "
+                        + "provide, so Gradle drops the redundant shim. It moves no version, "
+                        + "which is what keeps it out of your way -- a version pin, a force, "
+                        + "an enforced BOM, a range or a Kotlin compiler older than 1.8 all "
+                        + "resolve exactly as they did without it. Below 1.8.0 nothing "
+                        + "happens at all, because there the shims still hold the only copy "
+                        + "of their classes. Set to false to manage these coordinates "
+                        + "yourself."));
+
         h.add(new Hint("android.largeScreens")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)

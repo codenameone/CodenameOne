@@ -7270,6 +7270,58 @@ public class AndroidGradleBuilder extends Executor {
             namespace = "namespace '"+request.getPackageName()+"'\n";
         }
 
+        // Kotlin stdlib alignment, emitted for every AndroidX build rather than
+        // for Kotlin-shaped apps: the duplicate class it prevents is produced by
+        // ordinary AndroidX and Play dependencies, not by anything the app wrote.
+        // See KotlinStdlibAlignment for the mechanism and for why Gradle cannot
+        // work it out for itself on the kotlin-stdlib 1.8.x line. A constraint
+        // adds nothing to a graph that has no Kotlin in it, so an app that could
+        // never hit the clash resolves exactly as it did before.
+        //
+        // Gated on AndroidX because that is what decides the configuration name a few
+        // lines below: `compile` is only "implementation" when useAndroidX or the aar
+        // implementation flag is set, so a useAndroidX=false build would take this
+        // block on the legacy `compile` configuration. Reviewed as an unrelated flag
+        // to gate on -- it is not, and the failing case it is meant to protect needs
+        // a modern AndroidX dependency in a project that has AndroidX turned off,
+        // which AGP refuses for its own reasons before this could matter. That
+        // whole line of reasoning turned out not to matter either: see the
+        // useAndroidX note on the gate below.
+        //
+        // On Gradle 6 rather than on 4.6 where the constraints
+        // DSL first appeared. That is deliberate, and it has been questioned in
+        // review, so: 4.6 selects AGP 3.2.0, which cannot compile against a
+        // compileSdk the current AndroidX releases require, and the builder gives
+        // that path appcompat 1.0.0, whose graph contains no Kotlin at all. A graph
+        // that reaches a merged kotlin-stdlib cannot occur there. Widening the gate
+        // would put an untested constraints block into AGP 3.x builds that work
+        // today, to fix a clash they cannot have -- and the two failure directions
+        // are not symmetrical: too narrow leaves an ancient build with a failure it
+        // already had, too wide breaks a build that currently succeeds. Raise this
+        // gate only with a reproduction on that path.
+        // No inputs. This used to collect every Gradle fragment the app
+        // controls and search it for signs that the app was holding a stdlib
+        // version down, because the alignment RAISED one and could then break a
+        // build that resolved. It declares a capability now, which raises
+        // nothing, so there is nothing to search for -- see KotlinStdlibAlignment.
+        //
+        // Not gated on useAndroidX any more. It was, on the reasoning above that
+        // a non-AndroidX graph cannot reach a merged kotlin-stdlib -- and that
+        // reasoning is wrong, because the duplicate has nothing to do with
+        // AndroidX. Reproduced with android.useAndroidX=false explicitly set,
+        // AGP 8.1.4, kotlin-stdlib 1.8.10 beside kotlin-stdlib-jdk8 1.6.21:
+        // checkDebugDuplicateClasses fails exactly as it does with AndroidX on,
+        // and passes with this script. The old gate left those builds broken.
+        //
+        // The Gradle 6 floor stays, and for a reason that did survive
+        // measurement: capabilitiesResolution is the mechanism here, and AGP 3.x
+        // on Gradle 4.6 is a different world. Turning it off is the hint.
+        String kotlinStdlibAlignment = "";
+        if (gradleVersionInt >= 6
+                && request.getArg("android.kotlinStdlibAlignment", "true").equals("true")) {
+            kotlinStdlibAlignment = KotlinStdlibAlignment.alignmentScript();
+        }
+
         String gradleProps = "apply plugin: 'com.android.application'\n"
                 + kotlinPluginApply
                 + request.getArg("android.gradlePlugin", "")
@@ -7362,6 +7414,12 @@ public class AndroidGradleBuilder extends Executor {
                 + addNewlineIfMissing(request.getArg("android.gradleDep", ""))
                 + addNewlineIfMissing(aarDependencies)
                 + "}\n"
+                // After the dependencies block, not inside it: the alignment
+                // needs a component metadata rule (which lives in dependencies)
+                // AND a resolution strategy (which does not), so it brings its
+                // own dependencies block rather than being spliced into two
+                // places.
+                + kotlinStdlibAlignment
                 + request.getArg("android.xgradle", "");
 
         debug("Gradle File start\n-------\n");
