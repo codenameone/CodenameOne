@@ -261,6 +261,24 @@ JAVADOC_PACKAGE_PAGES = {
     "package-summary.html",
     "package-tree.html",
 }
+# The finite set javadoc writes at the root of the tree. Taken from a real run --
+# the first seven always appear; the rest are emitted only when the sources have
+# anything to put in them, so they are accepted without being required.
+JAVADOC_ROOT_PAGES = {
+    "index.html",
+    "overview-summary.html",
+    "overview-tree.html",
+    "allclasses-index.html",
+    "allpackages-index.html",
+    "index-all.html",
+    "help-doc.html",
+    "constant-values.html",
+    "deprecated-list.html",
+    "serialized-form.html",
+    "search.html",
+}
+# Directories javadoc writes beside the packages, for its own assets.
+JAVADOC_ASSET_DIRS = {"legal", "resources", "script-dir"}
 _javadoc_index: tuple[set[str], set[str]] | None = None
 
 
@@ -451,13 +469,25 @@ def javadoc_path_exists(target: str) -> bool:
     if _JAVADOC_ROOT is None:
         return True
     path = target[len("/javadoc/"):] if target.startswith("/javadoc/") else target
-    if not path.endswith(".html"):
-        return True  # a directory or an asset, not a documented type
+    path = path.strip("/")
     packages, classes = javadoc_index(_JAVADOC_ROOT)
+    if not path.endswith(".html"):
+        # A directory: the tree root, one of javadoc's own asset directories, or a
+        # package. Anything else names a directory the generator never creates --
+        # accepting every non-.html path let /javadoc/com/codename1/DefinitelyMissing/
+        # through on the strength of having no file extension.
+        if not path:
+            return True
+        if path.split("/", 1)[0] in JAVADOC_ASSET_DIRS:
+            return True
+        return path in packages
     package = str(PurePosixPath(path).parent)
     page = PurePosixPath(path).name
     if package == ".":
-        return True  # a top-level index or overview page, outside the model
+        # A page at the root of the tree. The set javadoc writes there is finite,
+        # so an invented one -- /javadoc/DefinitelyMissing.html -- is a 404 rather
+        # than something outside the model.
+        return page in JAVADOC_ROOT_PAGES
     # No class-use/ exemption: the generator does not pass -use, and without it
     # javadoc emits no usage pages at all -- verified by running it both ways. An
     # earlier version stripped the segment and validated the enclosing package,
