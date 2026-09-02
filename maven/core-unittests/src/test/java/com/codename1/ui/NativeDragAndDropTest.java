@@ -716,6 +716,38 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDragStartedInCodeStillGetsTheSourcesPreview() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            source.setPreferredSize(new com.codename1.ui.geom.Dimension(40, 40));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            NativeDragOperation op = new NativeDragOperation("started in code");
+            assertTrue(NativeDragAndDrop.startDrag(source, op));
+
+            assertNotNull(op.getDragImage(),
+                    "this entry point documents the source as providing the default preview, "
+                            + "and without one Android snapshots the whole surface while JavaSE "
+                            + "drags nothing at all");
+            assertTrue(op.isDragImageGenerated(),
+                    "and it is the framework's snapshot, not something the application supplied");
+
+        } finally {
+            // In the finally, not after the assertions: a session left active wedges every test
+            // that follows, so a failure here would be reported as twenty.
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
+            flushSerialCalls();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aDropThatLandsElsewhereTellsTheComponentItLeft() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder left = new DropRecorder();

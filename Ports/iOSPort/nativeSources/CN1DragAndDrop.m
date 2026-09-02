@@ -112,14 +112,28 @@ static int cn1LastDropAction = CN1_DND_ACTION_NONE;
 /// True while this application is the source of the session in progress.
 static BOOL cn1DraggingOut = NO;
 
-/// A drop whose representations are still loading.
+/// The drop sessions whose representations are still loading.
 ///
-/// UIKit ends the session as soon as performDrop: returns, which is long before the
-/// asynchronous loads that drop depends on have answered. The end must not clear the hover
-/// state while the drop that is about to use it is still in flight -- doing so made the commit
-/// find its own target gone and fall back to the declarative answer, discarding whatever the
-/// target's callbacks had decided.
-static BOOL cn1DropInFlight = NO;
+/// UIKit ends a session as soon as performDrop: returns, which is long before the asynchronous
+/// loads that drop depends on have answered. The end must not clear the hover state while the
+/// drop about to use it is still in flight -- doing so made the commit find its own target gone
+/// and fall back to the declarative answer, discarding whatever the target's callbacks had
+/// decided.
+///
+/// Per session, not a single flag. A slow NSItemProvider can leave one assembly running while
+/// the user completes a second drop, and one boolean answered for both: the first assembly's
+/// completion cleared it, so the second session's end went on to dispatch an exit while its own
+/// loads were still running -- and its commit then found no target of its own to honour, which
+/// is the very failure the flag exists to prevent.
+///
+/// The table holds its sessions weakly; each assembly's own completion block is what keeps its
+/// session alive for as long as the answer is needed.
+static NSHashTable* cn1LoadingDropSessions = nil;
+
+static BOOL cn1DropIsLoading(id session) {
+    return session != nil && cn1LoadingDropSessions != nil
+            && [cn1LoadingDropSessions containsObject:session];
+}
 
 /// A drop of this application's own session onto its own surface, still loading.
 ///
@@ -752,10 +766,11 @@ API_AVAILABLE(ios(11.0))
     // hovered, and the next session entering that same component was routed as a move over it
     // -- inheriting the ended session's answer, with no enter callback ever arriving.
     //
-    // Not while a drop is still loading, though. This arrives as soon as performDrop: returns,
-    // which is before the asynchronous loads have answered, and clearing the target there would
-    // leave the commit to find it gone. That path clears the hover state itself.
-    if (cn1DropInFlight) {
+    // Not while *this* session's drop is still loading, though. This arrives as soon as
+    // performDrop: returns, which is before the asynchronous loads have answered, and clearing
+    // the target there would leave the commit to find it gone. That path clears the hover state
+    // itself.
+    if (cn1DropIsLoading(session)) {
         return;
     }
     cn1LastDropAction = CN1_DND_ACTION_NONE;
@@ -768,7 +783,13 @@ API_AVAILABLE(ios(11.0))
     const int y = (int)(point.y * scaleValue);
     const int action = cn1LastDropAction == CN1_DND_ACTION_NONE
             ? cn1DefaultAction(cn1AllowedActionsFor(session)) : cn1LastDropAction;
-    cn1DropInFlight = YES;
+    if (cn1LoadingDropSessions == nil) {
+        cn1LoadingDropSessions = [NSHashTable weakObjectsHashTable];
+#ifndef CN1_USE_ARC
+        [cn1LoadingDropSessions retain];
+#endif
+    }
+    [cn1LoadingDropSessions addObject:session];
     if (session.localDragSession != nil) {
         cn1LocalDropInFlight = YES;
         cn1EndDeferred = NO;
@@ -900,11 +921,17 @@ API_AVAILABLE(ios(11.0))
             CN1NativeDragDeliverDropAdd(@"application/x-file-list",
                                         [files componentsJoinedByString:@"\n"], nil);
         }
+        // An assembly overtaken by a newer session still commits. The framework keeps one hover
+        // state, because one drag is what a platform runs, so a late commit does disturb a drag
+        // begun since -- the newer target is sent an exit and its next update re-enters it, a
+        // flicker that repairs itself. Withholding the commit instead would lose a drop the
+        // user actually performed, and unperformed work is worse than a repaired frame.
         int accepted = CN1NativeDragDeliverDropCommit(x, y, action);
         cn1LastDropAction = CN1_DND_ACTION_NONE;
-        // The commit cleared the hover state itself, so the end that already went past can stop
-        // holding off.
-        cn1DropInFlight = NO;
+        // This assembly's commit cleared the hover state itself, so its own end -- which went
+        // past long ago -- can stop holding off. Only this one: another drop still loading is
+        // still entitled to its answer.
+        [cn1LoadingDropSessions removeObject:session];
         if (cn1LocalDropInFlight) {
             cn1LocalDropInFlight = NO;
             if (cn1EndDeferred) {

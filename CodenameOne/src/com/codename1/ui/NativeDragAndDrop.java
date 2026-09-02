@@ -185,6 +185,22 @@ public final class NativeDragAndDrop {
         }
         op.setSource(source);
         op.resetPerformedAction();
+        if (needsGeneratedImage(op) && source != null) {
+            try {
+                // The same snapshot the gesture path renders, because this method documents the
+                // source as providing the default preview and without it the ports fall back to
+                // something worse: Android snapshots the whole Codename One surface, and JavaSE
+                // drags with no image at all.
+                //
+                // Centred, because a drag begun in code has no grab point to offset from. The
+                // gesture path uses where the finger actually went down; there is no such place
+                // here, and the centre is what a preview with no anchor should hang from.
+                op.setGeneratedDragImage(source.getDragImage(),
+                        source.getWidth() / 2, source.getHeight() / 2);
+            } catch (Throwable err) {
+                Log.e(err);
+            }
+        }
         boolean started = false;
         try {
             started = Display.impl.startNativeDrag(op);

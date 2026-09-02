@@ -10690,7 +10690,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                     ClipboardContent content = contentFromClip(clip);
                     String plain = content.getText(ClipboardContent.MIME_TEXT);
-                    if (content.getMimeTypes().length > 1) {
+                    // What the clip actually holds, not how many types it happens to name.
+                    // Counting worked only because every clip used to acquire a text/plain of
+                    // its own, empty or not: with that padding gone an image-only clip counted
+                    // as one type, fell through to the plain-text answer, and a paste that had
+                    // a perfectly good PNG in it returned null.
+                    String[] types = content.getMimeTypes();
+                    boolean textOnly = types.length == 0
+                            || (types.length == 1 && ClipboardContent.MIME_TEXT.equals(types[0]));
+                    if (!textOnly) {
                         response[0] = content;
                     } else {
                         response[0] = plain != null && plain.length() > 0 ? plain : null;
