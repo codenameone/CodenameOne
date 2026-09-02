@@ -34,6 +34,10 @@ FENCE_RE = re.compile(r"^(----|\.\.\.\.|````|\+\+\+\+)\s*$")
 # Lines that end in a colon without promising a listing: headings, attributes,
 # comments, block titles, list markers, table cells and block delimiters.
 NON_PROSE_PREFIX = ("//", "|", "=", ".", ":", "*", "-", "+", "[", "<")
+# A list marker is followed by whitespace; a block title (.Title) and bold text
+# (*text*) are not. Stripping the marker lets the prose test see the sentence,
+# so an introduction written as a list item is not mistaken for markup.
+LIST_MARKER_RE = re.compile(r"^([*\-]+|\.{1,5}|[0-9]+\.)\s+")
 # What a real block looks like when it starts. An introduction separated from its
 # listing by more than one blank line is untidy, not a hole, and reporting it
 # would make the gate reject valid AsciiDoc spacing. Deliberately conservative:
@@ -60,7 +64,11 @@ def scan(path: Path) -> list[tuple[int, str]]:
         stripped = line.rstrip()
         if not stripped.endswith(":"):
             continue
-        if stripped.lstrip().startswith(NON_PROSE_PREFIX):
+        body = stripped.lstrip()
+        marker = LIST_MARKER_RE.match(body)
+        if marker:
+            body = body[marker.end():]
+        if not body or body.startswith(NON_PROSE_PREFIX):
             continue
         if index + 2 >= len(lines):
             continue

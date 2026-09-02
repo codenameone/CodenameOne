@@ -107,10 +107,15 @@ class Walker:
                     f"{path.name}:{index + 1}: include target does not exist: {target_raw}"
                 )
                 continue
-            if path == self.root and not self._inside_conditional(lines, index):
-                self.direct_include_count[target] += 1
+            if path == self.root:
+                # A conditional entry is still a chapter: it must open at chapter
+                # level and be spaced correctly. Only the DUPLICATE count skips
+                # it, because the same chapter under two exclusive branches
+                # appears twice in the source and once in the output.
                 self.direct.add(target)
                 self._check_manifest_spacing(index, lines, target_raw)
+                if not self._inside_conditional(lines, index):
+                    self.direct_include_count[target] += 1
             self._visit(target, attrs)
 
     @staticmethod
@@ -139,6 +144,10 @@ class Walker:
         spent its life rendered as subsections of the Windows one.
         """
         following = lines[index + 1] if index + 1 < len(lines) else ""
+        # A preprocessor directive is not content and cannot absorb a paragraph,
+        # so an include closed by endif:: on the next line is correctly spaced.
+        if re.match(r"^(ifdef|ifndef|ifeval|endif)::", following.strip()):
+            return
         if following.strip():
             self.errors.append(
                 f"developer-guide.asciidoc:{index + 1}: include of {target_raw} is not "
