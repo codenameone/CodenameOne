@@ -6719,19 +6719,24 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// true if a listener consumed the wheel event
     boolean fireMouseWheelEvent(com.codename1.ui.events.WheelEvent ev) {
+        // The whole listener chain first, then the built-in handlers. Consuming is
+        // documented to prevent the DEFAULT behaviour, and a component that pans itself on
+        // a wheel is exactly that, so a listener anywhere above the component has to be
+        // able to stop it: an application that binds control plus wheel to its own zoom on
+        // the form cannot be pre-empted by a viewer inside it. Interleaving the two let the
+        // nearest built-in win over every listener further up.
         Component c = this;
         while (c != null) {
-            // Listeners before the component's own handling, at every level. Consuming is
-            // documented to prevent the DEFAULT behaviour, and a component that pans itself
-            // on a wheel is exactly that -- an application listening for control plus wheel
-            // to zoom an image viewer has to be able to stop the pan. It is also the order
-            // every pointer event uses: listeners, then the built-in.
             if (c.mouseWheelListeners != null && c.mouseWheelListeners.hasListeners()) {
                 c.mouseWheelListeners.fireActionEvent(ev);
                 if (ev.isConsumed()) {
                     return true;
                 }
             }
+            c = c.getParent();
+        }
+        c = this;
+        while (c != null) {
             if (c.mouseWheel(ev) || ev.isConsumed()) {
                 return true;
             }
@@ -7467,13 +7472,14 @@ public class Component implements Animation, StyleListener, Editable {
     /// touches neither, so once the scrollbar had faded out the content moved with nothing
     /// on screen to say where in it the reader was.
     void restoreFadingScrollbar() {
-        // The opacity and nothing else, which is exactly what pointerPressed and
-        // pointerReleased do. Re-registering the component for animation here as well
-        // looked like "restart the fade", but the fade is already registered by the
-        // initial checkAnimation and stays that way: adding a second registration left
-        // an abandoned form animating for the life of the JVM, and the next test class
-        // to want the event thread timed out waiting for it.
+        // Registered again, not only made opaque. The fade deregisters itself: animate()
+        // returns true while the opacity is coming down and the tick after it reaches zero
+        // falls through to tryDeregisterAnimated. So a scrollbar that has finished fading
+        // has no animation left, and restoring the opacity alone would light it up for
+        // good. A press or a release gets away with setting the field because the pointer
+        // paths around them re-register through checkAnimation.
         scrollOpacity = 0xff;
+        checkAnimation();
     }
 
     void checkAnimation() {

@@ -338,10 +338,11 @@ class ScrollWheelGestureTest extends UITestBase {
             // opacity, so both are switched on to have something to fade at all.
             page.getUIManager().getLookAndFeel().setFadeScrollBar(true);
             Display.getInstance().setPureTouch(true);
-            for (int i = 0; i < 200 && page.getScrollOpacity() > 0; i++) {
-                page.animate();
-            }
+            fadeOut(page);
             assertEquals(0, page.getScrollOpacity(), "the scrollbar has to have faded out first");
+            // One tick past the fade is where the component drops its own animation, so
+            // there is nothing left to bring the scrollbar back on its own.
+            assertFalse(f.hasAnimations(), "the finished fade deregisters itself");
 
             wheelAt(page.getAbsoluteX() + page.getWidth() / 2,
                     page.getAbsoluteY() + page.getHeight() / 2, 0, -px(30));
@@ -351,10 +352,48 @@ class ScrollWheelGestureTest extends UITestBase {
             // nothing says where in it they are.
             assertEquals(0xff, page.getScrollOpacity(),
                     "a wheel that moved the content brings its scrollbar back");
+
+            // And something has to be registered to fade it out again. Asserting that it
+            // CAN fade would prove nothing here -- this test drives animate() itself, and
+            // the opacity comes down whether or not the framework would ever call it.
+            assertTrue(f.hasAnimations(),
+                    "the restored scrollbar has an animation to fade it out again");
+
+            fadeOut(page);
+            assertEquals(0, page.getScrollOpacity(),
+                    "and it does fade out again instead of staying lit");
         } finally {
             page.getUIManager().getLookAndFeel().setFadeScrollBar(fading);
             Display.getInstance().setPureTouch(pureTouch);
         }
+    }
+
+    @FormTest
+    void aListenerAboveTheComponentStillBeatsItsBuiltInHandling() {
+        Form f = new Form("ancestor listener", new BorderLayout());
+        final WheelHandlingComponent target = new WheelHandlingComponent();
+        target.setPreferredH(px(15));
+        Container holder = new Container(BoxLayout.y());
+        holder.add(target);
+        // On the ancestor, not on the component that handles the wheel itself. An
+        // application that binds control plus wheel to its own zoom does it once, high up.
+        holder.addMouseWheelListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                evt.consume();
+            }
+        });
+        f.getContentPane().setLayout(BoxLayout.y());
+        f.getContentPane().add(holder);
+        f.getContentPane().add(filler());
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+
+        wheel(target, 0, -px(20));
+
+        assertEquals(0, target.wheels(),
+                "a listener above the component consumes before the component's own handling");
     }
 
     @FormTest
@@ -408,6 +447,16 @@ class ScrollWheelGestureTest extends UITestBase {
     private void wheelAt(int x, int y, int deltaX, int deltaY) {
         Display.impl.pointerWheelMoved(x, y, deltaX, deltaY, false, 0);
         DisplayTest.flushEdt();
+    }
+
+    /// Runs the fade to completion and one tick past it, which is where the component
+    /// deregisters its own animation -- and leaves nothing registered on a form the test is
+    /// about to abandon.
+    private void fadeOut(Component c) {
+        for (int i = 0; i < 200 && c.getScrollOpacity() > 0; i++) {
+            c.animate();
+        }
+        c.animate();
     }
 
     /// A trackpad's deltas, which arrive small and often and are flagged precise.
