@@ -403,6 +403,15 @@ class MacNativeBuilder {
         // Read from the value the iOS side already resolved rather than through a hint of its own.
         // There is one correct container per app, and a second place to configure it is a second
         // place for the two slices to disagree.
+        //
+        // The namespaced argument ALONE, and the BuildDaemon twin deliberately resolves more. A
+        // review asked for the raw ios.entitlementsInject fragment to be consulted here too, on
+        // the grounds that a project naming its container that way would sign the two slices for
+        // different stores. That is true THERE and false here: this builder never reads that hint
+        // -- buildNamespacedEntitlements merges it only in the daemon -- so locally the fragment
+        // reaches no plist at all and both slices use exactly this value. Consulting it here would
+        // be a check over a value this builder never sees, which is the same asymmetry the VPN
+        // entitlement above already documents. A twin diff showing it is reading the right answer.
         String ubiquityKvStore = request.getArg(
                 "ios.entitlements.com.apple.developer.ubiquity-kvstore-identifier", null);
         if (ubiquityKvStore != null && ubiquityKvStore.trim().length() > 0) {

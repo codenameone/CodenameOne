@@ -112,6 +112,60 @@ class RouteStackRestoreTest extends UITestBase {
     }
 
     /**
+     * `lastSeen` is process-local, so a restart emptied it and the next poll -- automatic on an
+     * Android resume -- accepted the same (device, sequence) again and restored a foreign state a
+     * second time, prompting the user on every launch. The stored checkpoint carries the id and
+     * sequence of whatever was last acted on, so enable() seeds the high-water mark from it.
+     */
+    @FormTest
+    void aRestoredForeignStateIsNotActedOnAgainAfterARestart() {
+        Navigation.setDispatcher(new FakeDispatcher().route("/home").route("/cart"));
+        Continuity.enable();
+
+        AppState remote = new AppState();
+        remote.setRoutes(Arrays.asList("/home", "/cart"))
+                .setDeviceId("a-different-device")
+                .setSequence(7)
+                .setTimestamp(System.currentTimeMillis());
+        assertTrue(Continuity.restore(remote), "the stack was supposed to be rebuilt");
+
+        // The restart: everything process-local goes, storage stays -- which is exactly what a
+        // relaunch looks like.
+        Continuity.reset();
+        Navigation.setDispatcher(new FakeDispatcher().route("/home").route("/cart"));
+        Continuity.setBridge(new LocalContinuityBridge());
+        Continuity.enable();
+
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+
+        Continuity.deliver(remote);
+        // Drained, not merely queued. deliver() dispatches through callSerially and this test body
+        // IS the EDT, so asserting straight away asserted nothing: the count was zero whether the
+        // state had been dropped or was still sitting in the queue -- which is exactly how the
+        // first version of this test passed with the fix reverted. invokeAndBlock releases the EDT
+        // to run what is queued while this waits.
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+        assertEquals(0, seen[0],
+                "the state acted on before the restart was delivered again, so the user is "
+                        + "prompted on every launch");
+    }
+
+    /**
      * Applying an inbound stack is not the user navigating, and the difference is not cosmetic.
      * A checkpoint here republishes the state we just received under THIS device's id and a fresh
      * sequence, so the device that sent it can no longer recognize its own work -- it arrives as

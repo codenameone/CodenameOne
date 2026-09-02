@@ -555,6 +555,91 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A reconnect that lands while a publish is in flight has to be honoured. startPublisher()
+     * saw publishing == true and left the work to the live worker -- correct for ordering -- but
+     * if that attempt then FAILED the worker requeued and stood down, forgetting the request. A
+     * single reconnect after a failed send left the retained state unsent until some later
+     * checkpoint happened to restart the publisher.
+     */
+    @EdtTest
+    public void aReconnectDuringAFailedPublishIsRetried() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        BlockingFailingRelay r = new BlockingFailingRelay();
+        Continuity.setRelay(r);
+
+        Continuity.checkpoint();
+        r.awaitInPublish();
+        // The application reconnects while the first attempt is still on the wire.
+        Continuity.pollRelay();
+        // Now let that attempt fail; the next one is allowed to succeed.
+        r.fail = false;
+        r.release();
+
+        long deadline = System.currentTimeMillis() + 3000L;
+        while (r.delivered() == 0 && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(25);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+
+        assertTrue(r.delivered() > 0,
+                "the reconnect was forgotten, so the retained state was never sent");
+    }
+
+    /** Blocks inside publish() until released, and fails the attempt it was holding. */
+    static class BlockingFailingRelay implements StateRelay {
+        volatile boolean fail = true;
+        private final java.util.concurrent.CountDownLatch gate =
+                new java.util.concurrent.CountDownLatch(1);
+        private final java.util.concurrent.atomic.AtomicInteger inPublish =
+                new java.util.concurrent.atomic.AtomicInteger();
+        private final java.util.concurrent.atomic.AtomicInteger sent =
+                new java.util.concurrent.atomic.AtomicInteger();
+
+        public void publish(AppState state) throws java.io.IOException {
+            if (fail) {
+                inPublish.incrementAndGet();
+                try {
+                    gate.await(2, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                throw new java.io.IOException("no network");
+            }
+            sent.incrementAndGet();
+        }
+
+        public AppState fetch() {
+            return null;
+        }
+
+        void release() {
+            gate.countDown();
+        }
+
+        int delivered() {
+            return sent.get();
+        }
+
+        void awaitInPublish() {
+            long deadline = System.currentTimeMillis() + 2000L;
+            while (inPublish.get() == 0 && System.currentTimeMillis() < deadline) {
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
      * A poll coalesced behind a setRelay() must use the NEW relay. The worker kept the one it was
      * started with and refreshed only the era, so the second attempt fetched from the endpoint
      * that had just been replaced and then stamped the answer with the new era -- which made the

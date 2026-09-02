@@ -116,6 +116,9 @@ public final class Continuity {
     /// than not restoring at all.
     private static final long WINDOW_WAIT_MILLIS = 15000L;
 
+    /// How long a non-EDT caller waits for the EDT to take its capture.
+    private static final int EDT_WAIT_MILLIS = 2000;
+
     private static final List<ContinuityListener> listeners = new ArrayList<ContinuityListener>();
 
     /// Highest sequence seen from each device, so a state delivered twice -- which happens
@@ -227,6 +230,22 @@ public final class Continuity {
             sequence = seq;
             // Published LAST, under the same hold as the state a checkpoint needs.
             enabled = true;
+        }
+        // Seeded from what is already on disk, because `lastSeen` is process-local and a restart
+        // emptied it: the next poll -- automatic on an Android resume -- accepted the same
+        // (device, sequence) again and restored a foreign state a second time, prompting the user
+        // on every launch. The stored checkpoint carries the id and sequence of whatever was last
+        // ACTED on, including a state restored from another device, so it is exactly the
+        // high-water mark to start from. Read outside the lock; it touches Storage.
+        AppState acted = readStored();
+        if (acted != null && acted.getDeviceId() != null && acted.getDeviceId().length() > 0
+                && !acted.getDeviceId().equals(id)) {
+            synchronized (STATE_LOCK) {
+                Long seen = lastSeen.get(acted.getDeviceId());
+                if (seen == null || seen.longValue() < acted.getSequence()) {
+                    lastSeen.put(acted.getDeviceId(), Long.valueOf(acted.getSequence()));
+                }
+            }
         }
         ContinuityBridge b = bridgeInternal();
         if (b != null) {
@@ -541,6 +560,38 @@ public final class Continuity {
     /// - `IllegalArgumentException`: when the provider returned a payload that cannot cross to
     ///   another device
     public static void checkpoint() {
+        if (offEdt()) {
+            runOnEdt(new Runnable() {
+                @Override
+                public void run() {
+                    checkpointOnEdt();
+                }
+            });
+            return;
+        }
+        checkpointOnEdt();
+    }
+
+    /// Whether the caller is on a thread that must not touch the navigation stack directly.
+    private static boolean offEdt() {
+        return Display.isInitialized() && !Display.getInstance().isEdt();
+    }
+
+    /// Runs `r` on the EDT and waits, with a bound.
+    ///
+    /// Bounded rather than indefinite because the waiting thread is not always free to block: on
+    /// the desktop port the EDT itself blocks on the AWT thread while painting, so an application
+    /// calling a checkpoint from an AWT callback could otherwise deadlock the two against each
+    /// other. A checkpoint that misses its window is a lost checkpoint; a deadlock is a hung app.
+    private static void runOnEdt(Runnable r) {
+        try {
+            Display.getInstance().callSeriallyAndWait(r, EDT_WAIT_MILLIS);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    private static void checkpointOnEdt() {
         synchronized (STATE_LOCK) {
             if (!enabled) {
                 return;
@@ -586,6 +637,25 @@ public final class Continuity {
     ///
     /// - `IllegalArgumentException`: when the provider returned an unrepresentable payload
     public static AppState capture() {
+        if (offEdt()) {
+            // The navigation stack is EDT-owned and StateProvider.saveState() documents that it
+            // runs on the EDT. This is public and cheap, so an application calling it from a
+            // network callback is ordinary -- and it then read the stack while the EDT was
+            // mutating it and ran the provider on the wrong thread, which is a torn snapshot
+            // rather than an error anyone would see.
+            final AppState[] out = new AppState[1];
+            runOnEdt(new Runnable() {
+                @Override
+                public void run() {
+                    out[0] = captureOnEdt();
+                }
+            });
+            return out[0];
+        }
+        return captureOnEdt();
+    }
+
+    private static AppState captureOnEdt() {
         StateProvider p;
         synchronized (STATE_LOCK) {
             if (!enabled) {
@@ -1055,6 +1125,14 @@ public final class Continuity {
 
     private static boolean pollAgain;
 
+    /// True when someone asked for a publisher while one was already running.
+    ///
+    /// The publisher deliberately does not retry in a loop -- one attempt per change, rather than
+    /// a spin against a dead endpoint -- but a request that arrived DURING an attempt is a new
+    /// signal rather than a spin, and pollRelay() on reconnect is exactly that. Guarded by
+    /// STATE_LOCK.
+    private static boolean publishRequested;
+
     /// Hands a state to the relay, in order, one at a time.
     ///
     /// A thread per checkpoint was a race with a silent and durable result: two checkpoints in
@@ -1092,8 +1170,14 @@ public final class Continuity {
         }
         synchronized (STATE_LOCK) {
             if (relay == null || publishing || pendingPublish == null) {
-                // The live publisher will pick this up when it finishes its current request,
-                // which is what makes the ordering total.
+                if (publishing) {
+                    // Remembered rather than dropped. The live publisher picks up whatever is
+                    // queued when it finishes, which is what makes the ordering total -- but if
+                    // its current attempt FAILS it requeues and stands down, and this request
+                    // would have been forgotten. A single reconnect after a failed send then left
+                    // the retained state unsent until some later checkpoint happened.
+                    publishRequested = true;
+                }
                 return;
             }
             publishing = true;
@@ -1166,8 +1250,17 @@ public final class Continuity {
                             synchronized (STATE_LOCK) {
                                 if (era == accountEra && pendingPublish == null) {
                                     pendingPublish = next;
-                                    publishing = false;
-                                    return;
+                                    if (!publishRequested) {
+                                        publishing = false;
+                                        return;
+                                    }
+                                    // Somebody asked for a publisher while this attempt was in
+                                    // flight -- an application calling pollRelay() on reconnect is
+                                    // the ordinary case -- and startPublisher() left it to this
+                                    // worker. Consumed rather than looped on: only an external
+                                    // call sets it again, so this is one extra attempt per
+                                    // request and not the spin the stand-down exists to avoid.
+                                    publishRequested = false;
                                 }
                             }
                         }
@@ -1527,6 +1620,7 @@ public final class Continuity {
             pendingPublish = null;
             polling = false;
             pollAgain = false;
+            publishRequested = false;
         }
     }
 
