@@ -320,11 +320,6 @@ void cn1VirtualThreadStackBounds(struct cn1VirtualThread* co, void** low, void**
 /* Set up the initial frame so the first switch lands in the trampoline. */
 extern void* cn1VirtualThreadPrime(void* stackHigh, void* co, void* trampoline);
 
-/* The default. Overridden by the VM's strong definition when one is linked in. */
-__attribute__((weak)) void cn1VirtualThreadVmStateActive(void* vmState, int active) {
-    (void)vmState; (void)active;
-}
-
 void cn1VirtualThreadResume(struct cn1VirtualThread* co) {
     struct cn1VirtualThread* previous = cn1CurrentVirtualThread;
     if(co == 0 || co->finished) {
@@ -336,21 +331,16 @@ void cn1VirtualThreadResume(struct cn1VirtualThread* co) {
     }
     cn1CurrentVirtualThread = co;
     co->running = 1;
-    /* The attached VM state has to become ACTIVE here, not just `running`. It was
-     * created parked (cn1CreateThreadLocalData with bindToCallingOsThread false
-     * leaves threadActive FALSE) and nothing else ever raises it, so without this a
-     * collection running concurrently treats a mutator that is executing Java as
-     * parked -- and scans or migrates its object stack and pending-allocation table
-     * underneath it. Missed roots at best, corruption at worst. Lowered again on the
-     * way out, because a SUSPENDED virtual thread genuinely is parked: the collector
-     * reaches its roots through the registry snapshot instead. */
-    if(co->vmState != 0) {
-        cn1VirtualThreadVmStateActive(co->vmState, 1);
-    }
+    /* NOTE, and this is a KNOWN GAP rather than an oversight -- see the block above
+     * cn1SpawnVirtualThread in nativeMethods.m. The attached VM state is NOT marked
+     * threadActive here. Marking it looks obviously right and is a collector HANG:
+     * the state has no pthread of its own, and the collector's unbounded
+     * while(threadActive) wait can only be broken by a forced stop, which is gated
+     * on gcPthreadValid -- permanently false for a virtual thread. A compute-only
+     * virtual thread that never reaches a safepoint would stall collection forever.
+     * The C stack is covered regardless, by cn1GcScanParkedVirtualThreads, which
+     * scans every registered virtual thread whether or not it is running. */
     cn1VirtualThreadSwitch(&co->returnSp, co->sp);
-    if(co->vmState != 0) {
-        cn1VirtualThreadVmStateActive(co->vmState, 0);
-    }
     co->running = 0;
     cn1CurrentVirtualThread = previous;
 }

@@ -1104,7 +1104,7 @@ static void cn1FreeThreadStack(struct elementStruct* stack, int mapped) {
 // getenv returns a pointer into the process environment, which is owned by the
 // C runtime and must not be freed. stringToUTF8 hands back the calling thread's
 // scratch buffer, so the lookup must finish with it before anything else on this
-// thread converts another string -- newStringFromUtf8 copies, so building the
+// thread converts another string -- newStringFromNative copies, so building the
 // result here is safe.
 //
 // DECODED, not widened. An environment value is outside text: newStringFromCString
@@ -1124,7 +1124,7 @@ JAVA_OBJECT java_lang_System_getenv___java_lang_String_R_java_lang_String(CODENA
     if(value == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromUtf8(threadStateData, value);
+    return newStringFromNative(threadStateData, value);
 }
 
 // ---------------------------------------------------------------------------
@@ -2235,6 +2235,29 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
  * actually live. Giving it a stack but sharing the host's state would have two
  * threads of control writing one Java stack.
  *
+ * KNOWN GAP, stated here because the obvious fix is worse than the problem. The
+ * state this creates is never marked threadActive while its virtual thread runs,
+ * so a collection concurrent with a running virtual thread can walk that state's
+ * object stack and pending-allocation table while the virtual thread mutates them.
+ * Raised in review on PR #5658, and NOT fixed by setting threadActive: the state
+ * has no pthread of its own, the collector's while(threadActive) wait is unbounded,
+ * and the forced-stop escalation that breaks such a wait is gated on
+ * gcPthreadValid, which is permanently false here. Setting the flag converts a
+ * possible race into a certain hang for any virtual thread that computes without
+ * reaching a safepoint. That was measured against, not guessed: the flag was set,
+ * and this is the reverted state.
+ *
+ * The real fix is carrier association -- while a virtual thread runs, its state is
+ * executing ON a carrier that DOES have a stoppable pthread, so the collector
+ * should satisfy the wait by stopping the carrier rather than the state. That needs
+ * the stop handshake to stop being per-TLD (the signal handler records into the TLD
+ * of the thread it runs on, which is the carrier's), which is a change to the
+ * collector's stop protocol rather than to this function.
+ *
+ * The C stack half of the same report IS fixed, independently:
+ * cn1GcScanParkedVirtualThreads scans every registered virtual thread whether or
+ * not it is running, so no virtual stack goes unscanned.
+ *
  * Sizing: threadObjectStack is mmap'd and lazily faulted, so the 264KB it
  * reserves costs only the pages a virtual thread touches -- a handler that nests
  * a dozen frames commits a page or two. That is the difference against the
@@ -2264,17 +2287,6 @@ struct cn1VirtualThread* cn1SpawnVirtualThread(cn1VirtualThreadBody body, void* 
 /* Both are defined further down this file; cn1RetireVirtualThread needs them here. */
 extern void markDeadThread(struct ThreadLocalData* d);
 extern void cn1ReleaseThreadLocalData(struct ThreadLocalData* head);
-
-/*
- * The strong definition of the weak hook cn1VirtualThreadResume calls. See the
- * comment there for why the flag has to move with the switch.
- */
-void cn1VirtualThreadVmStateActive(void* vmState, int active) {
-    struct ThreadLocalData* state = (struct ThreadLocalData*)vmState;
-    if(state != 0) {
-        state->threadActive = active ? JAVA_TRUE : JAVA_FALSE;
-    }
-}
 
 /**
  * Retire a virtual thread produced by cn1SpawnVirtualThread, releasing BOTH halves.
