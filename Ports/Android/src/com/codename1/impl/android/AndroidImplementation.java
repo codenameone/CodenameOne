@@ -10471,9 +10471,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// AndroidGradleBuilder exposes cache/intent_files through the app's FileProvider, so
     /// generated payloads stay inside that root and FileProvider can safely name them.
     private Uri writeAsProviderUri(byte[] bytes, String extension) throws IOException {
-        if (bytes == null || bytes.length == 0) {
+        if (bytes == null) {
             return null;
         }
+        // A zero length payload is still a payload: refusing it would leave the clip without a
+        // type it had advertised, and a target filtering on that type would accept the hover
+        // and be refused the drop.
         File file = new File(new File(getContext().getCacheDir(), "intent_files"),
                 "cn1-clip-" + System.currentTimeMillis() + "-" + bytes.length + "." + extension);
         file.getParentFile().mkdirs();

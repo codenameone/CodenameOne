@@ -9297,9 +9297,13 @@ public class IOSImplementation extends CodenameOneImplementation {
             pendingDrop.setFiles(split(text));
             return;
         }
-        if (binary != null && binary.length > 0) {
+        // Length is not a test of presence. A representation the drag advertised and that is
+        // legitimately empty -- an empty string, a zero byte payload -- was discarded here, so
+        // the materialized content lacked a type the hover had accepted and the drop was then
+        // refused by the very target that agreed to take it. Null is absent; empty is present.
+        if (binary != null) {
             pendingDrop.setData(mimeType, binary);
-        } else if (text != null && text.length() > 0) {
+        } else if (text != null) {
             pendingDrop.setData(mimeType, text);
         }
     }
@@ -9324,11 +9328,20 @@ public class IOSImplementation extends CodenameOneImplementation {
                     if (in == null) {
                         return null;
                     }
+                    byte[] bytes;
                     try {
-                        return com.codename1.io.Util.readInputStream(in);
+                        bytes = com.codename1.io.Util.readInputStream(in);
                     } finally {
                         in.close();
                     }
+                    // A text type reads back as text. A document provider from Files commonly
+                    // offers a plain text representation beside its file URL, and answering
+                    // that with bytes made getText() and NativeDropEvent.getText() null for a
+                    // type the drop had just accepted.
+                    if (bytes != null && requested != null && requested.startsWith("text/")) {
+                        return new String(bytes, "UTF-8");
+                    }
+                    return bytes;
                 } catch (Throwable err) {
                     com.codename1.io.Log.e(err);
                     return null;

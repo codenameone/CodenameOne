@@ -201,6 +201,20 @@ static NSString* cn1UtiForMime(NSString* mime) {
     return legacy != nil ? legacy : mime;
 }
 
+/// The MIME type MobileCoreServices knows a uniform type identifier by, or nil. The reverse of
+/// cn1LegacyUtiForMime, and deprecated from iOS 15 for the same reason.
+static NSString* cn1LegacyMimeForUti(NSString* uti) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    CFStringRef mime = UTTypeCopyPreferredTagWithClass((CFStringRef) uti, kUTTagClassMIMEType);
+#pragma clang diagnostic pop
+    if (mime == NULL) {
+        return nil;
+    }
+    NSString* result = [(NSString*) mime autorelease];
+    return result.length > 0 ? [result lowercaseString] : nil;
+}
+
 static NSString* cn1MimeForUti(NSString* uti) {
     if ([uti isEqualToString:@"public.utf8-plain-text"] || [uti isEqualToString:@"public.plain-text"]
             || [uti isEqualToString:@"public.text"]) {
@@ -240,8 +254,17 @@ static NSString* cn1MimeForUti(NSString* uti) {
         if (type != nil && type.preferredMIMEType.length > 0) {
             return type.preferredMIMEType;
         }
+        return nil;
     }
 #endif
+    // Below iOS 14, the same way round as cn1UtiForMime goes. Answering nil here regardless of
+    // the identifier left a standard type such as com.adobe.pdf unnamed on those releases, so a
+    // drag of one was neither discovered while it hovered nor materialized when it dropped --
+    // the outgoing direction had its legacy conversion and the incoming one did not.
+    NSString* legacy = cn1LegacyMimeForUti(uti);
+    if (legacy != nil) {
+        return legacy;
+    }
     // A dynamic or private identifier with no MIME equivalent. Naming it anyway would fill the
     // content with identifiers no drop target could match on.
     return nil;
