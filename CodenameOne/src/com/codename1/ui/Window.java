@@ -3364,9 +3364,13 @@ public class Window extends Container implements TopLevelContainer {
         // call to the scalar one. With the hook only there a gesture never began a native drag
         // on any port that starts one itself.
         //
-        // One pointer only: a second finger makes this a pinch or a two-finger scroll, which is
-        // not a drag to hand to the operating system.
-        if (x.length == 1 && NativeDragAndDrop.pointerDragged(x[0], y[0])) {
+        // One pointer only: a second finger makes this a pinch or a two-finger scroll, which
+        // is not a drag to hand to the operating system -- and it spends the press that
+        // staged one, because the gesture has become something else. Merely skipping the
+        // hook left it staged for the next one-finger movement to start.
+        if (x.length > 1) {
+            NativeDragAndDrop.gestureCancelled();
+        } else if (NativeDragAndDrop.pointerDragged(x[0], y[0])) {
             return;
         }
         // The same listener block the scalar overload runs. Adding it there only

@@ -110,6 +110,15 @@ public final class NativeDragAndDrop {
     /// from one that offered both and chose a move.
     private static int advertisedActions;
 
+    /// The press the staged operation belongs to.
+    ///
+    /// A press is not its coordinates. Identifying it that way meant a gesture that ended
+    /// without a release -- Android cancels a touch outright, and nothing delivers a release
+    /// for it -- left an operation staged that a later press at the very same pixel then
+    /// inherited, along with a source component that may not even be under the pointer any
+    /// more. Every press mints one of these already, for the same reason.
+    private static Object pressToken;
+
     /// The session the operating system is currently running, or null.
     private static NativeDragOperation active;
 
@@ -226,6 +235,7 @@ public final class NativeDragAndDrop {
                 // stale payload.
                 pending = null;
                 pendingSource = null;
+                pressToken = null;
                 startOffered = false;
             }
         }
@@ -309,7 +319,8 @@ public final class NativeDragAndDrop {
     /// source that was pressed and released from being dragged by a later gesture somewhere
     /// else.
     static void pressedOn(Component cmp, int x, int y) {
-        if (isStagedFor(x, y)) {
+        Object token = pressTokenOf(cmp);
+        if (isStagedFor(token, x, y)) {
             return;
         }
         // Everything that can call out -- into the component for its payload and its drag
@@ -353,7 +364,7 @@ public final class NativeDragAndDrop {
                 Log.e(err);
             }
         }
-        stage(op, source, x, y);
+        stage(op, source, token, x, y);
         if (op != null) {
             try {
                 Display.impl.prepareNativeDrag(op);
@@ -370,18 +381,37 @@ public final class NativeDragAndDrop {
     /// int)` would not find a drag source that sits *between* the two -- so restaging would
     /// throw away what the first call correctly staged. Every release clears the pending
     /// operation, so a later press cannot land on a stale one even at the very same pixel.
-    private static boolean isStagedFor(int x, int y) {
+    private static boolean isStagedFor(Object token, int x, int y) {
         synchronized (LOCK) {
-            return pending != null && x == pressX && y == pressY;
+            if (pending == null) {
+                return false;
+            }
+            if (token != null || pressToken != null) {
+                return token == pressToken; // NOPMD CompareObjectsWithEquals
+            }
+            // No top level to mint a token: the position is all there is to go on.
+            return x == pressX && y == pressY;
         }
+    }
+
+    /// The object the top level minted for the press in progress, or null when there is no
+    /// top level to ask.
+    private static Object pressTokenOf(Component cmp) {
+        if (cmp == null) {
+            return null;
+        }
+        Container root = TopLevelSupport.rootOf(cmp);
+        return root == null ? null : root.getCurrentPointerPress();
     }
 
     /// Installs what a press staged, or clears it when the press staged nothing. Unconditional
     /// rather than a clear followed by a fill, so that one press leaves one consistent state.
-    private static void stage(NativeDragOperation op, Component source, int x, int y) {
+    private static void stage(NativeDragOperation op, Component source, Object token,
+            int x, int y) {
         synchronized (LOCK) {
             pending = op;
             pendingSource = op == null ? null : source;
+            pressToken = op == null ? null : token;
             pressX = x;
             pressY = y;
             startOffered = false;
@@ -452,6 +482,7 @@ public final class NativeDragAndDrop {
             if (pending == op) { // NOPMD CompareObjectsWithEquals
                 pending = null;
                 pendingSource = null;
+                pressToken = null;
             }
         }
         if (source != null) {
@@ -467,12 +498,25 @@ public final class NativeDragAndDrop {
     /// Drops the operation prepared by a press that turned out to be a click. Called as the
     /// pointer is released.
     static void pointerReleased() {
+        gestureCancelled();
+    }
+
+    /// Abandons whatever a press staged, because the gesture it belonged to is over or has
+    /// turned into something else.
+    ///
+    /// A release is the ordinary way that happens and the framework calls this itself. A port
+    /// calls it for the ways that are not a release: a touch the platform cancels outright,
+    /// which delivers no release at all, and anything else that ends a gesture without one.
+    /// Leaving an operation staged past its gesture is what lets a later, unrelated movement
+    /// start a drag nobody asked for.
+    public static void gestureCancelled() {
         boolean hadPending;
         synchronized (LOCK) {
             startOffered = false;
             hadPending = pending != null;
             pending = null;
             pendingSource = null;
+            pressToken = null;
         }
         if (hadPending) {
             try {

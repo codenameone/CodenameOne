@@ -156,8 +156,15 @@ public final class NativeDropEvent extends ActionEvent {
     /// - `action`: one of `NativeDragOperation#ACTION_COPY`, `NativeDragOperation#ACTION_MOVE`
     ///   or `NativeDragOperation#ACTION_LINK`
     public void accept(int action) {
-        int permitted = permittedActions();
-        acceptedAction = (action & permitted) == action ? action : NativeDragOperation.ACTION_NONE;
+        // Exactly one, and one that is permitted. A listener passing the whole set back --
+        // accept(getAllowedActions()) is the obvious thing to write -- used to have that set
+        // stored as though it were an action, and the ports then each read it their own way:
+        // the iOS mapping quietly chose the move out of copy-or-move. There is no such thing
+        // as agreeing to two actions, so a set is a refusal, as an unpermitted action is.
+        boolean single = action != NativeDragOperation.ACTION_NONE
+                && (action & (action - 1)) == 0;
+        acceptedAction = single && (action & permittedActions()) == action
+                ? action : NativeDragOperation.ACTION_NONE;
     }
 
     /// What may actually be agreed to here: what the source offers, narrowed by what the

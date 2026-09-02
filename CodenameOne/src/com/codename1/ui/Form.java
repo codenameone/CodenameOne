@@ -4369,8 +4369,13 @@ public class Form extends Container implements TopLevelContainer {
         // gives.
         //
         // One pointer only. A second finger makes this a pinch or a two-finger scroll, and
-        // handing that to the operating system as a drag is not what the user is doing.
-        if (x.length == 1 && NativeDragAndDrop.pointerDragged(x[0], y[0])) {
+        // handing that to the operating system as a drag is not what the user is doing --
+        // and the press that staged one is spent, because the gesture has become
+        // something else. Merely skipping the hook left it staged, so lifting the second
+        // finger and moving on could still start the drag the first finger had prepared.
+        if (x.length > 1) {
+            NativeDragAndDrop.gestureCancelled();
+        } else if (NativeDragAndDrop.pointerDragged(x[0], y[0])) {
             return;
         }
         autoRelease(x[0], y[0]);

@@ -878,6 +878,96 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void acceptingTheWholeSetIsNotAcceptingAnAction() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        int both = NativeDragOperation.ACTION_COPY | NativeDragOperation.ACTION_MOVE;
+        // accept(getAllowedActions()) is the obvious thing to write and means nothing: there is
+        // no agreeing to two actions at once.
+        target.rejectAction = both;
+
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), both);
+        flushSerialCalls();
+        int answer = NativeDragAndDrop.dragOver(0, x, y, textContent("hi"), both);
+
+        assertEquals(NativeDragOperation.ACTION_NONE, answer,
+                "a set is not an action; stored as one it reaches the ports, which each read it "
+                        + "their own way -- the iOS mapping picks the move out of copy-or-move");
+
+        NativeDragAndDrop.dragExit(0);
+        flushSerialCalls();
+    }
+
+    @FormTest
+    void aCancelledGestureDoesNotLeaveADragStaged() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("staged"));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            assertNotNull(implementation.getPreparedNativeDrag());
+
+            // What a platform that cancels a touch does: no release ever arrives.
+            NativeDragAndDrop.gestureCancelled();
+            drag(form, x + 200, y + 200);
+            assertNull(implementation.getStartedNativeDrag(),
+                    "the gesture the press belonged to is over, so nothing it staged may still "
+                            + "be dragged");
+        } finally {
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
+    void aPressAtTheSamePixelIsStillANewPress() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container first = new Container();
+            first.setNativeDragOperation(new NativeDragOperation("the first press"));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, first);
+            form.revalidate();
+
+            int x = first.getAbsoluteX() + 10;
+            int y = first.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+
+            // A second press at the very same pixel, with no release or cancellation between
+            // them to clear what the first staged -- which is what a platform that drops a
+            // gesture on the floor leaves behind. The component is given a different payload
+            // first: identified by position, the second press inherits the first one's.
+            NativeDragOperation second = new NativeDragOperation("the second press");
+            first.setNativeDragOperation(second);
+            form.pointerPressed(x, y);
+            drag(form, x + 200, y + 200);
+
+            assertNotNull(implementation.getStartedNativeDrag());
+            assertSame(second, implementation.getStartedNativeDrag(),
+                    "a press is not its coordinates: the second press has its own payload");
+        } finally {
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aDragStartedInCodeSpendsWhatThePressStaged() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);
