@@ -109,8 +109,11 @@ class KotlinStdlibAlignmentTest {
             "    implementation('" + JDK8 + "') { version { strictly '1.7.22' } }\n",
             "    configurations.all { resolutionStrategy.force '" + JDK8 + ":1.7.22' }\n",
             "    implementation('" + JDK8 + "') { version { reject '[1.8.0,)' } }\n",
+            // kotlin-bom, which is the coordinate that exists. This asserted
+            // against kotlin-stdlib-bom, so it passed while the real BOM went
+            // unseen -- the artifact under test has to be a real one.
             "    implementation(enforcedPlatform("
-                    + "'org.jetbrains.kotlin:kotlin-stdlib-bom:1.7.22'))\n",
+                    + "'org.jetbrains.kotlin:kotlin-bom:1.7.22'))\n",
             "    configurations.all { resolutionStrategy.eachDependency { d ->\n"
                     + "        if (d.requested.name == 'kotlin-stdlib') "
                     + "d.useVersion '1.7.22'\n    } }\n",
@@ -230,6 +233,39 @@ class KotlinStdlibAlignmentTest {
                 "and neither is a plain version");
     }
 
+    @Test
+    void theKotlinToolchainOwnsTheFamilyWhereverItCameFrom() {
+        // hasKotlinSources scans src/main/java. Kotlin can arrive from a source
+        // set it never looks at, with the app applying the plugin itself -- and
+        // then nothing names the stdlib, so naming it cannot be the test.
+        String[] applied = {
+            "    classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.7.22'\n",
+            "apply plugin: 'kotlin-android'\n",
+            "    id 'org.jetbrains.kotlin.android' version '1.7.22'\n",
+        };
+        for (int i = 0; i < applied.length; i++) {
+            assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
+                            "implementation", false, applied[i])),
+                    "<<" + applied[i].trim() + ">> puts the Kotlin toolchain in "
+                            + "this build, and it declares the stdlib itself");
+        }
+    }
+
+    @Test
+    void aSingleVersionRangeIsARange() {
+        // [1.7.22] admits exactly one version and contains no comma at all.
+        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
+                        "implementation", false,
+                        "    implementation "
+                                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:[1.7.22]'\n")),
+                "a single-version range admits nothing else");
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
+                        "    implementation "
+                                + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n")
+                        .contains(":1.8.0"),
+                "and a plain version is still raised");
+    }
+
     /** The floor is the version at which the shims became empty. */
     @Test
     void theFloorIsWhereTheClassesMoved() {
@@ -268,7 +304,8 @@ class KotlinStdlibAlignmentTest {
         assertTrue(at >= 0, "the builder collects the app's Gradle fragments");
         String list = src.substring(at, src.indexOf("};", at));
         String[] hints = {
-            "android.gradlePlugin", "android.gradle.androidx",
+            "android.gradlePlugin", "android.topDependency",
+            "android.gradle.androidx",
             "android.xgradle_default_config", "android.supportv4Dep",
             "android.gradleDep", "android.xgradle",
         };

@@ -558,12 +558,21 @@ public final class Display extends CN1Constants {
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
                 //
-                // Outside the lock: setThreadPriority reaches the platform's own
-                // UI thread on some ports, and holding `lock` across that trades
-                // the race for a deadlock. Only the decision needs to be atomic.
-                INSTANCE.edt = new CodenameOneThread(new RunnableWrapper(null, 3), "EDT");
-                impl.setThreadPriority(INSTANCE.edt, impl.getEDTThreadPriority());
-                INSTANCE.edt.start();
+                // Built and prioritised on a local, outside the lock:
+                // setThreadPriority reaches the platform's own UI thread on some
+                // ports, and holding `lock` across that would trade the race for
+                // a deadlock.
+                Thread replacement = new CodenameOneThread(new RunnableWrapper(null, 3), "EDT");
+                impl.setThreadPriority(replacement, impl.getEDTThreadPriority());
+                // Published under the lock, because the departing thread's own
+                // check-and-clear of this field runs under it. Otherwise that
+                // clear can land between the two and null out a LIVE dispatch
+                // thread: the loop keeps running, but isEdt() stops recognising
+                // it, so callSeriallyAndWait() from the EDT waits on itself.
+                synchronized (lock) {
+                    INSTANCE.edt = replacement;
+                    replacement.start();
+                }
             }
             impl.postInit();
             INSTANCE.setCommandBehavior(commandBehaviour);
@@ -1423,8 +1432,13 @@ public final class Display extends CN1Constants {
         // opposite of what the line below is for.
         Desktop.getInstance().disposeAll();
         departing.deinitialize();
-        if (INSTANCE.edt == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
-            INSTANCE.edt = null;
+        // Under the lock, and only if it is still this thread. init() publishes a
+        // replacement under the same lock, so the two cannot interleave into
+        // nulling a thread that is dispatching.
+        synchronized (lock) {
+            if (INSTANCE.edt == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
+                INSTANCE.edt = null;
+            }
         }
         //INSTANCE.impl = null;
         //INSTANCE.codenameOneGraphics = null;

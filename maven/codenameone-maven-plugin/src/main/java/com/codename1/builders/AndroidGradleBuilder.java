@@ -7307,6 +7307,11 @@ public class AndroidGradleBuilder extends Executor {
             // already holds this family, and what to hand the alignment.
             String[] appGradle = {
                 request.getArg("android.gradlePlugin", ""),
+                // The buildscript block. An app can put its own
+                // kotlin-gradle-plugin classpath here -- this builder checks for
+                // exactly that above before adding one -- so leaving it out hid
+                // the clearest statement an app can make about this family.
+                request.getArg("android.topDependency", ""),
                 request.getArg("android.gradle.androidx", ""),
                 request.getArg("android.xgradle_default_config", ""),
                 request.getArg("android.supportv4Dep", ""),

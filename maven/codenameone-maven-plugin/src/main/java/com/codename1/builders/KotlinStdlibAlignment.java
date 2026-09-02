@@ -85,11 +85,37 @@ public class KotlinStdlibAlignment {
     };
 
     /**
-     * The family, as the one name that prefixes all three of them --
+     * The names that mean "this family".
+     *
+     * <p>{@code kotlin-stdlib} prefixes all three of the modules themselves --
      * {@code kotlin-stdlib}, {@code kotlin-stdlib-jdk7} and
-     * {@code kotlin-stdlib-jdk8}.
+     * {@code kotlin-stdlib-jdk8}. {@code kotlin-bom} is the platform that
+     * manages them, and it is the real coordinate: there is no
+     * {@code kotlin-stdlib-bom}, which is what an earlier test here asserted
+     * against, so an enforced BOM went unseen.</p>
      */
-    private static final String STDLIB_FAMILY = "kotlin-stdlib";
+    private static final String[] FAMILY_NAMES = {
+        "kotlin-stdlib",
+        "kotlin-bom"
+    };
+
+    /**
+     * Text that means the Kotlin toolchain is in this build at all.
+     *
+     * <p>Applying a Kotlin Gradle plugin makes it the owner of the stdlib: it
+     * declares one at the compiler's own version, and on the Gradle 6 and 7
+     * path that version is below this floor. This stands the alignment down
+     * without the family being named anywhere, because whoever applied the
+     * plugin need not have named it -- the plugin does that itself. It is the
+     * same reason as {@code projectCompilesKotlin}, reached the other way: that
+     * one is a source scan under {@code src/main/java}, and Kotlin can arrive
+     * from a source set the scan never looks at.</p>
+     */
+    private static final String[] KOTLIN_TOOLCHAIN_WORDS = {
+        "kotlin-gradle-plugin",
+        "kotlin-android",
+        "org.jetbrains.kotlin.android"
+    };
 
     /**
      * The words that can hold a version where this would raise it.
@@ -209,7 +235,26 @@ public class KotlinStdlibAlignment {
         // I to a dotless i, which turns "STRICTLY" into "str\u0131ctly" and
         // matches nothing. The same trap is commented in AndroidGradleBuilder.
         String text = all.toString().toLowerCase(Locale.ENGLISH);
-        if (text.indexOf(STDLIB_FAMILY) < 0) {
+        for (int i = 0; i < KOTLIN_TOOLCHAIN_WORDS.length; i++) {
+            if (text.indexOf(KOTLIN_TOOLCHAIN_WORDS[i]) >= 0) {
+                return true;
+            }
+        }
+        boolean namesTheFamily = false;
+        for (int i = 0; i < FAMILY_NAMES.length; i++) {
+            if (text.indexOf(FAMILY_NAMES[i]) >= 0) {
+                namesTheFamily = true;
+                break;
+            }
+        }
+        if (!namesTheFamily) {
+            // Nothing else here can be about this family. Note what is NOT
+            // reachable from the Gradle text: a gradle.lockfile, which Gradle
+            // enforces as a strict constraint. This builder writes the project
+            // from scratch and has no dependency locking, no lock file and no
+            // hint that ships one, so there is no lock to read -- and locking
+            // with no lock state does nothing. Revisit this if the builder ever
+            // grows a way to carry files into the generated project.
             return false;
         }
         for (int i = 0; i < PINNING_WORDS.length; i++) {
@@ -229,9 +274,10 @@ public class KotlinStdlibAlignment {
      * excludes the floor: constraining to 1.8.0 leaves Gradle nothing that
      * satisfies both, so a build that resolves today stops resolving.</p>
      *
-     * <p>The signature is the comma, which appears nowhere else inside a
-     * version: a range has digits on its left and either digits or a closing
-     * bracket on its right. Map notation --
+     * <p>Two signatures. A bracket against a digit -- {@code [1.7.22]} admits
+     * exactly one version and has no comma at all -- and a comma with digits on
+     * its left and digits or a closing bracket on its right, which is the only
+     * place a comma appears inside a version. Map notation --
      * {@code group: 'x', name: 'y', version: '1.8.0'} -- puts a quote to the
      * left of every comma and is the case this must not fire on, since
      * declaring the family that way is ordinary and gets raised. Anything else
@@ -239,6 +285,20 @@ public class KotlinStdlibAlignment {
      * a false match only declines to help.</p>
      */
     private static boolean containsAVersionRange(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c != '[' && c != ']') {
+                continue;
+            }
+            int after = i + 1;
+            while (after < text.length() && text.charAt(after) == ' ') {
+                after++;
+            }
+            if (after < text.length() && text.charAt(after) >= '0'
+                    && text.charAt(after) <= '9') {
+                return true;
+            }
+        }
         for (int i = text.indexOf(','); i >= 0; i = text.indexOf(',', i + 1)) {
             int before = i - 1;
             while (before >= 0 && text.charAt(before) == ' ') {
