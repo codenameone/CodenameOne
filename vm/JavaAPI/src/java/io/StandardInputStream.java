@@ -29,6 +29,26 @@ package java.io;
  * here. This mirrors NSLogOutputStream, which plays the same role for System.out.
  */
 public class StandardInputStream extends InputStream {
+    /**
+     * InputStream.close() is a no-op, so without this a caller that closed System.in
+     * -- directly, or by closing a Reader wrapped around it -- kept reading and
+     * CONSUMING stdin instead of getting the IOException the contract promises.
+     *
+     * Volatile because a stream can be closed from a different thread than the one
+     * reading it, which is the usual shape of "close it to unblock the reader".
+     */
+    private volatile boolean closed;
+
+    public void close() throws IOException {
+        /* The Java-side state only. The process file descriptor is deliberately NOT
+         * closed: descriptor 0 belongs to the process rather than to this object, the
+         * VM and any native library in it may still be using it, and once released
+         * the next open() in the process is free to take the number back -- so a
+         * later read would be answered by an unrelated file rather than failing.
+         * Closing the stream stops THIS stream, which is what the caller asked for. */
+        closed = true;
+    }
+
     public int read() throws IOException {
         byte[] one = new byte[1];
         int n = read(one, 0, 1);
@@ -39,6 +59,9 @@ public class StandardInputStream extends InputStream {
     }
 
     public int read(byte[] b, int off, int len) throws IOException {
+        if(closed) {
+            throw new IOException("Stream closed");
+        }
         if(b == null) {
             throw new NullPointerException();
         }

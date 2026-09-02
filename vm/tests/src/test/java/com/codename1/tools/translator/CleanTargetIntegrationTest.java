@@ -1875,6 +1875,57 @@ class CleanTargetIntegrationTest {
                 "the environment must decode to the right code points, got:\n" + out);
     }
 
+    /**
+     * Closing System.in must make the next read fail, not silently keep consuming it.
+     *
+     * InputStream.close() is a no-op, so the class had to opt in. Without the fix the
+     * read below returns -1 at EOF (stdin is empty here) and the program prints
+     * CLOSE_NOT_HONOURED; with it the read throws and the program prints CLOSE_OK.
+     * Driven through a real clean-target binary because the behaviour only exists
+     * once the native read is wired up.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void closingStandardInputIsHonoured(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+        Path sourceDir = Files.createTempDirectory("stdin-close-sources");
+        Path classesDir = Files.createTempDirectory("stdin-close-classes");
+        Path javaApiDir = Files.createTempDirectory("stdin-close-java-api");
+        Files.write(sourceDir.resolve("StdinCloseApp.java"), stdinCloseSource().getBytes(StandardCharsets.UTF_8));
+        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("stdin-close-output");
+        runTranslator(classesDir, outputDir, "StdinCloseApp");
+        Path distDir = outputDir.resolve("dist");
+        replaceLibraryWithExecutableTarget(distDir.resolve("CMakeLists.txt"), "StdinCloseApp-src");
+        Path buildDir = distDir.resolve("build");
+        Files.createDirectories(buildDir);
+        List<String> configure = new java.util.ArrayList<>(Arrays.asList(
+                "cmake", "-S", distDir.toString(), "-B", buildDir.toString(), "-DCMAKE_BUILD_TYPE=Release"));
+        configure.addAll(CompilerHelper.cmakeToolchainArgs());
+        runCommand(configure, distDir);
+        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+
+        String output = runCommand(
+                Arrays.asList(buildDir.resolve(CompilerHelper.executableName("StdinCloseApp")).toString()), buildDir);
+        assertTrue(output.contains("CLOSE_OK"),
+                "a read after close must throw IOException, got:\n" + output);
+    }
+
+    private static String stdinCloseSource() {
+        return "public class StdinCloseApp {\n"
+                + "    public static void main(String[] args) throws Exception {\n"
+                + "        System.in.close();\n"
+                + "        try {\n"
+                + "            System.in.read();\n"
+                + "            System.out.println(\"CLOSE_NOT_HONOURED\");\n"
+                + "        } catch (java.io.IOException e) {\n"
+                + "            System.out.println(\"CLOSE_OK\");\n"
+                + "        }\n"
+                + "    }\n"
+                + "}\n";
+    }
+
     private static String utf8ArgsSource() {
         return "public class Utf8ArgsApp {\n"
                 + "    private static String points(String s) {\n"
