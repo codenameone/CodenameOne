@@ -220,9 +220,23 @@ public class KotlinStdlibAlignment {
         // written that would not conflict, so nothing is.
         String[] active = activeLines(combined(appGradleFragments));
         for (int i = 0; i < active.length; i++) {
-            if (callsNamed(active[i], "failOnVersionConflict")) {
-                return "";
+            if (!callsNamed(active[i], "failOnVersionConflict")) {
+                continue;
             }
+            // Applied to configurations.classpath it governs the PLUGIN classpath and
+            // nothing this block writes: the constraints go into the app's
+            // dependencies, which that strategy never sees, so standing down there
+            // would leave a real duplicate unfixed for a setting that cannot conflict
+            // with us.
+            //
+            // Only that spelling, because it names the configuration outright.
+            // `buildscript { configurations.all { ... } }` is also plugin-only and
+            // still stands the block down: knowing that needs the surrounding block,
+            // and being wrong in the other direction breaks a build that works.
+            if (namesTheBuildscriptClasspath(active[i])) {
+                continue;
+            }
+            return "";
         }
         // The two shims cannot be suppressed independently when the app holds one of
         // them below the merge. Measured: an app pinning the whole family at 1.7.22
@@ -564,13 +578,17 @@ public class KotlinStdlibAlignment {
         if (callsStrictly(line) || callsForce(line, artifact)) {
             return true;
         }
-        // A rejection manages the version just as firmly, from the other side:
-        //   implementation('...:kotlin-stdlib-jdk8') { version { reject '[1.8.0,)' } }
-        // says every version our floor could resolve to is unacceptable, so writing
-        // the constraint anyway leaves the graph with nothing to select. Any reject
-        // counts, without reading which versions it covers -- the conservative
-        // reading, and the only one available without evaluating the rule.
-        if (callsNamed(line, "reject") || callsNamed(line, "rejectAll")) {
+        // A rejection manages the version from the other side, but only when it
+        // actually leaves our floor nothing to select. rejectAll does; so does an
+        // open-ended range starting at or below the floor, `reject '[1.8.0,)'`.
+        // `reject '1.7.0'` does not -- 1.8.0 and everything after it are still
+        // available, the graph still needs aligning, and treating every rejection as
+        // management left the original duplicate unfixed.
+        if (callsNamed(line, "rejectAll")) {
+            return true;
+        }
+        String rejected = versionInCall(line, "reject");
+        if (rejected != null && rejectionLeavesNothingAtTheFloor(rejected)) {
             return true;
         }
         String declared = declaredVersionOf(line, artifact);
@@ -887,6 +905,61 @@ public class KotlinStdlibAlignment {
             return false;
         }
         return literalBelowTheFloor(selector);
+    }
+
+    /**
+     * Whether the statement applies its strategy to the plugin classpath.
+     *
+     * <p>{@code configurations.classpath} is the buildscript's own, and a
+     * strategy on it governs which plugin jars load -- never the app's
+     * dependencies, which is all this class writes to.</p>
+     */
+    private static boolean namesTheBuildscriptClasspath(String line) {
+        int at = line.indexOf(BUILDSCRIPT_CLASSPATH);
+        while (at >= 0) {
+            boolean startsToken = at == 0 || !isIdentifierChar(line.charAt(at - 1));
+            int after = at + BUILDSCRIPT_CLASSPATH.length();
+            if (startsToken && (after >= line.length()
+                    || !isIdentifierChar(line.charAt(after)))) {
+                return true;
+            }
+            at = line.indexOf(BUILDSCRIPT_CLASSPATH, at + 1);
+        }
+        return false;
+    }
+
+    private static final String BUILDSCRIPT_CLASSPATH = "configurations.classpath";
+
+    /**
+     * Whether a rejected selector removes the floor and everything after it.
+     *
+     * <p>Only an open-ended range starting at or below the floor does:
+     * {@code [1.8.0,)} leaves nothing for the constraint to resolve to, while
+     * {@code [1.9.0,)} still leaves 1.8.x and an exact {@code 1.7.0} removes a
+     * version the constraint was never going to select anyway.</p>
+     */
+    private static boolean rejectionLeavesNothingAtTheFloor(String selector) {
+        String rejection = selector.trim();
+        if (rejection.length() == 0) {
+            return false;
+        }
+        char opening = rejection.charAt(0);
+        if (opening != '[' && opening != '(' && opening != ']') {
+            return false;
+        }
+        int comma = rejection.indexOf(',');
+        if (comma < 0) {
+            return false;
+        }
+        String upper = rejection.substring(comma + 1,
+                Math.max(comma + 1, rejection.length() - 1)).trim();
+        if (upper.length() != 0) {
+            // Bounded above, so something at or past the floor survives it.
+            return false;
+        }
+        String lower = rejection.substring(1, comma).trim();
+        return lower.length() == 0
+                || compareVersions(lower, MERGED_STDLIB_FLOOR) <= 0;
     }
 
     /** Whether a range excludes every version at or above the floor. */

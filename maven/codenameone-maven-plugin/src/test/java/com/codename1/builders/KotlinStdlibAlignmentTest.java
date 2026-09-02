@@ -645,6 +645,54 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A strategy on {@code configurations.classpath} governs the plugin
+     * classpath, which is not where these constraints go -- so standing the
+     * block down for it would leave a real duplicate unfixed for a setting
+     * that cannot conflict with anything written here.
+     */
+    @Test
+    public void aBuildscriptStrategyIsNotTheAppsGraph() {
+        String plugin = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    buildscript { configurations.classpath.resolutionStrategy"
+                + ".failOnVersionConflict() }\n");
+        check(plugin.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a classpath-only strategy leaves the alignment alone, got <<"
+                        + plugin + ">>");
+
+        // The app's own configurations still stand it down.
+        String app = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.failOnVersionConflict() }\n");
+        check("".equals(app), "the app's graph still does, got <<" + app + ">>");
+    }
+
+    /**
+     * A rejection only manages the version when it leaves the floor nothing to
+     * select. Reading every rejection as management left the original
+     * duplicate unfixed for an app that had rejected something else entirely.
+     */
+    @Test
+    public void aRejectionCountsOnlyWhenItReachesTheFloor() {
+        String[] closing = {"reject '[1.8.0,)'", "rejectAll()"};
+        for (int i = 0; i < closing.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
+                    + "{ version { " + closing[i] + " } }\n");
+            check("".equals(out),
+                    closing[i] + " leaves nothing at the floor, got <<" + out + ">>");
+        }
+
+        String[] leaving = {"reject '1.7.0'", "reject '[1.9.0,)'", "reject '(,1.8.0]'"};
+        for (int i = 0; i < leaving.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
+                    + "{ version { " + leaving[i] + " } }\n");
+            check(out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                    leaving[i] + " still leaves the floor selectable, got <<"
+                            + out + ">>");
+        }
+    }
+
+    /**
      * A declaration written inside quoted prose never executes. An
      * unrestricted search for {@code def} found one there and recorded it,
      * overwriting a real binding so a later use read as something else.
