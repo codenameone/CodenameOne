@@ -68,6 +68,7 @@ class Walker:
         self.root = root
         self.guide_dir = guide_dir
         self.reachable: dict[Path, str] = {}
+        self.direct: set[Path] = set()
         self.errors: list[str] = []
         self._visit(root, "")
 
@@ -96,6 +97,7 @@ class Walker:
                 )
                 continue
             if path == self.root:
+                self.direct.add(target)
                 self._check_manifest_spacing(index, lines, target_raw)
             self._visit(target, attrs)
 
@@ -183,7 +185,13 @@ def main() -> int:
     for name in sorted(declared & reachable_names):
         errors.append(f"not-in-book.txt lists {name}, but it is included. Remove the entry.")
 
-    # 2. A level-0 heading in an included file silently becomes a book part.
+    # 2. A chapter's own heading level decides whether it is a chapter at all.
+    #    A level-0 heading turns it into a book PART; a level-3 heading (or none)
+    #    makes it a subsection of whatever chapter precedes it. Both nest silently,
+    #    and the rendered-title check below cannot see either, because it accepts a
+    #    title at any depth. Only entries the manifest includes DIRECTLY are held
+    #    to this: nested fragments such as the appendix_goal_* files legitimately
+    #    start at level 3 under their parent.
     for path, attrs in sorted(walker.reachable.items()):
         if path == root:
             continue
@@ -193,6 +201,19 @@ def main() -> int:
                 f"{path.name}: opens with a level-0 '= {heading[1]}' heading. Under "
                 f"doctype:book that renders as a PART and promotes its own sections to "
                 f"chapters. Use '== ' or include it with leveloffset=+1."
+            )
+        if path not in walker.direct or "leveloffset" in attrs:
+            continue
+        if heading is None:
+            errors.append(
+                f"{path.name}: is included directly by developer-guide.asciidoc but has "
+                f"no heading, so its content is absorbed into the chapter before it."
+            )
+        elif heading[0] > 2:
+            errors.append(
+                f"{path.name}: is included directly by developer-guide.asciidoc but opens "
+                f"at level {heading[0]} ('{'=' * heading[0]} {heading[1]}'), so it renders "
+                f"as a section of the preceding chapter rather than as a chapter. Use '== '."
             )
 
     # 3. Outcome check: every included chapter's title survives into the book.
