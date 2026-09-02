@@ -450,13 +450,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 .Captured photos previewed in the ImageViewer
 image::img/capture-photo.png[Captured photos previewed in the ImageViewer,scaledwidth=20%]
 
-// HTML_ONLY_START
-You show video capture in the https://www.codenameone.com/manual/components.html#mediamanager-section[MediaManager section].
-// HTML_ONLY_END
-////
-//PDF_ONLY
 You show video capture in the <<mediamanager-section,MediaManager section>>.
-////
 
 The sample below captures audio recordings (using the 'Capture' API) and copies them locally under unique names. It also demonstrates the storage and organization of captured audio:
 

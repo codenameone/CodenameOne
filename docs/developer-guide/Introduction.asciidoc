@@ -138,6 +138,7 @@ Before you proceed, this section explains some universal core concepts of mobile
 
 You can skip this section if you feel you're familiar enough with the core problems/issues in mobile app development.
 
+[[density-and-dpi]]
 ==== Density
 
 Density is also known as DPI (Dots Per Inch) or PPI (pixels or points per inch). Density is confusing, unintuitive and might collide with common sense. For example, an iPhone 7 plus has a resolution of `1080x1920` pixels and a PPI of `401` for a 5-inch screen. But, an iPad 4 has `1536x2048` pixels with a PPI of `264` on a `9.7` inch screen... Smaller devices can have higher resolutions!
@@ -317,6 +318,7 @@ image::img/codenameone-hello-world-title-label.png[Title and Label in the UI,sca
 
 Some complex ideas appear within this short snippet that this chapter addresses later when talking about layout. The gist of it's that you create and show a `Form`. `Form` is the top level UI element, it takes over the whole screen. You can add UI elements to that `Form` object, in this case the `Label`. You use the `BoxLayout` to arrange the elements within the `Form` from top to the bottom vertically.
 
+[[ApplicationLifecycle]]
 .Application Lifecycle
 ****
 A few years ago Romain Guy (a senior Google Android engineer) was on stage at the Google IO conference. He asked for a show of hands of people who understand the `Activity` lifecycle (`Activity` is like a Codename One main class). He then proceeded to jokingly call the audience members who lifted their hands "`liars`" claiming that after all his years in Google he still doesn't understand it...
@@ -478,7 +480,7 @@ image::img/build-server-results.png[Build Results,scaledwidth=80%]
 
 TIP: On iOS make sure you use Safari when installing, as 3rd party browsers might have issues
 
-Once you go through those steps you should have the #HelloWorld# app running on your device. This process is non-trivial when starting so if you run into difficulties don't despair and seek help at the discussion forum (https://www.codenameone.com/discussion-forum.html) or stack overflow (https://stackoverflow/tags/codenameone/). Once you go through signing and installation, it becomes easier.
+Once you go through those steps you should have the #HelloWorld# app running on your device. This process is non-trivial when starting so if you run into difficulties don't despair and seek help at the discussion forum (https://www.codenameone.com/discussion-forum/) or stack overflow (https://stackoverflow.com/questions/tagged/codenameone). Once you go through signing and installation, it becomes easier.
 
 TIP: You can also install the application either by emailing the installation link to your account (using the #e-mail Link#
 button)

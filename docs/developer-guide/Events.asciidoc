@@ -136,13 +136,7 @@ in the Codename One AutoCompleteTextField.
 * https://www.codenameone.com/javadoc/com/codename1/ui/table/TableModel.html[TableModel] & https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] - the model for the https://www.codenameone.com/javadoc/com/codename1/ui/table/Table.html[Table] class notifies the view that its content has changed via this
 event, thus allowing the UI to refresh.
 
-// HTML_ONLY_START
-An exhaustive example of search implemented using the `DataChangedListener` appears in the https://www.codenameone.com/manual/components.html#Advanced-search-code[Toolbar section].
-// HTML_ONLY_END
-////
-//PDF_ONLY
-There is a exhaustive example of search that's implemented using the `DataChangedListener` in the <<Advanced-search-code,Toolbar section>>.
-////
+There is an exhaustive example of search that's implemented using the `DataChangedListener` in the <<Advanced-search-code,Toolbar section>>.
 
 ==== FocusListener
 
@@ -163,13 +157,7 @@ For example, in this code from the `Flickr` demo the https://www.codenameone.com
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava009Snippet.java[tag=events-java-009,indent=0]
 ----
 
-// HTML_ONLY_START
-NOTE: A better way of implementing this exact effect uses title animations https://www.codenameone.com/manual/components.html#title-animations-section[illustrated here].
-// HTML_ONLY_END
-////
-//PDF_ONLY
 NOTE: There is a better way of implementing this exact effect using title animations <<title-animations-section,illustrated here>>.
-////
 
 ==== SelectionListener
 

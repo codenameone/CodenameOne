@@ -20,6 +20,7 @@ If you've access to a Mac, connect the device, open Xcode, and use the device ex
 - Check that the `ios.includePush` build hint matches your iOS provisioning. It must be false if your provisioning profile doesn't include push.
 
 [[section-ios-launch-screen]]
+[[ios-launch-storyboard]]
 === Launch screen storyboard best practices
 
 Launch screen storyboards are the default approach for Codename One iOS builds. Apple requires a storyboard-based launch experience for modern devices, so the legacy screenshot generator was removed in favor of a single adaptive layout. You can still opt back into the old behavior by setting the `ios.generateSplashScreens=true` build hint, but it's best to use a storyboard unless your use case can't be expressed with Auto Layout.

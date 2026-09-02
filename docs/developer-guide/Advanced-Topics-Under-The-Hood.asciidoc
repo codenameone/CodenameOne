@@ -1530,13 +1530,7 @@ Another problem might be counterintuitive. iOS has screenshot images representin
 
 Its impractical to support something like HTML for the screenshot process since it would also look different from the web component running on the device.
 
-// HTML_ONLY_START
-TIP: You can read more about the screenshot process https://www.codenameone.com/manual/appendix-ios.html#section-ios-screenshots[here].
-// HTML_ONLY_END
-////
-//PDF_ONLY
-TIP: You can read more about the screenshot process <<section-ios-screenshots, here>>.
-////
+TIP: The launch storyboard replaced the build server's screenshot generator. See <<ios-launch-storyboard,launch screen storyboard best practices>>.
 
 
 === Integrating 3rd party native SDKs

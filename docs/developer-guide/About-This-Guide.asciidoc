@@ -7,9 +7,21 @@ This developer guide comes directly from the `docs` directory of the https://git
 
 === How to contribute updates
 
-To contribute updates, clone the repository, create a feature branch, and edit the AsciiDoc files in `docs/developer-guide`. Follow the steps in the link:https://github.com/codenameone/CodenameOne/blob/master/CONTRIBUTING.md[CONTRIBUTING guidelines] to open a GitHub pull request (PR) instead of using the deprecated community wiki. Continuous integration lints and builds each PR automatically. A maintainer then reviews the PR before merging it. After the merge, the content appears in the web manual at https://www.codenameone.com/manual/ and in the downloadable PDF at https://www.codenameone.com/files/developer-guide.pdf[https://www.codenameone.com/files/developer-guide.pdf]. From time to time, major revisions are collected for print-on-demand distribution.
+To contribute updates, clone the repository, create a feature branch, and edit the AsciiDoc files in `docs/developer-guide`. Follow the steps in the link:https://github.com/codenameone/CodenameOne/blob/master/CONTRIBUTING.md[CONTRIBUTING guidelines] to open a GitHub pull request (PR) instead of using the deprecated community wiki. Continuous integration lints and builds each PR automatically. A maintainer then reviews the PR before merging it. After the merge, the content appears in the web manual at https://www.codenameone.com/developer-guide/ and in the downloadable PDF at https://www.codenameone.com/files/developer-guide.pdf[https://www.codenameone.com/files/developer-guide.pdf]. From time to time, major revisions are collected for print-on-demand distribution.
 
 This guide focuses on tutorial and conceptual material. The complete API reference is available in the https://www.codenameone.com/javadoc/[Codename One Javadoc]. The framework source code and this manual live side by side in Git, so documentation and code improvements follow the same contribution workflow.
+
+=== Where else to look
+
+This guide is the conceptual and tutorial reference. These resources cover the rest:
+
+* https://www.codenameone.com/javadoc/[Codename One Javadoc] -- the complete API reference.
+* https://www.codenameone.com/developer-guide/[Web edition of this guide] and the
+  https://www.codenameone.com/files/developer-guide.pdf[downloadable PDF].
+* https://www.codenameone.com/how-do-i/["`How Do I?`" video tutorials] -- short screencasts for common tasks.
+* https://www.codenameone.com/blog/[The Codename One blog] -- release notes and deep dives.
+* https://www.codenameone.com/discussion-forum/[The community discussion forum] -- questions and answers.
+* https://github.com/codenameone/CodenameOne/[The Codename One repository] -- source, issues, and pull requests.
 
 <<<
 
