@@ -30,6 +30,7 @@ from pathlib import Path
 
 ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
 INCLUDE_RE = re.compile(r"^include::([^\[]+)\[([^\]]*)\]\s*$")
+INLINE_CONDITIONAL_INCLUDE_RE = re.compile(r"^(ifdef|ifndef|ifeval)::[^\[]*\[.*include::")
 HEADING_RE = re.compile(r"^(=+) +(\S.*)$")
 # Literal-content blocks only. The container delimiters -- ==== example,
 # **** sidebar, ____ quote -- hold ordinary AsciiDoc, so an include or a heading
@@ -151,6 +152,19 @@ class Walker:
                     open_fence = None
                 continue
             if open_fence is not None:
+                continue
+            if INLINE_CONDITIONAL_INCLUDE_RE.match(line):
+                # asciidoctor expands the bracket content and processes the include
+                # inside it; INCLUDE_RE is anchored, so the line looked like nothing
+                # at all and the edge went uncounted. Refused for the same reason as
+                # any other conditional include: neither the duplicate count nor the
+                # rendered-title check can model one.
+                self.errors.append(
+                    f"{path.name}:{index + 1}: an include inside an inline conditional. "
+                    f"asciidoctor expands and processes it, but neither the duplicate "
+                    f"check nor the rendered-title check can model a conditional "
+                    f"include, so this refuses it rather than skipping it silently."
+                )
                 continue
             match = INCLUDE_RE.match(line)
             if not match:

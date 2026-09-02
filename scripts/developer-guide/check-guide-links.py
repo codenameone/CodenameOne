@@ -189,6 +189,12 @@ JAVA_LINE_COMMENT_RE = re.compile(r"//[^\n]*")
 PUBLIC_TYPE_RE = (
     r"\bpublic\b[^;{{]*?\b(?:class|interface|enum|record|@interface)\s+{stem}\b"
 )
+# A NESTED type may be protected as well as public, and javadoc -protected
+# documents both. It is declared inside the outer type's own file, so that is
+# where to look.
+NESTED_TYPE_RE = (
+    r"\b(?:public|protected)\b[^;{{]*?\b(?:class|interface|enum|record|@interface)\s+{stem}\b"
+)
 JAVADOC_PACKAGE_PAGES = {
     "package-summary.html",
     "package-frame.html",
@@ -240,6 +246,20 @@ def javadoc_index(repo_root: Path) -> tuple[set[str], set[str]]:
     return _javadoc_index
 
 
+def declares_nested_type(package: str, outer: str, nested: str) -> bool:
+    """Whether the outer type's source declares a documented nested type."""
+    if _JAVADOC_ROOT is None:
+        return True
+    for root_name in JAVADOC_SOURCE_ROOTS:
+        source = _JAVADOC_ROOT / root_name / package / f"{outer}.java"
+        if not source.exists():
+            continue
+        text = source.read_text(encoding="utf-8", errors="ignore")
+        text = JAVA_LINE_COMMENT_RE.sub("", JAVA_BLOCK_COMMENT_RE.sub("", text))
+        return re.search(NESTED_TYPE_RE.format(stem=re.escape(nested)), text) is not None
+    return True  # the outer source moved; the class check above already spoke
+
+
 def javadoc_path_exists(target: str) -> bool:
     """Whether a /javadoc/ path names something the generated tree will hold.
 
@@ -275,7 +295,15 @@ def javadoc_path_exists(target: str) -> bool:
     if page in JAVADOC_PACKAGE_PAGES:
         return True
     # A nested type is documented as Outer.Inner.html, generated from Outer.java.
-    return f"{package}/{page[:-5].split('.')[0]}" in classes
+    parts = page[:-5].split(".")
+    if f"{package}/{parts[0]}" not in classes:
+        return False
+    if len(parts) == 1:
+        return True
+    # javadoc emits a page for a nested type only where one is declared, so the
+    # innermost name has to appear in the outer type's file. Checking the outer
+    # name alone accepted Component.DoesNotExist.html.
+    return declares_nested_type(package, parts[0], parts[-1])
 
 
 def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
