@@ -1114,6 +1114,10 @@ static void cn1FreeThreadStack(struct elementStruct* stack, int mapped) {
 // issue recorded against the file layer below, and the same remedy.)
 JAVA_OBJECT java_lang_System_getenv___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
     if(name == JAVA_NULL) {
+        /* The API specifies NullPointerException for a null name. Returning null made
+           an invalid argument indistinguishable from an unset variable, so a caller
+           with a null name silently took the "not set" branch. */
+        throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData));
         return JAVA_NULL;
     }
     const char* key = stringToUTF8(threadStateData, name);
@@ -2229,6 +2233,17 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
        is worse. Reporting it lets a caller that can cope do so. */
     if(threadOffset < 0) {
         unlockCriticalSection();
+        /* UNBIND BEFORE FREEING. pthread_setspecific ran above, so the key already
+           points at this state; freeing it without clearing leaves every later
+           getThreadLocalData() on this thread returning memory that has been given
+           back -- a use-after-free introduced by the exhaustion check itself, and
+           worse than the out-of-bounds write it replaced, because the thread would
+           keep using the stale pointer instead of retrying. Cleared here rather than
+           by moving the bind below the search: cn1TlsSelf is expected to name the
+           host thread for the whole of the rest of this function. */
+        if(bindToCallingOsThread) {
+            pthread_setspecific(threadIdKey, NULL);
+        }
         cn1FreeThreadLocalDataFields(i);
         return 0;
     }

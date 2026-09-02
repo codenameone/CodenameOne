@@ -2000,7 +2000,20 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
  * and the collector gets its safepoint just the same. The pacing park already
  * did this; this site, the hottest of the four (once per syscall return), did
  * not. Platform threads still sleep -- there is nothing to yield to. */
-#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } __cn1rts->threadActive = JAVA_TRUE; CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
+/* MARK ACTIVE ONLY WHAT THE COLLECTOR CAN STOP -- that is what gcPthreadValid
+   means here, and the guard is not an optimisation.
+   getThreadLocalData() resolves to the VIRTUAL thread's state while one is running,
+   so without it every bracketed native -- a file read, a socket read -- left a
+   virtual thread's state threadActive on the way out. Nothing lowers it again until
+   the next yield, and the collector's wait for that flag is unbounded while the
+   forced-stop escalation that would break the wait is gated on gcPthreadValid,
+   permanently false for a virtual thread. A virtual thread that read a file and then
+   computed would stall collection forever.
+   This is the same hang as the reverted cn1VirtualThreadResume change, reached by a
+   different path, which is why removing that assignment alone did not close it.
+   Virtual-thread roots do not depend on the flag: cn1GcScanParkedVirtualThreads
+   scans every registered virtual thread whether or not it is running. */
+#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } if(__cn1rts->gcPthreadValid) { __cn1rts->threadActive = JAVA_TRUE; } CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
 
 extern struct ThreadLocalData* getThreadLocalData();
 
