@@ -58,7 +58,11 @@ NON_PROSE_PREFIX = ("//", "|", "=", ".", ":", "*", "-", "+", "[", "<")
 # (*text*) are not. Stripping the marker lets the prose test see the sentence,
 # so an introduction written as a list item is not mistaken for markup.
 LIST_MARKER_RE = re.compile(r"^([*\-]+|\.{1,5}|[0-9]+\.)\s+")
-# What a real block looks like when it starts. An introduction separated from its
+# What a real block looks like when it starts. image:: is deliberately absent: a
+# figure is not the listing a sentence promised, which is what the 33 baseline
+# entries of the form "looks something like this:" followed by a titled image
+# already record. Counting it made the answer depend on whether the figure
+# happened to carry a title. An introduction separated from its
 # listing by more than one blank line is untidy, not a hole, and reporting it
 # would make the gate reject valid AsciiDoc spacing. Deliberately conservative:
 # only unambiguous starts, so a genuine hole is never explained away.
@@ -71,14 +75,16 @@ ADMONITION = "NOTE|TIP|IMPORTANT|WARNING|CAUTION"
 # A bracketed attribute list or a block title. Both attach to the block BELOW them,
 # so neither answers the question "is a listing here".
 ATTRIBUTE_LINE_RE = re.compile(
-    r'^\[(?!(?:' + "NOTE|TIP|IMPORTANT|WARNING|CAUTION" + r')[,\]])[a-zA-Z%.#"][^\]]*\]\s*$'
+    r'^(\[\[[^\]]+\]\]\s*$'                              # [[anchor]]
+    r'|\[(?!(?:' + "NOTE|TIP|IMPORTANT|WARNING|CAUTION" + r')[,\]])[a-zA-Z%.#"][^\]]*\]\s*$'
+    r'|\.[^.\s].*$)'                                       # .Block title
 )
 BLOCK_START_RE = re.compile(
     # The name may be followed by "]" or by further attributes, as in
     # [NOTE,caption="Aside"] -- requiring the bracket immediately made an
     # attributed admonition look like the listing the sentence promised.
     r'^(\[(?!(?:' + ADMONITION + r')[,\]])[a-zA-Z%.#"]'
-    r'|image::|include::|\|===|(----|\.\.\.\.|````|\+\+\+\+|====|\*\*\*\*|____)\s*$)'
+    r'|include::|\|===|(----|\.\.\.\.|````|\+\+\+\+|====|\*\*\*\*|____)\s*$)'
 )
 
 

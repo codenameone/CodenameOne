@@ -80,6 +80,35 @@ def parse_lines(path: Path) -> list[str]:
     return path.read_text(encoding="utf-8").split("\n")
 
 
+def heading_is_conditional(path: Path) -> bool:
+    """Whether the file's first heading sits inside a backend conditional.
+
+    A chapter whose own title is conditional has no title in the branch that
+    excludes it, and its body merges into whatever precedes it there. The outcome
+    check cannot see that from one render: first_heading() reads the source, so
+    the title is found, and the HTML render contains it. Rather than render the
+    book a second time for a construct the guide does not use -- measured, zero
+    headings sit inside a backend conditional -- refuse the construct.
+    """
+    open_fence: str | None = None
+    depth = 0
+    for line in parse_lines(path):
+        fence = COMMENT_FENCE_RE.match(line)
+        if fence:
+            token = fence.group(1)
+            open_fence = token if open_fence is None else (None if token == open_fence else open_fence)
+            continue
+        if open_fence is not None:
+            continue
+        if BLOCK_DIRECTIVE_RE.match(line.strip()):
+            depth += 1 if not line.strip().startswith("endif::") else -1
+            depth = max(0, depth)
+            continue
+        if HEADING_RE.match(line):
+            return depth > 0
+    return False
+
+
 def first_heading(path: Path) -> tuple[int, str] | None:
     """Return (level, title) of the file's first heading outside a fenced block."""
     open_fence: str | None = None
@@ -540,6 +569,13 @@ def main() -> int:
             # title in this render would report a chapter that is deliberately
             # absent. Its level and spacing are still checked above.
             continue
+        if heading_is_conditional(path):
+            errors.append(
+                f"{path.name}: its own title sits inside a conditional. In the branch "
+                f"that excludes it the chapter has no heading and its body merges into "
+                f"whatever precedes it, which one render cannot show. Put the title "
+                f"outside the conditional."
+            )
         heading = first_heading(path)
         if not heading:
             continue

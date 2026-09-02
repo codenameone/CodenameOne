@@ -104,6 +104,7 @@ Introduction.asciidoc	Next consider the first lifecycle method `init(Object)`. T
 Introduction.asciidoc	Now that you have a general sense of the lifecycle lets look at the last two lifecycle methods:
 Introduction.asciidoc	The hello world Java source file looks like this (removed some comments and whitespace):
 Maps.asciidoc	A native provider only renders on the platforms that ship its SDK. To show a provider's map *everywhere* -- including platforms with no native SDK for it -- register a `WebMapProvider`, which hosts the provider's JavaScript SDK inside a `BrowserComponent`:
+Maps.asciidoc	Because it needs only a web view, the web provider (id `web`) is the natural last step before the pure-vector fallback in a provider chain. The order is fully customizable from code, so you can express per-platform preferences -- for example "try the native Google SDK, then the web map, then the vector `MapView`":
 Maps.asciidoc	Every map -- vector or native -- exposes the same operations through `MapSurface`:
 Maps.asciidoc	For a real app you point `MapView` at a hosted tile service. The simplest keyless option is OpenFreeMap (OpenStreetMap-based vector tiles); for branded styles or higher quotas use a keyed provider such as MapTiler or your own self-hosted Protomaps/TileServer GL endpoint:
 Maps.asciidoc	When a provider is selected the build server injects that provider's implementation into your app and wires it in; with no provider selected (or when the provider is unavailable at runtime, for example when Google Play Services is missing) `NativeMap` simply renders the vector `MapView` fallback. You can configure the fallback basemap explicitly:
@@ -117,6 +118,7 @@ Miscellaneous-Features.asciidoc	For example: you can copy the `Image` to `Storag
 Miscellaneous-Features.asciidoc	However, it gets better, say you want to return a value:
 Miscellaneous-Features.asciidoc	If you need to apply the scale manually for custom fonts or layout calculations, read the values directly:
 Miscellaneous-Features.asciidoc	It allows formatting numbers/dates & time based on platform locale. It also provides a great deal of the information you need such as the language/locale information you need to pick the proper resource bundle:
+Miscellaneous-Features.asciidoc	Or, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder` APIs to capture audio, as a more customizable approach than using the Capture API:
 Miscellaneous-Features.asciidoc	The `Capture` API also includes a callback based API that uses the `ActionListener` interface to implement capture. For example: you can adapt the previous sample to use this API as such:
 Miscellaneous-Features.asciidoc	The following code demonstrates usage of the GeoFence API:
 Miscellaneous-Features.asciidoc	The list of available languages in the resource bundle could be retrieved like this. Notice that this a list that was set by you and doesn't need to confirm to the ISO language code standards:
