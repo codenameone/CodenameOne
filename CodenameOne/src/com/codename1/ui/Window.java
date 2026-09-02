@@ -3429,8 +3429,9 @@ public class Window extends Container implements TopLevelContainer {
         // nothing left to scroll, and the release then reached the pressed component
         // and acted like a click on it (issue #5655). The dragged component still gets
         // its release -- that one IS the scroll, and it has momentum to settle.
+        final boolean wheeling = Display.impl.isScrollWheeling();
         Component target = releasingDragged != null ? releasingDragged
-                : (Display.impl.isScrollWheeling() ? null : releasingPressed);
+                : (wheeling ? null : releasingPressed);
         if (target != null) {
             if (releasingDragged != null && releasingDragged.isDragAndDropInitialized()) {
                 // An activated drag ends with dragFinished, not pointerReleased.
@@ -3442,6 +3443,21 @@ public class Window extends Container implements TopLevelContainer {
             } else {
                 LeadUtil.pointerReleased(target, x, y);
             }
+        }
+        // Guarded by the token for the same reason endGesture is: a release handler can
+        // enter invokeAndBlock, whose nested loop dispatches a fresh press in this window,
+        // and emptying the list then would erase the replacement gesture's pending
+        // component rather than this one's.
+        if (wheeling && currentPointerPress == releasing) { //NOPMD CompareObjectsWithEquals
+            // Nothing pressed by a wheel gesture is ever released: the release above went
+            // to the scrolling container or nowhere at all, and it is Button's own
+            // pointerReleased that takes it off this list. A stale entry makes the NEXT
+            // gesture's list hold two, which takes autoRelease out of its single component
+            // branch -- so dragging off the newly pressed button no longer cancels it and
+            // releasing outside fires its action. The same reasoning, and the same remedy,
+            // as the cancelled-gesture path above; Form clears its list on the equivalent
+            // path.
+            clearComponentsAwaitingRelease();
         }
         endGesture(releasing);
     }

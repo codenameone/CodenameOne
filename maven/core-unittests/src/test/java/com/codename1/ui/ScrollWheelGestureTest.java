@@ -121,6 +121,48 @@ class ScrollWheelGestureTest extends UITestBase {
         w.dispose();
     }
 
+    @FormTest
+    void aWheelOverAButtonInAWindowDoesNotStrandItAwaitingRelease() {
+        implementation.setMultiWindowSupported(true);
+        final int[] fired = new int[1];
+        Window w = new Window("wheel then press", new BorderLayout());
+        Button b = new Button("press me");
+        b.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                fired[0]++;
+            }
+        });
+        w.add(BorderLayout.CENTER, b);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.revalidate();
+        DisplayTest.flushEdt();
+
+        // The wheel gesture presses the button and is then denied its release, which is
+        // the point of the fix above -- but Button takes itself off the window's
+        // awaiting-release list in its OWN pointerReleased. Left there, the next real
+        // press makes that list hold two, autoRelease leaves its single component branch,
+        // and a press dragged off the button stops being cancelled.
+        Display.impl.windowPointerWheelMoved(w.getWindowId(), 150, 120, 0,
+                -Display.getInstance().convertToPixels(20), false, 0);
+        for (int i = 0; i < 6; i++) {
+            DisplayTest.flushEdt();
+        }
+        assertEquals(0, fired[0], "the wheel itself must not fire the button");
+
+        // Now the ordinary gesture that has to keep working: press, drag well clear of
+        // the button, release out there.
+        w.pointerPressed(150, 120);
+        w.pointerDragged(-20, -20);
+        w.pointerReleased(-20, -20);
+        int firedCount = fired[0];
+        w.dispose();
+
+        assertEquals(0, firedCount,
+                "releasing outside the button must still not fire its action after a wheel");
+    }
+
     /// Plays one wheel notch over the middle of `over`, then drains the queued steps.
     /// Through the implementation entry point rather than by fabricating pointer events,
     /// because the gesture it queues -- and the isScrollWheeling window around it -- is
