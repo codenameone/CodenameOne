@@ -58,7 +58,11 @@ import java.util.Vector;
 /// @author Chen Fishbein
 public class UIManager {
 
-    static UIManager instance;
+    /// Volatile because getInstance() reads it twice around a lock (a plain field
+    /// makes that double-checked lock unsafe) and because the constructor publishes
+    /// this instance before it has finished running: without it, another thread can
+    /// see the reference while the fields written below it are still unset.
+    static volatile UIManager instance;
     /// This member is used by the resource editor
     static boolean accessible = true;
     /// This member is used by the resource editor
@@ -109,10 +113,17 @@ public class UIManager {
         // from other projects that may be out of sync.  E.g. the Designer project
         // uses the "instance" property directly.  This should guarantee that
         // instance will be set
+        // current is assigned BEFORE this instance is published, not after. getInstance()
+        // hands out `instance`, so any thread reaching it while this constructor is still
+        // running gets an object whose getLookAndFeel() is null, and the first component
+        // built on that thread dies in Component.initLaf. Ordering it this way is safe:
+        // the LookAndFeel constructor only stores the manager it is handed, so it cannot
+        // reach back through the static. resetThemeProps() can, which is why it stays
+        // after the publish the comment above describes.
+        current = new DefaultLookAndFeel(this);
         if (instance == null) {
             instance = this;
         }
-        current = new DefaultLookAndFeel(this);
         resetThemeProps(null);
     }
 
