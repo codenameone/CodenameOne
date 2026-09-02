@@ -1108,7 +1108,7 @@ public class KotlinStdlibAlignment {
         }
         int dot = skipBlanksBackward(line, i);
         if (dot < 0 || line.charAt(dot) != '.') {
-            return true;
+            return !isAnOutputHelper(line.substring(i + 1, at + 1));
         }
         int end = skipBlanksBackward(line, dot - 1);
         if (end < 0) {
@@ -1128,6 +1128,38 @@ public class KotlinStdlibAlignment {
         return lastSegmentIs(receiver, "dependencies")
                 || lastSegmentIs(receiver, "constraints");
     }
+
+    /**
+     * Whether an unqualified call is one that prints rather than declares.
+     *
+     * <p>A configuration is never reached through a receiver, which is what
+     * makes an unqualified call a declaration -- but Groovy's output helpers are
+     * unqualified too, so {@code println('g:a:1.7.22!!')} read as a strict pin
+     * and stood the block down for a string the app was only logging.</p>
+     *
+     * <p>Named, because the configurations themselves cannot be: an app may call
+     * one anything. That makes this the complement of an open set, so it is a
+     * list -- and one it fails safely: a helper missing from it keeps being read
+     * as a declaration, which is what happens today and costs at worst the
+     * duplicate an app already had. Listing the CONFIGURATIONS instead would
+     * fail the other way, dropping a real pin the moment a project names a
+     * configuration nobody anticipated.</p>
+     */
+    private static boolean isAnOutputHelper(String call) {
+        for (int i = 0; i < OUTPUT_HELPERS.length; i++) {
+            if (OUTPUT_HELPERS[i].equals(call)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Groovy's unqualified printing calls, which declare nothing. */
+    private static final String[] OUTPUT_HELPERS = {
+        "println",
+        "print",
+        "printf"
+    };
 
     /** Gradle's strict-version shorthand, written after the version. */
     private static final String STRICT_SUFFIX = "!!";
@@ -3373,7 +3405,8 @@ public class KotlinStdlibAlignment {
      * than wrong.</p>
      */
     private static boolean recordsADestructuring(String statement, int at,
-            Map<String, String> literals, boolean conditional) {
+            Map<String, String> literals, boolean conditional, ScopedNames scope,
+            int depth) {
         int i = skipBlanks(statement, at);
         if (i >= statement.length() || statement.charAt(i) != '(') {
             return false;
@@ -3433,6 +3466,13 @@ public class KotlinStdlibAlignment {
                 }
             }
             if (names.get(n) != null && value != null) {
+                // Registered with the scope first, exactly as a single
+                // declaration is. Written straight into the map, a name declared
+                // this way inside a block outlived it -- so an inner
+                // `def (dep, x) = [..]` shadowed an extra property for the rest
+                // of the file and its coordinate was inlined into a later
+                // declaration that has nothing to do with it.
+                scope.declared(depthAt(statement, at, depth), names.get(n), literals);
                 recordDefinition(literals, names.get(n), value, conditional);
             }
             i = skipBlanks(statement, i);
@@ -3677,7 +3717,8 @@ public class KotlinStdlibAlignment {
         // recorded a declaration that never executes, overwriting the real binding
         // and making a later use read as something it is not.
         int at = afterCall(statement, DEF);
-        if (at >= 0 && recordsADestructuring(statement, at, literals, conditional)) {
+        if (at >= 0 && recordsADestructuring(statement, at, literals, conditional,
+                scope, depth)) {
             return;
         }
         if (at >= 0) {

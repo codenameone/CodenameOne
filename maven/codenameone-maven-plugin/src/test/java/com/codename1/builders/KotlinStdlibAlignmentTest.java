@@ -769,6 +769,69 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A destructured name is scoped like any other. Written straight into the
+     * map, one declared inside a block outlived it -- so an inner
+     * {@code def (dep, x) = [..]} shadowed an extra property for the rest of the
+     * file and its coordinate was inlined into a later declaration that has
+     * nothing to do with it.
+     */
+    @Test
+    public void aDestructuredNameLeavesItsBlock() {
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!";
+        String escaped = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    ext.dep = 'com.example:real:1.0'\n"
+                + "    if (true) {\n        def (dep, x) = ['" + pin + "', 'x']\n"
+                + "    }\n    implementation(dep)\n");
+        check(escaped.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "the extra property comes back after the block, got <<"
+                        + escaped + ">>");
+
+        // It still binds where it is in scope.
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def (dep, x) = ['" + pin + "', 'x']\n"
+                        + "    implementation(dep)\n")),
+                "at the top level it binds");
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    if (true) {\n        def (dep, x) = ['" + pin + "', 'x']\n"
+                        + "        implementation(dep)\n    }\n")),
+                "and inside the block it binds for the block");
+    }
+
+    /**
+     * A configuration is never reached through a receiver, which is what makes
+     * an unqualified call a declaration -- but Groovy's output helpers are
+     * unqualified too, so {@code println('g:a:1.7.22!!')} read as a strict pin
+     * and stood the block down for a string the app was only logging.
+     */
+    @Test
+    public void anOutputHelperIsNotAConfiguration() {
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!";
+        String[] printing = {
+            "    println('" + pin + "')\n",
+            "    print('" + pin + "')\n",
+            "    printf('" + pin + "')\n",
+        };
+        for (int i = 0; i < printing.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation", printing[i])
+                            .contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + printing[i].trim() + ">> declares nothing");
+        }
+
+        // Any other unqualified call is still a configuration, because an app
+        // may call one anything.
+        String[] declaring = {
+            "    implementation('" + pin + "')\n",
+            "    myCustomConfig('" + pin + "')\n",
+        };
+        for (int i = 0; i < declaring.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    declaring[i]);
+            check("".equals(out), "<<" + declaring[i].trim() + ">> is a declaration, "
+                    + "got <<" + out + ">>");
+        }
+    }
+
+    /**
      * Groovy's multiple assignment binds several names at once. The walk for a
      * single declaration expects an identifier after {@code def} and finds a
      * parenthesis, so it recorded nothing and the pin one of the names carried
