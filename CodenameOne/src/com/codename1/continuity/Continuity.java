@@ -130,6 +130,10 @@ public final class Continuity {
     /// How long a non-EDT caller waits for the EDT to take its capture.
     private static final int EDT_WAIT_MILLIS = 2000;
 
+    /// Passed to deliver() by a caller that has no relay session to tie the state to -- a platform
+    /// continuation, or a test.
+    private static final long NO_ERA = Long.MIN_VALUE;
+
     private static final List<ContinuityListener> listeners = new ArrayList<ContinuityListener>();
 
     /// Highest sequence seen from each device, so a state delivered twice -- which happens
@@ -817,10 +821,28 @@ public final class Continuity {
     /// #### Returns
     ///
     /// true when a form was shown
-    public static boolean restore(AppState state) {
+    public static boolean restore(final AppState state) {
         if (state == null) {
             return false;
         }
+        if (offEdt()) {
+            // Same reason capture() and checkpoint() marshal: this builds and shows forms through
+            // Navigation.restoreStack() and calls StateProvider.restoreState(), both of which are
+            // EDT work, and the method is public enough that an application restoring from its own
+            // transport's callback is ordinary.
+            final boolean[] out = new boolean[1];
+            runOnEdt(new Runnable() {
+                @Override
+                public void run() {
+                    out[0] = restoreOnEdt(state);
+                }
+            });
+            return out[0];
+        }
+        return restoreOnEdt(state);
+    }
+
+    private static boolean restoreOnEdt(AppState state) {
         StateProvider p = provider;
         if (p != null) {
             try {
@@ -988,17 +1010,11 @@ public final class Continuity {
         if (fetched == null) {
             return;
         }
-        synchronized (STATE_LOCK) {
-            if (era != accountEra) {
-                // The user signed out while this request was in flight. Delivering now would
-                // restore the PREVIOUS account's work into the session that is signed in -- and
-                // clear() emptied lastSeen, so nothing downstream would recognize it as stale.
-                // Publishing has had this check; polling is the direction that actually puts the
-                // old account's work on screen.
-                return;
-            }
-        }
-        deliver(fetched);
+        // The era travels WITH the state rather than being checked here and hoped for: a logout
+        // landing between this line and the admission inside deliver() would otherwise rebrand the
+        // previous account's response as a current-session arrival, and clear() has just emptied
+        // lastSeen so nothing downstream would know better.
+        deliver(fetched, era);
     }
 
     /// Forgets everything: the stored checkpoint, any parked arrival, the activity advertised to
@@ -1351,11 +1367,25 @@ public final class Continuity {
 
     /// Routes an arriving state to the application, from whatever channel produced it.
     static void deliver(final AppState state) {
+        deliver(state, NO_ERA);
+    }
+
+    /// As above, for a state fetched in a known relay session.
+    ///
+    /// The era is CARRIED rather than checked beforehand. A poll that validated the era, released
+    /// the lock and then delivered was a check-then-act: clear() landing in that gap admitted the
+    /// previous account's response under the new deliveryEra and the freshly emptied lastSeen, so
+    /// it restored into the account that had just signed in. Passing it here puts the question in
+    /// the same hold as the admission it governs.
+    static void deliver(final AppState state, final long pollEra) {
         if (state == null) {
             return;
         }
         synchronized (STATE_LOCK) {
             if (!enabled) {
+                return;
+            }
+            if (pollEra != NO_ERA && pollEra != accountEra) {
                 return;
             }
         }
@@ -1373,6 +1403,11 @@ public final class Continuity {
         }
         final long era;
         synchronized (STATE_LOCK) {
+            // Re-asked under the SAME hold that records the mark, so a logout between the check
+            // above and this one cannot slip a previous-account state past both.
+            if (pollEra != NO_ERA && pollEra != accountEra) {
+                return;
+            }
             Long seen = lastSeen.get(state.getDeviceId());
             if (seen != null && seen.longValue() >= state.getSequence()) {
                 return;
@@ -1532,6 +1567,9 @@ public final class Continuity {
         }
     }
 
+    /// Serializes the durable write of the high-water marks. See rememberSeen().
+    private static final Object SEEN_LOCK = new Object();
+
     /// Records that `state` has been acted on, durably.
     private static void noteActedOn(AppState state) {
         String from = state.getDeviceId();
@@ -1592,6 +1630,20 @@ public final class Continuity {
     /// Called after a delivery is accepted, which is rare -- it takes another device publishing --
     /// so this is not on any hot path.
     private static void rememberSeen() {
+        // SEEN_LOCK first and held across both the snapshot and the write, so the preference can
+        // only move forwards. Snapshotting outside it let two inbound channels interleave: the
+        // older snapshot -- carrying one device -- could land after the newer one carrying two,
+        // and the second device's mark vanished from disk while memory still looked right, so its
+        // state was acted on again after the next restart.
+        //
+        // Always SEEN_LOCK then STATE_LOCK, never the reverse: every caller reaches here with no
+        // lock held, so there is no cycle to close.
+        synchronized (SEEN_LOCK) {
+            rememberSeenLocked();
+        }
+    }
+
+    private static void rememberSeenLocked() {
         Map<String, Long> copy;
         synchronized (STATE_LOCK) {
             copy = new HashMap<String, Long>(lastSeen);

@@ -81,24 +81,42 @@ final class IOSContinuityCallbacks {
         String type;
         String json;
         synchronized (LOCK) {
-            // Installed and drained under one hold. A continuation landing between the two halves
-            // was written into a slot this method had already read and was about to clear, so it
-            // was dropped by the very call that exists to deliver it.
+            // Installed and READ under one hold, but not yet cleared -- see below. A continuation
+            // landing between installing and reading was written into a slot this method had
+            // already passed, so it was dropped by the very call that exists to deliver it.
             callback = c;
             type = pendingType;
             json = pendingJson;
-            pendingType = null;
-            pendingJson = null;
         }
         if (c != null && type != null) {
             // A continuation that cold-launched the app can reach this class before the
             // application's init() has called Continuity.enable(), which is what installs the
             // callback -- the scene delegate hands it over from willConnectToSession, which runs
             // first. Delivered now instead of dropped, which is what the whole feature is for.
+            boolean claimed = false;
             try {
-                c.continuationReceived(type, parse(json));
+                claimed = c.continuationReceived(type, parse(json));
             } catch (Throwable t) {
                 Log.e(t);
+            }
+            if (claimed) {
+                synchronized (LOCK) {
+                    // Cleared only once a callback has actually TAKEN it. The callback can
+                    // legitimately decline: SyncedStore.addChangeListener installs one without
+                    // enabling continuity -- a key/value store is not consent to restore a route
+                    // stack -- and on a cold launch that can happen before the application's
+                    // init() calls enable(). Clearing regardless meant the launch activity was
+                    // erased by the refusal, and the enable() moments later had nothing left to
+                    // deliver: initialization order alone silently lost the continuation.
+                    //
+                    // Only if it is still the same one. A newer arrival while the callback ran is
+                    // the one worth keeping, and blindly nulling would discard it.
+                    if (type.equals(pendingType)
+                            && (json == null ? pendingJson == null : json.equals(pendingJson))) {
+                        pendingType = null;
+                        pendingJson = null;
+                    }
+                }
             }
         }
     }

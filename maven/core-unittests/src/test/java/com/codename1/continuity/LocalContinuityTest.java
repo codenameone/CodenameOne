@@ -560,6 +560,40 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A state fetched in one relay session must not be admitted in another. The poll used to
+     * validate the account era, release the lock and then deliver -- a check-then-act, so a
+     * clear() landing in the gap admitted the previous account's response under the new era and
+     * the freshly emptied lastSeen, and restored it into the account that had just signed in.
+     * The era travels with the state now and is asked again under the hold that records the mark.
+     */
+    @EdtTest
+    public void aStateCarryingAForeignRelayEraIsNotAdmitted() {
+        Continuity.enable();
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+
+        // An era this session has never been in: what a poll started before a logout carries.
+        Continuity.deliver(foreign("device-x", 3), 4242L);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(250);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+        assertEquals(0, seen[0],
+                "a state from a previous relay session was delivered into this one");
+    }
+
+    /**
      * An app that only registers a store listener keeps continuity OFF by design -- a key/value
      * store is not consent to broadcast a route stack. refreshBridge() tested `enabled` alone, so
      * the simulator's capability menu, which swaps the bridge and calls it, left the replacement
