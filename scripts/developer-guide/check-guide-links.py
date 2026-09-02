@@ -230,6 +230,30 @@ def redirect_pattern(source: str) -> tuple[re.Pattern[str], list[str]] | None:
     return re.compile("^" + pattern + "/?$"), names
 
 
+def exact_redirect_pattern(source: str) -> re.Pattern[str] | None:
+    """Compile a source so it matches ONLY the spelling it declares.
+
+    redirect_pattern() ends every rule with "/?" so a link resolves whichever way
+    it is written, which is right for routing and wrong for asking "does the table
+    declare this exact form". `/*.html/ /:splat/` really does cover /download.html/
+    -- the slash is part of the source -- and matching it slash-insensitively would
+    have said the same about /download.html, which it does not cover.
+    """
+    if "*" not in source and ":" not in source:
+        return None
+    pattern = ""
+    for part in re.split(r"(\*|:[A-Za-z_][A-Za-z0-9_]*)", source):
+        if not part:
+            continue
+        if part == "*":
+            pattern += "(.*)"
+        elif part.startswith(":"):
+            pattern += "([^/]+)"
+        else:
+            pattern += re.escape(part)
+    return re.compile("^" + pattern + "$")
+
+
 # build_javadocs.sh generates the API docs from these two roots, so the published
 # tree is derivable from the repository without building it.
 JAVADOC_SOURCE_ROOTS = ("CodenameOne/src", "Ports/CLDC11/src")
@@ -554,7 +578,7 @@ def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
     return False
 
 
-def site_paths(repo_root: Path) -> tuple[set[str], list, set[str]]:
+def site_paths(repo_root: Path) -> tuple[set[str], list, set[str], list]:
     """Every path the website is known to answer on, derived rather than listed.
 
     Returns the literal paths and every redirect rule, each as a matcher, its
@@ -567,6 +591,9 @@ def site_paths(repo_root: Path) -> tuple[set[str], list, set[str]]:
     # ("^...$/?"), which is right for matching but loses the distinction the site
     # actually draws, so the trailing-slash rule needs the raw spelling.
     declared: set[str] = set()
+    # Wildcard sources, matched exactly: /*.html/ declares the slashed form of every
+    # root-level .html route, and a literal-set lookup cannot see that.
+    declared_patterns: list[re.Pattern[str]] = []
 
     redirects = repo_root / "docs/website/static/_redirects"
     if redirects.exists():
@@ -576,6 +603,9 @@ def site_paths(repo_root: Path) -> tuple[set[str], list, set[str]]:
                 continue
             destination = parts[1] if len(parts) > 1 else ""
             declared.add(parts[0])
+            exact = exact_redirect_pattern(parts[0])
+            if exact is not None:
+                declared_patterns.append(exact)
             compiled = redirect_pattern(parts[0])
             if compiled is not None:
                 patterns.append((compiled[0], compiled[1], destination))
@@ -713,7 +743,7 @@ def site_paths(repo_root: Path) -> tuple[set[str], list, set[str]]:
             if asset.name == "index.html":
                 paths.add(normalize_path(asset.parent.relative_to(static).as_posix()))
 
-    return paths, patterns, declared
+    return paths, patterns, declared, declared_patterns
 
 
 def bare_authority(split, host: str, port: int | None) -> bool:
@@ -742,7 +772,7 @@ def links_into_this_book(path: str, fragment: str) -> bool:
     return bool(fragment) and (path.rstrip("/") or "/") in SELF_PATHS
 
 
-def undeclared_file_slash(path: str, declared: set[str]) -> bool:
+def undeclared_file_slash(path: str, declared: set[str], declared_patterns: list) -> bool:
     """A file-like path wearing a trailing slash the redirect table does not spell out.
 
     The site treats "/x.html" and "/x.html/" as separate routes and declares both
@@ -751,14 +781,16 @@ def undeclared_file_slash(path: str, declared: set[str]) -> bool:
     not asked for. Directory routes such as /blog/ and /javadoc/com/codename1/io/
     have no dot in the last segment and never match.
     """
-    return (
-        path.endswith("/")
-        and "." in path.rstrip("/").rsplit("/", 1)[-1]
-        and path not in declared
-    )
+    if not path.endswith("/"):
+        return False
+    if "." not in path.rstrip("/").rsplit("/", 1)[-1]:
+        return False
+    if path in declared:
+        return False
+    return not any(pattern.match(path) for pattern in declared_patterns)
 
 
-def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]) -> list[tuple[str, str]]:
+def findings_for(path: Path, known: set[str], patterns: list, declared: set[str], declared_patterns: list) -> list[tuple[str, str]]:
     # Only http:// and https:// are extracted. Protocol-relative links were raised
     # as a gap; measured, the guide contains no `link://` macro at all, and its one
     # bare `//host/path` is a JavaScript string inside a source block, so widening
@@ -795,7 +827,7 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
             if links_into_this_book(path, fragment):
                 out.append((target, SELF_LINK_REASON))
                 continue
-            if undeclared_file_slash(path, declared):
+            if undeclared_file_slash(path, declared, declared_patterns):
                 # Same rule as for an absolute URL: normalize_path would drop the
                 # slash and validate the variant that was not asked for.
                 out.append((target, "a file path with a trailing slash that _redirects does not declare"))
@@ -868,7 +900,7 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
                 target = split.path.rstrip("/") or "/"
                 if links_into_this_book(target, split.fragment):
                     out.append((url, SELF_LINK_REASON))
-                elif undeclared_file_slash(split.path, declared):
+                elif undeclared_file_slash(split.path, declared, declared_patterns):
                     out.append((url, "a file path with a trailing slash that _redirects does not declare"))
                 elif not resolves(target, known, patterns):
                     out.append((url, "the website serves no such path (checked _redirects and the content tree)"))
@@ -910,7 +942,7 @@ def main() -> int:
     guide_dir = args.guide_dir.resolve()
     global _JAVADOC_ROOT
     _JAVADOC_ROOT = args.repo_root.resolve()
-    known, patterns, declared = site_paths(args.repo_root.resolve())
+    known, patterns, declared, declared_patterns = site_paths(args.repo_root.resolve())
     if not known:
         raise SystemExit("could not derive any site paths; is --repo-root correct?")
 
@@ -920,7 +952,7 @@ def main() -> int:
         if path.suffix not in ASCIIDOC_EXTENSIONS or not path.is_file():
             continue
         name = path.relative_to(guide_dir).as_posix()
-        for url, reason in findings_for(path, known, patterns, declared):
+        for url, reason in findings_for(path, known, patterns, declared, declared_patterns):
             entry = f"{name}\t{url}"
             current[entry] += 1
             reasons[entry] = reason
