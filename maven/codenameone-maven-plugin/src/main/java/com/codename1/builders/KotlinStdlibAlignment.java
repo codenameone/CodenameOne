@@ -1338,15 +1338,19 @@ public class KotlinStdlibAlignment {
      * between that graph and the duplicate.</p>
      */
     private static String richVersionIn(String statement) {
-        String strict = versionInCall(statement, STRICTLY);
-        if (strict != null) {
-            return strict;
+        // Whether it was CALLED settles which keyword speaks, and what it was
+        // called with is a separate question. Falling through on a null let
+        // `require '1.9.22'; strictly providers.gradleProperty('legacy').get()`
+        // report the requirement -- so a shim whose strict version may be
+        // pre-merge read as merged-era, its own constraint was skipped, and the
+        // sibling was raised around it.
+        if (callsStrictly(statement)) {
+            return versionInCall(statement, STRICTLY);
         }
         // A resolution rule's useVersion is as authoritative as either: it rewrites
         // what was requested, silently, on the way through.
-        String ruled = versionInCall(statement, USE_VERSION);
-        if (ruled != null) {
-            return ruled;
+        if (callsNamed(statement, USE_VERSION)) {
+            return versionInCall(statement, USE_VERSION);
         }
         return versionInCall(statement, "require");
     }
@@ -3904,6 +3908,13 @@ public class KotlinStdlibAlignment {
         // the strict pin the second carried was invisible to the statement using it.
         while (true) {
             i = skipBlanks(statement, i + 1);
+            // Past any parentheses around the value. Groovy accepts
+            // `def dep = ('g:a:1.7.22!!')`, and a value that did not START with a
+            // literal was recorded as unknown -- so the pin it held was invisible
+            // to whatever used the name.
+            while (i < statement.length() && statement.charAt(i) == '(') {
+                i = skipBlanks(statement, i + 1);
+            }
             int end = -1;
             String value = null;
             if (i < statement.length() && isLiteralStart(statement, i)) {

@@ -7333,10 +7333,17 @@ public class AndroidGradleBuilder extends Executor {
                         "buildscript {\nrepositories {\n%s\n}\n}\n"
                                 .replace("%s", injectRepo),
                         "buildscript {\ndependencies {\n%s\n}\n}\n".replace("%s", gradleDependency),
-                        "android {\n%s\n}\n".replace("%s", request.getArg("android.gradle.androidx", "")),
-                        minSDK,
-                        targetNumber,
-                        "android {\ndefaultConfig {\n%s\n}\n}\n".replace("%s", request.getArg("android.xgradle_default_config", "")),
+                        // ONE android closure around both, because the script has
+                        // one: androidx sits directly in it and the default config in
+                        // its defaultConfig block. A closure each made a scope boundary
+                        // Gradle does not have, so a `def` in the first was discarded
+                        // before the second used it.
+                        "android {\n"
+                                + request.getArg("android.gradle.androidx", "")
+                                + "\ndefaultConfig {\n"
+                                + minSDK + "\n" + targetNumber + "\n"
+                                + request.getArg("android.xgradle_default_config", "")
+                                + "\n}\n}\n",
                         "repositories {\n%s\n}\n".replace("%s", injectRepo),
                         // ONE closure around all of them, because the script has
                         // one: they are concatenated into a single dependencies { }

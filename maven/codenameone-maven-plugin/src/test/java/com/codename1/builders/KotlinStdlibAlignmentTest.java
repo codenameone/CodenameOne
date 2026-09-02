@@ -897,6 +897,135 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Whether a keyword was CALLED settles which one speaks, and what it was
+     * called with is a separate question. Falling through on a null let
+     * {@code require '1.9.22'; strictly providers.gradleProperty('k').get()}
+     * report the requirement, so a shim whose strict version may be pre-merge
+     * read as merged-era and only its sibling was raised.
+     */
+    @Test
+    public void aCalledKeywordSettlesItReadableOrNot() {
+        String jdk8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation('" + jdk8 + "') { version { "
+                        + "require '1.9.22'; strictly providers"
+                        + ".gradleProperty('legacy').get() } }\n")),
+                "an unreadable strictly is not the requirement beside it");
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    configurations.all { resolutionStrategy.eachDependency "
+                        + "{ d ->\n        if (d.requested.name == "
+                        + "'kotlin-stdlib-jdk8') { d.useVersion someProperty }\n"
+                        + "    } }\n")),
+                "and neither is an unreadable useVersion");
+
+        // A readable one still overrides the requirement beside it.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation('" + jdk8 + "') { version { "
+                        + "require '1.7.22'; strictly '1.9.22' } }\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a readable strictly speaks for the declaration");
+    }
+
+    /**
+     * Groovy accepts parentheses around a stored value, and one that did not
+     * START with a literal was recorded as unknown -- so the pin it held was
+     * invisible to whatever used the name.
+     */
+    @Test
+    public void aStoredValueMayBeWrapped() {
+        String jdk8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
+        String use = "    implementation(dep)\n";
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def dep = ('" + jdk8 + ":1.7.22!!')\n" + use)),
+                "one pair of parentheses");
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def dep = (( '" + jdk8 + ":1.7.22!!' ))\n" + use)),
+                "and two, with spaces");
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def dep = ('" + jdk8 + ":1.9.22')\n" + use)
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a wrapped merged-era value is read too");
+    }
+
+    /**
+     * The two android fragments run inside ONE {@code android { }} closure in
+     * the generated script -- androidx directly in it, the default config in its
+     * defaultConfig block. A synthetic closure each made a scope boundary Gradle
+     * does not have, so a name the first defined was gone before the second used
+     * it.
+     */
+    @Test
+    public void theAndroidFragmentsShareOneClosure() throws Exception {
+        String shared = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "android {\n"
+                + "def dep = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!'\n"
+                + "\ndefaultConfig {\n"
+                + "project.dependencies.add('implementation', dep)\n"
+                + "\n}\n}\n");
+        check("".equals(shared),
+                "the name survives into the default config, got <<" + shared + ">>");
+
+        // Handed over as a closure each, it does not -- which is what the builder
+        // was doing and what the source check below now forbids.
+        String split = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "android {\ndef dep = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!'\n}\n",
+                "android {\ndefaultConfig {\nproject.dependencies.add("
+                        + "'implementation', dep)\n}\n}\n");
+        check(!"".equals(split), "a closure each loses it, which is the bug");
+
+        // The half above proves the alignment honours the scope it is GIVEN.
+        // This half proves the builder gives it one: with a synthetic closure
+        // each the arguments are still in the right ORDER, so the enumeration
+        // test passes either way and only this catches it.
+        String builderSrc = new String(java.nio.file.Files.readAllBytes(
+                new java.io.File("src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath()), "UTF-8");
+        int at = builderSrc.indexOf("KotlinStdlibAlignment.constraintsBlock(");
+        check(at >= 0, "the builder calls the alignment");
+        String call = builderSrc.substring(at, builderSrc.indexOf(";", at))
+                .replaceAll("//[^\n]*", "");
+        // Split at the commas that separate ARGUMENTS -- the ones outside
+        // parentheses -- and require a single argument to carry both hints.
+        java.util.List<String> arguments = new java.util.ArrayList<String>();
+        int depth = 0;
+        int start = call.indexOf('(') + 1;
+        boolean quoted = false;
+        for (int i = start; i < call.length(); i++) {
+            char c = call.charAt(i);
+            if (quoted) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == '"') {
+                    quoted = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                quoted = true;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                if (depth == 0) {
+                    arguments.add(call.substring(start, i));
+                    break;
+                }
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                arguments.add(call.substring(start, i));
+                start = i + 1;
+            }
+        }
+        boolean together = false;
+        for (int i = 0; i < arguments.size(); i++) {
+            if (arguments.get(i).indexOf("android.gradle.androidx") >= 0
+                    && arguments.get(i).indexOf("android.xgradle_default_config") >= 0) {
+                together = true;
+            }
+        }
+        check(together, "the two android fragments are handed over in ONE closure, "
+                + "and the call splits them across arguments: " + arguments);
+    }
+
+    /**
      * The shapes this round found, each a valid Gradle spelling that read as
      * something it is not.
      */
