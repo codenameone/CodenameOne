@@ -369,17 +369,27 @@ final class JavaSENativeDragAndDrop {
             if (eager) {
                 content.setFiles(pathsFromUriList(content.getText(ClipboardContent.MIME_URI_LIST)));
             } else {
-                final ClipboardContent describing = content;
-                content.setDataProvider(ClipboardContent.MIME_FILE, new ClipboardDataProvider() {
-                    @Override
-                    public Object getClipboardData(String requested) {
-                        String[] paths = pathsFromUriList(describing.getText(ClipboardContent.MIME_URI_LIST));
-                        if (paths == null) {
-                            return null;
+                // Only when the list really does name files. A URI list is not a file list:
+                // a link dragged out of a browser is one line of http, and declaring files
+                // for it made a file-only target light up and then be refused the drop,
+                // because the materialized content -- which keeps only the file: entries --
+                // no longer had what the hover had promised.
+                //
+                // This is the one representation the description reads a value to decide,
+                // and it is a short piece of text rather than the file or the image the
+                // laziness elsewhere exists to defer. Where the platform will not part with
+                // even that until the drop -- which several do -- nothing is declared, which
+                // is the safe direction: refusing a drag this port cannot describe beats
+                // accepting one it cannot deliver.
+                final String[] named = pathsFromUriList(uriListDuringDrag(transferable, flavors));
+                if (named != null) {
+                    content.setDataProvider(ClipboardContent.MIME_FILE, new ClipboardDataProvider() {
+                        @Override
+                        public Object getClipboardData(String requested) {
+                            return named.length == 1 ? (Object) named[0] : named;
                         }
-                        return paths.length == 1 ? (Object) paths[0] : paths;
-                    }
-                });
+                    });
+                }
             }
         } else if (!content.hasMimeType(ClipboardContent.MIME_URI_LIST)
                 && content.hasMimeType(ClipboardContent.MIME_FILE)) {
@@ -474,6 +484,28 @@ final class JavaSENativeDragAndDrop {
         } catch (Throwable err) {
             return null;
         }
+    }
+
+    /// The URI list a drag is offering, read while it is still hovering, or null when the
+    /// platform will not produce one yet.
+    ///
+    /// Deliberately narrow: only the `text/uri-list` flavor, and only to answer whether the
+    /// drag names files. Everything else stays deferred.
+    private static String uriListDuringDrag(Transferable transferable, DataFlavor[] flavors) {
+        if (transferable == null || flavors == null) {
+            return null;
+        }
+        for (int iter = 0; iter < flavors.length; iter++) {
+            DataFlavor flavor = flavors[iter];
+            if (!ClipboardContent.MIME_URI_LIST.equals(mimeFor(flavor))) {
+                continue;
+            }
+            Object value = readValue(transferable, flavor, ClipboardContent.MIME_URI_LIST);
+            if (value instanceof String) {
+                return (String) value;
+            }
+        }
+        return null;
     }
 
     /// Reads a text flavor through the reader the flavor itself supplies, which applies the

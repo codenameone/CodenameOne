@@ -979,7 +979,7 @@ API_AVAILABLE(ios(11.0))
         // begun since -- the newer target is sent an exit and its next update re-enters it, a
         // flicker that repairs itself. Withholding the commit instead would lose a drop the
         // user actually performed, and unperformed work is worse than a repaired frame.
-        int accepted = CN1NativeDragDeliverDropCommit(x, y, action);
+        int accepted = CN1NativeDragDeliverDropCommit(x, y, action, localAssembly);
         cn1LastDropAction = CN1_DND_ACTION_NONE;
         // This assembly's commit cleared the hover state itself, so its own end -- which went
         // past long ago -- can stop holding off. Only this one: another drop still loading is

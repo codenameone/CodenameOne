@@ -712,6 +712,31 @@ public final class NativeDragAndDrop {
     /// the action actually accepted, or `NativeDragOperation#ACTION_NONE` when nothing under
     /// the pointer took the drop and the port should report the transfer as failed
     public static int drop(int windowId, int x, int y, ClipboardContent content, int action) {
+        boolean local;
+        synchronized (LOCK) {
+            local = active != null;
+        }
+        return drop(windowId, x, y, content, action, local);
+    }
+
+    /// Delivers a native drop whose origin the port knows.
+    ///
+    /// A port that assembles a drop asynchronously calls this one, because by the time the
+    /// assembly finishes the drag it belongs to may no longer be the one running: a drop that
+    /// arrived from another application, still loading when the user began a drag of their
+    /// own, would otherwise be reported to the target as local -- and a target that uses
+    /// `NativeDropEvent#isLocal()` to tell reordering from importing would treat foreign
+    /// content as an internal move.
+    ///
+    /// #### Parameters
+    ///
+    /// - `local`: true when the drag being dropped is one this application started
+    ///
+    /// #### Returns
+    ///
+    /// the action actually accepted, or `NativeDragOperation#ACTION_NONE`
+    public static int drop(int windowId, int x, int y, ClipboardContent content, int action,
+            boolean local) {
         Component target = findTarget(windowId, x, y, content, action);
         int accepted;
         Component previous;
@@ -770,7 +795,8 @@ public final class NativeDragAndDrop {
             // target without it left the old hover highlight on for good: the drop goes to
             // somebody else, and the port's own end-of-session cleanup then finds the target
             // already cleared and has nothing left to deliver the exit to.
-            dispatch(previous, ActionEvent.Type.NativeDragExit, content, x, y, action);
+            dispatch(previous, ActionEvent.Type.NativeDragExit, content, x, y, action,
+                    NativeDragOperation.ACTION_NONE, Boolean.valueOf(local));
         }
         if (accepted == NativeDragOperation.ACTION_NONE) {
             return NativeDragOperation.ACTION_NONE;
@@ -780,7 +806,8 @@ public final class NativeDragAndDrop {
         // and the action actually being performed -- different questions that used to get
         // the same answer, so the drop reported the chosen action as though it were all the
         // source had ever allowed.
-        dispatch(target, ActionEvent.Type.NativeDrop, content, x, y, advertised, accepted);
+        dispatch(target, ActionEvent.Type.NativeDrop, content, x, y, advertised, accepted,
+                Boolean.valueOf(local));
         return accepted;
     }
 
@@ -930,12 +957,15 @@ public final class NativeDragAndDrop {
     /// give the operating system.
     private static void dispatch(final Component target, final ActionEvent.Type type,
             final ClipboardContent content, final int x, final int y, final int allowedActions) {
-        dispatch(target, type, content, x, y, allowedActions, NativeDragOperation.ACTION_NONE);
+        dispatch(target, type, content, x, y, allowedActions, NativeDragOperation.ACTION_NONE, null);
     }
 
+    /// `knownLocal` is null when the caller has no better answer than the drag running now,
+    /// which is right for every event that happens while it is running. Only a drop assembled
+    /// after the fact knows better.
     private static void dispatch(final Component target, final ActionEvent.Type type,
             final ClipboardContent content, final int x, final int y, final int allowedActions,
-            final int performedAction) {
+            final int performedAction, final Boolean knownLocal) {
         if (target == null) {
             if (type == ActionEvent.Type.NativeDragOver) {
                 synchronized (LOCK) {
@@ -947,7 +977,7 @@ public final class NativeDragAndDrop {
         final boolean local;
         final int generation;
         synchronized (LOCK) {
-            local = active != null;
+            local = knownLocal == null ? active != null : knownLocal.booleanValue();
             generation = targetGeneration;
         }
         Display.getInstance().callSerially(new Runnable() {

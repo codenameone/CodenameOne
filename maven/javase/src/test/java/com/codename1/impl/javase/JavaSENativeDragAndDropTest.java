@@ -286,6 +286,34 @@ class JavaSENativeDragAndDropTest {
     }
 
     @Test
+    void aLinkDraggedFromABrowserIsNotAFileDrag() throws Exception {
+        DataFlavor uriList = new DataFlavor("text/uri-list;class=java.lang.String");
+        FakeTransferable t = new FakeTransferable()
+                .add(uriList, "https://www.codenameone.com/\r\n");
+
+        ClipboardContent hovering = JavaSENativeDragAndDrop.contentFor(t, t.getTransferDataFlavors(), false);
+        assertFalse(hovering.hasMimeType(ClipboardContent.MIME_FILE),
+                "a URI list is not a file list, and a file-only target that lights up for one "
+                        + "is refused the drop it was promised");
+
+        ClipboardContent dropped = JavaSENativeDragAndDrop.contentFor(t, t.getTransferDataFlavors(), true);
+        assertFalse(dropped.hasMimeType(ClipboardContent.MIME_FILE),
+                "and the drop agrees with the hover, which is the whole point");
+    }
+
+    @Test
+    void aFileUriListIsStillAFileDragWhileItHovers() throws Exception {
+        DataFlavor uriList = new DataFlavor("text/uri-list;class=java.lang.String");
+        FakeTransferable t = new FakeTransferable()
+                .add(uriList, new File("/tmp/a.txt").toURI() + "\r\n");
+
+        ClipboardContent hovering = JavaSENativeDragAndDrop.contentFor(t, t.getTransferDataFlavors(), false);
+        assertTrue(hovering.hasMimeType(ClipboardContent.MIME_FILE),
+                "a Linux file manager offers only this spelling, and a file target has to be "
+                        + "able to accept it while the drag is still hovering");
+    }
+
+    @Test
     void aDroppedFileListAlsoBecomesAUriList() {
         FakeTransferable t = new FakeTransferable()
                 .add(DataFlavor.javaFileListFlavor, Arrays.asList(new File("/tmp/a.txt"), new File("/tmp/b.txt")));

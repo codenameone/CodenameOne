@@ -878,6 +878,44 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDropAssembledLateIsNotLocalJustBecauseADragIsRunning() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            DropRecorder target = addTarget(form);
+            final Boolean[] seen = { null };
+            target.addNativeDropListener(new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(ActionEvent ev) {
+                    if (ev.getEventType() == ActionEvent.Type.NativeDrop) {
+                        seen[0] = Boolean.valueOf(((NativeDropEvent) ev).isLocal());
+                    }
+                }
+            });
+            int x = target.getAbsoluteX() + 5;
+            int y = target.getAbsoluteY() + 5;
+
+            // A drag this application started, running while a drop that arrived from elsewhere
+            // finally finishes loading -- which is what a slow item provider does on iOS.
+            assertTrue(NativeDragAndDrop.startDrag(null,
+                    new NativeDragOperation("ours, and still going")));
+            NativeDragAndDrop.drop(0, x, y, textContent("theirs"),
+                    NativeDragOperation.ACTION_COPY, false);
+            flushSerialCalls();
+
+            assertEquals(Boolean.FALSE, seen[0],
+                    "the drop came from another application; asking which drag is running now "
+                            + "answers about a different one, and a target telling reordering "
+                            + "from importing would take foreign content as an internal move");
+        } finally {
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void acceptingTheWholeSetIsNotAcceptingAnAction() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder target = addTarget(form);
