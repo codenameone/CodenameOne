@@ -454,6 +454,91 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDisabledDragSourceIsNotDraggable() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("dragged out"));
+            source.setEnabled(false);
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            assertNull(implementation.getPreparedNativeDrag(),
+                    "a Form primes drag and drop before its own isEnabled gate, so the check "
+                            + "has to be here or a disabled control is draggable on the main "
+                            + "surface and not in a window");
+
+            form.pointerDragged(x + 200, y + 200);
+            assertNull(implementation.getStartedNativeDrag());
+            form.pointerReleased(x + 200, y + 200);
+
+            // Enabled again, the very same component drags.
+            source.setEnabled(true);
+            form.pointerPressed(x, y);
+            assertNotNull(implementation.getPreparedNativeDrag());
+            form.pointerDragged(x + 200, y + 200);
+            assertNotNull(implementation.getStartedNativeDrag());
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
+    void aStaleDragCallbackDoesNotSpeakForANewerOne() {
+        Form form = Display.getInstance().getCurrent();
+        // Decides from the payload rather than from a field, because the whole point is that
+        // the stale callback runs later and must still carry *its own* drag's decision.
+        Container target = new Container() {
+            @Override
+            protected void nativeDragEnter(NativeDropEvent ev) {
+                ev.accept("first".equals(ev.getText())
+                        ? NativeDragOperation.ACTION_MOVE : NativeDragOperation.ACTION_COPY);
+            }
+        };
+        target.setNativeDropTarget(true);
+        form.setLayout(new BorderLayout());
+        form.add(BorderLayout.CENTER, target);
+        form.revalidate();
+
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        // A drag arrives, settles on a move, and leaves -- with its callback still queued.
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("first"),
+                NativeDragOperation.ACTION_COPY | NativeDragOperation.ACTION_MOVE);
+        NativeDragAndDrop.dragExit(0);
+
+        // What the operating system would be told, read from between the stale callback and
+        // the new drag's own. Nothing else can see the window: once the new drag's callback
+        // runs it puts the right answer back, so an assertion after the queue drains would
+        // pass whether or not the stale one had spoken.
+        final int[] observed = { -1 };
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                observed[0] = NativeDragAndDrop.dragOver(0, x, y, textContent("second"),
+                        NativeDragOperation.ACTION_COPY);
+            }
+        });
+
+        // The second, copy-only drag enters the same component before the queue drains.
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("second"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertEquals(NativeDragOperation.ACTION_COPY, observed[0],
+                "the first drag's move decision must not be handed to the second, copy-only drag");
+        NativeDragAndDrop.dragExit(0);
+        flushSerialCalls();
+    }
+
+    @FormTest
     void aClickOnANativeDragSourceDragsNothing() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

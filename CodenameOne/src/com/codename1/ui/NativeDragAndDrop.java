@@ -113,6 +113,14 @@ public final class NativeDragAndDrop {
     private static int currentAction = NativeDragOperation.ACTION_NONE;
     private static boolean overDispatchPending;
 
+    /// Bumped whenever the target or the session changes.
+    ///
+    /// The callbacks below are queued onto the event dispatch thread, so one can still be
+    /// waiting when its drag leaves and another arrives over the same component. Identity alone
+    /// cannot tell those apart -- the component is the same one -- and the stale callback would
+    /// then answer for the new drag, handing it the old one's action or its refusal.
+    private static int targetGeneration;
+
     private NativeDragAndDrop() {
     }
 
@@ -168,6 +176,7 @@ public final class NativeDragAndDrop {
             }
             active = op;
             currentTarget = null;
+            targetGeneration++;
             currentAction = NativeDragOperation.ACTION_NONE;
         }
         op.setSource(source);
@@ -217,6 +226,7 @@ public final class NativeDragAndDrop {
             pendingSource = null;
             active = op;
             currentTarget = null;
+            targetGeneration++;
             currentAction = NativeDragOperation.ACTION_NONE;
         }
         op.resetPerformedAction();
@@ -265,7 +275,11 @@ public final class NativeDragAndDrop {
         NativeDragOperation op = null;
         Component source = cmp;
         if (cmp != null && isSupported()) {
-            while (source != null && !source.isNativeDragSource()) {
+            // A disabled component is not a drag source, and neither is a disabled ancestor.
+            // A Form primes drag and drop before it applies its own isEnabled gate -- a Window
+            // applies it first -- so without this a disabled control could be dragged out of
+            // the application on the main surface and not in a window.
+            while (source != null && !(source.isNativeDragSource() && source.isEnabled())) {
                 source = source.getParent();
             }
             if (source != null) {
@@ -504,6 +518,11 @@ public final class NativeDragAndDrop {
             changed = previous != target; // NOPMD CompareObjectsWithEquals
             if (changed) {
                 currentTarget = target;
+                targetGeneration++;
+                // A pending dispatch belongs to the target that just went away, and its finally
+                // will no longer clear this -- so clearing it here is what keeps the new target
+                // able to dispatch at all.
+                overDispatchPending = false;
                 currentAction = target == null ? NativeDragOperation.ACTION_NONE
                         : preferredAction(allowedActions & target.getAcceptedDropActions());
             } else if (target != null && !overDispatchPending) {
@@ -531,6 +550,7 @@ public final class NativeDragAndDrop {
         synchronized (LOCK) {
             previous = currentTarget;
             currentTarget = null;
+            targetGeneration++;
             currentAction = NativeDragOperation.ACTION_NONE;
         }
         dispatch(previous, ActionEvent.Type.NativeDragExit, null, 0, 0, NativeDragOperation.ACTION_NONE);
@@ -565,6 +585,7 @@ public final class NativeDragAndDrop {
                 : preferredAction(action & target.getAcceptedDropActions());
         synchronized (LOCK) {
             currentTarget = null;
+            targetGeneration++;
             overDispatchPending = false;
             currentAction = accepted;
         }
@@ -589,6 +610,7 @@ public final class NativeDragAndDrop {
             op = active;
             active = null;
             currentTarget = null;
+            targetGeneration++;
             currentAction = NativeDragOperation.ACTION_NONE;
             overDispatchPending = false;
         }
@@ -681,9 +703,11 @@ public final class NativeDragAndDrop {
         }
         final boolean local;
         final int startingAction;
+        final int generation;
         synchronized (LOCK) {
             local = active != null;
             startingAction = currentAction;
+            generation = targetGeneration;
         }
         Display.getInstance().callSerially(new Runnable() {
             @Override
@@ -699,7 +723,11 @@ public final class NativeDragAndDrop {
                     target.dispatchNativeDropEvent(ev);
                     if (type == ActionEvent.Type.NativeDragOver || type == ActionEvent.Type.NativeDragEnter) {
                         synchronized (LOCK) {
-                            if (currentTarget == target) { // NOPMD CompareObjectsWithEquals
+                            // The generation as well as the component: the same component can be
+                            // the target of the drag that just left and of the one that just
+                            // arrived, and this decision belongs to whichever queued it.
+                            if (generation == targetGeneration
+                                    && currentTarget == target) { // NOPMD CompareObjectsWithEquals
                                 currentAction = ev.getAcceptedAction();
                             }
                         }
@@ -709,7 +737,9 @@ public final class NativeDragAndDrop {
                 } finally {
                     if (type == ActionEvent.Type.NativeDragOver) {
                         synchronized (LOCK) {
-                            overDispatchPending = false;
+                            if (generation == targetGeneration) {
+                                overDispatchPending = false;
+                            }
                         }
                     }
                 }
