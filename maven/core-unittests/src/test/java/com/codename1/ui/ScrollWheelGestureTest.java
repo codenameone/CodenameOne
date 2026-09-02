@@ -141,6 +141,73 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aListenerRunsBeforeTheComponentsOwnHandling() {
+        Form f = new Form("listener first", new BorderLayout());
+        final WheelHandlingComponent target = new WheelHandlingComponent();
+        target.setPreferredH(px(15));
+        // Consuming is documented to prevent the DEFAULT behaviour, and a component that
+        // pans itself on a wheel is exactly that: control plus wheel to zoom an image viewer
+        // has to be able to stop the viewer's own pan.
+        target.addMouseWheelListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                evt.consume();
+            }
+        });
+        f.getContentPane().setLayout(BoxLayout.y());
+        f.getContentPane().add(target);
+        f.getContentPane().add(filler());
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+
+        wheel(target, 0, -px(20));
+
+        assertEquals(0, target.wheels(), "a consumed wheel never reaches the component's own handler");
+    }
+
+    @FormTest
+    void aWheelPastTheEndOfAnInnerScrollerMovesThePage() {
+        Form f = scrollingForm();
+        Container page = f.getContentPane();
+        Container inner = new Container(BoxLayout.y());
+        inner.setScrollableY(true);
+        inner.setPreferredH(px(40));
+        for (int i = 0; i < 6; i++) {
+            inner.add(filler());
+        }
+        page.addComponent(0, inner);
+        f.revalidate();
+        DisplayTest.flushEdt();
+        assertTrue(inner.isScrollableY(), "the inner container has to overflow too");
+
+        // One point, held still. A container's absolute position follows its own scroll,
+        // so recomputing "the middle of inner" after each notch walks the cursor off it --
+        // the pointer does not move when the content under it does.
+        int x = inner.getAbsoluteX() + inner.getWidth() / 2;
+        int y = inner.getAbsoluteY() + inner.getHeight() / 2;
+        int innerMax = inner.getScrollDimension().getHeight() - inner.getHeight();
+
+        // While the inner container can move, it takes the wheel and the page stays put.
+        wheelAt(x, y, 0, -px(20));
+        assertTrue(inner.getScrollY() > 0, "the inner container scrolls first");
+        assertEquals(0, page.getScrollY(), "and the page does not move under it");
+
+        // Drive it to its end.
+        for (int i = 0; i < 40 && inner.getScrollY() < innerMax; i++) {
+            wheelAt(x, y, 0, -px(20));
+        }
+        assertEquals(innerMax, inner.getScrollY(), "the inner container reaches its end");
+        int pageBefore = page.getScrollY();
+
+        wheelAt(x, y, 0, -px(20));
+
+        assertEquals(innerMax, inner.getScrollY(), "the inner container has nothing left to give");
+        assertTrue(page.getScrollY() > pageBefore,
+                "so the wheel carries on to the page instead of stopping dead");
+    }
+
+    @FormTest
     void aWheelInADesktopWindowScrollsThatWindow() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("scroller", new BorderLayout());
@@ -184,8 +251,12 @@ class ScrollWheelGestureTest extends UITestBase {
 
     /// Plays one wheel notch over the middle of `over` and lets it be handled.
     private void wheel(Component over, int deltaX, int deltaY) {
-        Display.impl.pointerWheelMoved(over.getAbsoluteX() + over.getWidth() / 2,
-                over.getAbsoluteY() + over.getHeight() / 2, deltaX, deltaY, false, 0);
+        wheelAt(over.getAbsoluteX() + over.getWidth() / 2,
+                over.getAbsoluteY() + over.getHeight() / 2, deltaX, deltaY);
+    }
+
+    private void wheelAt(int x, int y, int deltaX, int deltaY) {
+        Display.impl.pointerWheelMoved(x, y, deltaX, deltaY, false, 0);
         DisplayTest.flushEdt();
     }
 

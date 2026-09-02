@@ -6714,14 +6714,19 @@ public class Component implements Animation, StyleListener, Editable {
     boolean fireMouseWheelEvent(com.codename1.ui.events.WheelEvent ev) {
         Component c = this;
         while (c != null) {
-            if (c.mouseWheel(ev) || ev.isConsumed()) {
-                return true;
-            }
+            // Listeners before the component's own handling, at every level. Consuming is
+            // documented to prevent the DEFAULT behaviour, and a component that pans itself
+            // on a wheel is exactly that -- an application listening for control plus wheel
+            // to zoom an image viewer has to be able to stop the pan. It is also the order
+            // every pointer event uses: listeners, then the built-in.
             if (c.mouseWheelListeners != null && c.mouseWheelListeners.hasListeners()) {
                 c.mouseWheelListeners.fireActionEvent(ev);
                 if (ev.isConsumed()) {
                     return true;
                 }
+            }
+            if (c.mouseWheel(ev) || ev.isConsumed()) {
+                return true;
             }
             c = c.getParent();
         }

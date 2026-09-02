@@ -8698,21 +8698,10 @@ public final class Display extends CN1Constants {
     private boolean scrollForWheel(Component cmp, int scrollX, int scrollY) {
         boolean scrolled = false;
         if (scrollY != 0) {
-            Component target = scrollableAncestor(cmp, true);
-            if (target != null) {
-                // Clamped here rather than left to setScrollY: that one only clamps for a
-                // component with tensile drag off, because a finger is allowed to overshoot
-                // and spring back. A wheel notch has nothing to spring back from.
-                int max = target.getScrollDimension().getHeight() - target.getHeight();
-                scrolled = applyScroll(target, true, target.getScrollY() - scrollY, max);
-            }
+            scrolled = scrollAxisForWheel(cmp, true, scrollY);
         }
         if (scrollX != 0) {
-            Component target = scrollableAncestor(cmp, false);
-            if (target != null) {
-                int max = target.getScrollDimension().getWidth() - target.getWidth();
-                scrolled = applyScroll(target, false, target.getScrollX() - scrollX, max) || scrolled;
-            }
+            scrolled = scrollAxisForWheel(cmp, false, scrollX) || scrolled;
         }
         return scrolled;
     }
@@ -8731,16 +8720,30 @@ public final class Display extends CN1Constants {
         return true;
     }
 
-    /// The closest component from `cmp` up that actually scrolls on this axis.
-    private Component scrollableAncestor(Component cmp, boolean vertical) {
+    /// Scrolls the first ancestor that can actually move on this axis, which is not always
+    /// the first one that scrolls: a list inside a page is scrollable right up to its last
+    /// row, and a wheel that stopped dead there would strand the reader half way down a
+    /// page that had plenty left to show. So the walk continues past a container already at
+    /// the edge it is being pushed against, and the page takes over -- which is what every
+    /// other toolkit does with nested scrollers, and what the drag this replaced did by
+    /// handing the gesture up.
+    private boolean scrollAxisForWheel(Component cmp, boolean vertical, int delta) {
         Component c = cmp;
         while (c != null) {
             if (vertical ? c.isScrollableY() : c.isScrollableX()) {
-                return c;
+                // Clamped here rather than left to setScrollY: that one only clamps for a
+                // component with tensile drag off, because a finger is allowed to overshoot
+                // and spring back. A wheel notch has nothing to spring back from.
+                int max = vertical ? c.getScrollDimension().getHeight() - c.getHeight()
+                        : c.getScrollDimension().getWidth() - c.getWidth();
+                int from = vertical ? c.getScrollY() : c.getScrollX();
+                if (applyScroll(c, vertical, from - delta, max)) {
+                    return true;
+                }
             }
             c = c.getParent();
         }
-        return null;
+        return false;
     }
 
     /// Dispatches a magnify (pinch) gesture aimed at one native window. Invoked by the
