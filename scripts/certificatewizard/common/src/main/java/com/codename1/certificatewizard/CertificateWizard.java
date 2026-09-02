@@ -1513,6 +1513,12 @@ public class CertificateWizard extends Lifecycle {
     private void autoSetupCurrentProject() {
         ProjectDefaults defaults = projectDefaults();
         autoSetupWarnings.clear();
+        // Both of the run's own records start empty. The reissue guard exists to stop one
+        // run deleting profiles forever; carrying it into the NEXT run turns it into the
+        // opposite -- a delete that failed leaves the id behind, and the retry then reads
+        // "already handled", skips the delete and installs the invalid profile it was
+        // supposed to replace, so the project ends up signed with assets that cannot sign.
+        reissuedProfiles.clear();
         autoSetupProject(defaults.bundleId, defaults.appName);
     }
 
@@ -1882,6 +1888,7 @@ public class CertificateWizard extends Lifecycle {
 
     private void autoSetupMacProject(String profileType) {
         autoSetupWarnings.clear();
+        reissuedProfiles.clear();
         final ProjectDefaults defaults = projectDefaults();
         // The Mac capability only: this button is scoped to Mac signing, and asserting the
         // iOS one here would change an App ID this run has no intention of reissuing

@@ -369,6 +369,12 @@ class ScrollWheelGestureTest extends UITestBase {
             fadeOut(page);
             assertEquals(0, page.getScrollOpacity(),
                     "and it does fade out again instead of staying lit");
+            // Nothing may be left registered on a form this test is about to walk away
+            // from. An abandoned form that still animates starves the event thread, and
+            // the next class to want it fails with display-not-initialized -- which is a
+            // failure in someone else's test that this one caused.
+            assertFalse(f.hasAnimations(),
+                    "the fade deregisters again, leaving nothing animating on an abandoned form");
         } finally {
             page.getUIManager().getLookAndFeel().setFadeScrollBar(fading);
             Display.getInstance().setPureTouch(pureTouch);

@@ -230,6 +230,41 @@ class CertificateWizardPushCapabilityTest {
     }
 
     @Test
+    void aSecondRunStillRetiresAProfileTheFirstRunFailedToDelete() throws Exception {
+        // The reissue guard records a profile before the delete is attempted, so a delete
+        // that failed leaves the id behind. Carried into the next run it reads as "already
+        // handled": the run skips the delete and installs the invalid profile it was
+        // supposed to replace, leaving the project signed with assets that cannot sign.
+        final MockSigningService service = new MockSigningService();
+        service.invalidateProfilesFor("com.example.myapp");
+        service.failProfileDeletion("Apple rejected the request.");
+        final CertificateWizard[] app = launchBound(service, "");
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "btn.autoSetup");
+            }
+        });
+        List<Long> firstRun = service.deletedProfileIds();
+        assertTrue(!firstRun.isEmpty(), "the first run has to try the delete");
+        Long refused = firstRun.get(0);
+
+        service.failProfileDeletion(null);
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "btn.autoSetup");
+            }
+        });
+
+        // The SAME profile, not merely another delete: a run retires several invalid
+        // profiles, so a count says nothing about whether this one was tried again.
+        List<Long> secondRun = service.deletedProfileIds().subList(firstRun.size(),
+                service.deletedProfileIds().size());
+        assertTrue(secondRun.contains(refused),
+                "the retry has to attempt the profile it could not delete, got " + secondRun
+                        + " after " + firstRun);
+    }
+
+    @Test
     void thePushCapabilityCanBeTurnedOnFromTheBundleIdsPage() throws Exception {
         // What a project whose push the builders DETECT rather than read from a hint is
         // left with: neither inference is reproducible in the wizard, so the remedy for a

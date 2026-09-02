@@ -549,7 +549,17 @@ public class MapView extends Container implements MapSurface {
         if (ev.getDeltaX() == 0 && ev.getDeltaY() == 0) {
             return false;
         }
+        // Web Mercator stops at its latitude limits, and panPixels clamps the centre back
+        // to where it already was. Claiming the wheel for a pan that did not happen traps
+        // scrolling on a page that holds a map: what cannot move passes the wheel on, the
+        // same rule the scrollers and the image viewer follow.
+        LatLng before = engine.getCenter();
         engine.panPixels(ev.getDeltaX(), ev.getDeltaY());
+        LatLng after = engine.getCenter();
+        if (Double.compare(before.getLatitude(), after.getLatitude()) == 0
+                && Double.compare(before.getLongitude(), after.getLongitude()) == 0) {
+            return false;
+        }
         repaint();
         fireCameraChanged();
         return true;

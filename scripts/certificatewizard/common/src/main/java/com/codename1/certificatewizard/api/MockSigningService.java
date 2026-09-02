@@ -42,6 +42,9 @@ public final class MockSigningService implements SigningService {
     private final List<String> pushEnabledOn = new ArrayList<String>();
     private final List<String> callLog = new ArrayList<String>();
     private String pushCapabilityFailure;
+    private String profileDeletionFailure;
+    private int deletedProfileAttempts;
+    private final List<Long> deletedProfileIds = new ArrayList<Long>();
     private long seq = 100;
 
     public MockSigningService() {
@@ -177,6 +180,36 @@ public final class MockSigningService implements SigningService {
         return new ArrayList<String>(pushEnabledOn);
     }
 
+    /// Marks every profile of this bundle INVALID, which is what Apple does to the
+    /// profiles issued before a capability change.
+    public void invalidateProfilesFor(String bundleIdentifier) {
+        for (int i = 0; i < profiles.size(); i++) {
+            SigningState.Profile p = profiles.get(i);
+            if (bundleIdentifier != null && bundleIdentifier.equals(p.bundleId())) {
+                profiles.set(i, new SigningState.Profile(p.id(), p.appleProfileId(), p.name(),
+                        p.profileType(), p.bundleId(), p.uuid(), p.expiresAt(), "INVALID"));
+            }
+        }
+    }
+
+    /// Makes profile deletion fail with `message`, or succeed again when given null.
+    public void failProfileDeletion(String message) {
+        profileDeletionFailure = message;
+    }
+
+    /// How many times a delete was attempted, so a test can tell a retry from a run that
+    /// decided the profile had already been dealt with.
+    public int deletedProfileAttempts() {
+        return deletedProfileAttempts;
+    }
+
+    /// Which profiles a delete was attempted on, in order. A run retiring several invalid
+    /// profiles makes a bare count useless: what says the guard was reset is the SAME
+    /// profile being attempted a second time.
+    public List<Long> deletedProfileIds() {
+        return new ArrayList<Long>(deletedProfileIds);
+    }
+
     /// Makes every push capability call fail with `message`, so a test can read the
     /// diagnostic the wizard puts up rather than only the happy path.
     public void failPushCapability(String message) {
@@ -230,6 +263,12 @@ public final class MockSigningService implements SigningService {
     }
 
     public void deleteProfile(Long id, OnComplete<Result<Void>> callback) {
+        deletedProfileAttempts++;
+        deletedProfileIds.add(id);
+        if (profileDeletionFailure != null) {
+            callback.completed(Result.<Void>fail(profileDeletionFailure));
+            return;
+        }
         for (int i = profiles.size() - 1; i >= 0; i--) {
             if (profiles.get(i).id().equals(id)) {
                 profiles.remove(i);

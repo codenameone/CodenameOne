@@ -566,8 +566,21 @@ public class ImageViewer extends Component {
         if (getZoom() <= 1 || getWidth() <= 0 || getHeight() <= 0) {
             return false;
         }
-        float nextX = clampPan(panPositionX - ((float) ev.getDeltaX()) / ((float) getWidth()));
-        float nextY = clampPan(panPositionY - ((float) ev.getDeltaY()) / ((float) getHeight()));
+        // Per axis, because zoom is not the same question as overflow: a wide image at a
+        // small zoom can be taller than nothing and wider than the viewer, and moving the
+        // axis that already fits shifts a fully visible image instead of letting the page
+        // it sits on scroll. These are the same measurements paint() constrains against.
+        boolean pansX = imageDrawWidth > getInnerWidth();
+        boolean pansY = imageDrawHeight > getInnerHeight();
+        if (!pansX && !pansY) {
+            return false;
+        }
+        float nextX = pansX
+                ? clampPan(panPositionX - ((float) ev.getDeltaX()) / ((float) getWidth()))
+                : panPositionX;
+        float nextY = pansY
+                ? clampPan(panPositionY - ((float) ev.getDeltaY()) / ((float) getHeight()))
+                : panPositionY;
         // Float.compare rather than ==, and not because the values are approximate: the
         // question is whether the clamp handed back the identical position, which is what
         // "already as far as it goes" looks like. An epsilon would answer a different and
