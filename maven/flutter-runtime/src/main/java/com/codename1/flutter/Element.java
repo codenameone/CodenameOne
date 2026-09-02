@@ -551,24 +551,49 @@ public abstract class Element implements BuildContext {
         }
         java.util.Set<Element> attached = new HashSet<Element>(host.attachOrder());
         List<RenderElement> desired = new ArrayList<RenderElement>();
-        for (Element c : childrenInTreeOrder) {
+        AttachedCollector collector = new AttachedCollector(attached, desired);
+        for (int i = 0, n = childrenInTreeOrder.size(); i < n; i++) {
+            Element c = childrenInTreeOrder.get(i);
             if (c != null) {
-                collectAttached(c, attached, desired);
+                collector.visit(c);
             }
         }
         host.reorderToTreeOrder(desired);
     }
 
-    private void collectAttached(Element e, final java.util.Set<Element> attached,
-                                 final List<RenderElement> out) {
-        if (e.host == host && attached.contains(e)) {
-            out.add((RenderElement) e);
+    /**
+     * Collects this host's attach entries under a subtree, in tree order.
+     *
+     * <p>One visitor for the whole traversal rather than one per node: the
+     * recursion used to hand visitChildren a fresh capturing callback at every
+     * element, even though the state it captured -- the attached set, the
+     * output list, and the enclosing element's host -- is identical at every
+     * level. An allocation census of a single screen counted 5,019 of those
+     * callbacks, the largest anonymous-class count in the runtime, and they
+     * are pure overhead: the same object serves the entire walk.</p>
+     *
+     * <p>Safe to reuse down the recursion because it holds no per-node state;
+     * `attached` is read-only here and `out` only ever accumulates.</p>
+     */
+    private final class AttachedCollector implements Funcs.VoidFunc1<Element> {
+        private final java.util.Set<Element> attached;
+        private final List<RenderElement> out;
+
+        AttachedCollector(java.util.Set<Element> attached, List<RenderElement> out) {
+            this.attached = attached;
+            this.out = out;
         }
-        e.visitChildren(new Funcs.VoidFunc1<Element>() {
-            @Override
-            public void call(Element c) {
-                collectAttached(c, attached, out);
+
+        @Override
+        public void call(Element c) {
+            visit(c);
+        }
+
+        void visit(Element e) {
+            if (e.host == Element.this.host && attached.contains(e)) {
+                out.add((RenderElement) e);
             }
-        });
+            e.visitChildren(this);
+        }
     }
 }

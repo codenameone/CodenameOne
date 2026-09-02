@@ -97,10 +97,12 @@ public abstract class RenderElement extends Element {
             ((com.codename1.ui.Label) c).setTickerEnabled(false);
         }
         try {
-            com.codename1.ui.plaf.Style all = c.getAllStyles();
-            all.setMarginUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
-            all.setMargin(0, 0, 0, 0);
-            unifyStateMetrics(c);
+            if (needsNeutralizing(c)) {
+                com.codename1.ui.plaf.Style all = c.getAllStyles();
+                all.setMarginUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+                all.setMargin(0, 0, 0, 0);
+                unifyStateMetrics(c);
+            }
         } catch (Throwable ignore) {
             // styles unavailable headless
         }
@@ -115,7 +117,157 @@ public abstract class RenderElement extends Element {
      * the unselected font and padding onto every other state so a state
      * change can never alter geometry; state styles keep their own colors.
      */
+    /// Whether this component needs its CN1 styling neutralised at all.
+    ///
+    /// getAllStyles() is not a read: it CREATES the selected, pressed and
+    /// disabled styles -- UIManager documents that each "always return a new
+    /// style instance" -- and then a proxy over the four. That is five Style
+    /// objects per component, built during the first frame purely so a margin
+    /// can be set to zero and the state metrics unified.
+    ///
+    /// Almost never necessary. A UIID whose theme already gives every state a
+    /// zero margin and matching font and padding is already what neutralising
+    /// would make it, so the whole thing can be skipped and those five objects
+    /// never exist. Decided once per UIID from the THEME's own styles (which
+    /// UIManager caches) rather than once per component, and re-decided when the
+    /// theme generation changes.
+    ///
+    /// When a UIID genuinely does differ it is neutralised exactly as before, so
+    /// this is a cost cut and not a behaviour change.
+    private static final java.util.HashMap<String, Boolean> NEEDS_NEUTRALIZE =
+            new java.util.HashMap<String, Boolean>();
+    private static int neutralizeGeneration = -1;
+
+    /// A component that can never enter the selected, pressed or disabled state
+    /// never consults those styles, so unifying them is work for nobody.
+    ///
+    /// This is most of the tree. Text, icons, images, dividers and plain boxes
+    /// are not focusable, are not Buttons and are enabled, so Codename One will
+    /// only ever paint them from the unselected style -- yet each was made to
+    /// build all three state styles plus a proxy so their metrics could be
+    /// matched against a state that cannot happen.
+    ///
+    /// Deliberately narrow: anything focusable, any Button (which paints a
+    /// pressed style on touch without being focused) and anything already
+    /// disabled still goes through the full path, so the geometry guarantee
+    /// holds exactly where a state change is possible.
+    private static boolean canChangeState(Component c) {
+        return c.isFocusable()
+                || c instanceof com.codename1.ui.Button
+                || !c.isEnabled();
+    }
+
+    private static boolean needsNeutralizing(Component c) {
+        if (!canChangeState(c)) {
+            return false;
+        }
+        String uiid = c.getUIID();
+        if (uiid == null) {
+            return true;
+        }
+        int gen = com.codename1.ui.plaf.UIManager.getThemeGeneration();
+        if (gen != neutralizeGeneration) {
+            NEEDS_NEUTRALIZE.clear();
+            neutralizeGeneration = gen;
+        }
+        Boolean known = NEEDS_NEUTRALIZE.get(uiid);
+        if (known != null) {
+            return known.booleanValue();
+        }
+        boolean needs;
+        try {
+            com.codename1.ui.plaf.UIManager m = c.getUIManager();
+            com.codename1.ui.plaf.Style un = m.getComponentStyle(uiid);
+            needs = hasMargin(un)
+                    || hasMargin(m.getComponentSelectedStyle(uiid))
+                    || hasMargin(m.getComponentCustomStyle(uiid, "press"))
+                    || hasMargin(m.getComponentCustomStyle(uiid, "dis"))
+                    || metricsDiffer(un, m.getComponentSelectedStyle(uiid))
+                    || metricsDiffer(un, m.getComponentCustomStyle(uiid, "dis"))
+                    || metricsDiffer(un, m.getComponentCustomStyle(uiid, "press"));
+        } catch (Throwable t) {
+            needs = true;
+        }
+        NEEDS_NEUTRALIZE.put(uiid, Boolean.valueOf(needs));
+        return needs;
+    }
+
+    /// A zero margin is zero in any unit, so the unit does not have to match.
+    private static boolean hasMargin(com.codename1.ui.plaf.Style s) {
+        if (s == null) {
+            return false;
+        }
+        return s.getMarginTop() != 0 || s.getMarginBottom() != 0
+                || s.getMarginLeftNoRTL() != 0 || s.getMarginRightNoRTL() != 0;
+    }
+
+    /// Whether a UIID's state styles differ from its unselected one at all.
+    ///
+    /// Asked ONCE per UIID, not once per component. getSelectedStyle(),
+    /// getDisabledStyle() and getPressedStyle() do not read a shared object --
+    /// UIManager documents that they "always return a new style instance" -- so
+    /// touching all three to unify them minted three Style objects for every
+    /// component mounted. At 377 components that is over eleven hundred Styles
+    /// built during the first frame, and it measured as the 22ms "create" half
+    /// of the component cost.
+    ///
+    /// Almost none of them need it: a UIID whose theme gives every state the
+    /// same font and padding is already state-invariant, which is what the
+    /// unification was there to guarantee. Deciding that from the THEME (whose
+    /// per-UIID styles UIManager caches) settles it for every component sharing
+    /// the UIID, and the ones that genuinely differ still get unified.
+    ///
+    /// Keyed by UIID and theme generation, so a theme change re-decides.
+    private static final java.util.HashMap<String, Boolean> STATE_METRICS_DIFFER =
+            new java.util.HashMap<String, Boolean>();
+    private static int stateMetricsGeneration = -1;
+
+    private static boolean statesDifferForUiid(Component c) {
+        String uiid = c.getUIID();
+        if (uiid == null) {
+            return true;
+        }
+        com.codename1.ui.plaf.UIManager m = c.getUIManager();
+        int gen = com.codename1.ui.plaf.UIManager.getThemeGeneration();
+        if (gen != stateMetricsGeneration) {
+            STATE_METRICS_DIFFER.clear();
+            stateMetricsGeneration = gen;
+        }
+        Boolean known = STATE_METRICS_DIFFER.get(uiid);
+        if (known != null) {
+            return known.booleanValue();
+        }
+        boolean differs;
+        try {
+            com.codename1.ui.plaf.Style un = m.getComponentStyle(uiid);
+            differs = metricsDiffer(un, m.getComponentSelectedStyle(uiid))
+                    || metricsDiffer(un, m.getComponentCustomStyle(uiid, "dis"))
+                    || metricsDiffer(un, m.getComponentCustomStyle(uiid, "press"));
+        } catch (Throwable t) {
+            differs = true;
+        }
+        STATE_METRICS_DIFFER.put(uiid, Boolean.valueOf(differs));
+        return differs;
+    }
+
+    private static boolean metricsDiffer(com.codename1.ui.plaf.Style a,
+                                         com.codename1.ui.plaf.Style b) {
+        if (b == null) {
+            return false;
+        }
+        return a.getFont() != b.getFont()
+                || a.getPaddingTop() != b.getPaddingTop()
+                || a.getPaddingBottom() != b.getPaddingBottom()
+                || a.getPaddingLeftNoRTL() != b.getPaddingLeftNoRTL()
+                || a.getPaddingRightNoRTL() != b.getPaddingRightNoRTL();
+    }
+
     private static void unifyStateMetrics(Component c) {
+        if (!statesDifferForUiid(c)) {
+            // Already state-invariant: touching the state styles here would
+            // create them for nothing.
+            return;
+        }
         com.codename1.ui.plaf.Style un = c.getUnselectedStyle();
         com.codename1.ui.Font font = un.getFont();
         int pt = un.getPaddingTop();

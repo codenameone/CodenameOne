@@ -243,6 +243,38 @@ public final class FlutterUI {
             for (String[] m : map) {
                 derives.put(m[0] + ".derive", m[1]);
             }
+            // Every Flutter UIID gets a zero margin, in all four states.
+            //
+            // These UIIDs derive from Codename One base UIIDs, so they inherit a
+            // margin meant for Codename One layouts -- Container's 2px, Switch's
+            // 10/15 -- which Flutter geometry must not have: the widget tree
+            // decides its own spacing. RenderElement.neutralizeCn1Behaviors was
+            // already forcing it to zero, but per COMPONENT, and getAllStyles()
+            // creates the selected, pressed and disabled styles plus a proxy to
+            // do it: five Style objects each, ~1900 during the first frame of
+            // the gallery, on the one primitive ParparVM is slowest at.
+            //
+            // Declaring it in the theme instead makes the components arrive
+            // already correct, so the per-component undo can be skipped
+            // entirely. Same rendered result -- the runtime set these to zero
+            // anyway -- for none of the allocation.
+            String[] uiids = {
+                    "FlutterText", "FlutterIcon", "FlutterImage", "FlutterDivider",
+                    "FlutterElevatedButton", "FlutterTextButton", "FlutterOutlinedButton",
+                    "FlutterIconButton", "FlutterCard", "FlutterScroll", "FlutterGesture",
+                    "FlutterAppBar", "FlutterTextField", "FlutterCheckbox", "FlutterSwitch",
+                    "FlutterRadio", "FlutterSlider", "FlutterListTile",
+                    "FlutterBottomNavigationBar", "FlutterDrawer",
+                    // Not derived above -- they take the theme's default UIID, which
+                    // is where Container's 2px margin comes from.
+                    "FlutterBox", "FlutterEffect", "FlutterScaffold", "FlutterCustomPaint",
+            };
+            for (String u : uiids) {
+                derives.put(u + ".margin", "0,0,0,0");
+                derives.put(u + ".sel#margin", "0,0,0,0");
+                derives.put(u + ".press#margin", "0,0,0,0");
+                derives.put(u + ".dis#margin", "0,0,0,0");
+            }
             com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(derives);
         } catch (Throwable t) {
             com.codename1.io.Log.p("Flutter runtime: could not install UIID derives: " + t);
