@@ -2320,9 +2320,21 @@ public final class Display extends CN1Constants {
                 || t == PointerEvent.TYPE_ERASER;
     }
 
-    /// Dispatches a mouse wheel event to the component under the given coordinates. Invoked by the
-    /// implementation on the EDT before the default scrolling gesture is synthesized. Returns true
-    /// if a listener consumed the event, in which case the default scroll should be skipped.
+    /// Dispatches a mouse wheel event to the component under the given coordinates, and scrolls
+    /// it. Invoked by the implementation on the EDT.
+    ///
+    /// This is where a wheel ends: listeners on the component and its ancestors see it first and
+    /// may consume it, then `Component#mouseWheel(com.codename1.ui.events.WheelEvent)` may take
+    /// it, and what neither claimed scrolls the nearest ancestor that can move in that direction.
+    /// A port calls this and does nothing else.
+    ///
+    /// It used to dispatch to listeners only, as a preflight before the port synthesized a press,
+    /// a few drags and a release to do the scrolling. Those synthetic events are gone -- they
+    /// pressed whatever sat under the cursor, so a trackpad nudge over a button activated it --
+    /// and the scrolling they existed for happens here instead. The method is deliberately the
+    /// single terminal entry point rather than one of a pair: a port that called the wrong half
+    /// of a split API would either scroll nothing or go back to faking pointer events, which is
+    /// the bug this replaced.
     ///
     /// #### Parameters
     ///
@@ -2340,7 +2352,10 @@ public final class Display extends CN1Constants {
     ///
     /// #### Returns
     ///
-    /// true if a listener consumed the wheel event
+    /// true if the wheel was acted on -- a listener consumed it, a component handled it, or
+    /// something scrolled. False means nothing under the cursor could move, which is the
+    /// answer a port needs to pass the gesture to whatever hosts the app; it is NOT an
+    /// invitation to emulate the wheel with pointer events.
     public boolean fireMouseWheelEvent(int x, int y, int scrollX, int scrollY, boolean precise, int modifiers) {
         return windowMouseWheelEventImpl(0, x, y, scrollX, scrollY, precise, modifiers);
     }
@@ -8644,7 +8659,10 @@ public final class Display extends CN1Constants {
     ///
     /// #### Returns
     ///
-    /// true if a listener consumed the wheel event
+    /// true if the wheel was acted on -- a listener consumed it, a component handled it, or
+    /// something scrolled. False means nothing under the cursor could move, which is the
+    /// answer a port needs to pass the gesture to whatever hosts the app; it is NOT an
+    /// invitation to emulate the wheel with pointer events.
     boolean windowMouseWheelEventImpl(int windowId, int x, int y, int scrollX, int scrollY,
             boolean precise, int modifiers) {
         if (Desktop.getInstance().isWindowInputBlocked(windowId)) {

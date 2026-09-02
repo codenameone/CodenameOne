@@ -9303,10 +9303,11 @@ public abstract class CodenameOneImplementation {
 
     /// Richer entry point for wheel events that also carries whether the deltas come from a high
     /// resolution device (a trackpad rather than a notched wheel) and the held keyboard modifiers.
-    /// Ports that can report these should call this overload. The framework first dispatches a
-    /// `com.codename1.ui.events.WheelEvent` to any mouse wheel listeners on the component under the
-    /// cursor; if a listener consumes it the default scrolling gesture is skipped, enabling
-    /// gestures such as control plus wheel to zoom.
+    /// Ports that can report these should call this overload. The framework dispatches a
+    /// `com.codename1.ui.events.WheelEvent` to the mouse wheel listeners on the component under
+    /// the cursor and its ancestors -- a listener that consumes it stops the gesture there,
+    /// enabling gestures such as control plus wheel to zoom -- and scrolls what nothing claimed.
+    /// The port calls this and is done: no pointer event is synthesized from a wheel.
     ///
     /// #### Parameters
     ///
@@ -9330,9 +9331,9 @@ public abstract class CodenameOneImplementation {
     /// event that arrived over a specific native window.
     ///
     /// A port with desktop windows has to say which window the wheel was over: the
-    /// main form version resolves everything -- the listeners and the synthesized
-    /// scroll gesture -- from the current form, so a wheel over a second window
-    /// would scroll the main form's content instead of the window's.
+    /// main form version resolves everything -- the listeners and the component that
+    /// scrolls -- from the current form, so a wheel over a second window would scroll
+    /// the main form's content instead of the window's.
     ///
     /// #### Parameters
     ///
