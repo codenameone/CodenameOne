@@ -7324,12 +7324,20 @@ public class AndroidGradleBuilder extends Executor {
                         // reads a later use as a declaration and skips that
                         // artifact's constraint.
                         request.getArg("android.gradlePlugin", ""),
-                        "repositories {\n%s\n}\n".replace("%s", injectRepo),
+                        // TWICE, because the script interpolates it twice: once into
+                        // the buildscript repositories and again into the project ones
+                        // after the android block. Gradle executes both, so a name this
+                        // fragment binds is restored at the second -- and scanning it
+                        // once left the scan holding whatever an intervening fragment
+                        // had reassigned, which reads a later use as something it is not.
+                        "buildscript {\nrepositories {\n%s\n}\n}\n"
+                                .replace("%s", injectRepo),
                         "buildscript {\ndependencies {\n%s\n}\n}\n".replace("%s", gradleDependency),
                         "android {\n%s\n}\n".replace("%s", request.getArg("android.gradle.androidx", "")),
                         minSDK,
                         targetNumber,
                         "android {\ndefaultConfig {\n%s\n}\n}\n".replace("%s", request.getArg("android.xgradle_default_config", "")),
+                        "repositories {\n%s\n}\n".replace("%s", injectRepo),
                         "dependencies {\n%s\n}\n".replace("%s", coreLibraryDesugaringDependency),
                         "dependencies {\n%s\n}\n".replace("%s", request.getArg("android.supportv4Dep", "")),
                         "dependencies {\n%s\n}\n".replace("%s", kotlinRuntimeDependency),

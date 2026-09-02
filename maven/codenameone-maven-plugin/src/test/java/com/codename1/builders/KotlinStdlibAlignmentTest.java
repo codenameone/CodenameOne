@@ -556,27 +556,28 @@ public class KotlinStdlibAlignmentTest {
             }
             byPosition.put(Integer.valueOf(name.start(1)), token);
         }
-        // By name, keeping where it FIRST appears: a fragment may be interpolated
-        // more than once -- injectRepo goes into the buildscript repositories and
-        // the project ones -- and requiring a strictly later position for each
-        // occurrence asked the call to repeat an argument it passes once.
-        java.util.List<String> fragments = new java.util.ArrayList<String>();
-        for (String fragment : byPosition.values()) {
-            if (!fragments.contains(fragment)) {
-                fragments.add(fragment);
-            }
-        }
+        // EVERY occurrence, not one per name. A fragment interpolated twice is
+        // executed twice -- injectRepo goes into the buildscript repositories and
+        // again into the project ones after the android block -- and Gradle runs
+        // both, so a name it binds is restored at the second. Collapsing them let
+        // the scan keep whatever an intervening fragment had reassigned, and read
+        // a later use of that name as something it is not. The dedup was put here
+        // to make the ordering check pass; the search below starts after the last
+        // match instead, which is what a repeated argument actually needs.
+        java.util.List<String> fragments =
+                new java.util.ArrayList<String>(byPosition.values());
         check(fragments.size() >= 6,
                 "the block really was parsed, found " + fragments);
+        check(java.util.Collections.frequency(fragments, "injectRepo") == 2,
+                "the script interpolates injectRepo twice, found " + fragments);
 
         int previous = -1;
         for (int i = 0; i < fragments.size(); i++) {
             String fragment = fragments.get(i);
-            int passed = call.indexOf(fragment);
+            int passed = call.indexOf(fragment, previous + 1);
             check(passed >= 0, "the alignment is given " + fragment
-                    + ", which the generated block contains but the call does not");
-            check(passed > previous, fragment
-                    + " is passed in the order the script emits it");
+                    + " at occurrence " + i + ", which the generated block contains "
+                    + "but the call does not");
             previous = passed;
         }
     }
@@ -731,6 +732,99 @@ public class KotlinStdlibAlignmentTest {
     private static String rejecting(String rejections) {
         return "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') {\n"
                 + "        version { require '1.+'; " + rejections + " }\n    }\n";
+    }
+
+    /**
+     * The {@code !!} spelling skips the configuration check, because a strict pin
+     * is honoured wherever it is declared. "Wherever" still means declared: a
+     * coordinate merely passed to something -- a log line, a list -- is not a
+     * dependency, and reading one as a pin stood the whole block down for an app
+     * that had declared nothing.
+     */
+    @Test
+    public void aStrictCoordinateHasToBeDeclaredToCount() {
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!";
+        String[] declarations = {
+            "    implementation '" + pin + "'\n",
+            "    implementation('" + pin + "')\n",
+            // Whatever the configuration is called: the rule is that a
+            // configuration is never reached through a receiver, not a list of
+            // the ones that count.
+            "    myCustomConfig '" + pin + "'\n",
+            "    debugImplementation '" + pin + "'\n",
+            "    kapt('" + pin + "')\n",
+            "    constraints {\n        implementation '" + pin + "'\n    }\n",
+            "    dependencies.add('implementation', '" + pin + "')\n",
+            // The spellings that carry the version somewhere other than the
+            // coordinate are not asked the question at all.
+            "    implementation group: 'org.jetbrains.kotlin', "
+                    + "name: 'kotlin-stdlib-jdk8', version: '1.7.22!!'\n",
+            "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
+                    + "{ version { strictly '1.7.22' } }\n",
+        };
+        for (int i = 0; i < declarations.length; i++) {
+            check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                            "implementation", declarations[i])),
+                    "<<" + declarations[i].trim() + ">> declares a strict pin");
+        }
+
+        String[] merelyCarried = {
+            "    logger.lifecycle('" + pin + "')\n",
+            "    project.logger.info('" + pin + "')\n",
+            "    myList.add('" + pin + "')\n",
+            "    def all = ['" + pin + "']\n",
+        };
+        for (int i = 0; i < merelyCarried.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            merelyCarried[i]).contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + merelyCarried[i].trim() + ">> declares nothing");
+        }
+    }
+
+    /**
+     * A fragment interpolated twice is executed twice. injectRepo goes into the
+     * buildscript repositories and again into the project ones after the android
+     * block, so a name it binds is restored at the second -- and scanning it once
+     * left the scan holding whatever came between.
+     *
+     * <p>Reported with a reassignment inside {@code android { }}, which does not
+     * reproduce: a brace this class can see makes the assignment conditional, and
+     * a conditional reassignment already refuses to discard a Kotlin coordinate.
+     * The shape that does reach it is an UNCONDITIONAL one, which app text
+     * produces by closing its own wrapper early -- so the replay is what the
+     * script does, and the scan follows it rather than the argument for it.</p>
+     */
+    @Test
+    public void aFragmentInterpolatedTwiceIsScannedTwice() {
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22";
+        String repositories = "project.ext.dep = '" + pin + "'\n";
+        String reassign = "dep = 'com.example:other:1.0'\n";
+        String use = "implementation(dep) { version { strictly '1.7.22' } }\n";
+
+        String replayed = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "buildscript {\nrepositories {\n" + repositories + "}\n}\n",
+                reassign,
+                "repositories {\n" + repositories + "}\n",
+                "dependencies {\n" + use + "}\n");
+        check("".equals(replayed),
+                "the second execution restores the coordinate, got <<" + replayed + ">>");
+
+        String once = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "repositories {\n" + repositories + "}\n",
+                reassign,
+                "dependencies {\n" + use + "}\n");
+        check(once.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "and without it the scan keeps the reassigned value, got <<"
+                        + once + ">>");
+
+        // The reported spelling, kept because it is the one a reader will try: a
+        // reassignment the class can see a brace around is conditional either way.
+        String guarded = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "repositories {\n" + repositories + "}\n",
+                "android {\n" + reassign + "}\n",
+                "dependencies {\n" + use + "}\n");
+        check("".equals(guarded),
+                "a guarded reassignment never hid the pin, got <<" + guarded + ">>");
     }
 
     /**
@@ -1424,6 +1518,12 @@ public class KotlinStdlibAlignmentTest {
         check(at >= 0, "the builder calls the alignment");
         String fromCall = builderSrc.substring(at).replaceAll("//[^\n]*", "");
         String call = fromCall.substring(0, fromCall.indexOf(";"));
+        int blockAt = builderSrc.indexOf("String gradleProps = ");
+        check(blockAt >= 0, "the generated script is found");
+        int blockEnd = builderSrc.indexOf("Gradle File start", blockAt);
+        check(blockEnd > blockAt, "and its end");
+        String block = builderSrc.substring(blockAt, blockEnd)
+                .replaceAll("//[^\n]*", "");
         String[] scopes = {
             "repositories {", "buildscript {", "android {", "dependencies {",
         };
@@ -1431,6 +1531,120 @@ public class KotlinStdlibAlignmentTest {
             check(call.indexOf(scopes[i]) >= 0,
                     "fragments are handed over inside their " + scopes[i]
                             + " scope, which the call does not show");
+        }
+
+        // And the scope has to be the RIGHT one, read off the script rather than
+        // named here. A fragment interpolated at two places sits in two different
+        // scopes -- injectRepo is inside buildscript { repositories { } } once and
+        // a bare repositories { } the second time -- so the call must wrap the two
+        // occurrences differently. Checking only that each was wrapped somehow let
+        // the first be handed over as an app-graph repositories block, which is a
+        // different question from the one Gradle asks there.
+        java.util.List<java.util.List<String>> scriptScopes =
+                new java.util.ArrayList<java.util.List<String>>();
+        java.util.List<String> stack = new java.util.ArrayList<String>();
+        boolean inLiteral = false;
+        StringBuilder literal = new StringBuilder();
+        for (int i = 0; i < block.length(); i++) {
+            char c = block.charAt(i);
+            if (inLiteral) {
+                if (c == '\\') {
+                    i++;
+                    continue;
+                }
+                if (c == '"') {
+                    inLiteral = false;
+                    continue;
+                }
+                if (c == '{') {
+                    String head = literal.toString().trim();
+                    int space = head.lastIndexOf(' ');
+                    stack.add(space < 0 ? head : head.substring(space + 1));
+                    literal.setLength(0);
+                } else if (c == '}') {
+                    if (!stack.isEmpty()) {
+                        stack.remove(stack.size() - 1);
+                    }
+                    literal.setLength(0);
+                } else {
+                    literal.append(c);
+                }
+                continue;
+            }
+            if (c == '"') {
+                inLiteral = true;
+                literal.setLength(0);
+                continue;
+            }
+            if (block.startsWith("injectRepo", i)
+                    && (i == 0 || !Character.isJavaIdentifierPart(block.charAt(i - 1)))
+                    && !Character.isJavaIdentifierPart(
+                            block.charAt(i + "injectRepo".length()))) {
+                scriptScopes.add(new java.util.ArrayList<String>(stack));
+            }
+        }
+        check(scriptScopes.size() == 2,
+                "the script interpolates injectRepo twice, found " + scriptScopes);
+        check(!scriptScopes.get(0).equals(scriptScopes.get(1)),
+                "and in two different scopes, found " + scriptScopes);
+
+        // Split at the commas that separate ARGUMENTS, which are the ones outside
+        // parentheses: the nearest comma before the token is the one inside
+        // .replace("%s", injectRepo), and slicing there left no wrapper to check.
+        java.util.List<String> arguments = new java.util.ArrayList<String>();
+        int depth = 0;
+        int start = call.indexOf('(') + 1;
+        boolean quoted = false;
+        for (int i = start; i < call.length(); i++) {
+            char c = call.charAt(i);
+            if (quoted) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == '"') {
+                    quoted = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                quoted = true;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                if (depth == 0) {
+                    arguments.add(call.substring(start, i));
+                    break;
+                }
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                arguments.add(call.substring(start, i));
+                start = i + 1;
+            }
+        }
+        java.util.List<String> passing = new java.util.ArrayList<String>();
+        for (int i = 0; i < arguments.size(); i++) {
+            if (arguments.get(i).indexOf("injectRepo") >= 0) {
+                passing.add(arguments.get(i));
+            }
+        }
+        check(passing.size() == scriptScopes.size(),
+                "the call passes injectRepo once per interpolation, found " + passing);
+
+        for (int i = 0; i < scriptScopes.size(); i++) {
+            String wrapper = passing.get(i);
+            java.util.List<String> scope = scriptScopes.get(i);
+            for (int j = 0; j < scope.size(); j++) {
+                check(wrapper.indexOf(scope.get(j) + " {") >= 0,
+                        "occurrence " + i + " of injectRepo is handed over inside "
+                                + scope + ", and its wrapper <<" + wrapper.trim()
+                                + ">> does not open " + scope.get(j));
+            }
+            for (int j = 0; j < scopes.length; j++) {
+                String other = scopes[j].substring(0, scopes[j].indexOf(' '));
+                check(scope.contains(other) || wrapper.indexOf(scopes[j]) < 0,
+                        "occurrence " + i + " of injectRepo is not inside " + other
+                                + " in the script, but its wrapper <<"
+                                + wrapper.trim() + ">> opens one");
+            }
         }
     }
 

@@ -627,7 +627,73 @@ public class KotlinStdlibAlignment {
             return true;
         }
         String declared = declaredVersionOf(line, artifact);
-        return declared != null && declared.endsWith(STRICT_SUFFIX);
+        return declared != null && declared.endsWith(STRICT_SUFFIX)
+                && strictCoordinateIsDeclared(line, artifact);
+    }
+
+    /**
+     * Whether the strict coordinate this statement carries is actually being
+     * DECLARED, rather than merely passed to something.
+     *
+     * <p>The {@code !!} spelling skips the configuration check, because a strict
+     * pin is honoured wherever it is declared. "Wherever" still means declared:
+     * {@code logger.lifecycle('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!')}
+     * is a log line, and reading it as a pin stood the whole block down for an app
+     * that had declared nothing at all.</p>
+     *
+     * <p>The discriminator is not a list of the calls that count -- configurations
+     * are open ended, and every list of them in this class has needed correcting.
+     * It is that a configuration is never reached through a receiver: an app
+     * writes {@code implementation '...'} or {@code myCustomConfig '...'}, never
+     * {@code project.implementation '...'}. So an unqualified call declares and a
+     * qualified one does not, with the dependency handler itself as the exception
+     * that {@code add} already needed.</p>
+     *
+     * <p>Only the coordinate spelling is asked. A {@code version: '1.7.22!!'} map
+     * entry is a dependency notation and nothing else, and a version reached
+     * through a rich-version closure has been read as syntax already.</p>
+     */
+    private static boolean strictCoordinateIsDeclared(String line, String artifact) {
+        String coordinate = KOTLIN_GROUP + ":" + artifact + ":";
+        for (int i = 0; i < line.length(); i++) {
+            if (!isLiteralStart(line, i)) {
+                continue;
+            }
+            int end = endOfStringLiteral(line, i);
+            String literal = stringLiteralContent(line, i);
+            if (literal.startsWith(coordinate)
+                    && versionComponentOf(literal.substring(coordinate.length()))
+                            .endsWith(STRICT_SUFFIX)) {
+                return isDeclarationArgument(line, i);
+            }
+            i = end;
+        }
+        // No coordinate carries it, so it came from a map entry or a closure.
+        return true;
+    }
+
+    /** Whether the literal at {@code quoteAt} is an argument of a declaring call. */
+    private static boolean isDeclarationArgument(String line, int quoteAt) {
+        int i = skipBlanksBackward(line, quoteAt - 1);
+        if (i >= 0 && line.charAt(i) == '(') {
+            i = skipBlanksBackward(line, i - 1);
+        }
+        if (i < 0 || !isIdentifierChar(line.charAt(i))) {
+            // Not an argument of anything -- a bare literal in a list, or an
+            // assignment's value. The use of the name decides those, not this.
+            return false;
+        }
+        while (i >= 0 && isIdentifierChar(line.charAt(i))) {
+            i--;
+        }
+        // A qualified call is not a declaration, with no exception for the
+        // dependency handler: `dependencies.add('implementation', '..')` takes the
+        // coordinate as its SECOND argument, so it never reaches here at all -- it
+        // is recognised where the configuration name is read, by isAddCallArgument.
+        // An exception for it here would have been a control that constrains
+        // nothing, which is worse than none: the next reader takes it for coverage.
+        int dot = skipBlanksBackward(line, i);
+        return dot < 0 || line.charAt(dot) != '.';
     }
 
     /** Gradle's strict-version shorthand, written after the version. */
