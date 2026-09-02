@@ -326,6 +326,9 @@ JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_Str
 #include <sys/stat.h>
 #include <string.h>
 #include <limits.h>
+/* Shared, not per-arm: cn1NameList below uses malloc/realloc/free on BOTH, and it
+   sits outside the platform blocks. */
+#include <stdlib.h>
 #ifdef _WIN32
 /* clang-cl ships no <unistd.h> and no <dirent.h>. Only two things in this file
    actually need them -- access() and the directory walk -- and the MSVC CRT
@@ -335,7 +338,6 @@ JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_Str
    reached java.io.File. */
 #include <io.h>
 #include <direct.h>
-#include <stdlib.h>
 /* WIN32_LEAN_AND_MEAN keeps <winsock.h> out of <windows.h>. Without it winsock's
    own `struct timeval` collides with the one cn1_win_compat.h defines, and the
    file fails on "redefinition of 'timeval'" rather than on anything it does. */
@@ -384,6 +386,67 @@ JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_Str
 #define CN1_FILE_ACCESS(p, m) access((p), (m))
 #define CN1_FILE_SEP '/'
 #endif
+
+/*
+ * A growable list of names, so a directory is enumerated exactly ONCE.
+ *
+ * The two-pass shape this replaces -- count, allocate, enumerate again -- assumed
+ * the two walks see the same directory. They do not: a file created between them
+ * overruns the array (CN1_SET_ARRAY_ELEMENT_OBJECT then raises
+ * ArrayIndexOutOfBoundsException) and a file removed leaves trailing nulls in a
+ * String[] that Java code has no reason to expect. Directories change under
+ * readers all the time, so this was a real race on every platform, not just the
+ * newly added Windows arm.
+ *
+ * The names are held in C memory on purpose: allocArray and newStringFromCString
+ * can both collect, and nothing here may be holding a directory handle when that
+ * happens.
+ */
+struct cn1NameList { char** names; int count; int cap; };
+
+static int cn1NameListAdd(struct cn1NameList* l, const char* name) {
+    size_t n;
+    char* copy;
+    if(l->count == l->cap) {
+        int cap = l->cap == 0 ? 16 : l->cap * 2;
+        char** grown = (char**)realloc(l->names, (size_t)cap * sizeof(char*));
+        if(grown == NULL) {
+            return 0;
+        }
+        l->names = grown;
+        l->cap = cap;
+    }
+    n = strlen(name) + 1;
+    copy = (char*)malloc(n);
+    if(copy == NULL) {
+        return 0;
+    }
+    memcpy(copy, name, n);
+    l->names[l->count++] = copy;
+    return 1;
+}
+
+static void cn1NameListFree(struct cn1NameList* l) {
+    int i;
+    for(i = 0 ; i < l->count ; i++) {
+        free(l->names[i]);
+    }
+    free(l->names);
+    l->names = 0;
+    l->count = 0;
+    l->cap = 0;
+}
+
+/* Turns a completed name list into the String[] File.list returns. */
+static JAVA_OBJECT cn1NameListToArray(CODENAME_ONE_THREAD_STATE, struct cn1NameList* l) {
+    JAVA_OBJECT arr = allocArray(threadStateData, l->count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
+    int i;
+    for(i = 0 ; i < l->count ; i++) {
+        JAVA_OBJECT s = newStringFromCString(threadStateData, l->names[i]);
+        CN1_SET_ARRAY_ELEMENT_OBJECT(arr, i, s);
+    }
+    return arr;
+}
 
 /*
  * "Absolute" is not the same question on the two platforms, and getting it wrong
@@ -512,16 +575,16 @@ JAVA_OBJECT java_io_File_listImpl___java_lang_String_R_java_lang_String_1ARRAY(C
     enteringNativeAllocations();
     const char* p = stringToUTF8(threadStateData, path);
 #ifdef _WIN32
-    /* FindFirstFile rather than opendir, and it wants a wildcard appended. Two
-       passes like the POSIX arm below: count, allocate, refill -- allocArray can
-       collect, so the array cannot be built while a find handle is open. */
+    /* FindFirstFile rather than opendir, and it wants a wildcard appended. ONE
+       enumeration into cn1NameList -- see the note there for why two walks of the
+       same directory is a race rather than a shortcut. */
     {
         char pattern[MAX_PATH];
         WIN32_FIND_DATAA fd;
         HANDLE h;
-        int count = 0;
-        JAVA_OBJECT arr;
+        struct cn1NameList list;
         size_t plen = strlen(p);
+        list.names = 0; list.count = 0; list.cap = 0;
         if (plen == 0 || plen + 3 > sizeof(pattern)) {
             finishedNativeAllocations();
             return JAVA_NULL;
@@ -543,61 +606,48 @@ JAVA_OBJECT java_io_File_listImpl___java_lang_String_R_java_lang_String_1ARRAY(C
         }
         do {
             if (strcmp(fd.cFileName, ".") == 0 || strcmp(fd.cFileName, "..") == 0) continue;
-            count++;
+            if (!cn1NameListAdd(&list, fd.cFileName)) {
+                FindClose(h);
+                cn1NameListFree(&list);
+                finishedNativeAllocations();
+                return JAVA_NULL;
+            }
         } while (FindNextFileA(h, &fd));
         FindClose(h);
-
-        arr = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
-
-        h = FindFirstFileA(pattern, &fd);
-        if (h == INVALID_HANDLE_VALUE) {
+        {
+            JAVA_OBJECT arr = cn1NameListToArray(threadStateData, &list);
+            cn1NameListFree(&list);
             finishedNativeAllocations();
             return arr;
         }
-        count = 0;
-        do {
-            if (strcmp(fd.cFileName, ".") == 0 || strcmp(fd.cFileName, "..") == 0) continue;
-            {
-                JAVA_OBJECT s = newStringFromCString(threadStateData, fd.cFileName);
-                CN1_SET_ARRAY_ELEMENT_OBJECT(arr, count, s);
-            }
-            count++;
-        } while (FindNextFileA(h, &fd));
-        FindClose(h);
-
-        finishedNativeAllocations();
-        return arr;
     }
 #else
-    DIR* d = opendir(p);
-    if (d == NULL) {
-        finishedNativeAllocations();
-        return JAVA_NULL;
+    {
+        DIR* d = opendir(p);
+        struct dirent* entry;
+        struct cn1NameList list;
+        list.names = 0; list.count = 0; list.cap = 0;
+        if (d == NULL) {
+            finishedNativeAllocations();
+            return JAVA_NULL;
+        }
+        while ((entry = readdir(d)) != NULL) {
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+            if (!cn1NameListAdd(&list, entry->d_name)) {
+                closedir(d);
+                cn1NameListFree(&list);
+                finishedNativeAllocations();
+                return JAVA_NULL;
+            }
+        }
+        closedir(d);
+        {
+            JAVA_OBJECT arr = cn1NameListToArray(threadStateData, &list);
+            cn1NameListFree(&list);
+            finishedNativeAllocations();
+            return arr;
+        }
     }
-
-    // First count
-    int count = 0;
-    struct dirent *dir;
-    while ((dir = readdir(d)) != NULL) {
-        if (strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) continue;
-        count++;
-    }
-    closedir(d);
-
-    JAVA_OBJECT arr = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
-
-    d = opendir(p);
-    count = 0;
-    while ((dir = readdir(d)) != NULL) {
-        if (strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) continue;
-        JAVA_OBJECT s = newStringFromCString(threadStateData, dir->d_name);
-        CN1_SET_ARRAY_ELEMENT_OBJECT(arr, count, s);
-        count++;
-    }
-    closedir(d);
-
-    finishedNativeAllocations();
-    return arr;
 #endif
 }
 

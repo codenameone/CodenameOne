@@ -136,6 +136,35 @@ public class FileClassIntegrationTest {
                "            if (f.isDirectory()) throw new RuntimeException(\"IsDirectory failed\");\n" +
                "            if (!f.delete()) throw new RuntimeException(\"Delete failed\");\n" +
                "            if (f.exists()) throw new RuntimeException(\"Delete verification failed\");\n" +
+               // File.list(): nothing exercised it before, so the native listing --
+               // rewritten from a racy count-then-refill pair into one enumeration --
+               // was compiled but never RUN by this suite.
+               "            char[] dirChars = new char[]{'l','s','d','i','r'};\n" +
+               "            File dir = new File(new String(dirChars));\n" +
+               "            dir.mkdir();\n" +
+               "            char[] aChars = new char[]{'l','s','d','i','r','/','a'};\n" +
+               "            char[] bChars = new char[]{'l','s','d','i','r','/','b'};\n" +
+               "            File fa = new File(new String(aChars));\n" +
+               "            File fb = new File(new String(bChars));\n" +
+               "            fa.createNewFile();\n" +
+               "            fb.createNewFile();\n" +
+               "            String[] names = dir.list();\n" +
+               "            if (names == null) throw new RuntimeException(\"list returned null\");\n" +
+               "            if (names.length != 2) throw new RuntimeException(\"list length\");\n" +
+               // A trailing null is what the old two-pass version produced when the
+               // second walk saw fewer entries than the first.
+               "            if (names[0] == null || names[1] == null) throw new RuntimeException(\"null entry\");\n" +
+               // The result must be a String[], not a String: allocArray installs the
+               // class it is handed as the ARRAY's own class.
+               "            Object asObject = names;\n" +
+               "            if (!(asObject instanceof String[])) throw new RuntimeException(\"not a String[]\");\n" +
+               "            boolean sawA = false; boolean sawB = false;\n" +
+               "            for (int i = 0; i < names.length; i++) {\n" +
+               "                if (names[i].equals(new String(new char[]{'a'}))) sawA = true;\n" +
+               "                if (names[i].equals(new String(new char[]{'b'}))) sawB = true;\n" +
+               "            }\n" +
+               "            if (!sawA || !sawB) throw new RuntimeException(\"missing entry\");\n" +
+               "            fa.delete(); fb.delete(); dir.delete();\n" +
                "        } catch (Exception e) {\n" +
                "            // e.printStackTrace(); // Can't print stack trace without constants\n" +
                "            System.exit(1);\n" +

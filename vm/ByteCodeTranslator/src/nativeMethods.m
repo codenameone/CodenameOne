@@ -1216,14 +1216,31 @@ JAVA_LONG java_io_FileInputStream_skipImpl___long_long_R_long(CODENAME_ONE_THREA
         return -1;
     }
     long end = ftell(f);
-    long target = start + (long)count;
-    if(target > end) {
-        target = end;
+    long remaining;
+    long skipped;
+    long target;
+    if(end < 0) {
+        return -1;
     }
+    /* Clamp against the DISTANCE, never by adding first. skip(Long.MAX_VALUE) after
+       any byte has been read overflows `start + count` before the comparison can
+       clamp it -- signed overflow is undefined behaviour, and in practice wraps
+       negative and seeks backwards, so the caller is told it skipped a negative
+       distance or gets an error instead of landing on EOF. Subtracting cannot
+       overflow: end >= start >= 0, and start + skipped is at most end. */
+    remaining = end - start;
+    if(count <= 0) {
+        skipped = 0;
+    } else if(count >= (JAVA_LONG)remaining) {
+        skipped = remaining;
+    } else {
+        skipped = (long)count;
+    }
+    target = start + skipped;
     if(fseek(f, target, SEEK_SET) != 0) {
         return -1;
     }
-    return (JAVA_LONG)(target - start);
+    return (JAVA_LONG)skipped;
 }
 
 JAVA_INT java_io_FileInputStream_availableImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
