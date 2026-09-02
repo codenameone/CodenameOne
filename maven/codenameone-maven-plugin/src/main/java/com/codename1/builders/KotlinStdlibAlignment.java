@@ -516,15 +516,51 @@ public class KotlinStdlibAlignment {
      * it.</p>
      */
     private static boolean heldOnlyBySoftRequirement(String line, String artifact) {
-        String required = versionInCall(line, "require");
-        if (required == null || required.endsWith(STRICT_SUFFIX)) {
-            return false;
-        }
         if (callsStrictly(line) || callsForce(line, artifact) || rejectsTheFloor(line)) {
             return false;
         }
-        return coordinateVersionOf(line, artifact) == null
-                && mapEntryValue(line, "version") == null;
+        String declared = declaredVersionOf(line, artifact);
+        if (declared == null || declared.endsWith(STRICT_SUFFIX)) {
+            // Unreadable stays conservative, and the `!!` suffix is a pin.
+            return false;
+        }
+        // Only BELOW the floor. A soft version there is the case this is for: the
+        // constraint raises it and the two agree, so neither standing the block
+        // down nor skipping that artifact is right -- both leave the shim
+        // pre-merge beside whatever selected a merged-era base, which is the
+        // duplicate this exists to prevent.
+        //
+        // At or above the floor a soft version already satisfies the constraint,
+        // so leaving that artifact to the app costs nothing and says something
+        // true: the app has it in hand. A plain coordinate is soft in exactly the
+        // way a `require` is, which is why they are one question here now.
+        return isAPlainVersion(declared) && belowTheFloor(declared);
+    }
+
+    /**
+     * Whether the version is an ordinary one rather than a selector or an
+     * unreadable reference.
+     *
+     * <p>What makes the exemption above safe is that the constraint can RAISE
+     * the version: {@code 1.7.22} and a floor of 1.8.0 agree on 1.8.0. Nothing
+     * else here can be raised that way. A range is satisfied or it is not --
+     * {@code [1.0,1.5]} and 1.8.0 have no version in common, so exempting one
+     * would write a constraint that cannot resolve. And a version this cannot
+     * read at all, {@code $mystery} or {@code latest.release}, says nothing
+     * about what it will be, which is the conservative path everywhere else.</p>
+     */
+    private static boolean isAPlainVersion(String version) {
+        if (version.length() == 0 || !Character.isDigit(version.charAt(0))) {
+            return false;
+        }
+        for (int i = 0; i < version.length(); i++) {
+            char c = version.charAt(i);
+            if (c == '[' || c == ']' || c == '(' || c == ')' || c == ','
+                    || c == '+' || c == '$' || c == '{') {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** The version the artifact's own coordinate carries, or null. */
@@ -1282,7 +1318,12 @@ public class KotlinStdlibAlignment {
                 end++;
             }
             String token = statement.substring(i, end);
-            if ("if".equals(token) || "else".equals(token)) {
+            // A switch arm is an alternative like any other, and `case` alone is
+            // enough to say so -- reading the last version kept whichever arm was
+            // written last rather than whichever runs.
+            if ("if".equals(token) || "else".equals(token)
+                    || "switch".equals(token) || "case".equals(token)
+                    || "default".equals(token)) {
                 return true;
             }
             i = end - 1;
@@ -1839,13 +1880,21 @@ public class KotlinStdlibAlignment {
     private static int compareVersions(String left, String right) {
         String[] l = left.split("\\.");
         String[] r = right.split("\\.");
-        int len = Math.max(l.length, r.length);
+        int len = Math.min(l.length, r.length);
         for (int i = 0; i < len; i++) {
-            int a = i < l.length ? parseSegment(l[i]) : 0;
-            int b = i < r.length ? parseSegment(r[i]) : 0;
+            int a = parseSegment(l[i]);
+            int b = parseSegment(r[i]);
             if (a != b) {
                 return a < b ? -1 : 1;
             }
+        }
+        // Equal as far as both go, so the SHORTER one is lower. Gradle orders
+        // `1.8` below `1.8.0`, and padding the missing segment with zero called
+        // them equal -- so a strict `[1.7,1.8]` looked like it admitted the floor
+        // when it stops just short of it, and the constraints went into a graph
+        // that cannot resolve them.
+        if (l.length != r.length) {
+            return l.length < r.length ? -1 : 1;
         }
         return 0;
     }

@@ -260,7 +260,7 @@ public class KotlinStdlibAlignmentTest {
         for (String configuration : configurations) {
             String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                     "    " + configuration
-                    + "('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22')\n");
+                    + "('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!')\n");
             check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
                     "a pin on " + configuration + " is the app managing jdk8");
             check("".equals(out),
@@ -364,13 +364,13 @@ public class KotlinStdlibAlignmentTest {
     public void aMapEntryMayHaveSpaceAroundItsColon() {
         String spaced = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation(group : 'org.jetbrains.kotlin', "
-                + "name : 'kotlin-stdlib-jdk8', version : '1.7.22')\n");
+                + "name : 'kotlin-stdlib-jdk8', version : '1.7.22!!')\n");
         check("".equals(spaced),
                 "a spaced map entry still pins jdk8, below the floor so both go");
 
         String doubleQuoted = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation(group: \"org.jetbrains.kotlin\", "
-                + "name:\"kotlin-stdlib-jdk8\", version: \"1.7.22\")\n");
+                + "name:\"kotlin-stdlib-jdk8\", version: \"1.7.22!!\")\n");
         check("".equals(doubleQuoted),
                 "and so does an unspaced double-quoted one");
 
@@ -418,12 +418,12 @@ public class KotlinStdlibAlignmentTest {
     @Test
     public void aPreMergeShimPinSuppressesItsSiblingToo() {
         String jdk8Pinned = KotlinStdlibAlignment.constraintsBlock("implementation",
-                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n");
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n");
         check("".equals(jdk8Pinned),
                 "a pre-merge jdk8 pin takes the jdk7 constraint with it");
 
         String jdk7Pinned = KotlinStdlibAlignment.constraintsBlock("implementation",
-                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.7.22'\n");
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.7.22!!'\n");
         check("".equals(jdk7Pinned),
                 "and the same the other way round");
     }
@@ -628,7 +628,7 @@ public class KotlinStdlibAlignmentTest {
             String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                     "    implementation(" + u + "group" + u + ": 'org.jetbrains.kotlin', "
                     + u + "name" + u + ": 'kotlin-stdlib-jdk8', "
-                    + u + "version" + u + ": '1.7.22')\n");
+                    + u + "version" + u + ": '1.7.22!!')\n");
             check("".equals(out),
                     "a key quoted with " + u + " is still a key, got <<" + out + ">>");
         }
@@ -636,7 +636,7 @@ public class KotlinStdlibAlignmentTest {
         // Mixed spellings in one declaration, which Groovy also accepts.
         String mixed = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation('group': 'org.jetbrains.kotlin', "
-                + "name: 'kotlin-stdlib-jdk8', \"version\": '1.7.22')\n");
+                + "name: 'kotlin-stdlib-jdk8', \"version\": '1.7.22!!')\n");
         check("".equals(mixed), "mixed key spellings, got <<" + mixed + ">>");
 
         // And a merged-era one written the same way keeps the sibling aligned.
@@ -772,6 +772,64 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A plain coordinate version is a SOFT requirement in Gradle, exactly as a
+     * rich {@code require} is, and below the floor the constraint raises it. So
+     * an app that declares an old shim directly is aligned rather than left
+     * alone: standing the block down there, or skipping that artifact's own
+     * constraint, kept the pre-merge shim beside whatever selected a merged-era
+     * base -- the duplicate this exists to prevent, in the graph it exists for.
+     */
+    @Test
+    public void aSoftPreMergeDeclarationIsRaisedRatherThanHonoured() {
+        String jdk8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
+        String[] soft = {
+            "    implementation '" + jdk8 + ":1.7.22'\n",
+            "    implementation('" + jdk8 + ":1.7.22')\n",
+            "    implementation group: 'org.jetbrains.kotlin', "
+                    + "name: 'kotlin-stdlib-jdk8', version: '1.7.22'\n",
+            "    implementation('" + jdk8 + "') { version { require '1.7.22' } }\n",
+        };
+        for (int i = 0; i < soft.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    soft[i]);
+            check(out.contains("kotlin-stdlib-jdk7:1.8.0")
+                            && out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                    "<<" + soft[i].trim() + ">> is raised, and its sibling with it, "
+                            + "got <<" + out + ">>");
+        }
+
+        // Anything that really PINS it still stands the block down, because the
+        // constraint cannot raise those.
+        String[] firm = {
+            "    implementation '" + jdk8 + ":1.7.22!!'\n",
+            "    implementation('" + jdk8 + "') { version { strictly '1.7.22' } }\n",
+            "    configurations.all { resolutionStrategy.force '" + jdk8 + ":1.7.22' }\n",
+            "    implementation('" + jdk8 + "') { version { require '1.+'; "
+                    + "reject '[1.8.0,)' } }\n",
+            // A range is satisfied or it is not: `[1.0,1.5]` and 1.8.0 have no
+            // version in common, so it cannot be raised either.
+            "    implementation '" + jdk8 + ":[1.0,1.5]'\n",
+            // And a version this cannot read says nothing about what it will be.
+            "    implementation \"" + jdk8 + ":$mystery\"\n",
+        };
+        for (int i = 0; i < firm.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    firm[i]);
+            check("".equals(out), "<<" + firm[i].trim()
+                    + ">> cannot be raised, got <<" + out + ">>");
+        }
+
+        // At or above the floor a soft version already satisfies the constraint,
+        // so that artifact is still left to the app and only its sibling raised.
+        String merged = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation '" + jdk8 + ":1.9.22'\n");
+        check(merged.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && !merged.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a merged-era declaration stands in for its own constraint, got <<"
+                        + merged + ">>");
+    }
+
+    /**
      * A bare carriage return ends a line in Groovy exactly as a newline does.
      * The comment scan learned that; the statement splitter had not, so every
      * statement of a CR-only fragment merged into one and a main-variant
@@ -812,6 +870,37 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Gradle orders a shortened version below a longer one: {@code 1.8} is below
+     * {@code 1.8.0}. Padding the missing segment with zero called them equal, so
+     * a strict range that stops just short of the floor looked like it admitted
+     * it and the constraints went into a graph that cannot resolve them.
+     */
+    @Test
+    public void aShortenedUpperBoundStopsShortOfTheFloor() {
+        String jdk8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
+        String[] capped = {
+            "    implementation('" + jdk8 + "') { version { strictly '[1.7,1.8]' } }\n",
+            "    implementation('" + jdk8 + "') { version { strictly '[1.7,1.8.0)' } }\n",
+        };
+        for (int i = 0; i < capped.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    capped[i]);
+            check("".equals(out), "<<" + capped[i].trim()
+                    + ">> cannot admit the floor, got <<" + out + ">>");
+        }
+
+        String[] reaching = {
+            "    implementation('" + jdk8 + "') { version { strictly '[1.7,1.8.0]' } }\n",
+            "    implementation('" + jdk8 + "') { version { strictly '[1.7,1.9]' } }\n",
+        };
+        for (int i = 0; i < reaching.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            reaching[i]).contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + reaching[i].trim() + ">> admits the floor");
+        }
+    }
+
+    /**
      * A ternary chooses between its arms exactly as an if/else does, and so does
      * an elvis. Read as a sequence, only the last setter counted -- so the arm
      * holding a strict pre-merge version was passed over.
@@ -822,6 +911,13 @@ public class KotlinStdlibAlignmentTest {
         String[] branched = {
             "    implementation('" + jdk8 + "') { version { "
                     + "legacy ? strictly('1.7.22') : strictly('1.9.22') } }\n",
+            // A switch arm is an alternative like any other.
+            "    implementation('" + jdk8 + "') { version { switch (mode) { "
+                    + "case 'legacy': strictly '1.7.22'; break; "
+                    + "default: strictly '1.9.22' } } }\n",
+            "    implementation('" + jdk8 + "') { version { switch (mode) { "
+                    + "case 'modern': strictly '1.9.22'; break; "
+                    + "default: strictly '1.7.22' } } }\n",
             "    implementation('" + jdk8 + "') { version { "
                     + "legacy ? strictly('1.9.22') : strictly('1.7.22') } }\n",
             "    implementation('" + jdk8 + "') { version { "
@@ -1810,9 +1906,9 @@ public class KotlinStdlibAlignmentTest {
     public void anAddCallMustBeOnADependencyHandler() {
         String pin = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22";
         String[] handlers = {
-            "    dependencies.add('implementation', '" + pin + "')\n",
-            "    project.dependencies.add('implementation', '" + pin + "')\n",
-            "    dependencies {\n        add 'implementation', '" + pin + "'\n    }\n",
+            "    dependencies.add('implementation', '" + pin + "!!')\n",
+            "    project.dependencies.add('implementation', '" + pin + "!!')\n",
+            "    dependencies {\n        add 'implementation', '" + pin + "!!'\n    }\n",
         };
         for (int i = 0; i < handlers.length; i++) {
             check("".equals(KotlinStdlibAlignment.constraintsBlock(
@@ -1935,7 +2031,7 @@ public class KotlinStdlibAlignmentTest {
                     "<<" + definitions[i].trim() + ">> is readable below, got <<"
                             + merged + ">>");
             check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
-                            definitions[i].replace("'V'", "'1.7.22'") + use)),
+                            definitions[i].replace("'V'", "'1.7.22!!'") + use)),
                     "and a pre-merge one stands the block down");
         }
 
@@ -2055,7 +2151,7 @@ public class KotlinStdlibAlignmentTest {
                 "the interpolated version is read, got <<" + modern + ">>");
 
         String old = KotlinStdlibAlignment.constraintsBlock("implementation",
-                "    def v = '1.7.22'\n"
+                "    def v = '1.7.22!!'\n"
                 + "    def dep = [group: 'org.jetbrains.kotlin', "
                 + "name: 'kotlin-stdlib-jdk7', version: \"$v\"]\n"
                 + "    implementation(dep)\n");
@@ -2443,7 +2539,7 @@ public class KotlinStdlibAlignmentTest {
         String across = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    configurations.all {\n"
                 + "        resolutionStrategy.forcedModules = [\n"
-                + "                'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n"
+                + "                'org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!'\n"
                 + "        ]\n"
                 + "    }\n");
         check("".equals(across),
@@ -2453,7 +2549,7 @@ public class KotlinStdlibAlignmentTest {
                 "    implementation([\n"
                 + "        group: 'org.jetbrains.kotlin',\n"
                 + "        name: 'kotlin-stdlib-jdk8',\n"
-                + "        version: '1.7.22'\n"
+                + "        version: '1.7.22!!'\n"
                 + "    ])\n");
         check("".equals(mapAcross),
                 "and so does a map written across them, got <<" + mapAcross + ">>");
@@ -2538,7 +2634,7 @@ public class KotlinStdlibAlignmentTest {
         for (int i = 0; i < endings.length; i++) {
             String reason = KotlinStdlibAlignment.constraintsBlock("implementation",
                     "    implementation('com.example:other:1.0') { because" + endings[i]
-                    + " 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22' }\n");
+                    + " 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!' }\n");
             check(reason.contains("kotlin-stdlib-jdk8:1.8.0"),
                     "the reason is still prose across " + endings[i].length()
                             + " line-ending chars, got <<" + reason + ">>");
@@ -2546,7 +2642,7 @@ public class KotlinStdlibAlignmentTest {
             String added = KotlinStdlibAlignment.constraintsBlock("implementation",
                     "    dependencies.add(" + endings[i]
                     + " 'implementation'," + endings[i]
-                    + " 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22')\n");
+                    + " 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!')\n");
             check("".equals(added),
                     "and an add() call is still an add() call, got <<" + added + ">>");
         }
@@ -2643,7 +2739,7 @@ public class KotlinStdlibAlignmentTest {
                     "    implementation(group:" + endings[i]
                     + " 'org.jetbrains.kotlin', name:" + endings[i]
                     + " 'kotlin-stdlib-jdk8', version:" + endings[i]
-                    + " '1.7.22')" + endings[i]);
+                    + " '1.7.22!!')" + endings[i]);
             check("".equals(out),
                     "the map entry survives the line ending, got <<" + out + ">>");
         }
@@ -2992,7 +3088,7 @@ public class KotlinStdlibAlignmentTest {
     public void aLocalNamedAfterAMapKeyDoesNotReplaceTheKey() {
         String[] keys = {"group", "name", "version"};
         for (int k = 0; k < keys.length; k++) {
-            String value = "version".equals(keys[k]) ? "1.7.22"
+            String value = "version".equals(keys[k]) ? "1.7.22!!"
                     : "name".equals(keys[k]) ? "kotlin-stdlib-jdk8"
                     : "org.jetbrains.kotlin";
             String out = KotlinStdlibAlignment.constraintsBlock("implementation",
@@ -3002,7 +3098,7 @@ public class KotlinStdlibAlignmentTest {
                     + ", name: "
                     + ("name".equals(keys[k]) ? "name" : "'kotlin-stdlib-jdk8'")
                     + ", version: "
-                    + ("version".equals(keys[k]) ? "version" : "'1.7.22'")
+                    + ("version".equals(keys[k]) ? "version" : "'1.7.22!!'")
                     + ")\n");
             check("".equals(out),
                     "the map form survives a local called " + keys[k]
@@ -3149,7 +3245,7 @@ public class KotlinStdlibAlignmentTest {
 
         // The same chain below the floor is still below it.
         String old = KotlinStdlibAlignment.constraintsBlock("implementation",
-                "    def v = '1.7.22'\n"
+                "    def v = '1.7.22!!'\n"
                 + "    def dep = \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$v\"\n"
                 + "    implementation dep\n");
         check("".equals(old),
@@ -3602,7 +3698,7 @@ public class KotlinStdlibAlignmentTest {
         for (int q = 0; q < quotes.length; q++) {
             String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                     "    dependencies.add(" + quotes[q] + "implementation" + quotes[q]
-                            + ", 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22')\n");
+                            + ", 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!')\n");
             check("".equals(out),
                     "an added pre-merge shim suppresses the block, named with "
                             + quotes[q] + " but got <<" + out + ">>");
@@ -3754,14 +3850,21 @@ public class KotlinStdlibAlignmentTest {
         check(old.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "and neither does an old one, which the floor simply overrides");
 
-        // Neither does a requirement, which is soft in the same way. This once
-        // asserted that it binds; it does not, and skipping the constraint for it
-        // is what left a softly-required shim pre-merge.
+        // A requirement AT OR ABOVE the floor does stand in for it: it already
+        // satisfies the constraint, so leaving that artifact to the app says
+        // something true. Below the floor it does not -- there the constraint
+        // raises it, and skipping is what left a softly-required shim pre-merge.
         String required = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
                 + "{ version { require '1.9.22' } }\n");
-        check(required.contains("kotlin-stdlib-jdk8:1.8.0"),
-                "a required version does not stand in for the constraint either");
+        check(!required.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a merged-era requirement stands in for the constraint");
+
+        String raised = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
+                + "{ version { require '1.7.22' } }\n");
+        check(raised.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "and a pre-merge one is raised rather than honoured");
 
         // A requirement that OVERRIDES a coordinate is still read as the version
         // that declaration carries -- soft is about whether it pins, not about
@@ -3894,7 +3997,7 @@ public class KotlinStdlibAlignmentTest {
     @Test
     public void aRuntimeOnlyPreMergePinSuppressesBoth() {
         String out = KotlinStdlibAlignment.constraintsBlock("implementation",
-                "    runtimeOnly 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n");
+                "    runtimeOnly 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n");
         check("".equals(out),
                 "a runtimeOnly pre-merge pin takes the sibling constraint with it");
     }
@@ -3936,7 +4039,7 @@ public class KotlinStdlibAlignmentTest {
                 "the expanded version is merged-era, so the sibling stays constrained");
 
         String braced = KotlinStdlibAlignment.constraintsBlock("implementation",
-                "    def v = '1.7.22'\n"
+                "    def v = '1.7.22!!'\n"
                 + "    implementation \"org.jetbrains.kotlin:kotlin-stdlib-jdk7:${v}\"\n");
         check("".equals(braced), "and a pre-merge one still suppresses both");
 
@@ -4273,7 +4376,7 @@ public class KotlinStdlibAlignmentTest {
 
         // A coordinate assembled by concatenation is not a coordinate in the text.
         String concatenated = KotlinStdlibAlignment.constraintsBlock("implementation",
-                "    implementation('org.jetbrains.kotlin:' + 'kotlin-stdlib-jdk8:1.7.22') "
+                "    implementation('org.jetbrains.kotlin:' + 'kotlin-stdlib-jdk8:1.7.22!!') "
                 + "{ version { strictly '1.7.22' } }\n");
         check(concatenated.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "a concatenated coordinate is left unrecognised, by design");
@@ -4308,7 +4411,7 @@ public class KotlinStdlibAlignmentTest {
         String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation group: 'org.jetbrains.kotlin',\n"
                 + "        name: 'kotlin-stdlib-jdk8',\n"
-                + "        version: '1.7.22'\n");
+                + "        version: '1.7.22!!'\n");
         check("".equals(out),
                 "a comma-continued map declaration pins jdk8, below the floor so both go");
     }
@@ -4411,7 +4514,7 @@ public class KotlinStdlibAlignmentTest {
 
         // and the real one still is
         String real = KotlinStdlibAlignment.constraintsBlock("implementation",
-                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n");
+                "    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n");
         check(!real.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "the main configuration still counts");
     }
@@ -4516,7 +4619,7 @@ public class KotlinStdlibAlignmentTest {
         // and the add() spelling it was widened for still works
         String add = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    dependencies.add(\"runtimeOnly\", "
-                + "\"org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22\")\n");
+                + "\"org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!\")\n");
         check(!add.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "the add() spelling is still recognised");
     }
@@ -4562,7 +4665,7 @@ public class KotlinStdlibAlignmentTest {
     public void theQuotedAddSpellingCountsAsAPin() {
         String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    dependencies.add(\"runtimeOnly\", "
-                + "\"org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22\")\n");
+                + "\"org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!\")\n");
         check("".equals(out),
                 "a quoted configuration name still pins jdk8, and a below-floor pin "
                 + "suppresses both");
@@ -4637,7 +4740,7 @@ public class KotlinStdlibAlignmentTest {
     public void aDeclarationSplitAcrossLinesIsStillAPin() {
         String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation(\n"
-                + "        'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
+                + "        'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n"
                 + "    )\n");
         check("".equals(out),
                 "a wrapped declaration pins jdk8, below the floor so both go");
@@ -4651,7 +4754,7 @@ public class KotlinStdlibAlignmentTest {
     @Test
     public void anInlineExclusionDoesNotCancelTheDeclaration() {
         String out = KotlinStdlibAlignment.constraintsBlock("implementation",
-                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!') "
                 + "{ exclude group: 'com.example', module: 'thing' }\n");
         check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "the declaration survives its own inline exclusion");
@@ -4704,7 +4807,7 @@ public class KotlinStdlibAlignmentTest {
     public void aSemicolonInsideAStringOrParensIsNotASeparator() {
         String out = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation(\n"
-                + "        'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'\n"
+                + "        'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n"
                 + "    )\n");
         check(!out.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "a wrapped declaration still pins");
