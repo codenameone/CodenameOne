@@ -265,6 +265,19 @@ class JavaSENativeDragAndDropTest {
     }
 
     @Test
+    void aStreamedTextFlavorIsReadOnlyOnce() throws Exception {
+        DataFlavor htmlStream = new DataFlavor("text/html;charset=UTF-8;class=java.io.InputStream");
+        FakeTransferable t = new FakeTransferable()
+                .add(htmlStream, new ByteArrayInputStream("<b>once</b>".getBytes("UTF-8")));
+
+        ClipboardContent content = JavaSENativeDragAndDrop.contentFor(t, t.getTransferDataFlavors(), true);
+        assertEquals("<b>once</b>", content.getText(ClipboardContent.MIME_HTML));
+        assertEquals(1, t.reads,
+                "a source that produces its stream once loses the representation on the second "
+                        + "ask, and one that produces a fresh stream transfers everything twice");
+    }
+
+    @Test
     void aTextFlavorCarriedAsAStreamStillReadsAsText() throws Exception {
         DataFlavor htmlStream = new DataFlavor("text/html;charset=UTF-16;class=java.io.InputStream");
         FakeTransferable t = new FakeTransferable()

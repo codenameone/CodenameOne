@@ -10408,20 +10408,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if (pathOrUri == null || pathOrUri.length() == 0) {
                     continue;
                 }
-                Uri u;
-                if (pathOrUri.startsWith("content:")) {
-                    u = Uri.parse(pathOrUri);
-                } else {
-                    File file = pathOrUri.startsWith("file:")
-                            ? new File(Uri.parse(pathOrUri).getPath())
-                            : new File(pathOrUri);
-                    u = FileProvider.getUriForFile(getContext(), authority, file);
-                    getContext().grantUriPermission("android", u, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                // Each file on its own. A path outside the roots the file provider was
+                // configured with throws, and one throwing on the second of three used to
+                // abandon the third as well *and* skip every representation after the file
+                // loop -- so the clip went out holding one file, silently, and the drag
+                // reported success.
+                try {
+                    Uri u;
+                    if (pathOrUri.startsWith("content:")) {
+                        u = Uri.parse(pathOrUri);
+                    } else {
+                        File file = pathOrUri.startsWith("file:")
+                                ? new File(Uri.parse(pathOrUri).getPath())
+                                : new File(pathOrUri);
+                        u = FileProvider.getUriForFile(getContext(), authority, file);
+                        getContext().grantUriPermission("android", u,
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    }
+                    if (!mimeTypes.contains("text/uri-list")) {
+                        mimeTypes.add("text/uri-list");
+                    }
+                    items.add(new ClipData.Item(u));
+                } catch (Throwable t) {
+                    // Absent rather than advertised: nothing named it a type of its own, so
+                    // no receiver is told the clip holds a file it does not.
+                    com.codename1.io.Log.e(t);
                 }
-                if (!mimeTypes.contains("text/uri-list")) {
-                    mimeTypes.add("text/uri-list");
-                }
-                items.add(new ClipData.Item(u));
             }
         }
 
@@ -10443,12 +10455,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             imageExt = "gif";
         }
         if (imageBytes != null) {
-            Uri imageUri = writeAsProviderUri(imageBytes, imageExt, imageMime);
-            if (imageUri != null) {
-                if (!mimeTypes.contains(imageMime)) {
-                    mimeTypes.add(imageMime);
+            try {
+                Uri imageUri = writeAsProviderUri(imageBytes, imageExt, imageMime);
+                if (imageUri != null) {
+                    if (!mimeTypes.contains(imageMime)) {
+                        mimeTypes.add(imageMime);
+                    }
+                    items.add(new ClipData.Item(imageUri));
                 }
-                items.add(new ClipData.Item(imageUri));
+            } catch (Throwable t) {
+                // On its own, so a picture that cannot be written does not take the files
+                // and the other representations with it.
+                com.codename1.io.Log.e(t);
             }
         }
     }
@@ -10491,7 +10509,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (mimeTypes.contains(mime) || ClipboardContent.MIME_FILE.equals(mime)) {
                 continue;
             }
-            Object value = content.getData(mime);
+            // Each representation on its own: a provider that throws is one type absent, not
+            // every type after it. ClipboardDataProvider permits it to fail.
+            Object value;
+            try {
+                value = content.getData(mime);
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+                continue;
+            }
             byte[] bytes = null;
             if (value instanceof String) {
                 if (carriedText != null && carriedText.equals(value)) {
@@ -10508,10 +10534,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 bytes = (byte[]) value;
             }
             if (bytes != null) {
-                Uri uri = writeAsProviderUri(bytes, extensionForMime(mime), mime);
-                if (uri != null) {
-                    mimeTypes.add(mime);
-                    items.add(new ClipData.Item(uri));
+                try {
+                    Uri uri = writeAsProviderUri(bytes, extensionForMime(mime), mime);
+                    if (uri != null) {
+                        mimeTypes.add(mime);
+                        items.add(new ClipData.Item(uri));
+                    }
+                } catch (Throwable t) {
+                    com.codename1.io.Log.e(t);
                 }
             }
         }

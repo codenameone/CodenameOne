@@ -440,6 +440,18 @@ final class JavaSENativeDragAndDrop {
     /// unreadable is simply one the drop does not offer.
     private static Object readValue(Transferable transferable, DataFlavor flavor, String mime) {
         try {
+            if (mime.startsWith("text/") && flavor.isFlavorTextType()
+                    && !String.class.equals(flavor.getRepresentationClass())) {
+                // Before the read below, not after it. A text flavor that hands over bytes or a
+                // stream has to be decoded through the flavor's own reader, and that reader
+                // fetches the data itself -- so reading first and calling it afterwards
+                // transferred everything twice, leaked the first stream, and lost the
+                // representation outright where a source produces it only once.
+                String text = textFromFlavor(transferable, flavor);
+                if (text != null) {
+                    return text;
+                }
+            }
             Object out = transferable.getTransferData(flavor);
             if (out == null) {
                 return null;
@@ -461,18 +473,6 @@ final class JavaSENativeDragAndDrop {
                     return JavaSEPort.imageToPngBytes((java.awt.Image) out);
                 }
                 return null;
-            }
-            if (mime.startsWith("text/") && !(out instanceof String) && flavor.isFlavorTextType()) {
-                // A text flavor is free to hand over bytes -- text/html;class="[B" and
-                // text/plain;class=java.io.InputStream are both ordinary on the desktop -- and
-                // the encoding those bytes are in is a parameter of the flavor, not something
-                // to assume. Storing them as a binary payload made getText() answer null for a
-                // type the drop had just accepted, and decoding them as UTF-8 by hand would get
-                // a charset=UTF-16 flavor wrong. DataFlavor's own reader is what knows.
-                String text = textFromFlavor(transferable, flavor);
-                if (text != null) {
-                    return text;
-                }
             }
             if (out instanceof byte[]) {
                 return out;
@@ -513,6 +513,12 @@ final class JavaSENativeDragAndDrop {
     /// Reads a text flavor through the reader the flavor itself supplies, which applies the
     /// charset the flavor declares. Returns null when the flavor will not produce one, leaving
     /// the caller's own handling to run.
+    ///
+    /// A text flavor is free to hand over bytes -- text/html;class="[B" and
+    /// text/plain;class=java.io.InputStream are both ordinary on the desktop -- and the encoding
+    /// those bytes are in is a parameter of the flavor rather than something to assume. Storing
+    /// them as a binary payload made getText() answer null for a type the drop had just
+    /// accepted, and decoding them as UTF-8 by hand gets a charset=UTF-16 flavor wrong.
     private static String textFromFlavor(Transferable transferable, DataFlavor flavor) {
         try {
             java.io.Reader reader = flavor.getReaderForText(transferable);
