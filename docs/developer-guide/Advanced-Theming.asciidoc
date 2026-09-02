@@ -770,13 +770,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedth
 [[understanding-images-and-multi-images]]
 === Understanding images and Multi-Images
 
-// HTML_ONLY_START
-NOTE: This section provides a high-level overview of images. You dive deeper into the various types of images in the https://www.codenameone.com/manual/graphics.html#deep-into-images-section[graphics section].
-// HTML_ONLY_END
-////
-//PDF_ONLY
 NOTE: This section provides a high-level overview of images. You dive deeper into the various types of images in the <<deep-into-images-section,graphics section>>.
-////
 
 When working with a theme, you often use images for borders or backgrounds. You also use images within the GUI for various purposes and most such images will be extracted from the resource file.
 
@@ -838,7 +832,7 @@ When configuring your styles, you should rarely use "Pixels" as the unit for pad
 and border thickness because the results will be inconsistent on different densities. Instead, you should use
 millimeters for all non-zero units of measurement.
 
-As you now understand the <<DPI-explanation-sidebar,complexities of DPI>> it should be clear why this is important.
+As you now understand the <<density-and-dpi,complexities of DPI>> it should be clear why this is important.
 
 ==== Fractions of millimeters
 

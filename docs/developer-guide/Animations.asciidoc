@@ -116,17 +116,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/animations
 
 First the UI goes through an "unlayout" animation, once that completes the layout itself is performed.
 
-// HTML_ONLY_START
 IMPORTANT: The `AndWait` calls needs to be invoked on the Event Dispatch Thread despite being "blocking." This is a common convention in Codename One powered by a unique capability of Codename One: `invokeAndBlock`. +
 You can learn more about `invokeAndBlock` in the
-https://www.codenameone.com/manual/edt.html[EDT section].
-// HTML_ONLY_END
-////
-//PDF_ONLY
-IMPORTANT: The `AndWait` calls needs to be invoked on the Event Dispatch Thread despite being "blocking". This is a common convention in Codename One powered by a unique capability of Codename One: `invokeAndBlock`. +
-You can learn more about `invokeAndBlock` in the
 <<invoke-And-Block-section,EDT section>>.
-////
 
 The callback variant is like the `invokeAndBlock` variant but uses a more conventional callback semantic which is more familiar to some developers. It accepts a `Runnable` callback that will be invoked after the fact. For example, you can change the <<animateUnlayutSampleCode,unlayout call from before>> to use the callback semantics as such:
 
@@ -220,13 +212,7 @@ Animations comprise two parts, the logic (deciding the position, etc.) and the p
 
 The separation of concerns allows you to avoid redundant painting for example, if animate didn't trigger a change return `false` to avoid the overhead related to animations.
 
-// HTML_ONLY_START
-You discuss low-level animations in more details within the https://www.codenameone.com/manual/graphics.html#clock-animation-section[animation section of the clock demo].
-// HTML_ONLY_END
-////
-//PDF_ONLY
 You discuss low-level animations in more details within the <<clock-animation-section,animation section of the clock demo>>.
-////
 
 === Transitions
 
@@ -259,13 +245,7 @@ Themes define the default transitions used when showing a form, these differ bas
 
 TIP: `SlideFade` is problematic without a title area. If you have a `Form` that lacks a title area you would recommend to disable `SlideFade` at least for that `Form`.
 
-// HTML_ONLY_START
-Check out the full set of theme constants in the https://www.codenameone.com/manual/advanced-theming.html#theme-constants-section[Theme Constants Section].
-// HTML_ONLY_END
-////
-//PDF_ONLY
 Check out the full set of theme constants in the <<theme-constants-section,Theme Constants Section>>.
-////
 
 ==== Replace
 

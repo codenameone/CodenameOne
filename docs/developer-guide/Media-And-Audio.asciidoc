@@ -1,16 +1,10 @@
 [[media-and-audio-section]]
-= Media and Audio
+== Media and Audio
 
 [[media-audio-mediamanager-section]]
-== MediaManager and MediaPlayer
+=== MediaManager and MediaPlayer
 
-// HTML_ONLY_START
-IMPORTANT: `MediaPlayer` is a *peer component*, understanding this is crucial if your application depends on such a component. You can learn about peer components and their issues https://www.codenameone.com/manual/advanced-topics.html#native-peer-components[here].
-// HTML_ONLY_END
-////
-//PDF_ONLY
 IMPORTANT: `MediaPlayer` is a *peer component*, understanding this is crucial if your application depends on such a component. You can learn about peer components and their issues <<native-peer-components,here>>.
-////
 
 The https://www.codenameone.com/javadoc/com/codename1/components/MediaPlayer.html[MediaPlayer] allows you to control video playback. To use the `MediaPlayer` you need to first load the `Media` object from the https://www.codenameone.com/javadoc/com/codename1/media/MediaManager.html[MediaManager].
 
@@ -34,7 +28,7 @@ image::img/components-mediaplayer-android.png[Video playback running on an Andro
 IMPORTANT: Video playback in the simulator will work with JavaFX enabled. This is the default for Java 8 or newer so recommend using that.
 
 [[pcm-audio-section]]
-== PCM Audio Buffers, Mixing, and Effects
+=== PCM Audio Buffers, Mixing, and Effects
 
 `AudioBuffer` stores raw interleaved float PCM samples in the `[-1, 1]` range, and `WAVWriter` writes those samples to a WAV file.
 

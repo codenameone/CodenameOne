@@ -51,9 +51,9 @@ import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
 import java.util.*;
-import static com.codename1.ui.ComponentSelector.$;
 
-class ComponentSelectorJava001Snippet {
+
+class VideoCaptureConstraintsJava001Snippet {
 
     Object context;
     Object url;
@@ -78,19 +78,13 @@ class ComponentSelectorJava001Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     void snippet() throws Exception {
-        // tag::component-selector-java-001[]
-        // ...
-
-        Button slideUp = $(new Button("Slide Up")) // <1>
-            .setIcon(FontImage.MATERIAL_EXPAND_LESS) // <2>
-            .addActionListener(e->{ // <3>
-                $(e) // <4>
-                    .getParent() // <5>
-                    .find(">*") // <6>
-                    .slideUpAndWait(1000) // <7>
-                    .slideDownAndWait(1000); // <8>
-            })
-            .asComponent(Button.class); // <9>
-        // end::component-selector-java-001[]
+        // tag::video-capture-constraints-java-001[]
+        // The original wrote "new VideoCaptureConstraint()" -- a class that does
+        // not exist. Corrected while restoring it: a snippet that cannot compile is
+        // worse than no snippet.
+        VideoCaptureConstraints cnst = new VideoCaptureConstraints()
+            .preferredQuality(VideoCaptureConstraints.QUALITY_LOW)
+            .preferredMaxLength(5);
+        // end::video-capture-constraints-java-001[]
     }
 }

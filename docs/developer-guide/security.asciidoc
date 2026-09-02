@@ -61,7 +61,6 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 This allows you to type in the first text field and the second text area shows the encoded result. A text area is used so copy/paste is easy.
 
-For your convenience this app can be accessed here: https://www.codenameone.com/demos/StringEncoder/index.html
 
 
 === Storage encryption
@@ -193,7 +192,7 @@ The trustworthy way to verify device and app integrity is hardware-backed attest
 
 Enable it with a build hint, which bundles the SDK (Android) or links the entitlement (iOS):
 
-* `android.playIntegrity=true` -- bundles the Play Integrity SDK and enables the runtime token API. Optionally add `android.playIntegrity.verifyUrl=https://your-backend/integrity` to *also* attest at launch on a background thread and exit if your backend rejects the token. `android.playIntegrityVersion` overrides the bundled SDK version.
+* `android.playIntegrity=true` -- bundles the Play Integrity SDK and enables the runtime token API. Optionally add `android.playIntegrity.verifyUrl=https://backend.example.com/integrity` to *also* attest at launch on a background thread and exit if your backend rejects the token. `android.playIntegrityVersion` overrides the bundled SDK version.
 * `ios.appAttest=true` -- enables App Attest (DeviceCheck.framework) and the runtime token API. `ios.appAttest.environment` is `development` (debug builds) or `production` (release) by default.
 
 The runtime API is identical on both platforms -- request a token bound to a fresh server nonce, then POST it to your backend for verification:

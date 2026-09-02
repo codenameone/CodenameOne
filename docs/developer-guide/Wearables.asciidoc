@@ -103,8 +103,8 @@ NOTE: `isWatch()` describes the device form factor, not the screen shape. A Wear
 OS device can be round or square; query the display safe-area insets (see
 <<designing-for-the-watch>>) rather than assuming a rectangle.
 
-=== Designing for the Watch
 [[designing-for-the-watch]]
+=== Designing for the Watch
 
 A watch screen is small and is frequently round. A few practical guidelines:
 
@@ -119,8 +119,8 @@ A watch screen is small and is frequently round. A few practical guidelines:
   without forking your code (the override layer activates on watch devices the
   same way platform overrides do elsewhere).
 
-=== Sharing Data Between the Phone and the Watch
 [[wearable-data]]
+=== Sharing Data Between the Phone and the Watch
 
 The two apps share no storage. `Storage`, `Preferences` and the SQLite database
 are per device, and there's no container that spans the pair, so a value written
@@ -234,8 +234,8 @@ has no such gap. Gate a wearable feature on those rather than on `isSupported()`
 or you will offer it to someone holding a phone and nothing else. Add a
 `WearableStateListener` rather than polling.
 
-=== Complications and Tiles
 [[watch-complications]]
+=== Complications and Tiles
 
 A complication -- the small live readout on a watch face -- is the same idea as a
 home-screen widget: content-driven, rendered while your app isn't running, fed
@@ -276,8 +276,8 @@ home here, because most complications are a gauge, a dial or a ring.
 Design for a glance. A complication is a few dozen pixels someone reads in under
 a second, so one number or one gauge beats any layout that has to be read.
 
-==== What a Watch Face Actually Shows
 [[watch-complication-fidelity]]
+==== What a Watch Face Actually Shows
 
 This is the part that surprises people, so it's worth stating plainly: **a
 complication isn't a small widget.** A watch face asks your data source for one
@@ -348,7 +348,6 @@ image::img/wearables/apple-watch-simulator.png[Codename One running on the Apple
 
 [[watch-distribution]]
 ==== What the Watch App Runs Today
-[[watch-entry-point]]
 
 `codename1.watchMain` is the watch app's entry point on both platforms. The
 watchOS build writes a stub of its own for that class and runs a second
@@ -377,8 +376,8 @@ from the phone.
 
 None of this affects building, running or testing on the simulator or a device.
 
-==== Native Code and the Watch Slice
 [[watch-native-code]]
+==== Native Code and the Watch Slice
 
 Your Objective-C is compiled for the watch as well as the phone. The translator
 copies native sources through to every slice it produces, so a `.m` that imports
@@ -400,8 +399,8 @@ no build hint for this and no attempt to infer it: which of your native sources
 can compile for watchOS is a question about that source, and the preprocessor is
 where it's answered.
 
-==== Supported and Unsupported APIs on watchOS
 [[watch-supported-apis]]
+==== Supported and Unsupported APIs on watchOS
 
 Because watchOS lacks UIKit views, GPU rendering and several iOS frameworks, the
 APIs that depend on them aren't available on the watch slice. They're guarded
@@ -432,8 +431,8 @@ usual. Cloud builds generate the watch target through the same iOS build --
 declare the watch main class and build for iOS -- and the same applies there,
 so a standalone cloud build returns the iOS archive.
 
-=== Android (Wear OS)
 [[wear-os-android]]
+=== Android (Wear OS)
 
 A Wear OS app is a regular Android app. The Codename One Android port renders the
 UI with the same pipeline it uses on phones, so no special rendering backend is
@@ -499,8 +498,8 @@ dependency and the listener service automatically. The
 `android.playService.wearable` hint remains for apps that want to call the Data
 Layer APIs directly.
 
-=== Feeding a Complication from the Phone
 [[watch-complication-mirror]]
+=== Feeding a Complication from the Phone
 
 A watch app has its own storage. Nothing the phone writes is visible there, on
 either platform -- on Apple the App Group identifier is the same string but

@@ -13,13 +13,7 @@ image::img/component-uml.png[Component-Container relationship expressed as UML,s
 
 Components are arranged in containers with layout managers. A layout manager decides how to arrange components inside the container.
 
-// HTML_ONLY_START
-You can read more about layout managers in the https://www.codenameone.com/manual/basics.html#component-container-hierarchy[basics section].
-// HTML_ONLY_END
-////
-//PDF_ONLY
-You can read more about layout managers in the <<component-container-hierarchy,basics section>>.
-////
+You can read more about layout managers in the <<layout-managers,basics section>>.
 
 ==== Composite components
 
@@ -44,13 +38,7 @@ This means a single `Component` can contain multiple nested `UIID`s. For example
 
 The lead component also handles events from a single source. Clicking another component in the hierarchy sends the event to the leading `Button`, which can make action events route to a different target than the apparent click target. That's why `getActualComponent()` exists.
 
-// HTML_ONLY_START
-You can learn more about lead components in https://www.codenameone.com/manual/misc-features.html#lead-component-section[here].
-// HTML_ONLY_END
-////
-//PDF_ONLY
 You can learn more about lead components in <<lead-component-section,here>>.
-////
 ****
 
 === Form
@@ -165,13 +153,7 @@ Notice that during the `show` call above the execution of the next line was "pau
 
 IMPORTANT: All usage of `Dialog` must be within the Event Dispatch Thread (the default thread of Codename One). This is true for modal dialogs. The `Dialog` class knows how to "block the EDT" without blocking it.
 
-// HTML_ONLY_START
-To learn more about `invokeAndBlock` which is the workhorse behind the modal dialog functionality check out https://www.codenameone.com/manual/edt.html[the EDT section].
-// HTML_ONLY_END
-////
-//PDF_ONLY
 To learn more about `invokeAndBlock` which is the workhorse behind the modal dialog functionality check out <<edt-section,the EDT section>>.
-////
 
 The `Dialog` class contains many static helper methods to show user notifications, but also allows a
 developer to create a `Dialog` instance, add information to its content pane and show the dialog.
@@ -1452,13 +1434,7 @@ indicator chains cleanly.
 [[mediamanager-section]]
 === MediaManager & MediaPlayer
 
-// HTML_ONLY_START
-IMPORTANT: `MediaPlayer` is a *peer component*, understanding this is crucial if your application depends on such a component. You can learn about peer components and their issues https://www.codenameone.com/manual/advanced-topics.html#native-peer-components[here].
-// HTML_ONLY_END
-////
-//PDF_ONLY
 IMPORTANT: `MediaPlayer` is a *peer component*, understanding this is crucial if your application depends on such a component. You can learn about peer components and their issues <<native-peer-components,here>>.
-////
 
 The https://www.codenameone.com/javadoc/com/codename1/components/MediaPlayer.html[MediaPlayer] allows you to control video playback. To use the `MediaPlayer` you need to first load the `Media` object from the https://www.codenameone.com/javadoc/com/codename1/media/MediaManager.html[MediaManager].
 
@@ -1670,13 +1646,7 @@ In the first line you create a style animation that will translate the style fro
 
 === BrowserComponent & WebBrowser
 
-// HTML_ONLY_START
-IMPORTANT: `BrowserComponent` is a *peer component*, understanding this is crucial if your application depends on such a component. You can learn about peer components and their issues https://www.codenameone.com/manual/advanced-topics.html#native-peer-components[here].
-// HTML_ONLY_END
-////
-//PDF_ONLY
 IMPORTANT: `BrowserComponent` is a *peer component*, understanding this is crucial if your application depends on such a component. You can learn about peer components and their issues <<native-peer-components,here>>.
-////
 
 The https://www.codenameone.com/javadoc/com/codename1/components/WebBrowser.html[WebBrowser] component shows the native device web browser when supported by the device and the
 https://www.codenameone.com/javadoc/com/codename1/ui/html/HTMLComponent.html[HTMLComponent] when the web browser isn't supported on the given device. If you intend to target smartphones

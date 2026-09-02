@@ -51,9 +51,9 @@ import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
 import java.util.*;
-import static com.codename1.ui.ComponentSelector.$;
 
-class ComponentSelectorJava001Snippet {
+
+class VideoCaptureConstraintsJava005Snippet {
 
     Object context;
     Object url;
@@ -77,20 +77,29 @@ class ComponentSelectorJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    void snippet() throws Exception {
-        // tag::component-selector-java-001[]
-        // ...
+    VideoCaptureConstraints cnst;
 
-        Button slideUp = $(new Button("Slide Up")) // <1>
-            .setIcon(FontImage.MATERIAL_EXPAND_LESS) // <2>
-            .addActionListener(e->{ // <3>
-                $(e) // <4>
-                    .getParent() // <5>
-                    .find(">*") // <6>
-                    .slideUpAndWait(1000) // <7>
-                    .slideDownAndWait(1000); // <8>
-            })
-            .asComponent(Button.class); // <9>
-        // end::component-selector-java-001[]
+    void snippet() throws Exception {
+        // tag::video-capture-constraints-java-005[]
+        if (cnst.isSizeSupported()) {
+            // This platform supports the constraint, so the captured video will be
+            // exactly 320x240.
+        } else {
+            // Not supported -- see whether the platform will get close.
+            int effectiveWidth = cnst.getWidth();
+            int effectiveHeight = cnst.getHeight();
+            int quality = cnst.getQuality();
+            if (effectiveWidth == 0 && effectiveHeight == 0) {
+                // No control over width and height. In many cases the platform will
+                // approximate with the quality setting instead.
+                if (quality != 0) {
+                    // Quality was set for us. Since 320x240 is small, it would
+                    // probably be QUALITY_LOW.
+                }
+            } else {
+                // Could not capture at 320x240, but supplied the closest size it can.
+            }
+        }
+        // end::video-capture-constraints-java-005[]
     }
 }

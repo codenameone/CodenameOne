@@ -43,11 +43,35 @@ toc::[]
 
 include::About-This-Guide.asciidoc[]
 
+= Getting started
+
+include::Introduction.asciidoc[]
+
 include::Maven-Project-Workflow.asciidoc[]
 
-include::Index.asciidoc[]
+= Core concepts
+
+include::The-EDT---Event-Dispatch-Thread.asciidoc[]
+
+include::Events.asciidoc[]
+
+include::Device-Input-And-Form-Factors.asciidoc[]
+
+= User interface
 
 include::basics.asciidoc[]
+
+include::The-Components-Of-Codename-One.asciidoc[]
+
+include::component-selector.asciidoc[]
+
+include::Rich-Text-And-Code-Editing.asciidoc[]
+
+include::Accessibility-Semantics.asciidoc[]
+
+include::Animations.asciidoc[]
+
+= Theming and styling
 
 include::Advanced-Theming.asciidoc[]
 
@@ -55,21 +79,11 @@ include::Native-Themes.asciidoc[]
 
 include::css.asciidoc[]
 
-include::The-Components-Of-Codename-One.asciidoc[]
-
-include::Rich-Text-And-Code-Editing.asciidoc[]
-
-include::Accessibility-Semantics.asciidoc[]
-
-include::MCP-Headless-API.asciidoc[]
-
-include::Media-And-Audio.asciidoc[]
-
-include::Animations.asciidoc[]
-
-include::The-EDT---Event-Dispatch-Thread.asciidoc[]
+= Graphics and games
 
 include::graphics.asciidoc[]
+
+include::SVG-Transcoder.asciidoc[]
 
 include::3D-Graphics.asciidoc[]
 
@@ -83,11 +97,25 @@ include::Game-Builder.asciidoc[]
 
 include::Game-Assets.asciidoc[]
 
-include::Events.asciidoc[]
-
-include::Device-Input-And-Form-Factors.asciidoc[]
+= Data, media and networking
 
 include::io.asciidoc[]
+
+include::Network-Connectivity.asciidoc[]
+
+include::Annotation-JSON-XML-Mapping.asciidoc[]
+
+include::Annotation-Component-Binding.asciidoc[]
+
+include::Annotation-SQLite-ORM.asciidoc[]
+
+include::Media-And-Audio.asciidoc[]
+
+include::Video-IO.asciidoc[]
+
+include::Video-Capture-Constraints.asciidoc[]
+
+= Device and platform services
 
 include::Push-Notifications.asciidoc[]
 
@@ -102,58 +130,6 @@ include::Maps.asciidoc[]
 include::In-Car-Experiences.asciidoc[]
 
 include::Motion-Sensors.asciidoc[]
-
-include::Miscellaneous-Features.asciidoc[]
-
-include::Video-IO.asciidoc[]
-
-include::performance.asciidoc[]
-
-include::Testing-with-JUnit.adoc[]
-
-include::Advertising.asciidoc[]
-
-include::Crash-Protection.asciidoc[]
-
-include::Analytics.asciidoc[]
-
-include::Commerce.asciidoc[]
-
-
-include::Monetization.asciidoc[]
-
-include::App-Review.asciidoc[]
-
-include::Apple-Wallet-Extension.asciidoc[]
-
-include::Document-Provider.asciidoc[]
-
-include::Advanced-Topics-Under-The-Hood.asciidoc[]
-
-
-include::security.asciidoc[]
-
-include::App-Shield.asciidoc[]
-
-include::App-Hardening.asciidoc[]
-
-include::Biometric-Authentication.asciidoc[]
-
-include::Authentication-And-Identity.asciidoc[]
-
-include::Phone-Number-Verification.asciidoc[]
-
-include::Deep-Links-Routing.asciidoc[]
-
-include::App-Intents.asciidoc[]
-
-include::Annotation-JSON-XML-Mapping.asciidoc[]
-
-include::Annotation-Component-Binding.asciidoc[]
-
-include::Annotation-SQLite-ORM.asciidoc[]
-
-include::Ai-And-Speech.asciidoc[]
 
 include::Near-Field-Communication.asciidoc[]
 
@@ -171,15 +147,69 @@ include::Smart-Home.asciidoc[]
 
 include::Printing.asciidoc[]
 
-include::Network-Connectivity.asciidoc[]
+include::Deep-Links-Routing.asciidoc[]
 
-include::signing.asciidoc[]
+include::App-Intents.asciidoc[]
 
-include::Working-With-iOS.asciidoc[]
+include::Document-Provider.asciidoc[]
+
+include::Apple-Wallet-Extension.asciidoc[]
+
+include::Miscellaneous-Features.asciidoc[]
+
+= AI and agents
+
+include::Ai-And-Speech.asciidoc[]
+
+include::MCP-Headless-API.asciidoc[]
+
+= Security and identity
+
+include::security.asciidoc[]
+
+include::App-Shield.asciidoc[]
+
+include::App-Hardening.asciidoc[]
+
+include::Biometric-Authentication.asciidoc[]
+
+include::Authentication-And-Identity.asciidoc[]
+
+include::Phone-Number-Verification.asciidoc[]
+
+= Monetization and analytics
+
+include::Commerce.asciidoc[]
+
+include::Monetization.asciidoc[]
+
+include::Advertising.asciidoc[]
+
+include::Analytics.asciidoc[]
+
+include::App-Review.asciidoc[]
+
+include::Crash-Protection.asciidoc[]
+
+= Testing, performance and debugging
+
+include::Testing-with-JUnit.adoc[]
+
+include::performance.asciidoc[]
 
 include::On-Device-Debugging.asciidoc[]
 
 include::On-Device-Debugging-Android.asciidoc[]
+
+= Build, sign and ship
+
+include::signing.asciidoc[]
+
+include::App-Store-Submission.asciidoc[]
+
+= Platform guides
+
+include::Working-With-iOS.asciidoc[]
 
 include::Working-With-Javascript.asciidoc[]
 
@@ -187,22 +217,27 @@ include::Working-with-Mac-OS-X.asciidoc[]
 
 include::Working-with-Mac-Catalyst.asciidoc[]
 
-include::App-Store-Submission.asciidoc[]
+include::Working-With-Windows.asciidoc[]
+
+include::Working-With-Linux.asciidoc[]
 
 include::Desktop-Integration.asciidoc[]
 
 include::Desktop-Windows.asciidoc[]
 
-include::Working-With-Windows.asciidoc[]
-include::Working-With-Linux.asciidoc[]
-
 include::Wearables.asciidoc[]
 
 include::TVPlatforms.asciidoc[]
 
+= Under the hood
+
+include::Advanced-Topics-Under-The-Hood.asciidoc[]
+
 include::Working-With-CodenameOne-Sources.asciidoc[]
 
 include::Skin-Designer.asciidoc[]
+
+= Appendices
 
 include::Maven-Appendix-Archetypes.adoc[]
 

@@ -1,3 +1,4 @@
+[[analytics]]
 == Analytics
 
 The analytics API records how your application is used in the field. It's built around a small provider SPI: you register one or more providers with the `Analytics` entry point, then report screen views, events, user properties and crashes. The `Analytics` class fans every call out to all registered providers, but only after the matching consent has been granted. Consent is central to this API and is explained in <<analytics-consent, Consent and privacy>> below.

@@ -630,6 +630,13 @@ public class VideoCaptureConstraints {
     ///
     /// - #preferredQuality(int)
     public boolean isQualitySupported() {
+        // Resolve first. Every getter of a resolved value builds, and so do
+        // isSizeSupported() and isMaxLengthSupported(); these last two predicates
+        // did not, so asking one of them FIRST compared the caller's preference
+        // against a `quality` field the platform had never filled in, and answered
+        // "unsupported" for a constraint the platform honours. isSupported()
+        // masked it, because isSizeSupported() runs first and builds.
+        build();
         return preferredQuality == 0 || quality == preferredQuality;
     }
 
@@ -647,6 +654,8 @@ public class VideoCaptureConstraints {
     ///
     /// - #getPreferredMaxFileSize()
     public boolean isMaxFileSizeSupported() {
+        // Resolve first, for the same reason as isQualitySupported() above.
+        build();
         return preferredMaxFileSize == 0 || maxFileSize == preferredMaxFileSize;
     }
 

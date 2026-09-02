@@ -1,10 +1,10 @@
-= Accessibility Semantics
+== Accessibility Semantics
 
 Codename One components are lightweight: they're painted by Codename One instead of being represented by a native widget on every platform. The accessibility semantics API builds an explicit, immutable virtual tree from those components and presents it to VoiceOver, TalkBack, Windows UI Automation, AT-SPI, Java Access Bridge, and web accessibility APIs.
 
 The semantic tree is separate from the visual tree. This is important for renderer-backed controls, merged cards, decorative content, custom controls, and applications that need a reading order different from paint order.
 
-== Built-in semantics
+=== Built-in semantics
 
 Standard components work without extra configuration. `Button`, `CheckBox`, `RadioButton`, `Slider`, text fields, lists, tables, tabs, labels, dialogs, and containers infer appropriate roles, values, states, collection metadata, and standard actions. Renderer-backed `List` rows are exposed as stable virtual children even though no `Component` exists for each painted row.
 
@@ -15,7 +15,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 Changes to text, selection, focus, enabled state, bounds, scrolling, ranges, tabs, and the current `Form` automatically invalidate the native semantic tree. Custom components should call `accessibilityChanged()` after a semantic value changes outside a standard setter.
 
-== Roles, names, values, and state
+=== Roles, names, values, and state
 
 `AccessibilityRole` contains portable control roles including buttons, toggle buttons, switches, checkboxes, radio buttons, headings, links, images, text and search fields, sliders, progress indicators, lists, grids, rows, cells, headers, tabs, dialogs, alerts, menus, toolbars, combo boxes, trees, and separators. A port maps an unsupported role to the closest native role without discarding its label or state.
 
@@ -26,7 +26,7 @@ Tri-state controls use `UNCHECKED`, `CHECKED`, or `MIXED`. Nullable Boolean prop
 
 Use `setRoleDescription()` only when the platform role isn't sufficiently specific. Localize labels, hints, descriptions, errors, pane titles, role descriptions, and custom action labels.
 
-== Ranges and editable values
+=== Ranges and editable values
 
 `AccessibilityRange` describes minimum, maximum, current value, increment, and an optional spoken value. The spoken value is useful for ranges such as ratings and durations where a raw number is ambiguous.
 
@@ -35,7 +35,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 Editable controls can provide `SET_VALUE` or `SET_TEXT` actions. Sliders and other adjustable controls should expose `INCREMENT` and `DECREMENT`. Standard components infer these actions.
 
-== Custom accessibility actions
+=== Custom accessibility actions
 
 An `AccessibilityAction` has a stable ID, a localized label, an enabled state, and a handler. Handlers always execute on the Codename One EDT, including when the action originates on a native accessibility thread.
 
@@ -44,7 +44,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 Use the standard IDs in `AccessibilityAction` for activation, long press, increment, decrement, set value, set text, selection, character or word cursor movement, focus, show-on-screen, dismiss, expand, collapse, scrolling, and clipboard operations. A custom ID must be stable and its label must not be null.
 
-== Grouping and virtual descendants
+=== Grouping and virtual descendants
 
 `AccessibilityGrouping` controls how a component participates in the semantic tree:
 
@@ -65,7 +65,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 Virtual bounds are relative to the owning component. Component nodes use their clipped absolute bounds.
 
-== Traversal order
+=== Traversal order
 
 Visual order is the default reading order. `setSortKey()` assigns an ordered semantic key among siblings. `setTraversalBefore()` and `setTraversalAfter()` express a direct relationship when a numeric order would be fragile.
 
@@ -74,7 +74,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 Keep traversal relationships within the same semantic parent. The tree builder resolves these constraints deterministically and preserves stable node IDs.
 
-== Live regions and screen changes
+=== Live regions and screen changes
 
 Set `AccessibilityLiveRegion.POLITE` for non-urgent updates and `ASSERTIVE` for errors or urgent status. `OFF` is the default. Live changes produce the corresponding platform notification or ARIA live update.
 
@@ -83,7 +83,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 Form changes and nodes with a pane title produce screen or pane transition notifications. `Display.announceForAccessibility()` remains available for an exceptional announcement that isn't represented by persistent UI. Prefer a live region for state that's visible on screen.
 
-== User accessibility preferences
+=== User accessibility preferences
 
 Semantics describe what a control means. Accessibility preferences describe how the user wants the interface presented. Read these preferences through `Display` or the matching static shortcuts in `CN`:
 
@@ -130,7 +130,7 @@ IMPORTANT: Never use `getColorVisionDeficiency() == NONE` as permission to conve
 
 Preference detection uses each platform's public signals. iOS and macOS expose contrast, differentiate-without-color, motion, transparency, bold text, inversion, grayscale, switch labels, and VoiceOver; Apple doesn't expose the selected color-filter type, so the deficiency value is `UNKNOWN`. Android reads high-text contrast, display inversion and color-correction mode, animation scale, font-weight adjustment, and touch exploration. Windows reads High Contrast, client-area animation, and screen-reader settings. Linux detects the GTK HighContrast theme, disabled GTK animation, and ATK bridge activation. JavaScript uses `forced-colors`, `prefers-contrast`, `prefers-reduced-motion`, and `prefers-reduced-transparency`. The Java SE simulator provides deterministic controls for every portable signal.
 
-== Collections
+=== Collections
 
 `AccessibilityCollectionInfo` describes row and column counts, hierarchy, and selection mode. `AccessibilityCollectionItemInfo` describes row and column index, spans, position and size in a set, nesting level, and header status.
 
@@ -141,7 +141,7 @@ Row and column indexes are zero-based. Position and set size are one-based; use 
 
 Renderer-backed lists keep the full model size in their collection metadata but materialize only the visible rows, a small navigation buffer, and the selected row as virtual children. Forward and backward semantic scroll actions move the window. This keeps accessibility-tree work proportional to the viewport instead of invoking a cell renderer for every row whenever a large list scrolls.
 
-== Inspecting and testing semantics
+=== Inspecting and testing semantics
 
 `AccessibilityInspector` returns an immutable snapshot. A snapshot is safe to inspect without racing native accessibility callbacks and includes stable IDs, hierarchy, bounds, resolved state, actions, range and collection data. `toJson()` is suitable for diagnostic reports and tooling.
 
@@ -154,7 +154,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 The Java SE Component Inspector provides *Copy Accessibility Tree JSON* and *Audit Accessibility Tree* actions. Tests should assert resolved semantic properties instead of platform-specific spoken sentences. The `scripts/hellocodenameone` suite contains the cross-port conformance fixture used by native CI.
 
-== Diagnosing and correcting an inaccessible screen
+=== Diagnosing and correcting an inaccessible screen
 
 Accessibility review works best as a repeatable loop instead of a final checklist:
 
@@ -181,7 +181,7 @@ Don't fix the warning by adding a label alone if the role, current state, range,
 .Auditing the semantic tree in the Component Inspector
 image::img/accessibility-component-inspector-audit.png[Component Inspector showing an accessibility audit,scaledwidth=80%]
 
-=== Assertions that prevent regressions
+==== Assertions that prevent regressions
 
 Snapshot the finished form and assert behavior that matters to a user. Prefer stable identifiers and resolved semantics over implementation class names or platform-specific speech:
 
@@ -192,11 +192,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 Keep targeted assertions for traversal order, validation errors, live-region behavior, ranges, and stable virtual keys. The `scripts/hellocodenameone` accessibility fixture invokes every portable preference API and exercises the resolved semantic tree on each native CI platform.
 
-=== Native verification
+==== Native verification
 
 The simulator finds portable problems, but the final pass must use VoiceOver, TalkBack, Narrator, Orca, or the browser accessibility tree. Navigate in both directions, activate every action, change adjustable values, enter and leave collections, trigger errors, and confirm that focus moves sensibly after a dialog, navigation, deletion, or live update. Record the platform, assistive-technology version, input method, and failed semantic node in the bug report; attach the inspector JSON when the native result differs from the portable snapshot.
 
-== Platform mappings
+=== Platform mappings
 
 [cols="1,2,2"]
 |===

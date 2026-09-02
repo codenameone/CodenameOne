@@ -51,9 +51,9 @@ import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
 import java.util.*;
-import static com.codename1.ui.ComponentSelector.$;
 
-class ComponentSelectorJava001Snippet {
+
+class VideoCaptureConstraintsJava003Snippet {
 
     Object context;
     Object url;
@@ -77,20 +77,23 @@ class ComponentSelectorJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    void snippet() throws Exception {
-        // tag::component-selector-java-001[]
-        // ...
+    VideoCaptureConstraints cnst;
 
-        Button slideUp = $(new Button("Slide Up")) // <1>
-            .setIcon(FontImage.MATERIAL_EXPAND_LESS) // <2>
-            .addActionListener(e->{ // <3>
-                $(e) // <4>
-                    .getParent() // <5>
-                    .find(">*") // <6>
-                    .slideUpAndWait(1000) // <7>
-                    .slideDownAndWait(1000); // <8>
-            })
-            .asComponent(Button.class); // <9>
-        // end::component-selector-java-001[]
+    void snippet() throws Exception {
+        // tag::video-capture-constraints-java-003[]
+        if (cnst.isMaxLengthSupported()) {
+            // The max length constraint we specified is supported on this platform.
+        } else {
+            // It is not. Check the effective value to see whether it is partially
+            // supported.
+            int effectiveMaxLength = cnst.getMaxLength();
+            if (effectiveMaxLength == 0) {
+                // Not supported at all: the user can capture without a duration limit.
+            } else {
+                // Set to a different value than preferredMaxLength asked for, so the
+                // platform is at least trying to accommodate us.
+            }
+        }
+        // end::video-capture-constraints-java-003[]
     }
 }

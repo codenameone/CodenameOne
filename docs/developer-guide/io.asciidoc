@@ -97,13 +97,7 @@ The `FileSystemStorage` API provides a `getRoots()` call to list the root direct
 
 To simplify the process of creating/reading files Codename One provides the `getAppHomePath()` method. This method allows you to get the path to a directory where files can be stored/read.
 
-// HTML_ONLY_START
-You can use this directory to place an image to share as you did in the https://www.codenameone.com/manual/components.html#sharebutton-section[share sample].
-// HTML_ONLY_END
-////
-//PDF_ONLY
 You can use this directory to place an image to share as you did in the <<sharebutton-section,share sample>>.
-////
 
 
 WARNING: A common Android hack is to write files to the SDCard storage to share them among apps. Android 4.x disabled the ability to write to arbitrary directories on the SDCard even when the appropriate permission was requested.
@@ -775,14 +769,7 @@ The simplest usage of `XMLParser` looks a bit like this:
 
 The https://www.codenameone.com/javadoc/com/codename1/xml/Element.html[Element] contains children and attributes. It represents a tag within the XML document and even the root document itself. You can iterate over the XML tree to extract the data from within the XML file.
 
-// HTML_ONLY_START
-You've had a great sample of working with `XMLParser` in the
-https://www.codenameone.com/manual/components.html#tree-section[Tree Section] of this guide.
-// HTML_ONLY_END
-////
-//PDF_ONLY
 You've had a great sample of working with `XMLParser` in the <<tree-section,Tree Section>> of this guide.
-////
 
 `XMLParser` has the complimentary https://www.codenameone.com/javadoc/com/codename1/xml/XMLWriter.html[XMLWriter] class which can generate XML from the `Element` hierarchy. This allows developers to mutate (change) the elements and save them to a writer stream.
 
@@ -1479,7 +1466,7 @@ You ignored functions, joins, transactions and a lot of other SQL capabilities.
 
 You can use SQL directly to use all these capabilities for example: if you begin a transaction before inserting/updating or deleting this will work as advertised but if a rollback occurs your mapping will be unaware of that so you will need to re-fetch the data.
 
-You will notice you mapped autoincrement so you will try to map things that make sense for various use cases, if you've such a use case you'd appreciate pull requests and feedback on the implementation.
+The mapping covers autoincrement and the cases that map cleanly onto a table; a use case that needs more than that subset is better served by dropping to SQL directly.
 
 ====== Caching/Collision
 

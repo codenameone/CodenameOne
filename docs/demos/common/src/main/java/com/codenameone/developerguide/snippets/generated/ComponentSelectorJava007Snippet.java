@@ -53,7 +53,7 @@ import java.io.*;
 import java.util.*;
 import static com.codename1.ui.ComponentSelector.$;
 
-class ComponentSelectorJava001Snippet {
+class ComponentSelectorJava007Snippet {
 
     Object context;
     Object url;
@@ -78,19 +78,27 @@ class ComponentSelectorJava001Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     void snippet() throws Exception {
-        // tag::component-selector-java-001[]
-        // ...
-
-        Button slideUp = $(new Button("Slide Up")) // <1>
-            .setIcon(FontImage.MATERIAL_EXPAND_LESS) // <2>
-            .addActionListener(e->{ // <3>
-                $(e) // <4>
-                    .getParent() // <5>
-                    .find(">*") // <6>
-                    .slideUpAndWait(1000) // <7>
-                    .slideDownAndWait(1000); // <8>
+        // tag::component-selector-java-007[]
+        Button replace = $(new Button("Replace Fade/Slide"))
+            .setIcon(FontImage.MATERIAL_REDEEM)
+            .addActionListener(e->{
+                $(e).getParent()
+                    .find(">*")  // <1>
+                    .replaceAndWait(c->{ // <2>
+                        return $(new Label("Replacement")) // <3>
+                            .putClientProperty("origComponent", c) // <4>
+                            .asComponent();
+                    }, CommonTransitions.createFade(1000)) // <5>
+                    .replaceAndWait(c->{
+                        Component orig = (Component)c.getClientProperty("origComponent");
+                        if (orig != null) {
+                            c.putClientProperty("origComponent", null);
+                            return orig; // <6>
+                        }
+                        return c;
+                    }, CommonTransitions.createCover(CommonTransitions.SLIDE_HORIZONTAL, false, 1000)); // <7>
             })
-            .asComponent(Button.class); // <9>
-        // end::component-selector-java-001[]
+            .asComponent(Button.class);
+        // end::component-selector-java-007[]
     }
 }

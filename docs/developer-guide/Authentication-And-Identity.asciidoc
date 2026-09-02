@@ -1,3 +1,4 @@
+[[authentication-and-identity]]
 == Authentication and Identity
 
 This chapter covers Codename One's modern sign-in stack: OpenID Connect, Sign in with Apple, Google, Facebook, Microsoft Entra ID, Auth0 and Firebase Authentication.

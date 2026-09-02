@@ -91,7 +91,6 @@ Building the SDK yourself gives you:
 * Immediate access to fixes and features before they reach a release.
 * The ability to inspect, debug, and change the framework when you need custom
  behavior.
-* A path to contribute improvements back to the Codename One core.
 
 Once you're comfortable with the baseline build, continue with the scripts in
 `scripts/` or the `BUILDING.md` guide to compile specific ports (Android or

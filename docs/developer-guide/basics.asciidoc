@@ -33,6 +33,7 @@ image::img/codenameone-form.png[Structure of a Form,scaledwidth=50%]
 
 Now that the structure is clear, open the Java file `TodoApp.java` in the project you created. You should see the lines that set up the UI in the `start()` method:
 
+[[layout-managers]]
 ==== Layout managers
 
 A layout manager decides the size and location of components within a `Container`. Every `Container` has a layout manager. The default layout manager is `FlowLayout`.
