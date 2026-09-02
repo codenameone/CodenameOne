@@ -10371,32 +10371,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             List<ClipData.Item> items) throws IOException {
         String authority = getContext().getPackageName() + ".provider";
 
-        // Image bytes: prefer PNG, then JPEG, then GIF
-        String imageMime = null;
-        byte[] imageBytes = null;
-        String imageExt = null;
-        if (content.getBytes(ClipboardContent.MIME_PNG) != null) {
-            imageMime = ClipboardContent.MIME_PNG;
-            imageBytes = content.getBytes(ClipboardContent.MIME_PNG);
-            imageExt = "png";
-        } else if (content.getBytes(ClipboardContent.MIME_JPEG) != null) {
-            imageMime = ClipboardContent.MIME_JPEG;
-            imageBytes = content.getBytes(ClipboardContent.MIME_JPEG);
-            imageExt = "jpg";
-        } else if (content.getBytes(ClipboardContent.MIME_GIF) != null) {
-            imageMime = ClipboardContent.MIME_GIF;
-            imageBytes = content.getBytes(ClipboardContent.MIME_GIF);
-            imageExt = "gif";
-        }
-        if (imageBytes != null) {
-            Uri imageUri = writeAsProviderUri(imageBytes, imageExt, imageMime);
-            if (imageUri != null) {
-                if (!mimeTypes.contains(imageMime)) {
-                    mimeTypes.add(imageMime);
-                }
-                items.add(new ClipData.Item(imageUri));
-            }
-        }
+        // The files first, then the byte-backed representations. Android's ClipData.Item holds
+        // exactly one Uri, so two representations that are both bytes cannot be one item -- the
+        // platform has no way to say "another reading of the same object" for them, only for
+        // the text and markup that attachCarriedText rides on the item below. Publishing them
+        // is still right: they are what the description advertises, and dropping them would
+        // refuse the very target that accepted the hover on one. What order fixes is which
+        // object a receiver reading only the first item takes -- the document, not its
+        // thumbnail.
+        //
+        // It is also what puts the carried text on the document rather than on the thumbnail.
 
         // File references: MIME_FILE may be a single String or a String[]
         Object fileData = content.getData(ClipboardContent.MIME_FILE);
@@ -10426,6 +10410,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     mimeTypes.add("text/uri-list");
                 }
                 items.add(new ClipData.Item(u));
+            }
+        }
+
+        // Image bytes: prefer PNG, then JPEG, then GIF
+        String imageMime = null;
+        byte[] imageBytes = null;
+        String imageExt = null;
+        if (content.getBytes(ClipboardContent.MIME_PNG) != null) {
+            imageMime = ClipboardContent.MIME_PNG;
+            imageBytes = content.getBytes(ClipboardContent.MIME_PNG);
+            imageExt = "png";
+        } else if (content.getBytes(ClipboardContent.MIME_JPEG) != null) {
+            imageMime = ClipboardContent.MIME_JPEG;
+            imageBytes = content.getBytes(ClipboardContent.MIME_JPEG);
+            imageExt = "jpg";
+        } else if (content.getBytes(ClipboardContent.MIME_GIF) != null) {
+            imageMime = ClipboardContent.MIME_GIF;
+            imageBytes = content.getBytes(ClipboardContent.MIME_GIF);
+            imageExt = "gif";
+        }
+        if (imageBytes != null) {
+            Uri imageUri = writeAsProviderUri(imageBytes, imageExt, imageMime);
+            if (imageUri != null) {
+                if (!mimeTypes.contains(imageMime)) {
+                    mimeTypes.add(imageMime);
+                }
+                items.add(new ClipData.Item(imageUri));
             }
         }
     }
@@ -10844,9 +10855,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if (plain != null) {
             content.setData(ClipboardContent.MIME_TEXT, plain);
-        } else if (!content.hasMimeType(ClipboardContent.MIME_TEXT)) {
-            // Every clip reports text, so a target asking for it gets "" rather than nothing --
-            // but only when nothing else has supplied it. A URI the resolver typed text/plain,
+        } else if (!content.hasMimeType(ClipboardContent.MIME_TEXT)
+                && description != null && description.hasMimeType(ClipboardContent.MIME_TEXT)) {
+            // The clip promised text and no item produced it, so the empty string keeps that
+            // promise: a target that accepted the hover on text/plain would otherwise be
+            // refused the drop it was told it could have. Only then, though -- a clip that
+            // never mentioned text does not acquire it here. findTarget runs again against the
+            // materialized content, so inventing text/plain let a nested text-only component
+            // take a drop the type-capable ancestor had been chosen for while it hovered, and
+            // that component never saw an enter event at all.
+            //
+            // Nor over a representation that answered: a URI the resolver typed text/plain,
             // which is what a dragged .txt is, has already registered the document's own
             // contents, and writing over that handed the target an empty document.
             content.setData(ClipboardContent.MIME_TEXT, "");
