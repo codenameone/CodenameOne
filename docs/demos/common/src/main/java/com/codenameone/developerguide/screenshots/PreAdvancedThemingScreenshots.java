@@ -99,6 +99,14 @@ public final class PreAdvancedThemingScreenshots {
     }
 
     public static void generate(ScreenshotSink sink) throws IOException {
+        // MigLayout picks its default gaps from PlatformDefaults, which reads
+        // System.getProperty("os.name") and returns MAC_OSX, GNOME or WINDOWS_XP.
+        // The gaps differ per platform, so mig-layout.png came out with macOS
+        // spacing on a Mac and GNOME spacing on the Linux runner -- a 12.8% pixel
+        // difference that has nothing to do with fonts. Pin it so the figure shows
+        // the same thing wherever it is generated.
+        com.codename1.ui.layouts.mig.PlatformDefaults.setPlatform(
+                com.codename1.ui.layouts.mig.PlatformDefaults.GNOME);
         write(sink, "flow-layout.png", flow("Flow Layout", Component.LEFT, Component.TOP), PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
         write(sink, "flow-layout-center.png", flow("Flow Layout", Component.CENTER, Component.TOP), PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
         write(sink, "flow-layout-right.png", flow("Flow Layout", Component.RIGHT, Component.TOP), PORTRAIT_WIDTH, PORTRAIT_HEIGHT);

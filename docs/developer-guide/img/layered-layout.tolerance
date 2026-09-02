@@ -1,0 +1,13 @@
+# This figure contains a FontImage material glyph. Measured against the CI
+# runner's own output, the glyph lands at exactly the same size and position --
+# a 55x49 bounding box at the same origin -- and differs only in antialiased
+# edge coverage: 946 fully-white pixels against 916, 173 differing pixels in
+# total, 0.113% of the image. Java2D rasterizes the same glyph from the same
+# bundled font at the same size slightly differently on macOS and Linux.
+#
+# The area bound is what does the work here: a per-pixel delta this large is
+# meaningless on its own (a glyph edge flips between white and the green block
+# behind it), but a regression that changed the icon would move far more than
+# 0.3% of the image.
+maxChannelDelta=160
+maxMismatchPercent=0.3

@@ -132,23 +132,13 @@ jobs:
             -P guide-screenshot-generator \
             -Dguide.screenshot.output="$GENERATED_DIR" \
             verify
-          COUNT="$(find "$GENERATED_DIR" -maxdepth 1 -type f -name '*.png' | wc -l | tr -d ' ')"
-          if [ "$COUNT" != "24" ]; then
-            echo "::error::Expected 24 generated pre-Advanced Theming screenshots, found $COUNT"
-            exit 1
-          fi
-          for generated in "$GENERATED_DIR"/*.png; do
-            name="$(basename "$generated")"
-            committed="docs/developer-guide/img/$name"
-            if [ ! -f "$committed" ]; then
-              echo "::error::Generated screenshot has no committed counterpart: $name"
-              exit 1
-            fi
-            if ! cmp -s "$generated" "$committed"; then
-              echo "::error::Committed screenshot is stale: $name"
-              exit 1
-            fi
-          done
+          pip install --user --quiet Pillow
+          # Byte equality is still the rule; a figure only gets a bounded
+          # difference if it carries a .tolerance sidecar saying why.
+          python3 scripts/developer-guide/compare-screenshots.py \
+            --generated "$GENERATED_DIR" \
+            --committed docs/developer-guide/img \
+            --expected-count 24
 
       # When the byte compare fails, the message names the file but not what it
       # actually rendered, which leaves no way to tell a real regression from an
