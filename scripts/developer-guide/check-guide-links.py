@@ -41,6 +41,13 @@ LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0"}
 # Only the marketing site is served from the redirect table and the Hugo content
 # tree. cloud.codenameone.com and friends are separate services.
 SITE_HOSTS = {"codenameone.com", "www.codenameone.com"}
+# The routes that serve this very book. A link from inside the guide to one of
+# these, carrying a fragment, is a cross-reference wearing a URL: it leaves the
+# reader's PDF or offline copy to fetch a page they are already reading, and no
+# gate can tell that a renamed section broke the fragment, because the anchor
+# lives in the rendered book rather than in the site tree. Written as `<<id>>`
+# instead, check-guide-xrefs.py resolves it against the rendered anchors.
+SELF_PATHS = {"/developer-guide", "/developer-guide.html", "/manual", "/manual.html"}
 
 
 def front_matter(page: Path) -> dict[str, object]:
@@ -297,7 +304,9 @@ def findings_for(path: Path, known: set[str], patterns: list) -> list[tuple[str,
                 out.append((url, "plain http, not https"))
             if host in SITE_HOSTS:
                 target = split.path.rstrip("/") or "/"
-                if not resolves(target, known, patterns):
+                if split.fragment and target in SELF_PATHS:
+                    out.append((url, "links into this book's own body; use an xref so the anchor is checked"))
+                elif not resolves(target, known, patterns):
                     out.append((url, "the website serves no such path (checked _redirects and the content tree)"))
     return out
 
