@@ -42,7 +42,10 @@ ATTRIBUTE_LINK_RE = re.compile(r"\blink:\{[^}]+\}")
 # hrefs beginning with "/" because they are not same-page anchors. Between the two
 # gates the route went unchecked, so it is run through the same route model here.
 ROOT_RELATIVE_RE = re.compile(
-    r"""(?:\blink:|\bxref:|\bhref\s*=\s*["'])(/[^\s\[\]"'`>]*)""", re.IGNORECASE
+    # The quote is optional: <a href=/x> is valid HTML, and the character class
+    # already stops at whitespace or ">", which is exactly where an unquoted
+    # attribute value ends.
+    r"""(?:\blink:|\bxref:|\bhref\s*=\s*["']?)(/[^\s\[\]"'`>]*)""", re.IGNORECASE
 )
 # The one tree that genuinely cannot be enumerated from this repository: the
 # Javadoc is produced from the framework sources at build time. Everything else,
