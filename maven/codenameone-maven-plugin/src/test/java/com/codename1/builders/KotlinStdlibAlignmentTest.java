@@ -645,6 +645,135 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * strictly, require and useVersion SET the constraint rather than adding to
+     * it, so a closure that calls one twice keeps the last value. Reading the
+     * first wrote the shim constraints beside a pin that was really pre-merge.
+     */
+    @Test
+    public void theLastCallOfARepeatedSetterIsTheOneThatCounts() {
+        String[] spellings = {
+            "        version { strictly '1.9.22'; strictly '1.7.22' }\n",
+            "        version {\n            strictly '1.9.22'\n"
+                    + "            strictly '1.7.22'\n        }\n",
+            "        version { require '1.9.22'; require '1.7.22!!' }\n",
+        };
+        for (int i = 0; i < spellings.length; i++) {
+            String declaration = "    implementation("
+                    + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8') {\n"
+                    + spellings[i] + "    }\n";
+            check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                            "implementation", declaration)),
+                    "the last value stands the block down, in <<" + spellings[i] + ">>");
+        }
+
+        // And the other way round, so this is the last value rather than the
+        // lowest: set back UP to a merged-era version the sibling is still raised.
+        String raised = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') {\n"
+                + "        version { strictly '1.7.22'; strictly '1.9.22' }\n    }\n");
+        check(raised.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && !raised.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "and the last value is read even raising, got <<" + raised + ">>");
+    }
+
+    /**
+     * Rejections accumulate -- reject takes varargs and may be called again -- and
+     * Gradle applies every selector. Asked one at a time, two that jointly leave
+     * the constraint nothing to resolve to each looked harmless.
+     */
+    @Test
+    public void rejectionsAreCombinedBeforeTheFloorIsCalledReachable() {
+        String[] jointlyFatal = {
+            "reject '1.8.0', '(1.8.0,)'",
+            "reject('1.8.0', '(1.8.0,)')",
+            "reject '[1.8.0]', '(1.8.0,)'",
+            "reject '1.8.0'\n            reject '(1.8.0,)'",
+        };
+        for (int i = 0; i < jointlyFatal.length; i++) {
+            check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            rejecting(jointlyFatal[i]))),
+                    "<<" + jointlyFatal[i] + ">> leaves nothing at the floor");
+        }
+
+        // Each half alone leaves the constraint somewhere to land, and so do
+        // rejections that never reach the floor -- reading any of these as
+        // management would leave the duplicate this block exists to prevent.
+        String[] survivable = {
+            "reject '1.8.0'",
+            "reject '(1.8.0,)'",
+            "reject '[1.9.0,)'",
+            "reject '[1.7.0,1.9.0]'",
+            "reject '[1.7.0,1.8.5]', '[1.8.6,1.9.0]'",
+            "reject '1.7.0'",
+            // A prerelease of the floor is a different version from the floor.
+            "reject '1.8.0-RC2', '(1.8.0,)'",
+        };
+        for (int i = 0; i < survivable.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            rejecting(survivable[i]))
+                            .contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + survivable[i] + ">> still leaves the floor selectable");
+        }
+    }
+
+    /** A jdk8 declaration whose rich version requires anything and rejects this. */
+    private static String rejecting(String rejections) {
+        return "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') {\n"
+                + "        version { require '1.+'; " + rejections + " }\n    }\n";
+    }
+
+    /**
+     * The extra properties extension is reachable through the project, and its
+     * property may be subscripted rather than dotted. Both spellings set the
+     * property the bare name goes on to read, and neither was recorded, so a
+     * strict pre-merge pin held in one was emitted straight over.
+     */
+    @Test
+    public void anExtraPropertyIsFoundThroughEverySpellingOfIt() {
+        String pin = "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'";
+        String use = "    implementation(dep) { version { strictly '1.7.22' } }\n";
+        String[] definitions = {
+            "    ext.dep = " + pin + "\n",
+            "    project.ext.dep = " + pin + "\n",
+            "    rootProject.ext.dep = " + pin + "\n",
+            "    ext['dep'] = " + pin + "\n",
+            "    ext[\"dep\"] = " + pin + "\n",
+            "    project.ext['dep'] = " + pin + "\n",
+        };
+        for (int i = 0; i < definitions.length; i++) {
+            check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            definitions[i] + use)),
+                    "the pin in <<" + definitions[i].trim() + ">> stands the block down");
+        }
+
+        // The owner still has to BE the extension: a property of anything else
+        // does not bind the bare name, and reading one as though it did is how an
+        // unreadable version becomes a confidently wrong one.
+        String[] strangers = {
+            "    somePlugin.dep = " + pin + "\n",
+            "    extras.dep = " + pin + "\n",
+            "    myext.dep = " + pin + "\n",
+            "    notext['dep'] = " + pin + "\n",
+        };
+        for (int i = 0; i < strangers.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            strangers[i] + use).contains("kotlin-stdlib-jdk8:1.8.0"),
+                    "<<" + strangers[i].trim() + ">> does not bind dep");
+        }
+
+        // And a merged-era coordinate held the same way is still read as a
+        // declaration, so the artifact it names is left alone and its sibling is
+        // the only one raised.
+        String merged = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    project.ext['dep'] = "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n"
+                + "    implementation(dep)\n");
+        check(merged.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && !merged.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the subscripted declaration is read, got <<" + merged + ">>");
+    }
+
+    /**
      * A stored map goes through the same expansion a stored string does, so a
      * version interpolated into it carries the version rather than the text of
      * the reference -- {@code "$v"} read as no version at all, which counts as

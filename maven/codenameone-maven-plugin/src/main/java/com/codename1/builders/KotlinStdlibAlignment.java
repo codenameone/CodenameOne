@@ -822,13 +822,31 @@ public class KotlinStdlibAlignment {
 
     /** The quoted argument of {@code call}, found outside string literals. */
     private static String versionInCall(String statement, String call) {
+        List<String> found = versionsInCall(statement, call);
+        // The LAST of them. Every keyword this is asked about -- strictly, require,
+        // useVersion -- SETS the constraint rather than adding to it, so a closure
+        // that calls one twice keeps what it was set to last. Reading the first
+        // reported 1.9.22 for `strictly '1.9.22'; strictly '1.7.22'` and wrote the
+        // shim constraints beside a pin that was really pre-merge.
+        return found.isEmpty() ? null : found.get(found.size() - 1);
+    }
+
+    /**
+     * Every quoted argument of every syntactic {@code call} in the statement, in
+     * source order.
+     *
+     * <p>One call may carry several -- {@code reject} takes varargs -- and the
+     * call may be made more than once. The two are the same thing to a caller
+     * that has to consider the arguments together, so they arrive as one list.</p>
+     */
+    private static List<String> versionsInCall(String statement, String call) {
+        List<String> found = new ArrayList<String>();
         // The same syntax-level call callsStrictly validated, not any occurrence of
         // the word: a reason reading `because "strictly '1.7.22' is not intended"`
         // otherwise supplies the version for a declaration whose real strict version
         // is something else entirely, and the wrong one decides whether the block is
         // written.
         for (int i = 0; i < statement.length(); i++) {
-            char c = statement.charAt(i);
             if (isLiteralStart(statement, i)) {
                 i = endOfStringLiteral(statement, i);
                 continue;
@@ -844,21 +862,31 @@ public class KotlinStdlibAlignment {
             if (after < statement.length() && statement.charAt(after) == '(') {
                 after = skipBlanks(statement, after + 1);
             }
-            if (after < statement.length()
-                    && isLiteralStart(statement, after)) {
+            while (after < statement.length() && isLiteralStart(statement, after)) {
                 int end = endOfStringLiteral(statement, after);
-                if (end < statement.length()) {
-                    // The literal's own delimiters, however many it has. Written
-                    // strictly """1.7.22""", the one-per-side slice returned
-                    // ""1.7.22"" -- which parsed as no version at all and only
-                    // reached the right answer because an unreadable version counts
-                    // as below the floor. Correct by accident is not correct.
-                    return stringLiteralContent(statement, after);
+                if (end >= statement.length()) {
+                    break;
                 }
+                // The literal's own delimiters, however many it has. Written
+                // strictly """1.7.22""", the one-per-side slice returned
+                // ""1.7.22"" -- which parsed as no version at all and only
+                // reached the right answer because an unreadable version counts
+                // as below the floor. Correct by accident is not correct.
+                found.add(stringLiteralContent(statement, after));
+                after = skipBlanks(statement, end + 1);
+                if (after >= statement.length() || statement.charAt(after) != ',') {
+                    break;
+                }
+                after = skipBlanks(statement, after + 1);
             }
-            i = after;
+            // One BEFORE the next unread character, because the loop's own step
+            // lands on it. Advancing straight to it skipped a character, and while
+            // this returned on the first call that cost nothing -- now that it
+            // keeps looking, it landed inside `strictly` and read the second call
+            // of a repeated pair as ordinary text.
+            i = after - 1;
         }
-        return null;
+        return found;
     }
 
     /**
@@ -913,6 +941,17 @@ public class KotlinStdlibAlignment {
     }
 
     /**
+     * Whether a dotted Gradle path ends in the given segment.
+     *
+     * <p>`ext`, `project.ext` and `rootProject.ext` all name the one extra
+     * properties extension, so the segment that owns the property is the last
+     * one rather than the whole qualifier.</p>
+     */
+    private static boolean lastSegmentIs(String path, String segment) {
+        return segment.equals(path.substring(path.lastIndexOf('.') + 1));
+    }
+
+    /**
      * Whether the statement applies its strategy to the plugin classpath.
      *
      * <p>{@code configurations.classpath} is the buildscript's own, and a
@@ -935,52 +974,111 @@ public class KotlinStdlibAlignment {
 
     private static final String BUILDSCRIPT_CLASSPATH = "configurations.classpath";
 
-    /**
-     * Whether a rejected selector removes the floor and everything after it.
-     *
-     * <p>Only an open-ended range starting at or below the floor does:
-     * {@code [1.8.0,)} leaves nothing for the constraint to resolve to, while
-     * {@code [1.9.0,)} still leaves 1.8.x and an exact {@code 1.7.0} removes a
-     * version the constraint was never going to select anyway.</p>
-     */
-    private static boolean rejectionLeavesNothingAtTheFloor(String selector) {
-        String rejection = selector.trim();
-        if (rejection.length() == 0) {
-            return false;
-        }
-        char opening = rejection.charAt(0);
-        if (opening != '[' && opening != '(' && opening != ']') {
-            return false;
-        }
-        int comma = rejection.indexOf(',');
-        if (comma < 0) {
-            return false;
-        }
-        String upper = rejection.substring(comma + 1,
-                Math.max(comma + 1, rejection.length() - 1)).trim();
-        if (upper.length() != 0) {
-            // Bounded above, so something at or past the floor survives it.
-            return false;
-        }
-        String lower = rejection.substring(1, comma).trim();
-        if (lower.length() == 0) {
-            return true;
-        }
-        int compared = compareVersions(lower, MERGED_STDLIB_FLOOR);
-        // An exclusive lower bound does not reject the bound itself, so
-        // `(1.8.0,)` leaves exactly the floor selectable and the constraint has
-        // somewhere to land; `[1.8.0,)` does not.
-        boolean excludesItsOwnBound = opening == '(' || opening == ']';
-        return excludesItsOwnBound ? compared < 0 : compared <= 0;
-    }
-
     /** Whether the statement rejects the floor and everything past it. */
     private static boolean rejectsTheFloor(String line) {
         if (callsNamed(line, "rejectAll")) {
             return true;
         }
-        String rejected = versionInCall(line, "reject");
-        return rejected != null && rejectionLeavesNothingAtTheFloor(rejected);
+        // Rejections ACCUMULATE, and Gradle applies every one of them. Asked one
+        // selector at a time, `reject '1.8.0', '(1.8.0,)'` looked harmless twice
+        // over -- the exact rejection still leaves 1.8.1, the open range still
+        // leaves 1.8.0 -- while together they leave the constraint nothing to
+        // resolve to at all, and the block was written into a graph that could not
+        // resolve it. So the question is split in two and each half is asked of the
+        // whole list: something has to remove the floor itself, and something has
+        // to remove everything past it.
+        List<String> rejected = versionsInCall(line, "reject");
+        boolean floorRemoved = false;
+        boolean pastTheFloorRemoved = false;
+        for (int i = 0; i < rejected.size(); i++) {
+            String selector = rejected.get(i).trim();
+            floorRemoved = floorRemoved || rejectionRemovesTheFloor(selector);
+            pastTheFloorRemoved = pastTheFloorRemoved
+                    || rejectionRemovesPastTheFloor(selector);
+        }
+        return floorRemoved && pastTheFloorRemoved;
+    }
+
+    /**
+     * Whether one rejection selector removes the floor version itself.
+     *
+     * <p>A prerelease of the floor is a different version from the floor, so
+     * rejecting {@code 1.8.0-RC2} does not reject {@code 1.8.0}.</p>
+     */
+    private static boolean rejectionRemovesTheFloor(String selector) {
+        if (selector.length() == 0) {
+            return false;
+        }
+        char opening = selector.charAt(0);
+        if (opening != '[' && opening != '(' && opening != ']') {
+            // A plain version rejects exactly itself.
+            return isTheFloor(selector);
+        }
+        int comma = selector.indexOf(',');
+        if (comma < 0) {
+            // [1.8.0] is an exact version written as a range.
+            return isTheFloor(selector.substring(1,
+                    Math.max(1, selector.length() - 1)).trim());
+        }
+        char closing = selector.charAt(selector.length() - 1);
+        boolean excludesLower = opening == '(' || opening == ']';
+        boolean excludesUpper = closing == ')' || closing == '[';
+        String lower = selector.substring(1, comma).trim();
+        if (lower.length() != 0) {
+            int compared = compareVersions(lower, MERGED_STDLIB_FLOOR);
+            if (compared > 0 || (compared == 0 && excludesLower)) {
+                return false;
+            }
+        }
+        String upper = selector.substring(comma + 1,
+                Math.max(comma + 1, selector.length() - 1)).trim();
+        if (upper.length() != 0) {
+            int compared = compareVersions(upper, MERGED_STDLIB_FLOOR);
+            if (compared < 0 || (compared == 0 && excludesUpper)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether one rejection selector removes every version PAST the floor.
+     *
+     * <p>Only an open-ended range can. A bounded one always leaves whatever is
+     * past its ceiling, and no number of bounded ranges covers an unbounded
+     * tail, so there is nothing here for several of them to do jointly.</p>
+     */
+    private static boolean rejectionRemovesPastTheFloor(String selector) {
+        if (selector.length() == 0) {
+            return false;
+        }
+        char opening = selector.charAt(0);
+        if (opening != '[' && opening != '(' && opening != ']') {
+            return false;
+        }
+        int comma = selector.indexOf(',');
+        if (comma < 0) {
+            return false;
+        }
+        String upper = selector.substring(comma + 1,
+                Math.max(comma + 1, selector.length() - 1)).trim();
+        if (upper.length() != 0) {
+            // Bounded above, so something past the floor survives it.
+            return false;
+        }
+        String lower = selector.substring(1, comma).trim();
+        // Whether its own bound is included does not matter here: the question is
+        // what is left ABOVE the floor, and both `[1.8.0,)` and `(1.8.0,)` take
+        // all of that.
+        return lower.length() == 0
+                || compareVersions(lower, MERGED_STDLIB_FLOOR) <= 0;
+    }
+
+    /** Whether a plain version literal IS the floor, prerelease and all. */
+    private static boolean isTheFloor(String version) {
+        return version.length() != 0
+                && compareVersions(version, MERGED_STDLIB_FLOOR) == 0
+                && !literalBelowTheFloor(version);
     }
 
     /** Whether a range excludes every version at or above the floor. */
@@ -2288,6 +2386,7 @@ public class KotlinStdlibAlignment {
         }
         int i = 0;
         boolean declared = false;
+        boolean subscript = false;
         // Outside literals, like every other question about syntax. An unrestricted
         // search found `def` inside quoted prose -- println "def dep = '...'" -- and
         // recorded a declaration that never executes, overwriting the real binding
@@ -2368,15 +2467,43 @@ public class KotlinStdlibAlignment {
                 // ext.kotlinVersion = '1.9.22' -- Gradle's extra properties, which is
                 // how a project-wide version is nearly always written, and which
                 // really does bind the bare name the interpolation then reads.
-                // Restricted to that one prefix on purpose: recording ANY dotted
+                // Restricted to that one owner on purpose: recording ANY dotted
                 // assignment would let `somePlugin.version = '1.0'` supply the value
                 // for an unrelated $version and turn an unreadable version into a
                 // confidently wrong one, which is the direction that under-suppresses.
                 String only = statement.substring(lastTokenStart, lastTokenEnd);
                 int dot = only.lastIndexOf('.');
-                if (dot > 0 && EXTRA_PROPERTIES.equals(only.substring(0, dot))) {
+                int openBracket = skipBlanks(statement, lastTokenEnd);
+                boolean subscripted = openBracket < statement.length()
+                        && statement.charAt(openBracket) == '[';
+                // The owner is the LAST segment of the qualifier, not the whole of
+                // it, because the extension is reachable through the project too:
+                // `project.ext.dep` and `rootProject.ext.dep` set the same property
+                // the bare name goes on to read -- Gradle resolves a bare name up
+                // the project hierarchy -- and comparing the prefix whole rejected
+                // both, so a strict pre-merge pin held in one was never seen.
+                // Addressing ANOTHER project cannot arrive here: `(` ends the token
+                // walk above, so `project(':lib').ext.dep` never reads as one token
+                // and the chain is always this script's own.
+                if (dot > 0 && !subscripted
+                        && lastSegmentIs(only.substring(0, dot), EXTRA_PROPERTIES)) {
                     declared = true;
                     i = lastTokenStart + dot + 1;
+                } else if (subscripted && lastSegmentIs(only, EXTRA_PROPERTIES)) {
+                    // ext['dep'] = '...' is the subscript spelling of the same
+                    // extension and the only one whose property name is a string
+                    // rather than an identifier, so the walk above read `ext` as the
+                    // name and recorded nothing the app could later refer to. Step
+                    // inside the quote and let the identifier scan below take the
+                    // name; the closing quote and bracket are stepped over after it.
+                    int nameAt = skipBlanks(statement, openBracket + 1);
+                    if (nameAt < statement.length()
+                            && isLiteralStart(statement, nameAt)
+                            && delimiterLength(statement, nameAt) == 1) {
+                        declared = true;
+                        subscript = true;
+                        i = nameAt + 1;
+                    }
                 }
             }
         }
@@ -2388,6 +2515,17 @@ public class KotlinStdlibAlignment {
             return;
         }
         String name = statement.substring(nameStart, i);
+        if (subscript) {
+            // Past the `']` the subscript form puts between the name and the `=`,
+            // so the value is read the same way every other definition's is.
+            if (i < statement.length() && !isIdentifierChar(statement.charAt(i))) {
+                i++;
+            }
+            i = skipBlanks(statement, i);
+            if (i < statement.length() && statement.charAt(i) == ']') {
+                i++;
+            }
+        }
         if (!declared && !literals.containsKey(name)) {
             return;
         }
