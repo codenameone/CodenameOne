@@ -850,6 +850,50 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A configuration the app made can still INHERIT the constraint.
+     * {@code configurations.create('tooling').extendsFrom(configurations
+     * .implementation)} is not an independent graph, and reading only the name
+     * it was created under exempted it -- so the constraints went into a graph
+     * that then fails on the version they raise.
+     */
+    @Test
+    public void aCustomConfigurationMayInheritTheConstraint() {
+        String conflict = ".resolutionStrategy.failOnVersionConflict()\n";
+        String[] inheriting = {
+            "    configurations.create('tooling').extendsFrom("
+                    + "configurations.implementation)" + conflict,
+            "    configurations.create('tooling').extendsFrom("
+                    + "configurations.api)" + conflict,
+            "    configurations.create('tooling').extendsFrom("
+                    + "configurations.getByName('implementation'))" + conflict,
+            "    configurations.tooling.extendsFrom("
+                    + "configurations.implementation)" + conflict,
+        };
+        for (int i = 0; i < inheriting.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    inheriting[i]);
+            check("".equals(out), "<<" + inheriting[i].trim()
+                    + ">> inherits what these constrain, got <<" + out + ">>");
+        }
+
+        // Extending something the constraint is NOT on does not inherit it, or
+        // the exemption would cover nothing at all.
+        String[] independent = {
+            "    configurations.create('tooling').extendsFrom("
+                    + "configurations.compileOnly)" + conflict,
+            "    configurations.create('tooling').extendsFrom("
+                    + "configurations.other)" + conflict,
+            "    configurations.create('tooling')" + conflict,
+            "    configurations.tooling" + conflict,
+        };
+        for (int i = 0; i < independent.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            independent[i]).contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + independent[i].trim() + ">> governs another graph");
+        }
+    }
+
+    /**
      * The resolvable classpaths EXTEND the constrained configurations and are
      * where a resolution strategy actually runs, so a conflict check on one
      * governs the graph these constraints are resolved in.

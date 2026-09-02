@@ -2502,7 +2502,55 @@ public class KotlinStdlibAlignment {
         // as "some other configuration" put the constraints into a graph whose
         // strategy fails the build on the version they raise.
         return named == null || named.equals(configuration)
-                || isAMainConfiguration(named);
+                || isAMainConfiguration(named)
+                // A configuration the app made can still INHERIT the constraint:
+                // `configurations.create('tooling').extendsFrom(configurations
+                // .implementation)` is not an independent graph, and reading only
+                // the name it was created under exempted it -- so the constraints
+                // went into a graph that then failed on the version they raise.
+                || extendsAConstrainedConfiguration(line, configuration);
+    }
+
+    /**
+     * Whether the statement makes its configuration extend one the constraint is
+     * written on.
+     *
+     * <p>Only what follows {@code extendsFrom} is read, because that is the one
+     * API for inheritance and the parent is its argument. A configuration
+     * extending something else -- {@code compileOnly}, say -- does not receive
+     * the constraint, and answering otherwise would exempt nothing at all.</p>
+     */
+    private static boolean extendsAConstrainedConfiguration(String line,
+            String configuration) {
+        int at = afterCall(line, "extendsFrom");
+        if (at < 0) {
+            return false;
+        }
+        for (int i = at; i < line.length(); i++) {
+            if (isLiteralStart(line, i)) {
+                int end = endOfStringLiteral(line, i);
+                String held = stringLiteralContent(line, i);
+                if (held.equals(configuration) || isAMainConfiguration(held)) {
+                    return true;
+                }
+                i = end;
+                continue;
+            }
+            if (!isIdentifierChar(line.charAt(i))
+                    || (i > at && isIdentifierChar(line.charAt(i - 1)))) {
+                continue;
+            }
+            int end = i;
+            while (end < line.length() && isIdentifierChar(line.charAt(end))) {
+                end++;
+            }
+            String token = line.substring(i, end);
+            if (token.equals(configuration) || isAMainConfiguration(token)) {
+                return true;
+            }
+            i = end - 1;
+        }
+        return false;
     }
 
     /** Whether the name is one of the configurations the constraint is on. */
