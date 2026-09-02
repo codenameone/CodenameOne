@@ -575,6 +575,18 @@ public class ImageViewer extends Component {
         if (!pansX && !pansY) {
             return false;
         }
+        // Whose gesture is it? A trackpad swipe is never purely one axis, so an image that
+        // overflows sideways only would pan on the sideways jitter of a downward swipe and
+        // claim the whole event -- and the page under it would stop scrolling now and then
+        // for no reason the reader can see. The larger delta decides, which is how the drag
+        // above decides whether to keep the gesture or hand it to the scrollable ancestor.
+        //
+        // The whole event goes or stays: splitting it would mean handling one axis here and
+        // passing the other on, and the event carries no notion of a delta already spent.
+        boolean verticalGesture = Math.abs(ev.getDeltaY()) >= Math.abs(ev.getDeltaX());
+        if (verticalGesture ? !pansY : !pansX) {
+            return false;
+        }
         float wasPanX = panPositionX;
         float wasPanY = panPositionY;
         int wasX = constrainedImageX();
