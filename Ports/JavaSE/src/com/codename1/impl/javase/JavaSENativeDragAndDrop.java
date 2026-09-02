@@ -573,13 +573,26 @@ final class JavaSENativeDragAndDrop {
             }
         }
 
+        /// What the source permits *at this instant*.
+        ///
+        /// getSourceActions is the whole mask the source offered, and answering with it alone
+        /// made the framework prefer a copy every time -- so holding the platform's modifier to
+        /// ask for a move changed nothing, because getDropAction, which is where AWT records
+        /// that choice, was never read. The user's choice wins where the source allows it, and
+        /// the full mask stands where it does not.
+        private int allowedActionsFor(DropTargetDragEvent e) {
+            int sourceActions = fromAwtActions(e.getSourceActions());
+            int chosen = fromAwtActions(e.getDropAction()) & sourceActions;
+            return chosen == NativeDragOperation.ACTION_NONE ? sourceActions : chosen;
+        }
+
         private void respond(DropTargetDragEvent e, boolean entering) {
             try {
                 Point at = e.getLocation();
                 int x = canvas.scaleCoordinateX(at.x);
                 int y = canvas.scaleCoordinateY(at.y);
                 ClipboardContent content = contentFor(e.getTransferable(), e.getCurrentDataFlavors(), false);
-                int allowed = fromAwtActions(e.getSourceActions());
+                int allowed = allowedActionsFor(e);
                 int action = entering
                         ? NativeDragAndDrop.dragEnter(canvas.windowId, x, y, content, allowed)
                         : NativeDragAndDrop.dragOver(canvas.windowId, x, y, content, allowed);

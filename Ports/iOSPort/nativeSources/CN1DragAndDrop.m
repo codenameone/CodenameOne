@@ -491,18 +491,36 @@ API_AVAILABLE(ios(11.0))
     return items;
 }
 
-- (UIDragPreview *)dragInteraction:(UIDragInteraction *)interaction
-                previewForLiftingItem:(UIDragItem *)item
-                              session:(id<UIDragSession>)session {
-    if (cn1PreparedPreview == nil) {
+- (UITargetedDragPreview *)dragInteraction:(UIDragInteraction *)interaction
+                     previewForLiftingItem:(UIDragItem *)item
+                                   session:(id<UIDragSession>)session {
+    // UITargetedDragPreview, which is what UIDragInteractionDelegate declares. This returned a
+    // UIDragPreview instead -- an unrelated class -- so UIKit was handed an object it would go
+    // on to send UITargetedDragPreview messages to. Clang does not warn about the mismatch, and
+    // nothing but a device would have shown it.
+    if (cn1PreparedPreview == nil || interaction.view == nil) {
         // Without one UIKit snapshots the interaction's view, which is the whole Codename One
         // surface; nil here leaves UIKit to its default rather than dragging the entire screen.
         return nil;
     }
     UIImageView* view = [[UIImageView alloc] initWithImage:cn1PreparedPreview];
-    UIDragPreview* preview = [[UIDragPreview alloc] initWithView:view];
+    // Positioned so the point the finger grabbed stays under the finger. Untargeted, the
+    // preview is centred whereever UIKit chooses and the image jumps out from under the touch
+    // the moment the drag lifts -- which is also why setDragImageOffset had no effect at all.
+    CGPoint touch = [session locationInView:interaction.view];
+    CGSize size = cn1PreparedPreview.size;
+    CGPoint centre = CGPointMake(touch.x - cn1PreparedTouch.x + size.width / 2.0,
+                                 touch.y - cn1PreparedTouch.y + size.height / 2.0);
+    UIDragPreviewTarget* target = [[UIDragPreviewTarget alloc] initWithContainer:interaction.view
+                                                                         center:centre];
+    UIDragPreviewParameters* parameters = [[UIDragPreviewParameters alloc] init];
+    UITargetedDragPreview* preview = [[UITargetedDragPreview alloc] initWithView:view
+                                                                     parameters:parameters
+                                                                         target:target];
 #ifndef CN1_USE_ARC
     [view release];
+    [target release];
+    [parameters release];
     [preview autorelease];
 #endif
     return preview;
