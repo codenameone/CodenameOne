@@ -331,6 +331,11 @@ public class MapComponent extends Container {
                 -ev.getDeltaX() * scale.getLongitude());
         _needTiles = true;
         super.repaint();
+        // The listeners hear about it, exactly as they do when a drag or a zoom moves the
+        // map. An application that loads content for the visible region from
+        // mapPositionUpdated would otherwise be told about every way the map can move
+        // except this one.
+        fireMapListenerEvent();
         return true;
     }
 

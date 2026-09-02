@@ -8734,7 +8734,12 @@ public final class Display extends CN1Constants {
                 // Clamped here rather than left to setScrollY: that one only clamps for a
                 // component with tensile drag off, because a finger is allowed to overshoot
                 // and spring back. A wheel notch has nothing to spring back from.
-                int max = vertical ? c.getScrollDimension().getHeight() - c.getHeight()
+                // The vertical range includes what the virtual keyboard is covering, the
+                // same way the drag path and setScrollY compute it: a wheel that stopped at
+                // the keyboard could never bring the field behind it into view.
+                int max = vertical
+                        ? c.getScrollDimension().getHeight() - c.getHeight()
+                                + c.getInvisibleAreaUnderVKB()
                         : c.getScrollDimension().getWidth() - c.getWidth();
                 int from = vertical ? c.getScrollY() : c.getScrollX();
                 if (applyScroll(c, vertical, from - delta, max)) {

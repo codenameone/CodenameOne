@@ -3375,7 +3375,14 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Returns
     ///
     /// The height of the area under the virtual keyboard in pixels
-    private int getInvisibleAreaUnderVKB() {
+    /// The part of this component the virtual keyboard is covering, which the scroll range
+    /// has to include or whatever is under the keyboard can never be brought into view.
+    ///
+    /// Package private rather than private because the wheel scroll in `Display` needs the
+    /// same number the drag path uses: a wheel clamps the position itself, and clamping to
+    /// a range that stops at the keyboard is how a field hidden behind it becomes
+    /// unreachable with a trackpad.
+    int getInvisibleAreaUnderVKB() {
         TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             int invisibleAreaUnderVKB = f.getInvisibleAreaUnderVKB();

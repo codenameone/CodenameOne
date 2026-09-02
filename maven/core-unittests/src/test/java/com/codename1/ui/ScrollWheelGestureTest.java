@@ -208,6 +208,30 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aWheelReachesWhatTheKeyboardIsCovering() {
+        Form f = scrollingForm();
+        Container page = f.getContentPane();
+        int x = page.getAbsoluteX() + page.getWidth() / 2;
+        int y = page.getAbsoluteY() + page.getHeight() / 2;
+        int plainMax = page.getScrollDimension().getHeight() - page.getHeight();
+        for (int i = 0; i < 200 && page.getScrollY() < plainMax; i++) {
+            wheelAt(x, y, 0, -px(30));
+        }
+        assertEquals(plainMax, page.getScrollY(), "the bottom of the content with no keyboard up");
+
+        // With the keyboard covering the bottom, the range grows by what it hides -- which
+        // is how the drag path and setScrollY compute it. A wheel clamped to the smaller
+        // range leaves whatever is behind the keyboard unreachable with a trackpad.
+        f.setOverrideInvisibleAreaUnderVKB(px(30));
+        wheelAt(x, y, 0, -px(30));
+
+        assertTrue(page.getScrollY() > plainMax,
+                "the wheel has to reach past the keyboard, got " + page.getScrollY()
+                        + " with the plain end at " + plainMax);
+        f.setOverrideInvisibleAreaUnderVKB(-1);
+    }
+
+    @FormTest
     void aWheelInADesktopWindowScrollsThatWindow() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("scroller", new BorderLayout());
