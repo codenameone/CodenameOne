@@ -642,6 +642,22 @@ def bare_authority(split, host: str, port: int | None) -> bool:
     return netloc == (host if port is None else f"{host}:{port}")
 
 
+SELF_LINK_REASON = (
+    "links into this book's own body; use an xref so the anchor is checked"
+)
+
+
+def links_into_this_book(path: str, fragment: str) -> bool:
+    """A link to one of this book's own routes that names an anchor inside it.
+
+    Applied to root-relative targets as well as absolute URLs. The absolute branch
+    had this and the root-relative one did not, so link:/developer-guide/#missing
+    reached neither gate -- check-guide-xrefs.py skips hrefs starting with "/"
+    because they are not same-page anchors.
+    """
+    return bool(fragment) and (path.rstrip("/") or "/") in SELF_PATHS
+
+
 def undeclared_file_slash(path: str, declared: set[str]) -> bool:
     """A file-like path wearing a trailing slash the redirect table does not spell out.
 
@@ -688,7 +704,11 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
         if ATTRIBUTE_LINK_RE.search(line):
             out.append((ATTRIBUTE_LINK_RE.search(line).group(0), "a link target built from an attribute, which this cannot expand or check"))
         for target in ROOT_RELATIVE_RE.findall(line):
-            path = target.split("#", 1)[0].split("?", 1)[0]
+            path, _, fragment = target.partition("#")
+            path = path.split("?", 1)[0]
+            if links_into_this_book(path, fragment):
+                out.append((target, SELF_LINK_REASON))
+                continue
             if undeclared_file_slash(path, declared):
                 # Same rule as for an absolute URL: normalize_path would drop the
                 # slash and validate the variant that was not asked for.
@@ -747,8 +767,8 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
                 continue
             if host in SITE_HOSTS:
                 target = split.path.rstrip("/") or "/"
-                if split.fragment and target in SELF_PATHS:
-                    out.append((url, "links into this book's own body; use an xref so the anchor is checked"))
+                if links_into_this_book(target, split.fragment):
+                    out.append((url, SELF_LINK_REASON))
                 elif undeclared_file_slash(split.path, declared):
                     out.append((url, "a file path with a trailing slash that _redirects does not declare"))
                 elif not resolves(target, known, patterns):
