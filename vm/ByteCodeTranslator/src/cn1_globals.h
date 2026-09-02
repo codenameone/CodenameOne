@@ -2570,11 +2570,16 @@ extern struct clazz class_array3__JAVA_DOUBLE;
 
 extern JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]);
 /**
- * Like newStringFromCString but DECODES UTF-8 instead of widening bytes. Use it for
- * text that came from outside the program (argv, the environment); the widening one
- * is right only for generated literals, which are ASCII plus ~~uXXXX escapes.
+ * Like newStringFromCString but DECODES, in the PLATFORM's encoding, instead of
+ * widening bytes. Use it for text that came from outside the program (argv, the
+ * environment); the widening one is right only for generated literals, which are
+ * ASCII plus ~~uXXXX escapes.
+ *
+ * UTF-8 on POSIX; the active code page on Windows, where the CRT has already
+ * converted the wide command line and environment down to it. Not named FromUtf8
+ * for exactly that reason.
  */
-extern JAVA_OBJECT newStringFromUtf8(CODENAME_ONE_THREAD_STATE, const char* str);
+extern JAVA_OBJECT newStringFromNative(CODENAME_ONE_THREAD_STATE, const char* str);
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str);
 extern JAVA_OBJECT newStringFromAsciiLen(CODENAME_ONE_THREAD_STATE, const char *src, int len);
 // Single-allocation fused compact-String builder (see cn1_globals.m). Returns a valid empty

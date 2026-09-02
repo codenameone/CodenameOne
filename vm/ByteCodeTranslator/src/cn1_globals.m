@@ -11032,6 +11032,15 @@ JAVA_OBJECT alloc4DArray(CODENAME_ONE_THREAD_STATE, int length4, int length3, in
  * Creates a java.lang.String object from an array of integers, this is useful
  * for the constant pool
  */
+#ifdef _WIN32
+/* MultiByteToWideChar for the native-encoding conversion below. LEAN_AND_MEAN keeps
+   winsock's timeval out, which collides with cn1_win_compat.h's. */
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 /*
  * Builds a java.lang.String from decoded UTF-16 code units.
  *
@@ -11040,7 +11049,7 @@ JAVA_OBJECT alloc4DArray(CODENAME_ONE_THREAD_STATE, int length4, int length3, in
  * reads whichever it finds. Handing it the wrong one does not fail loudly -- it
  * reads 8-bit units out of 16-bit data, so "caf..." comes back as c,NUL,a,NUL,f.
  *
- * Used by newString and newStringFromUtf8. newStringFromCString deliberately keeps
+ * Used by newString and newStringFromNative. newStringFromCString deliberately keeps
  * its own copy of this tail: it tracks the Latin-1 flag DURING decoding, and it runs
  * for every generated string literal at startup, so routing it through here would
  * add a second pass over every literal in the program to save a dozen duplicated
@@ -11102,7 +11111,12 @@ JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]) {
 }
 
 /**
- * Creates a java.lang.String by DECODING UTF-8, rather than widening bytes.
+ * Creates a java.lang.String by DECODING text that came from the OS, rather than
+ * widening its bytes.
+ *
+ * The encoding is the PLATFORM's, which is why this is not called FromUtf8: UTF-8
+ * on POSIX, and the active code page on Windows, where the CRT has already
+ * converted the wide command line and environment down to it.
  *
  * newStringFromCString below widens each byte to a char independently -- its own
  * comment says so, and that is correct for the generated string literals it exists
@@ -11120,8 +11134,37 @@ JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]) {
  * unfixed issue recorded against the file layer in nativeMethods.m, and the same
  * remedy.
  */
-JAVA_OBJECT newStringFromUtf8(CODENAME_ONE_THREAD_STATE, const char* str) {
-    int length;
+JAVA_OBJECT newStringFromNative(CODENAME_ONE_THREAD_STATE, const char* str) {
+#ifdef _WIN32
+    /* NOT UTF-8 on Windows. The CRT hands main() and getenv() the wide command line
+       and environment converted down to the ACTIVE CODE PAGE, so decoding those
+       bytes as UTF-8 yields U+FFFD for every non-ASCII character -- which is what
+       the clean-target Windows leg reported for "cafe-acute-euro": 99,97,102,65533,
+       65533. MultiByteToWideChar with CP_ACP is the conversion the platform
+       actually needs, and it produces UTF-16 code units directly, so no decoding
+       follows it. */
+    if(str != 0) {
+        int wide = MultiByteToWideChar(CP_ACP, 0, str, -1, NULL, 0);
+        if(wide > 0) {
+            JAVA_ARRAY_CHAR wstack[256];
+            JAVA_ARRAY_CHAR* wbuf = wide <= 256 ? wstack
+                    : (JAVA_ARRAY_CHAR*)malloc((size_t)wide * sizeof(JAVA_ARRAY_CHAR));
+            if(wbuf != 0) {
+                JAVA_OBJECT wres;
+                int got = MultiByteToWideChar(CP_ACP, 0, str, -1, (LPWSTR)wbuf, wide);
+                /* got includes the terminating NUL; the string does not. */
+                if(got > 0) { got--; } else { got = 0; }
+                enteringNativeAllocations();
+                wres = cn1StringFromUnits(threadStateData, wbuf, got);
+                finishedNativeAllocations();
+                if(wbuf != wstack) { free(wbuf); }
+                return wres;
+            }
+        }
+        return JAVA_NULL;
+    }
+    return JAVA_NULL;
+#endif
     int in = 0;
     int out = 0;
     /* JAVA_ARRAY_CHAR, not JAVA_CHAR: these are UTF-16 code UNITS destined for a
@@ -11129,6 +11172,7 @@ JAVA_OBJECT newStringFromUtf8(CODENAME_ONE_THREAD_STATE, const char* str) {
     JAVA_ARRAY_CHAR stackBuf[256];
     JAVA_ARRAY_CHAR* buf;
     JAVA_OBJECT result;
+    int length;
     if(str == 0) {
         return JAVA_NULL;
     }
@@ -12078,7 +12122,7 @@ JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]) {
         /* Decoded, not widened: an argument is outside text. A UTF-8 "e-acute" is
            two bytes, and widening them hands main(String[]) two garbage chars --
            enough to corrupt a path or an option value before the program starts. */
-        JAVA_OBJECT str = newStringFromUtf8(threadStateData, argv[iter + 1]);
+        JAVA_OBJECT str = newStringFromNative(threadStateData, argv[iter + 1]);
         CN1_WRITE_BARRIER(arrObj, str);
         dest[iter] = str;
     }
