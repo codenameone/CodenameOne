@@ -734,6 +734,101 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * An ENFORCED Kotlin platform is the one case a BOM stands the block down.
+     * The class comment records why a plain {@code platform()} does not -- its
+     * constraints are ordinary, so the higher version wins and these are
+     * harmless beside it -- and {@code enforcedPlatform} is the other thing:
+     * Gradle makes the same managed versions strict, so a pre-merge one pins
+     * the family at 1.7.x and a 1.8.0 requirement beside it cannot resolve.
+     */
+    @Test
+    public void anEnforcedPreMergeKotlinPlatformManagesTheFamily() {
+        String[] enforced = {
+            "    implementation(enforcedPlatform("
+                    + "'org.jetbrains.kotlin:kotlin-bom:1.7.22'))\n",
+            "    implementation enforcedPlatform("
+                    + "'org.jetbrains.kotlin:kotlin-bom:1.7.22')\n",
+            "    api(enforcedPlatform(\"org.jetbrains.kotlin:kotlin-bom:1.7.22\"))\n",
+            "    def kv = '1.7.22'\n    implementation(enforcedPlatform("
+                    + "\"org.jetbrains.kotlin:kotlin-bom:$kv\"))\n",
+            // A version this cannot read is not proof it reaches the floor, and a
+            // prerelease of the floor is below it.
+            "    implementation(enforcedPlatform('org.jetbrains.kotlin:kotlin-bom'))\n",
+            "    implementation(enforcedPlatform("
+                    + "'org.jetbrains.kotlin:kotlin-bom:1.8.0-RC2'))\n",
+        };
+        for (int i = 0; i < enforced.length; i++) {
+            check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                            "implementation", enforced[i])),
+                    "<<" + enforced[i].trim() + ">> manages the family");
+        }
+
+        String[] harmless = {
+            // At or past the floor it already agrees with these constraints.
+            "    implementation(enforcedPlatform("
+                    + "'org.jetbrains.kotlin:kotlin-bom:1.9.22'))\n",
+            "    implementation(enforcedPlatform("
+                    + "'org.jetbrains.kotlin:kotlin-bom:1.8.0'))\n",
+            "    implementation(enforcedPlatform("
+                    + "'com.squareup.okhttp3:okhttp-bom:4.0.0'))\n",
+            // A plain platform is not strict, whatever version it names.
+            "    implementation(platform('org.jetbrains.kotlin:kotlin-bom:1.7.22'))\n",
+            "    implementation(platform('org.jetbrains.kotlin:kotlin-bom:1.9.22'))\n",
+            // And the word in a reason is not the call.
+            "    implementation('com.example:x:1.0') { because 'unlike "
+                    + "enforcedPlatform(\\\"org.jetbrains.kotlin:kotlin-bom:1.7.22\\\")' }\n",
+        };
+        for (int i = 0; i < harmless.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation", harmless[i])
+                            .contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + harmless[i].trim() + ">> leaves the alignment alone");
+        }
+    }
+
+    /**
+     * Quoted syntax is not syntax. A raw search for the plugin classpath, or for
+     * a block opener, read the words in a {@code because} reason as the real
+     * thing -- blanking the declaration that carried them, strict pin and all,
+     * or putting every statement after it in a scope it was never in.
+     */
+    @Test
+    public void syntaxQuotedInProseIsNotSyntax() {
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!";
+        String[] prose = {
+            "    implementation('" + pin + "') "
+                    + "{ because 'match configurations.classpath' }\n",
+            "    implementation('" + pin + "') { because 'as buildscript { } does' }\n",
+            "    implementation('" + pin + "') { because 'set in ext { } above' }\n",
+            "    implementation('" + pin + "') {\n"
+                    + "        because 'configurations.classpath'\n    }\n",
+            "    println 'buildscript { classpath }'\n    implementation('" + pin + "')\n",
+        };
+        for (int i = 0; i < prose.length; i++) {
+            check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                            "implementation", prose[i])),
+                    "the pin in <<" + prose[i].trim() + ">> is still read");
+        }
+
+        // The real spellings still say what they say.
+        String[] real = {
+            "    buildscript { dependencies { classpath '" + pin + "' } }\n",
+            "    configurations.classpath.resolutionStrategy.force '" + pin + "'\n",
+        };
+        for (int i = 0; i < real.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation", real[i])
+                            .contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + real[i].trim() + ">> is the plugin's graph");
+        }
+
+        // And a quoted block opener does not put what follows it in a scope.
+        String scoped = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    println 'ext {'\n    def kv = '1.9.22'\n"
+                + "    implementation \"org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kv\"\n");
+        check(scoped.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a quoted opener opens nothing, got <<" + scoped + ">>");
+    }
+
+    /**
      * {@code add} is an ordinary method name. Reading any call of it as a
      * dependency declaration let an unrelated API -- a version catalog, a list --
      * claim an artifact the app had never put in its graph, and the constraint

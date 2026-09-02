@@ -220,6 +220,16 @@ public class KotlinStdlibAlignment {
         // written that would not conflict, so nothing is.
         String[] active = activeLines(combined(appGradleFragments));
         for (int i = 0; i < active.length; i++) {
+            // An ENFORCED platform is the one case a Kotlin BOM stands this down.
+            // A plain `platform()` does not, and the class comment says why it was
+            // measured not to: a BOM's constraints are ordinary, so the higher
+            // version simply wins and these are harmless beside it. enforcedPlatform
+            // is the other thing -- Gradle turns the same versions into STRICT
+            // requirements -- so a pre-merge one strictly pins the family at 1.7.x
+            // and a 1.8.0 requirement written beside it cannot resolve at all.
+            if (namesAnEnforcedKotlinPlatformBelowTheFloor(active[i])) {
+                return "";
+            }
             if (!callsNamed(active[i], "failOnVersionConflict")) {
                 continue;
             }
@@ -1020,6 +1030,42 @@ public class KotlinStdlibAlignment {
     }
 
     /**
+     * Whether the statement enforces a Kotlin platform that cannot reach the
+     * floor.
+     *
+     * <p>A version this cannot read counts as below it, the same way a
+     * declaration's does: an enforced platform is strict by construction, so
+     * guessing that it is high enough is guessing that the constraints below
+     * will resolve.</p>
+     */
+    private static boolean namesAnEnforcedKotlinPlatformBelowTheFloor(String line) {
+        List<String> enforced = versionsInCall(line, ENFORCED_PLATFORM);
+        for (int i = 0; i < enforced.size(); i++) {
+            String coordinate = enforced.get(i).trim();
+            if (!coordinate.startsWith(KOTLIN_GROUP + ":")) {
+                continue;
+            }
+            int version = coordinate.indexOf(':', KOTLIN_GROUP.length() + 1);
+            if (version < 0) {
+                // No version at all, so nothing says it reaches the floor.
+                return true;
+            }
+            String declared = versionComponentOf(coordinate.substring(version + 1));
+            if (declared.endsWith(STRICT_SUFFIX)) {
+                declared = declared.substring(0,
+                        declared.length() - STRICT_SUFFIX.length());
+            }
+            if (belowTheFloor(declared)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The platform spelling whose managed versions become strict. */
+    private static final String ENFORCED_PLATFORM = "enforcedPlatform";
+
+    /**
      * Whether the statement names the plugin classpath outright.
      *
      * <p>{@code configurations.classpath} is the buildscript's own, and a
@@ -1034,15 +1080,24 @@ public class KotlinStdlibAlignment {
      * one as the app managing the family left a real duplicate unfixed.</p>
      */
     private static boolean namesTheBuildscriptClasspath(String line) {
-        int at = line.indexOf(BUILDSCRIPT_CLASSPATH);
-        while (at >= 0) {
+        // Outside literals, like every other question about syntax here. A raw
+        // search read the words in a reason -- because 'match configurations
+        // .classpath' -- as the configuration itself and blanked the declaration
+        // carrying them, strict pin and all, before anything could look at it.
+        for (int at = 0; at < line.length(); at++) {
+            if (isLiteralStart(line, at)) {
+                at = endOfStringLiteral(line, at);
+                continue;
+            }
+            if (!line.startsWith(BUILDSCRIPT_CLASSPATH, at)) {
+                continue;
+            }
             boolean startsToken = at == 0 || !isIdentifierChar(line.charAt(at - 1));
             int after = at + BUILDSCRIPT_CLASSPATH.length();
             if (startsToken && (after >= line.length()
                     || !isIdentifierChar(line.charAt(after)))) {
                 return true;
             }
-            at = line.indexOf(BUILDSCRIPT_CLASSPATH, at + 1);
         }
         return false;
     }
@@ -2403,8 +2458,17 @@ public class KotlinStdlibAlignment {
 
     /** Whether the statement opens a block named {@code name}. */
     private static boolean opensBlockNamed(String statement, String name) {
-        int at = statement.indexOf(name);
-        while (at >= 0) {
+        // Outside literals, for the same reason the classpath check is: a block
+        // opener quoted in a reason opens nothing, and treating one as the real
+        // thing puts every statement after it in a scope it is not in.
+        for (int at = 0; at < statement.length(); at++) {
+            if (isLiteralStart(statement, at)) {
+                at = endOfStringLiteral(statement, at);
+                continue;
+            }
+            if (!statement.startsWith(name, at)) {
+                continue;
+            }
             int after = at + name.length();
             boolean startsToken = at == 0 || !isIdentifierChar(statement.charAt(at - 1));
             int brace = skipBlanks(statement, after);
@@ -2413,7 +2477,6 @@ public class KotlinStdlibAlignment {
                     && brace < statement.length() && statement.charAt(brace) == '{') {
                 return true;
             }
-            at = statement.indexOf(name, at + 1);
         }
         return false;
     }
