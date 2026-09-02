@@ -1641,6 +1641,20 @@ public class CertificateWizard extends Lifecycle {
     /// have. A project that declares the voip background mode says the same thing in the
     /// settings file, and that much is read here -- see
     /// [WizardDecisions#pushRequested(String,String)] for what is left over.
+    ///
+    /// Local notifications are NOT push, and a project using them must not have this
+    /// capability put on its App ID. IPhoneBuilder's `usesLocalNotifications` links
+    /// UserNotifications.framework and keeps the notification handling in the app
+    /// delegate; it does not emit an entitlement, and the block that runs when push was
+    /// not asked for STRIPS the push code even from an app that uses them. iOS asks for
+    /// nothing from an App ID to schedule a local notification -- only a remote one needs
+    /// the capability, which is why `aps-environment` appears nowhere in that builder and
+    /// the push entitlement reaches an iOS app through the provisioning profile. The
+    /// signing guide's note that the build server enables the notification entitlement for
+    /// a LocalNotification project even when `ios.includePush` is false is about not
+    /// hand-stripping that entitlement to quieten App Store Connect; it is not a
+    /// requirement on the App ID. Provisioning push for it would be issue #5657 again:
+    /// a capability nobody asked for, on every project that schedules a reminder.
     private boolean projectWantsPush(String platform) {
         if (binding == null) {
             return false;
