@@ -216,6 +216,24 @@ def site_paths(repo_root: Path) -> tuple[set[str], list, set[str]]:
             # sits in this file, so trusting destinations would accept a guide
             # link to a page that no longer exists.
 
+    # Cloudflare Pages Functions serve a fallback the redirect table does not
+    # mention: docs/website/functions/[[path]].js runs only after context.next()
+    # has already 404ed, and then sends anything under /files/ or /demos/ to
+    # download.codenameone.com. Those paths are therefore served, and this was
+    # recording a real one -- /files/iOS_UI-Kit.psd -- as a broken link. The
+    # destination is off-site, so it lands in the same bucket as every other
+    # off-site redirect: reachable, and not verifiable from this repository.
+    # Appended AFTER the _redirects rules because the function is a fallback and
+    # the first matching rule wins, mirroring the order the host evaluates.
+    for prefix in ("files", "demos"):
+        patterns.append(
+            (
+                re.compile(rf"^/{prefix}(/.*)?$"),
+                [],
+                "https://download.codenameone.com/",
+            )
+        )
+
     # Hugo's published route is the section path plus the page's slug, which
     # 1055 of the content pages override; deriving it from the filename instead
     # both invents routes that are never generated and rejects real ones.

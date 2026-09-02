@@ -48,6 +48,37 @@ ANCHOR_SOURCE_RE = re.compile(r"<<([^>,]+)")
 # checked SEPARATELY, never pooled: an anchor that exists only in the HTML branch
 # must not be allowed to satisfy a reference made in the PDF branch.
 BACKENDS = (("html", ()), ("pdf", ("backend-pdf",)))
+# The surrogate has one blind spot, and it cannot be closed from the command line.
+# Setting backend-pdf makes `ifndef::backend-pdf[]` content disappear and
+# `ifdef::backend-pdf[]` content appear, which is exactly right -- verified -- and
+# is the only form this guide uses. It does NOT undefine `backend-html5`: the HTML
+# converter sets that itself, after command-line attributes are applied, so even
+# `-a backend-html5!` leaves it defined (measured). Content guarded by
+# `ifdef::backend-html5[]` would therefore survive into the surrogate PDF render
+# and could satisfy a PDF-only reference that the real asciidoctor-pdf build
+# leaves dangling. The guide has no such conditional, so rather than model a
+# construct that is not there -- or shell out to asciidoctor-pdf and try to read
+# anchors back out of a PDF -- notice if one appears.
+UNMODELLED_CONDITIONAL_RE = re.compile(
+    r"^\s*if(n?def|eval)::.*\b(backend-html5|basebackend-html)\b"
+)
+
+
+def reject_unmodelled_conditionals(guide_dir: Path) -> None:
+    for path in sorted(guide_dir.rglob("*")):
+        if path.suffix not in {".adoc", ".asciidoc"} or not path.is_file():
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
+            if UNMODELLED_CONDITIONAL_RE.match(line):
+                raise SystemExit(
+                    f"{path.name}:{number}: this file guards content on the HTML "
+                    f"backend attribute. The PDF render here is an HTML render with "
+                    f"backend-pdf set, and the converter re-defines backend-html5 "
+                    f"afterwards, so that content cannot be excluded and a PDF-only "
+                    f"reference into it would pass unchecked. Guard on backend-pdf "
+                    f"(ifndef::backend-pdf[]) as the rest of the guide does, or teach "
+                    f"this script to drive asciidoctor-pdf."
+                )
 
 
 def render(root: Path, attributes: tuple[str, ...] = ()) -> str:
@@ -83,6 +114,7 @@ def main() -> int:
     args = parser.parse_args()
 
     guide_dir = args.guide_dir.resolve()
+    reject_unmodelled_conditionals(guide_dir)
     root = guide_dir / "developer-guide.asciidoc"
     dangling: dict[str, int] = defaultdict(int)
     raw_id_links: dict[str, int] = defaultdict(int)
