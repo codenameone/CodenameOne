@@ -411,8 +411,13 @@ public final class CertificateWizardStructureHarness {
         fire(form, "pick.type.mac_app_store");
         check(selectedChoice(form, "pick.bundle.BID_MAC"),
                 "a Mac profile type selects the macOS registration of the identifier");
-        check(!selectedChoice(form, "pick.bundle.BID_A1"),
-                "and drops the iOS one the dialog opened with");
+        // Not merely deselected: an App ID registered for iOS cannot carry a Mac profile,
+        // and while the row was on screen it could be picked outright -- nothing refused
+        // the selection and Create submitted it.
+        check(find(form, "pick.bundle.BID_A1") == null,
+                "and stops offering the iOS one at all");
+        check(find(form, "pick.bundle.BID_B2") == null,
+                "no iOS App ID is offered for a Mac profile, this project's or anyone's");
         fire(form, "pick.type.ios_app_store");
         check(selectedChoice(form, "pick.bundle.BID_A1"),
                 "and back again when the type returns to iOS");

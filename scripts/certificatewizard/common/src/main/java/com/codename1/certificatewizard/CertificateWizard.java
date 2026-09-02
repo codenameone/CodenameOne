@@ -1228,23 +1228,29 @@ public class CertificateWizard extends Lifecycle {
             // here with equal weight, so the one identifier that can actually sign this
             // project had to be found in a list of everything anyone on the team ever
             // registered (issue #5654).
-            final List<SigningState.BundleId> ownBundles =
-                    WizardDecisions.projectBundleIds(state.bundleIds, projectDefaults().bundleId);
-            final boolean narrowed = !showAllBundles[0] && !ownBundles.isEmpty();
-            final List<SigningState.BundleId> shownBundles = narrowed ? ownBundles : state.bundleIds;
-            // A bundle selection outlives both the profile type it was made under and the
-            // list it was made from, and neither may be left standing out of sight. An App
-            // ID registered for one platform cannot carry a profile for the other -- Apple
-            // rejects the request -- and one that narrowing the list has hidden is a choice
-            // nothing on screen accounts for; in both cases Create stayed enabled and
-            // submitted it. Dropped here, which is the one place every type change and every
-            // widening or narrowing of the list goes through, exactly as the device
-            // selection above is.
+            // Only the App IDs this profile type can be created against. An App ID
+            // registered for one platform cannot carry a profile for the other, and
+            // offering the row anyway let it be picked outright: nothing refused the
+            // selection, so Create submitted it and Apple rejected the request long after
+            // the dialog said it was fine. The certificate section below is filtered the
+            // same way, for the same reason.
             final String bundlePlatform = platformForProfile(profileType[0]);
+            final List<SigningState.BundleId> usableBundles =
+                    WizardDecisions.usableBundleIds(state.bundleIds, bundlePlatform);
+            final List<SigningState.BundleId> ownBundles =
+                    WizardDecisions.projectBundleIds(usableBundles, projectDefaults().bundleId);
+            final boolean narrowed = !showAllBundles[0] && !ownBundles.isEmpty();
+            final List<SigningState.BundleId> shownBundles = narrowed ? ownBundles : usableBundles;
+            // A bundle selection outlives both the profile type it was made under and the
+            // list it was made from, and neither may be left standing out of sight: a
+            // selection that is not among the rows on screen is a choice nothing accounts
+            // for, and Create stayed enabled and submitted it. Dropped here, which is the
+            // one place every type change and every widening or narrowing of the list goes
+            // through, exactly as the device selection above is. With the list filtered by
+            // platform this covers the wrong-platform selection too -- such a row is no
+            // longer among them.
             SigningState.BundleId selectedBundle = findBundleById(bundleId[0]);
-            if (selectedBundle != null && (!shownBundles.contains(selectedBundle)
-                    || !WizardDecisions.bundlePlatformSatisfies(
-                            bundlePlatform, selectedBundle.platform()))) {
+            if (selectedBundle != null && !shownBundles.contains(selectedBundle)) {
                 bundleId[0] = null;
             }
             if (bundleId[0] == null) {
@@ -1275,9 +1281,9 @@ public class CertificateWizard extends Lifecycle {
             }
             // The toggle appears only when it would change what is on screen: an account
             // holding nothing but this project's App IDs has nothing to reveal or hide.
-            if (ownBundles.size() < state.bundleIds.size() && !ownBundles.isEmpty()) {
+            if (ownBundles.size() < usableBundles.size() && !ownBundles.isEmpty()) {
                 Button toggle = narrowed
-                        ? outline("Show all " + state.bundleIds.size() + " bundle IDs",
+                        ? outline("Show all " + usableBundles.size() + " bundle IDs",
                                 "btn.profileShowAllBundles")
                         : outline("Show only this project's bundle IDs",
                                 "btn.profileShowProjectBundles");
@@ -1287,10 +1293,25 @@ public class CertificateWizard extends Lifecycle {
                 });
                 c.add(toggle);
             }
-            if (state.bundleIds.isEmpty()) {
-                Button createBundle = outline("Register bundle ID first", "btn.profileNeedsBundle");
-                createBundle.addActionListener(e -> { d.dispose(); bundleDialog(null, null); });
-                c.add(createBundle);
+            if (usableBundles.isEmpty()) {
+                if (state.bundleIds.isEmpty()) {
+                    Button createBundle = outline("Register bundle ID first", "btn.profileNeedsBundle");
+                    createBundle.addActionListener(e -> { d.dispose(); bundleDialog(null, null); });
+                    c.add(createBundle);
+                } else {
+                    // Registered, but not for this platform -- and this is not the same
+                    // remedy. Apple registers an identifier once for the whole account, so
+                    // an App ID that exists for iOS cannot be registered again for macOS;
+                    // the platform is added to the existing one in the portal. Saying so
+                    // beats an empty section, which is what filtering the list would
+                    // otherwise leave behind.
+                    label(c, "No bundle ID is registered for "
+                            + bundlePlatformName(bundlePlatform)
+                            + ". Automatic setup registers one, unless the identifier is already"
+                            + " registered for another platform -- Apple registers it once, and"
+                            + " the platform is added to it in the Apple Developer portal.",
+                            "CWCardMeta");
+                }
             }
 
             label(c, "Certificate", "CWFieldLabel");
@@ -2679,16 +2700,23 @@ public class CertificateWizard extends Lifecycle {
         renderPageMessage();
     }
 
-    /// Clears a progress message and leaves a warning standing.
+    /// Clears a progress message, and leaves standing a warning the running automatic
+    /// setup has recorded.
     ///
     /// The banner reports both what the wizard is doing and what went wrong with it, and
     /// automatic setup runs a dozen steps in a row: a step that succeeded wiped the
-    /// warning the step before it had just put up, so the only trace of a skipped or
-    /// refused step was a banner that appeared and vanished too fast to read (issue
-    /// #5652). A warning now survives until the run reports its outcome, or until the
-    /// user navigates to another page.
+    /// warning the step before it had just put up, so the only trace of a skipped step was
+    /// a banner that appeared and vanished too fast to read (issue #5652). It survives
+    /// until the run reports its outcome, or until the user navigates to another page.
+    ///
+    /// Only that warning, though, and not every warning-styled message. The install path
+    /// this guards is also the Install button on the certificates and profiles pages: a
+    /// failure there followed by a successful retry would otherwise leave the obsolete
+    /// failure on screen beside the success toast. What the run recorded is exactly what
+    /// the run will repeat in its summary; anything else is stale the moment something
+    /// succeeds.
     private void clearProgressMessage() {
-        if (pageMessageWarn && pageMessage != null && pageMessage.length() > 0) {
+        if (pageMessageWarn && pageMessage != null && autoSetupWarnings.contains(pageMessage)) {
             return;
         }
         clearPageMessage();

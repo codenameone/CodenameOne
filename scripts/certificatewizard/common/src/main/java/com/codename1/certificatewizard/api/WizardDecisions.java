@@ -258,6 +258,31 @@ public final class WizardDecisions {
         return required.equals(actual) || "UNIVERSAL".equals(actual);
     }
 
+    /// The App IDs a profile of this platform can be created against.
+    ///
+    /// The dialog used to list every App ID whatever the profile type was, so a Mac App
+    /// Store profile could be pointed at an iOS App ID and Apple rejected the request --
+    /// the same "the wizard said it was fine" gap the certificate list closed. The
+    /// certificate section beside it is filtered exactly this way.
+    ///
+    /// Note this excludes the KNOWN WRONG platform rather than requiring the known right
+    /// one, for the reason [#isUsableDevice] gives: UNIVERSAL covers both, and a value the
+    /// service did not report must not empty the picker. Offering one App ID too many
+    /// costs a rejected request; offering none costs the whole flow.
+    public static List<SigningState.BundleId> usableBundleIds(List<SigningState.BundleId> all,
+                                                              String requiredPlatform) {
+        List<SigningState.BundleId> out = new ArrayList<SigningState.BundleId>();
+        if (all == null) {
+            return out;
+        }
+        for (SigningState.BundleId b : all) {
+            if (bundlePlatformSatisfies(requiredPlatform, b.platform())) {
+                out.add(b);
+            }
+        }
+        return out;
+    }
+
     /// The certificate types the wizard can generate, and how they are labelled.
     ///
     /// Kept here rather than inside the dialog so the set is one thing: every type
