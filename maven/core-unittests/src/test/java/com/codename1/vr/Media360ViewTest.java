@@ -24,6 +24,7 @@ package com.codename1.vr;
 
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Image;
+import com.codename1.ui.events.WheelEvent;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -87,6 +88,40 @@ class Media360ViewTest extends UITestBase {
         view.pointerDragged(50, 100);
         view.pointerDragged(50, 200);
         assertEquals(89f, view.getPitch(), 0f);
+    }
+
+    @Test
+    void theWheelLooksAroundTheSameWayADragDoes() {
+        // The desktop ports used to turn a wheel into synthetic drag events, so this worked
+        // without the component knowing the wheel existed. They no longer do, and the
+        // gesture has to land at the same scale and in the same directions as the drag
+        // above -- these are the numbers from dragUpdatesYawAndPitch.
+        Media360View view = new Media360View();
+        view.setWidth(360);
+        view.setHeight(180);
+
+        assertTrue(view.mouseWheel(new WheelEvent(view, 100, 100, 36, 0, false, 0)));
+        assertEquals(-18f, view.getYaw(), 0.01f);
+
+        assertTrue(view.mouseWheel(new WheelEvent(view, 100, 100, 0, 18, false, 0)));
+        assertEquals(18f, view.getPitch(), 0.01f);
+    }
+
+    @Test
+    void aWheelThatCannotMoveTheViewIsLeftForThePageBehindIt() {
+        Media360View view = new Media360View();
+        view.setWidth(360);
+        view.setHeight(180);
+        view.setPitch(89f);
+
+        // Straight up, already against the stop: nothing to turn, so the event has to stay
+        // available to whatever is scrollable behind the view rather than vanishing here.
+        assertFalse(view.mouseWheel(new WheelEvent(view, 100, 100, 0, 40, false, 0)));
+        assertEquals(89f, view.getPitch(), 0f);
+
+        // The same event with a sideways component does turn the view, and is taken.
+        assertTrue(view.mouseWheel(new WheelEvent(view, 100, 100, 36, 40, false, 0)));
+        assertEquals(-18f, view.getYaw(), 0.01f);
     }
 
     @Test
