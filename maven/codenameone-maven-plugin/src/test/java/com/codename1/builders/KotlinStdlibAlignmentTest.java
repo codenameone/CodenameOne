@@ -848,6 +848,83 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A conditional swap between two coordinates of this family is a choice
+     * between two of ours, and which arm runs is not readable here. Taking the
+     * replacement let {@code def dep = '..jdk8:1.7.22'} followed by
+     * {@code if (useNew) dep = '..jdk8:1.9.22'} read as merged-era, so the
+     * declaration below it needed no constraint -- and with the condition false
+     * the class-bearing 1.7.22 jar is still there.
+     */
+    @Test
+    public void aConditionalSwapKeepsTheLowerCoordinate() {
+        String jdk8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
+        String use = "    implementation(dep)\n";
+        String[] swaps = {
+            "    def dep = '" + jdk8 + ":1.7.22'\n"
+                    + "    if (useNew) dep = '" + jdk8 + ":1.9.22'\n",
+            "    def dep = '" + jdk8 + ":1.7.22'\n"
+                    + "    if (useNew) {\n        dep = '" + jdk8 + ":1.9.22'\n    }\n",
+            // The same choice written the other way round. Its assignment sits
+            // after a header with no brace, which was not read as an assignment
+            // at all -- so the name kept the merged-era value it started with.
+            "    def dep = '" + jdk8 + ":1.9.22'\n"
+                    + "    if (legacy) dep = '" + jdk8 + ":1.7.22'\n",
+        };
+        for (int i = 0; i < swaps.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    swaps[i] + use);
+            check(out.contains("kotlin-stdlib-jdk7:1.8.0")
+                            && out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                    "the pre-merge arm may be the live one, so the shim is raised; "
+                            + "got <<" + out + ">>");
+        }
+
+        // Two merged-era coordinates leave the artifact to the app, and an
+        // UNCONDITIONAL raise still replaces what it replaces.
+        String[] settled = {
+            "    def dep = '" + jdk8 + ":1.9.22'\n"
+                    + "    if (useNew) dep = '" + jdk8 + ":1.9.24'\n",
+            "    def dep = '" + jdk8 + ":1.7.22'\n    dep = '" + jdk8 + ":1.9.22'\n",
+        };
+        for (int i = 0; i < settled.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    settled[i] + use);
+            check(!out.contains("kotlin-stdlib-jdk8:1.8.0")
+                            && out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "a merged-era binding stands in for its own constraint, got <<"
+                            + out + ">>");
+        }
+    }
+
+    /**
+     * A selection rule may name its module by whole coordinate --
+     * {@code withModule('org.jetbrains.kotlin:kotlin-stdlib-jdk8')} -- which is
+     * neither the bare artifact name nor the group on its own, so a rule written
+     * that way looked like it concerned nothing of ours.
+     */
+    @Test
+    public void aSelectionRuleMayNameItsModuleByCoordinate() {
+        String open = "    configurations.all {\n        resolutionStrategy {\n"
+                + "            componentSelection {\n";
+        String close = "            }\n        }\n    }\n";
+        String ours = KotlinStdlibAlignment.constraintsBlock("implementation",
+                open + "                withModule('org.jetbrains.kotlin:"
+                + "kotlin-stdlib-jdk8') { selection ->\n"
+                + "                    if (selection.candidate.version == '1.8.0') {\n"
+                + "                        selection.reject('unsupported')\n"
+                + "                    }\n                }\n" + close);
+        check("".equals(ours), "the rule may reject the floor, got <<" + ours + ">>");
+
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        open + "                withModule('com.squareup.okhttp3:"
+                        + "okhttp') { selection ->\n"
+                        + "                    selection.reject('unsupported')\n"
+                        + "                }\n" + close)
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a rule on another module rejects nothing this writes");
+    }
+
+    /**
      * A component-selection block holds a rule per {@code all { }}, and the
      * predicate that names this family has to be in the SAME rule as the
      * rejection. Accumulated across the block, a rule that merely mentions

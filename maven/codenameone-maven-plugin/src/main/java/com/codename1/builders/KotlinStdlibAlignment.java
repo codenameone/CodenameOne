@@ -549,8 +549,7 @@ public class KotlinStdlibAlignment {
             }
             if (openedAt >= 0) {
                 rejects = rejects || callsNamed(active[i], "reject");
-                namesKotlin = namesKotlin || namesOneOfTheFamily(active[i])
-                        || holdsLiteral(active[i], KOTLIN_GROUP);
+                namesKotlin = namesKotlin || mentionsTheKotlinGroup(active[i]);
             }
             int before = depth;
             depth += braceBalance(active[i]);
@@ -1595,8 +1594,12 @@ public class KotlinStdlibAlignment {
      * assigned to -- which is a declaration this already reads.</p>
      */
     private static int afterAnyBlockOpener(String statement) {
-        int start = 0;
-        for (int i = 0; i < statement.length(); i++) {
+        // Past a header whose body is on the SAME line, which opens no brace at
+        // all: `if (legacy) dep = '..'` began the walk at `if`, stopped at its
+        // parenthesis, and recorded nothing -- so a conditional swap to a
+        // pre-merge coordinate was not seen and the name kept whatever it had.
+        int start = afterAnUnbracedHeader(statement);
+        for (int i = start; i < statement.length(); i++) {
             if (isLiteralStart(statement, i)) {
                 i = endOfStringLiteral(statement, i);
                 continue;
@@ -1609,6 +1612,49 @@ public class KotlinStdlibAlignment {
             }
         }
         return start;
+    }
+
+    /**
+     * The index just past a leading {@code if (..)} or {@code while (..)} whose
+     * body follows on the same line, or 0.
+     *
+     * <p>Only a header at the START of the statement, because that is the one
+     * whose body the rest of the statement is. The condition's own parentheses
+     * are stepped over as a unit, so a call inside it is not mistaken for the
+     * end.</p>
+     */
+    private static int afterAnUnbracedHeader(String statement) {
+        int at = skipBlanks(statement, 0);
+        int end = at;
+        while (end < statement.length() && isIdentifierChar(statement.charAt(end))) {
+            end++;
+        }
+        if (end == at || UNBRACED_HEADERS.indexOf(
+                " " + statement.substring(at, end) + " ") < 0) {
+            return 0;
+        }
+        int open = skipBlanks(statement, end);
+        if (open >= statement.length() || statement.charAt(open) != '(') {
+            // `else` carries no condition, so its body starts straight after it.
+            return "else".equals(statement.substring(at, end)) ? end : 0;
+        }
+        int depth = 0;
+        for (int i = open; i < statement.length(); i++) {
+            if (isLiteralStart(statement, i)) {
+                i = endOfStringLiteral(statement, i);
+                continue;
+            }
+            char c = statement.charAt(i);
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+                if (depth == 0) {
+                    return i + 1;
+                }
+            }
+        }
+        return 0;
     }
 
     /** Whether the character at {@code at} is an assignment, not a comparison. */
@@ -3387,6 +3433,45 @@ public class KotlinStdlibAlignment {
         return true;
     }
 
+    /** The version a coordinate carries, or null when it has none. */
+    private static String coordinateVersion(String coordinate) {
+        int group = coordinate.indexOf(':');
+        if (group < 0) {
+            return null;
+        }
+        int artifact = coordinate.indexOf(':', group + 1);
+        if (artifact < 0 || artifact + 1 >= coordinate.length()) {
+            return null;
+        }
+        return versionComponentOf(coordinate.substring(artifact + 1));
+    }
+
+    /**
+     * Whether the statement mentions this group at all, in any of the shapes a
+     * selection rule names a module by.
+     *
+     * <p>{@code withModule('org.jetbrains.kotlin:kotlin-stdlib-jdk8')} names it
+     * with a whole coordinate, which is neither the bare artifact name nor the
+     * group on its own -- so a rule written that way looked like it concerned
+     * nothing of ours and the rejected version was written anyway.</p>
+     */
+    private static boolean mentionsTheKotlinGroup(String line) {
+        if (namesOneOfTheFamily(line) || holdsLiteral(line, KOTLIN_GROUP)) {
+            return true;
+        }
+        for (int i = 0; i < line.length(); i++) {
+            if (!isLiteralStart(line, i)) {
+                continue;
+            }
+            int end = endOfStringLiteral(line, i);
+            if (stringLiteralContent(line, i).startsWith(KOTLIN_GROUP + ":")) {
+                return true;
+            }
+            i = end;
+        }
+        return false;
+    }
+
     /**
      * Records a definition, or forgets it, unless doing so under a condition
      * would throw away the value that decides suppression.
@@ -3398,6 +3483,24 @@ public class KotlinStdlibAlignment {
             if (known != null && known.indexOf(KOTLIN_GROUP) >= 0
                     && (value == null || value.indexOf(KOTLIN_GROUP) < 0)) {
                 return;
+            }
+            // Kotlin for Kotlin is a choice between two of ours, and which arm
+            // runs is not readable here. `def dep = '..jdk8:1.7.22'` then
+            // `if (useNew) dep = '..jdk8:1.9.22'` took the merged-era one, so the
+            // declaration below read as needing no constraint -- and with the
+            // condition false the class-bearing 1.7.22 jar is still there. The
+            // lower version is kept, for the reason every unevaluable branch gets
+            // the conservative answer.
+            if (known != null && value != null
+                    && known.indexOf(KOTLIN_GROUP) >= 0
+                    && value.indexOf(KOTLIN_GROUP) >= 0) {
+                String held = coordinateVersion(known);
+                String offered = coordinateVersion(value);
+                if (held != null && offered != null
+                        && compareVersions(withoutStrictSuffix(held),
+                                withoutStrictSuffix(offered)) < 0) {
+                    return;
+                }
             }
         }
         if (value == null) {
@@ -3717,7 +3820,9 @@ public class KotlinStdlibAlignment {
         // unconditional reassignment and threw away the coordinate the condition
         // might never replace -- which is the pin, hidden, that this whole rule
         // exists to keep.
-        if (depthAt(statement, nameStart, depth) > depth) {
+        if (depthAt(statement, nameStart, depth) > depth
+                || nameStart >= afterAnUnbracedHeader(statement)
+                        && afterAnUnbracedHeader(statement) > 0) {
             conditional = true;
         }
         if (declared) {
