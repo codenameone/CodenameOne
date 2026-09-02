@@ -735,6 +735,90 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * The canonical Gradle rule puts its openers, its condition and its body on
+     * separate lines, and every one of those splits was losing the override.
+     */
+    @Test
+    public void aResolutionRuleSurvivesEveryLineBreakInIt() {
+        String open = "    configurations.all { resolutionStrategy.eachDependency "
+                + "{ d ->\n";
+        String close = "    } }\n";
+        String[] rules = {
+            // The reported one: openers and condition on one line, body on the
+            // next. The first token is `configurations` and two braces are open,
+            // so neither test for an unbraced body saw a header here.
+            open + "        if (d.requested.name == 'kotlin-stdlib')\n"
+                    + "            d.useVersion '1.7.22'\n" + close,
+            // Braced, which is how it is usually written. The condition and the
+            // body were only glued together when the GROUP appeared, and a rule
+            // comparing the name alone never names it.
+            open + "        if (d.requested.name == 'kotlin-stdlib') {\n"
+                    + "            d.useVersion '1.7.22'\n        }\n" + close,
+            open + "        if (d.requested.group == 'org.jetbrains.kotlin') {\n"
+                    + "            d.useVersion '1.7.22'\n        }\n" + close,
+            // An else is the same statement as its if, and the condition that
+            // names the family is on the if.
+            open + "        if (d.requested.name != 'kotlin-stdlib')\n"
+                    + "            d.useVersion '1.9.22'\n"
+                    + "        else\n            d.useVersion '1.7.22'\n" + close,
+            open + "        while (d.requested.name == 'kotlin-stdlib')\n"
+                    + "            d.useVersion '1.7.22'\n" + close,
+            // The openers, the condition and the body on three different
+            // lines is one shape; all the openers AND the condition on ONE
+            // line is another, and there the statement begins with
+            // `configurations` and holds two open braces, so reading the first
+            // token found no header at all.
+            "    configurations.all { resolutionStrategy.eachDependency { d -> "
+                    + "if (d.requested.name == 'kotlin-stdlib')\n"
+                    + "        d.useVersion '1.7.22'\n" + close,
+            "    configurations.all { resolutionStrategy.eachDependency { d -> "
+                    + "if (d.requested.group == 'org.jetbrains.kotlin')\n"
+                    + "        d.useVersion '1.7.22'\n" + close,
+            // And the spellings that already worked still do.
+            open + "        if (d.requested.name == 'kotlin-stdlib') "
+                    + "d.useVersion '1.7.22'\n" + close,
+        };
+        for (int i = 0; i < rules.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    rules[i]);
+            check("".equals(out), "rule " + i + " holds the base library pre-merge, "
+                    + "got <<" + out + ">>");
+        }
+
+        // A trailing parenthesis that is not a header takes no body with it, or
+        // every declaration would swallow the line after it.
+        String[] independent = {
+            "    dependencies {\n        implementation('com.example:x:1.0')\n"
+                    + "        implementation('org.jetbrains.kotlin:"
+                    + "kotlin-stdlib-jdk8:1.9.22')\n    }\n",
+            "    configurations.all { resolutionStrategy.force"
+                    + "('com.example:x:1.0') }\n"
+                    + "    implementation 'org.jetbrains.kotlin:"
+                    + "kotlin-stdlib-jdk8:1.9.22'\n",
+            // A parenthesis inside a string is not a parenthesis.
+            "    println 'if (x)'\n    implementation "
+                    + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n",
+        };
+        for (int i = 0; i < independent.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            independent[i]).contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "line " + i + " does not take the next one with it");
+        }
+
+        // A rule that names the group and then narrows to ONE artifact governs
+        // that artifact only: reading it as governing the family made the
+        // siblings look declared and the block came out empty, which leaves the
+        // duplicate exactly where it was.
+        String narrowed = KotlinStdlibAlignment.constraintsBlock("implementation",
+                open + "        if (d.requested.group == 'org.jetbrains.kotlin' && "
+                + "d.requested.name == 'kotlin-stdlib') d.useVersion '1.9.22'\n"
+                + close);
+        check(narrowed.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a narrowed merged-era rule keeps the alignment, got <<"
+                        + narrowed + ">>");
+    }
+
+    /**
      * One statement can name a module twice: {@code force} takes varargs, so
      * {@code force 'g:a:1.9.22', 'g:a:1.7.22'} is one call listing the same
      * module at two versions. Reading the first reported the merged-era one and

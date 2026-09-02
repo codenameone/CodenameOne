@@ -325,6 +325,41 @@ public class KotlinStdlibAlignment {
         return declaredVersionOf(line, artifact) != null;
     }
 
+    /**
+     * Whether the text mentions one of the artifacts this class aligns.
+     *
+     * <p>Used to decide whether a statement absorbs the closure that follows it,
+     * where the group alone was the trigger. A rule comparing only the name --
+     * {@code if (d.requested.name == 'kotlin-stdlib') {} } with the useVersion on
+     * the next line -- never named the group, so the condition and the body
+     * stayed separate statements and neither said anything.</p>
+     *
+     * <p>Deliberately a plain mention rather than the careful reading
+     * namesArtifactAnywhere does: gluing a closure onto a statement is bounded
+     * to one declaration either way, and the careful question is asked later of
+     * the merged text.</p>
+     */
+    /** Whether the statement continues the previous one with an else branch. */
+    private static boolean continuesWithElse(String statement) {
+        int i = skipBlanks(statement, 0);
+        while (i < statement.length() && statement.charAt(i) == '}') {
+            i = skipBlanks(statement, i + 1);
+        }
+        int end = i;
+        while (end < statement.length() && isIdentifierChar(statement.charAt(end))) {
+            end++;
+        }
+        return "else".equals(statement.substring(i, end));
+    }
+
+    private static boolean namesAnAlignedArtifact(String text) {
+        // The base library's name, which is a prefix of both shims', so one test
+        // covers the family. ALIGNED_ARTIFACTS is the two shims alone -- they are
+        // what gets a constraint written -- and asking only those missed a rule
+        // naming the base, which is the one whose version decides everything.
+        return text.contains(BASE_STDLIB);
+    }
+
     /** Whether the statement names the artifact, in either spelling. */
     private static boolean namesArtifactAnywhere(String line, String artifact) {
         return namesCoordinate(line, artifact)
@@ -353,7 +388,48 @@ public class KotlinStdlibAlignment {
                 // caught, and is left uncaught: telling a group literal from a
                 // version or a classifier by shape is the kind of guess this class
                 // keeps having to correct, and being wrong here only suppresses.
-                || (holdsLiteral(line, artifact) && !namesAnotherGroup(line));
+                || (holdsLiteral(line, artifact) && !namesAnotherGroup(line))
+                // An override that names the GROUP on its own applies to every
+                // module in it, this family included:
+                //   if (d.requested.group == 'org.jetbrains.kotlin')
+                //       d.useVersion '1.7.22'
+                // is the canonical Gradle snippet, and it holds the base library
+                // pre-merge while these constraints raise the shims to their empty
+                // 1.8.0 jars -- the failure that reaches the device.
+                //
+                // The group has to be a literal of its OWN, which is what makes
+                // this narrow: `force 'org.jetbrains.kotlin:kotlin-reflect:1.7.22'`
+                // carries the group inside a coordinate and does not match, so an
+                // override of an unrelated Kotlin module still leaves the block to
+                // write. A rule that names the group AND some other artifact does
+                // match, and stands the block down for a module it does not govern
+                // -- the ambiguity resolved the way every other one here is,
+                // because that costs an app the duplicate it already had.
+                || (holdsLiteral(line, KOTLIN_GROUP) && callsForce(line, artifact)
+                        && !namesOneOfTheFamily(line));
+    }
+
+    /**
+     * Whether the statement names a particular member of the family, as a
+     * literal of its own.
+     *
+     * <p>What stops the group-wide reading above from widening a rule that has
+     * already narrowed itself. {@code group == '..' && name == 'kotlin-stdlib'}
+     * governs the base library and nothing else, and reading it as governing the
+     * family made the siblings look declared -- so their constraints were skipped
+     * as already handled and the block came out empty. That is not the safe
+     * direction: it leaves the duplicate exactly where it was.</p>
+     */
+    private static boolean namesOneOfTheFamily(String line) {
+        if (holdsLiteral(line, BASE_STDLIB)) {
+            return true;
+        }
+        for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
+            if (holdsLiteral(line, ALIGNED_ARTIFACTS[i])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether the statement declares a group entry that is not Kotlin's. */
@@ -2419,7 +2495,7 @@ public class KotlinStdlibAlignment {
         List<String> merged = new ArrayList<String>();
         for (int i = 0; i < defined.size(); i++) {
             String statement = defined.get(i);
-            if (statement.contains(KOTLIN_GROUP)) {
+            if (statement.contains(KOTLIN_GROUP) || namesAnAlignedArtifact(statement)) {
                 // A trailing closure may sit on the line AFTER the call's closing
                 // parenthesis -- Gradle accepts it and the strictly inside really does
                 // apply, checked by watching a competing higher requirement fail
@@ -2449,6 +2525,27 @@ public class KotlinStdlibAlignment {
                     i++;
                     statement = statement + " " + defined.get(i);
                     braces += braceBalance(defined.get(i));
+                }
+                // An `else` is the same statement as the `if` before it, and the
+                // condition that names the family is on the `if`. Left apart, the
+                //   if (d.requested.name == 'kotlin-stdlib')
+                //       d.useVersion '1.9.22'
+                //   else
+                //       d.useVersion '1.7.22'
+                // rule offered only its first branch, so the version that decides
+                // suppression was in a statement that named nothing. Adjacency, not
+                // a reading of which branch runs: joined, the statement holds both
+                // versions and the last one wins, which is the conservative answer
+                // this class takes wherever it cannot evaluate a condition.
+                while (i + 1 < defined.size() && continuesWithElse(defined.get(i + 1))) {
+                    i++;
+                    statement = statement + " " + defined.get(i);
+                    int reopened = trailingBraceBalance(statement);
+                    while (reopened > 0 && i + 1 < defined.size()) {
+                        i++;
+                        statement = statement + " " + defined.get(i);
+                        reopened += braceBalance(defined.get(i));
+                    }
                 }
             }
             merged.add(statement);
@@ -3148,21 +3245,63 @@ public class KotlinStdlibAlignment {
      * these words introduce one.</p>
      */
     private static boolean opensAnUnbracedBody(String text) {
-        int i = skipBlanks(text, 0);
-        int end = i;
-        while (end < text.length() && isIdentifierChar(text.charAt(end))) {
-            end++;
-        }
-        String head = text.substring(i, end);
-        if (UNBRACED_HEADERS.indexOf(" " + head + " ") < 0) {
-            return false;
-        }
-        if (braceBalance(text) != 0) {
-            return false;
-        }
+        // Whether the statement ENDS with a header, not whether it starts with
+        // one. A rule is written with its openers and its condition on one line
+        // and the body on the next:
+        //   configurations.all { resolutionStrategy.eachDependency { d ->
+        //           if (d.requested.name == 'kotlin-stdlib')
+        //       d.useVersion '1.7.22'
+        // Reading the first token found `configurations`, and the brace balance
+        // is two open besides, so the condition and the useVersion were split into
+        // separate statements -- neither of which says anything, which is how an
+        // override in force went unread and the constraints went in beside it.
         int last = skipBlanksBackward(text, text.length() - 1);
-        // `else` stands alone; the rest carry a condition in parentheses.
-        return last >= 0 && (text.charAt(last) == ')' || "else".equals(head));
+        if (last < 0) {
+            return false;
+        }
+        if (text.charAt(last) != ')') {
+            // `else` stands alone; it is the only header with no condition.
+            int start = last;
+            while (start >= 0 && isIdentifierChar(text.charAt(start))) {
+                start--;
+            }
+            return "else".equals(text.substring(start + 1, last + 1));
+        }
+        // The parenthesis that closes AT the end, found forward so a bracket
+        // inside a string is not counted as one.
+        List<Integer> opened = new ArrayList<Integer>();
+        int opener = -1;
+        for (int i = 0; i < text.length(); i++) {
+            if (isLiteralStart(text, i)) {
+                i = endOfStringLiteral(text, i);
+                continue;
+            }
+            char c = text.charAt(i);
+            if (c == '(') {
+                opened.add(Integer.valueOf(i));
+            } else if (c == ')' && !opened.isEmpty()) {
+                int open = opened.remove(opened.size() - 1).intValue();
+                if (i == last) {
+                    opener = open;
+                    break;
+                }
+            }
+        }
+        if (opener < 0) {
+            return false;
+        }
+        int end = skipBlanksBackward(text, opener - 1);
+        if (end < 0) {
+            return false;
+        }
+        int start = end;
+        while (start >= 0 && isIdentifierChar(text.charAt(start))) {
+            start--;
+        }
+        // Only a header takes the next line as its body. `implementation('a:1.0')`
+        // and `force('a:1.0')` end in a parenthesis too and take nothing.
+        return UNBRACED_HEADERS.indexOf(
+                " " + text.substring(start + 1, end + 1) + " ") >= 0;
     }
 
     /** The words that introduce a body, braced or not. */
