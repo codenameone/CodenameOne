@@ -118,7 +118,23 @@ class Walker:
                 self.direct.add(target)
                 self._check_manifest_spacing(index, lines, target_raw)
                 if self._inside_conditional(lines, index):
+                    # Nothing in the manifest is conditional today (measured: zero
+                    # include:: lines sit inside a conditional anywhere in the guide),
+                    # and the two checks that matter cannot see one. The duplicate
+                    # count has to skip it, because the same chapter under two
+                    # exclusive branches is one chapter in the output; the
+                    # rendered-title check has to skip it too, because only one
+                    # branch renders. Skipping BOTH silently means a chapter
+                    # included twice inside a single active branch would pass.
+                    # So refuse the construct instead of quietly not validating it.
                     self.conditional.add(target)
+                    self.errors.append(
+                        f"developer-guide.asciidoc:{index + 1}: {target_raw} is included "
+                        f"inside a conditional. Neither the duplicate check nor the "
+                        f"rendered-title check can validate a conditional entry, so this "
+                        f"refuses it rather than skipping it silently. Teach the checker "
+                        f"which branches are mutually exclusive before adding one."
+                    )
                 else:
                     self.direct_include_count[target] += 1
             self._visit(target, attrs)
