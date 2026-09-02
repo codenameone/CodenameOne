@@ -1147,15 +1147,58 @@ JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ON
     return (JAVA_LONG)(intptr_t)f;
 }
 
+/*
+ * TWO KNOWN LIMITATIONS of this file layer, recorded here rather than fixed,
+ * because both are pre-existing on every platform and neither is what enabling the
+ * clean target is about. Raised in review on PR #5658; written down so the next
+ * reader finds the analysis instead of rediscovering it.
+ *
+ * 1. FILE POSITIONS ARE 32-BIT WHERE C `long` IS. skipImpl/availableImpl below use
+ *    ftell/fseek, so a file over 2GiB cannot have its position represented on
+ *    Windows (LLP64: long is 32 bits) even though the Java API is `long`
+ *    throughout. The fix is _ftelli64/_fseeki64 against ftello/fseeko, plus
+ *    widening the local arithmetic -- worth doing, and not a build-enablement
+ *    change.
+ *
+ * 2. PATHS ARE PASSED TO THE NARROW CRT. stringToUTF8 produces UTF-8, and the
+ *    Windows CRT's fopen reads it in the active ANSI code page, so a path holding
+ *    a non-ASCII user or file name fails to open. The same mismatch runs through
+ *    java_io_File.m's stat/access/FindFirstFile calls. cn1_db_sqlite_impl.h around
+ *    line 196 already documents this exact problem and converts UTF-8 to UTF-16
+ *    before calling the wide API; the file layer needs the same treatment applied
+ *    across every entry point, which is its own change rather than a line here.
+ */
+
+/* Keeps a Java object provably live past a safepoint. Only an INTERIOR pointer into
+   an array is used across the blocking calls below, so the optimizer is free to drop
+   the array reference itself -- and the concurrent collector, scanning this parked
+   thread, then sees no root and sweeps the buffer while the read is still filling it.
+   The Linux port solves this with an asm barrier; this file also compiles under
+   clang-cl, which has no __asm__ __volatile__, so it uses a volatile store, which no
+   compiler may elide. The sink is written from several threads and never read: that
+   is the entire point of it, and the races are benign because no value is consumed. */
+static volatile JAVA_OBJECT cn1BlockingIoKeepAlive;
+#define CN1_KEEP_ALIVE_ACROSS_SAFEPOINT(obj) do { cn1BlockingIoKeepAlive = (obj); } while(0)
+
 JAVA_INT java_io_FileInputStream_readImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
     FILE* f = (FILE*)(intptr_t)handle;
     if(f == NULL || buffer == JAVA_NULL) {
         return -2;
     }
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
-    size_t n = fread(&data[offset], 1, (size_t)length, f);
+    size_t n;
+    int atEof;
+    /* A "file" is not always a file: a FIFO, a device or a network-backed path can
+       block here for as long as the other end stays quiet, and with the thread left
+       ACTIVE the collector spins for a safepoint it cannot reach. Same treatment as
+       the socket reads and StandardInputStream. */
+    CN1_YIELD_THREAD;
+    n = fread(&data[offset], 1, (size_t)length, f);
+    atEof = feof(f);            /* before the resume: the resume is a safepoint */
+    CN1_RESUME_THREAD;
+    CN1_KEEP_ALIVE_ACROSS_SAFEPOINT(buffer);
     if(n == 0) {
-        return feof(f) ? -1 : -2;
+        return atEof ? -1 : -2;
     }
     return (JAVA_INT)n;
 }
@@ -1229,7 +1272,14 @@ JAVA_INT java_io_FileOutputStream_writeImpl___long_byte_1ARRAY_int_int_R_int(COD
         return -1;
     }
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
-    return (JAVA_INT)fwrite(&data[offset], 1, (size_t)length, f);
+    size_t written;
+    /* Blocks for the same reasons the read does -- a full pipe, a slow device -- and
+       strands the collector the same way. */
+    CN1_YIELD_THREAD;
+    written = fwrite(&data[offset], 1, (size_t)length, f);
+    CN1_RESUME_THREAD;
+    CN1_KEEP_ALIVE_ACROSS_SAFEPOINT(buffer);
+    return (JAVA_INT)written;
 }
 
 JAVA_INT java_io_FileOutputStream_flushImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
@@ -1247,17 +1297,6 @@ JAVA_INT java_io_FileOutputStream_closeImpl___long_R_int(CODENAME_ONE_THREAD_STA
     }
     return fclose(f) == 0 ? 0 : -1;
 }
-
-/* Keeps a Java object provably live past a safepoint. Only an INTERIOR pointer into
-   an array is used across the blocking calls below, so the optimizer is free to drop
-   the array reference itself -- and the concurrent collector, scanning this parked
-   thread, then sees no root and sweeps the buffer while the read is still filling it.
-   The Linux port solves this with an asm barrier; this file also compiles under
-   clang-cl, which has no __asm__ __volatile__, so it uses a volatile store, which no
-   compiler may elide. The sink is written from several threads and never read: that
-   is the entire point of it, and the races are benign because no value is consumed. */
-static volatile JAVA_OBJECT cn1BlockingIoKeepAlive;
-#define CN1_KEEP_ALIVE_ACROSS_SAFEPOINT(obj) do { cn1BlockingIoKeepAlive = (obj); } while(0)
 
 // Standard input. Separate from FileInputStream because stdin is not seekable, so
 // skip/available cannot be implemented by the ftell dance above.
@@ -2241,18 +2280,21 @@ void cn1RetireVirtualThread(struct cn1VirtualThread* vt) {
         // Frees the allThreads slot and runs collectThreadResources, exactly as an
         // OS thread's death does.
         markDeadThread(state);
-        // Then the state itself, with the same deferral an OS thread's finalizer
-        // uses: if the collector has this TLD queued for drain, its pending
-        // allocations have not been migrated into allObjectsInHeap yet and freeing
-        // now would hand the drain a dangling pointer.
+        // ALWAYS deferred, never freed here, and there is deliberately no
+        // synchronous branch to fall into. collectThreadResources -- which
+        // markDeadThread just called, and which has no early return -- sets
+        // gcQueuedForDrain unconditionally, so the release is the drain's job.
+        //
+        // That is required rather than incidental, and the reason is worth stating
+        // because a synchronous free reads as harmless once the allThreads slot is
+        // cleared: codenameOneGCMark copies each ThreadLocalData* out of allThreads
+        // under the critical section and then dereferences it OUTSIDE the lock, so
+        // a mark already past that copy is still reading this state. The drain runs
+        // at the START of a mark, after the previous one has finished, which is the
+        // one point where no collector iteration can still hold the pointer.
         lockCriticalSection();
-        if(state->gcQueuedForDrain) {
-            state->gcReleaseRequested = JAVA_TRUE;
-            unlockCriticalSection();
-        } else {
-            unlockCriticalSection();
-            cn1ReleaseThreadLocalData(state);
-        }
+        state->gcReleaseRequested = JAVA_TRUE;
+        unlockCriticalSection();
     }
     cn1VirtualThreadFree(vt);
 }

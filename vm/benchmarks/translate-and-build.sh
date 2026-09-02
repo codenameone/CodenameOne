@@ -94,7 +94,16 @@ mkdir -p "$WORK/out"
 #    for generated C (Java wrapping arithmetic; clang -O3 provably miscompiles
 #    without them). ThinLTO (-flto=thin, clang only) is the release shape.
 SRCDIR="$WORK/out/dist/$MAIN-src"
+# The .S as well as the .c. The translator emits the virtual-thread context switch
+# beside the generated sources, and on aarch64/x86_64 the C half references it, so
+# a *.c-only invocation links against a missing cn1VirtualThreadSwitch. The CMake
+# and Xcode project generators had the identical omission; this is the third place
+# that had to learn the same thing. nullglob keeps the argument from expanding to a
+# literal "*.S" on a target where no assembly is emitted.
+shopt -s nullglob
+ASM=("$SRCDIR"/*.S)
+shopt -u nullglob
 $CC -O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf \
-    $CN1_BENCH_CFLAGS $EXTRA -I"$SRCDIR" "$SRCDIR"/*.c -lm -lpthread -o "$OUTBIN" \
+    $CN1_BENCH_CFLAGS $EXTRA -I"$SRCDIR" "$SRCDIR"/*.c "${ASM[@]}" -lm -lpthread -o "$OUTBIN" \
     2> "$WORK/cc.log" || { echo "COMPILE FAILED"; tail -30 "$WORK/cc.log"; exit 1; }
 echo "built $OUTBIN (workdir $WORK)"

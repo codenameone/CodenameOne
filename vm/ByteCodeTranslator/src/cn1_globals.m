@@ -8730,14 +8730,32 @@ static void cn1GcBuildVirtualThreadSnapshot(void) {
     cn1GcVtSnapshotCount = n;
 }
 
-// Mark every PARKED virtual thread's live stack region. The running ones are
-// covered through the thread that is running them, in the scan below.
+// Mark every virtual thread's saved stack region -- the RUNNING ones included, and
+// that redundancy is the point.
+//
+// The obvious version of this skipped anything cn1VirtualThreadIsRunning() reported,
+// on the reasoning that the carrier covers those. The carrier does cover them, but
+// only once its stack pointer is actually INSIDE the virtual stack, and `running` is
+// raised before the switch and lowered after the switch back. In those two windows a
+// stopped carrier still has an OS-stack pointer, so cn1VirtualThreadForStackAddress
+// matches nothing and the carrier pass scans only the OS stack -- while this pass
+// skipped the virtual stack for being "running". Java references living in C
+// temporaries on that stack went unmarked and could be swept. The flag cannot be made
+// atomic with the switch it brackets, because the switch is what changes the very
+// stack the flag would have to be written from.
+//
+// Scanning unconditionally removes the window instead of narrowing it. It is SAFE
+// because [sp, stackHigh) is inside the mapping whenever sp is non-zero, and it is
+// COMPLETE in combination with the carrier pass: while a virtual thread runs, the
+// carrier's pointer is lower than the saved sp, so this pass covers a subset and the
+// carrier covers the rest. Conservative marking is idempotent, so the overlap costs a
+// second walk of a small region and nothing else.
 static void cn1GcScanParkedVirtualThreads(CODENAME_ONE_THREAD_STATE) {
     int i;
     for(i = 0 ; i < cn1GcVtSnapshotCount ; i++) {
         struct cn1VirtualThread* vt = cn1GcVtSnapshot[i];
         void* lo; void* hi;
-        if(vt == 0 || cn1VirtualThreadIsRunning(vt)) {
+        if(vt == 0) {
             continue;
         }
         cn1VirtualThreadStackBounds(vt, &lo, &hi);

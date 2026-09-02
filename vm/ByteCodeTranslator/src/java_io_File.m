@@ -126,7 +126,14 @@ JAVA_OBJECT java_io_File_listImpl___java_lang_String_R_java_lang_String_1ARRAY(C
         return JAVA_NULL;
     }
 
-    JAVA_OBJECT arr = allocArray(threadStateData, [files count], &class__java_lang_String, sizeof(JAVA_OBJECT), 1);
+    /* class_array1__java_lang_String, not class__java_lang_String: allocArray
+       installs whatever class it is given as the ARRAY object's own class, so the
+       element class here made File.list() return something that reported itself as
+       a String rather than a String[] -- wrong for getClass() and for any array
+       type check, and it hands the collector String metadata for an array payload.
+       cn1MainArgs has always used the array class; these three did not. Fixed on
+       all of them, including the two that predate the Windows arm. */
+    JAVA_OBJECT arr = allocArray(threadStateData, [files count], &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
 
     for (int i=0; i<[files count]; i++) {
         NSString* f = [files objectAtIndex:i];
@@ -353,6 +360,8 @@ JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_Str
 #define PATH_MAX MAX_PATH
 #endif
 #define realpath(path, resolved) _fullpath((resolved), (path), MAX_PATH)
+#define CN1_FILE_SEP '\\'
+
 #ifndef F_OK
 #define F_OK 0
 #endif
@@ -373,7 +382,38 @@ JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_Str
 #include <unistd.h>
 #include <dirent.h>
 #define CN1_FILE_ACCESS(p, m) access((p), (m))
+#define CN1_FILE_SEP '/'
 #endif
+
+/*
+ * "Absolute" is not the same question on the two platforms, and getting it wrong
+ * CORRUPTS a path rather than merely misreporting one: the caller prepends the
+ * working directory to anything this rejects, so "C:\\data" came back as
+ * "C:\\cwd\\C:\\data".
+ *
+ * NOTE the matching Java-side gap, deliberately not changed here:
+ * java.io.File.isAbsolute() tests path.startsWith(File.separator) and
+ * File.separator is "/" on every target, so it still answers false for a drive or
+ * UNC path. Fixing that means giving JavaAPI a per-platform separator, which is a
+ * change to shared Java for every port -- out of scope for making the clean target
+ * build. The native above is what stops a wrong answer from producing a wrong
+ * PATH; isAbsolute() returning false is a wrong answer that corrupts nothing.
+ */
+static int cn1FileIsAbsolute(const char* p) {
+    if (p == NULL || p[0] == '\0') {
+        return 0;
+    }
+#ifdef _WIN32
+    /* A UNC path ("\\server\share") and a rooted "\path" both start at a root. */
+    if (p[0] == '/' || p[0] == '\\') {
+        return 1;
+    }
+    /* "C:\x" or "C:/x". A bare "C:x" is drive-RELATIVE, and is not absolute. */
+    return p[1] == ':' && (p[2] == '\\' || p[2] == '/');
+#else
+    return p[0] == '/';
+#endif
+}
 
 // Helper: assumes stringToUTF8 is available (implemented in test stubs or runtime)
 extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
@@ -507,7 +547,7 @@ JAVA_OBJECT java_io_File_listImpl___java_lang_String_R_java_lang_String_1ARRAY(C
         } while (FindNextFileA(h, &fd));
         FindClose(h);
 
-        arr = allocArray(threadStateData, count, &class__java_lang_String, sizeof(JAVA_OBJECT), 1);
+        arr = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
 
         h = FindFirstFileA(pattern, &fd);
         if (h == INVALID_HANDLE_VALUE) {
@@ -544,7 +584,7 @@ JAVA_OBJECT java_io_File_listImpl___java_lang_String_R_java_lang_String_1ARRAY(C
     }
     closedir(d);
 
-    JAVA_OBJECT arr = allocArray(threadStateData, count, &class__java_lang_String, sizeof(JAVA_OBJECT), 1);
+    JAVA_OBJECT arr = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
 
     d = opendir(p);
     count = 0;
@@ -629,12 +669,22 @@ JAVA_LONG java_io_File_getUsableSpaceImpl___java_lang_String_R_long(CODENAME_ONE
 JAVA_OBJECT java_io_File_getAbsolutePathImpl___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_NULL;
     const char* p = stringToUTF8(threadStateData, path);
-    if (p[0] == '/') return path;
-    char buf[PATH_MAX];
-    if (getcwd(buf, sizeof(buf)) != NULL) {
-        strcat(buf, "/");
-        strcat(buf, p);
-        return newStringFromCString(threadStateData, buf);
+    if (cn1FileIsAbsolute(p)) return path;
+    {
+        char buf[PATH_MAX];
+        char joined[PATH_MAX];
+#ifdef _WIN32
+        if (_getcwd(buf, (int)sizeof(buf)) != NULL) {
+#else
+        if (getcwd(buf, sizeof(buf)) != NULL) {
+#endif
+            /* snprintf, not strcat: the original wrote the separator and the whole
+               relative path onto a PATH_MAX buffer already holding the cwd, with no
+               room left to check. */
+            if (snprintf(joined, sizeof(joined), "%s%c%s", buf, CN1_FILE_SEP, p) < (int)sizeof(joined)) {
+                return newStringFromCString(threadStateData, joined);
+            }
+        }
     }
     return path;
 }
