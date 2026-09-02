@@ -505,9 +505,13 @@ def javadoc_path_exists(target: str) -> bool:
         # package. Anything else names a directory the generator never creates --
         # accepting every non-.html path let /javadoc/com/codename1/DefinitelyMissing/
         # through on the strength of having no file extension.
-        if not path:
-            return True
-        return path in packages
+        # Only the tree root. A package directory has no index.html -- javadoc
+        # writes package-summary.html and package-tree.html and nothing else --
+        # so /javadoc/com/codename1/ui/ is a 404 even though the package is real.
+        # The root does have one, and build.sh moves it aside to render a Hugo
+        # page in its place. The guide links to the root five times and to no
+        # package directory at all; a link to a package should name the summary.
+        return not path
     package = str(PurePosixPath(path).parent)
     page = PurePosixPath(path).name
     if package == ".":
