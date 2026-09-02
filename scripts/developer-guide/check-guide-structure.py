@@ -393,6 +393,24 @@ def main() -> int:
     # A chapter included twice by the manifest is rendered twice. The title check
     # below cannot see it, because it only asks whether a title appears AT LEAST
     # as often as it is declared.
+    # A chapter reached from the manifest AND from some nested document renders
+    # twice, but each (parent, target) pair counts one, so the duplicate rule sees
+    # nothing and the title check only asks for "at least once". Cross-parent reuse
+    # stays legitimate for a FRAGMENT; a direct chapter is a different thing --
+    # it already has its place in the book.
+    for target in sorted(walker.direct, key=lambda path: path.name):
+        others = sorted(
+            parent.name
+            for (parent, other) in walker.include_edges
+            if other == target and parent != walker.root
+        )
+        if others:
+            errors.append(
+                f"{target.name}: is a chapter in the manifest and is also included by "
+                f"{', '.join(others)}, so the book renders it twice. Include it in one "
+                f"place."
+            )
+
     for (parent, target), count in sorted(
         walker.include_edges.items(), key=lambda item: (item[0][0].name, item[0][1].name)
     ):

@@ -770,8 +770,17 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
             normalized = normalize_path(path)
             if not resolves(normalized, known, patterns):
                 out.append((target, "the website serves no such path (checked _redirects and the content tree)"))
-        for url in URL_RE.findall(line):
-            url = url.rstrip(".,;:")
+        for match in URL_RE.finditer(line):
+            url = match.group(0)
+            # Trailing punctuation is sentence punctuation after a BARE url, and
+            # part of the path inside an explicit macro, where the "[" delimits the
+            # target: link:https://host/download.[label] really does request
+            # "/download.". Trimming unconditionally validated a different route.
+            explicit = line[: match.start()].rstrip().endswith("link:") or line[
+                match.end() : match.end() + 1
+            ] == "["
+            if not explicit:
+                url = url.rstrip(".,;:")
             split = urlsplit(url)
             # urlsplit lowercases the host but keeps the root label's trailing dot,
             # so the fully qualified spelling "www.codenameone.com." misses
