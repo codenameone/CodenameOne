@@ -179,7 +179,7 @@ def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
     return False
 
 
-def site_paths(repo_root: Path) -> tuple[set[str], list]:
+def site_paths(repo_root: Path) -> tuple[set[str], list, set[str]]:
     """Every path the website is known to answer on, derived rather than listed.
 
     Returns the literal paths and every redirect rule, each as a matcher, its
@@ -188,6 +188,10 @@ def site_paths(repo_root: Path) -> tuple[set[str], list]:
     """
     paths: set[str] = set()
     patterns: list = []
+    # The sources exactly as written. Every rule is compiled slash-insensitively
+    # ("^...$/?"), which is right for matching but loses the distinction the site
+    # actually draws, so the trailing-slash rule needs the raw spelling.
+    declared: set[str] = set()
 
     redirects = repo_root / "docs/website/static/_redirects"
     if redirects.exists():
@@ -196,6 +200,7 @@ def site_paths(repo_root: Path) -> tuple[set[str], list]:
             if not parts or parts[0].startswith("#"):
                 continue
             destination = parts[1] if len(parts) > 1 else ""
+            declared.add(parts[0])
             compiled = redirect_pattern(parts[0])
             if compiled is not None:
                 patterns.append((compiled[0], compiled[1], destination))
@@ -235,6 +240,28 @@ def site_paths(repo_root: Path) -> tuple[set[str], list]:
             if relative.parts[0] == "sketch" or relative.suffix in {".asciidoc", ".adoc"}:
                 continue
             paths.add(normalize_path("developer-guide/" + relative.as_posix()))
+
+    # This derives a Hugo route as "section path + slug", which is true only while
+    # the site leaves routing alone. A [permalinks] rule or uglyURLs would rewrite
+    # every route underneath and this would keep accepting links to paths Hugo no
+    # longer publishes -- accepting a dead link is exactly the failure this script
+    # exists to prevent. hugo.toml declares neither today, so rather than model a
+    # configuration that is not there, notice when it appears.
+    hugo_config = repo_root / "docs/website/hugo.toml"
+    if hugo_config.exists():
+        config = hugo_config.read_text(encoding="utf-8", errors="ignore")
+        overrides = [
+            name
+            for name, probe in (("[permalinks]", r"^\s*\[permalinks\]"), ("uglyURLs", r"^\s*uglyURLs\s*="))
+            if re.search(probe, config, re.M)
+        ]
+        if overrides:
+            raise SystemExit(
+                f"hugo.toml now sets {', '.join(overrides)}, which rewrites the routes "
+                f"this script derives from the content tree. Derive them from the built "
+                f"docs/website/public tree instead, or teach this function the rule -- "
+                f"until then every link it accepts is unverified."
+            )
 
     today = datetime.date.today().isoformat()
     content = repo_root / "docs/website/content"
@@ -279,10 +306,24 @@ def site_paths(repo_root: Path) -> tuple[set[str], list]:
             if asset.name == "index.html":
                 paths.add(normalize_path(asset.parent.relative_to(static).as_posix()))
 
-    return paths, patterns
+    return paths, patterns, declared
 
 
-def findings_for(path: Path, known: set[str], patterns: list) -> list[tuple[str, str]]:
+def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]) -> list[tuple[str, str]]:
+    # Only http:// and https:// are extracted. Protocol-relative links were raised
+    # as a gap; measured, the guide contains no `link://` macro at all, and its one
+    # bare `//host/path` is a JavaScript string inside a source block, so widening
+    # URL_RE to match `//` would start reporting code as a broken link. The scheme
+    # requirement is what keeps this off code.
+    #
+    # Fragments are checked only against this book's own routes. On an ordinary
+    # same-site page the anchors live in Hugo's rendered output, which this does
+    # not build, so a fragment there cannot be resolved from the repository.
+    # Measured: of the 42 same-site URLs carrying a fragment, 38 are /javadoc/ --
+    # generated at build time and exempt for the same reason -- and the other four
+    # pointed into this book and are now xrefs, which check-guide-xrefs.py resolves
+    # against the rendered anchors. That leaves nothing this could check today.
+    #
     # Every URL in the source is checked, including any inside an AsciiDoc `//`
     # line comment or `////` block. That is deliberate. Across the guide's 120
     # files there is not one commented-out URL and not one `////` block, so
@@ -306,15 +347,22 @@ def findings_for(path: Path, known: set[str], patterns: list) -> list[tuple[str,
                 target = split.path.rstrip("/") or "/"
                 if split.fragment and target in SELF_PATHS:
                     out.append((url, "links into this book's own body; use an xref so the anchor is checked"))
-                elif split.path.endswith("/") and "." in split.path.rstrip("/").rsplit("/", 1)[-1]:
+                elif (
+                    split.path.endswith("/")
+                    and "." in split.path.rstrip("/").rsplit("/", 1)[-1]
+                    and split.path not in declared
+                ):
                     # The site treats "/x.html" and "/x.html/" as separate routes and
-                    # declares both explicitly where both work -- 32 such pairs in
-                    # _redirects. Normalising the slash away below would validate the
-                    # variant that was not asked for, so a file path wearing a trailing
-                    # slash is reported rather than quietly rewritten. Directory routes
-                    # (/blog/, /javadoc/com/codename1/io/) have no dot in the last
-                    # segment and are untouched.
-                    out.append((url, "a file path with a trailing slash; the site serves that as a separate route"))
+                    # spells both out where both work -- 32 such pairs in _redirects.
+                    # Every rule here compiles slash-insensitively, so the normalised
+                    # lookup below would silently validate the variant that was NOT
+                    # asked for. Hence: a file path wearing a trailing slash is
+                    # reported, UNLESS _redirects declares that exact spelling, which
+                    # is the site saying it serves it -- "/videos.html/" is declared
+                    # and must not be reported. Directory routes such as /blog/ and
+                    # /javadoc/com/codename1/io/ have no dot in the last segment and
+                    # never reach this branch.
+                    out.append((url, "a file path with a trailing slash that _redirects does not declare"))
                 elif not resolves(target, known, patterns):
                     out.append((url, "the website serves no such path (checked _redirects and the content tree)"))
     return out
@@ -353,7 +401,7 @@ def main() -> int:
     args = parser.parse_args()
 
     guide_dir = args.guide_dir.resolve()
-    known, patterns = site_paths(args.repo_root.resolve())
+    known, patterns, declared = site_paths(args.repo_root.resolve())
     if not known:
         raise SystemExit("could not derive any site paths; is --repo-root correct?")
 
@@ -363,7 +411,7 @@ def main() -> int:
         if path.suffix not in ASCIIDOC_EXTENSIONS or not path.is_file():
             continue
         name = path.relative_to(guide_dir).as_posix()
-        for url, reason in findings_for(path, known, patterns):
+        for url, reason in findings_for(path, known, patterns, declared):
             entry = f"{name}\t{url}"
             current[entry] += 1
             reasons[entry] = reason
