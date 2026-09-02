@@ -102,7 +102,15 @@ class Walker:
         # reused from two parents on purpose, and a file included under
         # mutually exclusive ifdef/ifndef branches appears twice in the source
         # while rendering once -- neither is a duplicated chapter.
-        self.direct_include_count: collections.Counter = collections.Counter()
+        # Keyed by (parent, target) rather than by target alone. A fragment reused
+        # from two different parents is deliberate -- that is what a fragment is
+        # for -- but the SAME parent including the SAME file twice renders it
+        # twice, at the root or nested. Keying only by target missed the nested
+        # case entirely, and _visit() returns early on a revisit, so the second
+        # edge left no trace at all: the outcome check then saw one declaration
+        # and two rendered titles and passed, because it only asks whether a
+        # title appears AT LEAST as often as it is declared.
+        self.include_edges: collections.Counter = collections.Counter()
         self.errors: list[str] = []
         self._visit(root, "")
 
@@ -161,7 +169,11 @@ class Walker:
                         f"which branches are mutually exclusive before adding one."
                     )
                 else:
-                    self.direct_include_count[target] += 1
+                    self.include_edges[(path, target)] += 1
+            if path != self.root and not self._inside_conditional(lines, index):
+                # A conditional edge is excluded for the same reason as at the
+                # root: two mutually exclusive branches are one rendering.
+                self.include_edges[(path, target)] += 1
             self._visit(target, attrs)
 
     @staticmethod
@@ -321,11 +333,13 @@ def main() -> int:
     # A chapter included twice by the manifest is rendered twice. The title check
     # below cannot see it, because it only asks whether a title appears AT LEAST
     # as often as it is declared.
-    for path, count in sorted(walker.direct_include_count.items()):
+    for (parent, target), count in sorted(
+        walker.include_edges.items(), key=lambda item: (item[0][0].name, item[0][1].name)
+    ):
         if count > 1:
             errors.append(
-                f"{path.name}: is included {count} times, so the book renders it "
-                f"{count} times. Remove the duplicate include."
+                f"{parent.name}: includes {target.name} {count} times, so the book "
+                f"renders it {count} times. Remove the duplicate include."
             )
 
     # 1. Every chapter in the tree is either in the book or declared out of it.
