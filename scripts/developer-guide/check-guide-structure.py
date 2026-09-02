@@ -75,7 +75,11 @@ class Walker:
         self.direct: set[Path] = set()
         # Counted at the EDGE, not per visited file: _visit returns early on a
         # revisit, so a document included twice would otherwise leave no trace.
-        self.include_count: collections.Counter = collections.Counter()
+        # Only direct manifest entries are counted. A nested fragment may be
+        # reused from two parents on purpose, and a file included under
+        # mutually exclusive ifdef/ifndef branches appears twice in the source
+        # while rendering once -- neither is a duplicated chapter.
+        self.direct_include_count: collections.Counter = collections.Counter()
         self.errors: list[str] = []
         self._visit(root, "")
 
@@ -103,11 +107,27 @@ class Walker:
                     f"{path.name}:{index + 1}: include target does not exist: {target_raw}"
                 )
                 continue
-            self.include_count[target] += 1
-            if path == self.root:
+            if path == self.root and not self._inside_conditional(lines, index):
+                self.direct_include_count[target] += 1
                 self.direct.add(target)
                 self._check_manifest_spacing(index, lines, target_raw)
             self._visit(target, attrs)
+
+    @staticmethod
+    def _inside_conditional(lines: list[str], index: int) -> bool:
+        """Whether this line sits inside an ifdef/ifndef/ifeval region.
+
+        A chapter included once per branch of a conditional appears twice in the
+        source and once in the output, so counting it as a duplicate would reject
+        valid markup.
+        """
+        depth = 0
+        for line in lines[:index]:
+            if re.match(r"^(ifdef|ifndef|ifeval)::.*\[\s*\]\s*$", line):
+                depth += 1
+            elif re.match(r"^endif::", line):
+                depth = max(0, depth - 1)
+        return depth > 0
 
     def _check_manifest_spacing(self, index: int, lines: list[str], target_raw: str) -> None:
         """Require a blank line after every include in the top-level manifest.
@@ -166,10 +186,10 @@ def main() -> int:
     walker = Walker(root, guide_dir)
     errors = list(walker.errors)
 
-    # A document included twice is rendered twice. The title check below cannot
-    # see it, because it only asks whether a title appears AT LEAST as often as
-    # it is declared.
-    for path, count in sorted(walker.include_count.items()):
+    # A chapter included twice by the manifest is rendered twice. The title check
+    # below cannot see it, because it only asks whether a title appears AT LEAST
+    # as often as it is declared.
+    for path, count in sorted(walker.direct_include_count.items()):
         if count > 1:
             errors.append(
                 f"{path.name}: is included {count} times, so the book renders it "
