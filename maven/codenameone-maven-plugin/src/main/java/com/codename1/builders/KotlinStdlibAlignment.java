@@ -220,6 +220,24 @@ public class KotlinStdlibAlignment {
         // written that would not conflict, so nothing is.
         String[] active = activeLines(combined(appGradleFragments));
         for (int i = 0; i < active.length; i++) {
+            // A component-selection rule rejects CANDIDATES, outside any
+            // declaration, so the rejection reading that lives on a declaration
+            // never saw it: `componentSelection { all { if (it.candidate.module
+            // == 'kotlin-stdlib-jdk8' && it.candidate.version == '1.8.0')
+            // it.reject('..') } }` removes the very version this writes, and the
+            // constraint then has nothing to resolve to.
+            //
+            // Any rejecting rule that mentions this family at all stands the block
+            // down. Which candidates a closure will reject cannot be read here,
+            // and being wrong the other way emits a requirement into a graph that
+            // has excluded it.
+            if (callsNamed(active[i], "componentSelection")
+                    && callsNamed(active[i], "reject")
+                    && (namesOneOfTheFamily(active[i])
+                            || holdsLiteral(active[i], KOTLIN_GROUP))
+                    && governsTheConstrainedGraph(active[i], config)) {
+                return "";
+            }
             // An ENFORCED platform is the one case a Kotlin BOM stands this down.
             // A plain `platform()` does not, and the class comment says why it was
             // measured not to: a BOM's constraints are ordinary, so the higher
@@ -3411,6 +3429,7 @@ public class KotlinStdlibAlignment {
         boolean declared = false;
         boolean subscript = false;
         boolean callForm = false;
+        boolean typed = false;
         // An extra property is NOT block scoped. A local declared inside a block
         // leaves with it, which is why declarations carry their depth -- but
         // `buildscript { ext.kotlin_version = '1.9.22' }` sets a project-wide
@@ -3521,6 +3540,7 @@ public class KotlinStdlibAlignment {
             }
             if (tokens > 1 && !followedByMapKeyColon(statement, lastTokenEnd)) {
                 declared = true;
+                typed = true;
                 i = lastTokenStart;
             } else if (tokens == 1) {
                 // ext.kotlinVersion = '1.9.22' -- Gradle's extra properties, which is
@@ -3630,13 +3650,20 @@ public class KotlinStdlibAlignment {
             i++;
         } else if (i >= statement.length() || statement.charAt(i) != '='
                 || (i + 1 < statement.length() && statement.charAt(i + 1) == '=')) {
-            if (declared) {
+            if (declared && !typed) {
                 // `def dep` with no value yet is still a name this knows about, and
                 // recording it is what lets a later assignment be recognised as one.
                 // Without it, `def dep` then `if (legacy) { dep = '...' }` left the
                 // assignment looking like a write to something unrelated, so the
                 // coordinate it carried was never learned. A null value inlines as
                 // the name itself, which is what an unset variable should look like.
+                //
+                // Only where a KEYWORD said it was a declaration. Two identifiers in
+                // a row are as often a parenthesis-free call as a typed local, and
+                // `println dep` was clearing the very binding it was printing -- so
+                // the pin that name carried was gone by the time anything used it.
+                // A genuinely valueless `String dep` records nothing now, which
+                // leaves the name unknown rather than wrong.
                 literals.put(name, null);
             }
             return;

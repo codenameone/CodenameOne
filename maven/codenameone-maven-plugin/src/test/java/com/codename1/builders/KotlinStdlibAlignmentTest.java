@@ -816,6 +816,79 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Two identifiers in a row are as often a parenthesis-free call as a typed
+     * local. Read as a declaration, {@code println dep} cleared the very binding
+     * it was printing, so the pin that name carried was gone by the time
+     * anything used it.
+     */
+    @Test
+    public void aCommandCallDoesNotClearItsArgument() {
+        String coord = "org.jetbrains.kotlin:kotlin-stdlib:1.7.22";
+        String use = "    implementation(dep) { version { strictly '1.7.22' } }\n";
+        String[] kept = {
+            "    def dep = '" + coord + "'\n    println dep\n",
+            "    def dep = '" + coord + "'\n    logger dep\n",
+            "    def dep = '" + coord + "'\n",
+            // A real typed declaration WITH a value still binds.
+            "    String dep = '" + coord + "'\n",
+        };
+        for (int i = 0; i < kept.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    kept[i] + use);
+            check("".equals(out), "<<" + kept[i].trim() + ">> keeps dep bound, got <<"
+                    + out + ">>");
+        }
+
+        // And `def` with no value is still a name this knows about, which is what
+        // lets the assignment below it be recognised as one.
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def dep\n    if (legacy) { dep = '" + coord + "' }\n"
+                        + use)),
+                "a valueless def still introduces the name");
+    }
+
+    /**
+     * A component-selection rule rejects CANDIDATES, outside any declaration, so
+     * the rejection reading that lives on a declaration never saw it. Such a rule
+     * can remove the very version this writes, and the constraint then has
+     * nothing to resolve to.
+     */
+    @Test
+    public void aComponentSelectionRuleMayRejectTheFloor() {
+        String[] rejecting = {
+            "    configurations.all { resolutionStrategy.componentSelection { all { "
+                    + "if (it.candidate.module == 'kotlin-stdlib-jdk8' && "
+                    + "it.candidate.version == '1.8.0') it.reject('unsupported') } } }\n",
+            "    configurations.all { resolutionStrategy.componentSelection { all { "
+                    + "if (it.candidate.group == 'org.jetbrains.kotlin') "
+                    + "it.reject('unsupported') } } }\n",
+        };
+        for (int i = 0; i < rejecting.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    rejecting[i]);
+            check("".equals(out), "a rule that may reject the floor stands the block "
+                    + "down, got <<" + out + ">>");
+        }
+
+        // A rule that rejects nothing, one that does not mention this family, and
+        // one on a configuration the constraint never reaches all leave it alone.
+        String[] harmless = {
+            "    configurations.all { resolutionStrategy.componentSelection { all { "
+                    + "logger.info(it.candidate.module) } } }\n",
+            "    configurations.all { resolutionStrategy.componentSelection { all { "
+                    + "if (it.candidate.module == 'okhttp') it.reject('x') } } }\n",
+            "    configurations.create('tooling').resolutionStrategy"
+                    + ".componentSelection { all { if (it.candidate.group == "
+                    + "'org.jetbrains.kotlin') it.reject('x') } }\n",
+        };
+        for (int i = 0; i < harmless.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation", harmless[i])
+                            .contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + harmless[i].trim() + ">> rejects nothing this writes");
+        }
+    }
+
+    /**
      * A value that is a NAME rather than a literal copies a binding that is
      * already known. Reading only literals recorded the new name as unknown, so
      * a force through it named nothing and the constraints went in beside a pin

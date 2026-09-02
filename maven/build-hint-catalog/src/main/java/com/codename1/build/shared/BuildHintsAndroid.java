@@ -654,12 +654,13 @@ final class BuildHintsAndroid {
                         + "lowers a version. Set to false only to manage those coordinates yourself. "
                         + "Declaring `kotlin-stdlib-jdk7` or `kotlin-stdlib-jdk8` at 1.8.0 or newer in "
                         + "your own Gradle build hints switches it off for that artifact, because your "
-                        + "version already satisfies the floor. Declaring an OLDER one does not: an "
+                        + "version already satisfies the floor. Declaring an older one doesn\'t: an "
                         + "ordinary Gradle version is a soft requirement, so the constraint raises it "
                         + "to the empty shim rather than leaving the duplicate in place. To hold one "
-                        + "below 1.8.0 on purpose, pin it strictly -- `1.7.22!!`, `version { strictly "
-                        + "\'1.7.22\' }` -- or force it, which switches the whole block off. A Kotlin "
-                        + "BOM has no such effect unless it is enforced, and needs none: a "
+                        + "below 1.8.0 on purpose, give it a strict version -- `1.7.22!!` or "
+                        + "`version { strictly \'1.7.22\' }` -- or force it, which switches the whole "
+                        + "block off. A Kotlin BOM has no such effect unless it\'s enforced, and "
+                        + "needs none: a "
                         + "BOM contributes ordinary constraints rather than strict ones, so a newer "
                         + "BOM simply wins over this floor while an older BOM still needs it."));
 
