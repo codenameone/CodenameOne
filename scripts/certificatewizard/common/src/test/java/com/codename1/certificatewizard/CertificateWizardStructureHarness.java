@@ -247,6 +247,17 @@ public final class CertificateWizardStructureHarness {
         fire(form, "pick.type.mac_app_development");
         check(find(form, "pick.cert.3") == null, "a Mac App Store certificate is not a Mac development one");
         check(find(form, "btn.profileNeedsCert") != null, "the missing certificate is called out");
+        // And the certificate chosen under the previous type went with it. With a bundle
+        // picked, the certificate is the ONLY thing still missing -- so if one left behind
+        // by the type change were still in the request, canCreateProfile would see a
+        // non-empty list of certificate IDs and enable Create with no certificate row
+        // selected, sending Apple one that cannot sign this profile type.
+        fire(form, "pick.bundle.BID_MAC");
+        check(selectedChoice(form, "pick.bundle.BID_MAC"), "the Mac bundle ID is selectable here");
+        check(!enabled(form, "modal.profile.submit"),
+                "no certificate can sign this type, so create stays disabled");
+        check(requirementText(form).contains("certificate"),
+                "and the missing certificate is what it asks for: " + requirementText(form));
         check(find(form, "pick.device.DEV_1") == null, "an iPhone is not offered for a Mac profile");
         // and says so, rather than the section simply not being drawn -- which is the reading
         // that would make the check above pass for the wrong reason

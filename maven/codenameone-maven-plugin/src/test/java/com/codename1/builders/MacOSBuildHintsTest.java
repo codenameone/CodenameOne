@@ -71,6 +71,15 @@ public class MacOSBuildHintsTest {
         raw.put("macos.entitlements.apsEnvironment", "   ");
         assertFalse(parse(raw, "com.example").entitlementsFor("developerID").push(false));
         assertTrue(parse(raw, "com.example").entitlementsFor("developerID").push(true));
+
+        // And it does not shadow the migrated spelling on the way. A modern key left blank
+        // counted as present, so the macNative value that actually said something was never
+        // read -- a project still using its legacy hint lost the entitlement it asks for.
+        raw.put("macNative.entitlements.apsEnvironment", "production");
+        MacOSBuildHints.EntitlementOverrides legacy =
+                parse(raw, "com.example").entitlementsFor("developerID");
+        assertTrue("a blank modern key must not shadow the migrated one", legacy.push(false));
+        assertEquals("production", legacy.getApsEnvironment());
     }
 
     private static MacOSBuildHints parse(final Map<String, String> raw, String pkg) {

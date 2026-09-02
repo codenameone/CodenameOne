@@ -1326,6 +1326,12 @@ public class CertificateWizard extends Lifecycle {
             // holds one certificate this profile could be signed with, picking it is not a
             // decision -- it is the answer, and leaving it blank only disables Create until
             // the user finds the single row and clicks it (issue #5654).
+            //
+            // This fills an EMPTY selection and never replaces one, which is all it has to
+            // do: the only thing that changes which certificates are usable is the profile
+            // type, and its listener clears the selection before asking for this rebuild.
+            // A stale certificate therefore cannot reach canCreateProfile -- the dead-end
+            // stage of the structure harness is what keeps that true.
             if (certificateId[0] == null) {
                 SigningState.Certificate only = soleCertificate(usable);
                 if (only != null) {
