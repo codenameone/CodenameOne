@@ -734,6 +734,100 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A resolution rule may compare one part of the coordinate only -- the name
+     * is unambiguous on its own -- and it is in force either way. Requiring the
+     * group beside it left the override unread, so the shims were raised to
+     * their empty 1.8.0 jars around a base library the rule held at 1.7.22:
+     * a build that links and then throws on the device.
+     */
+    @Test
+    public void aResolutionRuleMayNameTheArtifactAlone() {
+        String[] artifacts = {
+            "kotlin-stdlib", "kotlin-stdlib-jdk7", "kotlin-stdlib-jdk8",
+        };
+        for (int i = 0; i < artifacts.length; i++) {
+            // Every spelling of the same override reaches the same verdict. The two
+            // predicates that identify an artifact had diverged, so a force naming
+            // a shim by coordinate stood the block down while a useVersion holding
+            // the SAME shim at the same version did not.
+            String[] overrides = {
+                "    configurations.all { resolutionStrategy.eachDependency { d ->\n"
+                        + "        if (d.requested.name == '" + artifacts[i] + "') "
+                        + "d.useVersion '1.7.22'\n    } }\n",
+                "    configurations.all { resolutionStrategy.eachDependency { d ->\n"
+                        + "        if (d.requested.group == 'org.jetbrains.kotlin' && "
+                        + "d.requested.name == '" + artifacts[i] + "') "
+                        + "d.useVersion '1.7.22'\n    } }\n",
+                "    configurations.all { resolutionStrategy.force "
+                        + "'org.jetbrains.kotlin:" + artifacts[i] + ":1.7.22' }\n",
+            };
+            for (int j = 0; j < overrides.length; j++) {
+                check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                                "implementation", overrides[j])),
+                        "<<" + overrides[j].trim() + ">> is an override in force");
+            }
+        }
+
+        // A fork under another group shares the name and is a different module.
+        String fork = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation(group: 'com.example', "
+                + "name: 'kotlin-stdlib-jdk8', version: '1.0')\n");
+        check(fork.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "another group's artifact is not the shim, got <<" + fork + ">>");
+
+        // A name in a reason is not a reference to anything, and an unrelated
+        // rule binds nothing.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation('com.example:x:1.0') "
+                        + "{ because 'replaces kotlin-stdlib' }\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a name in a reason is prose");
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    configurations.all { resolutionStrategy.eachDependency "
+                        + "{ d ->\n        if (d.requested.name == 'okhttp') "
+                        + "d.useVersion '3.0.0'\n    } }\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "an unrelated rule binds nothing");
+    }
+
+    /**
+     * A platform takes a dependency notation, and a map is one. There is no
+     * literal following the call in that spelling, so an enforced pre-merge BOM
+     * written as a map read as absent entirely.
+     */
+    @Test
+    public void anEnforcedPlatformMayBeWrittenAsAMap() {
+        String[] managing = {
+            "    implementation(enforcedPlatform(group: 'org.jetbrains.kotlin', "
+                    + "name: 'kotlin-bom', version: '1.7.22'))\n",
+            "    implementation(enforcedPlatform(version: '1.7.22', "
+                    + "group: 'org.jetbrains.kotlin', name: 'kotlin-bom'))\n",
+            "    implementation(enforcedPlatform(group: 'org.jetbrains.kotlin', "
+                    + "name: 'kotlin-bom'))\n",
+        };
+        for (int i = 0; i < managing.length; i++) {
+            check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                            "implementation", managing[i])),
+                    "<<" + managing[i].trim() + ">> manages the family");
+        }
+
+        String[] harmless = {
+            "    implementation(enforcedPlatform(group: 'org.jetbrains.kotlin', "
+                    + "name: 'kotlin-bom', version: '1.9.22'))\n",
+            "    implementation(enforcedPlatform(group: 'com.squareup.okhttp3', "
+                    + "name: 'okhttp-bom', version: '3.0.0'))\n",
+            // A plain platform is not strict in either spelling.
+            "    implementation(platform(group: 'org.jetbrains.kotlin', "
+                    + "name: 'kotlin-bom', version: '1.7.22'))\n",
+        };
+        for (int i = 0; i < harmless.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation", harmless[i])
+                            .contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + harmless[i].trim() + ">> leaves the alignment alone");
+        }
+    }
+
+    /**
      * An ENFORCED Kotlin platform is the one case a BOM stands the block down.
      * The class comment records why a plain {@code platform()} does not -- its
      * constraints are ordinary, so the higher version wins and these are

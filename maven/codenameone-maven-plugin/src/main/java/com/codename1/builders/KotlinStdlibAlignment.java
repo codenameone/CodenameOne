@@ -330,7 +330,36 @@ public class KotlinStdlibAlignment {
         return namesCoordinate(line, artifact)
                 || (declaresMapEntry(line, "group", KOTLIN_GROUP)
                 && declaresMapEntry(line, "name", artifact))
-                || (holdsLiteral(line, KOTLIN_GROUP) && holdsLiteral(line, artifact));
+                // The bare artifact name is enough, without the group beside it. A
+                // rule may compare one part only -- `if (d.requested.name ==
+                // 'kotlin-stdlib') d.useVersion '1.7.22'` -- and it is in force
+                // either way; requiring both left that override unread, so the
+                // shims were raised to 1.8.0 around a base library the rule held at
+                // 1.7.22. That build links and then fails at runtime, when the jdk
+                // classes are in neither jar.
+                //
+                // Not when the statement declares some OTHER group, though: a fork
+                // published as com.example:kotlin-stdlib-jdk8 is a different module
+                // that happens to share a name, and reading it as the shim stood the
+                // whole block down for a pre-merge version of somebody else's jar.
+                //
+                // Otherwise safe, because these three names are the whole question:
+                // nothing else publishes kotlin-stdlib or its jdk shims, and the
+                // literal has to BE the name, so a coordinate that merely contains
+                // it does not match.
+                //
+                // A rule that compares the group to something else instead of
+                // declaring it -- d.requested.group == 'com.example' -- is not
+                // caught, and is left uncaught: telling a group literal from a
+                // version or a classifier by shape is the kind of guess this class
+                // keeps having to correct, and being wrong here only suppresses.
+                || (holdsLiteral(line, artifact) && !namesAnotherGroup(line));
+    }
+
+    /** Whether the statement declares a group entry that is not Kotlin's. */
+    private static boolean namesAnotherGroup(String line) {
+        String group = mapEntryValue(line, "group");
+        return group != null && !KOTLIN_GROUP.equals(group);
     }
 
     /**
@@ -1050,16 +1079,29 @@ public class KotlinStdlibAlignment {
                 // No version at all, so nothing says it reaches the floor.
                 return true;
             }
-            String declared = versionComponentOf(coordinate.substring(version + 1));
-            if (declared.endsWith(STRICT_SUFFIX)) {
-                declared = declared.substring(0,
-                        declared.length() - STRICT_SUFFIX.length());
-            }
-            if (belowTheFloor(declared)) {
+            if (belowTheFloor(withoutStrictSuffix(
+                    versionComponentOf(coordinate.substring(version + 1))))) {
                 return true;
             }
         }
+        // A platform takes a dependency notation, and a map is one:
+        // enforcedPlatform(group: '..', name: 'kotlin-bom', version: '1.7.22').
+        // There is no literal following the call at all in that spelling, so the
+        // scan above found nothing and the enforced pre-merge BOM read as absent.
+        // The same two entries the map form of a declaration is read by.
+        if (callsNamed(line, ENFORCED_PLATFORM)
+                && declaresMapEntry(line, "group", KOTLIN_GROUP)) {
+            return belowTheFloor(withoutStrictSuffix(mapEntryValue(line, "version")));
+        }
         return false;
+    }
+
+    /** A version without the {@code !!} that makes it strict, if it carries one. */
+    private static String withoutStrictSuffix(String version) {
+        if (version != null && version.endsWith(STRICT_SUFFIX)) {
+            return version.substring(0, version.length() - STRICT_SUFFIX.length());
+        }
+        return version;
     }
 
     /** The platform spelling whose managed versions become strict. */
@@ -1423,12 +1465,15 @@ public class KotlinStdlibAlignment {
             // same reason it does in belowTheFloor.
             return false;
         }
-        if (namesCoordinate(line, artifact)) {
-            return true;
-        }
-        // group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8', version: '...'
-        return declaresMapEntry(line, "group", KOTLIN_GROUP)
-                && declaresMapEntry(line, "name", artifact);
+        // The same three spellings namesArtifactAnywhere reads, because there were
+        // two lists and they diverged: this one knew the coordinate and the
+        // group/name map, and not the bare name a resolution rule compares. So a
+        // `force` naming a shim by coordinate stood the block down while a
+        // `useVersion` holding the SAME shim at the same version did not -- and the
+        // constraints went in beside a rule that keeps jdk8 pre-merge, raising jdk7
+        // to its empty 1.8.0 shim around it. The base library had a scan of its own
+        // and was never exposed to this, which is why it read as correct.
+        return namesArtifactAnywhere(line, artifact);
     }
 
     /**
