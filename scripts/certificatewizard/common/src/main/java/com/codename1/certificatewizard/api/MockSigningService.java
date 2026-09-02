@@ -39,6 +39,7 @@ public final class MockSigningService implements SigningService {
     private final List<SigningState.ApnsKey> apns = new ArrayList<SigningState.ApnsKey>();
     private final List<SigningState.AppGroup> appGroups = new ArrayList<SigningState.AppGroup>();
     private final Map<String, List<String>> appGroupAssociations = new LinkedHashMap<String, List<String>>();
+    private final List<String> pushEnabledOn = new ArrayList<String>();
     private long seq = 100;
 
     public MockSigningService() {
@@ -140,6 +141,24 @@ public final class MockSigningService implements SigningService {
         appGroupAssociations.put(bundleIdAppleId,
                 appGroupIds == null ? new ArrayList<String>() : new ArrayList<String>(appGroupIds));
         callback.completed(Result.ok(null));
+    }
+
+    public void enablePushCapability(String bundleIdAppleId, OnComplete<Result<Void>> callback) {
+        pushEnabledOn.add(bundleIdAppleId);
+        for (int i = 0; i < bundles.size(); i++) {
+            SigningState.BundleId b = bundles.get(i);
+            if (b.id() != null && b.id().equals(bundleIdAppleId)) {
+                bundles.set(i, new SigningState.BundleId(b.id(), b.identifier(), b.name(), b.platform(),
+                        Boolean.TRUE));
+            }
+        }
+        callback.completed(Result.ok(null));
+    }
+
+    /// The App IDs push has been asserted on, so a test can tell "the wizard asked" from
+    /// "the App ID happened to have it already".
+    public List<String> pushEnabledOn() {
+        return new ArrayList<String>(pushEnabledOn);
     }
 
     public List<String> appGroupAssociation(String bundleIdAppleId) {

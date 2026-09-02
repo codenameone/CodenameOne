@@ -246,6 +246,11 @@ public final class CloudSigningService implements SigningService {
                 bearerToken, r -> done(r, callback));
     }
 
+    public void enablePushCapability(String bundleIdAppleId, OnComplete<Result<Void>> callback) {
+        bundleIdsApi.enableCapability(bundleIdAppleId, new CapabilityRequest("PUSH_NOTIFICATIONS", null),
+                bearerToken, r -> done(r, callback));
+    }
+
     public void registerDevice(String name, String udid, OnComplete<Result<Void>> callback) {
         devicesApi.registerDevice(new RegisterDeviceRequest(name, udid, "IOS"), bearerToken, r -> done(r, callback));
     }

@@ -1509,8 +1509,43 @@ public class CertificateWizard extends Lifecycle {
                 refreshForAutoSetup(() -> autoSetupDefaultProfiles(bundleIdentifier, appName));
             });
         } else {
-            autoSetupDefaultProfiles(bundleIdentifier, appName);
+            ensurePushCapability(existing, () -> autoSetupDefaultProfiles(bundleIdentifier, appName));
         }
+    }
+
+    /// Asserts push notifications on an App ID this run did not create.
+    ///
+    /// Registration is the only place the capability was ever set, which covers exactly
+    /// the App IDs the wizard made itself. A project that turns `ios.includePush` on
+    /// later reuses the App ID it already has, so nothing enabled the capability while
+    /// the builder started stamping an aps-environment entitlement on the app -- and an
+    /// entitlement the profile does not grant is a codesign failure, not a warning.
+    ///
+    /// Asserted rather than compared, exactly as the App Group step above does it and for
+    /// the same reason: the service reports no capabilities with an App ID, so there is
+    /// nothing to compare against. Enabling one that is already on is what that step has
+    /// been doing on every run. It goes before the profiles, because a profile is a
+    /// snapshot of the capabilities the App ID had when it was issued, and the ones a
+    /// capability change leaves behind are reissued by [#autoSetupProfile].
+    ///
+    /// A failure is a warning rather than the end of the run: the iOS assets that follow
+    /// are still worth having, and the banner names the App ID that needs the capability.
+    private void ensurePushCapability(SigningState.BundleId bundle, Runnable next) {
+        if (!projectWantsPush() || bundle == null) {
+            next.run();
+            return;
+        }
+        showPageMessage("Enabling push notifications on " + bundle.identifier() + "...", false);
+        service.enablePushCapability(bundle.id(), r -> {
+            if (!r.ok) {
+                warnDuringAutoSetup("Push notifications could not be enabled on " + bundle.identifier()
+                        + ": " + r.message + " The build stamps a push entitlement because"
+                        + " ios.includePush is on, and signing fails until the App ID grants it.");
+                next.run();
+                return;
+            }
+            refreshForAutoSetup(next);
+        });
     }
 
     /// Enables every App Group an extension in this project needs on the MAIN App ID, before any

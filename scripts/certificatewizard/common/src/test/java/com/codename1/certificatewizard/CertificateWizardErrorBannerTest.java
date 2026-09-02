@@ -225,6 +225,10 @@ class CertificateWizardErrorBannerTest {
             delegate.enableAppGroupCapability(bundleId, groups, cb);
         }
 
+        public void enablePushCapability(String bundleId, OnComplete<Result<Void>> cb) {
+            delegate.enablePushCapability(bundleId, cb);
+        }
+
         public void registerDevice(String name, String udid, OnComplete<Result<Void>> cb) {
             delegate.registerDevice(name, udid, cb);
         }
