@@ -7303,64 +7303,23 @@ public class AndroidGradleBuilder extends Executor {
             try {
                 kotlinStdlibConstraints = KotlinStdlibAlignment.constraintsBlock(
                         compile,
-                        // In the order the generated script emits them, because a
-                        // definition is only in scope for what comes after it, and
-                        // EVERY fragment carrying app-supplied text -- read straight
-                        // from a hint, or held by a local that was assigned from one.
-                        // Bounding this at the dependencies block was wrong twice: a
-                        // rule reaches the app's configurations from the android block
-                        // and from the repositories closure just as well. The scalars
-                        // ride along rather than being filtered out, because deciding
-                        // which hints are text and which are values is the judgement
-                        // that keeps being wrong, and this way there is none to make.
-                        // KotlinStdlibAlignmentTest reads this call against the script
-                        // and fails if they ever disagree.
-                        //
-                        // Each one wrapped in the closure that surrounds it in the
-                        // generated file, because a `def` inside repositories { } is
-                        // scoped to that closure and the alignment now tracks scopes.
-                        // Handed over bare, such a local outlived its closure and
-                        // shadowed a real binding for everything after it -- which
-                        // reads a later use as a declaration and skips that
-                        // artifact's constraint.
+                        // Every fragment the APP controls, as one piece of
+                        // text. Order and nesting do not matter to a whole-text
+                        // check, so nothing here wraps or sequences them --
+                        // that was the parser's requirement, not this one.
                         request.getArg("android.gradlePlugin", ""),
-                        // TWICE, because the script interpolates it twice: once into
-                        // the buildscript repositories and again into the project ones
-                        // after the android block. Gradle executes both, so a name this
-                        // fragment binds is restored at the second -- and scanning it
-                        // once left the scan holding whatever an intervening fragment
-                        // had reassigned, which reads a later use as something it is not.
-                        "buildscript {\nrepositories {\n%s\n}\n}\n"
-                                .replace("%s", injectRepo),
-                        "buildscript {\ndependencies {\n%s\n}\n}\n".replace("%s", gradleDependency),
-                        // ONE android closure around both, because the script has
-                        // one: androidx sits directly in it and the default config in
-                        // its defaultConfig block. A closure each made a scope boundary
-                        // Gradle does not have, so a `def` in the first was discarded
-                        // before the second used it.
-                        "android {\n"
-                                + request.getArg("android.gradle.androidx", "")
-                                + "\ndefaultConfig {\n"
-                                + minSDK + "\n" + targetNumber + "\n"
-                                + request.getArg("android.xgradle_default_config", "")
-                                + "\n}\n}\n",
-                        "repositories {\n%s\n}\n".replace("%s", injectRepo),
-                        // ONE closure around all of them, because the script has
-                        // one: they are concatenated into a single dependencies { }
-                        // below. A closure each made a scope boundary Gradle does
-                        // not have, so a `def` in an earlier fragment was discarded
-                        // before a later one used it -- and the use then named no
-                        // artifact, which loses whatever pin it carried.
-                        "dependencies {\n"
-                                + coreLibraryDesugaringDependency
-                                + request.getArg("android.supportv4Dep", "") + "\n"
-                                + kotlinRuntimeDependency
-                                + additionalDependencies + "\n"
-                                + aiExtraGradleDependencies.toString() + "\n"
-                                + request.getArg("android.gradleDep", "") + "\n"
-                                + aarDependencies
-                                + "\n}\n",
-                        request.getArg("android.xgradle", ""));
+                        request.getArg("android.gradle.androidx", ""),
+                        request.getArg("android.xgradle_default_config", ""),
+                        request.getArg("android.supportv4Dep", ""),
+                        request.getArg("android.gradleDep", ""),
+                        request.getArg("android.xgradle", ""),
+                        coreLibraryDesugaringDependency,
+                        kotlinRuntimeDependency,
+                        additionalDependencies,
+                        aiExtraGradleDependencies.toString(),
+                        aarDependencies,
+                        injectRepo,
+                        gradleDependency);
             } catch (RuntimeException e) {
                 // The alignment reads the app's Gradle text to decide whether the app
                 // already manages the stdlib family, and that reading is a scanner

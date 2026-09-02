@@ -651,18 +651,18 @@ final class BuildHintsAndroid {
                         + "and the build fails in `checkReleaseDuplicateClasses` naming Kotlin artifacts "
                         + "the app never asked for. Expressed as a Gradle constraint, so it adds "
                         + "nothing to an app with no Kotlin anywhere in its dependencies and never "
-                        + "lowers a version. Set to false only to manage those coordinates yourself. "
-                        + "Declaring `kotlin-stdlib-jdk7` or `kotlin-stdlib-jdk8` at 1.8.0 or newer in "
-                        + "your own Gradle build hints switches it off for that artifact, because your "
-                        + "version already satisfies the floor. Declaring an older one doesn\'t: an "
-                        + "ordinary Gradle version is a soft requirement, so the constraint raises it "
-                        + "to the empty shim rather than leaving the duplicate in place. To hold one "
-                        + "below 1.8.0 on purpose, give it a strict version -- `1.7.22!!` or "
-                        + "`version { strictly \'1.7.22\' }` -- or force it, which switches the whole "
-                        + "block off. A Kotlin BOM has no such effect unless it\'s enforced, and "
-                        + "needs none: a "
-                        + "BOM contributes ordinary constraints rather than strict ones, so a newer "
-                        + "BOM simply wins over this floor while an older BOM still needs it."));
+                        + "lowers a version. A version you declare yourself is a soft requirement in "
+                        + "Gradle, so the constraint raises an older one rather than leaving the "
+                        + "duplicate in place, and a newer one wins over the floor on its own. "
+                        + "If you pin the family yourself the whole block is left out: your Gradle "
+                        + "build hints are searched for the text `kotlin-stdlib` alongside any of "
+                        + "`strictly`, `!!`, `force`, `reject`, `enforcedPlatform`, `useVersion`, "
+                        + "`useTarget`, `substitute` or `failOnVersionConflict`, and a hit means you "
+                        + "have decided the version. That search is plain text, so it errs toward "
+                        + "leaving the floor out. Leaving it out costs you the duplicate class "
+                        + "you already had; adding it over a deliberate pin would break a build "
+                        + "that works today. Set to false to manage these coordinates yourself in "
+                        + "every case."));
 
         h.add(new Hint("android.largeScreens")
                 .group(HintGroup.ANDROID)
