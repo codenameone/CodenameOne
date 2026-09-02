@@ -21,7 +21,6 @@ Advanced-Topics-Under-The-Hood.asciidoc	http://jruby.org/
 Advanced-Topics-Under-The-Hood.asciidoc	http://shannah.github.io/cn1-freshdesk/
 Advanced-Topics-Under-The-Hood.asciidoc	http://stackoverflow.com/questions/11421048/android-ios-custom-uri-protocol-handling
 Advanced-Topics-Under-The-Hood.asciidoc	http://www.mirah.org/
-Introduction.asciidoc	http://teavm.org
 Introduction.asciidoc	http://www.xmlvm.org/
 Miscellaneous-Features.asciidoc	http://wiki.akosma.com/IPhone_URL_Schemes
 The-Components-Of-Codename-One.asciidoc	http://awoiaf.westeros.org/index.php/A_Game_of_Thrones
