@@ -594,6 +594,99 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * An expired parked arrival must not hide a valid local checkpoint. Returning null the moment
+     * the parked state aged out reported "nothing to restore" while storage held a perfectly good
+     * one -- ordinary with automatic restore off and the user still navigating -- so a single
+     * restore() call told the application to show its initial screen instead.
+     */
+    @EdtTest
+    public void anExpiredParkedStateFallsBackToTheStoredCheckpoint() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        Continuity.enable();
+        // A local checkpoint that is fresh and valid.
+        Continuity.checkpoint();
+        long mine = Continuity.getRestorableState().getSequence();
+
+        // An arrival from elsewhere, parked through the real path: no maxAge yet, so it is
+        // admitted, and automatic restore is off so dispatch parks it rather than applying it.
+        Continuity.setAutoRestore(false);
+        AppState stale = foreign("device-stale", 2);
+        stale.setTimestamp(System.currentTimeMillis() - 5000L);
+        Continuity.deliver(stale);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        // Now it is too old, which is what an application configuring an expiry would see.
+        Continuity.setMaxAge(1000L);
+
+        AppState offered = Continuity.getRestorableState();
+
+        assertNotNull(offered, "the expired arrival hid the valid stored checkpoint");
+        assertEquals(mine, offered.getSequence(),
+                "the stored checkpoint should be offered once the parked one has expired");
+    }
+
+    /**
+     * A parked state lives only in a field, so a process killed before the application calls
+     * restore() loses it. Persisting the sender's high-water mark at park time therefore left a
+     * durable "already handled" for something nothing ever handled, and the relay's repeat was
+     * rejected on the next launch.
+     */
+    @EdtTest
+    public void parkingAStateDoesNotDurablyMarkItHandled() {
+        Continuity.enable();
+        Continuity.setAutoRestore(false);
+        AppState fromA = foreign("device-parked", 3);
+
+        bridge.simulateArrival(Continuity.getActivityType(), StateCodec.toMap(fromA));
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        assertNotNull(Continuity.getRestorableState(), "the state should be parked for the app");
+
+        // The relaunch: everything in memory goes, storage and preferences stay.
+        Continuity.reset();
+        Continuity.setBridge(bridge);
+        Continuity.enable();
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+
+        Continuity.deliver(fromA);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+        assertEquals(1, seen[0],
+                "the parked state was marked handled durably, so the relay's repeat was rejected "
+                        + "and a state nothing ever restored is now unrecoverable");
+    }
+
+    /**
      * An app that only registers a store listener keeps continuity OFF by design -- a key/value
      * store is not consent to broadcast a route stack. refreshBridge() tested `enabled` alone, so
      * the simulator's capability menu, which swaps the bridge and calls it, left the replacement

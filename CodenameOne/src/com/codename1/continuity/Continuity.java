@@ -804,10 +804,14 @@ public final class Continuity {
             // exempting it would have let exactly the expiry the application configured slip
             // through on the one path where the delay is longest.
             if (isTooOld(waiting)) {
+                // Cleared, and then we keep looking. Returning null here reported "nothing to
+                // restore" while a perfectly valid local checkpoint sat in storage -- which is
+                // ordinary with automatic restore off and the user still navigating -- so a
+                // single restore() call told the application to show its initial screen instead.
                 setParked(null);
-                return null;
+            } else {
+                return waiting;
             }
-            return waiting;
         }
         AppState stored = readStored();
         if (stored == null || isTooOld(stored)) {
@@ -989,7 +993,11 @@ public final class Continuity {
         // reaches a listener. A genuinely different device's state is not made older or newer by
         // when our publish lands; ordering between devices is per-device sequences, maxAge and
         // the listener's own answer, none of which this would change.
-        startPublisher();
+        // NOT startPublisher() here. A relay holds one document per user, so a POST that reaches
+        // the endpoint before this GET erases the other device's state -- and the GET then returns
+        // this device's own echo, which deliver() drops, so the remote update is never seen at
+        // all. The retained publish is started when the poll finishes, below, which is the only
+        // ordering that both sends what is owed and reads what is there.
         synchronized (STATE_LOCK) {
             if (polling) {
                 // One fetch at a time. Two overlapping GETs can return DIFFERENT documents -- a
@@ -1018,6 +1026,8 @@ public final class Continuity {
                                 // publisher documents: releasing the lock between the two would
                                 // let a poll requested in the gap set a flag nobody ever reads.
                                 polling = false;
+                                // Owed work goes out AFTER the fetch, never before it.
+                                startPublisher();
                                 return;
                             }
                             pollAgain = false;
@@ -1514,6 +1524,22 @@ public final class Continuity {
     }
 
     private static void dispatch(AppState state) {
+        // COMMIT_LOCK for the whole dispatch, which is what actually serializes it against
+        // clear(). stillDeliverable() checked the era and released STATE_LOCK, so a logout landing
+        // after that let this run listeners, restore navigation and persist the PREVIOUS account's
+        // state after the user had signed out -- the era check cannot help once it is behind us.
+        //
+        // Yes, this holds a lock across application code, which STATE_LOCK never does. The other
+        // holders are clear() and the checkpoint commit: the commit runs on the EDT, as this does,
+        // so it is the same thread and reentrant; clear() is short and rare. A listener that
+        // blocks on a THREAD that wants COMMIT_LOCK would stall, and that is the price of a logout
+        // being able to stop a restore it has already superseded.
+        synchronized (COMMIT_LOCK) {
+            dispatchLocked(state);
+        }
+    }
+
+    private static void dispatchLocked(AppState state) {
         if (isTooOld(state)) {
             // Checked HERE and not only on arrival, because arrival is not the only way in. A
             // continuation that cold-launches the app is parked and waits up to WINDOW_WAIT_MILLIS
@@ -1555,15 +1581,18 @@ public final class Continuity {
         }
         if (auto) {
             restore(state);
+            // Durable only NOW, and only on the branch that actually consumed the state. Writing
+            // it at admission meant a process killed before this runnable ran left a high-water
+            // mark for a state nothing had acted on -- and writing it on the PARKED branch below
+            // was the same bug one step further along: `parked` is a field, so a process killed
+            // before the application calls restore() loses the state while the mark survives, and
+            // the relay's repeat is rejected on the next launch. The parked branch gets its mark
+            // from restore() itself, through noteActedOn, when the application accepts it. The
+            // in-memory mark still goes in at admission, which is what dedups within a session.
+            rememberSeen();
         } else {
             setParked(state);
         }
-        // Durable only NOW. Writing it when the state was admitted meant a process killed before
-        // this runnable ran left a high-water mark on disk for a state nothing had acted on and
-        // nothing had stored -- so the next launch rejected the relay's repeat as already seen and
-        // the continuation was lost for good. The in-memory mark still goes in at admission,
-        // which is what dedups within the session; only the durable copy waits for the act.
-        rememberSeen();
     }
 
     private static void park(final AppState state) {

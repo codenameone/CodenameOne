@@ -11019,7 +11019,11 @@ public class IPhoneBuilder extends Executor {
     private static final int MAX_SETTING_EXPANSIONS = 16;
 
     /// One build setting, in either of the two spellings Xcode accepts for a reference.
-    private static String replaceBuildSetting(String path, String name, String value) {
+    ///
+    /// Package-visible rather than private because MacNativeBuilder needs the SAME answer: the
+    /// Catalyst entitlement has to materialize the iOS bundle id, and hand-listing the spellings
+    /// there was how "$(CFBundleIdentifier)" got handled while "${CFBundleIdentifier}" did not.
+    static String replaceBuildSetting(String path, String name, String value) {
         String out = path.replace("$(" + name + ")", value).replace("${" + name + "}", value);
         return applyModifiers(out, name, value);
     }

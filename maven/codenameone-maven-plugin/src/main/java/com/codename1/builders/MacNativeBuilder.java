@@ -427,8 +427,15 @@ class MacNativeBuilder {
             String container = ubiquityKvStore.trim();
             String iosBundleId = request.getPackageName();
             if (iosBundleId != null && iosBundleId.length() > 0) {
-                container = container.replace("$(CFBundleIdentifier)", iosBundleId)
-                        .replace("$(PRODUCT_BUNDLE_IDENTIFIER)", iosBundleId);
+                // Through replaceBuildSetting, which knows BOTH spellings Xcode accepts. Listing
+                // "$(NAME)" by hand here meant a project writing "${CFBundleIdentifier}" -- the
+                // same reference, and equally valid -- left it unresolved, so the iOS entitlement
+                // expanded it against the iOS bundle id while this one expanded it against the
+                // derived Catalyst id and the two slices synchronized against different stores.
+                container = IPhoneBuilder.replaceBuildSetting(
+                        container, "CFBundleIdentifier", iosBundleId);
+                container = IPhoneBuilder.replaceBuildSetting(
+                        container, "PRODUCT_BUNDLE_IDENTIFIER", iosBundleId);
             }
             sb.append("    <key>com.apple.developer.ubiquity-kvstore-identifier</key>\n    <string>")
                     .append(escapeEntitlementValue(container))
