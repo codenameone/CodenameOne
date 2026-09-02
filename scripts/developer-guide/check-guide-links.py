@@ -73,7 +73,9 @@ def front_matter(page: Path) -> dict[str, object]:
     """Pull the few front-matter keys that decide a page's published route.
 
     Deliberately not a YAML parse: the tree mixes YAML and TOML front matter and
-    only three keys matter here.
+    only a few keys matter here. Note the list is an allowlist -- a key absent from
+    it reads as empty downstream, which is how publishDate and expiryDate came to
+    be queried by is_published() while never being stored.
     """
     text = page.read_text(encoding="utf-8", errors="ignore")
     lines = text.split("\n")
@@ -97,10 +99,16 @@ def front_matter(page: Path) -> dict[str, object]:
                 aliases.append(stripped.lstrip("- ").strip().rstrip(",").strip("\"'"))
                 continue
             in_aliases = False
-        match = re.match(r'^(url|slug|aliases|draft|date)\s*[:=]\s*(.*)$', line)
+        # Hugo treats front-matter keys case-insensitively, and this tree mixes
+        # YAML and TOML, so match either spelling and store one canonical form.
+        match = re.match(
+            r'^(url|slug|aliases|draft|date|publishdate|expirydate)\s*[:=]\s*(.*)$',
+            line,
+            re.IGNORECASE,
+        )
         if not match:
             continue
-        key, raw = match.group(1), match.group(2).strip()
+        key, raw = match.group(1).lower(), match.group(2).strip()
         if key == "aliases":
             if raw in {"", "[", "[]"}:
                 in_aliases = raw != "[]"
@@ -130,11 +138,11 @@ def is_published(meta: dict[str, object], today: str) -> bool:
     # Hugo builds neither a future page nor an expired one. publishDate overrides
     # date for scheduling, and expiryDate withdraws a page that was published; a
     # date-only expiry lapses at midnight, so the day itself is already too late.
-    for key in ("date", "publishDate"):
+    for key in ("date", "publishdate"):
         scheduled = day(key)
         if scheduled and scheduled > today:
             return False
-    expiry = day("expiryDate")
+    expiry = day("expirydate")
     return not (expiry and expiry <= today)
 
 
