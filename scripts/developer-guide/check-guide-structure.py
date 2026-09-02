@@ -162,6 +162,7 @@ class Walker:
         # and two rendered titles and passed, because it only asks whether a
         # title appears AT LEAST as often as it is declared.
         self.include_edges: collections.Counter = collections.Counter()
+        self.include_attrs: dict[Path, set[str]] = {}
         self.errors: list[str] = []
         self._visit(root, "")
 
@@ -250,6 +251,14 @@ class Walker:
                 )
             else:
                 self.include_edges[(path, target)] += 1
+            # _visit() records the attributes of the FIRST inclusion and returns
+            # early on every later one, so a fragment brought in twice with
+            # different leveloffsets was validated against whichever came first --
+            # and its heading renders at two different depths. Collected per
+            # target so the disagreement can be reported.
+            self.include_attrs.setdefault(target, set()).add(
+                " ".join(attrs.split())
+            )
             self._visit(target, attrs)
 
     @staticmethod
@@ -460,6 +469,17 @@ def main() -> int:
     # nothing and the title check only asks for "at least once". Cross-parent reuse
     # stays legitimate for a FRAGMENT; a direct chapter is a different thing --
     # it already has its place in the book.
+    for target, seen in sorted(
+        walker.include_attrs.items(), key=lambda item: item[0].name
+    ):
+        if len(seen) > 1:
+            spellings = ", ".join(repr(a) for a in sorted(seen))
+            errors.append(
+                f"{target.name}: is included with different attributes ({spellings}), "
+                f"so its heading renders at more than one depth. Use the same "
+                f"attributes everywhere, or give each parent its own fragment."
+            )
+
     for target in sorted(walker.direct, key=lambda path: path.name):
         others = sorted(
             parent.name

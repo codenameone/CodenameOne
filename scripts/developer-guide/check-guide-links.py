@@ -36,7 +36,9 @@ URL_RE = re.compile(r"\bhttps?://[^\s\[\]<>\"'`)]+", re.IGNORECASE)
 # measured: zero URL-valued attribute declarations and zero link:{...} targets.
 # So both spellings are refused instead, which keeps the gap from opening quietly.
 ATTRIBUTE_URL_DECL_RE = re.compile(r"^:[A-Za-z0-9_-]+:\s*https?://")
-ATTRIBUTE_LINK_RE = re.compile(r"\blink:\{[^}]+\}")
+ATTRIBUTE_LINK_RE = re.compile(
+    r"""(?:\blink:|\bxref:|\bhref\s*=\s*["']?)\{[^}]+\}""", re.IGNORECASE
+)
 # An array parameter written raw ends the AsciiDoc link macro at the "[", so the
 # URL is cut mid-signature and the label is lost -- #createImage(byte[],int,int)
 # rendered as a bare link to "#createImage(byte". It has to be written %5B%5D.
