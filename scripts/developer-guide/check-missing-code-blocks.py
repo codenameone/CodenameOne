@@ -119,25 +119,30 @@ def main() -> int:
             number = located[(name, text)]
             new.append(f"{name}:{number}: promises a code block that is not there: {text[:100]}")
 
+    # A filled hole has to leave the baseline. Leaving it keeps a slot open: a
+    # later change can empty that exact block again and `current - baseline` stays
+    # empty, so the regression passes. The ratchet only ratchets if fixes are banked.
+    stale: list[str] = []
+    for name in sorted(baseline):
+        for text in sorted(baseline[name] - current.get(name, set())):
+            stale.append(
+                f"{name}: filled, but still in the baseline: {text[:80]}. Run "
+                f"check-missing-code-blocks.py --write-baseline to bank the fix."
+            )
+
     total = sum(len(v) for v in current.values())
-    baseline_total = sum(len(v) for v in baseline.values())
-    if new:
-        for entry in new:
+    if new or stale:
+        for entry in new + stale:
             print(entry, file=sys.stderr)
         print(
-            f"\n{len(new)} new hole(s). Restore the block (the originals are recoverable "
-            f"from bbdc6058f0~1) or rewrite the sentence so it stops promising one.",
+            f"\n{len(new)} new hole(s) and {len(stale)} stale baseline entr(ies). Restore "
+            f"the block (the originals are recoverable from bbdc6058f0~1) or rewrite the "
+            f"sentence so it stops promising one.",
             file=sys.stderr,
         )
         return 1
 
-    fixed = baseline_total - total
-    print(
-        f"Missing code blocks: {total} known hole(s), none new"
-        + (f", {fixed} fixed since the baseline was written." if fixed > 0 else ".")
-    )
-    if fixed > 0:
-        print("Run --write-baseline to bank the progress.")
+    print(f"Missing code blocks: {total} known hole(s), none new, none stale.")
     return 0
 
 

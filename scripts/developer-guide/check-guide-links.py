@@ -89,9 +89,31 @@ def normalize_path(value: str) -> str:
     return value.rstrip("/") or "/"
 
 
-def site_paths(repo_root: Path) -> set[str]:
-    """Every path the website is known to answer on, derived rather than listed."""
+def redirect_pattern(source: str) -> re.Pattern[str] | None:
+    """Compile a _redirects source that is not a literal path.
+
+    Netlify sources may end in a `*` splat or contain `:placeholder` segments, and
+    21 of the rules in this file do. Recording `/files/cn1libs/*` as a literal
+    string means a real link to `/files/cn1libs/foo.cn1lib` matches nothing and is
+    reported as broken.
+    """
+    if "*" not in source and ":" not in source:
+        return None
+    pattern = "".join(
+        ".*" if part == "*" else (r"[^/]+" if part.startswith(":") else re.escape(part))
+        for part in re.split(r"(\*|:[A-Za-z_][A-Za-z0-9_]*)", source)
+        if part
+    )
+    return re.compile("^" + pattern + "/?$")
+
+
+def site_paths(repo_root: Path) -> tuple[set[str], list[re.Pattern[str]]]:
+    """Every path the website is known to answer on, derived rather than listed.
+
+    Returns the literal paths and the patterns for the wildcard redirect rules.
+    """
     paths: set[str] = set()
+    patterns: list[re.Pattern[str]] = []
 
     redirects = repo_root / "docs/website/static/_redirects"
     if redirects.exists():
@@ -99,9 +121,15 @@ def site_paths(repo_root: Path) -> set[str]:
             parts = line.split()
             if not parts or parts[0].startswith("#"):
                 continue
-            paths.add(normalize_path(parts[0]))
+            compiled = redirect_pattern(parts[0])
+            if compiled is not None:
+                patterns.append(compiled)
+            else:
+                paths.add(normalize_path(parts[0]))
             if len(parts) > 1 and parts[1].startswith("/"):
-                paths.add(normalize_path(parts[1]))
+                target = redirect_pattern(parts[1])
+                if target is None:
+                    paths.add(normalize_path(parts[1]))
 
     # Hugo's published route is the section path plus the page's slug, which
     # 1055 of the content pages override; deriving it from the filename instead
@@ -142,10 +170,10 @@ def site_paths(repo_root: Path) -> set[str]:
             if asset.is_file() and asset.name == "index.html":
                 paths.add(normalize_path(asset.parent.relative_to(static).as_posix()))
 
-    return paths
+    return paths, patterns
 
 
-def findings_for(path: Path, known: set[str]) -> list[tuple[str, str]]:
+def findings_for(path: Path, known: set[str], patterns: list[re.Pattern[str]]) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
         for url in URL_RE.findall(line):
@@ -161,7 +189,7 @@ def findings_for(path: Path, known: set[str]) -> list[tuple[str, str]]:
                 target = split.path.rstrip("/") or "/"
                 if target.startswith(GENERATED_PREFIXES) or target + "/" in GENERATED_PREFIXES:
                     continue
-                if target not in known:
+                if target not in known and not any(p.match(target) for p in patterns):
                     out.append((url, "the website serves no such path (checked _redirects and the content tree)"))
     return out
 
@@ -187,7 +215,7 @@ def main() -> int:
     args = parser.parse_args()
 
     guide_dir = args.guide_dir.resolve()
-    known = site_paths(args.repo_root.resolve())
+    known, patterns = site_paths(args.repo_root.resolve())
     if not known:
         raise SystemExit("could not derive any site paths; is --repo-root correct?")
 
@@ -196,7 +224,7 @@ def main() -> int:
         if path.suffix not in ASCIIDOC_EXTENSIONS or not path.is_file():
             continue
         name = path.relative_to(guide_dir).as_posix()
-        for url, reason in findings_for(path, known):
+        for url, reason in findings_for(path, known, patterns):
             current[f"{name}\t{url}"] = reason
 
     if args.write_baseline:
@@ -217,20 +245,32 @@ def main() -> int:
 
     baseline = load_baseline(args.baseline)
     new = sorted(set(current) - baseline)
-    if new:
+    # A baselined entry that no longer reproduces has to leave the file. Leaving it
+    # keeps a slot open: a later change can restore that exact file+URL and
+    # `current - baseline` stays empty, so the regression sails through. The
+    # ratchet only ratchets if fixes are banked.
+    stale = sorted(baseline - set(current))
+    if new or stale:
         for entry in new:
             name, _, url = entry.partition("\t")
             print(f"{name}: {url} -- {current[entry]}", file=sys.stderr)
-        print(f"\n{len(new)} new broken or insecure link(s).", file=sys.stderr)
+        for entry in stale:
+            name, _, url = entry.partition("\t")
+            print(
+                f"{name}: {url} -- no longer broken, but still in the baseline. Run "
+                f"check-guide-links.py --write-baseline to bank the fix.",
+                file=sys.stderr,
+            )
+        print(
+            f"\n{len(new)} new broken or insecure link(s), {len(stale)} stale baseline entr(ies).",
+            file=sys.stderr,
+        )
         return 1
 
-    fixed = len(baseline) - len(current)
     print(
-        f"Links: {len(current)} known bad link(s) against {len(known)} known site paths, none new"
-        + (f", {fixed} fixed since the baseline was written." if fixed > 0 else ".")
+        f"Links: {len(current)} known bad link(s) against {len(known)} known site paths "
+        f"and {len(patterns)} wildcard rule(s); none new, none stale."
     )
-    if fixed > 0:
-        print("Run --write-baseline to bank the progress.")
     return 0
 
 
