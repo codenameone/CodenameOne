@@ -10296,22 +10296,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
         }
-        if (sdk >= 16 && html != null) {
+        // The types are recorded here, but the text does not become an item of its own yet. A
+        // clip item is a dragged *object*, so a text item beside a file item is two things
+        // being dragged at once, and a receiver that imports everything takes the document
+        // *and* a stray piece of text instead of choosing the best form of one thing. Where
+        // the clip carries a URI, the text rides on it -- see attachCarriedText below.
+        boolean carriesHtml = sdk >= 16 && html != null;
+        if (carriesHtml) {
             mimeTypes.add(ClipboardContent.MIME_TEXT);
             mimeTypes.add(ClipboardContent.MIME_HTML);
-            items.add(new ClipData.Item(plain, html));
         } else if (plain != null) {
             mimeTypes.add(ClipboardContent.MIME_TEXT);
             if (primaryTextMime != null && !mimeTypes.contains(primaryTextMime)) {
                 mimeTypes.add(primaryTextMime);
             }
-            items.add(new ClipData.Item(plain));
         }
         try {
             addBinaryContent(content, mimeTypes, items);
             addRemainingRepresentations(content, plain, mimeTypes, items);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
+        }
+        if (carriesHtml || plain != null) {
+            attachCarriedText(items, plain, carriesHtml ? html : null);
         }
         if (items.isEmpty()) {
             return ClipData.newPlainText("Codename One", "");
@@ -10423,6 +10430,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /// Puts the clip's text on the first item that carries a URI, or makes an item of it when
+    /// there is none.
+    ///
+    /// Android has no notion of "an alternative reading of this object": every item is another
+    /// thing being dragged. A file and its text fallback therefore have to be one item, or a
+    /// receiver importing the clip gets two objects where the source published one. The same
+    /// mistake on the iOS side made a receiver import a document and a stray piece of text.
+    private static void attachCarriedText(List<ClipData.Item> items, String plain, String html) {
+        for (int iter = 0; iter < items.size(); iter++) {
+            Uri uri = items.get(iter).getUri();
+            if (uri != null) {
+                items.set(iter, html != null
+                        ? new ClipData.Item(plain, html, null, uri)
+                        : new ClipData.Item(plain, null, uri));
+                return;
+            }
+        }
+        // Nothing to ride on, so the text is the object. First, as it was before there was
+        // anything else in the clip at all.
+        items.add(0, html != null ? new ClipData.Item(plain, html) : new ClipData.Item(plain));
+    }
+
     /// Adds the representations neither the text nor the binary pass above has taken.
     ///
     /// Byte-backed types -- a PDF, an archive, an application's own format -- become typed
@@ -10500,6 +10529,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 getContext().getPackageName() + ".provider", file);
         // Grant broadly so any paste or drop target can read the content:// URI
         getContext().grantUriPermission("android", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        rememberGeneratedClipUri(uri);
         return uri;
     }
 
@@ -10766,12 +10796,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     // a nested file-only target take a drop the PDF-capable one was chosen for
                     // while it hovered.
                     //
-                    // The two are told apart exactly, not guessed at: writeAsProviderUri names
-                    // what it mints, and a real file keeps its own name.
+                    // The two are told apart by the exporter's own record of what it minted,
+                    // not by anything about the URI or its name -- an application may publish a
+                    // file called anything at all.
                     if (!isGeneratedClipFile(uri)) {
                         fileUris.add(uri.toString());
                     }
-                    continue;
+                    // No continue: an item carrying a URI carries the clip's text too, because
+                    // that is where this exporter puts it -- a text item of its own would be a
+                    // second object being dragged. Returning here dropped the fallback the
+                    // source published on its own round trip.
                 }
             } catch (Throwable t) {
                 com.codename1.io.Log.e(t);
@@ -10785,11 +10819,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 html = item.getHtmlText();
             }
             if (plain == null) {
-                // Not the same test. coerceToText *derives* text from whatever the item holds,
-                // so an empty answer means it had nothing to give rather than that the source
-                // published nothing -- and accepting it would stop the search before an item
-                // that does carry the text.
-                CharSequence text = item.coerceToText(getContext());
+                // Literally for an item that also carries a URI, and coerced otherwise.
+                // coerceToText *derives* text from whatever the item holds, which for a URI
+                // means going and reading the document behind it -- a different value
+                // altogether, and one this branch has no business producing. Where it does
+                // coerce, an empty answer means the item had nothing to give rather than that
+                // the source published nothing, so it does not stop the search.
+                CharSequence text = item.getUri() != null
+                        ? item.getText() : item.coerceToText(getContext());
                 if (text != null && text.length() > 0) {
                     plain = text.toString();
                 }
@@ -10820,17 +10857,41 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return content;
     }
 
+    /// The content URIs this exporter minted to carry bytes, oldest first.
+    ///
+    /// Remembered, not recognized. The file name cannot answer the question: an application may
+    /// publish a file of its own by any name it likes, and one called cn1-clip-roundtrip.txt is
+    /// exactly what the clipboard round trip publishes -- which a prefix test then threw away
+    /// as one of ours, losing the file reference it had just copied. The type cannot answer it
+    /// either, since a PDF published as bytes and a PDF published as a file both arrive as
+    /// application/pdf. Only the exporter knows, so the exporter records it.
+    ///
+    /// Bounded: a clip that has been replaced on the clipboard can no longer be pasted, so the
+    /// oldest entries are of no further use. A clip that outlives the process falls back to
+    /// being read as a file, which is what it was read as before any of this existed.
+    private static final int GENERATED_CLIP_URI_MEMORY = 64;
+    private static final java.util.LinkedHashSet<String> GENERATED_CLIP_URIS =
+            new java.util.LinkedHashSet<String>();
+
+    private static void rememberGeneratedClipUri(Uri uri) {
+        synchronized (GENERATED_CLIP_URIS) {
+            GENERATED_CLIP_URIS.remove(uri.toString());
+            GENERATED_CLIP_URIS.add(uri.toString());
+            java.util.Iterator<String> oldest = GENERATED_CLIP_URIS.iterator();
+            while (GENERATED_CLIP_URIS.size() > GENERATED_CLIP_URI_MEMORY && oldest.hasNext()) {
+                oldest.next();
+                oldest.remove();
+            }
+        }
+    }
+
     /// True when this content URI is one `#writeAsProviderUri(byte[], java.lang.String,
     /// java.lang.String)` minted to carry a representation's bytes, rather than a file the
     /// source published.
-    ///
-    /// Every generated file is named with the same prefix and a real one keeps its own name, so
-    /// this is the exporter's own record rather than an inference from the type -- which cannot
-    /// answer it, since a PDF published as bytes and a PDF published as a file both arrive as
-    /// application/pdf.
-    private boolean isGeneratedClipFile(Uri uri) {
-        String name = displayNameFor(uri);
-        return name != null && name.startsWith(CLIP_FILE_PREFIX);
+    private static boolean isGeneratedClipFile(Uri uri) {
+        synchronized (GENERATED_CLIP_URIS) {
+            return GENERATED_CLIP_URIS.contains(uri.toString());
+        }
     }
 
     /// A MIME type without its parameters, lower case, or null when there is none.

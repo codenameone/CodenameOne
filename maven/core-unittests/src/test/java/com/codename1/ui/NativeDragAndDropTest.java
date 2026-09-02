@@ -716,6 +716,37 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDropThatLandsElsewhereTellsTheComponentItLeft() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder left = new DropRecorder();
+        DropRecorder landed = new DropRecorder();
+        left.setNativeDropTarget(true);
+        landed.setNativeDropTarget(true);
+        form.setLayout(new BorderLayout());
+        form.add(BorderLayout.NORTH, left);
+        form.add(BorderLayout.SOUTH, landed);
+        left.setPreferredSize(new com.codename1.ui.geom.Dimension(40, 40));
+        landed.setPreferredSize(new com.codename1.ui.geom.Dimension(40, 40));
+        form.revalidate();
+
+        NativeDragAndDrop.dragEnter(0, left.getAbsoluteX() + 5, left.getAbsoluteY() + 5,
+                textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        assertEquals("[enter]", left.events.toString());
+
+        // Moved and released in one go, so the release resolves somewhere the drag never
+        // hovered.
+        NativeDragAndDrop.drop(0, landed.getAbsoluteX() + 5, landed.getAbsoluteY() + 5,
+                textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertEquals("[enter, exit]", left.events.toString(),
+                "the drag ended for the component it was over, and nothing else can tell it: "
+                        + "the port's own cleanup finds the target already cleared");
+        assertEquals("[drop]", landed.events.toString());
+    }
+
+    @FormTest
     void anEntryAfterASessionThatNeverExitedIsStillAnEntry() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder target = addTarget(form);

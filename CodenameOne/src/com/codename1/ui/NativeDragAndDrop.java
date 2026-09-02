@@ -632,7 +632,9 @@ public final class NativeDragAndDrop {
     public static int drop(int windowId, int x, int y, ClipboardContent content, int action) {
         Component target = findTarget(windowId, x, y, content, action);
         int accepted;
+        Component previous;
         synchronized (LOCK) {
+            previous = currentTarget;
             if (target != null && target == currentTarget) { // NOPMD CompareObjectsWithEquals
                 // The target's own latest word, not a recomputation from the action the port
                 // supplied. That action is by construction one event behind -- it is what the
@@ -674,9 +676,19 @@ public final class NativeDragAndDrop {
             overDispatchPending = false;
             currentAction = accepted;
         }
+        if (previous != null && previous != target) { // NOPMD CompareObjectsWithEquals
+            // A release that lands somewhere else -- a quick move and let go -- ends the drag
+            // for the component it was over, and that component has to be told. Clearing the
+            // target without it left the old hover highlight on for good: the drop goes to
+            // somebody else, and the port's own end-of-session cleanup then finds the target
+            // already cleared and has nothing left to deliver the exit to.
+            dispatch(previous, ActionEvent.Type.NativeDragExit, content, x, y, action);
+        }
         if (accepted == NativeDragOperation.ACTION_NONE) {
             return NativeDragOperation.ACTION_NONE;
         }
+        // Queued after the exit above, so a component losing the drag hears about it before the
+        // one taking it hears about the drop.
         dispatch(target, ActionEvent.Type.NativeDrop, content, x, y, accepted);
         return accepted;
     }
