@@ -342,6 +342,39 @@ class Walker:
         )
 
 
+def occurrence_counts(root: Path, edges: collections.Counter) -> dict[Path, int]:
+    """How many times each document renders, following multiplicity down the graph.
+
+    A file included twice renders twice, and so does every file IT includes. The
+    include graph is a DAG -- asciidoctor rejects a cycle -- so each node's count
+    is the sum over its incoming edges of the parent's count times the edge's
+    multiplicity, with the root rendering once.
+    """
+    incoming: dict[Path, list[tuple[Path, int]]] = collections.defaultdict(list)
+    for (parent, child), count in edges.items():
+        incoming[child].append((parent, count))
+
+    counts: dict[Path, int] = {}
+    visiting: set[Path] = set()
+
+    def count_for(node: Path) -> int:
+        if node == root:
+            return 1
+        if node in counts:
+            return counts[node]
+        if node in visiting:
+            return 1  # a cycle asciidoctor would reject; do not spin on it
+        visiting.add(node)
+        total = sum(count_for(parent) * n for parent, n in incoming[node]) or 1
+        visiting.discard(node)
+        counts[node] = total
+        return total
+
+    for child in incoming:
+        count_for(child)
+    return counts
+
+
 def render(root: Path) -> str:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "guide.html"
@@ -495,6 +528,8 @@ def main() -> int:
                 f"A direct manifest entry must come out at level 2."
             )
 
+    render_counts = occurrence_counts(root, walker.include_edges)
+
     # 3. Outcome check: every included chapter's title survives into the book.
     rendered, rendered_chapters = rendered_titles(render(root))
     expected: dict[str, list[str]] = {}
@@ -512,15 +547,13 @@ def main() -> int:
         # A direct entry must appear at CHAPTER level. A nested fragment sits at
         # whatever depth its parent puts it, so it is only counted at all.
         #
-        # Counted once per INCLUSION, not once per file. A fragment two parents
-        # both include renders twice, and expecting one title let a swallowed
-        # occurrence hide behind the surviving one -- the check only ever asks
-        # whether a title appears at least as often as expected.
-        occurrences = sum(
-            count
-            for (_, included), count in walker.include_edges.items()
-            if included == path
-        ) or 1
+        # How many times this file RENDERS, which is not how many edges point at
+        # it. Multiplicity multiplies down the graph: a fragment two parents both
+        # include renders twice, and so does everything it includes in turn --
+        # counting the single edge recorded before _visit() returned early on the
+        # second traversal expected one title for two renderings, and a swallowed
+        # one hid behind the survivor.
+        occurrences = render_counts.get(path, 1)
         target = expected_chapters if path in walker.direct else expected
         for _ in range(occurrences):
             target.setdefault(key, []).append(path.name)

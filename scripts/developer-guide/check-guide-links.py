@@ -253,10 +253,12 @@ PUBLIC_TYPE_RE = (
 NESTED_TYPE_RE = (
     r"\b(?:public|protected)\b[^;{{]*?\b(?:class|interface|enum|record|@interface)\s+{stem}\b"
 )
+# What a --release 8 -protected run actually writes beside a package, checked by
+# running it: package-frame.html is a pre-JDK-11 artifact and is never emitted,
+# and package-use.html needs -use, which the generator does not pass -- the same
+# reason class-use/ is not accepted.
 JAVADOC_PACKAGE_PAGES = {
     "package-summary.html",
-    "package-frame.html",
-    "package-use.html",
     "package-tree.html",
 }
 _javadoc_index: tuple[set[str], set[str]] | None = None
