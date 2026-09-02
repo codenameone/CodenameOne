@@ -268,6 +268,56 @@ class IPhoneBuilderContinuityPlistTest {
                 IPhoneBuilder.plistWithoutComments(inject), "NSUserActivityTypes") >= 0);
     }
 
+    /**
+     * The case that survived the previous round: an old declaration kept commented out ABOVE the
+     * live one. The branch that calls the merge correctly saw a live key; the merge then found
+     * the dead one first and inserted into the comment, so the array iOS actually reads shipped
+     * without the continuity type and Handoff was never advertised.
+     */
+    @Test
+    void aCommentedDeclarationAboveALiveOneIsNotTheOneMergedInto() {
+        String inject = "<!-- <key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.old</string></array> -->"
+                + "<key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.live</string></array>";
+
+        String merged = IPhoneBuilder.mergeUserActivityTypes(inject, noIntents(), CONTINUITY_TYPE);
+
+        int comment = merged.indexOf("-->");
+        int added = merged.indexOf("<string>" + CONTINUITY_TYPE + "</string>");
+        assertTrue(added > comment,
+                "the continuity type landed inside the commented-out array: " + merged);
+        assertTrue(merged.contains("<string>com.example.app.live</string>"), merged);
+    }
+
+    /** The expander targets the live key too, for the same reason. */
+    @Test
+    void aCommentedSelfClosingArrayIsNotTheOneExpanded() {
+        String inject = "<!-- <key>NSUserActivityTypes</key><array/> -->"
+                + "<key>NSUserActivityTypes</key><array/>";
+
+        String expanded = IPhoneBuilder.expandEmptyUserActivityArray(inject);
+
+        assertTrue(expanded.contains("<!-- <key>NSUserActivityTypes</key><array/> -->"),
+                "the commented array was rewritten: " + expanded);
+        assertTrue(expanded.endsWith("<array></array>"), expanded);
+    }
+
+    @Test
+    void insideCommentRecognizesBothSides() {
+        String s = "aa<!--bb-->cc";
+        assertFalse(IPhoneBuilder.insideComment(s, 0));
+        assertTrue(IPhoneBuilder.insideComment(s, 6));
+        assertFalse(IPhoneBuilder.insideComment(s, 12));
+    }
+
+    /** An unterminated comment swallows the rest, which is what a parser does with it too. */
+    @Test
+    void anUnterminatedCommentSwallowsWhatFollows() {
+        String s = "aa<!--bb";
+        assertTrue(IPhoneBuilder.insideComment(s, 7));
+    }
+
     @Test
     void nothingToAddLeavesTheFragmentAlone() {
         String inject = "<key>NSUserActivityTypes</key><array>"

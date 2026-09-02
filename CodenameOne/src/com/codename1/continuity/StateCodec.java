@@ -300,14 +300,18 @@ public final class StateCodec {
             if (tag == 's') {
                 return body;
             }
+            // parseX rather than valueOf(String). Core is compiled a second time against
+            // Ports/CLDC11 and translated against vm/JavaAPI, and neither carries the
+            // String-taking valueOf overloads -- only valueOf(primitive). The Maven build accepts
+            // them against the full JDK, so the mistake only appears in the Ant leg.
             if (tag == 'i') {
-                return Integer.valueOf(body);
+                return Integer.valueOf(Integer.parseInt(body));
             }
             if (tag == 'l') {
-                return Long.valueOf(body);
+                return Long.valueOf(Long.parseLong(body));
             }
             if (tag == 'd') {
-                return Double.valueOf(body);
+                return Double.valueOf(Double.parseDouble(body));
             }
             if (tag == 'b') {
                 return Boolean.valueOf(body);

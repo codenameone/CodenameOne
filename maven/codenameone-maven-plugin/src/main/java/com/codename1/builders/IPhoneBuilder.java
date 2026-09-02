@@ -11721,6 +11721,35 @@ public class IPhoneBuilder extends Executor {
         return "\n<key>NSUserActivityTypes</key><array>" + types + "</array>";
     }
 
+    /// The index of the first `<key>` element naming `key` that is NOT inside an XML comment.
+    ///
+    /// `plistKeyIndex` reads structure but not liveness, so it answers with a declaration the
+    /// project commented out. Every use that goes on to EDIT what it found needs this instead.
+    ///
+    /// @param plist the fragment
+    /// @param key the key name
+    /// @return the index of the live key element, or -1
+    static int firstLiveIndex(String plist, String key) {
+        int at = plistKeyIndex(plist, key);
+        while (at >= 0 && insideComment(plist, at)) {
+            at = plistKeyIndex(plist, key, at + 1);
+        }
+        return at;
+    }
+
+    /// Whether `at` falls inside an `<!-- ... -->` span.
+    ///
+    /// An unterminated comment swallows the rest of the fragment, which is what a parser does
+    /// with it too -- see plistWithoutComments.
+    static boolean insideComment(String plist, int at) {
+        int open = plist.lastIndexOf("<!--", at);
+        if (open < 0) {
+            return false;
+        }
+        int close = plist.indexOf("-->", open + 4);
+        return close < 0 || close > at;
+    }
+
     /// Rewrites a self-closing `NSUserActivityTypes` array into an open/close pair.
     ///
     /// `<array/>` is the ordinary XML spelling of an empty array and a plist parser reads it
@@ -11738,7 +11767,7 @@ public class IPhoneBuilder extends Executor {
         if (inject == null) {
             return null;
         }
-        int key = plistKeyIndex(inject, "NSUserActivityTypes");
+        int key = firstLiveIndex(inject, "NSUserActivityTypes");
         if (key < 0) {
             return inject;
         }
@@ -11785,8 +11814,16 @@ public class IPhoneBuilder extends Executor {
         // fragment the application supplied, so "<array >" and "</array >" are shapes it
         // has to accept. Found by enumerating every literal closing tag left in this
         // file rather than waiting for the next one to be reported.
-        int key = plistKeyIndex(inject, "NSUserActivityTypes");
+        // The LIVE key, not the first one that matches. A project that kept an old declaration
+        // commented out above its real one had the ids merged into the comment: the branch above
+        // correctly saw a live key, and this then found the dead one first. The plist that
+        // shipped had no continuity type in the array iOS actually reads, so Handoff was never
+        // advertised and nothing anywhere said so.
+        int key = firstLiveIndex(inject, "NSUserActivityTypes");
         int open = key < 0 ? -1 : plistElementIndex(inject, "array", key);
+        while (open >= 0 && insideComment(inject, open)) {
+            open = plistElementIndex(inject, "array", open + 1);
+        }
         int close = open < 0 ? -1 : plistCloseElementIndex(inject, "array", open);
         if (close < 0) {
             return inject;
