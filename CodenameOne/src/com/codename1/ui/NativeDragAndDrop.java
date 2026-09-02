@@ -103,6 +103,13 @@ public final class NativeDragAndDrop {
     /// the session is not asked again on every drag event of the same gesture.
     private static boolean startOffered;
 
+    /// The action mask the drag last advertised, so the drop event can report what the
+    /// *source* permits rather than the one action the target settled on. The port hands
+    /// drop() a single action, not a mask, and NativeDropEvent#getAllowedActions() is
+    /// documented as the source's -- a listener could not otherwise tell a move-only source
+    /// from one that offered both and chose a move.
+    private static int advertisedActions;
+
     /// The session the operating system is currently running, or null.
     private static NativeDragOperation active;
 
@@ -566,6 +573,7 @@ public final class NativeDragAndDrop {
         boolean dispatchOver = false;
         int answer;
         synchronized (LOCK) {
+            advertisedActions = allowedActions;
             previous = currentTarget;
             changed = previous != target; // NOPMD CompareObjectsWithEquals
             if (changed) {
@@ -618,6 +626,7 @@ public final class NativeDragAndDrop {
             currentTarget = null;
             targetGeneration++;
             currentAction = NativeDragOperation.ACTION_NONE;
+            advertisedActions = NativeDragOperation.ACTION_NONE;
         }
         dispatch(previous, ActionEvent.Type.NativeDragExit, null, 0, 0, NativeDragOperation.ACTION_NONE);
     }
@@ -649,7 +658,13 @@ public final class NativeDragAndDrop {
         Component target = findTarget(windowId, x, y, content, action);
         int accepted;
         Component previous;
+        int advertised;
         synchronized (LOCK) {
+            // What the drag has been advertising all along. A drop arriving with no drag
+            // event before it -- which no real port does -- has only the port's one action
+            // to report.
+            advertised = advertisedActions == NativeDragOperation.ACTION_NONE
+                    ? action : advertisedActions;
             previous = currentTarget;
             if (target != null && target == currentTarget) { // NOPMD CompareObjectsWithEquals
                 // The target's own latest word, not a recomputation from the action the port
@@ -703,9 +718,12 @@ public final class NativeDragAndDrop {
         if (accepted == NativeDragOperation.ACTION_NONE) {
             return NativeDragOperation.ACTION_NONE;
         }
-        // Queued after the exit above, so a component losing the drag hears about it before the
-        // one taking it hears about the drop.
-        dispatch(target, ActionEvent.Type.NativeDrop, content, x, y, accepted);
+        // Queued after the exit above, so a component losing the drag hears about it before
+        // the one taking it hears about the drop. The event carries the source's whole mask
+        // and the action actually being performed -- different questions that used to get
+        // the same answer, so the drop reported the chosen action as though it were all the
+        // source had ever allowed.
+        dispatch(target, ActionEvent.Type.NativeDrop, content, x, y, advertised, accepted);
         return accepted;
     }
 
@@ -764,6 +782,7 @@ public final class NativeDragAndDrop {
             targetGeneration++;
             currentAction = NativeDragOperation.ACTION_NONE;
             overDispatchPending = false;
+            advertisedActions = NativeDragOperation.ACTION_NONE;
         }
         if (op == null) {
             return;
@@ -854,6 +873,12 @@ public final class NativeDragAndDrop {
     /// give the operating system.
     private static void dispatch(final Component target, final ActionEvent.Type type,
             final ClipboardContent content, final int x, final int y, final int allowedActions) {
+        dispatch(target, type, content, x, y, allowedActions, NativeDragOperation.ACTION_NONE);
+    }
+
+    private static void dispatch(final Component target, final ActionEvent.Type type,
+            final ClipboardContent content, final int x, final int y, final int allowedActions,
+            final int performedAction) {
         if (target == null) {
             if (type == ActionEvent.Type.NativeDragOver) {
                 synchronized (LOCK) {
@@ -873,6 +898,13 @@ public final class NativeDragAndDrop {
             public void run() {
                 try {
                     NativeDropEvent ev = new NativeDropEvent(target, type, content, x, y, allowedActions, local);
+                    if (type == ActionEvent.Type.NativeDrop
+                            && performedAction != NativeDragOperation.ACTION_NONE) {
+                        // The action the drop is performing, which is not what the event
+                        // would default to: a source allowing both defaults to a copy, so a
+                        // target handed a move read getAcceptedAction() as a copy.
+                        ev.accept(performedAction);
+                    }
                     if (type == ActionEvent.Type.NativeDragOver || type == ActionEvent.Type.NativeDragEnter) {
                         // Read as this runs, not when it was queued. A drag event can arrive
                         // before the enter callback ahead of it in the queue has run, and

@@ -4359,6 +4359,20 @@ public class Form extends Container implements TopLevelContainer {
         if (dragStopFlag) {
             pointerPressed(x, y);
         }
+        // The same hook the scalar overload runs, and the one that matters: an ordinary
+        // one-finger drag reaches a Form through *this* method. CodenameOneImplementation wraps
+        // its coordinates into one-element arrays and Display dispatches them here, and this
+        // overload is a separate implementation rather than a call to the scalar one -- so with
+        // the hook only there, a gesture never started a native drag on any port that begins
+        // one itself, which is every port except the one whose operating system owns the
+        // gesture. Placed after the dragStopFlag recovery for the reason the scalar overload
+        // gives.
+        //
+        // One pointer only. A second finger makes this a pinch or a two-finger scroll, and
+        // handing that to the operating system as a drag is not what the user is doing.
+        if (x.length == 1 && NativeDragAndDrop.pointerDragged(x[0], y[0])) {
+            return;
+        }
         autoRelease(x[0], y[0]);
         boolean localPointerPressedAgainDuringDrag = pointerPressedAgainDuringDrag;
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {

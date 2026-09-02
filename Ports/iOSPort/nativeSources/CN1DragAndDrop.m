@@ -790,7 +790,13 @@ API_AVAILABLE(ios(11.0))
 #endif
     }
     [cn1LoadingDropSessions addObject:session];
-    if (session.localDragSession != nil) {
+    // Whether *this* assembly is the one that owns the local completion state below. An older
+    // assembly must not consume state a newer one set: an external drop still loading when a
+    // local drag was dropped used to see that local session's flag and complete its source with
+    // the external drop's action. Two local drops cannot overlap -- the framework runs one drag
+    // at a time and a local drop's completion is what ends it -- so this is the whole of it.
+    const BOOL localAssembly = (session.localDragSession != nil);
+    if (localAssembly) {
         cn1LocalDropInFlight = YES;
         cn1EndDeferred = NO;
         cn1LocalDropResult = -1;
@@ -932,7 +938,7 @@ API_AVAILABLE(ios(11.0))
         // past long ago -- can stop holding off. Only this one: another drop still loading is
         // still entitled to its answer.
         [cn1LoadingDropSessions removeObject:session];
-        if (cn1LocalDropInFlight) {
+        if (localAssembly && cn1LocalDropInFlight) {
             cn1LocalDropInFlight = NO;
             if (cn1EndDeferred) {
                 cn1EndDeferred = NO;

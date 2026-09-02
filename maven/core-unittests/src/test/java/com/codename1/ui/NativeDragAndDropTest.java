@@ -90,6 +90,14 @@ class NativeDragAndDropTest extends UITestBase {
         return target;
     }
 
+    /// Drives a drag the way the framework really does. CodenameOneImplementation wraps a
+    /// single pointer into one-element arrays and Display dispatches *those*, and Form and
+    /// Window implement that overload separately from the scalar one -- so a test that calls
+    /// the scalar overload exercises a path no port takes.
+    private static void drag(Form form, int x, int y) {
+        form.pointerDragged(new int[]{x}, new int[]{y});
+    }
+
     private static ClipboardContent textContent(String text) {
         return new ClipboardContent().setData(ClipboardContent.MIME_TEXT, text);
     }
@@ -402,7 +410,7 @@ class NativeDragAndDropTest extends UITestBase {
             int x = source.getAbsoluteX() + 10;
             int y = source.getAbsoluteY() + 10;
             form.pointerPressed(x, y);
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             Image first = op.getDragImage();
             assertNotNull(first);
             NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
@@ -412,7 +420,7 @@ class NativeDragAndDropTest extends UITestBase {
             // become the operation's permanent image: the component may look different now and
             // the press landed somewhere else.
             form.pointerPressed(x + 4, y + 4);
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             Image second = op.getDragImage();
             assertNotNull(second);
             assertNotSame(first, second,
@@ -424,7 +432,7 @@ class NativeDragAndDropTest extends UITestBase {
             Image supplied = Image.createImage(4, 4);
             op.setDragImage(supplied);
             form.pointerPressed(x, y);
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             assertSame(supplied, op.getDragImage(), "an application's own image is left alone");
             NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
             flushSerialCalls();
@@ -549,7 +557,7 @@ class NativeDragAndDropTest extends UITestBase {
                     "the press stages the payload so a platform that owns the gesture can ask for it");
             assertNull(implementation.getStartedNativeDrag(), "a press alone is not a drag");
 
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             assertNotNull(implementation.getStartedNativeDrag(), "moving far enough starts the session");
             assertSame(source, implementation.getStartedNativeDrag().getSource());
             assertSame(implementation.getStartedNativeDrag(), NativeDragAndDrop.getActiveDrag());
@@ -586,7 +594,7 @@ class NativeDragAndDropTest extends UITestBase {
             form.pointerPressed(x, y);
             assertNotNull(implementation.getPreparedNativeDrag());
 
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             assertNotNull(implementation.getStartedNativeDrag());
             assertSame(source, implementation.getStartedNativeDrag().getSource());
 
@@ -620,7 +628,7 @@ class NativeDragAndDropTest extends UITestBase {
 
             form.pointerPressed(x, y);
             assertNotNull(implementation.getPreparedNativeDrag());
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             assertNotNull(implementation.getStartedNativeDrag());
             NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
             flushSerialCalls();
@@ -651,7 +659,7 @@ class NativeDragAndDropTest extends UITestBase {
                             + "has to be here or a disabled control is draggable on the main "
                             + "surface and not in a window");
 
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             assertNull(implementation.getStartedNativeDrag());
             form.pointerReleased(x + 200, y + 200);
 
@@ -659,7 +667,7 @@ class NativeDragAndDropTest extends UITestBase {
             source.setEnabled(true);
             form.pointerPressed(x, y);
             assertNotNull(implementation.getPreparedNativeDrag());
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             assertNotNull(implementation.getStartedNativeDrag());
             NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
             flushSerialCalls();
@@ -848,14 +856,14 @@ class NativeDragAndDropTest extends UITestBase {
             int x = source.getAbsoluteX() + 5;
             int y = source.getAbsoluteY() + 5;
             form.pointerPressed(x, y);
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             assertNull(implementation.getStartedNativeDrag(),
                     "grabbing a moving list stops it; handing the row to the operating system "
                             + "on that first packet makes the list impossible to stop");
 
             // The glide is over, and a deliberate drag from here still starts one.
             scroller.draggedMotionY = null;
-            form.pointerDragged(x + 400, y + 400);
+            drag(form, x + 400, y + 400);
             assertNotNull(implementation.getStartedNativeDrag(),
                     "and the feature still works once the scroll has been taken over");
 
@@ -866,6 +874,97 @@ class NativeDragAndDropTest extends UITestBase {
             implementation.resetNativeDragState();
             NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
             flushSerialCalls();
+        }
+    }
+
+    @FormTest
+    void theDropEventReportsWhatTheSourceAllowedAndWhatIsHappening() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        final NativeDropEvent[] seen = { null };
+        target.addNativeDropListener(new com.codename1.ui.events.ActionListener() {
+            public void actionPerformed(ActionEvent ev) {
+                if (ev.getEventType() == ActionEvent.Type.NativeDrop) {
+                    seen[0] = (NativeDropEvent) ev;
+                }
+            }
+        });
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        int both = NativeDragOperation.ACTION_COPY | NativeDragOperation.ACTION_MOVE;
+
+        // The source offers both and the target asks for the move, which is the case the
+        // question is about: the mask and the choice are different answers.
+        target.rejectAction = NativeDragOperation.ACTION_MOVE;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), both);
+        flushSerialCalls();
+        NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_MOVE);
+        flushSerialCalls();
+
+        assertNotNull(seen[0], "the drop has to reach the target for any of this to be asked");
+        assertEquals(both, seen[0].getAllowedActions(),
+                "getAllowedActions is what the *source* permits, and reporting the chosen "
+                        + "action there makes a copy-or-move source look move-only");
+        assertEquals(NativeDragOperation.ACTION_MOVE, seen[0].getAcceptedAction(),
+                "and the action being performed is the one that was chosen, not the copy a "
+                        + "source allowing both would default to");
+    }
+
+    @FormTest
+    void aSecondFingerIsAPinchRatherThanADragToHandOver() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("row"));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            form.pointerDragged(new int[]{x + 200, x + 260}, new int[]{y + 200, y + 40});
+            assertNull(implementation.getStartedNativeDrag(),
+                    "two pointers are a pinch or a two-finger scroll, not something to hand to "
+                            + "the operating system as a drag");
+
+            form.pointerReleased(x + 200, y + 200);
+        } finally {
+            // As everywhere else here: a session left active wedges every test after this one,
+            // so a failure has to be reported as one failure.
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
+    void theScalarDragOverloadStartsADragToo() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("row"));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            // Not the overload the ports drive, but public API an application may call, and the
+            // two must not diverge again.
+            form.pointerDragged(x + 200, y + 200);
+            assertNotNull(implementation.getStartedNativeDrag());
+        } finally {
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
         }
     }
 
@@ -914,11 +1013,11 @@ class NativeDragAndDropTest extends UITestBase {
             int x = source.getAbsoluteX() + 10;
             int y = source.getAbsoluteY() + 10;
             form.pointerPressed(x, y);
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             assertNull(NativeDragAndDrop.getActiveDrag(),
                     "the port refused, so no session is running yet");
             // A second drag packet must not offer the same gesture again.
-            form.pointerDragged(x + 220, y + 220);
+            drag(form, x + 220, y + 220);
 
             assertSame(op, NativeDragAndDrop.dragSessionStarted(),
                     "the staged operation is still there for the platform's own recognizer");
@@ -954,7 +1053,7 @@ class NativeDragAndDropTest extends UITestBase {
             int x = source.getAbsoluteX() + 10;
             int y = source.getAbsoluteY() + 10;
             form.pointerPressed(x, y);
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             assertNull(implementation.getStartedNativeDrag(),
                     "no receiver could accept it, so there is no drag to run");
             assertFalse(NativeDragAndDrop.startDrag(source, op),
@@ -991,7 +1090,7 @@ class NativeDragAndDropTest extends UITestBase {
             int x = source.getAbsoluteX() + 10;
             int y = source.getAbsoluteY() + 10;
             form.pointerPressed(x, y);
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             assertFalse(source.isVisible(),
                     "the lightweight drag took the gesture and hid the source it is carrying");
 
@@ -1027,7 +1126,7 @@ class NativeDragAndDropTest extends UITestBase {
             int x = source.getAbsoluteX() + 10;
             int y = source.getAbsoluteY() + 10;
             form.pointerPressed(x, y);
-            form.pointerDragged(x + 200, y + 200);
+            drag(form, x + 200, y + 200);
             form.pointerReleased(x + 200, y + 200);
             assertNull(NativeDragAndDrop.dragSessionStarted(),
                     "a gesture that ended cannot be turned into a drag by a later recognizer");
@@ -1052,7 +1151,7 @@ class NativeDragAndDropTest extends UITestBase {
         int x = source.getAbsoluteX() + 10;
         int y = source.getAbsoluteY() + 10;
         form.pointerPressed(x, y);
-        form.pointerDragged(x + 200, y + 200);
+        drag(form, x + 200, y + 200);
         assertNull(implementation.getPreparedNativeDrag());
         assertNull(implementation.getStartedNativeDrag());
         form.pointerReleased(x + 200, y + 200);

@@ -3358,6 +3358,17 @@ public class Window extends Container implements TopLevelContainer {
     /// pressed child gets an ordinary one-finger drag and never its `pinch` callbacks.
     @Override
     public void pointerDragged(int[] x, int[] y) {
+        // The same hook the scalar overload runs, and the one an ordinary one-finger drag
+        // actually reaches: Display wraps a single pointer into one-element arrays and
+        // dispatches them here, and this overload is a separate implementation rather than a
+        // call to the scalar one. With the hook only there a gesture never began a native drag
+        // on any port that starts one itself.
+        //
+        // One pointer only: a second finger makes this a pinch or a two-finger scroll, which is
+        // not a drag to hand to the operating system.
+        if (x.length == 1 && NativeDragAndDrop.pointerDragged(x[0], y[0])) {
+            return;
+        }
         // The same listener block the scalar overload runs. Adding it there only
         // meant a gesture stopped notifying window listeners the moment it became
         // multi touch, which is where pull to refresh loses its updates.
