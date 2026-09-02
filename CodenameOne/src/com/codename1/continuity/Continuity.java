@@ -399,8 +399,14 @@ public final class Continuity {
     ///
     /// - `l`: the listener
     public static void addContinuationListener(ContinuityListener l) {
-        if (l != null && !listeners.contains(l)) {
-            listeners.add(l);
+        synchronized (STATE_LOCK) {
+            // Guarded, because the registration API carries no EDT-only contract: an application
+            // registering from a worker raced the snapshot dispatchLocked() takes on the EDT, so
+            // a new listener could be missed, a removed one still called, or the copy taken
+            // mid-mutation.
+            if (l != null && !listeners.contains(l)) {
+                listeners.add(l);
+            }
         }
     }
 
@@ -410,7 +416,9 @@ public final class Continuity {
     ///
     /// - `l`: the listener
     public static void removeContinuationListener(ContinuityListener l) {
-        listeners.remove(l);
+        synchronized (STATE_LOCK) {
+            listeners.remove(l);
+        }
     }
 
     /// Installs the endpoint that carries state to devices the platform will not reach, and asks
@@ -898,7 +906,23 @@ public final class Continuity {
         // prevent.
         boolean shown = restore(state);
         if (shown) {
-            setParked(null);
+            synchronized (STATE_LOCK) {
+                // Compare-and-clear, not a blind clear. An off-EDT caller takes state A and waits
+                // while the EDT restores it, and a delivery queued behind that can park a NEWER
+                // state B in the meantime -- clearing the slot then threw B away, and the
+                // in-memory high-water mark stopped the relay offering it again for the rest of
+                // the session.
+                //
+                // By (device, sequence) rather than by reference. That pair is how this class
+                // identifies a state everywhere else -- it is what lastSeen keys on and what the
+                // echo check uses -- so two objects carrying it ARE the same state, which a
+                // reference test would have missed. The project's PMD gate forbids == on objects
+                // for exactly this reason.
+                if (isSameState(parked, state)) {
+                    parked = null;
+                    parkedEra = NO_ERA;
+                }
+            }
         }
         return shown;
     }
@@ -1083,6 +1107,7 @@ public final class Continuity {
             public void run() {
                 try {
                     for (;;) {
+                        boolean standDown = false;
                         pollOnce();
                         synchronized (STATE_LOCK) {
                             if (!pollAgain) {
@@ -1090,11 +1115,17 @@ public final class Continuity {
                                 // publisher documents: releasing the lock between the two would
                                 // let a poll requested in the gap set a flag nobody ever reads.
                                 polling = false;
-                                // Owed work goes out AFTER the fetch, never before it.
-                                startPublisher();
-                                return;
+                                standDown = true;
+                            } else {
+                                pollAgain = false;
                             }
-                            pollAgain = false;
+                        }
+                        if (standDown) {
+                            // Owed work goes out AFTER the fetch, never before it -- and OUTSIDE
+                            // the lock, because startPublisher() spawns a thread and nothing slow
+                            // or re-entrant may run under STATE_LOCK.
+                            startPublisher();
+                            return;
                         }
                     }
                 } catch (Throwable t) {
@@ -1360,7 +1391,17 @@ public final class Continuity {
             return;
         }
         synchronized (STATE_LOCK) {
-            if (relay == null || publishing || pendingPublish == null) {
+            if (relay == null || publishing || pendingPublish == null || polling) {
+                if (polling) {
+                    // A GET is outstanding. The relay holds ONE document per user, so a POST that
+                    // lands before the answer overwrites the other device's state -- and the GET
+                    // then reads back our own write, so the remote update is never seen. The
+                    // earlier fix deferred only the retained work pollRelay() itself starts;
+                    // a checkpoint arriving mid-poll still published straight over it. The poll
+                    // starts a publisher when it finishes.
+                    publishRequested = true;
+                    return;
+                }
                 if (publishing) {
                     // Remembered rather than dropped. The live publisher picks up whatever is
                     // queued when it finishes, which is what makes the ordering total -- but if
@@ -1641,7 +1682,10 @@ public final class Continuity {
         }
         // A copy, because a listener that reacts by unregistering itself is ordinary and would
         // otherwise mutate the list being walked.
-        List<ContinuityListener> snapshot = new ArrayList<ContinuityListener>(listeners);
+        List<ContinuityListener> snapshot;
+        synchronized (STATE_LOCK) {
+            snapshot = new ArrayList<ContinuityListener>(listeners);
+        }
         for (ContinuityListener l : snapshot) {
             boolean accepted;
             try {
@@ -1761,6 +1805,20 @@ public final class Continuity {
 
     /// Serializes the durable write of the high-water marks. See rememberSeen().
     private static final Object SEEN_LOCK = new Object();
+
+    /// Whether two states are the same one: same origin device, same sequence.
+    ///
+    /// The pair that identifies a state throughout this class. Neither half alone will do --
+    /// sequences restart at zero on a device whose preferences were cleared, and one device
+    /// publishes many.
+    private static boolean isSameState(AppState a, AppState b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        String left = a.getDeviceId();
+        String right = b.getDeviceId();
+        return left != null && left.equals(right) && a.getSequence() == b.getSequence();
+    }
 
     /// Records that `state` has been acted on, durably.
     private static void noteActedOn(AppState state) {
@@ -1994,7 +2052,9 @@ public final class Continuity {
 
     /// Test seam: returns the framework to its untouched state.
     static void reset() {
-        listeners.clear();
+        synchronized (STATE_LOCK) {
+            listeners.clear();
+        }
         synchronized (STATE_LOCK) {
             lastSeen.clear();
             deliveryEra++;
