@@ -27,6 +27,7 @@ import com.codenameone.developerguide.snippets.generated.BasicsJava034Snippet;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.CN;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Font;
@@ -99,6 +100,24 @@ public final class PreAdvancedThemingScreenshots {
     }
 
     public static void generate(ScreenshotSink sink) throws IOException {
+        // JavaSEPort.loadTrueTypeFont has an earlier branch for native: fonts:
+        // when isIOS is set -- which loadSkinFile does for any skin whose
+        // systemFontFamily contains "helvetica" -- it resolves to the first
+        // INSTALLED SF or Helvetica family and never reaches the bundled Roboto.
+        // This generator never loads a skin, so that branch is not taken, and the
+        // measurement agrees: figures rendered on a Mac match the Linux runner
+        // byte for byte, which could not happen if one side were using Helvetica
+        // Neue. Guard it anyway, because a future change that loads a skin here
+        // would put the host's fonts back into the output without any other
+        // symptom.
+        String platform = Display.getInstance().getPlatformName();
+        if ("ios".equals(platform)) {
+            throw new IllegalStateException(
+                    "an iOS skin is active, so native: fonts would resolve to installed "
+                    + "system faces instead of the bundled ones and these figures would "
+                    + "stop being reproducible off this machine");
+        }
+
         // MigLayout picks its default gaps from PlatformDefaults, which reads
         // System.getProperty("os.name") and returns MAC_OSX, GNOME or WINDOWS_XP.
         // The gaps differ per platform, so mig-layout.png came out with macOS

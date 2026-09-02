@@ -50,8 +50,13 @@ jobs:
             docs:
               - 'docs/developer-guide/**'
               - 'docs/demos/common/src/main/snippets/**'
-              - 'scripts/developer-guide/migrate-inline-guide-snippets.py'
-              - 'scripts/developer-guide/validate-guide-snippets.py'
+              # The whole directory, not two named files. on.pull_request.paths
+              # already triggers on scripts/developer-guide/**, so a change to any
+              # other script here started the workflow while leaving this filter
+              # false -- which skipped the very steps that script governs. A
+              # change to compare-screenshots.py could have merged without the
+              # screenshot check ever running it.
+              - 'scripts/developer-guide/**'
               - '.github/workflows/developer-guide-docs.yml'
               # Triggering the workflow is not enough on its own: the HTML and PDF
               # build and the steps beside it are gated on this filter, so the
