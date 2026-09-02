@@ -2886,6 +2886,12 @@ struct cn1VirtualThread;
  * which owns it rather than borrowing the host's -- see the definition.
  */
 extern struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThread);
+/**
+ * EXPERIMENTAL and unfinished -- see the block above the definition in
+ * nativeMethods.m for what is open. Nothing in this repository calls either of
+ * these; they ship so the server work can build against them. The coroutine runtime
+ * underneath (cn1_virtual_thread.h) is finished and is not experimental.
+ */
 /** A virtual thread with a Java stack of its own, ready to be resumed. */
 extern struct cn1VirtualThread* cn1SpawnVirtualThread(void (*body)(void*), void* arg,
                                                       size_t stackBytes);

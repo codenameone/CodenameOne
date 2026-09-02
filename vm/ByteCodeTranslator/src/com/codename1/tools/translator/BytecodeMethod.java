@@ -4225,7 +4225,8 @@ public class BytecodeMethod implements SignatureSet {
         // charInternal is the hottest String method under a server load.
         //
         // Worth removing rather than tolerating because a checked cast is REAL work
-        // here: builds pass -Dcn1.checkedCasts=true, so BC_CHECKCAST_CHECKED walks
+        // here: the clean target enables checked casts unconditionally and other
+        // targets can pass -Dcn1.checkedCasts=true, so BC_CHECKCAST_CHECKED walks
         // the class hierarchy instead of expanding to nothing.
         removeRepeatedCheckcasts();
 

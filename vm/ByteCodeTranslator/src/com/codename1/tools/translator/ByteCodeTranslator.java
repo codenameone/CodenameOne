@@ -235,6 +235,23 @@ public class ByteCodeTranslator {
      * java.lang.ClassCastException. Emitting the check without retaining the class would
      * leave an unresolved symbol at link time.
      */
+    /**
+     * EXPERIMENTAL, and deliberately INERT unless asked for.
+     *
+     * Checked casts exist for the server-side clean target, where there is no EDT
+     * catch upstream and a bad cast otherwise walks into generated native field
+     * access. They are OFF by default on purpose -- including on the clean target --
+     * because the feature is not finished and nothing in this repository ships with
+     * it on. Turning it on by default was suggested in review and is wrong: it would
+     * change codegen for every clean-target build in the tree to exercise a path that
+     * is still being designed.
+     *
+     * Enable it deliberately with -Dcn1.checkedCasts=true. The emitted checks
+     * (BC_CHECKCAST_CHECKED, CN1_ARRAY_STORE_CHECK) are maintained and reviewed under
+     * that flag; they are not a claim that the VM validates casts today. See
+     * CLAUDE.md, "Never rely on ClassCastException", which remains the rule for every
+     * shipping target.
+     */
     public static boolean isCheckedCastsEnabled() {
         return "true".equalsIgnoreCase(System.getProperty("cn1.checkedCasts", "false"));
     }

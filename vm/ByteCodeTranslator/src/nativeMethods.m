@@ -2264,6 +2264,26 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
  * actually live. Giving it a stack but sharing the host's state would have two
  * threads of control writing one Java stack.
  *
+ * EXPERIMENTAL. This pair -- cn1SpawnVirtualThread and cn1RetireVirtualThread --
+ * is the VM-state half of virtual threads and is NOT FINISHED. Nothing in this
+ * repository calls it; it ships so the server work can build against it, and its
+ * lifecycle is designed against a real workload rather than guessed at. Review
+ * findings against it are noted rather than patched, because each patch so far has
+ * traded one hole for another (a scanning race became a collector hang; a bounds
+ * fix became a use-after-free). The COROUTINE runtime it sits on --
+ * cn1_virtual_thread.{h,c,S} and the collector's stack scanning -- is finished,
+ * tested and used, and is not covered by this notice.
+ *
+ * Known and deliberately open, all of them waiting on one design decision (carrier
+ * association, i.e. making the collector's stop handshake stop being per-TLD):
+ *   - a collection can walk this state's object stack while its virtual thread
+ *     mutates it;
+ *   - retiring a virtual thread retires the CARRIER's BiBOP pages, because
+ *     collectThreadResources works on thread-local state rather than the state it
+ *     is handed;
+ *   - the collector cannot stop a compute-only virtual thread at all, which is why
+ *     marking such a state active is a hang rather than a fix.
+ *
  * KNOWN GAP, stated here because the obvious fix is worse than the problem. The
  * state this creates is never marked threadActive while its virtual thread runs,
  * so a collection concurrent with a running virtual thread can walk that state's
