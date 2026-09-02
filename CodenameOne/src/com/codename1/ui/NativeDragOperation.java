@@ -250,6 +250,17 @@ public class NativeDragOperation {
         }
     }
 
+    /// Clears the outcome of a previous drag, because this operation is being installed as the
+    /// active one again.
+    ///
+    /// The same instance is offered for every drag of the component that owns it, so without
+    /// this `#getPerformedAction()` would go on reporting the *previous* drag's result for the
+    /// whole of the new one, which contradicts its contract that the value before completion is
+    /// `#ACTION_NONE`.
+    void resetPerformedAction() {
+        performedAction = ACTION_NONE;
+    }
+
     /// Records the outcome and notifies the completion listeners. Invoked by the port, on the
     /// event dispatch thread, when the native drag session ends.
     ///

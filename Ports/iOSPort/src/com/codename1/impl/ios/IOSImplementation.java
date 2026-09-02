@@ -9303,14 +9303,29 @@ public class IOSImplementation extends CodenameOneImplementation {
             return 0;
         }
         ClipboardContent content = op.getContent();
-        byte[] image = content.getBytes(ClipboardContent.MIME_PNG);
-        if (image == null) {
-            image = content.getBytes(ClipboardContent.MIME_JPEG);
+        nativeInstance.beginNativeDragPayload();
+        // Every advertised representation, not a fixed list of the framework's own. prepare
+        // advertises whatever the content holds, so forwarding less than that left an operation
+        // carrying only, say, MIME_MARKDOWN advertising a type it then could not produce -- and
+        // a drag with no items at all is cancelled the moment it starts.
+        String[] mimeTypes = content.getMimeTypes();
+        for (int iter = 0; iter < mimeTypes.length; iter++) {
+            String mime = mimeTypes[iter];
+            if (ClipboardContent.MIME_FILE.equals(mime)) {
+                // Normalized through getFiles(), which reads back both the single-String and
+                // the String[] spellings a producer may have used.
+                nativeInstance.addNativeDragPayload(mime, join(content.getFiles()), null);
+                continue;
+            }
+            // Reading the value here is what resolves a promised representation, which is the
+            // whole point of doing this at session start rather than on the press.
+            Object value = content.getData(mime);
+            if (value instanceof String) {
+                nativeInstance.addNativeDragPayload(mime, (String) value, null);
+            } else if (value instanceof byte[]) {
+                nativeInstance.addNativeDragPayload(mime, null, (byte[]) value);
+            }
         }
-        nativeInstance.setNativeDragPayload(content.getText(ClipboardContent.MIME_TEXT),
-                content.getText(ClipboardContent.MIME_HTML),
-                content.getText(ClipboardContent.MIME_RTF),
-                image, join(content.getFiles()));
         return op.getAllowedActions();
     }
 

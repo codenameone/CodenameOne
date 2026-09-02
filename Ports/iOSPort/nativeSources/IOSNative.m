@@ -1095,15 +1095,17 @@ void com_codename1_impl_ios_IOSNative_prepareNativeDrag___java_lang_String_int_b
     POOL_END();
 }
 
-void com_codename1_impl_ios_IOSNative_setNativeDragPayload___java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT plain, JAVA_OBJECT html, JAVA_OBJECT rtf, JAVA_OBJECT image, JAVA_OBJECT fileUris) {
+void com_codename1_impl_ios_IOSNative_beginNativeDragPayload__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    CN1BeginNativeDragPayload();
+}
+
+void com_codename1_impl_ios_IOSNative_addNativeDragPayload___java_lang_String_java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType, JAVA_OBJECT text, JAVA_OBJECT binary) {
     POOL_BEGIN();
-    // Synchronously, unlike prepare: this runs inside the session-started callback on the main
-    // thread and the item providers are built from it the moment it returns.
-    CN1SetNativeDragPayload(plain == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG plain),
-                            html == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG html),
-                            rtf == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG rtf),
-                            image == JAVA_NULL ? nil : arrayToData(image),
-                            fileUris == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG fileUris));
+    // Synchronously, unlike prepare: these run inside the session-started callback on the main
+    // thread and the item providers are built from them the moment it returns.
+    CN1AddNativeDragPayload(mimeType == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeType),
+                            text == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG text),
+                            binary == JAVA_NULL ? nil : arrayToData(binary));
     POOL_END();
 }
 

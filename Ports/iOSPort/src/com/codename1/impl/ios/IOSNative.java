@@ -375,23 +375,26 @@ public final class IOSNative {
     native void prepareNativeDrag(String mimeTypes, int allowedActions, byte[] dragImagePng,
             int touchX, int touchY);
 
-    /// Delivers the payload for the session UIKit has just started, called from inside the
-    /// session-started callback so that a promised file is written only once a drag really
-    /// happens.
+    /// Clears the payload, ready for the representations of the session UIKit has just started.
+    /// Called from inside the session-started callback, so that a promised representation is
+    /// built only once a drag really happens.
+    native void beginNativeDragPayload();
+
+    /// Adds one representation to the payload being built.
+    ///
+    /// Every MIME type the operation advertises goes through here rather than a fixed list, so
+    /// nothing the application published is silently left behind -- a drag offering only
+    /// `text/markdown` used to advertise it and then carry nothing, which UIKit cancels.
     ///
     /// #### Parameters
     ///
-    /// - `plain`: the plain text representation, or null
+    /// - `mimeType`: the representation's MIME type
     ///
-    /// - `html`: the HTML representation, or null
+    /// - `text`: the value when it is text, or newline separated paths for
+    ///   `com.codename1.ui.ClipboardContent#MIME_FILE`; null otherwise
     ///
-    /// - `rtf`: the rich text representation, or null
-    ///
-    /// - `image`: image bytes, or null
-    ///
-    /// - `fileUris`: newline separated file paths or `file:` URIs, or null
-    native void setNativeDragPayload(String plain, String html, String rtf, byte[] image,
-            String fileUris);
+    /// - `binary`: the value when it is binary; null otherwise
+    native void addNativeDragPayload(String mimeType, String text, byte[] binary);
 
     /// Drops whatever `#prepareNativeDrag(java.lang.String, int, byte[], int, int)` staged,
     /// because the press turned out to be a tap.

@@ -157,6 +157,7 @@ public final class NativeDragAndDrop {
             return false;
         }
         op.setSource(source);
+        op.resetPerformedAction();
         synchronized (LOCK) {
             active = op;
             currentTarget = null;
@@ -204,6 +205,7 @@ public final class NativeDragAndDrop {
             currentTarget = null;
             currentAction = NativeDragOperation.ACTION_NONE;
         }
+        op.resetPerformedAction();
         if (source != null) {
             // On the event dispatch thread, because it repaints. A component that is draggable
             // as well as a native drag source would otherwise be left mid-drag with its image

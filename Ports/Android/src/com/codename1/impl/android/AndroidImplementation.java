@@ -10271,21 +10271,34 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// the clip, never null
     ClipData clipDataFor(ClipboardContent content) {
         int sdk = android.os.Build.VERSION.SDK_INT;
-        ClipData clip = null;
-        if (sdk >= 16 && content.getText(ClipboardContent.MIME_HTML) != null) {
-            clip = ClipData.newHtmlText("Codename One",
-                    content.getText(ClipboardContent.MIME_TEXT),
-                    content.getText(ClipboardContent.MIME_HTML));
-        } else if (content.getText(ClipboardContent.MIME_TEXT) != null) {
-            clip = ClipData.newPlainText("Codename One", content.getText(ClipboardContent.MIME_TEXT));
+        List<String> mimeTypes = new ArrayList<String>();
+        List<ClipData.Item> items = new ArrayList<ClipData.Item>();
+        String plain = content.getText(ClipboardContent.MIME_TEXT);
+        String html = content.getText(ClipboardContent.MIME_HTML);
+        if (sdk >= 16 && html != null) {
+            mimeTypes.add(ClipboardContent.MIME_TEXT);
+            mimeTypes.add(ClipboardContent.MIME_HTML);
+            items.add(new ClipData.Item(plain, html));
+        } else if (plain != null) {
+            mimeTypes.add(ClipboardContent.MIME_TEXT);
+            items.add(new ClipData.Item(plain));
         }
         try {
-            clip = enrichClipWithBinaryContent(content, clip);
+            addBinaryContent(content, mimeTypes, items);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
         }
-        if (clip == null) {
-            clip = ClipData.newPlainText("Codename One", "");
+        if (items.isEmpty()) {
+            return ClipData.newPlainText("Codename One", "");
+        }
+        // Built from the union of the types, not by appending to a text clip. ClipData.addItem
+        // does not add the item's type to the description, so a clip assembled that way
+        // describes itself as text only -- and both a Codename One drop target filtering on
+        // MIME_FILE and an external receiver choosing a representation read the description.
+        ClipData clip = new ClipData("Codename One",
+                mimeTypes.toArray(new String[mimeTypes.size()]), items.get(0));
+        for (int iter = 1; iter < items.size(); iter++) {
+            clip.addItem(items.get(iter));
         }
         return clip;
     }
@@ -10317,12 +10330,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
-     * Enriches the given base ClipData (which may be null) with image bytes and/or file
-     * references carried by the ClipboardContent, exposing binary content as FileProvider
-     * content:// URIs. Returns the (possibly newly created) ClipData, or the original clip on
-     * failure. Never throws.
+     * Collects the image bytes and file references carried by the ClipboardContent as items and
+     * MIME types, exposing binary content as FileProvider content:// URIs. The caller assembles
+     * the ClipData from the union of everything collected here and the text types, because
+     * ClipData.addItem cannot widen a description that already exists.
      */
-    private ClipData enrichClipWithBinaryContent(ClipboardContent content, ClipData clip) throws IOException {
+    private void addBinaryContent(ClipboardContent content, List<String> mimeTypes,
+            List<ClipData.Item> items) throws IOException {
         String authority = getContext().getPackageName() + ".provider";
 
         // Image bytes: prefer PNG, then JPEG, then GIF
@@ -10358,11 +10372,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             Uri imageUri = FileProvider.getUriForFile(getContext(), authority, imageFile);
             // Grant broadly so any paste target can read the content:// URI
             getContext().grantUriPermission("android", imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            if (clip == null) {
-                clip = new ClipData("Codename One", new String[]{ imageMime }, new ClipData.Item(imageUri));
-            } else {
-                clip.addItem(new ClipData.Item(imageUri));
+            if (!mimeTypes.contains(imageMime)) {
+                mimeTypes.add(imageMime);
             }
+            items.add(new ClipData.Item(imageUri));
         }
 
         // File references: MIME_FILE may be a single String or a String[]
@@ -10389,14 +10402,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     u = FileProvider.getUriForFile(getContext(), authority, file);
                     getContext().grantUriPermission("android", u, Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 }
-                if (clip == null) {
-                    clip = new ClipData("Codename One", new String[]{ "text/uri-list" }, new ClipData.Item(u));
-                } else {
-                    clip.addItem(new ClipData.Item(u));
+                if (!mimeTypes.contains("text/uri-list")) {
+                    mimeTypes.add("text/uri-list");
                 }
+                items.add(new ClipData.Item(u));
             }
         }
-        return clip;
     }
 
     /**

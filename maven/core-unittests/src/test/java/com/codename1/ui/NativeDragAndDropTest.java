@@ -303,6 +303,31 @@ class NativeDragAndDropTest extends UITestBase {
     // ------------------------------------------------------------------------------------
 
     @FormTest
+    void reusingAnOperationForgetsTheOutcomeOfTheLastDrag() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            NativeDragOperation op = new NativeDragOperation("reused")
+                    .setAllowedActions(NativeDragOperation.ACTION_COPY | NativeDragOperation.ACTION_MOVE);
+            assertTrue(NativeDragAndDrop.startDrag(null, op));
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_MOVE);
+            flushSerialCalls();
+            assertEquals(NativeDragOperation.ACTION_MOVE, op.getPerformedAction());
+
+            // The same instance is offered for every drag of its component, so the second drag
+            // must not go on reporting the first one's result while it is still running.
+            assertTrue(NativeDragAndDrop.startDrag(null, op));
+            assertEquals(NativeDragOperation.ACTION_NONE, op.getPerformedAction(),
+                    "a drag in flight has performed nothing yet, whatever the last one did");
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void becomingADragSourceTellsThePort() {
         implementation.resetNativeDragState();
         try {

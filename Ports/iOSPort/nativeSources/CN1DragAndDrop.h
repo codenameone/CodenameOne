@@ -82,19 +82,26 @@ void CN1EnableNativeDropTarget(void);
 
 /// Stages the drag a press has made possible: which representations it can offer, what the
 /// receiver may do with them, and the image to show under the finger. The representations are
-/// named but not built -- CN1SetNativeDragPayload delivers the bytes once the drag really
+/// named but not built -- CN1AddNativeDragPayload delivers the bytes once the drag really
 /// starts.
 ///
 /// mimeTypes is newline separated.
 void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragImagePng,
                           int touchX, int touchY);
 
-/// Delivers the payload for the session UIKit has just started. Called from Java, from inside
-/// the session-started callback below.
+/// Clears the payload, ready for the representations of the session UIKit has just started.
+/// Called from Java, from inside the session-started callback below.
+void CN1BeginNativeDragPayload(void);
+
+/// Adds one representation to the payload being built.
 ///
-/// fileUris is newline separated and may be nil.
-void CN1SetNativeDragPayload(NSString* plain, NSString* html, NSString* rtf,
-                             NSData* image, NSString* fileUris);
+/// Every MIME type the operation advertises is pushed through here, rather than a fixed list of
+/// the framework's own -- an operation carrying only, say, `text/markdown` was advertised but
+/// never forwarded, so the drag began with no items and UIKit cancelled it at once.
+///
+/// `text` and `binary` are alternatives; `application/x-file-list` arrives as newline separated
+/// paths in `text`.
+void CN1AddNativeDragPayload(NSString* mimeType, NSString* text, NSData* binary);
 
 /// Drops whatever CN1PrepareNativeDrag staged, because the press turned out to be a tap.
 void CN1CancelNativeDrag(void);
@@ -116,7 +123,7 @@ int CN1NativeDragDeliverDrop(int x, int y, NSString* plain, NSString* html, NSSt
 
 /// Announces that UIKit has started a drag session. Returns the actions the framework's staged
 /// operation allows, or 0 when it has none -- in which case no drag begins. The Java side calls
-/// CN1SetNativeDragPayload from inside this call.
+/// CN1BeginNativeDragPayload and CN1AddNativeDragPayload from inside this call.
 int CN1NativeDragDeliverSessionStarted(void);
 
 /// Reports the outcome of a session this application started.

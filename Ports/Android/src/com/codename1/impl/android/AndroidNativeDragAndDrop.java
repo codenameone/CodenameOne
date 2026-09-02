@@ -66,6 +66,11 @@ final class AndroidNativeDragAndDrop {
     private static NativeDragOperation exporting;
     private static int lastAction = NativeDragOperation.ACTION_NONE;
 
+    /// What a drop of *our own* session onto one of our own components settled on, kept until
+    /// the session ends so the source is told what really happened. Android's drag events carry
+    /// no action, so this is the only place the true answer exists.
+    private static int localDropAction = NativeDragOperation.ACTION_NONE;
+
     private static NativeDragOperation exporting() {
         synchronized (LOCK) {
             return exporting;
@@ -87,6 +92,18 @@ final class AndroidNativeDragAndDrop {
     private static void setLastAction(int action) {
         synchronized (LOCK) {
             lastAction = action;
+        }
+    }
+
+    private static int localDropAction() {
+        synchronized (LOCK) {
+            return localDropAction;
+        }
+    }
+
+    private static void setLocalDropAction(int action) {
+        synchronized (LOCK) {
+            localDropAction = action;
         }
     }
 
@@ -145,6 +162,7 @@ final class AndroidNativeDragAndDrop {
         }
         setExporting(op);
         setLastAction(NativeDragOperation.ACTION_NONE);
+        setLocalDropAction(NativeDragOperation.ACTION_NONE);
         view.post(new Runnable() {
             @Override
             public void run() {
@@ -200,12 +218,15 @@ final class AndroidNativeDragAndDrop {
                     return drop(impl, event);
                 case DragEvent.ACTION_DRAG_ENDED:
                     if (exporting() != null) {
-                        int allowed = allowedActions();
+                        // Settled *before* the operation is forgotten. Reading the allowed
+                        // actions afterwards is how this reported every move as a copy: with
+                        // nothing exporting, allowedActions() answers with its copy fallback.
+                        int completed = completedAction(event.getResult());
                         setExporting(null);
-                        NativeDragAndDrop.dragCompleted(event.getResult()
-                                ? preferred(allowed) : NativeDragOperation.ACTION_NONE);
+                        NativeDragAndDrop.dragCompleted(completed);
                     }
                     setLastAction(NativeDragOperation.ACTION_NONE);
+                    setLocalDropAction(NativeDragOperation.ACTION_NONE);
                     return true;
                 default:
                     return false;
@@ -214,6 +235,29 @@ final class AndroidNativeDragAndDrop {
             Log.e(err);
             return false;
         }
+    }
+
+    /// What to tell the source a finished session actually did.
+    ///
+    /// A drop onto one of this application's own components knows exactly what was accepted,
+    /// and that is the answer -- without it a move accepted locally was reported as a copy and
+    /// a source relying on ACTION_MOVE to delete its data never did.
+    ///
+    /// A drop into *another* application cannot be answered so precisely: Android's drag
+    /// protocol carries no notion of copy versus move, and ACTION_DRAG_ENDED reports only a
+    /// boolean. Copy is the honest reading of "it succeeded and we do not know how", and it is
+    /// also the safe one, because reporting a move the receiver may not have performed would
+    /// have the source delete data nothing else holds. An operation that allows only a move
+    /// still reports a move, since there is nothing else it could have been.
+    private static int completedAction(boolean result) {
+        if (!result) {
+            return NativeDragOperation.ACTION_NONE;
+        }
+        int local = localDropAction();
+        if (local != NativeDragOperation.ACTION_NONE) {
+            return local;
+        }
+        return preferred(allowedActions());
     }
 
     private static boolean drop(AndroidImplementation impl, DragEvent event) {
@@ -233,6 +277,11 @@ final class AndroidNativeDragAndDrop {
                 ? preferred(allowedActions()) : lastAction();
         int accepted = NativeDragAndDrop.drop(0, (int) event.getX(), (int) event.getY(), content, action);
         setLastAction(NativeDragOperation.ACTION_NONE);
+        if (exporting() != null) {
+            // Our own drag, dropped on our own surface: remember what the target took, because
+            // ACTION_DRAG_ENDED is about to be asked and has no way of knowing.
+            setLocalDropAction(accepted);
+        }
         return accepted != NativeDragOperation.ACTION_NONE;
     }
 
