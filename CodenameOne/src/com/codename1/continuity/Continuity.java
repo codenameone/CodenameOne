@@ -219,6 +219,9 @@ public final class Continuity {
     /// A state that arrived and could not be shown yet. Guarded by STATE_LOCK.
     private static AppState parked;
 
+    /// The delivery era `parked` arrived in, or NO_ERA. Guarded by STATE_LOCK.
+    private static long parkedEra;
+
     private Continuity() {
     }
 
@@ -1008,12 +1011,16 @@ public final class Continuity {
             // write that records where the user now is, and without this a cold start would come
             // back to the position that preceded the restore.
             persist(state);
-            // And recorded as acted on. deliver() is not the only way a state gets applied: an
-            // application may hand one to restore() itself, from its own transport or from
-            // getRestorableState(). Marking only the arrival path meant a relaunch re-delivered
-            // the very state the user was already looking at.
-            noteActedOn(state);
         }
+        // Acknowledged whenever the state was APPLIED, which is not the same question as whether
+        // a form appeared. A route-less continuation is applied by handing its payload to the
+        // provider -- the documented shape for an app that does not use @Route -- and
+        // restoreStack() then returns false, so tying the acknowledgement to the return value
+        // left that state unmarked: the relay offered it again after every restart, and with
+        // automatic restore off the no-argument wrapper re-applied it on every call. Calling
+        // restore() IS the acceptance; what it returns only says whether the caller still needs
+        // to show a screen.
+        noteActedOn(state);
         return shown;
     }
 
@@ -1580,11 +1587,13 @@ public final class Continuity {
         }
     }
 
-    private static void dispatch(AppState state) {
-        dispatch(state, NO_ERA);
-    }
-
-    /// As above, for a delivery queued in a known run of the framework.
+    /// Applies an arrival: offers it to the listeners, then restores or parks it.
+    ///
+    /// The era is always supplied. There was a convenience overload passing NO_ERA, and the
+    /// cold-launch waiter used it -- which is precisely how the revalidation inside COMMIT_LOCK
+    /// came to be bypassed on the one path where the wait is longest. Removing it means the
+    /// question cannot be skipped by accident, and SpotBugs refuses an uncalled private method
+    /// anyway.
     private static void dispatch(AppState state, long era) {
         // COMMIT_LOCK for the whole dispatch, which is what actually serializes it against
         // clear(). stillDeliverable() checked the era and released STATE_LOCK, so a logout landing
@@ -1607,11 +1616,11 @@ public final class Continuity {
                     return;
                 }
             }
-            dispatchLocked(state);
+            dispatchLocked(state, era);
         }
     }
 
-    private static void dispatchLocked(AppState state) {
+    private static void dispatchLocked(AppState state, long era) {
         if (isTooOld(state)) {
             // Checked HERE and not only on arrival, because arrival is not the only way in. A
             // continuation that cold-launches the app is parked and waits up to WINDOW_WAIT_MILLIS
@@ -1627,7 +1636,7 @@ public final class Continuity {
             // table into a display that is not ready, so it waits -- bounded, because a launch
             // that never produces a form is broken and jumping the user minutes later is worse
             // than doing nothing.
-            park(state);
+            park(state, era);
             return;
         }
         // A copy, because a listener that reacts by unregistering itself is ordinary and would
@@ -1663,12 +1672,14 @@ public final class Continuity {
             // in-memory mark still goes in at admission, which is what dedups within a session.
             rememberSeen();
         } else {
-            setParked(state);
+            // Parked with its era, so the application accepting it later is still checked against
+            // the run it arrived in.
+            setParked(state, era);
         }
     }
 
-    private static void park(final AppState state) {
-        setParked(state);
+    private static void park(final AppState state, long era) {
+        setParked(state, era);
         synchronized (STATE_LOCK) {
             if (waitingForWindow) {
                 return;
@@ -1702,12 +1713,15 @@ public final class Continuity {
                         // waiter was started for. A newer arrival while it waited is the one
                         // worth showing, and identity comparison would have discarded it.
                         AppState waiting;
+                        long waitingEra;
                         synchronized (STATE_LOCK) {
                             waiting = parked;
+                            waitingEra = parkedEra;
                             parked = null;
+                            parkedEra = NO_ERA;
                         }
                         if (waiting != null) {
-                            dispatch(waiting);
+                            dispatch(waiting, waitingEra);
                         }
                     }
                 });
@@ -2039,8 +2053,19 @@ public final class Continuity {
     }
 
     private static void setParked(AppState state) {
+        setParked(state, NO_ERA);
+    }
+
+    /// Parks `state`, remembering which run of the framework it arrived in.
+    ///
+    /// The era travels WITH it. The cold-launch waiter unparks and dispatches minutes later, and
+    /// dispatching through the era-less overload bypassed the revalidation inside COMMIT_LOCK --
+    /// so a clear() during the wait let the previous account's listeners, navigation and
+    /// persistence run after logout, which is the one thing that revalidation exists to stop.
+    private static void setParked(AppState state, long era) {
         synchronized (STATE_LOCK) {
             parked = state;
+            parkedEra = state == null ? NO_ERA : era;
         }
     }
 

@@ -209,8 +209,14 @@ public class LocalContinuityBridge implements ContinuityBridge {
 
     @Override
     public boolean syncedStorePut(String key, String value) {
-        Preferences.set(PREFIX + key, value);
         synchronized (INDEX_LOCK) {
+            // The VALUE write is inside the lock too. Serializing only the index left the two
+            // halves able to interleave with remove(): the delete could land between this write
+            // and the index update, leaving a listed key with no value -- or this could report
+            // success while the concurrent remove stripped its index entry, so keys() omitted a
+            // value that is really stored. The store and its index have to move together or they
+            // do not describe the same thing.
+            Preferences.set(PREFIX + key, value);
             // Read, modify and write the key index under ONE hold. Two concurrent put()s each
             // read the same index, each added their own key, and the second write erased the
             // first: both values stayed readable directly, while keys() omitted one of them for
@@ -220,10 +226,11 @@ public class LocalContinuityBridge implements ContinuityBridge {
                 keys.add(key);
                 writeIndex(keys);
             }
+            // Read back rather than assume, so the simulation answers the same question the
+            // device does: is the value there now? Under the lock, so the answer cannot be
+            // invalidated by a remove() between the write and the read.
+            return value.equals(Preferences.get(PREFIX + key, null));
         }
-        // Read back rather than assume, so the simulation answers the same question the device
-        // does: is the value there now?
-        return value.equals(Preferences.get(PREFIX + key, null));
     }
 
     @Override
@@ -233,8 +240,8 @@ public class LocalContinuityBridge implements ContinuityBridge {
 
     @Override
     public void syncedStoreRemove(String key) {
-        Preferences.delete(PREFIX + key);
         synchronized (INDEX_LOCK) {
+            Preferences.delete(PREFIX + key);
             List<String> keys = indexKeys();
             if (keys.remove(key)) {
                 writeIndex(keys);
