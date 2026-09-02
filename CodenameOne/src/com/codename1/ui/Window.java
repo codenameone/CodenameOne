@@ -4038,6 +4038,12 @@ public class Window extends Container implements TopLevelContainer {
     /// notification `#cancelPendingInput()` sends -- that one is for a window going
     /// away, this one is for input changing hands while the window stays put.
     private void cancelPointerGesture() {
+        // Whatever the press staged for the operating system goes with it. This is the
+        // window's own cancellation -- a press handler putting a dialog up, an overlay
+        // taking the pointer -- and it delivers no release, so nothing else clears it. The
+        // next motion packet reaches the native hook before the gestureCancelled test below
+        // it, and would have started a drag from the component now behind the dialog.
+        NativeDragAndDrop.gestureCancelled();
         if (dragged != null && dragged.isDragAndDropInitialized()) {
             // No drop target: the user never completed the drag, something took the
             // pointer away. This still restores visibility and clears the drag flags.

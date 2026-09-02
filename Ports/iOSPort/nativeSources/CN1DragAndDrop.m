@@ -413,7 +413,12 @@ void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragI
 #endif
     cn1PreparedMimes = mimes;
     cn1SessionActions = allowedActions;
-    cn1PreparedPreview = dragImagePng == nil ? nil : [UIImage imageWithData:dragImagePng];
+    // At the screen's scale, because the framework renders in device pixels and UIKit lays
+    // the preview out in points. Decoded at scale 1, a snapshot from a 2x or 3x screen is
+    // that many times too big -- and the touch offset below is converted to points, so the
+    // grab point lands somewhere else on an image of the wrong size as well.
+    cn1PreparedPreview = dragImagePng == nil ? nil
+            : [UIImage imageWithData:dragImagePng scale:(scaleValue > 0 ? scaleValue : 1)];
     cn1PreparedTouch = CGPointMake(touchX / scaleValue, touchY / scaleValue);
 #ifndef CN1_USE_ARC
     [cn1PreparedMimes retain];

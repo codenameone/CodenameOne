@@ -10249,6 +10249,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     android.content.ClipData clip;
                     if (obj instanceof ClipboardContent) {
                         clip = clipDataFor((ClipboardContent) obj);
+                        if (clip == null) {
+                            // A copy of nothing is an empty clipboard, which is a thing the user
+                            // asked for and can paste. A *drag* of nothing is not: there the null
+                            // refuses to start, because a drag that carries nothing still lands
+                            // somewhere and tells that receiver it succeeded.
+                            clip = ClipData.newPlainText("Codename One", "");
+                        }
                     } else {
                         clip = ClipData.newPlainText("Codename One", obj.toString());
                     }
@@ -10269,7 +10276,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     ///
     /// #### Returns
     ///
-    /// the clip, never null
+    /// the clip, or null when the content produced no representation at all
     ClipData clipDataFor(ClipboardContent content) {
         int sdk = android.os.Build.VERSION.SDK_INT;
         List<String> mimeTypes = new ArrayList<String>();
@@ -10321,7 +10328,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             attachCarriedText(items, plain, carriesHtml ? html : null);
         }
         if (items.isEmpty()) {
-            return ClipData.newPlainText("Codename One", "");
+            // Nothing was produced. Every representation this content offered is a provider that
+            // answered null or threw, which ClipboardDataProvider explicitly permits -- so there
+            // is no clip, and the callers decide what that means. Answering with empty text
+            // instead replaced the payload with a different one: a drag offering only
+            // application/pdf reported success and let another application accept blank text.
+            return null;
         }
         // Built from the union of the types, not by appending to a text clip. ClipData.addItem
         // does not add the item's type to the description, so a clip assembled that way

@@ -939,6 +939,44 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aGestureTheWindowHandsOverDoesNotLeaveADragStaged() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("holds a drag source");
+        try {
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("behind the dialog"));
+            w.setLayout(new BorderLayout());
+            w.add(BorderLayout.CENTER, source);
+            w.show();
+            flushSerialCalls();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            w.pointerPressed(x, y);
+            assertNotNull(implementation.getPreparedNativeDrag(), "the press staged one");
+
+            // What showing a dialog from a press handler does: the pointer changes hands and
+            // no release ever arrives for the gesture that was in flight.
+            w.pushPointerInputScope(new Container());
+            w.pointerDragged(new int[]{x + 200}, new int[]{y + 200});
+
+            assertNull(implementation.getStartedNativeDrag(),
+                    "the component that staged this is behind whatever took the pointer, and "
+                            + "the native hook runs before the cancellation is looked at");
+        } finally {
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            w.dispose();
+            flushSerialCalls();
+            implementation.setMultiWindowSupported(false);
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aCancelledGestureDoesNotLeaveADragStaged() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

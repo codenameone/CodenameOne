@@ -154,10 +154,12 @@ final class JavaSENativeDragAndDrop {
                         NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
                         return;
                     }
-                    if (dragImage != null) {
-                        handler.setDragImage(dragImage);
-                        handler.setDragImageOffset(offset);
-                    }
+                    // Every session, including the ones with no image at all. The handler
+                    // belongs to the canvas and outlives the drag, so setting it only when
+                    // there is one left the previous drag's picture on it and exported the
+                    // next payload under a preview of something else entirely.
+                    handler.setDragImage(dragImage);
+                    handler.setDragImageOffset(dragImage == null ? new Point(0, 0) : offset);
                     handler.exportAsDrag(target, trigger, toAwtAction(preferred(op.getAllowedActions())));
                 } catch (Throwable err) {
                     Log.e(err);
