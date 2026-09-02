@@ -772,6 +772,80 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A bare carriage return ends a line in Groovy exactly as a newline does.
+     * The comment scan learned that; the statement splitter had not, so every
+     * statement of a CR-only fragment merged into one and a main-variant
+     * configuration paired with a debug-only coordinate.
+     */
+    @Test
+    public void aBareCarriageReturnSeparatesStatements() {
+        String jdk8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
+        String separate = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation 'com.example:other:1.0'\r"
+                + "    debugImplementation '" + jdk8 + ":1.9.22'\r");
+        check(separate.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a debug-only coordinate is not the main declaration, got <<"
+                        + separate + ">>");
+
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation 'com.example:other:1.0'\r"
+                        + "    implementation '" + jdk8 + ":1.7.22!!'\r")),
+                "and a pin on its own CR-terminated line is read");
+
+        // CRLF is one break, not two.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation 'com.example:other:1.0'\r\n"
+                        + "    debugImplementation '" + jdk8 + ":1.9.22'\r\n")
+                        .contains("kotlin-stdlib-jdk8:1.8.0"),
+                "CRLF does not split twice");
+
+        // Everything that continues a statement across a newline continues it
+        // across a carriage return.
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation \\\r        '" + jdk8 + ":1.7.22!!'\r")),
+                "a line continuation still continues");
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    configurations.all { resolutionStrategy.eachDependency "
+                        + "{ d ->\r        if (d.requested.name == 'kotlin-stdlib')\r"
+                        + "            d.useVersion '1.7.22'\r    } }\r")),
+                "an unbraced body still joins its condition");
+    }
+
+    /**
+     * A ternary chooses between its arms exactly as an if/else does, and so does
+     * an elvis. Read as a sequence, only the last setter counted -- so the arm
+     * holding a strict pre-merge version was passed over.
+     */
+    @Test
+    public void aTernaryChoosesBetweenVersionsToo() {
+        String jdk8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
+        String[] branched = {
+            "    implementation('" + jdk8 + "') { version { "
+                    + "legacy ? strictly('1.7.22') : strictly('1.9.22') } }\n",
+            "    implementation('" + jdk8 + "') { version { "
+                    + "legacy ? strictly('1.9.22') : strictly('1.7.22') } }\n",
+            "    implementation('" + jdk8 + "') { version { "
+                    + "legacy ?: strictly('1.9.22') ; strictly '1.7.22' } }\n",
+        };
+        for (int i = 0; i < branched.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    branched[i]);
+            check("".equals(out), "either arm may run, got <<" + out + ">>");
+        }
+
+        // Safe navigation is the one question mark that chooses nothing, so the
+        // setters either side of it stay a sequence and the last one wins. Both
+        // versions are readable on purpose: an unreadable one would suppress for
+        // a different reason and test nothing.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation('" + jdk8 + "') { version { "
+                        + "strictly '1.7.22'; strictly '1.9.22' } "
+                        + "because project?.name.toString() }\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "safe navigation is not a branch");
+    }
+
+    /**
      * Groovy ends a line at a bare carriage return too. Searching only for the
      * newline swallowed the whole remainder of a CR-only fragment as part of a
      * line comment -- including the strict pin that followed it.

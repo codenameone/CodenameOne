@@ -1243,7 +1243,7 @@ public class KotlinStdlibAlignment {
         // other, and which one is not readable here. The lowest is the answer then,
         // for the reason every unevaluable branch gets it -- a pre-merge version
         // that may be the live one has to stand the block down.
-        if (!containsAConditional(statement)) {
+        if (!containsAConditional(statement) && !holdsATernary(statement)) {
             return found.get(found.size() - 1);
         }
         String lowest = null;
@@ -1273,6 +1273,25 @@ public class KotlinStdlibAlignment {
                 return true;
             }
             i = end - 1;
+        }
+        return false;
+    }
+
+    /** Whether a question mark outside a literal makes this an expression branch. */
+    private static boolean holdsATernary(String statement) {
+        for (int i = 0; i < statement.length(); i++) {
+            if (isLiteralStart(statement, i)) {
+                i = endOfStringLiteral(statement, i);
+                continue;
+            }
+            // `legacy ? strictly('1.7.22') : strictly('1.9.22')` chooses between
+            // them exactly as an if/else does, and so does the elvis form. Safe
+            // navigation is the one question mark that branches nothing, and it is
+            // the only one followed by a dot.
+            if (statement.charAt(i) == '?'
+                    && (i + 1 >= statement.length() || statement.charAt(i + 1) != '.')) {
+                return true;
+            }
         }
         return false;
     }
@@ -2852,7 +2871,16 @@ public class KotlinStdlibAlignment {
                 if (depth > 0) {
                     depth--;
                 }
-            } else if ((c == '\n' || c == ';') && depth == 0) {
+            } else if ((c == '\n' || c == '\r' || c == ';') && depth == 0) {
+                // A bare carriage return ends a line in Groovy exactly as a newline
+                // does. Recognising only the newline merged every statement of a
+                // CR-only fragment into one, so a main-variant configuration paired
+                // with a debug-only coordinate and that artifact read as declared.
+                // CRLF is one break, not two: the newline behind a return is eaten
+                // here rather than splitting again on an already-empty statement.
+                if (c == '\r' && i + 1 < text.length() && text.charAt(i + 1) == '\n') {
+                    i++;
+                }
                 // A trailing comma continues the statement. Groovy's parenthesis-free
                 // map notation spreads one declaration over several lines --
                 //   implementation group: 'org.jetbrains.kotlin',
@@ -2861,7 +2889,7 @@ public class KotlinStdlibAlignment {
                 // -- and splitting there left the configuration, the group, the
                 // artifact and any closure in four statements, none of which is a
                 // declaration on its own.
-                if (c == '\n' && endsWithComma(current)) {
+                if (c != ';' && endsWithComma(current)) {
                     current.append(' ');
                     continue;
                 }
@@ -2869,12 +2897,12 @@ public class KotlinStdlibAlignment {
                 // coordinate on the next line was split into a configuration with
                 // no dependency and a coordinate with no configuration, so neither
                 // said anything and the strict pin between them went unread.
-                if (c == '\n' && endsWithLineContinuation(current)) {
+                if (c != ';' && endsWithLineContinuation(current)) {
                     current.setLength(current.length() - 1);
                     current.append(' ');
                     continue;
                 }
-                if (c == '\n' && opensAnUnbracedBody(current.toString())) {
+                if (c != ';' && opensAnUnbracedBody(current.toString())) {
                     // An `if (...)` with no brace takes the next line as its body, so
                     // splitting there put the condition in one statement and the body
                     // in another -- and a resolution rule written that way had the
@@ -2883,7 +2911,7 @@ public class KotlinStdlibAlignment {
                     current.append(' ');
                     continue;
                 }
-                out.add(current.toString().replace('\n', ' '));
+                out.add(current.toString().replace('\n', ' ').replace('\r', ' '));
                 current.setLength(0);
                 continue;
             }
@@ -2900,7 +2928,7 @@ public class KotlinStdlibAlignment {
                     out.add(dangling[i]);
                 }
             } else {
-                out.add(current.toString().replace('\n', ' '));
+                out.add(current.toString().replace('\n', ' ').replace('\r', ' '));
             }
         }
         // Definitions are folded in FIRST, because the merge below only absorbs a
