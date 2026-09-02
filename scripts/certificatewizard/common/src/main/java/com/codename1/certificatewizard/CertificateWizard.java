@@ -1519,13 +1519,28 @@ public class CertificateWizard extends Lifecycle {
         if (!canInstallIntoProject()) {
             return;
         }
-        // Deliberately platform-neutral, and only as an existence test. Apple registers an
-        // identifier once for the whole account, so a record of ANY platform means the
-        // create below would come back "not available" -- the refusal issue #5652 is about.
-        // Every step that goes on to USE the App ID resolves it for the platform it needs,
-        // which is not necessarily this record.
-        SigningState.BundleId existing = findBundleByIdentifier(bundleIdentifier);
+        // The iOS record specifically, because everything below this uses one. A neutral
+        // existence test was answered by the macOS registration of the same identifier on
+        // an account that had run Mac setup first: the create was skipped, and the run then
+        // stopped several steps later saying the bundle ID "could not be found after
+        // refresh" -- about an App ID it had never tried to create.
+        SigningState.BundleId existing = findBundleByIdentifier(bundleIdentifier, "IOS");
         if (existing == null) {
+            // Registered, but not for iOS. Apple registers an identifier once for the whole
+            // account, so asking again returns "not available" (the refusal issue #5652 is
+            // about) and adding iOS to it is a portal action the signing API does not offer.
+            // The Mac stages do not need the iOS App ID, so the run says what it skipped and
+            // goes on to do them -- the same shape as the Mac half skipping when the
+            // identifier is iOS-only.
+            SigningState.BundleId taken = findBundleByIdentifier(bundleIdentifier);
+            if (taken != null) {
+                warnDuringAutoSetup("iOS signing was skipped: the App ID " + bundleIdentifier
+                        + " is registered for " + bundlePlatformName(taken.platform())
+                        + ", and Apple registers an identifier once. Enable iOS on it in the Apple"
+                        + " Developer portal to sign iOS builds with it.");
+                autoSetupMacStages(() -> finishAutoSetup("Automatic signing setup completed."));
+                return;
+            }
             showPageMessage("Creating Bundle ID " + bundleIdentifier + "...", false);
             service.createBundleId(bundleIdentifier, appName, projectWantsPush("IOS"), r -> {
                 if (!r.ok) {
@@ -1790,11 +1805,19 @@ public class CertificateWizard extends Lifecycle {
     private void autoSetupDefaultProfilesAfterGroups(String bundleIdentifier, String appName) {
         autoSetupCertificate(bundleIdentifier, appName, PROFILE_DEVELOPMENT,
                 () -> autoSetupCertificate(bundleIdentifier, appName, PROFILE_APP_STORE,
-                        () -> autoSetupMacProject(PROFILE_MAC_STORE,
-                                () -> autoSetupMacProject(PROFILE_MAC_DIRECT,
-                                        () -> autoSetupWidgetExtension(bundleIdentifier, appName,
-                                                () -> autoSetupDocumentProviderExtension(bundleIdentifier, appName,
-                                                        () -> finishAutoSetup("Automatic signing setup completed.")))))));
+                        () -> autoSetupMacStages(
+                                () -> autoSetupWidgetExtension(bundleIdentifier, appName,
+                                        () -> autoSetupDocumentProviderExtension(bundleIdentifier, appName,
+                                                () -> finishAutoSetup("Automatic signing setup completed."))))));
+    }
+
+    /// The Mac half of a run: the store and Developer ID profiles, in that order.
+    ///
+    /// Named because it is reached two ways -- after the iOS half, and instead of it when
+    /// the identifier turns out not to be registered for iOS. The extensions are not part
+    /// of it: they are App IDs derived from the app's own iOS one.
+    private void autoSetupMacStages(Runnable next) {
+        autoSetupMacProject(PROFILE_MAC_STORE, () -> autoSetupMacProject(PROFILE_MAC_DIRECT, next));
     }
 
     private void autoSetupMacProject(String profileType) {

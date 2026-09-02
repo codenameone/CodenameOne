@@ -78,6 +78,30 @@ class CertificateWizardPageMessageTest {
     }
 
     @Test
+    void anIdentifierRegisteredOnlyForMacStillRunsTheMacStages() throws Exception {
+        // The account has this identifier registered for macOS and nothing else, which is
+        // what running Mac setup first leaves behind. iOS cannot be added to it from here --
+        // Apple registers an identifier once -- so the run has to say so and carry on with
+        // the stages that do not need an iOS App ID, rather than stopping several steps
+        // later to report a bundle ID it never tried to create.
+        CertificateWizard app = launch("com.example.macapp");
+
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app.getForm(), "btn.autoSetup");
+            }
+        });
+
+        String banner = bannerText(app.getForm());
+        assertTrue(banner.contains("iOS signing was skipped"),
+                "the run has to say what it could not do, got: " + banner);
+        assertTrue(banner.contains("Automatic signing setup completed"),
+                "and still finish the stages that can run, got: " + banner);
+        assertTrue(banner.indexOf("could not be found after refresh") < 0,
+                "and never report a bundle ID it did not try to create: " + banner);
+    }
+
+    @Test
     void aSuccessfulInstallClearsTheFailureBeforeIt() throws Exception {
         CertificateWizard app = launch("com.example.myapp");
 

@@ -63,6 +63,10 @@ public final class MockSigningService implements SigningService {
         // endpoint carries no capabilities at all. The wizard has to render that as unknown
         // rather than as off (issue #5657).
         bundles.add(new SigningState.BundleId("BID_C3", "com.example.legacy", "Legacy App", "IOS", null));
+        // Registered for macOS and nothing else, which is what an account looks like after
+        // Mac signing was set up for a project before anything else was.
+        bundles.add(new SigningState.BundleId("BID_MACONLY", "com.example.macapp", "Mac Only App",
+                "MAC_OS", null));
         devices.add(new SigningState.Device("DEV_1", "Shai's iPhone", "00008120-000A1C3E0C68201E", "IOS", "ENABLED"));
         devices.add(new SigningState.Device("DEV_2", "QA iPad", "00008027-0004450E2688002E", "IOS", "ENABLED"));
         // A retired device is still on the account and Apple rejects a profile request naming it,
