@@ -20,6 +20,7 @@ import sys
 import tempfile
 from collections import defaultdict
 from pathlib import Path
+from urllib.parse import unquote
 
 ID_RE = re.compile(r'\bid="([^"]+)"')
 HREF_RE = re.compile(r'href="#([^"]+)"')
@@ -95,6 +96,27 @@ def render(root: Path, attributes: tuple[str, ...] = ()) -> str:
         return out.read_text(encoding="utf-8")
 
 
+def packaged_asset(guide_dir: Path, target: str) -> bool:
+    """Whether a relative href names a file that ships beside the rendered page.
+
+    The HTML package copies every subdirectory of docs/developer-guide next to
+    developer-guide.html, so `link:img/example.png[]` resolves for a reader who
+    opens the zip. `sketch` is the one directory the packaging step skips, so a
+    link into it does not.
+    """
+    path = target.split("#", 1)[0].split("?", 1)[0]
+    if not path:
+        return False
+    candidate = (guide_dir / unquote(path)).resolve()
+    try:
+        relative_path = candidate.relative_to(guide_dir)
+    except ValueError:
+        return False  # escapes the guide directory, so it is not packaged
+    if relative_path.parts and relative_path.parts[0] == "sketch":
+        return False
+    return candidate.exists()
+
+
 def source_locations(guide_dir: Path, target: str) -> list[str]:
     """Find where a dangling target is referenced, so the error is actionable."""
     hits = []
@@ -134,6 +156,8 @@ def main() -> int:
             raw_id_links[target] += 1
             branches[target].add(name)
         for target in RELATIVE_HREF_RE.findall(markup):
+            if packaged_asset(guide_dir, target):
+                continue
             relative[target] += 1
             branches[target].add(name)
 
