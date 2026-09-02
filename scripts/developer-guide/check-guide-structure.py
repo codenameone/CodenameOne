@@ -34,7 +34,13 @@ HEADING_RE = re.compile(r"^(=+) +(\S.*)$")
 # Literal-content blocks only. The container delimiters -- ==== example,
 # **** sidebar, ____ quote -- hold ordinary AsciiDoc, so an include or a heading
 # inside one is real and must not be skipped.
-FENCE_RE = re.compile(r"^(----|\.\.\.\.|````|\+\+\+\+)\s*$")
+# Literal blocks only -- an example (====) or sidebar (****) block contains live
+# markup, so its headings and includes are real. A delimiter may be LONGER than
+# four characters, and closes on one of the same character AND length, so a
+# four-dash line inside a five-dash block is content rather than the close.
+# Matching exactly four left every ----- block's contents live: the guide has 20
+# such lines, all [source] blocks wrapping an include::.
+FENCE_RE = re.compile(r"^(-{4,}|\.{4,}|`{4,}|\+{4,})\s*$")
 # Inline AsciiDoc markup that never survives into the rendered heading text.
 INLINE_MARKUP_RE = re.compile(r"[`*_#]|\[\[[^\]]*\]\]|\[[^\]]*\]")
 
@@ -45,12 +51,17 @@ def parse_lines(path: Path) -> list[str]:
 
 def first_heading(path: Path) -> tuple[int, str] | None:
     """Return (level, title) of the file's first heading outside a fenced block."""
-    in_fence = False
+    open_fence: str | None = None
     for line in parse_lines(path):
-        if FENCE_RE.match(line):
-            in_fence = not in_fence
+        fence = FENCE_RE.match(line)
+        if fence:
+            token = fence.group(1)
+            if open_fence is None:
+                open_fence = token
+            elif token == open_fence:
+                open_fence = None
             continue
-        if in_fence:
+        if open_fence is not None:
             continue
         match = HEADING_RE.match(line)
         if match:
@@ -91,12 +102,17 @@ class Walker:
             return
         self.reachable[path] = attrs_from_parent
         lines = parse_lines(path)
-        in_fence = False
+        open_fence: str | None = None
         for index, line in enumerate(lines):
-            if FENCE_RE.match(line):
-                in_fence = not in_fence
+            fence = FENCE_RE.match(line)
+            if fence:
+                token = fence.group(1)
+                if open_fence is None:
+                    open_fence = token
+                elif token == open_fence:
+                    open_fence = None
                 continue
-            if in_fence:
+            if open_fence is not None:
                 continue
             match = INCLUDE_RE.match(line)
             if not match:

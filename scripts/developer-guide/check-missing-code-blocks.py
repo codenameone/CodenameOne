@@ -35,7 +35,13 @@ ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
 # and validate-guide-snippets.py requires every listing to be [source,LANG] with a
 # bare include:: inside ---- delimiters, so a three-backtick block would fail that
 # gate before reaching this one. Add it here if that convention ever changes.
-FENCE_RE = re.compile(r"^(----|\.\.\.\.|````|\+\+\+\+)\s*$")
+# Literal blocks only -- an example (====) or sidebar (****) block contains live
+# markup, so its headings and includes are real. A delimiter may be LONGER than
+# four characters, and closes on one of the same character AND length, so a
+# four-dash line inside a five-dash block is content rather than the close.
+# Matching exactly four left every ----- block's contents live: the guide has 20
+# such lines, all [source] blocks wrapping an include::.
+FENCE_RE = re.compile(r"^(-{4,}|\.{4,}|`{4,}|\+{4,})\s*$")
 # Lines that end in a colon without promising a listing: headings, attributes,
 # comments, block titles, list markers, table cells and block delimiters.
 NON_PROSE_PREFIX = ("//", "|", "=", ".", ":", "*", "-", "+", "[", "<")
@@ -65,13 +71,18 @@ def normalize(line: str) -> str:
 
 def scan(path: Path) -> list[tuple[int, str]]:
     lines = path.read_text(encoding="utf-8").split("\n")
-    in_fence = False
+    open_fence: str | None = None
     findings = []
     for index, line in enumerate(lines):
-        if FENCE_RE.match(line):
-            in_fence = not in_fence
+        fence = FENCE_RE.match(line)
+        if fence:
+            token = fence.group(1)
+            if open_fence is None:
+                open_fence = token
+            elif token == open_fence:
+                open_fence = None
             continue
-        if in_fence:
+        if open_fence is not None:
             continue
         stripped = line.rstrip()
         if not stripped.endswith(":"):
