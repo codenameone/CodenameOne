@@ -283,6 +283,11 @@ jobs:
           python3 scripts/developer-guide/check-guide-structure.py
           python3 scripts/developer-guide/check-guide-xrefs.py
           python3 scripts/developer-guide/check-missing-code-blocks.py
+          # Note this only catches a link the GUIDE breaks. When the website
+          # moves the route instead -- a page renamed, deleted or re-slugged --
+          # the same script runs from website-docs.yml, which triggers on
+          # docs/website/**. Putting those paths here would run this whole job
+          # (maven install, demo build, screenshots) for every blog post.
           python3 scripts/developer-guide/check-guide-links.py
 
       - name: Build Developer Guide HTML and PDF

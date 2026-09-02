@@ -26,8 +26,11 @@ from urllib.parse import urlsplit
 
 ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
 URL_RE = re.compile(r"\bhttps?://[^\s\[\]<>\"'`)]+")
-# Served by the site outside the content tree.
-STATIC_PREFIXES = ("/javadoc/", "/files/", "/developer-guide/", "/images/", "/img/", "/blog/")
+# Trees the site serves that are produced by a build rather than by a file in
+# this repository, so nothing here can be enumerated. Everything else --
+# including /blog/ and every static asset -- is derived, because whitelisting a
+# prefix silently exempts every path under it from the check.
+GENERATED_PREFIXES = ("/javadoc/", "/developer-guide/")
 # http:// is correct for these: RFC 3161 timestamping servers reject TLS, and
 # example.com URLs are illustrative rather than fetched.
 TLS_EXEMPT_HOSTS = {"timestamp.digicert.com", "example.com", "www.example.com"}
@@ -38,33 +41,107 @@ LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0"}
 SITE_HOSTS = {"codenameone.com", "www.codenameone.com"}
 
 
+def front_matter(page: Path) -> dict[str, object]:
+    """Pull the few front-matter keys that decide a page's published route.
+
+    Deliberately not a YAML parse: the tree mixes YAML and TOML front matter and
+    only three keys matter here.
+    """
+    text = page.read_text(encoding="utf-8", errors="ignore")
+    lines = text.split("\n")
+    if not lines or lines[0].strip() not in {"---", "+++"}:
+        return {}
+    fence = lines[0].strip()
+    out: dict[str, object] = {}
+    aliases: list[str] = []
+    in_aliases = False
+    for line in lines[1:]:
+        if line.strip() == fence:
+            break
+        if in_aliases:
+            stripped = line.strip()
+            if stripped.startswith("-"):
+                aliases.append(stripped.lstrip("- ").strip().strip("\"'"))
+                continue
+            in_aliases = False
+        match = re.match(r'^(url|slug|aliases)\s*[:=]\s*(.*)$', line)
+        if not match:
+            continue
+        key, raw = match.group(1), match.group(2).strip()
+        if key == "aliases":
+            if raw in {"", "["}:
+                in_aliases = True
+            else:
+                aliases.extend(v.strip().strip("\"'") for v in raw.strip("[]").split(",") if v.strip())
+            continue
+        out[key] = raw.strip("\"'")
+    if aliases:
+        out["aliases"] = aliases
+    return out
+
+
+def normalize_path(value: str) -> str:
+    value = value.strip()
+    if not value:
+        return ""
+    if not value.startswith("/"):
+        value = "/" + value
+    return value.rstrip("/") or "/"
+
+
 def site_paths(repo_root: Path) -> set[str]:
-    """Every path the website is known to answer on."""
+    """Every path the website is known to answer on, derived rather than listed."""
     paths: set[str] = set()
+
     redirects = repo_root / "docs/website/static/_redirects"
     if redirects.exists():
         for line in redirects.read_text(encoding="utf-8").split("\n"):
             parts = line.split()
             if not parts or parts[0].startswith("#"):
                 continue
-            paths.add(parts[0].rstrip("/") or "/")
+            paths.add(normalize_path(parts[0]))
             if len(parts) > 1 and parts[1].startswith("/"):
-                paths.add(parts[1].rstrip("/") or "/")
+                paths.add(normalize_path(parts[1]))
+
+    # Hugo's published route is the section path plus the page's slug, which
+    # 1055 of the content pages override; deriving it from the filename instead
+    # both invents routes that are never generated and rejects real ones.
     content = repo_root / "docs/website/content"
     if content.exists():
         for page in content.rglob("*.md"):
-            stem = page.relative_to(content).with_suffix("").as_posix()
-            stem = stem[: -len("/_index")] if stem.endswith("/_index") else stem
-            if stem in {"_index", "index"}:
-                paths.add("/")
+            relative = page.relative_to(content).with_suffix("")
+            meta = front_matter(page)
+            for alias in meta.get("aliases", []) or []:
+                if isinstance(alias, str):
+                    paths.add(normalize_path(alias))
+            if meta.get("url"):
+                paths.add(normalize_path(str(meta["url"])))
                 continue
-            paths.add("/" + stem)
-            paths.add("/" + stem + ".html")
-            # front matter may override the permalink
-            head = page.read_text(encoding="utf-8", errors="ignore")[:600]
-            match = re.search(r'^url:\s*"?([^"\n]+)"?', head, re.M)
-            if match:
-                paths.add(match.group(1).strip().rstrip("/") or "/")
+            parts = list(relative.parts)
+            if parts and parts[-1] in {"_index", "index"}:
+                parts.pop()
+            if meta.get("slug"):
+                parts = parts[:-1] + [str(meta["slug"])] if parts else [str(meta["slug"])]
+            paths.add(normalize_path("/".join(parts)) if parts else "/")
+
+    # Some redirects are written into _redirects at deploy time rather than
+    # committed, so the file in the tree does not list them. Read the paths out
+    # of the script that emits them instead of assuming a prefix is safe.
+    for emitter in sorted((repo_root / "scripts/website").glob("*redirect*.sh")):
+        for match in re.finditer(
+            r"printf\s+'(/[^\s']+)\s+%s[^']*'", emitter.read_text(encoding="utf-8")
+        ):
+            paths.add(normalize_path(match.group(1)))
+
+    # Anything committed under static/ is served at its own path.
+    static = repo_root / "docs/website/static"
+    if static.exists():
+        for asset in static.rglob("*"):
+            relative = asset.relative_to(static).as_posix()
+            paths.add(normalize_path(relative))
+            if asset.is_file() and asset.name == "index.html":
+                paths.add(normalize_path(asset.parent.relative_to(static).as_posix()))
+
     return paths
 
 
@@ -82,7 +159,7 @@ def findings_for(path: Path, known: set[str]) -> list[tuple[str, str]]:
                 out.append((url, "plain http, not https"))
             if host in SITE_HOSTS:
                 target = split.path.rstrip("/") or "/"
-                if target.startswith(STATIC_PREFIXES) or target + "/" in STATIC_PREFIXES:
+                if target.startswith(GENERATED_PREFIXES) or target + "/" in GENERATED_PREFIXES:
                     continue
                 if target not in known:
                     out.append((url, "the website serves no such path (checked _redirects and the content tree)"))

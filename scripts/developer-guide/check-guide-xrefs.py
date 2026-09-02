@@ -100,7 +100,6 @@ def main() -> int:
             f"(<<{target},some words>>) or move the anchor onto the section.",
             file=sys.stderr,
         )
-    total = len(dangling) + len(raw_id_links)
     print(
         f"\n{len(dangling)} dangling and {len(raw_id_links)} untitled "
         f"cross-reference target(s).",
