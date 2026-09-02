@@ -23,6 +23,14 @@ from pathlib import Path
 
 ID_RE = re.compile(r'\bid="([^"]+)"')
 HREF_RE = re.compile(r'href="#([^"]+)"')
+# The guide renders as one page, so a RELATIVE href resolves against wherever that
+# page happens to be served and reaches nothing that ships with it. Three survived
+# from the wiki this book replaced -- link:Images[], link:Fonts[] and
+# link:Supported-Properties#text-decoration[] -- naming pages that were never
+# carried across, and a reader following one landed on a 404 while every gate
+# reported success. Absolute URLs (checked by check-guide-links.py), root-relative
+# paths and same-page fragments are all excluded.
+RELATIVE_HREF_RE = re.compile(r'href="(?!#|/|[a-zA-Z][a-zA-Z0-9+.-]*:)([^"]+)"')
 # Asciidoctor falls back to printing the raw id in brackets when a reference
 # resolves to an anchor that carries no title -- an anchor on an image or a
 # paragraph rather than on a section. The link works; the sentence reads
@@ -78,6 +86,7 @@ def main() -> int:
     root = guide_dir / "developer-guide.asciidoc"
     dangling: dict[str, int] = defaultdict(int)
     raw_id_links: dict[str, int] = defaultdict(int)
+    relative: dict[str, int] = defaultdict(int)
     branches: dict[str, set[str]] = defaultdict(set)
     anchor_total = 0
 
@@ -92,8 +101,11 @@ def main() -> int:
         for target in RAW_ID_LINK_RE.findall(markup):
             raw_id_links[target] += 1
             branches[target].add(name)
+        for target in RELATIVE_HREF_RE.findall(markup):
+            relative[target] += 1
+            branches[target].add(name)
 
-    if not dangling and not raw_id_links:
+    if not dangling and not raw_id_links and not relative:
         print(
             f"Cross-references OK: {anchor_total} anchors, every internal link "
             f"resolves in both the default and backend-pdf renders."
@@ -119,9 +131,17 @@ def main() -> int:
             f"(<<{target},some words>>) or move the anchor onto the section.",
             file=sys.stderr,
         )
+    for target in sorted(relative):
+        print(
+            f"css.asciidoc or elsewhere: link:{target}[] renders as a relative URL "
+            f"({relative[target]} reference(s)). The guide is one page, so this "
+            f"reaches nothing that ships with it -- use an xref, or an absolute URL "
+            f"if the destination really is off-site.",
+            file=sys.stderr,
+        )
     print(
-        f"\n{len(dangling)} dangling and {len(raw_id_links)} untitled "
-        f"cross-reference target(s).",
+        f"\n{len(dangling)} dangling, {len(raw_id_links)} untitled and "
+        f"{len(relative)} relative cross-reference target(s).",
         file=sys.stderr,
     )
     return 1
