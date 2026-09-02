@@ -10477,9 +10477,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // A zero length payload is still a payload: refusing it would leave the clip without a
         // type it had advertised, and a target filtering on that type would accept the hover
         // and be refused the drop.
-        File file = new File(new File(getContext().getCacheDir(), "intent_files"),
-                "cn1-clip-" + System.currentTimeMillis() + "-" + bytes.length + "." + extension);
-        file.getParentFile().mkdirs();
+        File dir = new File(getContext().getCacheDir(), "intent_files");
+        dir.mkdirs();
+        // A name built from the clock and the payload's length collided: two representations of
+        // one payload that share an extension and a byte length are written within the same
+        // millisecond, and the second overwrote the first -- leaving both clip items pointing at
+        // the second one's bytes. createTempFile is the guarantee rather than a longer guess,
+        // and it keeps the extension, which is what names the type this URI carries.
+        File file = File.createTempFile("cn1-clip-", "." + extension, dir);
         OutputStream os = new FileOutputStream(file);
         try {
             os.write(bytes);
@@ -10685,12 +10690,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 com.codename1.io.Log.e(t);
             }
             if (html == null && sdk >= 16) {
-                String itemHtml = item.getHtmlText();
-                if (itemHtml != null && itemHtml.length() > 0) {
-                    html = itemHtml;
-                }
+                // Empty markup is a value, not an absence: getHtmlText answers null when the
+                // item carries no HTML at all, so anything else is what the source published.
+                // Discarding it left fillAdvertisedTypes to rebuild the advertised text/html
+                // from the plain text, handing the target something the source never wrote --
+                // and this exporter publishes exactly that item for content whose HTML is empty.
+                html = item.getHtmlText();
             }
             if (plain == null) {
+                // Not the same test. coerceToText *derives* text from whatever the item holds,
+                // so an empty answer means it had nothing to give rather than that the source
+                // published nothing -- and accepting it would stop the search before an item
+                // that does carry the text.
                 CharSequence text = item.coerceToText(getContext());
                 if (text != null && text.length() > 0) {
                     plain = text.toString();
