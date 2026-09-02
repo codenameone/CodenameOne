@@ -7321,15 +7321,21 @@ public class AndroidGradleBuilder extends Executor {
                 gradleDependency
             };
             try {
-                if (KotlinStdlibAlignment.appPinsTheStdlibFamily(appGradle)) {
+                if (hasKotlinSources) {
+                    // The Kotlin plugin applied above owns this family, at the
+                    // compiler's own version -- which is below the floor on this
+                    // path. See constraintsBlock's projectCompilesKotlin.
+                    log("NOTICE: not aligning the Kotlin stdlib, this project "
+                            + "compiles Kotlin and its plugin manages that family");
+                } else if (KotlinStdlibAlignment.appPinsTheStdlibFamily(appGradle)) {
                     // Said out loud. An alignment that silently does not happen
                     // is the one support cannot account for later, when the
                     // duplicate class it exists to prevent comes back.
                     log("NOTICE: not aligning the Kotlin stdlib, the project's "
                             + "own Gradle text holds that family itself");
                 } else {
-                    kotlinStdlibConstraints =
-                            KotlinStdlibAlignment.constraintsBlock(compile, appGradle);
+                    kotlinStdlibConstraints = KotlinStdlibAlignment.constraintsBlock(
+                            compile, hasKotlinSources, appGradle);
                 }
             } catch (RuntimeException e) {
                 // The alignment is string work with no indexing in it, so this

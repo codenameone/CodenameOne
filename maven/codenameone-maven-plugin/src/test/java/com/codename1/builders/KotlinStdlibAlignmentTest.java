@@ -46,7 +46,7 @@ class KotlinStdlibAlignmentTest {
      */
     @Test
     void aGraphThatNamesNoKotlinIsAligned() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", false,
                 "    implementation 'androidx.appcompat:appcompat:1.6.1'\n",
                 "    implementation 'com.android.billingclient:billing:9.1.0'\n");
         assertTrue(out.contains("'" + JDK7 + ":1.8.0'"), "jdk7 is raised: " + out);
@@ -59,7 +59,7 @@ class KotlinStdlibAlignmentTest {
     /** A constraint pulls nothing into a graph that does not have it. */
     @Test
     void anEmptyProjectStillGetsTheFloor() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", "");
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", false, "");
         assertTrue(out.contains(":1.8.0"), "the block is written unconditionally");
     }
 
@@ -69,13 +69,13 @@ class KotlinStdlibAlignmentTest {
      */
     @Test
     void theConstraintFollowsTheCallersConfiguration() {
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("compile", "")
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("compile", false, "")
                 .contains("compile('" + JDK7 + ":1.8.0')"), "compile");
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", "")
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false, "")
                 .contains("implementation('" + JDK7 + ":1.8.0')"), "implementation");
-        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(null, "")),
+        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(null, false, "")),
                 "and no configuration means no block");
-        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock("  ", "")),
+        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock("  ", false, "")),
                 "nor does a blank one");
     }
 
@@ -87,11 +87,11 @@ class KotlinStdlibAlignmentTest {
      */
     @Test
     void anOrdinaryDeclarationIsRaisedNotHonoured() {
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation",
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
                         "    implementation '" + JDK8 + ":1.7.22'\n")
                         .contains(":1.8.0"),
                 "a pre-merge declaration is raised");
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation",
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
                         "    implementation '" + JDK8 + ":1.9.22'\n")
                         .contains(":1.8.0"),
                 "and a merged-era one is unaffected by a floor beneath it");
@@ -121,7 +121,7 @@ class KotlinStdlibAlignmentTest {
                     + "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n",
         };
         for (int i = 0; i < pinned.length; i++) {
-            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation", false,
                     pinned[i]);
             assertTrue("".equals(out),
                     "<<" + pinned[i].trim() + ">> holds the family, got <<" + out + ">>");
@@ -135,12 +135,12 @@ class KotlinStdlibAlignmentTest {
      */
     @Test
     void bothHalvesOfTheGuardAreRequired() {
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation",
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
                         "    configurations.all { resolutionStrategy.force "
                         + "'com.squareup.okhttp3:okhttp:4.0.0' }\n")
                         .contains(":1.8.0"),
                 "a force on someone else is not a pin on this family");
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation",
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
                         "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'\n")
                         .contains(":1.8.0"),
                 "and naming the family without pinning it is an ordinary declaration");
@@ -149,10 +149,55 @@ class KotlinStdlibAlignmentTest {
         // one in a comment or an unrelated string counts. That costs an app the
         // duplicate it already had, which android.kotlinStdlibAlignment=false
         // does deliberately; the other direction breaks a build that works.
-        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock("implementation", false,
                         "    // we used to force kotlin-stdlib here\n")),
                 "a pinning word in a comment stands it down, which is the safe way "
                         + "to be wrong");
+    }
+
+    @Test
+    void theProjectsOwnKotlinPluginOwnsTheFamily() {
+        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
+                        "implementation", true,
+                        "    implementation 'androidx.appcompat:appcompat:1.6.1'\n")),
+                "a project with Kotlin sources gets a Kotlin plugin and a stdlib at "
+                        + "the compiler's own version, which is below this floor on the "
+                        + "Gradle 6 and 7 path -- raising the shims would drag the base "
+                        + "stdlib past the compiler");
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
+                        "    implementation 'androidx.appcompat:appcompat:1.6.1'\n")
+                        .contains(":1.8.0"),
+                "and the Java-only graph this exists for is still aligned");
+    }
+
+    @Test
+    void aPinIsFoundWhateverItsCase() {
+        // force the command and setForcedModules the setter are the same act.
+        String[] spellings = {
+            "    configurations.all { resolutionStrategy.setForcedModules("
+                    + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22') }\n",
+            "    configurations.all { resolutionStrategy.FORCE "
+                    + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22' }\n",
+            "    implementation('org.jetbrains.kotlin:kotlin-stdlib') "
+                    + "{ version { STRICTLY '1.7.22' } }\n",
+        };
+        for (int i = 0; i < spellings.length; i++) {
+            assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
+                            "implementation", false, spellings[i])),
+                    "<<" + spellings[i].trim() + ">> holds the family");
+        }
+    }
+
+    @Test
+    void aBoundedRequireIsAPin() {
+        // require '[1.7,1.8)' excludes the floor, so a constraint demanding it
+        // leaves no version satisfying both. The unbounded form is soft and
+        // would be raised happily; standing down for it too is the cheap side.
+        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
+                        "implementation", false,
+                        "    implementation('org.jetbrains.kotlin:kotlin-stdlib') "
+                                + "{ version { require '[1.7,1.8)' } }\n")),
+                "a bounded require holds the family below the floor");
     }
 
     /** The floor is the version at which the shims became empty. */
@@ -168,10 +213,10 @@ class KotlinStdlibAlignmentTest {
      */
     @Test
     void missingFragmentsAreNotAnError() {
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation",
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
                         (String[]) null).contains(":1.8.0"),
                 "no fragments at all");
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation",
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
                         null, "", null).contains(":1.8.0"),
                 "and a mix of null and empty ones");
     }
@@ -219,8 +264,12 @@ class KotlinStdlibAlignmentTest {
         String uses = src.substring(src.indexOf("};", at));
         assertTrue(uses.contains("appPinsTheStdlibFamily(appGradle)"),
                 "the stand-down question is asked over that same list");
-        assertTrue(uses.contains("constraintsBlock(compile, appGradle)"),
-                "and so is the alignment");
+        // The whole argument list, not the names one at a time: hasKotlinSources
+        // also appears in the log branch just above, so a looser assertion stayed
+        // true after the argument itself was replaced with a literal.
+        assertTrue(uses.contains("compile, hasKotlinSources, appGradle)"),
+                "the alignment is asked over the caller's configuration, that same "
+                        + "fragment list, and whether this project compiles Kotlin");
     }
     /**
      * The alignment is an optimisation over a build that already worked apart
@@ -235,7 +284,7 @@ class KotlinStdlibAlignmentTest {
             "kotlin-stdlib   strictly",
         };
         for (int i = 0; i < hostile.length; i++) {
-            KotlinStdlibAlignment.constraintsBlock("implementation", hostile[i]);
+            KotlinStdlibAlignment.constraintsBlock("implementation", false, hostile[i]);
             KotlinStdlibAlignment.appPinsTheStdlibFamily(hostile[i]);
         }
         assertTrue(true, "no input produces an exception");

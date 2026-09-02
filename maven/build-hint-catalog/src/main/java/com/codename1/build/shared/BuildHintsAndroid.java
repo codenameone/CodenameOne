@@ -656,13 +656,18 @@ final class BuildHintsAndroid {
                         + "duplicate in place, and a newer one wins over the floor on its own. "
                         + "If you pin the family yourself the whole block is left out: your Gradle "
                         + "build hints are searched for the text `kotlin-stdlib` alongside any of "
-                        + "`strictly`, `!!`, `force`, `reject`, `enforcedPlatform`, `useVersion`, "
-                        + "`useTarget`, `substitute` or `failOnVersionConflict`, and a hit means you "
-                        + "have decided the version. That search is plain text, so it errs toward "
-                        + "leaving the floor out. Leaving it out costs you the duplicate class "
-                        + "you already had; adding it over a deliberate pin would break a build "
-                        + "that works today. Set to false to manage these coordinates yourself in "
-                        + "every case."));
+                        + "`strictly`, `!!`, `force`, `reject`, `require`, `enforcedPlatform`, "
+                        + "`useVersion`, `useTarget`, `substitute` or `failOnVersionConflict`, and "
+                        + "a hit means you have decided the version. The search ignores case, so "
+                        + "`setForcedModules` counts as a force. It's plain text, so it errs "
+                        + "toward leaving the floor out. Leaving it out costs you the duplicate "
+                        + "class you already had; adding it over a deliberate pin would break a "
+                        + "build that works today. A project with Kotlin sources of its own is left "
+                        + "alone for the same reason: it gets a Kotlin Gradle plugin and a stdlib "
+                        + "at the compiler\'s version, and on Gradle 6 and 7 that version is below "
+                        + "this floor, so raising the shims would pull the base stdlib past the "
+                        + "compiler that has to read it. Set to false to manage these coordinates "
+                        + "yourself in every case."));
 
         h.add(new Hint("android.largeScreens")
                 .group(HintGroup.ANDROID)

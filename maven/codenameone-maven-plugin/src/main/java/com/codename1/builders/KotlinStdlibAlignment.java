@@ -22,6 +22,8 @@
  */
 package com.codename1.builders;
 
+import java.util.Locale;
+
 /**
  * The Kotlin stdlib alignment written into the generated Android
  * {@code build.gradle}.
@@ -96,17 +98,29 @@ public class KotlinStdlibAlignment {
      * turns the raise itself into a build failure. Matched as plain text: the
      * point of this list is to be crude and complete rather than precise, since
      * a false match only declines to help.</p>
+     *
+     * <p>Lower case, because the text is lower cased before the search. The
+     * same act appears in more than one spelling -- {@code force} the command
+     * and {@code setForcedModules} the setter -- and a case-sensitive
+     * {@code force} finds the first and misses the second.</p>
+     *
+     * <p>{@code require} is here for its bounded form. A plain
+     * {@code require '1.7.22'} is soft and the constraint raises it happily,
+     * but {@code require '[1.7,1.8)'} excludes the floor, and no version then
+     * satisfies both. Standing down for the unbounded case as well is the
+     * cheap side of the trade.</p>
      */
     private static final String[] PINNING_WORDS = {
         "strictly",
         "!!",
         "force",
         "reject",
-        "enforcedPlatform",
-        "useVersion",
-        "useTarget",
+        "require",
+        "enforcedplatform",
+        "useversion",
+        "usetarget",
         "substitute",
-        "failOnVersionConflict"
+        "failonversionconflict"
     };
 
     private KotlinStdlibAlignment() {
@@ -117,6 +131,17 @@ public class KotlinStdlibAlignment {
      * {@code dependencies { }}, or an empty string when no alignment should be
      * written.
      *
+     * @param projectCompilesKotlin whether the project has Kotlin sources, and
+     *   so gets a Kotlin Gradle plugin and a stdlib declaration at the
+     *   compiler's own version. That version is the one the app's own classes
+     *   are compiled against, and it is below this floor on the Gradle 6 and 7
+     *   path. Raising the shims there pulls the base stdlib up with them --
+     *   the empty shims depend on it -- and a compiler reading a stdlib newer
+     *   than itself reports "Module was compiled with an incompatible version
+     *   of Kotlin", turning a Kotlin app that builds today into one that does
+     *   not. This alignment is for the Java-only graph that reaches the shims
+     *   transitively; where the project compiles Kotlin, the Kotlin plugin
+     *   owns the family.
      * @param configuration the dependency configuration to declare the
      *   constraints on, {@code implementation} on any AndroidX project. The
      *   caller passes the same name it uses for the rest of the block so a
@@ -128,8 +153,11 @@ public class KotlinStdlibAlignment {
      * @return the block, newline terminated, or {@code ""}
      */
     public static String constraintsBlock(String configuration,
-            String... appGradleFragments) {
+            boolean projectCompilesKotlin, String... appGradleFragments) {
         if (configuration == null || configuration.trim().length() == 0) {
+            return "";
+        }
+        if (projectCompilesKotlin) {
             return "";
         }
         if (appPinsTheStdlibFamily(appGradleFragments)) {
@@ -177,7 +205,10 @@ public class KotlinStdlibAlignment {
                 all.append(appGradleFragments[i]).append('\n');
             }
         }
-        String text = all.toString();
+        // Locale.ENGLISH, not the default: a Turkish default locale lower cases
+        // I to a dotless i, which turns "STRICTLY" into "str\u0131ctly" and
+        // matches nothing. The same trap is commented in AndroidGradleBuilder.
+        String text = all.toString().toLowerCase(Locale.ENGLISH);
         if (text.indexOf(STDLIB_FAMILY) < 0) {
             return false;
         }
