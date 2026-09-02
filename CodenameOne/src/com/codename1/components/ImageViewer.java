@@ -566,8 +566,21 @@ public class ImageViewer extends Component {
         if (getZoom() <= 1 || getWidth() <= 0 || getHeight() <= 0) {
             return false;
         }
-        panPositionX = clampPan(panPositionX - ((float) ev.getDeltaX()) / ((float) getWidth()));
-        panPositionY = clampPan(panPositionY - ((float) ev.getDeltaY()) / ((float) getHeight()));
+        float nextX = clampPan(panPositionX - ((float) ev.getDeltaX()) / ((float) getWidth()));
+        float nextY = clampPan(panPositionY - ((float) ev.getDeltaY()) / ((float) getHeight()));
+        // Float.compare rather than ==, and not because the values are approximate: the
+        // question is whether the clamp handed back the identical position, which is what
+        // "already as far as it goes" looks like. An epsilon would answer a different and
+        // vaguer question.
+        if (Float.compare(nextX, panPositionX) == 0 && Float.compare(nextY, panPositionY) == 0) {
+            // Panned as far as it goes in the direction being asked for. Claiming the wheel
+            // anyway would swallow it: the page the viewer sits on could not scroll while
+            // the pointer stayed over an image that had stopped moving. The same rule the
+            // nested scrollers follow -- what cannot move passes the wheel on.
+            return false;
+        }
+        panPositionX = nextX;
+        panPositionY = nextY;
         updatePositions();
         repaint();
         return true;

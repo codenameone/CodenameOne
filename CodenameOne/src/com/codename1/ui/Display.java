@@ -8707,7 +8707,8 @@ public final class Display extends CN1Constants {
     }
 
     private boolean applyScroll(Component target, boolean vertical, int position, int max) {
-        int next = Math.max(0, Math.min(max < 0 ? 0 : max, position));
+        int ceiling = max < 0 ? 0 : max;
+        int next = Math.max(0, Math.min(ceiling, position));
         if (vertical ? next == target.getScrollY() : next == target.getScrollX()) {
             return false;
         }
@@ -8715,6 +8716,22 @@ public final class Display extends CN1Constants {
             target.setScrollY(next);
         } else {
             target.setScrollX(next);
+        }
+        // A container that snaps to a grid has to land on it. That used to happen when the
+        // deceleration a drag left behind ran out -- which is where the wheel emulation got
+        // it from, and there is no deceleration here. Spinner3D scrolls a snapping container,
+        // so a notch that is not an exact multiple of the row height would otherwise leave
+        // it stopped between two rows.
+        if (target.isSnapToGrid()) {
+            int snapped = Math.max(0, Math.min(ceiling,
+                    vertical ? target.getGridPosY() : target.getGridPosX()));
+            if (vertical ? snapped != target.getScrollY() : snapped != target.getScrollX()) {
+                if (vertical) {
+                    target.setScrollY(snapped);
+                } else {
+                    target.setScrollX(snapped);
+                }
+            }
         }
         target.repaint();
         return true;

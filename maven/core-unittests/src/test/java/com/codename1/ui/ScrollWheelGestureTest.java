@@ -232,6 +232,43 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aWheelLandsOnTheGridWhenTheTargetSnapsToOne() {
+        Form f = new Form("snapping", new BorderLayout());
+        Container page = f.getContentPane();
+        page.setLayout(BoxLayout.y());
+        page.setScrollableY(true);
+        int row = px(30);
+        for (int i = 0; i < 60; i++) {
+            Label l = new Label("row");
+            l.setPreferredH(row);
+            page.add(l);
+        }
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        // After show, not before: initialising a component resets this to the look and
+        // feel's default, so setting it earlier is silently discarded.
+        page.setSnapToGrid(true);
+        assertTrue(page.isSnapToGrid(), "the container has to actually be snapping");
+
+        // A notch that is not a whole number of rows. The snap used to come from the
+        // deceleration a drag left behind, and there is no deceleration in a wheel.
+        wheelAt(page.getAbsoluteX() + page.getWidth() / 2, page.getAbsoluteY() + page.getHeight() / 2,
+                0, -(row + row / 3));
+
+        assertTrue(page.getScrollY() > 0, "the wheel still moves it");
+        boolean onARow = false;
+        for (int i = 0; i < page.getComponentCount(); i++) {
+            if (page.getComponentAt(i).getY() == page.getScrollY()) {
+                onARow = true;
+                break;
+            }
+        }
+        assertTrue(onARow, "a snapping container has to land on a row, got " + page.getScrollY()
+                + " between " + page.getComponentAt(0).getY() + " and " + page.getComponentAt(1).getY());
+    }
+
+    @FormTest
     void aWheelInADesktopWindowScrollsThatWindow() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("scroller", new BorderLayout());
