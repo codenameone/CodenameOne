@@ -607,6 +607,127 @@ public class LocalContinuityTest extends UITestBase {
         }
     }
 
+    /**
+     * disable() documents that arriving states are ignored. A delivery that had already reached
+     * the event queue kept its lastSeen marker and dispatched anyway -- running listeners and
+     * restoring after the application had turned the framework off.
+     */
+    @EdtTest
+    public void aDeliveryQueuedBeforeDisableDoesNotDispatch() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        RecordingListener listener = new RecordingListener();
+        Continuity.addContinuationListener(listener);
+
+        // Queued but not drained: deliver() posts to the event queue and nothing runs it yet.
+        Continuity.deliver(fromElsewhere("after disable", 1L));
+        Continuity.disable();
+        flushSerialCalls();
+
+        assertEquals(0, listener.calls, "a delivery from before disable() still dispatched");
+    }
+
+    /**
+     * And re-enabling before the queue drains must not resurrect it, which is why this is a
+     * generation rather than a flag: an `enabled` test at dispatch time would pass here.
+     */
+    @EdtTest
+    public void disablingAndReEnablingDoesNotResurrectAQueuedDelivery() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        RecordingListener listener = new RecordingListener();
+        Continuity.addContinuationListener(listener);
+
+        Continuity.deliver(fromElsewhere("stale run", 1L));
+        Continuity.disable();
+        Continuity.enable();
+        flushSerialCalls();
+
+        assertEquals(0, listener.calls,
+                "a delivery from the previous run survived disable/enable");
+    }
+
+    /**
+     * A state that is still QUEUED when the user signs out is never sent. The worker is held
+     * inside its first request, a second checkpoint queues behind it, and clear() then empties
+     * the queue -- so when the worker is released it finds nothing of the old session to send.
+     *
+     * <p>The boundary this does NOT cover is a request already on the wire. Holding the relay
+     * inside publish is exactly that case, and clear()'s own documentation says it cannot recall
+     * one -- which is why the first state is expected to arrive and only the second must not.</p>
+     */
+    @EdtTest
+    public void aStateStillQueuedAtLogoutIsNeverSent() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+
+        Continuity.checkpoint();
+        r.awaitEntered();
+        long inFlight = Continuity.getRestorableState().getSequence();
+
+        // Queued behind the request the worker is holding.
+        provider.saved.put("n", Integer.valueOf(2));
+        Continuity.checkpoint();
+        long queued = Continuity.getRestorableState().getSequence();
+        assertTrue(queued > inFlight, "the second checkpoint did not advance the sequence");
+
+        Continuity.clear();
+        r.release();
+        r.awaitQuiet();
+
+        assertFalse(r.sent.contains(Long.valueOf(queued)),
+                "a state queued before logout was published after it: " + r.sent);
+    }
+
+    /**
+     * Blocks on entry to publish so a test can act while a state is dequeued but unsent. Records
+     * only what it was actually asked to send AFTER being released.
+     */
+    static class GatedRelay implements StateRelay {
+        final List<Long> sent = java.util.Collections.synchronizedList(new ArrayList<Long>());
+        private final java.util.concurrent.CountDownLatch entered =
+                new java.util.concurrent.CountDownLatch(1);
+        private final java.util.concurrent.CountDownLatch gate =
+                new java.util.concurrent.CountDownLatch(1);
+
+        public void publish(AppState state) {
+            entered.countDown();
+            try {
+                gate.await(3, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            sent.add(Long.valueOf(state.getSequence()));
+        }
+
+        public AppState fetch() {
+            return null;
+        }
+
+        void awaitEntered() {
+            try {
+                entered.await(3, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        void release() {
+            gate.countDown();
+        }
+
+        void awaitQuiet() {
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
     /** Records the sequence of everything the relay is handed, slowly enough to overlap. */
     static class OrderRecordingRelay implements StateRelay {
         final List<Long> published =

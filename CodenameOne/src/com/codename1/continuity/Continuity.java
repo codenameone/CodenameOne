@@ -122,6 +122,14 @@ public final class Continuity {
     /// routinely, since a continuation and a relay can carry the same one -- acts once.
     private static final Map<String, Long> lastSeen = new HashMap<String, Long>();
 
+    /// Which run of the framework a delivery belongs to, bumped by `disable()` and `clear()`.
+    ///
+    /// A delivery is two steps -- reach the event queue, then dispatch -- and `enabled` alone
+    /// cannot separate them: an application that disables and re-enables before the queue drains
+    /// would have the old arrival pass an `enabled` check and restore anyway. Guarded by the
+    /// `lastSeen` monitor, which the other half of the same decision already holds.
+    private static long deliveryEra;
+
     // Configured by the application while it starts, then read. A lock rather than volatile
     // fields, which the project's PMD gate forbids and which would be the wrong tool anyway for
     // the two below whose invariant spans more than one read.
@@ -201,6 +209,14 @@ public final class Continuity {
             return;
         }
         enabled = false;
+        synchronized (lastSeen) {
+            // Everything already on the event queue belongs to the run that just ended. Bumping
+            // the era rather than testing `enabled` at dispatch is what makes disable-then-enable
+            // safe: a re-enabled framework would otherwise accept an arrival from before it was
+            // turned off.
+            deliveryEra++;
+        }
+        setParked(null);
         synchronized (HANDOFF_LOCK) {
             dirty = false;
         }
@@ -642,6 +658,20 @@ public final class Continuity {
         // Anything owed goes out first. This is the natural moment for it -- the application
         // calls this when it reconnects, and Android calls it on resume -- and without it a state
         // retained after a failed send had no way back onto the wire.
+        //
+        // Started, not waited for, and a review asked for the opposite: serialize the fetch
+        // behind the publication so the GET cannot read a document the pending POST is about to
+        // replace. Waiting would be worse than the race it closes.
+        //
+        // A relay holds ONE document per user, so a fetch that waits for our own publish reads
+        // back our own write -- every time. The other device's state would be overwritten before
+        // it was ever seen, and polling would stop working for the case it exists to serve.
+        //
+        // The race itself is benign in the shape described. What the GET can return early is the
+        // copy of THIS device's own earlier state, and deliver() drops that as an echo before it
+        // reaches a listener. A genuinely different device's state is not made older or newer by
+        // when our publish lands; ordering between devices is per-device sequences, maxAge and
+        // the listener's own answer, none of which this would change.
         startPublisher();
         final long era;
         synchronized (PUBLISH_LOCK) {
@@ -709,6 +739,7 @@ public final class Continuity {
             // enough for a queued delivery to pass isStillNewest and dispatch the previous
             // account's state after the user signed out.
             lastSeen.clear();
+            deliveryEra++;
         }
         clearContinuation();
         try {
@@ -897,6 +928,23 @@ public final class Continuity {
                             pendingPublish = null;
                             era = accountEra;
                         }
+                        synchronized (PUBLISH_LOCK) {
+                            if (era != accountEra) {
+                                // clear() ran between taking this state off the queue and
+                                // reaching the send. Dequeued-but-not-yet-sent is recallable and
+                                // already-on-the-wire is not, and an earlier version of this
+                                // reasoning treated them as the same thing -- so the old
+                                // account's state went out after logout, under whatever
+                                // credentials the relay resolved by then.
+                                //
+                                // Still not atomic with the network call, and it cannot be: a
+                                // clear() landing after this check is the in-flight case, which
+                                // clear()'s own documentation says it cannot undo. This closes
+                                // the half that was never in flight at all.
+                                publishing = false;
+                                return;
+                            }
+                        }
                         try {
                             r.publish(next);
                         } catch (Throwable t) {
@@ -978,15 +1026,17 @@ public final class Continuity {
             // device.
             return;
         }
+        final long era;
         synchronized (lastSeen) {
             Long seen = lastSeen.get(state.getDeviceId());
             if (seen != null && seen.longValue() >= state.getSequence()) {
                 return;
             }
             lastSeen.put(state.getDeviceId(), Long.valueOf(state.getSequence()));
+            era = deliveryEra;
         }
         if (!Display.isInitialized()) {
-            if (isStillNewest(state)) {
+            if (stillDeliverable(state, era)) {
                 setParked(state);
             }
             return;
@@ -999,19 +1049,25 @@ public final class Continuity {
                 // deliver on threads of their own: an older state could pass the check, pause,
                 // and be queued BEHIND the newer one that overtook it. The event thread then
                 // restored the newer state and overwrote it with the stale one.
-                if (isStillNewest(state)) {
+                if (stillDeliverable(state, era)) {
                     dispatch(state);
                 }
             }
         });
     }
 
-    /// Whether this state is still the newest seen from its device.
+    /// Whether a delivery queued in `era` should still act: the framework has not been turned off
+    /// or logged out since, and nothing newer from that device has overtaken it.
     ///
-    /// False once a later one has overtaken it, which is what makes a delivery that lost the race
-    /// to the queue drop itself rather than undo the winner.
-    private static boolean isStillNewest(AppState state) {
+    /// One predicate rather than two. It replaced a separate "is this still the newest" check, and
+    /// leaving that behind would have been a private method nobody calls -- which the SpotBugs
+    /// gate refuses, correctly: the two questions are always asked together and answering them
+    /// under one hold of the monitor is also what keeps them consistent with each other.
+    private static boolean stillDeliverable(AppState state, long era) {
         synchronized (lastSeen) {
+            if (era != deliveryEra) {
+                return false;
+            }
             Long seen = lastSeen.get(state.getDeviceId());
             return seen != null && seen.longValue() == state.getSequence();
         }
@@ -1195,6 +1251,7 @@ public final class Continuity {
         listeners.clear();
         synchronized (lastSeen) {
             lastSeen.clear();
+            deliveryEra++;
         }
         provider = null;
         relay = null;

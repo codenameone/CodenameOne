@@ -373,6 +373,21 @@ class IPhoneBuilderContinuityPlistTest {
         assertEquals(-1, IPhoneBuilder.immediateValueIndex("<key>K</key><!-- oops", 0));
     }
 
+    /**
+     * A key may carry a comment, and a comment may contain the text "</key>". A raw search ended
+     * the key inside the comment, concluded the value was not an array, and dropped every
+     * activity type -- while the branch that decided to merge had resolved the key correctly.
+     */
+    @Test
+    void aCommentInsideTheKeyDoesNotEndItEarly() {
+        String inject = "<key><!-- </key> -->NSUserActivityTypes</key><array/>";
+
+        String merged = IPhoneBuilder.mergeUserActivityTypes(
+                IPhoneBuilder.expandEmptyUserActivityArray(inject), noIntents(), CONTINUITY_TYPE);
+
+        assertTrue(merged.contains("<string>" + CONTINUITY_TYPE + "</string>"), merged);
+    }
+
     @Test
     void nothingToAddLeavesTheFragmentAlone() {
         String inject = "<key>NSUserActivityTypes</key><array>"

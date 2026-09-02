@@ -11766,15 +11766,15 @@ public class IPhoneBuilder extends Executor {
         if (plist == null || keyIndex < 0) {
             return -1;
         }
-        int afterKey = plist.indexOf("</key", keyIndex);
-        if (afterKey < 0) {
+        // plistKeyEnd, not a literal search for "</key". A key may legitimately carry a comment,
+        // and a comment may contain the text "</key>" -- at which point a raw search ends the key
+        // inside the comment, decides the value is not an array, and drops every activity type
+        // without a word. The structural helper resolves the element the way the branch that
+        // decided to merge already did.
+        int at = plistKeyEnd(plist, keyIndex);
+        if (at < 0) {
             return -1;
         }
-        afterKey = plist.indexOf('>', afterKey);
-        if (afterKey < 0) {
-            return -1;
-        }
-        int at = afterKey + 1;
         for (;;) {
             while (at < plist.length() && Character.isWhitespace(plist.charAt(at))) {
                 at++;
