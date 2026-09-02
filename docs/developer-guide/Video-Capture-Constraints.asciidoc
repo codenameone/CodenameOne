@@ -14,9 +14,17 @@ Support for these constraints vary by platform and device, but the API allows yo
 
 Suppose you want to allow the user to capture a short (5 second) clip, in a low resolution, appropriate for sharing on a social media platform. You create your `VideoCaptureConstraints` object as follows:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VideoCaptureConstraintsJava001Snippet.java[tag=video-capture-constraints-java-001,indent=0]
+----
 
 This constraint can then be passed to `Capture.captureVideo()` to get the captured file:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VideoCaptureConstraintsJava002Snippet.java[tag=video-capture-constraints-java-002,indent=0]
+----
 
 === Not all platforms support all constraints
 
@@ -24,6 +32,10 @@ How do you know whether your constraints will be honored? When the platform does
 
 For example:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VideoCaptureConstraintsJava003Snippet.java[tag=video-capture-constraints-java-003,indent=0]
+----
 
 You can probe a constraint to see whether the entire constraint is supported (that is, whether it will be obeyed), or whether any particular aspect of it will be supported using the following methods:
 
@@ -46,6 +58,10 @@ Explicit width and height constraints aren't well-supported across platforms. An
 
 Find out if this constraint will be obeyed:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VideoCaptureConstraintsJava005Snippet.java[tag=video-capture-constraints-java-005,indent=0]
+----
 
 === Constraint support by platform
 
@@ -58,7 +74,7 @@ Find out if this constraint will be obeyed:
 | Simulator/Java SE | No | No | No | No
 | JavaScript (Desktop) | Yes | Yes | Yes | No
 | JavaScript (Android) | Yes | Yes | Yes | No
-| JavaScript (iOS) | Yes | Yes | Yes | No
+| JavaScript (iOS) | No | No | No | No
 |====================
 `*` If size is specified, the platform will try to translate to the appropriate quality constraint.
 
