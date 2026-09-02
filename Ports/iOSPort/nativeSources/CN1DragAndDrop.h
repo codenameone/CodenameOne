@@ -154,6 +154,16 @@ int CN1NativeDragDeliverDropCommit(int x, int y, int action);
 /// session belongs to can no longer supply it.
 NSData* CN1NativeDragDeliverResolve(NSString* mimeType, int sessionId);
 
+/// Reports that the last item provider able to read this session's payload has gone, so the
+/// framework may drop it.
+///
+/// An NSItemProvider may be kept by a receiver and read long after the gesture ended, so the
+/// payload cannot be released on any schedule of the drag's own -- holding a fixed number of
+/// recent drags instead means a provider older than that answers nothing. The providers
+/// themselves say when they are done: each one retains a token for the session, and the last
+/// release calls this.
+void CN1NativeDragDeliverPayloadReleased(int sessionId);
+
 /// Announces that UIKit has started a drag session. Returns the actions the framework's staged
 /// operation allows, or 0 when it has none -- in which case no drag begins. The Java side calls
 /// CN1BeginNativeDragPayload and CN1AddNativeDragPayload from inside this call.

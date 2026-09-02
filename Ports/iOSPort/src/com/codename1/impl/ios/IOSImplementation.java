@@ -9272,22 +9272,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         NativeDragAndDrop.dragExit(0);
     }
 
-    /// The two most recent exported drags, each under the session id its load handlers carry.
+    /// Every exported drag whose payload something can still read, under the session id its
+    /// load handlers carry.
     ///
     /// Deliberately not the active drag: an item provider's load handler is asynchronous by
     /// design, and a receiving application is free to defer reading a representation until
     /// after the session has ended -- by which point the active drag has been cleared and the
     /// lookup would answer with nothing at all.
     ///
-    /// Two of them, and matched by id, because a single slot answered a late read with
-    /// *whatever was being dragged by then*: a handler from the previous drag resolving after
-    /// the next one began produced that one's bytes. Wrong data is worse than none, so a read
-    /// older than these answers null instead. Two payloads is the bound: a receiver would have
-    /// to sit on an unread representation across two further complete drags to fall off it.
-    private static NativeDragOperation exportedDrag;
-    private static int exportedDragId;
-    private static NativeDragOperation previousExportedDrag;
-    private static int previousExportedDragId;
+    /// Matched by id, because a single slot answered a late read with *whatever was being
+    /// dragged by then*: a handler from the previous drag resolving after the next one began
+    /// produced that one's bytes. Nor is it a fixed number of recent drags -- a receiver may
+    /// keep an item provider and read it at any later point, and any bound expires payloads
+    /// that are still legitimately readable. The providers themselves say when they are done:
+    /// CN1DragAndDrop.m gives every load handler a token for its session and calls
+    /// #nativeDragPayloadReleasedCallback(int) when the last of them is released, so a payload
+    /// is held for exactly as long as something can ask for it and no longer.
+    private static final java.util.Map<Integer, NativeDragOperation> exportedDrags =
+            new java.util.HashMap<Integer, NativeDragOperation>();
     private static int nextDragSessionId;
 
     /// The drop being assembled by CN1DragAndDrop.m, one representation at a time.
@@ -9385,12 +9387,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (op == null) {
             return 0;
         }
-        previousExportedDrag = exportedDrag;
-        previousExportedDragId = exportedDragId;
-        exportedDrag = op;
-        exportedDragId = ++nextDragSessionId;
+        int sessionId;
+        synchronized (exportedDrags) {
+            sessionId = ++nextDragSessionId;
+            exportedDrags.put(Integer.valueOf(sessionId), op);
+        }
         ClipboardContent content = op.getContent();
-        nativeInstance.beginNativeDragPayload(exportedDragId);
+        nativeInstance.beginNativeDragPayload(sessionId);
         // Names, not values. Reading a representation here would build every promised file and
         // encode every promised image at the moment the drag begins -- including for a drag the
         // user then abandons -- which is the opposite of what setDataProvider promises. The
@@ -9426,12 +9429,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// its bytes, or null when that drag can no longer supply it
     public static byte[] nativeDragResolveCallback(String mimeType, int sessionId) {
         // Matched by session id, not simply the latest: a handler from an earlier drag must
-        // answer for that drag or not at all. See the fields.
-        NativeDragOperation op = null;
-        if (exportedDrag != null && sessionId == exportedDragId) {
-            op = exportedDrag;
-        } else if (previousExportedDrag != null && sessionId == previousExportedDragId) {
-            op = previousExportedDrag;
+        // answer for that drag or not at all. See the field.
+        NativeDragOperation op;
+        synchronized (exportedDrags) {
+            op = exportedDrags.get(Integer.valueOf(sessionId));
         }
         if (op == null || mimeType == null || mimeType.length() == 0) {
             return null;
@@ -9463,6 +9464,18 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Invoked from CN1DragAndDrop.m when a session this application started has ended.
     public static void nativeDragCompletedCallback(int action) {
         NativeDragAndDrop.dragCompleted(action);
+    }
+
+    /// Invoked from CN1DragAndDrop.m once the last item provider that could read a drag's
+    /// payload has been released, which is the only moment the payload is certainly unreadable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sessionId`: the drag whose payload may be dropped
+    public static void nativeDragPayloadReleasedCallback(int sessionId) {
+        synchronized (exportedDrags) {
+            exportedDrags.remove(Integer.valueOf(sessionId));
+        }
     }
 
     @Override

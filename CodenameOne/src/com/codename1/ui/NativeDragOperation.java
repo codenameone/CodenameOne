@@ -126,6 +126,9 @@ public class NativeDragOperation {
     /// Sets the bit set of actions the source is willing to allow. The receiver chooses one of
     /// them, usually influenced by the modifier keys the user is holding.
     ///
+    /// Allowing none of them is allowing nothing to be done with the drag, so no drag begins at
+    /// all: there is nothing a receiver could accept.
+    ///
     /// #### Parameters
     ///
     /// - `allowedActions`: any combination of `#ACTION_COPY`, `#ACTION_MOVE` and `#ACTION_LINK`

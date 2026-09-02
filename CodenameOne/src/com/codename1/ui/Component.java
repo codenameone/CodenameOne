@@ -6017,6 +6017,12 @@ public class Component implements Animation, StyleListener, Editable {
     void cancelLightweightDrag() {
         Component leadParent = LeadUtil.leadParentImpl(this);
         if (leadParent.dragActivated) {
+            if (leadParent.dragAndDropInitialized) {
+                // pointerDragged hides the source while the framework carries its image; the
+                // native session draws its own preview and never runs dragFinishedImpl, so
+                // without this the component the user dragged stays invisible for good.
+                leadParent.setVisible(true);
+            }
             Form p = getComponentForm();
             if (p != null) {
                 p.setDraggedComponent(null);

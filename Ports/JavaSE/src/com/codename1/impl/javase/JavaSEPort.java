@@ -1976,7 +1976,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     continue;
                 }
                 if (mime.startsWith("image/")) {
-                    if (!available.contains(DataFlavor.imageFlavor)) {
+                    // Only when something can actually decode this encoding. Desktop receivers
+                    // commonly pick the standard image flavor ahead of the MIME specific stream,
+                    // so advertising it for a WebP -- which ImageIO has no reader for -- lost the
+                    // whole drop to an UnsupportedFlavorException for a payload that was
+                    // perfectly readable as bytes.
+                    if (hasImageReader(mime) && !available.contains(DataFlavor.imageFlavor)) {
                         available.add(DataFlavor.imageFlavor);
                     }
                     addBinaryFlavor(available, mime);
@@ -2015,15 +2020,62 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
-        private static byte[] imageBytes(ClipboardContent data) {
-            byte[] b = data.getBytes(ClipboardContent.MIME_PNG);
-            if (b == null) {
-                b = data.getBytes(ClipboardContent.MIME_JPEG);
+        /// True when this JVM has an `ImageIO` reader for the encoding, which is the question
+        /// `DataFlavor#imageFlavor` really asks. Asked by MIME type, so it reads no value and a
+        /// lazily provided representation is not built in order to answer it.
+        private static boolean hasImageReader(String mime) {
+            try {
+                return ImageIO.getImageReadersByMIMEType(mime).hasNext();
+            } catch (Throwable err) {
+                return false;
             }
-            if (b == null) {
-                b = data.getBytes(ClipboardContent.MIME_GIF);
+        }
+
+        /// Decodes whichever image representation this content offers that `ImageIO` can read.
+        ///
+        /// The three encodings the framework names come first because they are what a Codename
+        /// One source publishes; anything else -- a BMP, a TIFF, whatever a reader plugin adds --
+        /// is tried afterwards, so the standard image flavor serves the same set of types
+        /// `#hasImageReader(java.lang.String)` advertised it for.
+        private static java.awt.Image decodeImage(ClipboardContent data) {
+            java.awt.Image img = decodeImage(data, ClipboardContent.MIME_PNG);
+            if (img == null) {
+                img = decodeImage(data, ClipboardContent.MIME_JPEG);
             }
-            return b;
+            if (img == null) {
+                img = decodeImage(data, ClipboardContent.MIME_GIF);
+            }
+            if (img != null) {
+                return img;
+            }
+            String[] mimeTypes = data.getMimeTypes();
+            for (int i = 0; i < mimeTypes.length; i++) {
+                String mime = mimeTypes[i];
+                if (!mime.startsWith("image/") || ClipboardContent.MIME_PNG.equals(mime)
+                        || ClipboardContent.MIME_JPEG.equals(mime)
+                        || ClipboardContent.MIME_GIF.equals(mime) || !hasImageReader(mime)) {
+                    continue;
+                }
+                img = decodeImage(data, mime);
+                if (img != null) {
+                    return img;
+                }
+            }
+            return null;
+        }
+
+        private static java.awt.Image decodeImage(ClipboardContent data, String mime) {
+            byte[] bytes = data.getBytes(mime);
+            if (bytes == null) {
+                return null;
+            }
+            try {
+                return ImageIO.read(new ByteArrayInputStream(bytes));
+            } catch (Throwable err) {
+                // A representation that does not decode is not the image flavor's answer; the
+                // next one, or the byte stream flavor, still is.
+                return null;
+            }
         }
 
         /// Resolves the `application/x-file-list` representation (a single path/URI `String` or a
@@ -2080,12 +2132,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 throw new UnsupportedFlavorException(flavor);
             }
             if (DataFlavor.imageFlavor.equals(flavor)) {
-                byte[] bytes = imageBytes(data);
-                if (bytes != null) {
-                    java.awt.Image img = ImageIO.read(new ByteArrayInputStream(bytes));
-                    if (img != null) {
-                        return img;
-                    }
+                java.awt.Image img = decodeImage(data);
+                if (img != null) {
+                    return img;
                 }
                 throw new UnsupportedFlavorException(flavor);
             }

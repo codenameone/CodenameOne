@@ -439,6 +439,37 @@ void CN1CancelNativeDrag(void) {
     cn1SessionActions = CN1_DND_ACTION_NONE;
 }
 
+/// Holds a drag's payload alive for exactly as long as something can still read it.
+///
+/// Every load handler this session registers captures the token, and copying a block retains
+/// what it captures, so the token outlives the gesture precisely when an NSItemProvider does --
+/// which is the case that matters, since a receiver may keep a provider and read it much later.
+/// When the last provider goes the token deallocates and the framework drops the payload. It
+/// carries only the session id: the bytes stay on the Java side, unbuilt until read.
+@interface CN1DragPayloadToken : NSObject {
+    int _sessionId;
+}
+@property (nonatomic) int sessionId;
+@end
+
+@implementation CN1DragPayloadToken
+
+@synthesize sessionId = _sessionId;
+
+- (void)dealloc {
+    const int released = _sessionId;
+    // dealloc runs on whichever thread released the last provider. Every other call into the
+    // framework from this file is made on the main thread, and this one is no different.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1NativeDragDeliverPayloadReleased(released);
+    });
+#ifndef CN1_USE_ARC
+    [super dealloc];
+#endif
+}
+
+@end
+
 API_AVAILABLE(ios(11.0))
 @interface CN1DragAndDropDelegate : NSObject <UIDragInteractionDelegate, UIDropInteractionDelegate>
 @end
@@ -458,6 +489,8 @@ API_AVAILABLE(ios(11.0))
     // receiver reads them.
     int allowed = CN1NativeDragDeliverSessionStarted();
     if (allowed == CN1_DND_ACTION_NONE) {
+        // Nothing was staged, or nothing may be done with what was. Either way no session
+        // begins; the framework side has already tidied up whatever it had.
         return @[];
     }
     // The authoritative set, which is what a local drop session is told the source allows.
@@ -468,7 +501,12 @@ API_AVAILABLE(ios(11.0))
     cn1LocalDropResult = -1;
 
     NSMutableArray<UIDragItem *>* items = [NSMutableArray array];
-    const int sessionId = cn1DragSessionId;
+    // The payload's keeper. Released once below, after everything that could read it has been
+    // registered; from then on the load handlers are its only owners, so it dies with the last
+    // of them -- and with no handlers at all it dies here, which is equally correct because
+    // nothing can read the payload then either.
+    CN1DragPayloadToken* payloadToken = [[CN1DragPayloadToken alloc] init];
+    payloadToken.sessionId = cn1DragSessionId;
 
     // Every representation the operation declared, registered lazily. The value is fetched when
     // a receiver reads that type, not now: a drag that is begun and abandoned must not have
@@ -487,7 +525,7 @@ API_AVAILABLE(ios(11.0))
                                                        visibility:NSItemProviderRepresentationVisibilityAll
                                                       loadHandler:^NSProgress *(void (^completion)(NSData *, NSError *)) {
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    completion(CN1NativeDragDeliverResolve(mime, sessionId), nil);
+                    completion(CN1NativeDragDeliverResolve(mime, payloadToken.sessionId), nil);
                 });
                 return nil;
             }];
@@ -527,6 +565,11 @@ API_AVAILABLE(ios(11.0))
         [item release];
 #endif
     }
+#ifndef CN1_USE_ARC
+    // The registered load handlers own it from here; under ARC the local strong reference goes
+    // at the end of this scope and does the same thing.
+    [payloadToken release];
+#endif
     if (items.count == 0) {
         cn1DraggingOut = NO;
         CN1NativeDragDeliverCompleted(CN1_DND_ACTION_NONE);

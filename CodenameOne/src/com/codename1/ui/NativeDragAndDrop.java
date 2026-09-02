@@ -161,7 +161,11 @@ public final class NativeDragAndDrop {
     /// true when the operating system took the drag; false when the platform has no native drag
     /// and drop, refused to start a session, or is already running one
     public static boolean startDrag(Component source, NativeDragOperation op) {
-        if (op == null || !isSupported()) {
+        if (op == null || !isSupported()
+                || op.getAllowedActions() == NativeDragOperation.ACTION_NONE) {
+            // Allowing nothing to be done with a drag is having no drag, and a press stages one
+            // on the same terms. Running it anyway would put a session in flight that no target
+            // could ever accept.
             return false;
         }
         synchronized (LOCK) {
@@ -218,7 +222,12 @@ public final class NativeDragAndDrop {
                 return null;
             }
             op = pending;
-            if (op == null) {
+            if (op == null || op.getAllowedActions() == NativeDragOperation.ACTION_NONE) {
+                // As in startDrag. Refusing *before* the operation is made active also keeps a
+                // session that can never complete from wedging every drag after it: a running
+                // drag is what stops the next one from starting, and nothing would report this
+                // one finished. A press does not stage such an operation in the first place, so
+                // this is only reachable if the source changed its mind mid-gesture.
                 return null;
             }
             source = pendingSource;

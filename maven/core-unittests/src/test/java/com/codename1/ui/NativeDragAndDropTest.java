@@ -783,6 +783,80 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void anOperationThatPermitsNothingNeverBecomesADrag() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            NativeDragOperation op = new NativeDragOperation("nothing may be done with me")
+                    .setAllowedActions(NativeDragOperation.ACTION_NONE);
+            source.setNativeDragOperation(op);
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            form.pointerDragged(x + 200, y + 200);
+            assertNull(implementation.getStartedNativeDrag(),
+                    "no receiver could accept it, so there is no drag to run");
+            assertFalse(NativeDragAndDrop.startDrag(source, op),
+                    "and asking for one directly is refused on the same terms");
+            assertNull(NativeDragAndDrop.dragSessionStarted(),
+                    "a platform whose own recognizer fires later gets the same answer -- a "
+                            + "session that can never complete would wedge every drag after it");
+            assertNull(NativeDragAndDrop.getActiveDrag());
+
+            form.pointerReleased(x + 200, y + 200);
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
+    void aDeferredSessionGivesTheSourceBackTheVisibilityTheLightweightDragTook() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        // The port refuses the start, so the gesture carries on as a lightweight drag -- which
+        // hides the source and carries its image -- until the platform's own recognizer fires.
+        implementation.setNativeDragStartRefused(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            source.setDraggable(true);
+            NativeDragOperation op = new NativeDragOperation("dragged out");
+            source.setNativeDragOperation(op);
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            form.pointerDragged(x + 200, y + 200);
+            assertFalse(source.isVisible(),
+                    "the lightweight drag took the gesture and hid the source it is carrying");
+
+            assertSame(op, NativeDragAndDrop.dragSessionStarted());
+            flushSerialCalls();
+            assertTrue(source.isVisible(),
+                    "the native session draws its own preview and never runs the lightweight "
+                            + "drop, so nothing else would ever make the source visible again");
+
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragStartRefused(false);
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+        }
+    }
+
+    @FormTest
     void aReleaseAfterARefusedStartDoesNotLeaveTheDragArmed() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

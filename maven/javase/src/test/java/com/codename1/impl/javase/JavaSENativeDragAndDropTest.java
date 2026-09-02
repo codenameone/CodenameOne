@@ -178,6 +178,54 @@ class JavaSENativeDragAndDropTest {
     }
 
     @Test
+    void anImageEncodingNothingCanDecodeDoesNotClaimTheStandardImageFlavor() {
+        ClipboardContent content = new ClipboardContent()
+                .setData("image/webp", new byte[]{'R', 'I', 'F', 'F'});
+        Transferable t = new JavaSEPort.RichTransferable(content);
+
+        assertFalse(t.isDataFlavorSupported(DataFlavor.imageFlavor),
+                "a desktop receiver commonly picks the standard image flavor ahead of the "
+                        + "MIME specific stream, so claiming it for an encoding ImageIO cannot "
+                        + "read loses the whole drop to an UnsupportedFlavorException");
+        assertNotNull(flavorFor(t, "image/webp"),
+                "the bytes are still perfectly readable by anything that wants that type");
+    }
+
+    @Test
+    void aDecodableImageStillClaimsTheStandardImageFlavor() throws Exception {
+        ClipboardContent content = new ClipboardContent()
+                .setData(ClipboardContent.MIME_PNG, onePixelPng());
+        Transferable t = new JavaSEPort.RichTransferable(content);
+
+        assertTrue(t.isDataFlavorSupported(DataFlavor.imageFlavor));
+        assertTrue(t.getTransferData(DataFlavor.imageFlavor) instanceof java.awt.Image);
+    }
+
+    @Test
+    void theStandardImageFlavorServesAnyEncodingItWasAdvertisedFor() throws Exception {
+        java.io.ByteArrayOutputStream bmp = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(
+                new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB),
+                "bmp", bmp);
+        ClipboardContent content = new ClipboardContent().setData("image/bmp", bmp.toByteArray());
+        Transferable t = new JavaSEPort.RichTransferable(content);
+
+        assertTrue(t.isDataFlavorSupported(DataFlavor.imageFlavor),
+                "ImageIO reads BMP, so the flavor is advertised");
+        assertTrue(t.getTransferData(DataFlavor.imageFlavor) instanceof java.awt.Image,
+                "and what is advertised has to be servable -- reading only the three encodings "
+                        + "the framework names left this one throwing");
+    }
+
+    private static byte[] onePixelPng() throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(
+                new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB),
+                "png", out);
+        return out.toByteArray();
+    }
+
+    @Test
     void anUnofferedFlavorIsRefusedRatherThanAnsweredWithNull() {
         ClipboardContent content = new ClipboardContent().setData(ClipboardContent.MIME_TEXT, "hi");
         final Transferable t = new JavaSEPort.RichTransferable(content);

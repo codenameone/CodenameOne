@@ -1163,6 +1163,11 @@ NSData* CN1NativeDragDeliverResolve(NSString* mimeType, int sessionId) {
     return bytes == JAVA_NULL ? nil : arrayToData(bytes);
 }
 
+void CN1NativeDragDeliverPayloadReleased(int sessionId) {
+    com_codename1_impl_ios_IOSImplementation_nativeDragPayloadReleasedCallback___int(
+            CN1_THREAD_GET_STATE_PASS_ARG sessionId);
+}
+
 int CN1NativeDragDeliverDropCommit(int x, int y, int action) {
     return (int)com_codename1_impl_ios_IOSImplementation_nativeDropCommitCallback___int_int_int_R_int(
             CN1_THREAD_GET_STATE_PASS_ARG x, y, action);

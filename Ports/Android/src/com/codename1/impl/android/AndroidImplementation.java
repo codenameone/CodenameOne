@@ -10754,6 +10754,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private void fillAdvertisedTypes(ClipboardContent content, ClipDescription description,
             String plain, List<String> fileUris, List<Uri> unnamedUris) {
         List<String> unsatisfiedBinary = new ArrayList<String>();
+        List<String> unsatisfiedText = new ArrayList<String>();
         for (int iter = 0; iter < description.getMimeTypeCount(); iter++) {
             String mime = description.getMimeType(iter);
             if (mime == null) {
@@ -10762,9 +10763,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             mime = mime.toLowerCase();
             if (content.hasMimeType(mime)) {
                 continue;
-            }
-            if (!mime.startsWith("text/") && !"text/uri-list".equals(mime)) {
-                unsatisfiedBinary.add(mime);
             }
             if ("text/uri-list".equals(mime)) {
                 if (!fileUris.isEmpty()) {
@@ -10779,18 +10777,116 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
                 continue;
             }
-            if (mime.startsWith("text/") && plain != null && plain.length() > 0) {
-                content.setData(mime, plain);
+            // A text type is *not* assumed to be the carried text here. The exporter writes a
+            // text representation whose value differs from that text into a content URI exactly
+            // as it writes binary, so assuming made a target asking for an application's own
+            // text format receive the plain fallback instead of the value it published.
+            if (mime.startsWith("text/")) {
+                unsatisfiedText.add(mime);
+            } else {
+                unsatisfiedBinary.add(mime);
             }
         }
-        if (unsatisfiedBinary.size() == 1 && unnamedUris.size() == 1) {
-            // One type the clip promised and could not produce, and one URI whose type Android
-            // could not name: the pairing cannot be anything else. With more of either it could
-            // be, and inventing an association would tell a target it has something it may not
-            // -- which is the failure this whole path exists to avoid -- so those are left
-            // absent and the target correctly refuses.
-            content.setDataProvider(unsatisfiedBinary.get(0), uriBytesProvider(unnamedUris.get(0)));
+        List<Uri> unclaimed = new ArrayList<Uri>(unnamedUris);
+        for (int iter = unclaimed.size() - 1; iter >= 0; iter--) {
+            Uri uri = unclaimed.get(iter);
+            String named = mimeForUnnamedUri(uri, unsatisfiedBinary, unsatisfiedText);
+            if (named != null) {
+                content.setDataProvider(named, uriBytesProvider(uri));
+                unsatisfiedBinary.remove(named);
+                unsatisfiedText.remove(named);
+                unclaimed.remove(iter);
+            }
         }
+        if (unclaimed.size() == 1) {
+            // One representation the clip promised and could not produce, and one URI whose
+            // type Android could not name: the pairing cannot be anything else. A byte backed
+            // type is taken first because bytes can only have come from a URI, where a text one
+            // may also be another reading of the text the clip carries. With more of either it
+            // could be, and inventing an association would tell a target it has something it
+            // may not -- which is the failure this whole path exists to avoid -- so those are
+            // left absent and the target correctly refuses.
+            String only = null;
+            if (unsatisfiedBinary.size() == 1) {
+                only = unsatisfiedBinary.remove(0);
+            } else if (unsatisfiedBinary.isEmpty() && unsatisfiedText.size() == 1) {
+                only = unsatisfiedText.remove(0);
+            }
+            if (only != null) {
+                content.setDataProvider(only, uriBytesProvider(unclaimed.get(0)));
+            }
+        }
+        if (plain != null && plain.length() > 0) {
+            for (int iter = 0; iter < unsatisfiedText.size(); iter++) {
+                // What is left: an Android clip carries a single text payload, and a text type
+                // no URI accounted for is another name for that payload -- which is exactly how
+                // the exporter advertises a reading whose value *is* the carried text.
+                content.setData(unsatisfiedText.get(iter), plain);
+            }
+        }
+    }
+
+    /// The type an untyped content URI was published as, recovered from the name of the file it
+    /// serves.
+    ///
+    /// ContentResolver could not name it -- MimeTypeMap has no entry for an application defined
+    /// type, so the FileProvider serving it reports octet-stream -- but the extension is still
+    /// exactly what `#extensionForMime(java.lang.String)` produced for the type that was
+    /// written, so the association the resolver lost is recoverable rather than guessed. That is
+    /// what lets more than one unnameable representation survive the round trip. An extension
+    /// two advertised types share answers nothing, as does a clip this application did not
+    /// write.
+    private String mimeForUnnamedUri(Uri uri, List<String> binary, List<String> text) {
+        String name = displayNameFor(uri);
+        if (name == null) {
+            return null;
+        }
+        int dot = name.lastIndexOf('.');
+        if (dot < 0 || dot == name.length() - 1) {
+            return null;
+        }
+        String extension = name.substring(dot + 1).toLowerCase();
+        String match = null;
+        for (int pass = 0; pass < 2; pass++) {
+            List<String> candidates = pass == 0 ? binary : text;
+            for (int iter = 0; iter < candidates.size(); iter++) {
+                String candidate = candidates.get(iter);
+                if (extension.equals(extensionForMime(candidate))) {
+                    if (match != null) {
+                        return null;
+                    }
+                    match = candidate;
+                }
+            }
+        }
+        return match;
+    }
+
+    /// The file name behind a content URI, which is where the extension an exporter chose
+    /// survives. A provider that will not answer OpenableColumns still has the name in its path.
+    private String displayNameFor(Uri uri) {
+        Cursor cursor = null;
+        try {
+            cursor = getContext().getContentResolver().query(uri,
+                    new String[]{android.provider.OpenableColumns.DISPLAY_NAME},
+                    null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                int column = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                if (column >= 0) {
+                    String name = cursor.getString(column);
+                    if (name != null && name.length() > 0) {
+                        return name;
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            // Fall through to the path below.
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        return uri.getLastPathSegment();
     }
 
     public static MediaException createMediaException(int extra) {
