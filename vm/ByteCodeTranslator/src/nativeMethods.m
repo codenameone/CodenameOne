@@ -2282,7 +2282,9 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
  *     collectThreadResources works on thread-local state rather than the state it
  *     is handed;
  *   - the collector cannot stop a compute-only virtual thread at all, which is why
- *     marking such a state active is a hang rather than a fix.
+ *     marking such a state active is a hang rather than a fix;
+ *   - a virtual thread registered after the collector's once-per-cycle registry
+ *     snapshot is invisible to the stack scan until the next cycle.
  *
  * KNOWN GAP, stated here because the obvious fix is worse than the problem. The
  * state this creates is never marked threadActive while its virtual thread runs,

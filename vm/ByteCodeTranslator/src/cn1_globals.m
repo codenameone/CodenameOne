@@ -8741,6 +8741,17 @@ static void cn1GcBuildVirtualThreadSnapshot(void) {
     cn1GcVtSnapshotCount = n;
 }
 
+// SNAPSHOT SCOPE, since review asks: a virtual thread registered AFTER the
+// once-per-cycle snapshot is invisible to this pass and to
+// cn1VirtualThreadForStackAddress until the next cycle. That is real, and it is a
+// property of the EXPERIMENTAL spawn API rather than of this scan -- inside the VM
+// the only caller of cn1VirtualThreadCreate is cn1SpawnVirtualThread, which nothing
+// in this repository calls. It belongs to the same unfinished design as the other
+// gaps listed above cn1SpawnVirtualThread in nativeMethods.m, and is fixed by the
+// same decision (carrier association), not by widening the snapshot here: taking
+// the registry lock during the scan is what the snapshot exists to avoid, because a
+// thread frozen by the stop signal may be the one holding it.
+//
 // Mark every virtual thread's saved stack region -- the RUNNING ones included, and
 // that redundancy is the point.
 //
