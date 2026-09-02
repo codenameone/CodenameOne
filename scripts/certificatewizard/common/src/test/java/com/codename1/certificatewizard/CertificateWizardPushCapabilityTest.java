@@ -24,6 +24,7 @@ package com.codename1.certificatewizard;
 
 import com.codename1.certificatewizard.api.MockSigningService;
 import com.codename1.certificatewizard.project.ProjectIO;
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -159,6 +160,17 @@ class CertificateWizardPushCapabilityTest {
 
         assertTrue(service.pushEnabledOn().contains(EXISTING_BUNDLE_APPLE_ID),
                 "the action has to reach the service, got " + service.pushEnabledOn());
+
+        // And it has to say what the change did to the profiles. Apple invalidates the ones
+        // issued before a capability change, so stopping at "enabled" would leave the
+        // project installed against profiles that no longer sign -- the App ID fixed and
+        // the same codesign failure on screen.
+        Component banner = find(app[0].getForm(), "page.message");
+        assertNotNull(banner, "the follow-up has to be on screen");
+        assertTrue(((SpanLabel) banner).getText().contains("reissued"),
+                ((SpanLabel) banner).getText());
+        assertNotNull(find(app[0].getForm(), "page.message.action"),
+                "and offer the flow that reissues them");
     }
 
     /// Runs the wizard's Auto Setup against a project whose settings carry `extraSettings`,

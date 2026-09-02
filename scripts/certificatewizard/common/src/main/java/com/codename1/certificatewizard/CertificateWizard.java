@@ -1709,6 +1709,33 @@ public class CertificateWizard extends Lifecycle {
         return push.booleanValue() ? "Enabled" : "Off";
     }
 
+    /// What has to happen after the push capability is turned on by hand.
+    ///
+    /// A profile is a snapshot of the App ID's capabilities at the moment it was issued,
+    /// and Apple invalidates the ones a capability change leaves behind -- which is what
+    /// [#isUsableProfile] and the reissue in [#autoSetupProfile] exist for. Reporting
+    /// success and stopping would leave the project installed against profiles that no
+    /// longer sign, so the developer would have fixed the App ID and still be looking at
+    /// the same codesign failure.
+    ///
+    /// Conditional, because the wizard cannot read a capability back: if push was already
+    /// on, the call changed nothing and nothing was invalidated. The remedy is offered
+    /// rather than performed for the same reason -- and it is the flow that already knows
+    /// how to do it, which reissues exactly the profiles Apple marked invalid.
+    private void afterPushEnabled(SigningState.BundleId bundle) {
+        String message = "Push notifications are on for " + bundle.identifier()
+                + ". Apple invalidates the provisioning profiles issued before a capability"
+                + " change, so if this turned push on, the ones this project uses have to be"
+                + " reissued before it can sign.";
+        boolean projectOwnsIt = binding != null && bundle.identifier() != null
+                && bundle.identifier().equals(projectDefaults().bundleId);
+        if (projectOwnsIt) {
+            showPageMessage(message, true, "Run automatic setup", this::autoSetupCurrentProject);
+            return;
+        }
+        showPageMessage(message + " Recreate them from the profiles page.", true);
+    }
+
     /// Apple's BundleIdPlatform as a person reads it.
     private String bundlePlatformName(String platform) {
         if ("MAC_OS".equals(platform)) {
@@ -3177,8 +3204,15 @@ public class CertificateWizard extends Lifecycle {
             // button rather than a guess: one click, on the page that lists the App IDs,
             // instead of a signing failure with no remedy inside the wizard at all.
             Button enablePush = outline("Enable push", "btn.enablePush." + b.id());
-            enablePush.addActionListener(e -> service.enablePushCapability(b.id(),
-                    r2 -> afterMutation(r2, "Push notifications enabled for " + b.identifier())));
+            enablePush.addActionListener(e -> service.enablePushCapability(b.id(), r2 -> {
+                if (!r2.ok) {
+                    showPageError(r2, null);
+                    return;
+                }
+                ToastBar.showMessage("Push notifications enabled for " + b.identifier(),
+                        FontImage.MATERIAL_CHECK);
+                refreshForAutoSetup(() -> afterPushEnabled(b));
+            }));
             r.add(tableCell(actionRow(Component.RIGHT, enablePush)));
             body.add(r);
         }

@@ -4603,7 +4603,13 @@ public class Form extends Container implements TopLevelContainer {
             // the tap dispatches below no longer test isScrollWheeling before moving
             // focus: none of them is reachable during a wheel gesture any more.
             if (isScrollWheeling) {
-                fireReleaseListeners(x, y);
+                // Consuming a form level release listener means the gesture was handled and
+                // must not be dispatched further, and that holds for a wheel as much as for
+                // a finger: the ordinary path returns on it. Ignoring the answer here let a
+                // consumed release still reach an activated sticky target and commit a
+                // spinner's value -- fireReleaseListeners clears `dragged` itself on that
+                // path, but nothing else, so only the sticky half slipped through.
+                boolean consumed = fireReleaseListeners(x, y);
                 // Whatever the drag was actually delivered to, which is not only the
                 // scrolling container: a component that opts into sticky drag keeps the
                 // gesture once it starts, and a Spinner is one -- its drag rolls the value
@@ -4615,8 +4621,9 @@ public class Form extends Container implements TopLevelContainer {
                 // rest of this branch exists to suppress: List fires its action event only
                 // on the release of a gesture that never became a drag, and takes the
                 // settling path when it did.
-                Component wheelDragged = dragged != null ? dragged
-                        : (stickyDrag != null && stickyDrag.isDragActivated() ? stickyDrag : null);
+                Component wheelDragged = consumed ? null
+                        : (dragged != null ? dragged
+                                : (stickyDrag != null && stickyDrag.isDragActivated() ? stickyDrag : null));
                 if (wheelDragged != null) {
                     if (wheelDragged.isDragAndDropInitialized()) {
                         LeadUtil.dragFinished(wheelDragged, x, y);

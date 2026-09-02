@@ -220,6 +220,34 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aConsumedWheelReleaseSettlesNothing() {
+        Form f = new Form("consumed", new BorderLayout());
+        StickyDragComponent sticky = new StickyDragComponent();
+        sticky.setPreferredH(Display.getInstance().convertToPixels(15));
+        f.getContentPane().setLayout(BoxLayout.y());
+        f.getContentPane().add(sticky);
+        f.getContentPane().add(filler());
+        // Consuming a form level release listener means the gesture was handled and must
+        // not be dispatched further. The ordinary path returns on it, and a wheel is no
+        // different -- a listener that took the gesture did not ask for a spinner's value
+        // to be committed behind it.
+        f.addPointerReleasedListener(new ActionListener<ActionEvent>() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                evt.consume();
+            }
+        });
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+
+        wheel(sticky, -Display.getInstance().convertToPixels(20));
+
+        assertTrue(sticky.drags() > 0, "the drag has to have reached it for this to mean anything");
+        assertEquals(0, sticky.releases(), "a consumed release must not be dispatched onwards");
+    }
+
+    @FormTest
     void aWheelSettlesAKeptDragInAWindowToo() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("sticky", new BorderLayout());
