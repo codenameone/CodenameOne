@@ -233,6 +233,13 @@ public class KotlinStdlibAlignment {
             if (!callsNamed(active[i], "failOnVersionConflict")) {
                 continue;
             }
+            // On a configuration that never receives the constraint it cannot
+            // conflict with it. `configurations.create('tooling')
+            // .resolutionStrategy.failOnVersionConflict()` governs a
+            // configuration the app made and nothing extends.
+            if (!governsTheConstrainedGraph(active[i], config)) {
+                continue;
+            }
             // A statement that governs the plugin classpath never arrives here:
             // both spellings of it -- a buildscript block and configurations
             // .classpath -- are blanked with the rest of that graph before any
@@ -477,6 +484,41 @@ public class KotlinStdlibAlignment {
         if (rich != null) {
             return rich;
         }
+        String fromCoordinate = coordinateVersionOf(line, artifact);
+        if (fromCoordinate != null) {
+            return fromCoordinate;
+        }
+        String mapped = mapEntryValue(line, "version");
+        if (mapped != null) {
+            return mapped;
+        }
+        return null;
+    }
+
+    /**
+     * Whether a soft {@code require} is the only thing holding this artifact.
+     *
+     * <p>Such a declaration is not management: the constraint raises it and the
+     * two coexist. Anything that really pins -- a {@code strictly}, a force, a
+     * rejection that closes the floor, or the {@code !!} suffix on the
+     * requirement itself -- answers false, and so does a coordinate carrying its
+     * own version, which is the app's chosen version rather than a floor under
+     * it.</p>
+     */
+    private static boolean heldOnlyBySoftRequirement(String line, String artifact) {
+        String required = versionInCall(line, "require");
+        if (required == null || required.endsWith(STRICT_SUFFIX)) {
+            return false;
+        }
+        if (callsStrictly(line) || callsForce(line, artifact) || rejectsTheFloor(line)) {
+            return false;
+        }
+        return coordinateVersionOf(line, artifact) == null
+                && mapEntryValue(line, "version") == null;
+    }
+
+    /** The version the artifact's own coordinate carries, or null. */
+    private static String coordinateVersionOf(String line, String artifact) {
         String coordinate = KOTLIN_GROUP + ":" + artifact + ":";
         // Past `using`, when there is one: a substitution names the replaced module
         // first and the replacement second, and it is the replacement that decides
@@ -510,14 +552,7 @@ public class KotlinStdlibAlignment {
             }
             i = end;
         }
-        if (lowest != null) {
-            return lowest;
-        }
-        String mapped = mapEntryValue(line, "version");
-        if (mapped != null) {
-            return mapped;
-        }
-        return null;
+        return lowest;
     }
 
     /**
@@ -997,11 +1032,15 @@ public class KotlinStdlibAlignment {
      * it.
      *
      * <p>{@code strictly} is the one that changes whether the constraints can
-     * coexist with the app's, but it is not the only one that says what version
-     * is meant. Reading only it left {@code version { require '1.9.22' } }
-     * with no version at all, which the conservative path then treated as
-     * below the floor -- dropping BOTH constraints for a declaration that was
-     * already merged-era and needed only its sibling left alone.</p>
+     * coexist with the app's, and {@code useVersion} rewrites what was
+     * requested on the way through, so both are read.</p>
+     *
+     * <p>{@code require} is read too, because it OVERRIDES the coordinate:
+     * {@code implementation('..jdk7:1.7.22') { version { require '1.9.22' } }}
+     * resolves 1.9.22, and reading the coordinate there called a merged-era
+     * declaration pre-merge. Reading it is not the same as treating it as a
+     * pin -- see heldOnlyBySoftRequirement, which is where that distinction
+     * lives.</p>
      *
      * <p>{@code prefer} is deliberately NOT read here. A preference is soft:
      * Gradle takes it only when nothing stronger is in play, so a transitive
@@ -1642,6 +1681,21 @@ public class KotlinStdlibAlignment {
         // conflicting costs an app that had already pinned the family the duplicate
         // it already had. So this stays until the classification can be read from
         // something better than a name.
+        // A soft requirement is not management, in either direction. The
+        // constraint RAISES it -- `version { require '1.7.22' }` and a floor of
+        // 1.8.0 resolve to 1.8.0 with no conflict -- so treating one as a pin
+        // stood the block down for a shim this could have fixed, and treating it
+        // as a declaration skipped that shim's constraint and left it pre-merge
+        // beside a merged-era base. Both are the duplicate this exists to
+        // prevent, kept rather than removed.
+        //
+        // Only when nothing else holds the artifact: a strictly, a force, a
+        // rejection or the `!!` suffix on the requirement itself all pin, and a
+        // coordinate that carries its own version is the app's chosen version,
+        // whose measured behaviour is what the comment above describes.
+        if (heldOnlyBySoftRequirement(line, artifact)) {
+            return false;
+        }
         if (!holdsStrictly(line, artifact)
                 && !declaresOnTheConstrainedConfiguration(configuration, line)) {
             return false;
@@ -2201,6 +2255,78 @@ public class KotlinStdlibAlignment {
         "compile",
         "runtime"
     };
+
+    /**
+     * Whether a resolution strategy in this statement governs a configuration
+     * that receives the emitted constraint.
+     *
+     * <p>Asked as the complement of a closed set rather than as a list of the
+     * configurations to ignore, because a project's configurations are open
+     * ended: {@code all} and {@code configureEach} are the only two spellings
+     * that mean every configuration, and the constraint is written on the main
+     * ones. A statement naming any OTHER single configuration -- created,
+     * looked up, or dotted -- governs something this block never reaches.</p>
+     *
+     * <p>A statement that does not go through {@code configurations} at all
+     * cannot be placed, and is assumed to govern: it is a bare
+     * {@code resolutionStrategy} inside a block this cannot see, and being
+     * wrong about it the other way emits a constraint into a graph that fails
+     * the build outright.</p>
+     */
+    private static boolean governsTheConstrainedGraph(String line, String configuration) {
+        int at = -1;
+        for (int i = 0; i < line.length(); i++) {
+            if (isLiteralStart(line, i)) {
+                i = endOfStringLiteral(line, i);
+                continue;
+            }
+            if (line.startsWith(CONFIGURATIONS, i)
+                    && (i == 0 || !isIdentifierChar(line.charAt(i - 1)))) {
+                at = i + CONFIGURATIONS.length();
+                break;
+            }
+        }
+        if (at < 0) {
+            return true;
+        }
+        int end = at;
+        while (end < line.length() && isIdentifierChar(line.charAt(end))) {
+            end++;
+        }
+        String named = line.substring(at, end);
+        if ("all".equals(named) || "configureEach".equals(named)) {
+            return true;
+        }
+        if (named.equals(configuration) || isAMainConfiguration(named)) {
+            return true;
+        }
+        // create('implementation'), named('api'), getByName(..): the name is a
+        // string rather than a token, and it is the same question.
+        for (int i = 0; i < line.length(); i++) {
+            if (!isLiteralStart(line, i)) {
+                continue;
+            }
+            int close = endOfStringLiteral(line, i);
+            String held = stringLiteralContent(line, i);
+            if (held.equals(configuration) || isAMainConfiguration(held)) {
+                return true;
+            }
+            i = close;
+        }
+        return false;
+    }
+
+    /** Whether the name is one of the configurations the constraint is on. */
+    private static boolean isAMainConfiguration(String name) {
+        for (int i = 0; i < MAIN_CONFIGURATIONS.length; i++) {
+            if (MAIN_CONFIGURATIONS[i].equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final String CONFIGURATIONS = "configurations.";
 
     /** Whether this line declares on {@code configuration}, as a whole token. */
     private static boolean declaresOn(String configuration, String line) {

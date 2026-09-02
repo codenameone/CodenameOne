@@ -735,6 +735,45 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * failOnVersionConflict turns a disagreement into a build failure, so the
+     * block stands down for it -- but only where it governs a configuration that
+     * receives the constraint. One the app created and nothing extends never
+     * sees it, and standing down there left the shim unaligned for nothing.
+     */
+    @Test
+    public void aConflictStrategyCountsOnlyWhereTheConstraintReaches() {
+        String tail = ".resolutionStrategy.failOnVersionConflict()\n";
+        String[] elsewhere = {
+            "    configurations.create('tooling')" + tail,
+            "    configurations.tooling" + tail,
+            "    configurations.getByName('tooling')" + tail,
+        };
+        for (int i = 0; i < elsewhere.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            elsewhere[i]).contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + elsewhere[i].trim() + ">> governs another graph");
+        }
+
+        String[] reaching = {
+            "    configurations.all { resolutionStrategy.failOnVersionConflict() }\n",
+            "    configurations.configureEach { resolutionStrategy"
+                    + ".failOnVersionConflict() }\n",
+            "    configurations.implementation" + tail,
+            "    configurations.getByName('implementation')" + tail,
+            // Not going through `configurations` at all, so it cannot be placed:
+            // assumed to reach, because the other way emits into a graph that
+            // fails the build outright.
+            "    resolutionStrategy.failOnVersionConflict()\n",
+        };
+        for (int i = 0; i < reaching.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    reaching[i]);
+            check("".equals(out), "<<" + reaching[i].trim()
+                    + ">> reaches the constrained graph, got <<" + out + ">>");
+        }
+    }
+
+    /**
      * The canonical Gradle rule puts its openers, its condition and its body on
      * separate lines, and every one of those splits was losing the override.
      */
@@ -3087,12 +3126,24 @@ public class KotlinStdlibAlignmentTest {
         check(old.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "and neither does an old one, which the floor simply overrides");
 
-        // a required version still does
+        // Neither does a requirement, which is soft in the same way. This once
+        // asserted that it binds; it does not, and skipping the constraint for it
+        // is what left a softly-required shim pre-merge.
         String required = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
                 + "{ version { require '1.9.22' } }\n");
-        check(!required.contains("kotlin-stdlib-jdk8:1.8.0"),
-                "a required version still binds");
+        check(required.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a required version does not stand in for the constraint either");
+
+        // A requirement that OVERRIDES a coordinate is still read as the version
+        // that declaration carries -- soft is about whether it pins, not about
+        // whether it is read.
+        String overridden = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                + "{ version { require '1.9.22' } }\n");
+        check(overridden.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "the requirement is read past the coordinate, got <<"
+                        + overridden + ">>");
     }
 
     /**
@@ -3341,11 +3392,27 @@ public class KotlinStdlibAlignmentTest {
         check(preferred.contains("kotlin-stdlib-jdk8:1.8.0"),
                 "and so does a preferred one");
 
-        // below the floor it still takes both
+        // Below the floor it does NOT take both. This once asserted the
+        // opposite, which was the wrong call: a requirement is soft, so the
+        // constraint raises it and the two resolve to 1.8.0 together. Standing
+        // the block down there left the shim at 1.7.22 beside whatever selected
+        // a merged-era base -- the duplicate this exists to prevent, in the graph
+        // it exists for.
         String old = KotlinStdlibAlignment.constraintsBlock("implementation",
                 "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7') "
                 + "{ version { require '1.7.22' } }\n");
-        check("".equals(old), "a required pre-merge version still suppresses both");
+        check(old.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && old.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a soft pre-merge requirement is raised, not honoured, got <<"
+                        + old + ">>");
+
+        // The `!!` suffix inside a requirement is Gradle's strict shorthand, and
+        // that one really does pin.
+        String strict = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk7') "
+                + "{ version { require '1.7.22!!' } }\n");
+        check("".equals(strict), "a strict requirement still takes both, got <<"
+                + strict + ">>");
     }
 
     /**
