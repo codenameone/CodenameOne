@@ -40,6 +40,7 @@ public final class MockSigningService implements SigningService {
     private final List<SigningState.AppGroup> appGroups = new ArrayList<SigningState.AppGroup>();
     private final Map<String, List<String>> appGroupAssociations = new LinkedHashMap<String, List<String>>();
     private final List<String> pushEnabledOn = new ArrayList<String>();
+    private final List<String> callLog = new ArrayList<String>();
     private long seq = 100;
 
     public MockSigningService() {
@@ -67,6 +68,11 @@ public final class MockSigningService implements SigningService {
         // Mac signing was set up for a project before anything else was.
         bundles.add(new SigningState.BundleId("BID_MACONLY", "com.example.macapp", "Mac Only App",
                 "MAC_OS", null));
+        // One App ID serving both platforms, which is what Apple's UNIVERSAL registration
+        // is: a capability change on it changes what EVERY profile issued from it was a
+        // snapshot of, iOS and Mac alike.
+        bundles.add(new SigningState.BundleId("BID_UNIV", "com.example.universal", "Universal App",
+                "UNIVERSAL", null));
         devices.add(new SigningState.Device("DEV_1", "Shai's iPhone", "00008120-000A1C3E0C68201E", "IOS", "ENABLED"));
         devices.add(new SigningState.Device("DEV_2", "QA iPad", "00008027-0004450E2688002E", "IOS", "ENABLED"));
         // A retired device is still on the account and Apple rejects a profile request naming it,
@@ -149,6 +155,7 @@ public final class MockSigningService implements SigningService {
 
     public void enablePushCapability(String bundleIdAppleId, OnComplete<Result<Void>> callback) {
         pushEnabledOn.add(bundleIdAppleId);
+        callLog.add("enablePush:" + bundleIdAppleId);
         for (int i = 0; i < bundles.size(); i++) {
             SigningState.BundleId b = bundles.get(i);
             if (b.id() != null && b.id().equals(bundleIdAppleId)) {
@@ -163,6 +170,13 @@ public final class MockSigningService implements SigningService {
     /// "the App ID happened to have it already".
     public List<String> pushEnabledOn() {
         return new ArrayList<String>(pushEnabledOn);
+    }
+
+    /// Every call that changed something, in the order it arrived. A profile is a snapshot
+    /// of an App ID's capabilities, so WHEN a capability was changed relative to the
+    /// profiles issued from it is the thing a test has to be able to see.
+    public List<String> callLog() {
+        return new ArrayList<String>(callLog);
     }
 
     /// Moves one App ID to the front of the listing.
@@ -192,6 +206,7 @@ public final class MockSigningService implements SigningService {
 
     public void createProfile(String name, String profileType, String bundleIdAppleId, List<String> certificateAppleIds,
                               List<String> deviceAppleIds, OnComplete<Result<Void>> callback) {
+        callLog.add("createProfile:" + bundleIdAppleId);
         String bundle = bundleIdAppleId;
         for (SigningState.BundleId b : bundles) {
             if (b.id().equals(bundleIdAppleId)) {

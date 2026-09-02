@@ -1538,7 +1538,9 @@ public class CertificateWizard extends Lifecycle {
                         + " is registered for " + bundlePlatformName(taken.platform())
                         + ", and Apple registers an identifier once. Enable iOS on it in the Apple"
                         + " Developer portal to sign iOS builds with it.");
-                autoSetupMacStages(() -> finishAutoSetup("Automatic signing setup completed."));
+                ensurePushCapabilities(bundleIdentifier,
+                        () -> autoSetupMacStages(
+                                () -> finishAutoSetup("Automatic signing setup completed.")));
                 return;
             }
             showPageMessage("Creating Bundle ID " + bundleIdentifier + "...", false);
@@ -1550,9 +1552,24 @@ public class CertificateWizard extends Lifecycle {
                 refreshForAutoSetup(() -> autoSetupDefaultProfiles(bundleIdentifier, appName));
             });
         } else {
-            ensurePushCapability(bundleIdentifier, "IOS",
+            ensurePushCapabilities(bundleIdentifier,
                     () -> autoSetupDefaultProfiles(bundleIdentifier, appName));
         }
+    }
+
+    /// Asserts every capability this project needs on the App IDs it already has, before
+    /// any profile is issued from them.
+    ///
+    /// One at a time would be enough if the platforms were always separate records, and
+    /// they are not: Apple's UNIVERSAL registration is ONE App ID serving both. Enabling
+    /// the Mac half at the start of the Mac stages therefore changed the capabilities of
+    /// the same App ID the iOS profiles had just been issued from, and Apple invalidates a
+    /// profile issued before a capability change -- the run reissued only its Mac profiles
+    /// and finished with the iOS pair installed and dead. A profile is a snapshot, so every
+    /// change to what it is a snapshot OF has to happen first.
+    private void ensurePushCapabilities(String bundleIdentifier, Runnable next) {
+        ensurePushCapability(bundleIdentifier, "IOS",
+                () -> ensurePushCapability(bundleIdentifier, "MAC_OS", next));
     }
 
     /// Asserts push notifications on an App ID this run did not create.
@@ -1849,7 +1866,9 @@ public class CertificateWizard extends Lifecycle {
 
     private void autoSetupMacProject(String profileType) {
         autoSetupWarnings.clear();
-        autoSetupMacProject(profileType, () -> finishAutoSetup("Mac signing setup completed."));
+        ensurePushCapabilities(projectDefaults().bundleId,
+                () -> autoSetupMacProject(profileType,
+                        () -> finishAutoSetup("Mac signing setup completed.")));
     }
 
     private void autoSetupMacProject(String profileType, Runnable next) {
@@ -1892,8 +1911,7 @@ public class CertificateWizard extends Lifecycle {
                         profileType, next));
             });
         } else {
-            ensurePushCapability(defaults.bundleId, "MAC_OS",
-                    () -> autoSetupCertificate(defaults.bundleId, defaults.appName, profileType, next));
+            autoSetupCertificate(defaults.bundleId, defaults.appName, profileType, next);
         }
     }
 
@@ -3209,8 +3227,11 @@ public class CertificateWizard extends Lifecycle {
                     showPageError(r2, null);
                     return;
                 }
-                ToastBar.showMessage("Push notifications enabled for " + b.identifier(),
-                        FontImage.MATERIAL_CHECK);
+                // No toast beside the banner: the banner below says the capability is on AND
+                // what it did to the profiles, which is the part that matters, and a toast
+                // animating while the refresh rebuilds the page is a race -- container
+                // mutations are queued for the length of an animation, so the rebuilt page
+                // can be read back as if nothing had happened.
                 refreshForAutoSetup(() -> afterPushEnabled(b));
             }));
             r.add(tableCell(actionRow(Component.RIGHT, enablePush)));

@@ -1012,7 +1012,16 @@ public class MacOSBuildHints {
             this.location = location;
             this.calendars = calendars;
             this.filesDownloads = filesDownloads;
-            this.apsEnvironment = apsEnvironment;
+            // Trimmed once, here, so both readers below agree with everything else that
+            // reads this hint. A properties file keeps trailing whitespace, so
+            // "apsEnvironment= false " arrived as "false " and compared equal to neither
+            // false nor none: the build emitted the APNs entitlement for a project that
+            // had just turned it off, and getApsEnvironment() resolved " development " to
+            // production for the same reason. IPhoneBuilder normalises its own push hint
+            // with trim() before reading it, and the signing wizard reads the settings file
+            // trimmed, so an untrimmed comparison here is the one that disagrees. An
+            // all-whitespace value now reads as unset rather than as "some environment".
+            this.apsEnvironment = apsEnvironment == null ? null : apsEnvironment.trim();
         }
 
         /** The defaults, for a caller that has no hints to resolve against. */

@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -140,6 +141,37 @@ class CertificateWizardPushCapabilityTest {
     }
 
     @Test
+    void aUniversalAppIdHasItsCapabilitiesSettledBeforeAnyProfileIsIssued() throws Exception {
+        // One App ID serving both platforms, and only the Mac build asks for push. Enabling
+        // it when the Mac stages start would change the capabilities of the very App ID the
+        // iOS profiles had just been issued from, and Apple invalidates a profile issued
+        // before a capability change -- the run would reissue its Mac profiles and finish
+        // with the iOS pair installed and dead.
+        final MockSigningService service = new MockSigningService();
+        final CertificateWizard[] app = launchBound(service, "com.example.universal",
+                "codename1.arg.macos.entitlements.apsEnvironment=production\n");
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "btn.autoSetup");
+            }
+        });
+
+        List<String> log = service.callLog();
+        int enabled = log.indexOf("enablePush:BID_UNIV");
+        int firstProfile = -1;
+        for (int i = 0; i < log.size(); i++) {
+            if (log.get(i).equals("createProfile:BID_UNIV")) {
+                firstProfile = i;
+                break;
+            }
+        }
+        assertTrue(enabled >= 0, "push has to be enabled for a Mac build that declares it: " + log);
+        assertTrue(firstProfile >= 0, "and profiles have to be issued: " + log);
+        assertTrue(enabled < firstProfile,
+                "every capability change has to precede the profiles that snapshot it: " + log);
+    }
+
+    @Test
     void thePushCapabilityCanBeTurnedOnFromTheBundleIdsPage() throws Exception {
         // What a project whose push the builders DETECT rather than read from a hint is
         // left with: neither inference is reproducible in the wizard, so the remedy for a
@@ -205,9 +237,14 @@ class CertificateWizardPushCapabilityTest {
     /// A wizard bound to a project carrying `extraSettings`, running against `service`.
     private CertificateWizard[] launchBound(final MockSigningService service, String extraSettings)
             throws Exception {
+        return launchBound(service, EXISTING_BUNDLE, extraSettings);
+    }
+
+    private CertificateWizard[] launchBound(final MockSigningService service, String bundleIdentifier,
+            String extraSettings) throws Exception {
         Path dir = Files.createTempDirectory("cn1-cw-push");
         Path settings = dir.resolve("codenameone_settings.properties");
-        Files.write(settings, ("codename1.packageName=" + EXISTING_BUNDLE + "\n"
+        Files.write(settings, ("codename1.packageName=" + bundleIdentifier + "\n"
                 + "codename1.displayName=My App\n" + extraSettings).getBytes(StandardCharsets.UTF_8));
         Path binding = dir.resolve("binding.properties");
         Files.write(binding, ("projectDir=" + dir + "\nsettings=" + settings + "\noutputDir=" + dir + "\n")
