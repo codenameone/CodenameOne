@@ -735,6 +735,71 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A coordinate can be a LATER argument: {@code dependencies.add('impl',
+     * 'g:a:1.7.22!!')} puts it after a comma, and walking back one token found
+     * the comma and stopped. The shims survived that because the call is also
+     * recognised where the CONFIGURATION name is read; the base library has a
+     * scan of its own that does not go through there, so its strict pin was
+     * emitted straight over.
+     */
+    @Test
+    public void aCoordinateMayBeALaterArgument() {
+        String base = "org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!";
+        String[] declarations = {
+            "    dependencies.add('implementation', '" + base + "')\n",
+            "    project.dependencies.add('implementation', '" + base + "')\n",
+            "    dependencies {\n        add 'implementation', '" + base + "'\n    }\n",
+            "    dependencies.add('implementation', "
+                    + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!')\n",
+        };
+        for (int i = 0; i < declarations.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    declarations[i]);
+            check("".equals(out), "<<" + declarations[i].trim()
+                    + ">> is a strict declaration, got <<" + out + ">>");
+        }
+
+        // The receiver still decides. A list is not a dependency handler, and a
+        // coordinate handed to one is not declared.
+        String[] strangers = {
+            "    myList.add('implementation', '" + base + "')\n",
+            "    logger.lifecycle('implementation', '" + base + "')\n",
+        };
+        for (int i = 0; i < strangers.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            strangers[i]).contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + strangers[i].trim() + ">> declares nothing");
+        }
+    }
+
+    /**
+     * A test suite's nested {@code dependencies { }} configures the suite's own
+     * configurations. Its {@code implementation} has the same name as the app's
+     * and is a different thing, so reading a declaration there as the app's
+     * skipped the constraint for an artifact the release graph still carries.
+     */
+    @Test
+    public void aNestedTestSuiteIsNotTheApplicationGraph() {
+        String suite = "    testing {\n        suites {\n            test {\n"
+                + "                dependencies {\n"
+                + "                    implementation('org.jetbrains.kotlin:"
+                + "kotlin-stdlib-jdk8:1.9.22')\n"
+                + "                }\n            }\n        }\n    }\n";
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", suite);
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0")
+                        && out.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "the suite's declaration leaves both constrained, got <<" + out + ">>");
+
+        // The app's own block, which looks the same one level up, still counts.
+        String own = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    dependencies {\n        implementation('org.jetbrains.kotlin:"
+                + "kotlin-stdlib-jdk8:1.9.22')\n    }\n");
+        check(!own.contains("kotlin-stdlib-jdk8:1.8.0")
+                        && own.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "the app's own declaration is still read, got <<" + own + ">>");
+    }
+
+    /**
      * failOnVersionConflict turns a disagreement into a build failure, so the
      * block stands down for it -- but only where it governs a configuration that
      * receives the constraint. One the app created and nothing extends never

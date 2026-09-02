@@ -820,6 +820,17 @@ public class KotlinStdlibAlignment {
     /** Whether the literal at {@code quoteAt} is an argument of a declaring call. */
     private static boolean isDeclarationArgument(String line, int quoteAt) {
         int i = skipBlanksBackward(line, quoteAt - 1);
+        if (i >= 0 && line.charAt(i) == ',') {
+            // A LATER argument, which is where a coordinate sits in
+            // `dependencies.add('implementation', 'g:a:1.7.22!!')`. Walking back one
+            // token found the comma and stopped, so the strict pin the app really
+            // had went unread and the constraints went in against it. This was
+            // removed once as an exception that constrained nothing, on the
+            // reasoning that such a call is recognised where the CONFIGURATION name
+            // is read -- true for the shims, and not for the base library, which
+            // has a scan of its own that comes through here.
+            return isDeclarationCall(line, enclosingCallOf(line, quoteAt));
+        }
         if (i >= 0 && line.charAt(i) == '(') {
             i = skipBlanksBackward(line, i - 1);
         }
@@ -828,17 +839,76 @@ public class KotlinStdlibAlignment {
             // assignment's value. The use of the name decides those, not this.
             return false;
         }
+        return isDeclarationCall(line, i);
+    }
+
+    /**
+     * The index of the last character of the call whose argument list encloses
+     * {@code at}, or -1.
+     *
+     * <p>Found forward, so a parenthesis inside a string is not one. Groovy's
+     * command syntax has no parentheses at all, and there the call is the
+     * statement's first token.</p>
+     */
+    private static int enclosingCallOf(String line, int at) {
+        List<Integer> opened = new ArrayList<Integer>();
+        for (int i = 0; i < at && i < line.length(); i++) {
+            if (isLiteralStart(line, i)) {
+                i = endOfStringLiteral(line, i);
+                continue;
+            }
+            char c = line.charAt(i);
+            if (c == '(') {
+                opened.add(Integer.valueOf(i));
+            } else if (c == ')' && !opened.isEmpty()) {
+                opened.remove(opened.size() - 1);
+            }
+        }
+        if (!opened.isEmpty()) {
+            return skipBlanksBackward(line,
+                    opened.get(opened.size() - 1).intValue() - 1);
+        }
+        int first = skipBlanks(line, 0);
+        int end = first;
+        while (end < line.length() && isIdentifierChar(line.charAt(end))) {
+            end++;
+        }
+        return end > first ? end - 1 : -1;
+    }
+
+    /**
+     * Whether the call ending at {@code at} is one that can declare a
+     * dependency.
+     *
+     * <p>A configuration is never reached through a receiver -- an app writes
+     * {@code implementation '..'} or {@code myCustomConfig '..'}, never
+     * {@code project.implementation '..'} -- so an unqualified call declares.
+     * The dependency handler is the exception, because {@code add} really is
+     * called on it.</p>
+     */
+    private static boolean isDeclarationCall(String line, int at) {
+        if (at < 0 || !isIdentifierChar(line.charAt(at))) {
+            return false;
+        }
+        int i = at;
         while (i >= 0 && isIdentifierChar(line.charAt(i))) {
             i--;
         }
-        // A qualified call is not a declaration, with no exception for the
-        // dependency handler: `dependencies.add('implementation', '..')` takes the
-        // coordinate as its SECOND argument, so it never reaches here at all -- it
-        // is recognised where the configuration name is read, by isAddCallArgument.
-        // An exception for it here would have been a control that constrains
-        // nothing, which is worse than none: the next reader takes it for coverage.
         int dot = skipBlanksBackward(line, i);
-        return dot < 0 || line.charAt(dot) != '.';
+        if (dot < 0 || line.charAt(dot) != '.') {
+            return true;
+        }
+        int end = skipBlanksBackward(line, dot - 1);
+        if (end < 0) {
+            return false;
+        }
+        int start = end;
+        while (start >= 0 && (isIdentifierChar(line.charAt(start))
+                || (line.charAt(start) == '.' && start > 0
+                        && isIdentifierChar(line.charAt(start - 1))))) {
+            start--;
+        }
+        return lastSegmentIs(line.substring(start + 1, end + 1), "dependencies");
     }
 
     /** Gradle's strict-version shorthand, written after the version. */
@@ -2754,7 +2824,7 @@ public class KotlinStdlibAlignment {
         for (int i = 0; i < statements.size(); i++) {
             String statement = statements.get(i);
             boolean opensBuildscript = buildscriptDepth == 0
-                    && opensBlockNamed(statement, BUILDSCRIPT);
+                    && opensAForeignScope(statement);
             boolean pluginScoped = buildscriptDepth > 0 || opensBuildscript
                     || namesTheBuildscriptClasspath(statement);
             out.add(pluginScoped ? "" : (literals.isEmpty()
@@ -3360,6 +3430,42 @@ public class KotlinStdlibAlignment {
 
     /** The block that configures the plugin classpath rather than the app's. */
     private static final String BUILDSCRIPT = "buildscript";
+
+    /**
+     * Blocks whose contents configure something other than the application's
+     * dependency graph.
+     *
+     * <p>{@code buildscript} is the plugin classpath. {@code testing} is the
+     * JVM test suites block, whose nested {@code dependencies { }} belongs to a
+     * suite's own configurations -- its {@code implementation} has the same
+     * name as the app's and is a different thing, so reading a declaration
+     * there as the app's skipped the constraint for an artifact the release
+     * graph still carries.</p>
+     *
+     * <p>A list, unusually for this class, because the general question --
+     * which enclosing blocks reach this project's graph -- has no closed
+     * answer: {@code allprojects} does, {@code subprojects} does not, and a
+     * plugin may add either kind. It is safe as a list because a scope missing
+     * from it changes nothing: that block keeps being read as the app's, which
+     * is what happens today, and the cost is the duplicate an app already had.
+     * Inverting it -- treating every nested block as foreign -- is what is not
+     * safe, because blanking an {@code allprojects} declaration emits a
+     * constraint beside a pin that may be strict.</p>
+     */
+    private static final String[] FOREIGN_SCOPES = {
+        "buildscript",
+        "testing"
+    };
+
+    /** Whether the statement opens a block that is not the app's own graph. */
+    private static boolean opensAForeignScope(String statement) {
+        for (int i = 0; i < FOREIGN_SCOPES.length; i++) {
+            if (opensBlockNamed(statement, FOREIGN_SCOPES[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * Whether the text so far is a control header whose body is the next line.
