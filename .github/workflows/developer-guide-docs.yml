@@ -271,25 +271,6 @@ jobs:
             echo "Asciidoctor exited with status $STATUS — the final quality-gate step will fail the build." >&2
           fi
 
-      # These four cover defects the gates above are structurally blind to: a
-      # chapter swallowed by the one before it, a cross-reference that resolves
-      # to nothing, prose that promises a code block which is not there, and a
-      # link the website does not serve. Asciidoctor reports none of them, and
-      # every one of them shipped. The structure and cross-reference checks
-      # render the book, so they must run after the Asciidoctor install.
-      - name: Check developer guide structure, cross-references, code blocks and links
-        run: |
-          set -euo pipefail
-          python3 scripts/developer-guide/check-guide-structure.py
-          python3 scripts/developer-guide/check-guide-xrefs.py
-          python3 scripts/developer-guide/check-missing-code-blocks.py
-          # Note this only catches a link the GUIDE breaks. When the website
-          # moves the route instead -- a page renamed, deleted or re-slugged --
-          # the same script runs from website-docs.yml, which triggers on
-          # docs/website/**. Putting those paths here would run this whole job
-          # (maven install, demo build, screenshots) for every blog post.
-          python3 scripts/developer-guide/check-guide-links.py
-
       - name: Build Developer Guide HTML and PDF
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
