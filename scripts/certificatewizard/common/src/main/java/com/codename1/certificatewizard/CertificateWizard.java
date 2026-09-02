@@ -1498,6 +1498,11 @@ public class CertificateWizard extends Lifecycle {
         if (!canInstallIntoProject()) {
             return;
         }
+        // Deliberately platform-neutral, and only as an existence test. Apple registers an
+        // identifier once for the whole account, so a record of ANY platform means the
+        // create below would come back "not available" -- the refusal issue #5652 is about.
+        // Every step that goes on to USE the App ID resolves it for the platform it needs,
+        // which is not necessarily this record.
         SigningState.BundleId existing = findBundleByIdentifier(bundleIdentifier);
         if (existing == null) {
             showPageMessage("Creating Bundle ID " + bundleIdentifier + "...", false);
@@ -1509,7 +1514,7 @@ public class CertificateWizard extends Lifecycle {
                 refreshForAutoSetup(() -> autoSetupDefaultProfiles(bundleIdentifier, appName));
             });
         } else {
-            ensurePushCapability(existing, () -> autoSetupDefaultProfiles(bundleIdentifier, appName));
+            ensurePushCapability(bundleIdentifier, () -> autoSetupDefaultProfiles(bundleIdentifier, appName));
         }
     }
 
@@ -1530,7 +1535,14 @@ public class CertificateWizard extends Lifecycle {
     ///
     /// A failure is a warning rather than the end of the run: the iOS assets that follow
     /// are still worth having, and the banner names the App ID that needs the capability.
-    private void ensurePushCapability(SigningState.BundleId bundle, Runnable next) {
+    ///
+    /// Resolved here, by identifier AND platform, rather than taken from the caller: the
+    /// existence test above answers with a record of any platform, and Apple returns an
+    /// account's App IDs in no documented order, so on an account holding both records of
+    /// one identifier the capability could land on the macOS one while every iOS profile
+    /// was issued from the other.
+    private void ensurePushCapability(String bundleIdentifier, Runnable next) {
+        SigningState.BundleId bundle = findBundleByIdentifier(bundleIdentifier, "IOS");
         if (!projectWantsPush() || bundle == null) {
             next.run();
             return;

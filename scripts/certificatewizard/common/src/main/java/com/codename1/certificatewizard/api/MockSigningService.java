@@ -161,6 +161,21 @@ public final class MockSigningService implements SigningService {
         return new ArrayList<String>(pushEnabledOn);
     }
 
+    /// Moves one App ID to the front of the listing.
+    ///
+    /// Apple returns an account's bundle IDs in no documented order, so an identifier
+    /// registered for both platforms can come back either way round. A caller that
+    /// resolves such an identifier without saying which platform it means gets whichever
+    /// happens to be first, and a test has to be able to say "the macOS record was".
+    public void moveBundleToFront(String appleId) {
+        for (int i = 0; i < bundles.size(); i++) {
+            if (bundles.get(i).id() != null && bundles.get(i).id().equals(appleId)) {
+                bundles.add(0, bundles.remove(i));
+                return;
+            }
+        }
+    }
+
     public List<String> appGroupAssociation(String bundleIdAppleId) {
         List<String> assoc = appGroupAssociations.get(bundleIdAppleId);
         return assoc == null ? new ArrayList<String>() : new ArrayList<String>(assoc);

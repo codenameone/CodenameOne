@@ -51,6 +51,8 @@ class CertificateWizardPushCapabilityTest {
     /// The mock account's own App ID, so every run here takes the reuse path.
     private static final String EXISTING_BUNDLE = "com.example.myapp";
     private static final String EXISTING_BUNDLE_APPLE_ID = "BID_A1";
+    /// The macOS registration of that same identifier, which the account also holds.
+    private static final String MAC_BUNDLE_APPLE_ID = "BID_MAC";
 
     @BeforeAll
     static void initDisplay() {
@@ -87,9 +89,28 @@ class CertificateWizardPushCapabilityTest {
                 .contains(EXISTING_BUNDLE_APPLE_ID));
     }
 
+    @Test
+    void pushGoesOnTheIosAppIdEvenWhenTheMacRecordIsListedFirst() throws Exception {
+        // One identifier, two App ID records -- iOS and macOS -- which is what an account
+        // that also ships a Mac build holds, and Apple returns them in no documented order.
+        // The capability has to land on the record the iOS profiles are issued from.
+        MockSigningService service = runAutoSetup("codename1.arg.ios.includePush=true\n", true);
+
+        assertTrue(service.pushEnabledOn().contains(EXISTING_BUNDLE_APPLE_ID),
+                "push belongs on the iOS App ID, got " + service.pushEnabledOn());
+        assertFalse(service.pushEnabledOn().contains(MAC_BUNDLE_APPLE_ID),
+                "and not on the macOS one that merely came back first");
+    }
+
     /// Runs the wizard's Auto Setup against a project whose settings carry `extraSettings`,
     /// and hands back the service it ran through.
     private MockSigningService runAutoSetup(String extraSettings) throws Exception {
+        return runAutoSetup(extraSettings, false);
+    }
+
+    /// `macRecordFirst` puts the macOS registration of the identifier ahead of the iOS one
+    /// in what the service reports, which Apple is free to do.
+    private MockSigningService runAutoSetup(String extraSettings, boolean macRecordFirst) throws Exception {
         Path dir = Files.createTempDirectory("cn1-cw-push");
         Path settings = dir.resolve("codenameone_settings.properties");
         Files.write(settings, ("codename1.packageName=" + EXISTING_BUNDLE + "\n"
@@ -100,6 +121,9 @@ class CertificateWizardPushCapabilityTest {
         System.setProperty(ProjectIO.INPUT_PROPERTY, binding.toString());
 
         final MockSigningService service = new MockSigningService();
+        if (macRecordFirst) {
+            service.moveBundleToFront(MAC_BUNDLE_APPLE_ID);
+        }
         final CertificateWizard[] app = new CertificateWizard[1];
         try {
             onEdt(new Runnable() {
