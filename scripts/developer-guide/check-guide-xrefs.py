@@ -54,7 +54,11 @@ ANCHOR_SOURCE_RE = re.compile(r"<<([^>,]+)")
 # the PDF build includes, without needing asciidoctor-pdf here. The two runs are
 # checked SEPARATELY, never pooled: an anchor that exists only in the HTML branch
 # must not be allowed to satisfy a reference made in the PDF branch.
-BACKENDS = (("html", ()), ("pdf", ("backend-pdf",)))
+# asciidoctor-pdf defines basebackend-pdf alongside backend-pdf, and the guide may
+# legitimately test either, so the surrogate defines both. Missing the second one
+# meant ifdef::basebackend-pdf[] content vanished from the render that was meant
+# to be inspecting it.
+BACKENDS = (("html", ()), ("pdf", ("backend-pdf", "basebackend-pdf")))
 # The surrogate has one blind spot, and it cannot be closed from the command line.
 # Setting backend-pdf makes `ifndef::backend-pdf[]` content disappear and
 # `ifdef::backend-pdf[]` content appear, which is exactly right -- verified -- and

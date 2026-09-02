@@ -227,14 +227,28 @@ def site_paths(repo_root: Path) -> tuple[set[str], list, set[str]]:
     # off-site redirect: reachable, and not verifiable from this repository.
     # Appended AFTER the _redirects rules because the function is a fallback and
     # the first matching rule wins, mirroring the order the host evaluates.
-    for prefix in ("files", "demos"):
-        patterns.append(
-            (
-                re.compile(rf"^/{prefix}(/.*)?$"),
-                [],
-                "https://download.codenameone.com/",
+    function = repo_root / "docs/website/functions/[[path]].js"
+    if function.exists():
+        # Read the prefixes out of the Function rather than restating them here,
+        # so removing a fallback removes it from the model too. If it is ever
+        # rewritten in a shape this cannot read, the derivation yields nothing and
+        # links under those prefixes start failing -- loudly, which is the safe
+        # direction; a hardcoded pair would have gone on accepting them.
+        for prefix in sorted(
+            set(
+                re.findall(
+                    r'path\.startsWith\("/([^/"]+)/"\)',
+                    function.read_text(encoding="utf-8"),
+                )
             )
-        )
+        ):
+            patterns.append(
+                (
+                    re.compile(rf"^/{re.escape(prefix)}(/.*)?$"),
+                    [],
+                    "https://download.codenameone.com/",
+                )
+            )
 
     # Hugo's published route is the section path plus the page's slug, which
     # 1055 of the content pages override; deriving it from the filename instead
@@ -329,6 +343,16 @@ def site_paths(repo_root: Path) -> tuple[set[str], list, set[str]]:
     return paths, patterns, declared
 
 
+def bare_authority(split, host: str, port: int | None) -> bool:
+    """Whether the authority carries nothing but the host and, at most, its port."""
+    netloc = split.netloc.lower()
+    if netloc.endswith("."):
+        netloc = netloc[:-1]          # the DNS root dot, already stripped from host
+    elif ":" in netloc and netloc.rsplit(":", 1)[0].endswith("."):
+        netloc = netloc.replace(".:", ":", 1)
+    return netloc == (host if port is None else f"{host}:{port}")
+
+
 def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]) -> list[tuple[str, str]]:
     # Only http:// and https:// are extracted. Protocol-relative links were raised
     # as a gap; measured, the guide contains no `link://` macro at all, and its one
@@ -377,6 +401,17 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
                 continue
             if split.scheme == "http" and host not in TLS_EXEMPT_HOSTS | LOCAL_HOSTS:
                 out.append((url, "plain http, not https"))
+            if host in SITE_HOSTS and not bare_authority(split, host, port):
+                # Everything below identifies the site by hostname alone, and
+                # urlsplit is forgiving about what else the authority may carry:
+                # userinfo, a bracketed literal, mixed case. Each is a different
+                # way of writing something this route model has not been shown to
+                # describe, so classify on the bare form only and report the rest,
+                # rather than growing one rule per spelling. Measured: the guide
+                # has no URL with userinfo, a non-ASCII host, an IPv6 literal or
+                # mixed case in the authority.
+                out.append((url, f"authority '{split.netloc}' is not a bare hostname"))
+                continue
             if (
                 host in SITE_HOSTS
                 and port is not None
