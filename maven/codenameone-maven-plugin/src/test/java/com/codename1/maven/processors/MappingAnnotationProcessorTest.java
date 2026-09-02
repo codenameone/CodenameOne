@@ -359,6 +359,10 @@ public class MappingAnnotationProcessorTest {
                         // compile.
                         + "    @JsonProperty(\"od\\\"d\\\\key\") public String odd;\n"
                         // Declared as the mapped base, populated with the subclass.
+                        // Boxed primitives share their kind with the unboxed form, so
+                        // only these can be null. Left unset on the "empty" instance.
+                        + "    public Boolean flag;\n"
+                        + "    public Character initial;\n"
                         + "    public Base ref;\n"
                         + "    public List<Base> refs;\n"
                         + "    public Swatch() {}\n"
@@ -391,6 +395,8 @@ public class MappingAnnotationProcessorTest {
             swatchCls.getField("tags").set(populated, Arrays.asList("a", "b"));
             swatchCls.getField("when").set(populated, new java.util.Date(1234567890L));
             swatchCls.getField("odd").set(populated, "quoted");
+            swatchCls.getField("flag").set(populated, Boolean.TRUE);
+            swatchCls.getField("initial").set(populated, Character.valueOf('x'));
             // Base's mapper has to be REGISTERED or the declared-type lookup finds
             // nothing and both paths fall back to toString() -- agreeing with each
             // other while proving nothing about the polymorphic case. Registering it

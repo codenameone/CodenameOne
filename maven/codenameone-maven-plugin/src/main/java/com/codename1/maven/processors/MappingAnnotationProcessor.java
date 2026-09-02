@@ -585,11 +585,36 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 sb.append("        out.append(").append(read).append(");\n");
                 return;
             case BOOLEAN:
-                sb.append("        out.append(").append(read).append(" ? \"true\" : \"false\");\n");
+                // Boolean and boolean share this kind, and only the BOXED one can be
+                // null. Unboxing it in a ternary threw NullPointerException where the
+                // map path -- which just puts the value in and lets JSONWriter see a
+                // null -- emits JSON null. Told apart by binaryName; the temporary
+                // keeps a getter from being evaluated twice.
+                if ("java.lang.Boolean".equals(f.kind.binaryName)) {
+                    sb.append("        {\n");
+                    sb.append("            Boolean _b = ").append(read).append(";\n");
+                    sb.append("            out.append(_b == null ? \"null\" : (_b.booleanValue() ? \"true\" : \"false\"));\n");
+                    sb.append("        }\n");
+                } else {
+                    sb.append("        out.append(").append(read).append(" ? \"true\" : \"false\");\n");
+                }
                 return;
             case CHAR:
-                sb.append("        com.codename1.mapping.Mappers.appendJsonString(out, String.valueOf(")
-                  .append(read).append("));\n");
+                // Same split. A null Character went through String.valueOf(Object),
+                // which returns the four characters "null", and then got QUOTED --
+                // so an unset field serialised as the string "null" instead of JSON
+                // null. charValue() below also picks String.valueOf(char) rather than
+                // the Object overload.
+                if ("java.lang.Character".equals(f.kind.binaryName)) {
+                    sb.append("        {\n");
+                    sb.append("            Character _c = ").append(read).append(";\n");
+                    sb.append("            if (_c == null) { out.append(\"null\"); }\n");
+                    sb.append("            else { com.codename1.mapping.Mappers.appendJsonString(out, String.valueOf(_c.charValue())); }\n");
+                    sb.append("        }\n");
+                } else {
+                    sb.append("        com.codename1.mapping.Mappers.appendJsonString(out, String.valueOf(")
+                      .append(read).append("));\n");
+                }
                 return;
             case ENUM:
                 sb.append("        com.codename1.mapping.Mappers.appendJsonString(out, ")
