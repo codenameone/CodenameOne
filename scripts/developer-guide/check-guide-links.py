@@ -325,8 +325,34 @@ def is_public_type(source: Path, stem: str) -> bool:
         text = source.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return False
-    text = blank_java_noise(text)
-    return re.search(PUBLIC_TYPE_RE.format(stem=re.escape(stem)), text) is not None
+    blanked = blank_java_noise(text)
+    match = re.search(PUBLIC_TYPE_RE.format(stem=re.escape(stem)), blanked)
+    if match is None:
+        return False
+    # javadoc drops an element tagged @hidden entirely, so a public type carrying
+    # it gets no page. The tag lives in the doc comment, which blank_java_noise has
+    # just erased, so read it from the ORIGINAL text at the same offsets. Both
+    # comment styles occur here: /** */ and Java's /// markdown form, which is what
+    # com.codename1.vpn.tunnel.TunnelBuffers and TunnelHost use.
+    return "@hidden" not in doc_comment_before(text, match.start())
+
+
+def doc_comment_before(text: str, position: int) -> str:
+    """The doc comment attached to a declaration, in either comment style."""
+    before = text[:position]
+    block = re.search(r"/\*\*((?:(?!\*/).)*)\*/\s*(?:@\w+(?:\([^)]*\))?\s*)*$", before, re.S)
+    if block is not None:
+        return block.group(1)
+    collected: list[str] = []
+    for line in reversed(before.split("\n")):
+        stripped = line.strip()
+        if stripped.startswith("///"):
+            collected.append(stripped)
+        elif stripped == "" or stripped.startswith("@"):
+            continue
+        else:
+            break
+    return "\n".join(collected)
 
 
 def javadoc_index(repo_root: Path) -> tuple[set[str], set[str]]:
