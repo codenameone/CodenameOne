@@ -199,10 +199,12 @@ public final class SyncedStore {
         if (l != null && !listeners.contains(l)) {
             listeners.add(l);
         }
-        // Enabling is what installs the callback the port delivers change notifications through.
-        // An app that only ever uses the synced store never touches Continuity itself, and would
-        // otherwise register a listener nothing could ever reach.
-        Continuity.enable();
+        // The callback the port delivers change notifications through, and NOT Continuity.enable():
+        // an app that only ever uses the synced store never touches Continuity itself, and would
+        // otherwise register a listener nothing could ever reach -- but enabling would also make
+        // every route change checkpoint, which on iOS advertises the app's navigation to the
+        // devices around it. A key/value store is not consent to broadcast a route stack.
+        Continuity.installSyncedStoreCallback();
         // And this resolves the platform store, which is the half that actually creates it. On
         // iOS the external-change observer is installed the first time the store is resolved, and
         // enable() does not resolve it -- so an application that only registers a listener and

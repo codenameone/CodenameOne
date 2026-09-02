@@ -127,12 +127,13 @@ public final class Continuity {
     /// A delivery is two steps -- reach the event queue, then dispatch -- and `enabled` alone
     /// cannot separate them: an application that disables and re-enables before the queue drains
     /// would have the old arrival pass an `enabled` check and restore anyway. Guarded by the
-    /// `lastSeen` monitor, which the other half of the same decision already holds.
+    /// STATE_LOCK, which the other half of the same decision already holds.
     private static long deliveryEra;
 
-    // Configured by the application while it starts, then read. A lock rather than volatile
-    // fields, which the project's PMD gate forbids and which would be the wrong tool anyway for
-    // the two below whose invariant spans more than one read.
+    // Configured by the application while it starts, then read from the EDT, the relay worker
+    // and the thread a port delivers a continuation on. All guarded by STATE_LOCK -- volatile is
+    // forbidden by the project's PMD gate, and would not have been enough anyway for the ones
+    // whose invariant spans more than one read.
     private static StateProvider provider;
     private static StateRelay relay;
     private static ContinuityBridge bridge;
@@ -142,34 +143,44 @@ public final class Continuity {
     private static boolean flushScheduled;
 
     /// True while an inbound state is being applied, so the navigation it causes is not mistaken
-    /// for the user moving and republished. Guarded by HANDOFF_LOCK.
+    /// for the user moving and republished. Guarded by STATE_LOCK.
     private static boolean applyingRestore;
     private static String title;
     private static long sequence;
     private static long maxAge;
 
-    /// Guards the two fields a port can touch from a thread of its own.
+    /// Guards EVERY mutable static in this class. One lock, deliberately.
     ///
-    /// A continuation arrives on whatever thread the platform hands it over on -- on Apple
-    /// platforms the main thread, not the event dispatch thread -- so `parked` and `deviceId` are
-    /// written from there and read on the EDT. `HANDOFF_LOCK` is never held while application
-    /// code runs, so it cannot be part of a deadlock.
-    private static final Object HANDOFF_LOCK = new Object();
+    /// There were three -- one for the handoff fields, one for the relay queue, and the `lastSeen`
+    /// map's own monitor -- and a set of fields with no lock at all: `enabled`, `relay` and
+    /// `maxAge` are written by the application and read on the relay worker and on whatever
+    /// thread a platform hands a continuation over on. The comment above them claimed a lock they
+    /// did not have. That is not a missing guard on one field, it is the absence of a memory
+    /// model: every question of the form "can these two steps interleave" had a different answer
+    /// depending on which of the three locks each step happened to take, so the bugs arrived one
+    /// interleaving at a time and fixing them one at a time added another flag each round.
+    ///
+    /// The rule that replaces it is short enough to keep: touch a mutable static only while
+    /// holding this, and never call out -- to a listener, a provider, a relay, Storage or the
+    /// EDT -- while holding it. Read what is needed into locals, release, then act. The second
+    /// half is what keeps one lock from being a deadlock, and it is why nothing below wraps a
+    /// call to application code.
+    private static final Object STATE_LOCK = new Object();
 
-    /// The device id, lazily created. Guarded by HANDOFF_LOCK.
+    /// The device id, lazily created. Guarded by STATE_LOCK.
     private static String deviceId;
 
-    /// Whether a checkpoint is owed. Guarded by HANDOFF_LOCK, because Android asks this from its
+    /// Whether a checkpoint is owed. Guarded by STATE_LOCK, because Android asks this from its
     /// own main thread on the suspend path and a stale "no" there loses the last edit -- which is
     /// the one thing the question exists to protect.
     private static boolean dirty;
 
-    /// True while a thread is waiting for the first form. Guarded by HANDOFF_LOCK: it is cleared
+    /// True while a thread is waiting for the first form. Guarded by STATE_LOCK: it is cleared
     /// by that thread and read on the EDT, and a stale "true" would leave a parked state with
     /// nobody left to deliver it.
     private static boolean waitingForWindow;
 
-    /// A state that arrived and could not be shown yet. Guarded by HANDOFF_LOCK.
+    /// A state that arrived and could not be shown yet. Guarded by STATE_LOCK.
     private static AppState parked;
 
     private Continuity() {
@@ -185,16 +196,27 @@ public final class Continuity {
     /// Nothing before this call has any effect, which is what keeps an app that does not use this
     /// API behaving exactly as it always did.
     public static void enable() {
-        if (enabled) {
-            return;
+        synchronized (STATE_LOCK) {
+            if (enabled) {
+                return;
+            }
+            // Checked and set under one hold. Two callers -- an application on the EDT and
+            // setRelay() from wherever it was configured -- both saw false and both ran the rest,
+            // which installs a second callback and re-reads the sequence.
+            enabled = true;
         }
-        enabled = true;
         // Registered once, and only from here, so that a build which merely links this class --
         // because something else in the framework mentions it -- never installs a callback or
         // touches storage.
         Util.register(AppState.OBJECT_ID, AppState.class);
-        deviceId = loadDeviceId();
-        sequence = loadSequence();
+        // Loaded OUTSIDE the lock: both touch Preferences, and the rule for STATE_LOCK is that
+        // nothing slow happens under it.
+        String id = loadDeviceId();
+        long seq = loadSequence();
+        synchronized (STATE_LOCK) {
+            deviceId = id;
+            sequence = seq;
+        }
         ContinuityBridge b = bridgeInternal();
         if (b != null) {
             try {
@@ -209,11 +231,11 @@ public final class Continuity {
     /// arriving states are ignored. What is already in storage is left alone -- use `clear()` to
     /// remove it.
     public static void disable() {
-        if (!enabled) {
-            return;
-        }
-        enabled = false;
-        synchronized (lastSeen) {
+        synchronized (STATE_LOCK) {
+            if (!enabled) {
+                return;
+            }
+            enabled = false;
             // Everything already on the event queue belongs to the run that just ended. Bumping
             // the era rather than testing `enabled` at dispatch is what makes disable-then-enable
             // safe: a re-enabled framework would otherwise accept an arrival from before it was
@@ -221,7 +243,7 @@ public final class Continuity {
             deliveryEra++;
         }
         setParked(null);
-        synchronized (HANDOFF_LOCK) {
+        synchronized (STATE_LOCK) {
             dirty = false;
         }
         clearContinuation();
@@ -233,7 +255,9 @@ public final class Continuity {
     ///
     /// true when enabled
     public static boolean isEnabled() {
-        return enabled;
+        synchronized (STATE_LOCK) {
+            return enabled;
+        }
     }
 
     /// Whether this platform can save and restore state at all. False only where there is no
@@ -277,7 +301,9 @@ public final class Continuity {
     ///
     /// - `p`: the provider, or null to contribute nothing beyond the route stack
     public static void setStateProvider(StateProvider p) {
-        provider = p;
+        synchronized (STATE_LOCK) {
+            provider = p;
+        }
         enable();
     }
 
@@ -287,7 +313,9 @@ public final class Continuity {
     ///
     /// the provider
     public static StateProvider getStateProvider() {
-        return provider;
+        synchronized (STATE_LOCK) {
+            return provider;
+        }
     }
 
     /// Registers a listener for states arriving from elsewhere.
@@ -317,7 +345,19 @@ public final class Continuity {
     ///
     /// - `r`: the relay, or null to stop using one
     public static void setRelay(StateRelay r) {
-        relay = r;
+        synchronized (STATE_LOCK) {
+            // A different endpoint is a different destination for anything queued for the old one
+            // and a different source for a fetch already in flight. Without this a state retained
+            // after a failed send was published to the REPLACEMENT endpoint -- an application's
+            // data sent somewhere it was never handed to -- and a poll started against the relay
+            // the app has just removed could still deliver its answer afterwards.
+            //
+            // The same era the account uses, because it means the same thing: the relay session
+            // this work belonged to is over.
+            pendingPublish = null;
+            accountEra++;
+            relay = r;
+        }
         if (r != null) {
             enable();
             pollRelay();
@@ -330,7 +370,9 @@ public final class Continuity {
     ///
     /// the relay
     public static StateRelay getRelay() {
-        return relay;
+        synchronized (STATE_LOCK) {
+            return relay;
+        }
     }
 
     /// Whether a restorable state found at startup, or arriving from another device, is applied
@@ -344,7 +386,9 @@ public final class Continuity {
     ///
     /// - `b`: true to restore automatically
     public static void setAutoRestore(boolean b) {
-        autoRestore = b;
+        synchronized (STATE_LOCK) {
+            autoRestore = b;
+        }
     }
 
     /// Whether automatic restoration is on.
@@ -353,7 +397,9 @@ public final class Continuity {
     ///
     /// true when on
     public static boolean isAutoRestore() {
-        return autoRestore;
+        synchronized (STATE_LOCK) {
+            return autoRestore;
+        }
     }
 
     /// Sets the label a receiving device may show before the user accepts a continuation -- "Draft
@@ -364,7 +410,9 @@ public final class Continuity {
     ///
     /// - `t`: the label, or null for none
     public static void setTitle(String t) {
-        title = t;
+        synchronized (STATE_LOCK) {
+            title = t;
+        }
     }
 
     /// The current continuation label, or null.
@@ -373,7 +421,9 @@ public final class Continuity {
     ///
     /// the label
     public static String getTitle() {
-        return title;
+        synchronized (STATE_LOCK) {
+            return title;
+        }
     }
 
     /// How old a stored state may be and still be restored, in milliseconds. Zero, the default,
@@ -387,7 +437,9 @@ public final class Continuity {
     ///
     /// - `millis`: the limit, or 0 for none
     public static void setMaxAge(long millis) {
-        maxAge = millis < 0 ? 0 : millis;
+        synchronized (STATE_LOCK) {
+            maxAge = millis < 0 ? 0 : millis;
+        }
     }
 
     /// The staleness limit in milliseconds, or 0 for none.
@@ -396,7 +448,9 @@ public final class Continuity {
     ///
     /// the limit
     public static long getMaxAge() {
-        return maxAge;
+        synchronized (STATE_LOCK) {
+            return maxAge;
+        }
     }
 
     /// This installation's device id, the value that lets a state be recognized as this device's
@@ -406,8 +460,14 @@ public final class Continuity {
     ///
     /// the device id, never null
     public static String getDeviceId() {
-        synchronized (HANDOFF_LOCK) {
+        synchronized (STATE_LOCK) {
             if (deviceId == null) {
+                // The ONE place that reads storage under the lock, deliberately. loadDeviceId()
+                // generates and persists a UUID when there is none, so doing it outside would let
+                // two threads each generate one: the first writer wins the field and the second
+                // wins Preferences, and the id then CHANGES across a restart -- which makes every
+                // state this device ever sent look like it came from somewhere else. Preferences
+                // never calls back into this class, so holding the lock across it cannot cycle.
                 deviceId = loadDeviceId();
             }
             return deviceId;
@@ -422,10 +482,10 @@ public final class Continuity {
     /// stack; schedules a checkpoint rather than taking one, so a burst of navigations costs a
     /// single write.
     public static void routeStackChanged() {
-        if (!enabled) {
-            return;
-        }
-        synchronized (HANDOFF_LOCK) {
+        synchronized (STATE_LOCK) {
+            if (!enabled) {
+                return;
+            }
             if (applyingRestore) {
                 // See restore(). The stack is being rebuilt from a state we already hold, so
                 // there is nothing new to record, and publishing it would start a restore loop
@@ -435,14 +495,23 @@ public final class Continuity {
             }
             dirty = true;
         }
-        if (flushScheduled || !Display.isInitialized()) {
+        if (!Display.isInitialized()) {
             return;
         }
-        flushScheduled = true;
+        synchronized (STATE_LOCK) {
+            // Observed and claimed under one hold. Two route changes in the same cycle both read
+            // false and both scheduled a flush, so the checkpoint ran twice and published twice.
+            if (flushScheduled) {
+                return;
+            }
+            flushScheduled = true;
+        }
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                flushScheduled = false;
+                synchronized (STATE_LOCK) {
+                    flushScheduled = false;
+                }
                 if (isCheckpointPending()) {
                     checkpoint();
                 }
@@ -461,10 +530,10 @@ public final class Continuity {
     /// - `IllegalArgumentException`: when the provider returned a payload that cannot cross to
     ///   another device
     public static void checkpoint() {
-        if (!enabled) {
-            return;
-        }
-        synchronized (HANDOFF_LOCK) {
+        synchronized (STATE_LOCK) {
+            if (!enabled) {
+                return;
+            }
             dirty = false;
         }
         AppState state = capture();
@@ -486,7 +555,7 @@ public final class Continuity {
     ///
     /// true when `checkpoint()` would write something new
     public static boolean isCheckpointPending() {
-        synchronized (HANDOFF_LOCK) {
+        synchronized (STATE_LOCK) {
             return enabled && dirty;
         }
     }
@@ -506,12 +575,15 @@ public final class Continuity {
     ///
     /// - `IllegalArgumentException`: when the provider returned an unrepresentable payload
     public static AppState capture() {
-        if (!enabled) {
-            return null;
+        StateProvider p;
+        synchronized (STATE_LOCK) {
+            if (!enabled) {
+                return null;
+            }
+            p = provider;
         }
         AppState state = new AppState();
         state.setRoutes(currentRoutes());
-        StateProvider p = provider;
         if (p != null) {
             Map<String, Object> payload = null;
             try {
@@ -529,17 +601,23 @@ public final class Continuity {
                 state.setPayload(payload);
             }
         }
-        sequence = nextSequence();
+        long seq;
+        String label;
+        synchronized (STATE_LOCK) {
+            sequence = nextSequence();
+            seq = sequence;
+            label = title;
+        }
         // Persisted HERE rather than in persist(), which only checkpoint() reaches. capture() is
         // public and documented for sending a state through the application's own transport, and
         // a counter that only advanced durably on the checkpoint path restarted lower after a
         // relaunch -- so a receiver still holding the old high-water mark in lastSeen silently
         // ignored every state until the counter caught up.
-        rememberSequence();
+        rememberSequence(seq);
         state.setDeviceId(getDeviceId())
-                .setSequence(sequence)
+                .setSequence(seq)
                 .setTimestamp(System.currentTimeMillis())
-                .setTitle(title);
+                .setTitle(label);
         return state;
     }
 
@@ -555,7 +633,7 @@ public final class Continuity {
     /// the state, or null when there is nothing to restore or it is older than `getMaxAge()`
     public static AppState getRestorableState() {
         AppState waiting;
-        synchronized (HANDOFF_LOCK) {
+        synchronized (STATE_LOCK) {
             waiting = parked;
         }
         if (waiting != null) {
@@ -581,8 +659,12 @@ public final class Continuity {
     /// A state with no timestamp is never too old: it came from a build that did not set one, and
     /// discarding it would be reading "unknown" as "expired".
     private static boolean isTooOld(AppState state) {
-        return maxAge > 0 && state.getTimestamp() > 0
-                && System.currentTimeMillis() - state.getTimestamp() > maxAge;
+        long limit;
+        synchronized (STATE_LOCK) {
+            limit = maxAge;
+        }
+        return limit > 0 && state.getTimestamp() > 0
+                && System.currentTimeMillis() - state.getTimestamp() > limit;
     }
 
     /// Restores whatever `getRestorableState()` offers.
@@ -649,7 +731,7 @@ public final class Continuity {
             return false;
         }
         boolean shown;
-        synchronized (HANDOFF_LOCK) {
+        synchronized (STATE_LOCK) {
             // Applying a state is not the user navigating, and the difference is not cosmetic.
             // The rebuilt stack reaches routeStackChanged(), which checkpoints, which republishes
             // what we just received under THIS device's id and a fresh sequence. The originating
@@ -667,7 +749,7 @@ public final class Continuity {
             Log.e(t);
             shown = false;
         } finally {
-            synchronized (HANDOFF_LOCK) {
+            synchronized (STATE_LOCK) {
                 applyingRestore = false;
             }
         }
@@ -686,8 +768,14 @@ public final class Continuity {
     /// Worth calling when the app comes back to the foreground: a continuation reaches a nearby
     /// device on its own, but a relay is only read when something asks it to be.
     public static void pollRelay() {
-        final StateRelay r = relay;
-        if (r == null || !enabled || !Display.isInitialized()) {
+        final StateRelay r;
+        synchronized (STATE_LOCK) {
+            r = relay;
+            if (r == null || !enabled) {
+                return;
+            }
+        }
+        if (!Display.isInitialized()) {
             return;
         }
         // Anything owed goes out first. This is the natural moment for it -- the application
@@ -708,7 +796,7 @@ public final class Continuity {
         // when our publish lands; ordering between devices is per-device sequences, maxAge and
         // the listener's own answer, none of which this would change.
         startPublisher();
-        synchronized (PUBLISH_LOCK) {
+        synchronized (STATE_LOCK) {
             if (polling) {
                 // One fetch at a time. Two overlapping GETs can return DIFFERENT documents -- a
                 // relay holds one per user and the other device may replace it between them --
@@ -730,7 +818,7 @@ public final class Continuity {
                 try {
                     for (;;) {
                         pollOnce(r);
-                        synchronized (PUBLISH_LOCK) {
+                        synchronized (STATE_LOCK) {
                             if (!pollAgain) {
                                 // Observed and stood down under ONE hold, for the reason the
                                 // publisher documents: releasing the lock between the two would
@@ -746,7 +834,7 @@ public final class Continuity {
                     // failures -- but leaving the flag set would silently stop every future poll
                     // for the life of the process.
                     Log.e(t);
-                    synchronized (PUBLISH_LOCK) {
+                    synchronized (STATE_LOCK) {
                         polling = false;
                     }
                 }
@@ -758,7 +846,7 @@ public final class Continuity {
     /// never the polling loop -- which is why the stand-down lives in the caller.
     private static void pollOnce(StateRelay r) {
         final long era;
-        synchronized (PUBLISH_LOCK) {
+        synchronized (STATE_LOCK) {
             era = accountEra;
         }
         AppState fetched = null;
@@ -771,7 +859,7 @@ public final class Continuity {
         if (fetched == null) {
             return;
         }
-        synchronized (PUBLISH_LOCK) {
+        synchronized (STATE_LOCK) {
             if (era != accountEra) {
                 // The user signed out while this request was in flight. Delivering now would
                 // restore the PREVIOUS account's work into the session that is signed in -- and
@@ -796,10 +884,10 @@ public final class Continuity {
     /// in this process can recall that. What this guarantees is that nothing follows it.
     public static void clear() {
         setParked(null);
-        synchronized (HANDOFF_LOCK) {
+        synchronized (STATE_LOCK) {
             dirty = false;
         }
-        synchronized (PUBLISH_LOCK) {
+        synchronized (STATE_LOCK) {
             // Anything queued for the relay belonged to the account that just signed out, and a
             // relay reads its credentials when the request runs rather than when it was queued --
             // so a state left here would have gone out under the NEXT account's token. Dropped,
@@ -811,8 +899,8 @@ public final class Continuity {
             pendingPublish = null;
             accountEra++;
         }
-        synchronized (lastSeen) {
-            // Under the same monitor deliver() and isStillNewest() use. A bare clear() on a
+        synchronized (STATE_LOCK) {
+            // Under STATE_LOCK, which deliver() and stillDeliverable() use too. A bare clear() on a
             // HashMap that another thread is reading is a data race, not merely a stale read --
             // and the benign-looking version of it let a pre-logout high-water mark survive long
             // enough for a queued delivery to pass isStillNewest and dispatch the previous
@@ -862,9 +950,9 @@ public final class Continuity {
     }
 
     /// Writes the sequence counter so it keeps rising across a relaunch.
-    private static void rememberSequence() {
+    private static void rememberSequence(long seq) {
         try {
-            Preferences.set(PREF_SEQUENCE, sequence);
+            Preferences.set(PREF_SEQUENCE, seq);
         } catch (Throwable t) {
             Log.e(t);
         }
@@ -929,7 +1017,7 @@ public final class Continuity {
     /// what keeps a burst of checkpoints from becoming a burst of requests.
     private static AppState pendingPublish;
 
-    /// True while the single publisher thread is alive. Guarded by PUBLISH_LOCK.
+    /// True while the single publisher thread is alive. Guarded by STATE_LOCK.
     private static boolean publishing;
 
     /// Which signed-in session the relay work belongs to, bumped by `clear()`.
@@ -937,16 +1025,14 @@ public final class Continuity {
     /// Both directions need it. A publisher reads it with the state it dequeues, so a state taken
     /// before a logout is not sent after one; and a poll reads it before it asks, so a result that
     /// was already in flight when the user signed out is not delivered into the next account's
-    /// session. Guarded by PUBLISH_LOCK.
+    /// session. Guarded by STATE_LOCK.
     private static long accountEra;
 
     /// True while a relay fetch is in flight; `pollAgain` records a poll asked for during one.
-    /// Both guarded by PUBLISH_LOCK.
+    /// Both guarded by STATE_LOCK.
     private static boolean polling;
 
     private static boolean pollAgain;
-
-    private static final Object PUBLISH_LOCK = new Object();
 
     /// Hands a state to the relay, in order, one at a time.
     ///
@@ -955,10 +1041,13 @@ public final class Continuity {
     /// document, the slower OLDER request could land last and leave the user's other device
     /// fetching work they had already moved past. Nothing failed and nothing was logged.
     private static void publishToRelay(AppState state) {
-        if (relay == null || !Display.isInitialized()) {
+        if (!Display.isInitialized()) {
             return;
         }
-        synchronized (PUBLISH_LOCK) {
+        synchronized (STATE_LOCK) {
+            if (relay == null) {
+                return;
+            }
             pendingPublish = state;
         }
         startPublisher();
@@ -977,11 +1066,11 @@ public final class Continuity {
     /// state queued between these two lock holds is either seen by the live worker or starts a
     /// new one -- never dropped between them.
     private static void startPublisher() {
-        if (relay == null || !Display.isInitialized()) {
+        if (!Display.isInitialized()) {
             return;
         }
-        synchronized (PUBLISH_LOCK) {
-            if (publishing || pendingPublish == null) {
+        synchronized (STATE_LOCK) {
+            if (relay == null || publishing || pendingPublish == null) {
                 // The live publisher will pick this up when it finishes its current request,
                 // which is what makes the ordering total.
                 return;
@@ -996,7 +1085,7 @@ public final class Continuity {
                         StateRelay r;
                         AppState next;
                         long era;
-                        synchronized (PUBLISH_LOCK) {
+                        synchronized (STATE_LOCK) {
                             r = relay;
                             next = pendingPublish;
                             if (r == null || next == null) {
@@ -1013,7 +1102,7 @@ public final class Continuity {
                             pendingPublish = null;
                             era = accountEra;
                         }
-                        synchronized (PUBLISH_LOCK) {
+                        synchronized (STATE_LOCK) {
                             if (era != accountEra) {
                                 // clear() ran between taking this state off the queue and
                                 // reaching the send. Dequeued-but-not-yet-sent is recallable and
@@ -1053,7 +1142,7 @@ public final class Continuity {
                             // it belongs to. Standing down afterwards rather than retrying in a
                             // loop: the next checkpoint starts a publisher and sends it, which is
                             // one attempt per change instead of a spin against a dead endpoint.
-                            synchronized (PUBLISH_LOCK) {
+                            synchronized (STATE_LOCK) {
                                 if (era == accountEra && pendingPublish == null) {
                                     pendingPublish = next;
                                     publishing = false;
@@ -1071,7 +1160,7 @@ public final class Continuity {
                     // Nothing above is expected to throw -- the publish is already guarded -- but
                     // a publisher that died holding the flag would stop every later checkpoint
                     // from ever reaching the relay again.
-                    synchronized (PUBLISH_LOCK) {
+                    synchronized (STATE_LOCK) {
                         publishing = false;
                     }
                     Log.e(fatal);
@@ -1106,8 +1195,13 @@ public final class Continuity {
 
     /// Routes an arriving state to the application, from whatever channel produced it.
     static void deliver(final AppState state) {
-        if (!enabled || state == null) {
+        if (state == null) {
             return;
+        }
+        synchronized (STATE_LOCK) {
+            if (!enabled) {
+                return;
+            }
         }
         if (getDeviceId().equals(state.getDeviceId())) {
             // This device's own echo, which a relay returns as a matter of course.
@@ -1122,7 +1216,7 @@ public final class Continuity {
             return;
         }
         final long era;
-        synchronized (lastSeen) {
+        synchronized (STATE_LOCK) {
             Long seen = lastSeen.get(state.getDeviceId());
             if (seen != null && seen.longValue() >= state.getSequence()) {
                 return;
@@ -1159,7 +1253,7 @@ public final class Continuity {
     /// gate refuses, correctly: the two questions are always asked together and answering them
     /// under one hold of the monitor is also what keeps them consistent with each other.
     private static boolean stillDeliverable(AppState state, long era) {
-        synchronized (lastSeen) {
+        synchronized (STATE_LOCK) {
             if (era != deliveryEra) {
                 return false;
             }
@@ -1204,7 +1298,11 @@ public final class Continuity {
                 return;
             }
         }
-        if (autoRestore) {
+        boolean auto;
+        synchronized (STATE_LOCK) {
+            auto = autoRestore;
+        }
+        if (auto) {
             restore(state);
         } else {
             setParked(state);
@@ -1213,7 +1311,7 @@ public final class Continuity {
 
     private static void park(final AppState state) {
         setParked(state);
-        synchronized (HANDOFF_LOCK) {
+        synchronized (STATE_LOCK) {
             if (waitingForWindow) {
                 return;
             }
@@ -1233,7 +1331,7 @@ public final class Continuity {
                         break;
                     }
                 }
-                synchronized (HANDOFF_LOCK) {
+                synchronized (STATE_LOCK) {
                     waitingForWindow = false;
                 }
                 if (Display.getInstance().getCurrent() == null) {
@@ -1246,7 +1344,7 @@ public final class Continuity {
                         // waiter was started for. A newer arrival while it waited is the one
                         // worth showing, and identity comparison would have discarded it.
                         AppState waiting;
-                        synchronized (HANDOFF_LOCK) {
+                        synchronized (STATE_LOCK) {
                             waiting = parked;
                             parked = null;
                         }
@@ -1295,9 +1393,13 @@ public final class Continuity {
     ///
     /// - `b`: the bridge, or null to resolve from the platform again
     public static void setBridge(ContinuityBridge b) {
-        bridge = b;
-        bridgeOverridden = b != null;
-        if (b != null && enabled) {
+        boolean on;
+        synchronized (STATE_LOCK) {
+            bridge = b;
+            bridgeOverridden = b != null;
+            on = enabled;
+        }
+        if (b != null && on) {
             try {
                 b.setCallback(new Callback());
             } catch (Throwable t) {
@@ -1315,6 +1417,30 @@ public final class Continuity {
     /// the bridge, or null when this port has none
     public static ContinuityBridge bridgeForSyncedStore() {
         return bridgeInternal();
+    }
+
+    /// Internal. Installs the inbound seam WITHOUT turning continuity on. Application code uses
+    /// `com.codename1.continuity.sync.SyncedStore.addChangeListener`.
+    ///
+    /// `com.codename1.continuity.sync` is a package of its own precisely so that its cost is
+    /// earned separately, and `enable()` is not a cost the synced store asks for: it makes every
+    /// route change checkpoint, and a checkpoint advertises the app's navigation to the devices
+    /// around it over Handoff. Registering a store listener used to call it, so an application
+    /// that wanted a key/value store the user's devices share -- and nothing else -- was opted
+    /// into broadcasting its route stack.
+    ///
+    /// The store's own notification does not go through `enabled` (see Callback.syncedStoreChanged),
+    /// which is what lets the listener work with continuity still off.
+    public static void installSyncedStoreCallback() {
+        ContinuityBridge b = bridgeInternal();
+        if (b == null) {
+            return;
+        }
+        try {
+            b.setCallback(new Callback());
+        } catch (Throwable t) {
+            Log.e(t);
+        }
     }
 
     /// Internal. Re-installs the framework's inbound seam on whatever bridge the port now
@@ -1336,8 +1462,10 @@ public final class Continuity {
     }
 
     static ContinuityBridge bridgeInternal() {
-        if (bridgeOverridden) {
-            return bridge;
+        synchronized (STATE_LOCK) {
+            if (bridgeOverridden) {
+                return bridge;
+            }
         }
         if (!Display.isInitialized()) {
             return null;
@@ -1353,28 +1481,28 @@ public final class Continuity {
     /// Test seam: returns the framework to its untouched state.
     static void reset() {
         listeners.clear();
-        synchronized (lastSeen) {
+        synchronized (STATE_LOCK) {
             lastSeen.clear();
             deliveryEra++;
         }
-        provider = null;
-        relay = null;
-        bridge = null;
-        bridgeOverridden = false;
-        enabled = false;
-        autoRestore = true;
-        flushScheduled = false;
-        title = null;
-        sequence = 0;
-        maxAge = 0;
-        synchronized (HANDOFF_LOCK) {
+        synchronized (STATE_LOCK) {
+            provider = null;
+            relay = null;
+            bridge = null;
+            bridgeOverridden = false;
+            enabled = false;
+            autoRestore = true;
+            flushScheduled = false;
+            title = null;
+            sequence = 0;
+            maxAge = 0;
             deviceId = null;
             parked = null;
             dirty = false;
             waitingForWindow = false;
             applyingRestore = false;
         }
-        synchronized (PUBLISH_LOCK) {
+        synchronized (STATE_LOCK) {
             pendingPublish = null;
             polling = false;
             pollAgain = false;
@@ -1382,7 +1510,7 @@ public final class Continuity {
     }
 
     private static void setParked(AppState state) {
-        synchronized (HANDOFF_LOCK) {
+        synchronized (STATE_LOCK) {
             parked = state;
         }
     }

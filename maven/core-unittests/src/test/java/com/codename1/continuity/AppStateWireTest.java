@@ -419,4 +419,49 @@ public class AppStateWireTest {
                 .setSequence(7L)
                 .setTimestamp(1700000000123L);
     }
+
+    /**
+     * Util.writeObject writes every String with DataOutputStream.writeUTF, which cannot encode
+     * more than 65535 bytes and throws when asked to. Continuity.persist() logs that and carries
+     * on, so an oversized payload produced a checkpoint that LOOKED successful and simply was not
+     * there after the process died -- state restoration failing silently at exactly the moment it
+     * exists for. Refused up front instead, naming the key.
+     */
+    @Test
+    void anOversizedPayloadStringIsRefusedNamingTheKey() {
+        StringBuilder huge = new StringBuilder();
+        for (int i = 0; i < 70000; i++) {
+            huge.append('x');
+        }
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("draft", huge.toString());
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        StateCodec.requireRepresentable(payload);
+                    }
+                });
+
+        assertTrue(e.getMessage().contains("draft"), e.getMessage());
+        assertTrue(e.getMessage().contains("65535"), e.getMessage());
+    }
+
+    /** The limit is on BYTES: a CJK string reaches it at a third of the character count. */
+    @Test
+    void theLimitCountsBytesNotCharacters() {
+        StringBuilder cjk = new StringBuilder();
+        for (int i = 0; i < 30000; i++) {
+            cjk.append('\u4e2d');
+        }
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", cjk.toString());
+
+        assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        StateCodec.requireRepresentable(payload);
+                    }
+                });
+    }
 }

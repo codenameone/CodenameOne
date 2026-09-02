@@ -122,6 +122,62 @@ class IPhoneBuilderContinuityPlistTest {
     // ------------------------------------------------------------------
 
     /**
+     * Why the detection branch reads the fragment itself instead of stripping comments first.
+     * plistWithoutComments is not CDATA-aware: a valid CDATA value carrying the text "&lt;!--"
+     * and no "--&gt;" looks like an unterminated comment to it, so everything after is truncated
+     * and a live root key beyond it disappears -- and the branch then appends a second one.
+     */
+    @Test
+    void strippingCommentsFirstWouldHideALiveKeyAfterCdata() {
+        String plist = "<key>Note</key><string><![CDATA[<!-- not a comment]]></string>"
+                + "<key>NSUserActivityTypes</key><array/>";
+
+        assertTrue(IPhoneBuilder.firstLiveRootIndex(plist, "NSUserActivityTypes") > 0, plist);
+        assertEquals(-1, IPhoneBuilder.firstLiveRootIndex(
+                IPhoneBuilder.plistWithoutComments(plist), "NSUserActivityTypes"), plist);
+    }
+
+    /**
+     * A CDATA section is character data, not markup. "&lt;dict&gt;" written inside one is text an
+     * application chose to store, and counting it as structure classified a following ROOT
+     * NSUserActivityTypes as nested -- so the builder appended a second one and shipped a plist
+     * carrying the key twice, which iOS reads unpredictably.
+     */
+    @Test
+    void markupInsideCdataIsNotStructure() {
+        String plist = "<key>Note</key><string><![CDATA[a > <dict>]]></string>"
+                + "<key>NSUserActivityTypes</key><array/>";
+
+        assertTrue(IPhoneBuilder.firstLiveRootIndex(plist, "NSUserActivityTypes") > 0, plist);
+    }
+
+    /**
+     * The reverse: a dict that really does open, with a CDATA section inside it, still nests.
+     * A fix that simply ignored every "&lt;dict&gt;" would pass the test above and lose this.
+     */
+    @Test
+    void aRealDictStillNestsWhenItContainsCdata() {
+        String plist = "<key>MyFeature</key><dict>"
+                + "<key>Note</key><string><![CDATA[x]]></string>"
+                + "<key>NSUserActivityTypes</key><array/></dict>";
+
+        assertEquals(-1, IPhoneBuilder.firstLiveRootIndex(plist, "NSUserActivityTypes"), plist);
+    }
+
+    /**
+     * A valid CDATA value may contain the text "&lt;!--" and no "--&gt;". Stripping comments
+     * before the lookup read that as an unterminated comment and truncated the fragment, so a
+     * live root key after it went missing and a second one was appended beside it.
+     */
+    @Test
+    void aCommentMarkerInsideCdataDoesNotHideALaterKey() {
+        String plist = "<key>Note</key><string><![CDATA[<!-- not a comment]]></string>"
+                + "<key>NSUserActivityTypes</key><array/>";
+
+        assertTrue(IPhoneBuilder.firstLiveRootIndex(plist, "NSUserActivityTypes") > 0, plist);
+    }
+
+    /**
      * iOS reads NSUserActivityTypes at the plist root and nowhere else. Treating one that an
      * application-defined nested dictionary happens to own as the app's declaration merged the
      * continuity type into a dictionary nobody reads it from, AND suppressed the root key that

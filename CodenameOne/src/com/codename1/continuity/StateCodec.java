@@ -207,6 +207,9 @@ public final class StateCodec {
             if (entry.getKey() == null) {
                 throw new IllegalArgumentException("A continuity payload cannot have a null key.");
             }
+            // Keys go through the same writeUTF as values, so an oversized one loses the
+            // checkpoint just as quietly.
+            requireWritable(entry.getKey(), entry.getKey());
             check(entry.getValue(), entry.getKey(), 0);
         }
     }
@@ -354,6 +357,51 @@ public final class StateCodec {
         return out;
     }
 
+    /// The most modified-UTF-8 bytes a single string in a payload may occupy.
+    ///
+    /// `Util.writeObject` writes every String with `DataOutputStream.writeUTF`, which cannot
+    /// encode more than this and throws when asked to. `Continuity.persist()` logs that failure
+    /// and carries on, so an oversized payload produced a checkpoint that LOOKED successful and
+    /// simply was not there after the process died -- the one thing state restoration exists to
+    /// prevent, arriving with nothing said. Refused here instead, naming the key, which is the
+    /// same contract an unrepresentable type already gets.
+    static final int MAX_STRING_BYTES = 65535;
+
+    /// Refuses a string the local checkpoint could not store.
+    static void requireWritable(String value, String path) {
+        if (exceedsWritableLength(value)) {
+            throw new IllegalArgumentException("The continuity payload at \"" + path + "\" is "
+                    + "longer than " + MAX_STRING_BYTES + " bytes of modified UTF-8, which is the "
+                    + "most a stored checkpoint can hold. Keep the payload small -- it is a "
+                    + "pointer to where the user was, not the document they were working on -- "
+                    + "and load the rest from your own storage when the state is restored.");
+        }
+    }
+
+    /// Whether `s` encodes to more than MAX_STRING_BYTES.
+    ///
+    /// Counted rather than approximated from `length()`, because the limit is on BYTES and a
+    /// string of accented or CJK characters reaches it at a third of the character count. Stops
+    /// at the limit, so a huge string costs the limit rather than its own length, and the running
+    /// total cannot overflow.
+    static boolean exceedsWritableLength(String s) {
+        int len = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= 0x0001 && c <= 0x007F) {
+                len++;
+            } else if (c > 0x07FF) {
+                len += 3;
+            } else {
+                len += 2;
+            }
+            if (len > MAX_STRING_BYTES) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static void check(Object value, String path, int depth) {
         if (depth > 16) {
             // A payload cannot legitimately be this deep, and a cycle looks exactly like a very
@@ -362,7 +410,11 @@ public final class StateCodec {
                     + "\" nests more than 16 levels deep, or contains a cycle. Neither a property "
                     + "list nor JSON can represent a cycle.");
         }
-        if (value instanceof String || value instanceof Integer
+        if (value instanceof String) {
+            requireWritable((String) value, path);
+            return;
+        }
+        if (value instanceof Integer
                 || value instanceof Long || value instanceof Double || value instanceof Boolean) {
             return;
         }

@@ -11746,14 +11746,22 @@ public class IPhoneBuilder extends Executor {
             if (open < 0 || open >= at) {
                 break;
             }
-            if (plist.startsWith("<!--", open)) {
-                // A comment's contents are not structure. An unterminated one swallows the rest,
-                // which is what a parser does with it too -- see plistWithoutComments.
-                int commentEnd = plist.indexOf("-->", open + 4);
-                if (commentEnd < 0) {
-                    break;
-                }
-                i = commentEnd + 3;
+            // The SHARED scanner, not a local "is this a comment" test. A CDATA section, a
+            // comment, a processing instruction and a declaration can all carry text shaped like
+            // an element, and a plist parser reads none of it as markup. A hand-rolled comment
+            // check got this wrong in the way that matters: "<![CDATA[a > <dict>]]>" ended at the
+            // FIRST ">", so the "<dict>" written inside the character data was counted as real
+            // structure, a following root key was classified as nested, and the branch above
+            // appended a SECOND NSUserActivityTypes -- the duplicate key this whole area exists
+            // to prevent.
+            int skipped = WatchNativeBuilder.skipMarkupBefore(plist, open, i);
+            if (skipped < 0) {
+                // Unterminated: nothing after it can be read reliably, so stop counting rather
+                // than guess, and answer with the depth established so far.
+                break;
+            }
+            if (skipped != open) {
+                i = skipped;
                 continue;
             }
             int end = plist.indexOf('>', open);
@@ -11793,9 +11801,30 @@ public class IPhoneBuilder extends Executor {
     /// Both the branch that decides whether to append and the merge itself have to use this, or
     /// they disagree: one sees a declaration the other cannot find, which is how a key gets
     /// appended twice or an array gets merged into that iOS never reads.
+    /// Whether `at` is a position a plist parser would read as markup.
+    ///
+    /// The same four constructs `skipMarkupBefore` knows, walked forward rather than guessed at
+    /// backwards: the old `lastIndexOf("<!--")` test read a `<!--` written inside a CDATA section
+    /// as if it opened a real comment, and answered "commented out" for a key that is really
+    /// there.
+    static boolean isLivePosition(String plist, int at) {
+        int i = 0;
+        for (;;) {
+            int skipped = WatchNativeBuilder.skipMarkupBefore(plist, at, i);
+            if (skipped < 0 || skipped > at) {
+                // Unterminated, or `at` falls inside the construct that skipping it lands past.
+                return false;
+            }
+            if (skipped == at) {
+                return true;
+            }
+            i = skipped;
+        }
+    }
+
     static int firstLiveRootIndex(String plist, String key) {
         int at = plistKeyIndex(plist, key);
-        while (at >= 0 && (insideComment(plist, at) || plistDictDepth(plist, at) != 0)) {
+        while (at >= 0 && (!isLivePosition(plist, at) || plistDictDepth(plist, at) != 0)) {
             at = plistKeyIndex(plist, key, at + 1);
         }
         return at;
@@ -14503,7 +14532,12 @@ public class IPhoneBuilder extends Executor {
             // type at all, which is Handoff and Spotlight silently doing nothing on a device.
             // The same question is asked of UIBackgroundModes a few hundred lines up, and for
             // the same reason.
-            if (firstLiveRootIndex(plistWithoutComments(inject), "NSUserActivityTypes") < 0) {
+            // The fragment itself, NOT plistWithoutComments(inject). firstLiveRootIndex already
+            // skips a key that is commented out, and pre-stripping introduced a failure of its
+            // own: a valid CDATA value containing the text "<!--" and no "-->" looked like an
+            // unterminated comment, so everything after it was truncated and a live root key
+            // beyond it went missing -- and this branch then appended a SECOND one.
+            if (firstLiveRootIndex(inject, "NSUserActivityTypes") < 0) {
                 inject += userActivityTypesKey(intentsManifest, continuityActivityType);
             } else {
                 // Merge into the array the application supplied rather than replacing it: its

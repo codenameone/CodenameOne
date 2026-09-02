@@ -585,6 +585,72 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * com.codename1.continuity.sync is a package of its own so that its cost is earned
+     * separately. Enabling the whole framework to register a store listener made every route
+     * change checkpoint -- which on iOS advertises the app's navigation to the devices around it
+     * -- so an application that wanted a key/value store its user's devices share was opted into
+     * broadcasting its route stack. A key/value store is not consent to publish where the user is.
+     */
+    @EdtTest
+    public void registeringAStoreListenerDoesNotEnableContinuity() {
+        CountingStoreBridge counting = new CountingStoreBridge();
+        Continuity.setBridge(counting);
+        SyncedStoreListener l = new SyncedStoreListener() {
+            public void storeChanged() {
+            }
+        };
+        registered.add(l);
+
+        SyncedStore.addChangeListener(l);
+
+        assertFalse(Continuity.isEnabled(),
+                "registering a store listener turned continuity on, so route changes now "
+                        + "checkpoint and Handoff advertises them");
+        // The listener still has to be reachable, which is the whole reason the old code enabled.
+        assertTrue(counting.callbackInstalls() > 0,
+                "no callback was installed, so a change on another device could never arrive");
+    }
+
+    /**
+     * A different endpoint is a different destination. A state retained after a failed send was
+     * published to whatever relay replaced the one it was captured for -- an application's data
+     * sent somewhere it was never handed to.
+     */
+    @EdtTest
+    public void replacingTheRelayDropsWorkQueuedForTheOldOne() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        FailingThenWorkingRelay old = new FailingThenWorkingRelay();
+        Continuity.setRelay(old);
+
+        Continuity.checkpoint();
+        long stranded = Continuity.getRestorableState().getSequence();
+        old.awaitAttempts(1);
+        assertEquals(0, old.delivered.size(), "the first attempt was supposed to fail");
+
+        FailingThenWorkingRelay replacement = new FailingThenWorkingRelay();
+        replacement.fail = false;
+        Continuity.setRelay(replacement);
+
+        // Polled the way an application reconnects. Nothing owed to the previous endpoint may
+        // come out of this.
+        long deadline = System.currentTimeMillis() + 1200L;
+        while (System.currentTimeMillis() < deadline) {
+            Continuity.pollRelay();
+            try {
+                Thread.sleep(40);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+
+        assertFalse(replacement.delivered.contains(Long.valueOf(stranded)),
+                "the state captured for the previous relay was published to its replacement");
+    }
+
+    /**
      * On iOS the external-change observer is installed the first time the platform store is
      * resolved, and enable() does not resolve it. An application that only registers a listener
      * and waits to read values inside the callback was therefore never told about a change made
@@ -612,14 +678,27 @@ public class LocalContinuityTest extends UITestBase {
         private final java.util.concurrent.atomic.AtomicInteger queries =
                 new java.util.concurrent.atomic.AtomicInteger();
 
+        private final java.util.concurrent.atomic.AtomicInteger callbacks =
+                new java.util.concurrent.atomic.AtomicInteger();
+
         @Override
         public boolean isSyncedStoreSupported() {
             queries.incrementAndGet();
             return super.isSyncedStoreSupported();
         }
 
+        @Override
+        public void setCallback(com.codename1.continuity.spi.ContinuityCallback c) {
+            callbacks.incrementAndGet();
+            super.setCallback(c);
+        }
+
         int storeQueries() {
             return queries.get();
+        }
+
+        int callbackInstalls() {
+            return callbacks.get();
         }
     }
 
