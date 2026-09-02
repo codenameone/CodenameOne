@@ -22,6 +22,11 @@ from collections import defaultdict
 from pathlib import Path
 from urllib.parse import unquote
 
+ASCIIDOC_SUFFIXES = {".adoc", ".asciidoc"}
+# Literal and comment blocks, matching the other guide scanners: a delimiter may
+# be longer than four characters and closes on one of the same character and
+# length.
+FENCE_RE = re.compile(r"^(-{4,}|\.{4,}|`{4,}|\+{4,}|/{4,})\s*$")
 ID_RE = re.compile(r'\bid="([^"]+)"')
 HREF_RE = re.compile(r'href="#([^"]+)"')
 # The guide renders as one page, so a RELATIVE href resolves against wherever that
@@ -67,9 +72,22 @@ UNMODELLED_CONDITIONAL_RE = re.compile(
 
 def reject_unmodelled_conditionals(guide_dir: Path) -> None:
     for path in sorted(guide_dir.rglob("*")):
-        if path.suffix not in {".adoc", ".asciidoc"} or not path.is_file():
+        if path.suffix not in ASCIIDOC_SUFFIXES or not path.is_file():
             continue
+        open_fence: str | None = None
         for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
+            # A directive DISPLAYED inside a source block or a comment block does
+            # not take part in preprocessing, so it must not abort the gate.
+            fence = FENCE_RE.match(line)
+            if fence:
+                token = fence.group(1)
+                if open_fence is None:
+                    open_fence = token
+                elif token == open_fence:
+                    open_fence = None
+                continue
+            if open_fence is not None:
+                continue
             if UNMODELLED_CONDITIONAL_RE.match(line):
                 raise SystemExit(
                     f"{path.name}:{number}: this file guards content on the HTML "
@@ -99,10 +117,17 @@ def render(root: Path, attributes: tuple[str, ...] = ()) -> str:
 def packaged_asset(guide_dir: Path, target: str) -> bool:
     """Whether a relative href names a file that ships beside the rendered page.
 
-    The HTML package copies every subdirectory of docs/developer-guide next to
-    developer-guide.html, so `link:img/example.png[]` resolves for a reader who
-    opens the zip. `sketch` is the one directory the packaging step skips, so a
-    link into it does not.
+    A link only works if BOTH published outputs carry the file, so this reproduces
+    both filters rather than asking whether the path exists in the repository:
+
+    * the HTML archive copies only the SUBDIRECTORIES of docs/developer-guide next
+      to developer-guide.html, and skips `sketch`, so a root-level file such as
+      Introduction.asciidoc is never in the zip however much it exists here;
+    * the website rsync excludes `sketch/`, `*.asciidoc` and `*.adoc`, so a source
+      file nested inside a packaged directory still does not reach the site.
+
+    Getting this wrong in the permissive direction is the expensive one: it
+    suppresses a finding for a link readers cannot follow.
     """
     path = target.split("#", 1)[0].split("?", 1)[0]
     if not path:
@@ -111,10 +136,14 @@ def packaged_asset(guide_dir: Path, target: str) -> bool:
     try:
         relative_path = candidate.relative_to(guide_dir)
     except ValueError:
-        return False  # escapes the guide directory, so it is not packaged
-    if relative_path.parts and relative_path.parts[0] == "sketch":
+        return False  # escapes the guide directory, so neither output carries it
+    if len(relative_path.parts) < 2:
+        return False  # a root-level file; the archive copies directories only
+    if relative_path.parts[0] == "sketch":
         return False
-    return candidate.exists()
+    if candidate.suffix in ASCIIDOC_SUFFIXES:
+        return False  # excluded from the website copy at any depth
+    return candidate.is_file()
 
 
 def source_locations(guide_dir: Path, target: str) -> list[str]:
