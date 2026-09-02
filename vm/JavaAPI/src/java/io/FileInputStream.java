@@ -109,6 +109,27 @@ public class FileInputStream extends InputStream {
         }
     }
 
+    /**
+     * Releases the native FILE* if the caller never closed the stream.
+     *
+     * This VM runs finalizers for exactly this purpose (java.lang.Thread does the
+     * same for its thread state), and without one a stream that goes unreachable
+     * unclosed holds its descriptor until the process exits. On a desktop app that
+     * is untidy; on a long-running clean-target server it ends in EMFILE.
+     *
+     * Deliberately silent: a finalizer has nobody to report to, and throwing from
+     * one is worse than the leak it is cleaning up. close() remains the way to learn
+     * that a close failed.
+     */
+    protected void finalize() {
+        if(!closed && handle != 0) {
+            closed = true;
+            long h = handle;
+            handle = 0;
+            closeImpl(h);
+        }
+    }
+
     private void checkOpen() throws IOException {
         if(closed) {
             throw new IOException("Stream closed");
