@@ -239,6 +239,12 @@ public final class Continuity {
         // atomically, so two threads arriving here cannot end up with two different ids.
         String id = getDeviceId();
         long seq = loadSequence();
+        // Read BEFORE the flag is published, and merged under the same hold. Restoring them after
+        // meant another thread could see enabled, poll, and have deliver() admit a state into a
+        // still-empty map -- the very state this device acted on before the restart -- and the
+        // merge landing afterwards with an identical sequence does not recall a delivery already
+        // queued. The duplicate this whole mechanism exists to stop, in the window that creates it.
+        Map<String, Long> restored = readSeen();
         synchronized (STATE_LOCK) {
             if (enabled) {
                 // Lost the race while loading. The winner's values stand, and installing a second
@@ -247,29 +253,14 @@ public final class Continuity {
             }
             deviceId = id;
             sequence = seq;
-            // Published LAST, under the same hold as the state a checkpoint needs.
-            enabled = true;
-        }
-        // Restored from disk, because `lastSeen` is process-local: a relaunch emptied it and the
-        // next poll -- automatic on an Android resume -- accepted the same (device, sequence)
-        // again and restored a foreign state a second time, prompting the user on every launch
-        // against a documented guarantee that an acted-on state acts once.
-        //
-        // EVERY device's mark, not one reconstructed from the stored checkpoint. That earlier
-        // shape recovered at most a single id and recovered none at all once a local navigation
-        // had overwritten the checkpoint with this device's own state -- so a duplicate from any
-        // other device still arrived and still restored. Read outside the lock; it touches
-        // Preferences.
-        Map<String, Long> restored = readSeen();
-        if (!restored.isEmpty()) {
-            synchronized (STATE_LOCK) {
-                for (Map.Entry<String, Long> e : restored.entrySet()) {
-                    Long have = lastSeen.get(e.getKey());
-                    if (have == null || have.longValue() < e.getValue().longValue()) {
-                        lastSeen.put(e.getKey(), e.getValue());
-                    }
+            for (Map.Entry<String, Long> e : restored.entrySet()) {
+                Long have = lastSeen.get(e.getKey());
+                if (have == null || have.longValue() < e.getValue().longValue()) {
+                    lastSeen.put(e.getKey(), e.getValue());
                 }
             }
+            // Published LAST, under the same hold as every piece of state a delivery consults.
+            enabled = true;
         }
         ContinuityBridge b = bridgeInternal();
         if (b != null) {
@@ -628,20 +619,22 @@ public final class Continuity {
         if (state == null) {
             return;
         }
-        synchronized (STATE_LOCK) {
-            if (era != accountEra) {
-                // clear() ran while this snapshot was being built, and building it is not quick --
-                // it calls the application's own saveState(). The state was not in pendingPublish
-                // yet, so clear() could neither drop it nor stamp it with the old era: persisting
-                // would recreate the storage clear() had just deleted, publishContinuation would
-                // re-advertise the signed-out account's work to the devices around it, and the
-                // relay publish would go out under the NEXT account's credentials.
-                return;
+        // Held across the era check AND the three side effects, so a clear() cannot land between
+        // them. Building the snapshot is slow -- it calls the application's saveState() -- and the
+        // state is not in pendingPublish yet, so clear() can neither drop it nor stamp it: without
+        // this, persisting recreated the storage clear() had just deleted, publishContinuation
+        // re-advertised the signed-out account's work to the devices around it, and the relay
+        // publish went out under the NEXT account's credentials.
+        synchronized (COMMIT_LOCK) {
+            synchronized (STATE_LOCK) {
+                if (era != accountEra) {
+                    return;
+                }
             }
+            persist(state);
+            publishContinuation(state);
+            publishToRelay(state);
         }
-        persist(state);
-        publishContinuation(state);
-        publishToRelay(state);
     }
 
     /// Internal. Whether a checkpoint is owed -- something changed since the last one was
@@ -1028,6 +1021,12 @@ public final class Continuity {
     /// One thing it cannot undo: a relay request already on the wire when this is called. Nothing
     /// in this process can recall that. What this guarantees is that nothing follows it.
     public static void clear() {
+        synchronized (COMMIT_LOCK) {
+            clearLocked();
+        }
+    }
+
+    private static void clearLocked() {
         setParked(null);
         synchronized (STATE_LOCK) {
             dirty = false;
@@ -1567,6 +1566,19 @@ public final class Continuity {
         }
     }
 
+    /// Serializes a checkpoint's side effects against clear().
+    ///
+    /// An era recheck before them was still a check-then-act: clear() completing after the
+    /// comparison released STATE_LOCK left the checkpoint free to recreate the storage that had
+    /// just been deleted, re-advertise the signed-out account's work, and queue it under the new
+    /// account's credentials. The three side effects cannot be done while holding STATE_LOCK --
+    /// they write Storage and call the platform bridge, and nothing slow may run under it -- so
+    /// they take this instead, and clear() takes it for its whole body.
+    ///
+    /// Lock order is COMMIT_LOCK then SEEN_LOCK then STATE_LOCK, everywhere, and nothing acquires
+    /// them in any other order.
+    private static final Object COMMIT_LOCK = new Object();
+
     /// Serializes the durable write of the high-water marks. See rememberSeen().
     private static final Object SEEN_LOCK = new Object();
 
@@ -1829,6 +1841,33 @@ public final class Continuity {
             polling = false;
             pollAgain = false;
             publishRequested = false;
+        }
+        // `publishing` was missing from every list above, and the publisher is a LIVE thread: the
+        // relay going null only makes it stand down at its next dequeue. So the flag stayed true
+        // across a reset, the next caller's startPublisher() saw a publisher already running and
+        // returned, and nothing was ever sent again -- a relay whose last value is an old
+        // checkpoint while newer ones sit in the slot unread.
+        //
+        // Waited for rather than force-cleared. Clearing it under a running worker lets a second
+        // one start, and two publishers interleaving is the out-of-order relay the single-worker
+        // design exists to prevent. Bounded, because a wedged worker must not wedge this too.
+        long deadline = System.currentTimeMillis() + 2000L;
+        for (;;) {
+            synchronized (STATE_LOCK) {
+                if (!publishing || System.currentTimeMillis() > deadline) {
+                    publishing = false;
+                    break;
+                }
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                synchronized (STATE_LOCK) {
+                    publishing = false;
+                }
+                break;
+            }
         }
     }
 

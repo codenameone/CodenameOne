@@ -502,7 +502,7 @@ public class LocalContinuityTest extends UITestBase {
             Continuity.checkpoint();
         }
         long newest = Continuity.getRestorableState().getSequence();
-        r.awaitQuiet();
+        r.awaitPublished(newest);
 
         assertFalse(r.published.isEmpty(), "the relay saw nothing at all");
         // Coalescing is allowed and expected -- what is not allowed is going backwards.
@@ -1131,7 +1131,10 @@ public class LocalContinuityTest extends UITestBase {
 
         Continuity.clear();
         r.release();
-        r.awaitQuiet();
+        // The positive signal FIRST: the worker got past the gate and finished the request it was
+        // holding. Asserting the absence of `queued` before that proved nothing at all.
+        r.awaitSent(inFlight);
+        r.settle();
 
         assertFalse(r.sent.contains(Long.valueOf(queued)),
                 "a state queued before logout was published after it: " + r.sent);
@@ -1174,9 +1177,32 @@ public class LocalContinuityTest extends UITestBase {
             gate.countDown();
         }
 
-        void awaitQuiet() {
+        /// Waits until `sequence` has been sent -- a POSITIVE signal that the worker resumed.
+        ///
+        /// The test that uses this asserts an ABSENCE (the state queued before logout must not go
+        /// out), and an absence asserted too early is not evidence of anything: the publish simply
+        /// had not happened yet. A bare sleep gave exactly that, so the test could pass without
+        /// the code under it ever running.
+        void awaitSent(long sequence) {
+            long deadline = System.currentTimeMillis() + 5000L;
+            while (System.currentTimeMillis() < deadline) {
+                if (sent.contains(Long.valueOf(sequence))) {
+                    return;
+                }
+                sleepBriefly();
+            }
+        }
+
+        /// A bounded pause after the positive signal, so a worker that WOULD take the next state
+        /// has had its chance. A bound, not a proof -- but the proof is the assertion above it.
+        void settle() {
+            sleepBriefly();
+            sleepBriefly();
+        }
+
+        private void sleepBriefly() {
             try {
-                Thread.sleep(300);
+                Thread.sleep(50);
             } catch (InterruptedException ignored) {
                 Thread.currentThread().interrupt();
             }
@@ -1187,7 +1213,6 @@ public class LocalContinuityTest extends UITestBase {
     static class OrderRecordingRelay implements StateRelay {
         final List<Long> published =
                 java.util.Collections.synchronizedList(new ArrayList<Long>());
-        private volatile long lastFinished;
 
         public void publish(AppState state) {
             try {
@@ -1196,25 +1221,33 @@ public class LocalContinuityTest extends UITestBase {
                 Thread.currentThread().interrupt();
             }
             published.add(Long.valueOf(state.getSequence()));
-            lastFinished = System.currentTimeMillis();
         }
 
         public AppState fetch() {
             return null;
         }
 
-        /// Waits until the relay has been quiet for a moment, so the assertions read a settled
-        /// list rather than a race of their own.
-        void awaitQuiet() {
-            long deadline = System.currentTimeMillis() + 5000L;
+        /// Waits until `sequence` has actually been published.
+        ///
+        /// NOT "until the relay goes quiet", which is what this did and why it failed about one
+        /// run in five. Quiet is not finished: the publisher coalesces while the EDT is still
+        /// checkpointing, so a gap longer than the idle window happens naturally on a loaded
+        /// machine and was read as settled -- the assertions then ran against a half-delivered
+        /// list and reported the relay's last value as an older checkpoint. Waiting for the
+        /// condition the test actually asserts is the only version of this that cannot lie.
+        void awaitPublished(long sequence) {
+            long deadline = System.currentTimeMillis() + 10000L;
             while (System.currentTimeMillis() < deadline) {
+                synchronized (published) {
+                    if (!published.isEmpty()
+                            && published.get(published.size() - 1).longValue() >= sequence) {
+                        return;
+                    }
+                }
                 try {
-                    Thread.sleep(50);
+                    Thread.sleep(25);
                 } catch (InterruptedException ignored) {
                     Thread.currentThread().interrupt();
-                    return;
-                }
-                if (!published.isEmpty() && System.currentTimeMillis() - lastFinished > 300L) {
                     return;
                 }
             }

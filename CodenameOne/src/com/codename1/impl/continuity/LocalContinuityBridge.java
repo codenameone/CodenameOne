@@ -131,7 +131,12 @@ public class LocalContinuityBridge implements ContinuityBridge {
     ///
     /// a copy of the payload
     public Map<String, Object> getPublishedInfo() {
-        return publishedInfo == null ? null : new HashMap<String, Object>(publishedInfo);
+        synchronized (lock) {
+            // The null check and the copy under ONE hold: a clear landing between them turned the
+            // copy into new HashMap(null), which throws. The two accessors beside this one were
+            // guarded and this was missed -- the same enumeration slip that keeps costing here.
+            return publishedInfo == null ? null : new HashMap<String, Object>(publishedInfo);
+        }
     }
 
     /// Delivers the currently advertised activity back to the app as though it had arrived from
