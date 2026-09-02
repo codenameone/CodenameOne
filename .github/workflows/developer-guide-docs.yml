@@ -122,6 +122,7 @@ jobs:
         run: |
           set -euo pipefail
           GENERATED_DIR="$RUNNER_TEMP/pre-advanced-theming-screenshots"
+          echo "GUIDE_GENERATED_SCREENSHOTS=$GENERATED_DIR" >> "$GITHUB_ENV"
           rm -rf "$GENERATED_DIR"
           mkdir -p "$GENERATED_DIR"
           xvfb-run -a mvn -B -ntp \
@@ -148,6 +149,18 @@ jobs:
               exit 1
             fi
           done
+
+      # When the byte compare fails, the message names the file but not what it
+      # actually rendered, which leaves no way to tell a real regression from an
+      # environment difference. Publishing what this runner produced makes the
+      # two distinguishable without adding a debugging round trip to CI.
+      - name: Upload generated screenshots when they do not match
+        if: failure() && env.GUIDE_GENERATED_SCREENSHOTS != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: guide-generated-screenshots
+          path: ${{ env.GUIDE_GENERATED_SCREENSHOTS }}
+          if-no-files-found: warn
 
       - name: Verify developer guide images are referenced
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
