@@ -111,6 +111,54 @@ class RouteStackRestoreTest extends UITestBase {
         assertEquals(Arrays.asList("/home", "/users", "/users/42"), dispatcher.dispatched);
     }
 
+    /**
+     * Applying an inbound stack is not the user navigating, and the difference is not cosmetic.
+     * A checkpoint here republishes the state we just received under THIS device's id and a fresh
+     * sequence, so the device that sent it can no longer recognize its own work -- it arrives as
+     * a foreign device's state, gets restored, gets published back, and the two devices bounce
+     * the same stack between them, re-navigating the user on every poll.
+     */
+    @FormTest
+    void applyingAnInboundStackDoesNotQueueACheckpoint() {
+        Navigation.setDispatcher(new FakeDispatcher().route("/home").route("/cart"));
+        Continuity.enable();
+
+        AppState remote = new AppState();
+        remote.setRoutes(Arrays.asList("/home", "/cart"))
+                .setDeviceId("a-different-device")
+                .setSequence(9)
+                .setTimestamp(System.currentTimeMillis());
+
+        assertTrue(Continuity.restore(remote), "the stack was supposed to be rebuilt");
+
+        assertFalse(Continuity.isCheckpointPending(),
+                "restoring queued a checkpoint, so the state would go back out as ours");
+    }
+
+    /**
+     * The other half of the same rule: the suppression lasts exactly as long as the restore. Real
+     * navigation afterwards is the user moving and has to be published, or a device that received
+     * a state once would go quiet for the rest of the session.
+     */
+    @FormTest
+    void navigatingAfterARestoreCheckpointsAgain() {
+        Navigation.setDispatcher(new FakeDispatcher().route("/home").route("/cart"));
+        Continuity.enable();
+
+        AppState remote = new AppState();
+        remote.setRoutes(Arrays.asList("/home", "/cart"))
+                .setDeviceId("a-different-device")
+                .setSequence(9)
+                .setTimestamp(System.currentTimeMillis());
+        Continuity.restore(remote);
+        assertFalse(Continuity.isCheckpointPending());
+
+        assertTrue(Navigation.back(), "the rebuilt stack was supposed to have a frame to go back to");
+
+        assertTrue(Continuity.isCheckpointPending(),
+                "navigation after a restore stopped checkpointing, so the device went silent");
+    }
+
     @FormTest
     void goingBackAfterARestoreLandsOnTheRebuiltFrame() {
         Navigation.setDispatcher(new FakeDispatcher().route("/home").route("/users/42"));

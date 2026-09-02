@@ -554,6 +554,108 @@ public class LocalContinuityTest extends UITestBase {
                 "a different state was sent, so the failed one was not the one retained");
     }
 
+    /**
+     * A relay holds ONE document per user, so two overlapping GETs can return DIFFERENT states --
+     * the other device may replace it between them. Nothing downstream re-orders the answers:
+     * lastSeen is keyed by the ORIGINATING device, so a response that left first and came back
+     * second passes deduplication on its own key and puts the older screen over the newer one.
+     */
+    @EdtTest
+    public void overlappingPollsNeverRunTwoFetchesAtOnce() {
+        BlockingFetchRelay r = new BlockingFetchRelay();
+        Continuity.enable();
+        Continuity.setRelay(r);
+
+        // Six, and all of them while the first fetch is still held: this is the Android resume
+        // poll landing on top of an application that also polls on reconnect.
+        for (int i = 0; i < 6; i++) {
+            Continuity.pollRelay();
+        }
+        r.awaitInFlight();
+        r.release();
+        r.awaitQuiet();
+
+        assertEquals(1, r.maxConcurrent(),
+                "two relay fetches overlapped, so an older response can land after a newer one");
+        // Coalesced, not discarded. A poll asked for while one is in flight is a real question --
+        // the application just reconnected -- and answering it with silence is the lost-request
+        // bug the publisher already had once.
+        assertTrue(r.fetches() >= 2,
+                "the polls requested during the first fetch were dropped rather than coalesced");
+    }
+
+    /** Holds every fetch until released, and records how many ran at once. */
+    static class BlockingFetchRelay implements StateRelay {
+        private final java.util.concurrent.CountDownLatch gate =
+                new java.util.concurrent.CountDownLatch(1);
+        private final java.util.concurrent.atomic.AtomicInteger inFlight =
+                new java.util.concurrent.atomic.AtomicInteger();
+        private final java.util.concurrent.atomic.AtomicInteger peak =
+                new java.util.concurrent.atomic.AtomicInteger();
+        private final java.util.concurrent.atomic.AtomicInteger count =
+                new java.util.concurrent.atomic.AtomicInteger();
+
+        public void publish(AppState state) {
+        }
+
+        public AppState fetch() {
+            count.incrementAndGet();
+            int now = inFlight.incrementAndGet();
+            for (;;) {
+                int seen = peak.get();
+                if (now <= seen || peak.compareAndSet(seen, now)) {
+                    break;
+                }
+            }
+            try {
+                gate.await(2, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            inFlight.decrementAndGet();
+            return null;
+        }
+
+        void release() {
+            gate.countDown();
+        }
+
+        int maxConcurrent() {
+            return peak.get();
+        }
+
+        int fetches() {
+            return count.get();
+        }
+
+        /** Waits for the first fetch to actually be inside the relay before releasing it. */
+        void awaitInFlight() {
+            long deadline = System.currentTimeMillis() + 2000L;
+            while (inFlight.get() == 0 && System.currentTimeMillis() < deadline) {
+                sleep();
+            }
+        }
+
+        /** Waits for the coalesced follow-up to run and the worker to stand down. */
+        void awaitQuiet() {
+            long deadline = System.currentTimeMillis() + 3000L;
+            while (System.currentTimeMillis() < deadline) {
+                if (inFlight.get() == 0 && count.get() >= 2) {
+                    return;
+                }
+                sleep();
+            }
+        }
+
+        private void sleep() {
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
     /** Fails every publish until `fail` is cleared, and records what got through. */
     static class FailingThenWorkingRelay implements StateRelay {
         volatile boolean fail = true;

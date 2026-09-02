@@ -140,6 +140,10 @@ public final class Continuity {
     private static boolean enabled;
     private static boolean autoRestore = true;
     private static boolean flushScheduled;
+
+    /// True while an inbound state is being applied, so the navigation it causes is not mistaken
+    /// for the user moving and republished. Guarded by HANDOFF_LOCK.
+    private static boolean applyingRestore;
     private static String title;
     private static long sequence;
     private static long maxAge;
@@ -422,6 +426,13 @@ public final class Continuity {
             return;
         }
         synchronized (HANDOFF_LOCK) {
+            if (applyingRestore) {
+                // See restore(). The stack is being rebuilt from a state we already hold, so
+                // there is nothing new to record, and publishing it would start a restore loop
+                // between this device and the one that sent it. Not marked dirty either --
+                // restore() persists the state it applied.
+                return;
+            }
             dirty = true;
         }
         if (flushScheduled || !Display.isInitialized()) {
@@ -637,12 +648,36 @@ public final class Continuity {
             // documented shape -- would leave the application on no screen at all.
             return false;
         }
+        boolean shown;
+        synchronized (HANDOFF_LOCK) {
+            // Applying a state is not the user navigating, and the difference is not cosmetic.
+            // The rebuilt stack reaches routeStackChanged(), which checkpoints, which republishes
+            // what we just received under THIS device's id and a fresh sequence. The originating
+            // device then cannot recognize its own work -- it arrives as a foreign device's state
+            // -- so it restores it and republishes in turn, and the two bounce the same stack
+            // back and forth, re-navigating the user on every poll.
+            //
+            // A plain field because restoration is an EDT activity: restoreStack() builds forms
+            // and shows one. Two threads restoring at once is already broken for that reason.
+            applyingRestore = true;
+        }
         try {
-            return Navigation.restoreStack(routes);
+            shown = Navigation.restoreStack(routes);
         } catch (Throwable t) {
             Log.e(t);
-            return false;
+            shown = false;
+        } finally {
+            synchronized (HANDOFF_LOCK) {
+                applyingRestore = false;
+            }
         }
+        if (shown) {
+            // Locally, and only locally. Suppressing the checkpoint above also suppressed the
+            // write that records where the user now is, and without this a cold start would come
+            // back to the position that preceded the restore.
+            persist(state);
+        }
+        return shown;
     }
 
     /// Asks the relay for anything newer than what is here, on a background thread. Returns
@@ -673,36 +708,80 @@ public final class Continuity {
         // when our publish lands; ordering between devices is per-device sequences, maxAge and
         // the listener's own answer, none of which this would change.
         startPublisher();
-        final long era;
         synchronized (PUBLISH_LOCK) {
-            era = accountEra;
+            if (polling) {
+                // One fetch at a time. Two overlapping GETs can return DIFFERENT documents -- a
+                // relay holds one per user and the other device may replace it between them --
+                // and nothing downstream re-orders the answers: lastSeen is keyed by ORIGINATING
+                // device, so a response that left first and arrived second passes deduplication
+                // on its own key and puts the older screen over the newer one.
+                //
+                // Remembered rather than dropped. An application that polls on reconnect while a
+                // resume poll is still in flight is asking a real question, and answering it with
+                // silence would be the same lost-request bug the publisher had.
+                pollAgain = true;
+                return;
+            }
+            polling = true;
         }
         Display.getInstance().startThread(new Runnable() {
             @Override
             public void run() {
-                AppState fetched = null;
                 try {
-                    fetched = r.fetch();
+                    for (;;) {
+                        pollOnce(r);
+                        synchronized (PUBLISH_LOCK) {
+                            if (!pollAgain) {
+                                // Observed and stood down under ONE hold, for the reason the
+                                // publisher documents: releasing the lock between the two would
+                                // let a poll requested in the gap set a flag nobody ever reads.
+                                polling = false;
+                                return;
+                            }
+                            pollAgain = false;
+                        }
+                    }
                 } catch (Throwable t) {
+                    // Nothing below is expected to throw -- pollOnce() catches the relay's own
+                    // failures -- but leaving the flag set would silently stop every future poll
+                    // for the life of the process.
                     Log.e(t);
-                    return;
-                }
-                if (fetched == null) {
-                    return;
-                }
-                synchronized (PUBLISH_LOCK) {
-                    if (era != accountEra) {
-                        // The user signed out while this request was in flight. Delivering now
-                        // would restore the PREVIOUS account's work into the session that is
-                        // signed in -- and clear() emptied lastSeen, so nothing downstream would
-                        // recognize it as stale. Publishing has had this check; polling is the
-                        // direction that actually puts the old account's work on screen.
-                        return;
+                    synchronized (PUBLISH_LOCK) {
+                        polling = false;
                     }
                 }
-                deliver(fetched);
             }
         }, "Continuity relay poll").start();
+    }
+
+    /// One relay fetch and, if it is worth it, one delivery. Returning early ends this attempt,
+    /// never the polling loop -- which is why the stand-down lives in the caller.
+    private static void pollOnce(StateRelay r) {
+        final long era;
+        synchronized (PUBLISH_LOCK) {
+            era = accountEra;
+        }
+        AppState fetched = null;
+        try {
+            fetched = r.fetch();
+        } catch (Throwable t) {
+            Log.e(t);
+            return;
+        }
+        if (fetched == null) {
+            return;
+        }
+        synchronized (PUBLISH_LOCK) {
+            if (era != accountEra) {
+                // The user signed out while this request was in flight. Delivering now would
+                // restore the PREVIOUS account's work into the session that is signed in -- and
+                // clear() emptied lastSeen, so nothing downstream would recognize it as stale.
+                // Publishing has had this check; polling is the direction that actually puts the
+                // old account's work on screen.
+                return;
+            }
+        }
+        deliver(fetched);
     }
 
     /// Forgets everything: the stored checkpoint, any parked arrival, the activity advertised to
@@ -860,6 +939,12 @@ public final class Continuity {
     /// was already in flight when the user signed out is not delivered into the next account's
     /// session. Guarded by PUBLISH_LOCK.
     private static long accountEra;
+
+    /// True while a relay fetch is in flight; `pollAgain` records a poll asked for during one.
+    /// Both guarded by PUBLISH_LOCK.
+    private static boolean polling;
+
+    private static boolean pollAgain;
 
     private static final Object PUBLISH_LOCK = new Object();
 
@@ -1074,6 +1159,15 @@ public final class Continuity {
     }
 
     private static void dispatch(AppState state) {
+        if (isTooOld(state)) {
+            // Checked HERE and not only on arrival, because arrival is not the only way in. A
+            // continuation that cold-launches the app is parked and waits up to WINDOW_WAIT_MILLIS
+            // for the first form, and the waiter then dispatches it directly -- so a state that
+            // was fresh when it landed and expired during that wait was auto-restored anyway,
+            // past both the inbound check and the one in getRestorableState(). An expired
+            // checkout or booking is exactly what maxAge exists to refuse.
+            return;
+        }
         if (Display.getInstance().getCurrent() == null) {
             // A continuation can cold-launch the app, and both Apple delegates hand it over while
             // init/start are still queued. Restoring against no form at all would run the route
@@ -1268,9 +1362,12 @@ public final class Continuity {
             parked = null;
             dirty = false;
             waitingForWindow = false;
+            applyingRestore = false;
         }
         synchronized (PUBLISH_LOCK) {
             pendingPublish = null;
+            polling = false;
+            pollAgain = false;
         }
     }
 
