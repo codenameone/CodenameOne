@@ -738,6 +738,94 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A value that is a NAME rather than a literal copies a binding that is
+     * already known. Reading only literals recorded the new name as unknown, so
+     * a force through it named nothing and the constraints went in beside a pin
+     * still in effect.
+     */
+    @Test
+    public void aDefinitionMayCopyAnotherOne() {
+        String pre = "org.jetbrains.kotlin:kotlin-stdlib:1.7.22";
+        String force = "    configurations.all { resolutionStrategy.force forced }\n";
+        String[] copies = {
+            "    def coord = '" + pre + "'\n    def forced = coord\n",
+            "    def coord = '" + pre + "'\n    ext.set('forced', coord)\n",
+            "    def coord = '" + pre + "'\n    ext.forced = coord\n",
+            "    def a = '" + pre + "'\n    def b = a\n    def forced = b\n",
+        };
+        for (int i = 0; i < copies.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    copies[i] + force);
+            check("".equals(out), "the copy carries the coordinate, got <<"
+                    + out + ">>");
+        }
+
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def coord = 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'\n"
+                        + "    def forced = coord\n" + force)
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a merged-era one leaves the alignment alone");
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def forced = whateverThisIs\n" + force)
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and copying something unknown binds nothing");
+    }
+
+    /**
+     * Groovy ends a line at a bare carriage return too. Searching only for the
+     * newline swallowed the whole remainder of a CR-only fragment as part of a
+     * line comment -- including the strict pin that followed it.
+     */
+    @Test
+    public void aLineCommentEndsAtEitherTerminator() {
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    // explanation\r    implementation("
+                        + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22') "
+                        + "{ version { strictly '1.7.22' } }\r")),
+                "the pin after a CR-terminated comment is still read");
+
+        // And the comment still hides what is on ITS own line.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    // implementation 'org.jetbrains.kotlin:"
+                        + "kotlin-stdlib-jdk8:1.7.22!!'\n    implementation "
+                        + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a commented-out pin is still a comment");
+    }
+
+    /**
+     * An unqualified call has to be one of the dependency handler's own adders.
+     * Matched by prefix, any helper an app had defined -- {@code def addNote = {
+     * config, text -> .. }} -- declared a dependency as far as this was
+     * concerned, and that artifact's constraint was skipped as already handled.
+     */
+    @Test
+    public void anUnqualifiedAdderIsNamedNotPrefixed() {
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def addNote = { config, text -> println text }\n"
+                        + "    addNote('implementation', 'org.jetbrains.kotlin:"
+                        + "kotlin-stdlib-jdk8:1.9.22')\n")
+                        .contains("kotlin-stdlib-jdk8:1.8.0"),
+                "an app helper declares nothing");
+
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!";
+        String[] adders = {
+            "    dependencies {\n        add 'implementation', '" + pin + "'\n    }\n",
+            "    dependencies {\n        addProvider 'implementation', '"
+                    + pin + "'\n    }\n",
+            // A qualified call does not consult the name at all, so a handler
+            // that grows a fourth adder keeps working through its receiver.
+            "    dependencies.whateverTheyAddNext('implementation', '" + pin + "')\n",
+        };
+        for (int i = 0; i < adders.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    adders[i]);
+            check("".equals(out), "<<" + adders[i].trim() + ">> declares, got <<"
+                    + out + ">>");
+        }
+    }
+
+    /**
      * {@code ext.set('dep', '...')} is the extension's own setter, and the name
      * is its first argument. Read as a dotted assignment it recorded a property
      * called {@code set} and lost the real one, so a later reference through the

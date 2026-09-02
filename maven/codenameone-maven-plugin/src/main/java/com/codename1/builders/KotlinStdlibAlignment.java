@@ -858,6 +858,37 @@ public class KotlinStdlibAlignment {
         return false;
     }
 
+    /**
+     * Whether an unqualified call is one of the dependency handler's adders.
+     *
+     * <p>Named rather than matched by prefix. `add*` accepted any helper an app
+     * had defined -- {@code def addNote = { config, text -> .. }} called with a
+     * configuration and a coordinate declared a dependency as far as this was
+     * concerned, and the constraint for that artifact was skipped as already
+     * handled.</p>
+     *
+     * <p>A qualified call does NOT consult this: there the receiver settles it,
+     * so a handler that grows a fourth adder keeps working through
+     * {@code dependencies.whatever(..)}. What an unrecognised name costs is a
+     * constraint written beside a declaration that was already there, which is
+     * the direction this class errs in everywhere.</p>
+     */
+    private static boolean isADependencyHandlerAdder(String method) {
+        for (int i = 0; i < DEPENDENCY_HANDLER_ADDERS.length; i++) {
+            if (DEPENDENCY_HANDLER_ADDERS[i].equals(method)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** DependencyHandler's methods that take a configuration and a notation. */
+    private static final String[] DEPENDENCY_HANDLER_ADDERS = {
+        "add",
+        "addProvider",
+        "addProviderBundle"
+    };
+
     /** Whether the literal at {@code quoteAt} is an argument of a declaring call. */
     private static boolean isDeclarationArgument(String line, int quoteAt) {
         int i = skipBlanksBackward(line, quoteAt - 1);
@@ -2649,7 +2680,7 @@ public class KotlinStdlibAlignment {
         // and `myList.add(..)` to a list, and neither declares anything.
         int dot = skipBlanksBackward(line, i);
         if (dot < 0 || line.charAt(dot) != '.') {
-            return method.startsWith("add");
+            return isADependencyHandlerAdder(method);
         }
         int end = skipBlanksBackward(line, dot - 1);
         if (end < 0) {
@@ -2724,7 +2755,12 @@ public class KotlinStdlibAlignment {
                     continue;
                 }
                 if (next == '/') {
-                    while (i < fragment.length() && fragment.charAt(i) != '\n') {
+                    // Either terminator. Groovy ends a line at a bare carriage
+                    // return too, and searching only for the newline swallowed the
+                    // whole remainder of a CR-only fragment as part of the comment
+                    // -- including, in the case that found this, a strict pin.
+                    while (i < fragment.length() && fragment.charAt(i) != '\n'
+                            && fragment.charAt(i) != '\r') {
                         i++;
                     }
                     out.append('\n');
@@ -3455,6 +3491,28 @@ public class KotlinStdlibAlignment {
                     // below the floor and stood the whole block down.
                     value = withLiteralsInlined(
                             statement.substring(i, closes + 1), literals);
+                }
+            } else if (i < statement.length() && isIdentifierChar(statement.charAt(i))) {
+                // A value that is a NAME rather than a literal. `def forced =
+                // coord` and `ext.set('forced', coord)` copy a binding that is
+                // already known, and reading only literals recorded the new name as
+                // unknown -- so a force through it named nothing and the
+                // constraints went in beside a pin still in effect.
+                //
+                // Resolved from what is recorded rather than by inlining the whole
+                // statement first, which substitutes the name being ASSIGNED as
+                // readily as the one being read: `dep = somethingUnknown` became
+                // `'...' = somethingUnknown`, so the reassignment was not seen at
+                // all and the stale value survived it.
+                int token = i;
+                while (token < statement.length()
+                        && isIdentifierChar(statement.charAt(token))) {
+                    token++;
+                }
+                String alias = literals.get(statement.substring(i, token));
+                if (alias != null && !followedByMapKeyColon(statement, token)) {
+                    end = token - 1;
+                    value = alias;
                 }
             }
             recordDefinition(literals, name, value, conditional);
