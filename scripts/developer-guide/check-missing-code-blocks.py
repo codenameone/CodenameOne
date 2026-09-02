@@ -83,7 +83,12 @@ def main() -> int:
     parser.add_argument(
         "--write-baseline",
         action="store_true",
-        help="rewrite the baseline from the current tree (only ever to shrink it)",
+        help="rewrite the baseline from the current tree",
+    )
+    parser.add_argument(
+        "--allow-new",
+        action="store_true",
+        help="permit --write-baseline to ADD entries; without it the baseline may only shrink",
     )
     args = parser.parse_args()
 
@@ -99,6 +104,23 @@ def main() -> int:
             located[(name, text)] = number
 
     if args.write_baseline:
+        # Same reasoning as check-guide-links.py: the command that banks a fix
+        # must not silently bury a new hole.
+        previous = load_baseline(args.baseline)
+        added = sorted(
+            f"{name}\t{text}"
+            for name in current
+            for text in current[name] - previous.get(name, set())
+        )
+        if added and not args.allow_new:
+            for entry in added:
+                print(entry.replace("\t", ": "), file=sys.stderr)
+            print(
+                f"\nRefusing to add {len(added)} entr(ies) to the baseline. Restore the "
+                f"block, or pass --allow-new if this is debt you mean to record.",
+                file=sys.stderr,
+            )
+            return 1
         lines = [
             "# Prose that promises a code block where none follows.",
             "# A ratchet: entries may be removed as holes are filled, never added.",
