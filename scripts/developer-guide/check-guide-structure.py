@@ -202,18 +202,35 @@ def main() -> int:
                 f"doctype:book that renders as a PART and promotes its own sections to "
                 f"chapters. Use '== ' or include it with leveloffset=+1."
             )
-        if path not in walker.direct or "leveloffset" in attrs:
+        if path not in walker.direct:
             continue
         if heading is None:
             errors.append(
                 f"{path.name}: is included directly by developer-guide.asciidoc but has "
                 f"no heading, so its content is absorbed into the chapter before it."
             )
-        elif heading[0] > 2:
+            continue
+        # A leveloffset shifts every heading in the included file, so what decides
+        # whether this renders as a chapter is the declared level PLUS the offset.
+        # Exempting offset includes entirely would leave the same nesting bug one
+        # step further along: '== Chapter' at leveloffset=+1 renders as a
+        # subsection, and the outcome check cannot see it because it accepts a
+        # title at any depth.
+        offset = 0
+        match = re.search(r"leveloffset=([+-]?\d+)", attrs)
+        if match:
+            offset = int(match.group(1))
+        effective = heading[0] + offset
+        if effective != 2:
+            detail = (
+                f"level {heading[0]} with leveloffset={offset:+d}"
+                if offset
+                else f"level {heading[0]}"
+            )
             errors.append(
-                f"{path.name}: is included directly by developer-guide.asciidoc but opens "
-                f"at level {heading[0]} ('{'=' * heading[0]} {heading[1]}'), so it renders "
-                f"as a section of the preceding chapter rather than as a chapter. Use '== '."
+                f"{path.name}: is included directly by developer-guide.asciidoc at "
+                f"{detail}, so it renders at level {effective} rather than as a chapter. "
+                f"A direct manifest entry must come out at level 2."
             )
 
     # 3. Outcome check: every included chapter's title survives into the book.
