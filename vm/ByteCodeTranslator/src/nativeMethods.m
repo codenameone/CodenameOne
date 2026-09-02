@@ -1153,8 +1153,17 @@ JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ON
     if(path == NULL) {
         return 0;
     }
-    FILE* f = fopen(path, "rb");
-    return (JAVA_LONG)(intptr_t)f;
+    {
+        /* Opening BLOCKS on a FIFO: fopen for read waits until a writer opens the
+           other end, and there may never be one. `path` points into the thread's
+           utf8Buffer, which is C memory and unaffected by a collection, so it stays
+           valid across the safepoint. */
+        FILE* f;
+        CN1_YIELD_THREAD;
+        f = fopen(path, "rb");
+        CN1_RESUME_THREAD;
+        return (JAVA_LONG)(intptr_t)f;
+    }
 }
 
 /*
@@ -1278,7 +1287,13 @@ JAVA_INT java_io_FileInputStream_closeImpl___long_R_int(CODENAME_ONE_THREAD_STAT
     if(f == NULL) {
         return 0;
     }
-    return fclose(f) == 0 ? 0 : -1;
+    {
+        int r;
+        CN1_YIELD_THREAD;
+        r = fclose(f);
+        CN1_RESUME_THREAD;
+        return r == 0 ? 0 : -1;
+    }
 }
 
 JAVA_LONG java_io_FileOutputStream_openImpl___java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_BOOLEAN append) {
@@ -1289,8 +1304,14 @@ JAVA_LONG java_io_FileOutputStream_openImpl___java_lang_String_boolean_R_long(CO
     if(path == NULL) {
         return 0;
     }
-    FILE* f = fopen(path, append ? "ab" : "wb");
-    return (JAVA_LONG)(intptr_t)f;
+    {
+        /* The mirror of the read side: opening a FIFO for write waits for a reader. */
+        FILE* f;
+        CN1_YIELD_THREAD;
+        f = fopen(path, append ? "ab" : "wb");
+        CN1_RESUME_THREAD;
+        return (JAVA_LONG)(intptr_t)f;
+    }
 }
 
 JAVA_INT java_io_FileOutputStream_writeImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
@@ -1314,7 +1335,15 @@ JAVA_INT java_io_FileOutputStream_flushImpl___long_R_int(CODENAME_ONE_THREAD_STA
     if(f == NULL) {
         return -1;
     }
-    return fflush(f) == 0 ? 0 : -1;
+    {
+        /* fflush pushes the buffer at the peer and blocks for the same reasons the
+           write does -- a FIFO nobody is draining, a slow network filesystem. */
+        int r;
+        CN1_YIELD_THREAD;
+        r = fflush(f);
+        CN1_RESUME_THREAD;
+        return r == 0 ? 0 : -1;
+    }
 }
 
 JAVA_INT java_io_FileOutputStream_closeImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
@@ -1322,7 +1351,15 @@ JAVA_INT java_io_FileOutputStream_closeImpl___long_R_int(CODENAME_ONE_THREAD_STA
     if(f == NULL) {
         return 0;
     }
-    return fclose(f) == 0 ? 0 : -1;
+    {
+        /* fclose FLUSHES before it closes, so it blocks exactly where the flush
+           above does. */
+        int r;
+        CN1_YIELD_THREAD;
+        r = fclose(f);
+        CN1_RESUME_THREAD;
+        return r == 0 ? 0 : -1;
+    }
 }
 
 // Standard input. Separate from FileInputStream because stdin is not seekable, so
