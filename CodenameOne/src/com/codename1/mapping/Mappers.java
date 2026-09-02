@@ -277,6 +277,48 @@ public final class Mappers {
         writeJson(out, m.toMap(instance));
     }
 
+    /// Appends `value` exactly as `JSONWriter` would render it if it had been put
+    /// into the map that `Mapper#toMap` builds.
+    ///
+    /// This is deliberately NOT `#appendJsonValue`: that one is smarter, turning a
+    /// `Date` into epoch milliseconds and a mapped object into nested JSON. Where a
+    /// generated mapper is reproducing what the map path stored RAW -- a `Property`
+    /// value is the case that matters -- being smarter is being different, and
+    /// `Mapper.Direct` promises identical output rather than better output.
+    public static void appendJsonRaw(StringBuilder out, Object value) {
+        writeJson(out, value);
+    }
+
+    /// Appends `instance` through the mapper the CALLER names, rather than the one
+    /// registered for the instance's runtime class.
+    ///
+    /// The distinction is polymorphism. A field declared `Base` holding an instance
+    /// of an unmapped subclass finds no mapper by runtime class, and
+    /// `#appendJson(Object, StringBuilder)` then falls back to the quoted
+    /// `toString`. `Mapper#toMap` looks the mapper up by the DECLARED type and
+    /// serialises the subclass as an object, so a generated mapper reproducing the
+    /// map path has to ask the same question. Mirrors what the map path does with a
+    /// null mapper too: the raw value, which renders as its quoted `toString`.
+    public static void appendJsonUsing(Mapper<?> mapper, Object instance, StringBuilder out) {
+        if (instance == null) {
+            out.append("null");
+            return;
+        }
+        if (mapper == null) {
+            writeJson(out, instance);
+            return;
+        }
+        if (mapper instanceof Mapper.Direct) {
+            @SuppressWarnings("unchecked")
+            Mapper.Direct<Object> d = (Mapper.Direct<Object>) mapper;
+            d.toJson(instance, out);
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Mapper<Object> m = (Mapper<Object>) mapper;
+        writeJson(out, m.toMap(instance));
+    }
+
     static void writeJson(StringBuilder sb, Object value) {
         if (value == null) {
             sb.append("null");

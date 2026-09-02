@@ -393,8 +393,13 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             boolean firstProp = true;
             for (MappedField f : mc.fields) {
                 if (!f.includeInJson) continue;
+                // jsonEscape THEN escape: the inner one makes the key valid JSON, the
+                // outer one makes it a valid Java literal. escape() alone only did the
+                // second, so a @JsonProperty containing a quote compiled fine and then
+                // emitted "a"b" -- unparseable, where the map path escapes it properly
+                // because JSONWriter writes the key through writeString.
                 sb.append("        out.append(\"").append(firstProp ? "" : ",")
-                  .append("\\\"").append(escape(f.jsonName)).append("\\\":\");\n");
+                  .append("\\\"").append(escape(jsonEscape(f.jsonName))).append("\\\":\");\n");
                 emitFieldToJson(sb, f, isRecord);
                 firstProp = false;
             }
@@ -600,14 +605,25 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                   .append(read).append("));\n");
                 return;
             case PROPERTY:
-                sb.append("        com.codename1.mapping.Mappers.appendJsonValue(out, ")
+                // appendJsonRaw, not appendJsonValue. emitFieldToMap puts the value
+                // in the map UNCHANGED, so the old writer renders a Date or a mapped
+                // object through JSONWriter's String.valueOf fallback. appendJsonValue
+                // would render epoch millis and nested JSON instead -- better, and
+                // therefore a silent wire change for every mapper the day it gains a
+                // direct writer.
+                sb.append("        com.codename1.mapping.Mappers.appendJsonRaw(out, ")
                   .append(read).append(".get());\n");
                 return;
             case REFERENCE:
-                // Through the nested type's own mapper, which takes ITS direct
-                // route when it has one, so nesting builds no map either.
-                sb.append("        com.codename1.mapping.Mappers.appendJson(")
-                  .append(read).append(", out);\n");
+                // Looked up by the DECLARED type, exactly as emitFieldToMap does.
+                // appendJson would look up by the instance's RUNTIME class, so a
+                // field declared as a mapped base holding an unmapped subclass found
+                // no mapper and fell back to a quoted toString, where the map path
+                // serialises it as an object. appendJsonUsing still takes the nested
+                // mapper's direct route when it has one, so nesting builds no map.
+                sb.append("        com.codename1.mapping.Mappers.appendJsonUsing(")
+                  .append("com.codename1.mapping.Mappers.get(").append(f.kind.binaryName)
+                  .append(".class), ").append(read).append(", out);\n");
                 return;
             case LIST: case LIST_PROPERTY: {
                 String src = f.kind.kind == PropertyTypeKind.Kind.LIST
@@ -628,20 +644,27 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 sb.append("                for (java.util.Iterator _it = _src.iterator(); _it.hasNext(); ) {\n");
                 sb.append("                    if (!_first) { out.append(','); }\n");
                 sb.append("                    _first = false;\n");
+                // One branch per branch emitFieldToMap has for an element, in the
+                // same order and with the same answer. Anything less specific
+                // diverges: the enum and the mapped-object cases both did.
+                sb.append("                    Object _e = _it.next();\n");
                 if (f.elementIsEnum) {
-                    // name(), not toString(). The map path uses Enum.name() and
-                    // deserialisation matches against the declared constants, so an
-                    // enum that overrides toString() would serialise to something
-                    // that cannot be read back.
-                    sb.append("                    Object _e = _it.next();\n");
-                    sb.append("                    com.codename1.mapping.Mappers.appendJsonValue(out, _e == null ? null : ((")
+                    // name(), not toString(). Deserialisation matches against the
+                    // declared constants, so an enum overriding toString() would
+                    // serialise to something that cannot be read back.
+                    sb.append("                    com.codename1.mapping.Mappers.appendJsonRaw(out, _e == null ? null : ((")
                       .append(f.kind.elementBinaryName).append(") _e).name());\n");
+                } else if (isScalarBinary(f.kind.elementBinaryName)) {
+                    sb.append("                    com.codename1.mapping.Mappers.appendJsonRaw(out, _e);\n");
+                } else if ("java.util.Date".equals(f.kind.elementBinaryName)) {
+                    sb.append("                    com.codename1.mapping.Mappers.appendJsonRaw(out, _e == null ? null : Long.valueOf(((java.util.Date) _e).getTime()));\n");
                 } else {
-                    // Every other element kind already agrees: appendJsonValue maps
-                    // Date to getTime(), scalars and collections to writeJson, and a
-                    // mapped object through its own mapper -- the same three answers
-                    // emitFieldToMap produces.
-                    sb.append("                    com.codename1.mapping.Mappers.appendJsonValue(out, _it.next());\n");
+                    // By the DECLARED element type, as the map path does -- a
+                    // List<Base> holding an unmapped subclass otherwise found no
+                    // mapper by runtime class and fell back to a quoted toString.
+                    sb.append("                    com.codename1.mapping.Mappers.appendJsonUsing(")
+                      .append("com.codename1.mapping.Mappers.get(").append(f.kind.elementBinaryName)
+                      .append(".class), _e, out);\n");
                 }
                 sb.append("                }\n");
                 sb.append("                out.append(']');\n");
@@ -1265,6 +1288,44 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     private static String deriveXmlRoot(String simpleName) {
         if (simpleName.length() == 0) return simpleName;
         return Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
+    }
+
+    /**
+     * JSON-escapes a property name, matching JSONWriter.writeString character for
+     * character (minus the surrounding quotes, which the caller emits).
+     *
+     * Applied at GENERATION time because a jsonName is a compile-time constant --
+     * the direct writer stays a plain literal append with no per-call escaping. It
+     * must be composed with {@link #escape} afterwards, which is the Java-literal
+     * escaper: one makes the JSON valid, the other makes the source compile.
+     */
+    private static String jsonEscape(String s) {
+        if (s == null) return "";
+        StringBuilder b = new StringBuilder(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"':  b.append("\\\""); break;
+                case '\\': b.append("\\\\"); break;
+                case '\n': b.append("\\n"); break;
+                case '\r': b.append("\\r"); break;
+                case '\t': b.append("\\t"); break;
+                case '\b': b.append("\\b"); break;
+                case '\f': b.append("\\f"); break;
+                default:
+                    if (c < 0x20) {
+                        b.append("\\u");
+                        String hex = Integer.toHexString(c);
+                        for (int p = hex.length(); p < 4; p++) {
+                            b.append('0');
+                        }
+                        b.append(hex);
+                    } else {
+                        b.append(c);
+                    }
+            }
+        }
+        return b.toString();
     }
 
     private static String escape(String s) {
