@@ -27,6 +27,7 @@ import com.codename1.continuity.sync.SyncedStoreListener;
 import com.codename1.impl.continuity.LocalContinuityBridge;
 import com.codename1.io.Storage;
 import com.codename1.junit.EdtTest;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.AfterEach;
@@ -64,6 +65,10 @@ public class LocalContinuityTest extends UITestBase {
     public void installBridge() {
         Continuity.reset();
         Storage.getInstance().clearStorage();
+        // The delivery high-water marks are DURABLE now, so they outlive reset() by design --
+        // which is the whole point of them, and which makes them leak from one test into the
+        // next unless each starts from a clean slate.
+        com.codename1.io.Preferences.delete(Continuity.PREF_SEEN);
         bridge = new LocalContinuityBridge();
         Continuity.setBridge(bridge);
         // A running application has a form on screen, and the framework deliberately holds an
@@ -552,6 +557,82 @@ public class LocalContinuityTest extends UITestBase {
         assertEquals(1, r.delivered.size(), "the retained state never reached the relay");
         assertEquals(Long.valueOf(failed), r.delivered.get(0),
                 "a different state was sent, so the failed one was not the one retained");
+    }
+
+    /**
+     * An app that only registers a store listener keeps continuity OFF by design -- a key/value
+     * store is not consent to broadcast a route stack. refreshBridge() tested `enabled` alone, so
+     * the simulator's capability menu, which swaps the bridge and calls it, left the replacement
+     * with no callback and every later "Change the Synced Store" silently did nothing.
+     */
+    @EdtTest
+    public void swappingTheBridgeKeepsASyncOnlyListenerWorking() {
+        SyncedStoreListener l = new SyncedStoreListener() {
+            public void storeChanged() {
+            }
+        };
+        registered.add(l);
+        SyncedStore.addChangeListener(l);
+        assertFalse(Continuity.isEnabled(), "a store listener must not turn continuity on");
+
+        // What the simulator's capability menu does.
+        CountingStoreBridge swapped = new CountingStoreBridge();
+        Continuity.setBridge(swapped);
+        Continuity.refreshBridge();
+
+        assertTrue(swapped.callbackInstalls() > 0,
+                "the replacement bridge got no callback, so a change on another device can no "
+                        + "longer reach the listener");
+    }
+
+    /**
+     * Every device's mark has to survive a restart, not just one. An earlier shape reconstructed a
+     * single id from the stored checkpoint, so a second foreign device -- or any foreign device
+     * once a local navigation had overwritten the checkpoint -- was delivered and acted on again.
+     */
+    @EdtTest
+    public void everyDevicesHighWaterMarkSurvivesARestart() {
+        Continuity.enable();
+        AppState fromA = foreign("device-a", 4);
+        AppState fromB = foreign("device-b", 9);
+        bridge.simulateArrival(Continuity.getActivityType(), StateCodec.toMap(fromA));
+        bridge.simulateArrival(Continuity.getActivityType(), StateCodec.toMap(fromB));
+        // This device then navigates, so the stored checkpoint is OUR state and carries neither id.
+        Continuity.checkpoint();
+
+        Continuity.reset();
+        Continuity.setBridge(bridge);
+        Continuity.enable();
+
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+        Continuity.deliver(fromA);
+        Continuity.deliver(fromB);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+        assertEquals(0, seen[0],
+                "a device's mark was lost across the restart, so its state was acted on twice");
+    }
+
+    /** A foreign state, ready to deliver. */
+    private static AppState foreign(String device, long sequence) {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("k", "v");
+        return new AppState().setPayload(payload).setDeviceId(device).setSequence(sequence)
+                .setTimestamp(System.currentTimeMillis());
     }
 
     /**

@@ -415,8 +415,23 @@ class MacNativeBuilder {
         String ubiquityKvStore = request.getArg(
                 "ios.entitlements.com.apple.developer.ubiquity-kvstore-identifier", null);
         if (ubiquityKvStore != null && ubiquityKvStore.trim().length() > 0) {
+            // MATERIALIZED, not copied. $(CFBundleIdentifier) is target-relative and this is not
+            // the iOS target: DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER makes the Catalyst
+            // bundle id "<package>.maccatalyst" -- the same derivation the provisioning-profile
+            // block above already relies on -- so copying the expression verbatim signed this
+            // slice for TEAM.<package>.maccatalyst while the iOS slice used TEAM.<package>. Two
+            // containers, neither able to see the other's writes, which is precisely the failure
+            // this entry was added to prevent.
+            //
+            // $(TeamIdentifierPrefix) is left alone: it is the same team in both targets.
+            String container = ubiquityKvStore.trim();
+            String iosBundleId = request.getPackageName();
+            if (iosBundleId != null && iosBundleId.length() > 0) {
+                container = container.replace("$(CFBundleIdentifier)", iosBundleId)
+                        .replace("$(PRODUCT_BUNDLE_IDENTIFIER)", iosBundleId);
+            }
             sb.append("    <key>com.apple.developer.ubiquity-kvstore-identifier</key>\n    <string>")
-                    .append(escapeEntitlementValue(ubiquityKvStore.trim()))
+                    .append(escapeEntitlementValue(container))
                     .append("</string>\n");
         }
         if (extra != null && extra.trim().length() > 0) {

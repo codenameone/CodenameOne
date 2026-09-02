@@ -110,6 +110,17 @@ public final class Continuity {
     /// make every state after a relaunch look older than one the receiver had already seen.
     static final String PREF_SEQUENCE = "CN1$ContinuitySeq";
 
+    /// Where the per-device delivery high-water marks live between runs.
+    static final String PREF_SEEN = "CN1$ContinuitySeen";
+
+    /// How many devices' marks are kept.
+    ///
+    /// A user has a handful of devices, but the ids come off a relay and nothing stops one from
+    /// feeding many, so this is bounded. When it overflows the LOWEST sequences go: those are the
+    /// devices that have been quiet longest, and losing a mark costs one duplicate delivery rather
+    /// than anything durable.
+    private static final int MAX_SEEN = 64;
+
     /// How long to wait for the application to produce its first form before giving up on a
     /// continuation that cold-launched it. A launch that never produces one is a broken
     /// application, and restoring minutes later into whatever the user is doing by then is worse
@@ -148,6 +159,10 @@ public final class Continuity {
     /// True while an inbound state is being applied, so the navigation it causes is not mistaken
     /// for the user moving and republished. Guarded by STATE_LOCK.
     private static boolean applyingRestore;
+
+    /// True once a synced-store listener has asked for the inbound seam, independently of
+    /// `enabled`. Guarded by STATE_LOCK.
+    private static boolean storeCallbackInstalled;
     private static String title;
     private static long sequence;
     private static long maxAge;
@@ -231,19 +246,24 @@ public final class Continuity {
             // Published LAST, under the same hold as the state a checkpoint needs.
             enabled = true;
         }
-        // Seeded from what is already on disk, because `lastSeen` is process-local and a restart
-        // emptied it: the next poll -- automatic on an Android resume -- accepted the same
-        // (device, sequence) again and restored a foreign state a second time, prompting the user
-        // on every launch. The stored checkpoint carries the id and sequence of whatever was last
-        // ACTED on, including a state restored from another device, so it is exactly the
-        // high-water mark to start from. Read outside the lock; it touches Storage.
-        AppState acted = readStored();
-        if (acted != null && acted.getDeviceId() != null && acted.getDeviceId().length() > 0
-                && !acted.getDeviceId().equals(id)) {
+        // Restored from disk, because `lastSeen` is process-local: a relaunch emptied it and the
+        // next poll -- automatic on an Android resume -- accepted the same (device, sequence)
+        // again and restored a foreign state a second time, prompting the user on every launch
+        // against a documented guarantee that an acted-on state acts once.
+        //
+        // EVERY device's mark, not one reconstructed from the stored checkpoint. That earlier
+        // shape recovered at most a single id and recovered none at all once a local navigation
+        // had overwritten the checkpoint with this device's own state -- so a duplicate from any
+        // other device still arrived and still restored. Read outside the lock; it touches
+        // Preferences.
+        Map<String, Long> restored = readSeen();
+        if (!restored.isEmpty()) {
             synchronized (STATE_LOCK) {
-                Long seen = lastSeen.get(acted.getDeviceId());
-                if (seen == null || seen.longValue() < acted.getSequence()) {
-                    lastSeen.put(acted.getDeviceId(), Long.valueOf(acted.getSequence()));
+                for (Map.Entry<String, Long> e : restored.entrySet()) {
+                    Long have = lastSeen.get(e.getKey());
+                    if (have == null || have.longValue() < e.getValue().longValue()) {
+                        lastSeen.put(e.getKey(), e.getValue());
+                    }
                 }
             }
         }
@@ -592,15 +612,28 @@ public final class Continuity {
     }
 
     private static void checkpointOnEdt() {
+        long era;
         synchronized (STATE_LOCK) {
             if (!enabled) {
                 return;
             }
             dirty = false;
+            era = accountEra;
         }
         AppState state = capture();
         if (state == null) {
             return;
+        }
+        synchronized (STATE_LOCK) {
+            if (era != accountEra) {
+                // clear() ran while this snapshot was being built, and building it is not quick --
+                // it calls the application's own saveState(). The state was not in pendingPublish
+                // yet, so clear() could neither drop it nor stamp it with the old era: persisting
+                // would recreate the storage clear() had just deleted, publishContinuation would
+                // re-advertise the signed-out account's work to the devices around it, and the
+                // relay publish would go out under the NEXT account's credentials.
+                return;
+            }
         }
         persist(state);
         publishContinuation(state);
@@ -839,6 +872,11 @@ public final class Continuity {
             // write that records where the user now is, and without this a cold start would come
             // back to the position that preceded the restore.
             persist(state);
+            // And recorded as acted on. deliver() is not the only way a state gets applied: an
+            // application may hand one to restore() itself, from its own transport or from
+            // getRestorableState(). Marking only the arrival path meant a relaunch re-delivered
+            // the very state the user was already looking at.
+            noteActedOn(state);
         }
         return shown;
     }
@@ -999,6 +1037,10 @@ public final class Continuity {
             lastSeen.clear();
             deliveryEra++;
         }
+        // The durable copy as well. Leaving it behind meant the marks of the account that just
+        // signed out kept suppressing the NEXT account's deliveries -- a state silently never
+        // arriving, which is harder to notice than one arriving twice.
+        rememberSeen();
         clearContinuation();
         try {
             if (Display.isInitialized() && Storage.getInstance().exists(STORAGE_KEY)) {
@@ -1338,6 +1380,8 @@ public final class Continuity {
             lastSeen.put(state.getDeviceId(), Long.valueOf(state.getSequence()));
             era = deliveryEra;
         }
+        // Durable, so the mark survives the relaunch. Outside the lock: it touches Preferences.
+        rememberSeen();
         if (!Display.isInitialized()) {
             if (stillDeliverable(state, era)) {
                 setParked(state);
@@ -1488,6 +1532,103 @@ public final class Continuity {
         }
     }
 
+    /// Records that `state` has been acted on, durably.
+    private static void noteActedOn(AppState state) {
+        String from = state.getDeviceId();
+        if (from == null || from.length() == 0 || from.equals(getDeviceId())) {
+            // Our own work needs no mark: deliver() drops an echo on the device id alone.
+            return;
+        }
+        boolean changed;
+        synchronized (STATE_LOCK) {
+            Long seen = lastSeen.get(from);
+            changed = seen == null || seen.longValue() < state.getSequence();
+            if (changed) {
+                lastSeen.put(from, Long.valueOf(state.getSequence()));
+            }
+        }
+        if (changed) {
+            rememberSeen();
+        }
+    }
+
+    /// Reads the persisted high-water marks. Never null.
+    private static Map<String, Long> readSeen() {
+        Map<String, Long> out = new HashMap<String, Long>();
+        try {
+            String raw = Preferences.get(PREF_SEEN, "");
+            if (raw == null || raw.length() == 0) {
+                return out;
+            }
+            // "id|seq;id|seq". A device id is a UUID or a "cn1-" fallback, so neither separator
+            // can occur inside one -- and a malformed entry is skipped rather than throwing,
+            // because a corrupt preference must cost a duplicate delivery and not a launch.
+            int from = 0;
+            while (from < raw.length()) {
+                int end = raw.indexOf(';', from);
+                String entry = end < 0 ? raw.substring(from) : raw.substring(from, end);
+                int bar = entry.indexOf('|');
+                if (bar > 0 && bar < entry.length() - 1) {
+                    try {
+                        out.put(entry.substring(0, bar),
+                                Long.valueOf(Long.parseLong(entry.substring(bar + 1))));
+                    } catch (NumberFormatException ignored) {
+                        // Skipped, as above.
+                    }
+                }
+                if (end < 0) {
+                    break;
+                }
+                from = end + 1;
+            }
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+        return out;
+    }
+
+    /// Writes the high-water marks, trimmed to MAX_SEEN.
+    ///
+    /// Called after a delivery is accepted, which is rare -- it takes another device publishing --
+    /// so this is not on any hot path.
+    private static void rememberSeen() {
+        Map<String, Long> copy;
+        synchronized (STATE_LOCK) {
+            copy = new HashMap<String, Long>(lastSeen);
+        }
+        while (copy.size() > MAX_SEEN) {
+            String lowest = null;
+            long lowestSeq = Long.MAX_VALUE;
+            for (Map.Entry<String, Long> e : copy.entrySet()) {
+                if (e.getValue().longValue() < lowestSeq) {
+                    lowestSeq = e.getValue().longValue();
+                    lowest = e.getKey();
+                }
+            }
+            if (lowest == null) {
+                break;
+            }
+            copy.remove(lowest);
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, Long> e : copy.entrySet()) {
+            if (sb.length() > 0) {
+                sb.append(';');
+            }
+            sb.append(e.getKey()).append('|').append(e.getValue().longValue());
+        }
+        // ONLY the write is guarded. Iterating a generic map compiles to checkcasts, and a
+        // catch(Throwable) around them is a handler ParparVM never runs -- its CHECKCAST expands
+        // to nothing, so a failed cast hands the wrong object to the next instruction and crashes
+        // natively instead. check-cast-semantics.sh refuses the shape, correctly: the only thing
+        // here that can actually fail is the preference write.
+        try {
+            Preferences.set(PREF_SEEN, sb.toString());
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
     private static long loadSequence() {
         try {
             return Preferences.get(PREF_SEQUENCE, (long) 0);
@@ -1546,6 +1687,9 @@ public final class Continuity {
     /// The store's own notification does not go through `enabled` (see Callback.syncedStoreChanged),
     /// which is what lets the listener work with continuity still off.
     public static void installSyncedStoreCallback() {
+        synchronized (STATE_LOCK) {
+            storeCallbackInstalled = true;
+        }
         ContinuityBridge b = bridgeInternal();
         if (b == null) {
             return;
@@ -1561,7 +1705,18 @@ public final class Continuity {
     /// returns. Called by a port that swaps its bridge while the app is running, which only the
     /// simulator does -- a device's bridge is created once and lives as long as the process.
     public static void refreshBridge() {
-        if (!enabled) {
+        boolean wanted;
+        synchronized (STATE_LOCK) {
+            // OR the store's own flag, not `enabled` alone. An application that only registers a
+            // SyncedStore listener deliberately leaves continuity off -- a key/value store is not
+            // consent to broadcast a route stack -- so testing `enabled` here meant the
+            // simulator's capability menu, which swaps the bridge and calls this, left the
+            // replacement with no callback at all and every later "Change the Synced Store" item
+            // silently did nothing. That is the documented sync-only workflow breaking on the
+            // first use of an unrelated menu item.
+            wanted = enabled || storeCallbackInstalled;
+        }
+        if (!wanted) {
             return;
         }
         ContinuityBridge b = bridgeInternal();
@@ -1615,6 +1770,7 @@ public final class Continuity {
             dirty = false;
             waitingForWindow = false;
             applyingRestore = false;
+            storeCallbackInstalled = false;
         }
         synchronized (STATE_LOCK) {
             pendingPublish = null;

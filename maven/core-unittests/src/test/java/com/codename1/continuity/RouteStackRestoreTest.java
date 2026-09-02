@@ -83,6 +83,10 @@ class RouteStackRestoreTest extends UITestBase {
     void resetFramework() {
         Continuity.reset();
         Storage.getInstance().clearStorage();
+        // The delivery high-water marks are DURABLE now, so they outlive reset() by design --
+        // which is the whole point of them, and which makes them leak from one test into the
+        // next unless each starts from a clean slate.
+        com.codename1.io.Preferences.delete(Continuity.PREF_SEEN);
         Continuity.setBridge(new LocalContinuityBridge());
         Navigation.setDispatcher(null);
         new Form("start").show();

@@ -54,6 +54,7 @@ class MacNativeBuilderEntitlementsTest {
         req.setMainClass("MyApp");
         req.putArgument("macNative.enabled", "true");
         req.putArgument("macNative.distribution", "developerID");
+        req.setPackageName("com.example.app");
         // What IPhoneBuilder puts there when the app references com.codename1.continuity.sync.
         req.putArgument("ios.entitlements.com.apple.developer.ubiquity-kvstore-identifier",
                 "$(TeamIdentifierPrefix)$(CFBundleIdentifier)");
@@ -62,8 +63,14 @@ class MacNativeBuilderEntitlementsTest {
 
         assertTrue(body.contains("<key>com.apple.developer.ubiquity-kvstore-identifier</key>"),
                 "the Mac slice was signed without the key-value store entitlement: " + body);
-        assertTrue(body.contains("$(TeamIdentifierPrefix)$(CFBundleIdentifier)"),
-                "the container the iOS side resolved did not reach the Mac slice: " + body);
+        // MATERIALIZED. $(CFBundleIdentifier) is target-relative and the Catalyst target derives
+        // "<package>.maccatalyst", so leaving the expression in signed this slice for a DIFFERENT
+        // container than iOS -- the very failure this entitlement exists to prevent.
+        assertFalse(body.contains("$(CFBundleIdentifier)"),
+                "the Catalyst slice re-evaluates the iOS bundle id, so it signs for "
+                        + "<package>.maccatalyst instead: " + body);
+        assertTrue(body.contains("$(TeamIdentifierPrefix)com.example.app"),
+                "the iOS container did not reach the Mac slice: " + body);
     }
 
     /** An app that never references the sync package pays nothing on the Mac slice either. */
