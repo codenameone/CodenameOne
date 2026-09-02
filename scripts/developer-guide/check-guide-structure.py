@@ -30,7 +30,10 @@ from pathlib import Path
 ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
 INCLUDE_RE = re.compile(r"^include::([^\[]+)\[([^\]]*)\]\s*$")
 HEADING_RE = re.compile(r"^(=+) +(\S.*)$")
-FENCE_RE = re.compile(r"^(----|\.\.\.\.|````|\*\*\*\*|\+\+\+\+)\s*$")
+# Literal-content blocks only. The container delimiters -- ==== example,
+# **** sidebar, ____ quote -- hold ordinary AsciiDoc, so an include or a heading
+# inside one is real and must not be skipped.
+FENCE_RE = re.compile(r"^(----|\.\.\.\.|````|\+\+\+\+)\s*$")
 # Inline AsciiDoc markup that never survives into the rendered heading text.
 INLINE_MARKUP_RE = re.compile(r"[`*_#]|\[\[[^\]]*\]\]|\[[^\]]*\]")
 

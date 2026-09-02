@@ -26,7 +26,11 @@ import sys
 from pathlib import Path
 
 ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
-FENCE_RE = re.compile(r"^(----|\.\.\.\.|````|\*\*\*\*|\+\+\+\+|====|____)\s*$")
+# Only blocks whose CONTENT is literal: listing, literal, fenced code and
+# passthrough. The container delimiters -- ==== example, **** sidebar, ____ quote
+# -- hold ordinary prose, and skipping them hid six real holes in basics.asciidoc
+# alone, among them the setSameWidth example this check was written to find.
+FENCE_RE = re.compile(r"^(----|\.\.\.\.|````|\+\+\+\+)\s*$")
 # Lines that end in a colon without promising a listing: headings, attributes,
 # comments, block titles, list markers, table cells and block delimiters.
 NON_PROSE_PREFIX = ("//", "|", "=", ".", ":", "*", "-", "+", "[", "<")
