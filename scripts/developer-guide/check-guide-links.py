@@ -141,6 +141,10 @@ def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
     """
     if target in known:
         return True
+    if target.startswith(GENERATED_PREFIXES) or target + "/" in GENERATED_PREFIXES:
+        # Reachable both directly and by following a redirect into it, so the
+        # test belongs here rather than only at the call site.
+        return True
     if depth > 4:  # a redirect loop in the table should not hang the check
         return False
     for compiled, names, destination in rules:
@@ -163,7 +167,9 @@ def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
 def site_paths(repo_root: Path) -> tuple[set[str], list]:
     """Every path the website is known to answer on, derived rather than listed.
 
-    Returns the literal paths and the patterns for the wildcard redirect rules.
+    Returns the literal paths and every redirect rule, each as a matcher, its
+    capture names and its destination, so a link can be followed rather than
+    accepted for merely matching.
     """
     paths: set[str] = set()
     patterns: list = []
@@ -174,12 +180,18 @@ def site_paths(repo_root: Path) -> tuple[set[str], list]:
             parts = line.split()
             if not parts or parts[0].startswith("#"):
                 continue
+            destination = parts[1] if len(parts) > 1 else ""
             compiled = redirect_pattern(parts[0])
             if compiled is not None:
-                destination = parts[1] if len(parts) > 1 else ""
                 patterns.append((compiled[0], compiled[1], destination))
             else:
-                paths.add(normalize_path(parts[0]))
+                # A literal source is not a served route either -- it is a rule,
+                # and a rule pointing at a page that was deleted redirects the
+                # reader to a 404. Follow it like any other, rather than treating
+                # the fact that a rule exists as proof the link works.
+                patterns.append(
+                    (re.compile("^" + re.escape(normalize_path(parts[0])) + "/?$"), [], destination)
+                )
             # Only the SOURCE counts. A rule whose destination was deleted still
             # sits in this file, so trusting destinations would accept a guide
             # link to a page that no longer exists.
@@ -254,8 +266,6 @@ def findings_for(path: Path, known: set[str], patterns: list) -> list[tuple[str,
                 out.append((url, "plain http, not https"))
             if host in SITE_HOSTS:
                 target = split.path.rstrip("/") or "/"
-                if target.startswith(GENERATED_PREFIXES) or target + "/" in GENERATED_PREFIXES:
-                    continue
                 if not resolves(target, known, patterns):
                     out.append((url, "the website serves no such path (checked _redirects and the content tree)"))
     return out
@@ -356,7 +366,7 @@ def main() -> int:
 
     print(
         f"Links: {len(current)} known bad link(s) against {len(known)} known site paths "
-        f"and {len(patterns)} wildcard rule(s); none new, none stale."
+        f"and {len(patterns)} redirect rule(s); none new, none stale."
     )
     return 0
 
