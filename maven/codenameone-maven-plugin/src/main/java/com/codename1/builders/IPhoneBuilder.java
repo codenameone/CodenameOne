@@ -2673,6 +2673,17 @@ public class IPhoneBuilder extends Executor {
                     // State restoration and continuity (com.codename1.continuity.*). Gated on
                     // actual usage so the CN1_USE_CONTINUITY natives and the NSUserActivityTypes
                     // entry are only added for apps that hand work between devices.
+                    //
+                    // A cn1lib needs no separate pass, and must not get one. CN1BuildMojo merges
+                    // every compile-classpath element into one jar-with-dependencies and submits
+                    // that as dist.jar (blacklisting only codenameone-core and java-runtime), so
+                    // library code reaches the server already indistinguishable from the app's
+                    // own and is walked by this scan. Folding buildinRes in the way the call/VPN
+                    // pair does would also be actively wrong here: Navigation calls
+                    // Continuity.routeStackChanged, so the framework's own classes name this
+                    // package, and LibraryClassPrefixScan only filters classes INSIDE the scanned
+                    // prefix -- it would report usage for every app ever built and demand an
+                    // iCloud entitlement that fails codesigning wherever the App ID lacks it.
                     if (!usesContinuity && cls.indexOf("com/codename1/continuity/") == 0) {
                         usesContinuity = true;
                     }
