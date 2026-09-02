@@ -61,8 +61,16 @@ public class UIManager {
     /// Volatile because getInstance() reads it twice around a lock (a plain field
     /// makes that double-checked lock unsafe) and because the constructor publishes
     /// this instance before it has finished running: without it, another thread can
-    /// see the reference while the fields written below it are still unset.
-    static volatile UIManager instance;
+    /// see the reference while the fields written below it are still unset. Ordering
+    /// the constructor's assignments is not enough on its own -- with no
+    /// happens-before edge, a thread that sees the reference is still allowed to see
+    /// the fields as unwritten, which is the null look and feel this fixes.
+    ///
+    /// AvoidUsingVolatile is suppressed rather than worked around: it is a blanket
+    /// style rule, and a double-checked lock is the case the modifier exists for.
+    /// The alternative that needs no modifier is publishing after the constructor
+    /// finishes, and the comment on the constructor says why that is not safe here.
+    static volatile UIManager instance; //NOPMD AvoidUsingVolatile
     /// This member is used by the resource editor
     static boolean accessible = true;
     /// This member is used by the resource editor
