@@ -3449,6 +3449,13 @@ public class Window extends Container implements TopLevelContainer {
         // and emptying the list then would erase the replacement gesture's pending
         // component rather than this one's.
         if (wheeling && currentPointerPress == releasing) { //NOPMD CompareObjectsWithEquals
+            // Emptied rather than released, unlike Form's equivalent, and deliberately: a
+            // wheel gesture cannot leave a ReleasableComponent looking pressed, so there is
+            // no pressed look to undo. Button reaches its pressed state only through
+            // pressed(), which returns early while isScrollWheeling, and Switch implements
+            // setReleased() as a no-op. Form calls setReleased because its path also serves
+            // ordinary gestures; this one serves only the wheel.
+            //
             // Nothing pressed by a wheel gesture is ever released: the release above went
             // to the scrolling container or nowhere at all, and it is Button's own
             // pointerReleased that takes it off this list. A stale entry makes the NEXT
