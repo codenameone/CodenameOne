@@ -639,6 +639,14 @@ public final class Continuity {
         if (r == null || !enabled || !Display.isInitialized()) {
             return;
         }
+        // Anything owed goes out first. This is the natural moment for it -- the application
+        // calls this when it reconnects, and Android calls it on resume -- and without it a state
+        // retained after a failed send had no way back onto the wire.
+        startPublisher();
+        final long era;
+        synchronized (PUBLISH_LOCK) {
+            era = accountEra;
+        }
         Display.getInstance().startThread(new Runnable() {
             @Override
             public void run() {
@@ -649,9 +657,20 @@ public final class Continuity {
                     Log.e(t);
                     return;
                 }
-                if (fetched != null) {
-                    deliver(fetched);
+                if (fetched == null) {
+                    return;
                 }
+                synchronized (PUBLISH_LOCK) {
+                    if (era != accountEra) {
+                        // The user signed out while this request was in flight. Delivering now
+                        // would restore the PREVIOUS account's work into the session that is
+                        // signed in -- and clear() emptied lastSeen, so nothing downstream would
+                        // recognize it as stale. Publishing has had this check; polling is the
+                        // direction that actually puts the old account's work on screen.
+                        return;
+                    }
+                }
+                deliver(fetched);
             }
         }, "Continuity relay poll").start();
     }
@@ -681,7 +700,7 @@ public final class Continuity {
             // The one thing this cannot recall is a request already on the wire. Nothing in this
             // process can; what it can do is make sure nothing follows it.
             pendingPublish = null;
-            publishEra++;
+            accountEra++;
         }
         lastSeen.clear();
         clearContinuation();
@@ -796,10 +815,13 @@ public final class Continuity {
     /// True while the single publisher thread is alive. Guarded by PUBLISH_LOCK.
     private static boolean publishing;
 
-    /// Bumped by `clear()`. A publisher compares it either side of a request and stands down when
-    /// it moved, which is what stops one account's state reaching the relay under the next
-    /// account's credentials. Guarded by PUBLISH_LOCK.
-    private static long publishEra;
+    /// Which signed-in session the relay work belongs to, bumped by `clear()`.
+    ///
+    /// Both directions need it. A publisher reads it with the state it dequeues, so a state taken
+    /// before a logout is not sent after one; and a poll reads it before it asks, so a result that
+    /// was already in flight when the user signed out is not delivered into the next account's
+    /// session. Guarded by PUBLISH_LOCK.
+    private static long accountEra;
 
     private static final Object PUBLISH_LOCK = new Object();
 
@@ -815,7 +837,28 @@ public final class Continuity {
         }
         synchronized (PUBLISH_LOCK) {
             pendingPublish = state;
-            if (publishing) {
+        }
+        startPublisher();
+    }
+
+    /// Starts the single publisher, if there is work and nobody is doing it.
+    ///
+    /// Separate from `publishToRelay` because a checkpoint is not the only thing that should
+    /// start one. A state retained after a failed send would otherwise sit in the queue forever:
+    /// the only caller was `checkpoint()`, and a checkpoint OVERWRITES the pending slot with its
+    /// own newer state before starting anything -- so the retained one could never be sent, and
+    /// keeping it was an empty gesture. `pollRelay()` calls this too, which gives it a real
+    /// second chance at the moment an application already reconnects.
+    ///
+    /// The stand-down inside the worker re-reads the pending slot under the same lock, so a
+    /// state queued between these two lock holds is either seen by the live worker or starts a
+    /// new one -- never dropped between them.
+    private static void startPublisher() {
+        if (relay == null || !Display.isInitialized()) {
+            return;
+        }
+        synchronized (PUBLISH_LOCK) {
+            if (publishing || pendingPublish == null) {
                 // The live publisher will pick this up when it finishes its current request,
                 // which is what makes the ordering total.
                 return;
@@ -845,24 +888,34 @@ public final class Continuity {
                                 return;
                             }
                             pendingPublish = null;
-                            era = publishEra;
+                            era = accountEra;
                         }
                         try {
                             r.publish(next);
                         } catch (Throwable t) {
-                            // Logged and dropped. The state is already in storage, and the next
-                            // checkpoint carries a superset of it, so retrying this one would put
-                            // an older state on the wire after a newer one.
                             Log.e(t);
-                        }
-                        synchronized (PUBLISH_LOCK) {
-                            if (era != publishEra) {
-                                // clear() ran while that request was in flight. Whatever is
-                                // queued now belongs to a session this thread is not part of.
-                                publishing = false;
-                                return;
+                            // Kept, not dropped -- StateRelay.publish documents that the framework
+                            // holds a failed state for the next attempt, and dropping it meant the
+                            // last checkpoint before the network went away never reached the other
+                            // device at all.
+                            //
+                            // Put back only when nothing newer is queued, and only for the session
+                            // it belongs to. Standing down afterwards rather than retrying in a
+                            // loop: the next checkpoint starts a publisher and sends it, which is
+                            // one attempt per change instead of a spin against a dead endpoint.
+                            synchronized (PUBLISH_LOCK) {
+                                if (era == accountEra && pendingPublish == null) {
+                                    pendingPublish = next;
+                                    publishing = false;
+                                    return;
+                                }
                             }
                         }
+                        // No era check here, deliberately. clear() empties the queue, so anything
+                        // present now was queued by the session that is signed in NOW and has to
+                        // be sent. An earlier version stood down on an era change and stranded
+                        // exactly that state until some later checkpoint happened to restart the
+                        // worker.
                     }
                 } catch (Throwable fatal) {
                     // Nothing above is expected to throw -- the publish is already guarded -- but

@@ -509,6 +509,104 @@ public class LocalContinuityTest extends UITestBase {
                 "the newest checkpoint has to be the relay's final value");
     }
 
+    /**
+     * StateRelay.publish documents that a failed state is kept for the next attempt. Dropping it
+     * meant the last checkpoint before the network went away -- the one most worth having --
+     * never reached the other device at all.
+     */
+    @EdtTest
+    public void aFailedPublishKeepsTheStateForTheNextAttempt() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        FailingThenWorkingRelay r = new FailingThenWorkingRelay();
+        Continuity.setRelay(r);
+
+        Continuity.checkpoint();
+        long failed = Continuity.getRestorableState().getSequence();
+        r.awaitAttempts(1);
+        assertEquals(0, r.delivered.size(), "the first attempt was supposed to fail");
+
+        // Deliberately NOT another checkpoint. A checkpoint overwrites the pending slot with its
+        // own newer state, so asserting after one proves only that the SECOND state was sent --
+        // which happens whether or not the first was retained. That is what an earlier version of
+        // this test did, and it passed with the retention removed. pollRelay is the reconnect an
+        // application actually makes, and it is what has to send what is owed.
+        //
+        // Polled in a loop rather than once: awaitAttempts returns when publish() is ENTERED, so
+        // the worker may not have finished re-queuing and standing down yet, and a single poll
+        // arriving in that window sees publishing==true and correctly does nothing. A reconnect
+        // that happens twice is what an application does anyway.
+        r.fail = false;
+        long deadline = System.currentTimeMillis() + 3000L;
+        while (r.delivered.isEmpty() && System.currentTimeMillis() < deadline) {
+            Continuity.pollRelay();
+            try {
+                Thread.sleep(40);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+
+        assertEquals(1, r.delivered.size(), "the retained state never reached the relay");
+        assertEquals(Long.valueOf(failed), r.delivered.get(0),
+                "a different state was sent, so the failed one was not the one retained");
+    }
+
+    /** Fails every publish until `fail` is cleared, and records what got through. */
+    static class FailingThenWorkingRelay implements StateRelay {
+        volatile boolean fail = true;
+        final List<Long> delivered =
+                java.util.Collections.synchronizedList(new ArrayList<Long>());
+        private final java.util.concurrent.atomic.AtomicInteger attempts =
+                new java.util.concurrent.atomic.AtomicInteger();
+
+        public void publish(AppState state) throws java.io.IOException {
+            attempts.incrementAndGet();
+            if (fail) {
+                throw new java.io.IOException("no network");
+            }
+            delivered.add(Long.valueOf(state.getSequence()));
+        }
+
+        public AppState fetch() {
+            return null;
+        }
+
+        void awaitAttempts(int n) {
+            await(new Condition() {
+                public boolean met() {
+                    return attempts.get() >= n;
+                }
+            });
+        }
+
+        void awaitDelivered(int n) {
+            await(new Condition() {
+                public boolean met() {
+                    return delivered.size() >= n;
+                }
+            });
+        }
+
+        private void await(Condition c) {
+            long deadline = System.currentTimeMillis() + 1500L;
+            while (System.currentTimeMillis() < deadline && !c.met()) {
+                try {
+                    Thread.sleep(25);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+
+        interface Condition {
+            boolean met();
+        }
+    }
+
     /** Records the sequence of everything the relay is handed, slowly enough to overlap. */
     static class OrderRecordingRelay implements StateRelay {
         final List<Long> published =

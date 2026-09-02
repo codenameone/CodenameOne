@@ -44,8 +44,10 @@ public interface StateRelay {
     ///
     /// #### Throws
     ///
-    /// - `java.io.IOException`: when the send failed; the framework logs it and keeps the state
-    ///   for the next attempt
+    /// - `java.io.IOException`: when the send failed. The framework logs it and keeps the state,
+    ///   which the next checkpoint's publisher sends -- unless a newer state has superseded it by
+    ///   then, or the user signed out in between. It is not retried on a timer: one attempt per
+    ///   change beats spinning against an endpoint that is down.
     void publish(AppState state) throws IOException;
 
     /// Asks for the newest state this user has on any device. Returning this device's own most
