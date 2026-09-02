@@ -1112,12 +1112,10 @@ static void cn1FreeThreadStack(struct elementStruct* stack, int mapped) {
 // char per byte. (On Windows the value is in the ACTIVE CODE PAGE rather than
 // UTF-8, so it needs _wgetenv before any decoding is meaningful -- the same unfixed
 // issue recorded against the file layer below, and the same remedy.)
-JAVA_OBJECT java_lang_System_getenv___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
+/* Renamed from getenv: the null and embedded-NUL checks moved to the Java side,
+   where they are one line each, so this is now the raw lookup. */
+JAVA_OBJECT java_lang_System_getenvImpl___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
     if(name == JAVA_NULL) {
-        /* The API specifies NullPointerException for a null name. Returning null made
-           an invalid argument indistinguishable from an unset variable, so a caller
-           with a null name silently took the "not set" branch. */
-        throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData));
         return JAVA_NULL;
     }
     const char* key = stringToUTF8(threadStateData, name);

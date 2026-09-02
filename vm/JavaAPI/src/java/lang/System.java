@@ -195,8 +195,32 @@ public final class System {
      * process gets before it parses its own arguments, so a server-side
      * translated binary needs this to find, for example, the endpoint its host
      * runtime published to it.
+     *
+     * A name containing a NUL is answered null rather than passed down. The
+     * native side converts to a C string, where a NUL ends it, so
+     * "PATH\u0000suffix" would otherwise be looked up as "PATH" and return that
+     * variable's value -- a silent answer about a DIFFERENT variable, which is
+     * worse than reporting the name unset.
+     *
+     * Deliberately NOT IllegalArgumentException for an empty name or one holding
+     * '='. Neither this contract nor java.lang.System's declares that exception;
+     * the validation that throws it belongs to ProcessBuilder's environment
+     * mutation, not to a lookup. Such names simply name nothing, and null is
+     * exactly what "not set" means.
+     *
+     * @throws NullPointerException if name is null
      */
-    public static native java.lang.String getenv(java.lang.String name);
+    public static java.lang.String getenv(java.lang.String name) {
+        if(name == null) {
+            throw new NullPointerException();
+        }
+        if(name.indexOf(0) >= 0) {
+            return null;
+        }
+        return getenvImpl(name);
+    }
+
+    private static native java.lang.String getenvImpl(java.lang.String name);
 
     /**
      * Returns the same hashcode for the given object as would be returned by the default method hashCode(), whether or not the given object's class overrides hashCode(). The hashcode for the null reference is zero.
