@@ -477,9 +477,15 @@ static int cn1FileIsAbsolute(const char* p) {
         return 0;
     }
 #ifdef _WIN32
-    /* A UNC path ("\\server\share") and a rooted "\path" both start at a root. */
-    if (p[0] == '/' || p[0] == '\\') {
+    /* ONLY a UNC path ("\\server\share") is fully absolute. A SINGLE leading
+       separator ("\logs\app.txt") is rooted but still drive-relative -- it means
+       that path on whatever drive is current -- so reporting it absolute made
+       getAbsolutePathImpl hand it back unqualified instead of "C:\logs\app.txt". */
+    if ((p[0] == '\\' && p[1] == '\\') || (p[0] == '/' && p[1] == '/')) {
         return 1;
+    }
+    if (p[0] == '\\' || p[0] == '/') {
+        return 0;
     }
     /* "C:\x" or "C:/x". A bare "C:x" is drive-RELATIVE, and is not absolute. */
     return p[1] == ':' && (p[2] == '\\' || p[2] == '/');
@@ -781,6 +787,16 @@ JAVA_OBJECT java_io_File_getAbsolutePathImpl___java_lang_String_R_java_lang_Stri
                 if (snprintf(joined, sizeof(joined), "%s%c%s", buf, CN1_FILE_SEP, p + 2) < (int)sizeof(joined)) {
                     return newStringFromCString(threadStateData, joined);
                 }
+            }
+            return path;
+        }
+        /* Rooted but drive-relative: qualify it with the CURRENT drive rather than
+           joining it to the whole working directory, which would produce
+           "C:\cwd\logs\app.txt" for "\logs\app.txt". */
+        if ((p[0] == '\\' || p[0] == '/') && _getcwd(buf, (int)sizeof(buf)) != NULL
+                && buf[0] != '\0' && buf[1] == ':') {
+            if (snprintf(joined, sizeof(joined), "%c%c%s", buf[0], buf[1], p) < (int)sizeof(joined)) {
+                return newStringFromCString(threadStateData, joined);
             }
             return path;
         }

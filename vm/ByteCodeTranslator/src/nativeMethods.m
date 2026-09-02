@@ -2284,7 +2284,11 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
  *   - the collector cannot stop a compute-only virtual thread at all, which is why
  *     marking such a state active is a hang rather than a fix;
  *   - a virtual thread registered after the collector's once-per-cycle registry
- *     snapshot is invisible to the stack scan until the next cycle.
+ *     snapshot is invisible to the stack scan until the next cycle;
+ *   - past CN1_VT_SNAPSHOT_MAX (4096) registered virtual threads the snapshot is
+ *     truncated, and the collector warns but continues, so the overflow is unscanned.
+ *     Reaching that count needs this API, which is why it is listed here rather than
+ *     fixed in the collector.
  *
  * KNOWN GAP, stated here because the obvious fix is worse than the problem. The
  * state this creates is never marked threadActive while its virtual thread runs,

@@ -29,7 +29,18 @@ package java.io;
  */
 public class FileOutputStream extends OutputStream {
     private long handle;
-    private boolean closed;
+    /* volatile + synchronized close: two threads closing concurrently could both
+       read closed == false and hand the SAME FILE* to fclose twice, which is
+       undefined and crashes the translated process rather than merely erroring.
+       Idempotent now.
+
+       NOT a claim of thread safety. A read racing a close on the same stream can
+       still reach the native call with a handle this method is closing -- the JDK
+       buys that with a lock on every operation, and these streams are not worth
+       that cost. Like most java.io streams they are for one thread at a time; what
+       is guaranteed here is that closing twice, or closing from another thread, is
+       safe rather than fatal. */
+    private volatile boolean closed;
 
     public FileOutputStream(String name) throws FileNotFoundException {
         this(name, false);
@@ -89,7 +100,7 @@ public class FileOutputStream extends OutputStream {
         }
     }
 
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         if(closed) {
             return;
         }
@@ -115,11 +126,15 @@ public class FileOutputStream extends OutputStream {
      * that a close failed.
      */
     protected void finalize() {
-        if(!closed && handle != 0) {
-            closed = true;
-            long h = handle;
-            handle = 0;
-            closeImpl(h);
+        // Same lock as close(): a finalizer running while another thread closes
+        // would otherwise be the two-fclose case this synchronization exists for.
+        synchronized(this) {
+            if(!closed && handle != 0) {
+                closed = true;
+                long h = handle;
+                handle = 0;
+                closeImpl(h);
+            }
         }
     }
 
