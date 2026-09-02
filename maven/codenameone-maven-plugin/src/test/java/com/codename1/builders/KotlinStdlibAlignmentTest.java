@@ -645,6 +645,63 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A declaration written inside quoted prose never executes. An
+     * unrestricted search for {@code def} found one there and recorded it,
+     * overwriting a real binding so a later use read as something else.
+     */
+    @Test
+    public void aDeclarationInsideProseIsNotADeclaration() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = 'com.example:other:1.0'\n"
+                + "    println \"def dep = "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\"\n"
+                + "    implementation(dep)\n");
+        check(out.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "the quoted declaration is ignored, got <<" + out + ">>");
+
+        // A real one directly after it still counts.
+        String real = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    println \"nothing to see\"\n"
+                + "    def dep = 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!'\n"
+                + "    implementation(dep)\n");
+        check("".equals(real), "a real declaration still counts, got <<" + real + ">>");
+    }
+
+    /**
+     * Groovy accepts spaces around a map key's colon, and looking only at the
+     * character immediately after the token missed the key and substituted it
+     * away -- losing the map form and the strict pin inside it.
+     */
+    @Test
+    public void aMapKeyMayBeSpacedFromItsColon() {
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def group = 'org.jetbrains.kotlin'\n"
+                + "    implementation(group : group, name : 'kotlin-stdlib-jdk8', "
+                + "version : '1.7.22') { version { strictly '1.7.22' } }\n");
+        check("".equals(out), "the spaced map form is read, got <<" + out + ">>");
+    }
+
+    /**
+     * With failOnVersionConflict every disagreement is a build failure, and
+     * raising a shim to the floor IS a disagreement -- so the block would turn
+     * a graph that resolved coherently into one that does not resolve at all.
+     * Nothing can be written here that would not conflict, so nothing is.
+     */
+    @Test
+    public void nothingIsWrittenWhenConflictsAreFatal() {
+        String fatal = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    configurations.all { resolutionStrategy.failOnVersionConflict() }\n");
+        check("".equals(fatal), "the block stands down, got <<" + fatal + ">>");
+
+        // The words in a reason are prose, here as everywhere else.
+        String prose = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    implementation('a:b:1.0') "
+                + "{ because 'we do not failOnVersionConflict here' }\n");
+        check(prose.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "prose does not stand it down, got <<" + prose + ">>");
+    }
+
+    /**
      * An unbraced body belongs to the header above it. A resolution rule
      * written that way had the artifact named in the condition and the
      * override in the body, and splitting at the newline left neither

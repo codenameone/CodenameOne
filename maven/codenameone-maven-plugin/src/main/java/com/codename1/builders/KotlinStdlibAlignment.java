@@ -213,6 +213,17 @@ public class KotlinStdlibAlignment {
         if (strictlyPinsBaseStdlibBelowTheFloor(appGradleFragments)) {
             return "";
         }
+        // failOnVersionConflict turns every disagreement into a build failure, and
+        // raising a shim from 1.7.x to the floor IS a disagreement -- so in that mode
+        // the block converts a graph that resolved coherently into
+        // "Conflict found ... between versions 1.8 and 1.7". Nothing here can be
+        // written that would not conflict, so nothing is.
+        String[] active = activeLines(combined(appGradleFragments));
+        for (int i = 0; i < active.length; i++) {
+            if (callsNamed(active[i], "failOnVersionConflict")) {
+                return "";
+            }
+        }
         // The two shims cannot be suppressed independently when the app holds one of
         // them below the merge. Measured: an app pinning the whole family at 1.7.22
         // resolves with no duplicate, and emitting only the surviving sibling raises
@@ -2136,12 +2147,14 @@ public class KotlinStdlibAlignment {
         }
         int i = 0;
         boolean declared = false;
-        int at = statement.indexOf(DEF);
-        if (at >= 0 && (at == 0 || !isIdentifierChar(statement.charAt(at - 1)))
-                && (at + DEF.length() >= statement.length()
-                        || !isIdentifierChar(statement.charAt(at + DEF.length())))) {
+        // Outside literals, like every other question about syntax. An unrestricted
+        // search found `def` inside quoted prose -- println "def dep = '...'" -- and
+        // recorded a declaration that never executes, overwriting the real binding
+        // and making a later use read as something it is not.
+        int at = afterCall(statement, DEF);
+        if (at >= 0) {
             declared = true;
-            i = skipBlanks(statement, at + DEF.length());
+            i = skipBlanks(statement, at);
         } else {
             i = skipBlanks(statement, 0);
             // Past any annotations first. A script field is written
@@ -2364,10 +2377,11 @@ public class KotlinStdlibAlignment {
             // turning `group:` into a quoted string and losing the map form
             // entirely, strict pin and all. Groovy's named arguments are exactly
             // "identifier immediately followed by a colon", which is what this asks.
-            boolean isMapKey = end < statement.length()
-                    && statement.charAt(end) == ':'
-                    && (end + 1 >= statement.length()
-                            || statement.charAt(end + 1) != ':');
+            // The shared test, which skips blanks first: Groovy accepts
+            // `group : group` with spaces around the colon, and looking only at the
+            // character immediately after the token missed the key and substituted
+            // it away again.
+            boolean isMapKey = followedByMapKeyColon(statement, end);
             out.append(literal == null || isMapKey ? token : literal);
             i = end - 1;
         }
