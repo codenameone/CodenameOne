@@ -687,9 +687,19 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                     // By the DECLARED element type, as the map path does -- a
                     // List<Base> holding an unmapped subclass otherwise found no
                     // mapper by runtime class and fell back to a quoted toString.
-                    sb.append("                    com.codename1.mapping.Mappers.appendJsonUsing(")
-                      .append("com.codename1.mapping.Mappers.get(").append(f.kind.elementBinaryName)
-                      .append(".class), _e, out);\n");
+                    //
+                    // The NO-MAPPER case differs between the two paths and must be
+                    // split here. For a reference field emitFieldToMap stores
+                    // _v.toString(), so appendJsonUsing quotes it; for a list element
+                    // it stores _e UNCHANGED, so the writer keeps its JSON type and a
+                    // List<Object> holding 5 must stay [5] rather than becoming ["5"].
+                    // Routing both through appendJsonUsing regressed the list case.
+                    sb.append("                    {\n");
+                    sb.append("                        com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(")
+                      .append(f.kind.elementBinaryName).append(".class);\n");
+                    sb.append("                        if (_nm == null) { com.codename1.mapping.Mappers.appendJsonRaw(out, _e); }\n");
+                    sb.append("                        else { com.codename1.mapping.Mappers.appendJsonUsing(_nm, _e, out); }\n");
+                    sb.append("                    }\n");
                 }
                 sb.append("                }\n");
                 sb.append("                out.append(']');\n");

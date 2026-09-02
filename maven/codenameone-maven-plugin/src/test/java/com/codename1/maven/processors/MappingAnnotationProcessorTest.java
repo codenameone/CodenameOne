@@ -365,6 +365,9 @@ public class MappingAnnotationProcessorTest {
                         + "    public Character initial;\n"
                         + "    public Base ref;\n"
                         + "    public List<Base> refs;\n"
+                        // No mapper for Object: the map path stores elements raw, so
+                        // a number must stay a number rather than becoming a string.
+                        + "    public List<Object> mixed;\n"
                         + "    public Swatch() {}\n"
                         + "}\n");
         JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
@@ -415,6 +418,11 @@ public class MappingAnnotationProcessorTest {
             List<Object> refs = new ArrayList<Object>();
             refs.add(derived);
             swatchCls.getField("refs").set(populated, refs);
+            List<Object> mixed = new ArrayList<Object>();
+            mixed.add(Integer.valueOf(5));
+            mixed.add(Boolean.TRUE);
+            mixed.add("s");
+            swatchCls.getField("mixed").set(populated, mixed);
             Object dueProp = swatchCls.getField("due").get(populated);
             dueProp.getClass().getMethod("set", Object.class)
                     .invoke(dueProp, new java.util.Date(99000L));
@@ -434,6 +442,8 @@ public class MappingAnnotationProcessorTest {
                     json.contains("\"refs\":[{\"tag\":\"sub\"}]"));
             assertFalse("nothing should have fallen back to toString(): " + json,
                     json.contains("derived-tostring"));
+            assertTrue("an unmapped list element must keep its JSON type: " + json,
+                    json.contains("\"mixed\":[5,true,\"s\"]"));
             assertDirectMatchesMap(cl, mapperCls, mapper, empty);
         }
     }
