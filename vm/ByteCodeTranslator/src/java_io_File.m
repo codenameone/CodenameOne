@@ -312,13 +312,44 @@ JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_Str
 }
 
 #else
-// POSIX implementation for non-ObjC environments (e.g. Linux CI)
+// Implementation for non-ObjC environments: Linux CI, the native Windows port and
+// the clean target. Windows reaches this branch under clang-cl, which is neither
+// __OBJC__ nor POSIX.
 #include <stdio.h>
 #include <sys/stat.h>
-#include <unistd.h>
-#include <dirent.h>
 #include <string.h>
 #include <limits.h>
+#ifdef _WIN32
+/* clang-cl ships no <unistd.h> and no <dirent.h>. Only two things in this file
+   actually need them -- access() and the directory walk -- and the MSVC CRT
+   provides everything else (stat, remove, rename, mkdir) under the same names.
+   Without these guards the whole file stopped at "'unistd.h' file not found",
+   which is what every Windows clean-target build did the moment an app first
+   reached java.io.File. */
+#include <io.h>
+#include <direct.h>
+#include <windows.h>
+#ifndef F_OK
+#define F_OK 0
+#endif
+#ifndef R_OK
+#define R_OK 4
+#endif
+#ifndef W_OK
+#define W_OK 2
+#endif
+/* No execute bit exists in the Win32 access() model, and _access REJECTS a mode
+   of 1 rather than reporting "not executable". Ask whether the file exists, which
+   is the closest true answer and what the JDK reports for a readable file. */
+#ifndef X_OK
+#define X_OK 0
+#endif
+#define CN1_FILE_ACCESS(p, m) _access((p), (m))
+#else
+#include <unistd.h>
+#include <dirent.h>
+#define CN1_FILE_ACCESS(p, m) access((p), (m))
+#endif
 
 // Helper: assumes stringToUTF8 is available (implemented in test stubs or runtime)
 extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
@@ -327,7 +358,7 @@ extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *s
 JAVA_BOOLEAN java_io_File_existsImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_FALSE;
     const char* p = stringToUTF8(threadStateData, path);
-    return access(p, F_OK) != -1;
+    return CN1_FILE_ACCESS(p, F_OK) != -1;
 }
 
 JAVA_BOOLEAN java_io_File_isDirectoryImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
@@ -353,11 +384,20 @@ JAVA_BOOLEAN java_io_File_isFileImpl___java_lang_String_R_boolean(CODENAME_ONE_T
 JAVA_BOOLEAN java_io_File_isHiddenImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_FALSE;
     const char* p = stringToUTF8(threadStateData, path);
+#ifdef _WIN32
+    /* Windows has a real hidden ATTRIBUTE; a leading dot means nothing there. */
+    {
+        DWORD attr = GetFileAttributesA(p);
+        return (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_HIDDEN))
+                ? JAVA_TRUE : JAVA_FALSE;
+    }
+#else
     // This is a naive check, checking if filename starts with dot
     // We need to find the last slash
     const char* lastSlash = strrchr(p, '/');
     const char* name = lastSlash ? lastSlash + 1 : p;
     return name[0] == '.';
+#endif
 }
 
 JAVA_LONG java_io_File_lastModifiedImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
@@ -387,7 +427,7 @@ JAVA_LONG java_io_File_lengthImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_
 JAVA_BOOLEAN java_io_File_createNewFileImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_FALSE;
     const char* p = stringToUTF8(threadStateData, path);
-    if (access(p, F_OK) != -1) return JAVA_FALSE;
+    if (CN1_FILE_ACCESS(p, F_OK) != -1) return JAVA_FALSE;
     FILE* f = fopen(p, "w");
     if (f) {
         fclose(f);
@@ -407,6 +447,64 @@ JAVA_OBJECT java_io_File_listImpl___java_lang_String_R_java_lang_String_1ARRAY(C
     if(path == JAVA_NULL) return JAVA_NULL;
     enteringNativeAllocations();
     const char* p = stringToUTF8(threadStateData, path);
+#ifdef _WIN32
+    /* FindFirstFile rather than opendir, and it wants a wildcard appended. Two
+       passes like the POSIX arm below: count, allocate, refill -- allocArray can
+       collect, so the array cannot be built while a find handle is open. */
+    {
+        char pattern[MAX_PATH];
+        WIN32_FIND_DATAA fd;
+        HANDLE h;
+        int count = 0;
+        JAVA_OBJECT arr;
+        size_t plen = strlen(p);
+        if (plen == 0 || plen + 3 > sizeof(pattern)) {
+            finishedNativeAllocations();
+            return JAVA_NULL;
+        }
+        memcpy(pattern, p, plen);
+        /* Do not double a separator the caller already supplied. */
+        if (p[plen - 1] == '\\' || p[plen - 1] == '/') {
+            pattern[plen] = '*';
+            pattern[plen + 1] = '\0';
+        } else {
+            pattern[plen] = '\\';
+            pattern[plen + 1] = '*';
+            pattern[plen + 2] = '\0';
+        }
+        h = FindFirstFileA(pattern, &fd);
+        if (h == INVALID_HANDLE_VALUE) {
+            finishedNativeAllocations();
+            return JAVA_NULL;
+        }
+        do {
+            if (strcmp(fd.cFileName, ".") == 0 || strcmp(fd.cFileName, "..") == 0) continue;
+            count++;
+        } while (FindNextFileA(h, &fd));
+        FindClose(h);
+
+        arr = allocArray(threadStateData, count, &class__java_lang_String, sizeof(JAVA_OBJECT), 1);
+
+        h = FindFirstFileA(pattern, &fd);
+        if (h == INVALID_HANDLE_VALUE) {
+            finishedNativeAllocations();
+            return arr;
+        }
+        count = 0;
+        do {
+            if (strcmp(fd.cFileName, ".") == 0 || strcmp(fd.cFileName, "..") == 0) continue;
+            {
+                JAVA_OBJECT s = newStringFromCString(threadStateData, fd.cFileName);
+                CN1_SET_ARRAY_ELEMENT_OBJECT(arr, count, s);
+            }
+            count++;
+        } while (FindNextFileA(h, &fd));
+        FindClose(h);
+
+        finishedNativeAllocations();
+        return arr;
+    }
+#else
     DIR* d = opendir(p);
     if (d == NULL) {
         finishedNativeAllocations();
@@ -436,6 +534,7 @@ JAVA_OBJECT java_io_File_listImpl___java_lang_String_R_java_lang_String_1ARRAY(C
 
     finishedNativeAllocations();
     return arr;
+#endif
 }
 
 JAVA_BOOLEAN java_io_File_mkdirImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
@@ -476,19 +575,19 @@ JAVA_BOOLEAN java_io_File_setExecutableImpl___java_lang_String_boolean_R_boolean
 JAVA_BOOLEAN java_io_File_canReadImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_FALSE;
     const char* p = stringToUTF8(threadStateData, path);
-    return access(p, R_OK) != -1;
+    return CN1_FILE_ACCESS(p, R_OK) != -1;
 }
 
 JAVA_BOOLEAN java_io_File_canWriteImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_FALSE;
     const char* p = stringToUTF8(threadStateData, path);
-    return access(p, W_OK) != -1;
+    return CN1_FILE_ACCESS(p, W_OK) != -1;
 }
 
 JAVA_BOOLEAN java_io_File_canExecuteImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_FALSE;
     const char* p = stringToUTF8(threadStateData, path);
-    return access(p, X_OK) != -1;
+    return CN1_FILE_ACCESS(p, X_OK) != -1;
 }
 
 JAVA_LONG java_io_File_getTotalSpaceImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {

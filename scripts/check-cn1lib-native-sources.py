@@ -35,9 +35,13 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TRANSLATOR_SRC = os.path.join(REPO, 'vm', 'ByteCodeTranslator', 'src')
-# cn1_globals.h includes cn1_win_compat.h under _WIN32 and pthread.h otherwise,
-# so the Windows half does not even parse without the compat header beside it.
-PORT_HEADERS = ['cn1_globals.h', 'cn1_win_compat.h']
+# Everything cn1_globals.h pulls in has to sit beside it or the probe stops at
+# "file not found" before it compiles a line of the cn1lib. It includes
+# cn1_win_compat.h under _WIN32 and pthread.h otherwise, so the Windows half does
+# not even parse without the compat header; and it includes cn1_virtual_thread.h
+# unconditionally, because CN1_RESUME_THREAD yields a virtual thread rather than
+# sleeping the carrier it runs on.
+PORT_HEADERS = ['cn1_globals.h', 'cn1_win_compat.h', 'cn1_virtual_thread.h']
 
 
 def libraries():

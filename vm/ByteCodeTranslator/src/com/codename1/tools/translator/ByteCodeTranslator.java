@@ -1092,12 +1092,15 @@ public class ByteCodeTranslator {
                 }
             }
             if (windows) {
+                // Windows declares no ASM: MSVC cannot assemble GNU syntax, and the
+                // cross-compiled case is handled by an enable_language(ASM) guarded on
+                // NOT MSVC further down, once project() has told CMake which it got.
                 writer.append("project(").append(appName).append(embedResources
                         ? " LANGUAGES C CXX RC)\n" : " LANGUAGES C CXX)\n");
-            } else if (linux) {
-                writer.append("project(").append(appName).append(hasAsm
-                        ? " LANGUAGES C ASM)\n" : " LANGUAGES C)\n");
             } else {
+                // Linux and the clean target answer this identically -- assembly is
+                // declared when a .S is actually present -- so they share one branch
+                // rather than two spelled the same way.
                 writer.append("project(").append(appName).append(hasAsm
                         ? " LANGUAGES C ASM)\n" : " LANGUAGES C)\n");
             }
