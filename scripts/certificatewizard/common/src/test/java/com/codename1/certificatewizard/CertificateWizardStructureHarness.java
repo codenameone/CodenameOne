@@ -397,6 +397,17 @@ public final class CertificateWizardStructureHarness {
         check(selectedChoice(form, "pick.bundle.BID_A1"),
                 "widening the list does not lose the selection");
         check(find(form, "btn.profileShowProjectBundles") != null, "and the narrowing is reversible");
+        // The account holds the same identifier registered for both platforms. A default
+        // chosen platform-neutrally picked the iOS one and kept it when the type became a
+        // Mac one, so Create sent Apple an App ID that cannot carry the profile.
+        fire(form, "pick.type.mac_app_store");
+        check(selectedChoice(form, "pick.bundle.BID_MAC"),
+                "a Mac profile type selects the macOS registration of the identifier");
+        check(!selectedChoice(form, "pick.bundle.BID_A1"),
+                "and drops the iOS one the dialog opened with");
+        fire(form, "pick.type.ios_app_store");
+        check(selectedChoice(form, "pick.bundle.BID_A1"),
+                "and back again when the type returns to iOS");
         fire(form, "modal.cancel");
     }
 

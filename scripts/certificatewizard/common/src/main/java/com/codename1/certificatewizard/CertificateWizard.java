@@ -1165,14 +1165,10 @@ public class CertificateWizard extends Lifecycle {
         final String[] profileType = {PROFILE_APP_STORE};
         final String[] bundleId = {null};
         final String[] certificateId = {null};
-        // The project's own App ID is what this dialog is almost always for, so it starts
-        // chosen and the picker starts narrowed to it. Both are one click from the whole
-        // account: the assumption is a default, not a restriction.
+        // The picker starts narrowed to the project's own App IDs, with the whole account
+        // one click away: the assumption is a default, not a restriction. Which of them is
+        // chosen depends on the profile type, so it is decided in the rebuild below.
         final boolean[] showAllBundles = {false};
-        SigningState.BundleId projectBundle = findBundleByIdentifier(projectDefaults().bundleId);
-        if (projectBundle != null) {
-            bundleId[0] = projectBundle.id();
-        }
         final List<String> certs = new ArrayList<String>();
         final List<String> devs = new ArrayList<String>();
         // nameEdited: the suggested name follows the profile type until the user writes their own.
@@ -1227,6 +1223,29 @@ public class CertificateWizard extends Lifecycle {
             c.add(actionRow(Component.LEFT, typeButtons[3], typeButtons[4], typeButtons[5]));
 
             label(c, "Bundle ID", "CWFieldLabel");
+            // A bundle selection outlives the profile type it was made under, and an App ID
+            // registered for one platform cannot carry a profile for the other -- Apple
+            // rejects the request. So it is dropped here, at the one place every type change
+            // goes through, exactly as the device selection above is. The wizard offers a
+            // default rather than a filtered list: the list is what the account holds, and
+            // the remedy under an empty one can only register an iOS App ID.
+            final String bundlePlatform = platformForProfile(profileType[0]);
+            SigningState.BundleId selectedBundle = findBundleById(bundleId[0]);
+            if (selectedBundle != null && !WizardDecisions.bundlePlatformSatisfies(
+                    bundlePlatform, selectedBundle.platform())) {
+                bundleId[0] = null;
+            }
+            if (bundleId[0] == null) {
+                // The project's own App ID for THIS profile type's platform. Choosing it
+                // platform-neutrally picked the iOS record of an identifier registered for
+                // both, and that selection then survived a switch to a Mac profile type: the
+                // request went to Apple naming an App ID that cannot carry it.
+                SigningState.BundleId projectBundle =
+                        findBundleByIdentifier(projectDefaults().bundleId, bundlePlatform);
+                if (projectBundle != null) {
+                    bundleId[0] = projectBundle.id();
+                }
+            }
             // The project's own App ID and the ones derived from it for its extensions,
             // unless the user asked for the rest. Every App ID on the account was listed
             // here with equal weight, so the one identifier that can actually sign this
@@ -2220,6 +2239,16 @@ public class CertificateWizard extends Lifecycle {
             buildShell();
             next.run();
         });
+    }
+
+    /// The App ID a picker's selection refers to, by Apple's resource id.
+    private SigningState.BundleId findBundleById(String appleId) {
+        for (SigningState.BundleId b : state.bundleIds) {
+            if (appleId != null && appleId.equals(b.id())) {
+                return b;
+            }
+        }
+        return null;
     }
 
     private SigningState.BundleId findBundleByIdentifier(String identifier) {
