@@ -301,8 +301,13 @@ JAVADOC_ROOT_PAGES = {
     "serialized-form.html",
     "search.html",
 }
-# Directories javadoc writes beside the packages, for its own assets.
-JAVADOC_ASSET_DIRS = {"legal", "resources", "script-dir"}
+# javadoc writes legal/, resources/ and script-dir/ beside the packages for its own
+# plumbing -- stylesheets, jQuery, licence texts. Their contents are version
+# specific (JDK 17 ships jquery-3.6.1.min.js; another release ships another), so
+# enumerating them here would hardcode a claim about a tree this repository does
+# not build and would rot at the next JDK bump. The guide links into none of them,
+# and documentation prose has no business pointing at javadoc's internals, so a
+# path into one is rejected rather than waved through on its first segment.
 _javadoc_index: tuple[set[str], set[str]] | None = None
 
 
@@ -501,8 +506,6 @@ def javadoc_path_exists(target: str) -> bool:
         # accepting every non-.html path let /javadoc/com/codename1/DefinitelyMissing/
         # through on the strength of having no file extension.
         if not path:
-            return True
-        if path.split("/", 1)[0] in JAVADOC_ASSET_DIRS:
             return True
         return path in packages
     package = str(PurePosixPath(path).parent)
