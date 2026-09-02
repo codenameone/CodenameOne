@@ -180,6 +180,15 @@ JAVADOC_SOURCE_ROOTS = ("CodenameOne/src", "Ports/CLDC11/src")
 # and then guards that they never reached the output. Recording them here would
 # accept a link to a page the published tree deliberately does not contain.
 JAVADOC_EXCLUDED_PACKAGES = ("com/codename1/impl",)
+# The generator runs javadoc with -protected, which documents public and protected
+# types only. A top-level type cannot be protected, so in practice: public or it
+# gets no page. Comments are stripped before this is applied, because a sample in
+# a javadoc block can easily contain the word "public" next to a class name.
+JAVA_BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
+JAVA_LINE_COMMENT_RE = re.compile(r"//[^\n]*")
+PUBLIC_TYPE_RE = (
+    r"\bpublic\b[^;{{]*?\b(?:class|interface|enum|record|@interface)\s+{stem}\b"
+)
 JAVADOC_PACKAGE_PAGES = {
     "package-summary.html",
     "package-frame.html",
@@ -187,6 +196,22 @@ JAVADOC_PACKAGE_PAGES = {
     "package-tree.html",
 }
 _javadoc_index: tuple[set[str], set[str]] | None = None
+
+
+def is_public_type(source: Path, stem: str) -> bool:
+    """Whether the file declares its top-level type public, so javadoc documents it.
+
+    package-info carries no type and is excluded by name; javadoc emits its content
+    into package-summary.html, which the package check already covers.
+    """
+    if stem == "package-info":
+        return False
+    try:
+        text = source.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
+    text = JAVA_LINE_COMMENT_RE.sub("", JAVA_BLOCK_COMMENT_RE.sub("", text))
+    return re.search(PUBLIC_TYPE_RE.format(stem=re.escape(stem)), text) is not None
 
 
 def javadoc_index(repo_root: Path) -> tuple[set[str], set[str]]:
@@ -209,7 +234,8 @@ def javadoc_index(repo_root: Path) -> tuple[set[str], set[str]]:
             ):
                 continue
             packages.add(package)
-            classes.add(f"{package}/{relative.stem}")
+            if is_public_type(source, relative.stem):
+                classes.add(f"{package}/{relative.stem}")
     _javadoc_index = (packages, classes)
     return _javadoc_index
 
