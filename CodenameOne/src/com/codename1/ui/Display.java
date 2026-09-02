@@ -272,6 +272,22 @@ public final class Display extends CN1Constants {
     /// This is the instance of the EDT used internally to indicate whether
     /// we are executing on the EDT or some arbitrary thread
     private Thread edt;
+
+    /// Whether {@link #edt} is still inside its dispatch loop.
+    ///
+    /// A thread that has left that loop but not yet returned from
+    /// `mainEDTLoop()` is still `isAlive()`, and `init()` used to adopt it on
+    /// that evidence alone -- starting no dispatch thread of its own and
+    /// queueing the whole new generation onto a thread on its way out. This is
+    /// not a guess about a thread that might be leaving: the departing thread
+    /// clears it itself, at the instant it stops dispatching.
+    ///
+    /// Read without the lock, as `edt` is, and for the same reason: making the
+    /// read exclusive would hold `lock` across `impl.setThreadPriority()`,
+    /// which on some ports hands work to the platform's own UI thread. What
+    /// closes the race is that this is cleared BEFORE the teardown rather than
+    /// after it, not mutual exclusion.
+    private boolean edtDispatching;
     /// Contains animations that must be played in full by the EDT before anything further
     /// may be processed. This is useful for transitions/intro's etc... that animate without
     /// user interaction.
@@ -516,10 +532,16 @@ public final class Display extends CN1Constants {
             // has no dispatch at all. This is a thread that has actually
             // died, not one that might be mid-teardown; the speculative
             // machinery that used to be here was removed on purpose.
-            if (INSTANCE.edt == null || !INSTANCE.edt.isAlive()) {
+            // ... and neither is one that has stopped dispatching but not yet
+            // returned. That thread is still ALIVE for the whole of its
+            // teardown, and adopting it left every test in a class reporting
+            // "timed out after 5000ms; edt=display-not-initialized".
+            if (INSTANCE.edt == null || !INSTANCE.edt.isAlive()
+                    || !INSTANCE.edtDispatching) {
                 INSTANCE.touchScreen = impl.isTouchDevice();
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
+                INSTANCE.edtDispatching = true;
                 INSTANCE.edt = new CodenameOneThread(new RunnableWrapper(null, 3), "EDT");
                 impl.setThreadPriority(INSTANCE.edt, impl.getEDTThreadPriority());
                 INSTANCE.edt.start();
@@ -1353,14 +1375,51 @@ public final class Display extends CN1Constants {
                 }
             }
         }
+        // The dispatch loop has ended, so this thread will never run another
+        // call. Say so BEFORE the teardown below, which can take arbitrarily
+        // long: an init() during it would otherwise find this thread alive and
+        // adopt it as the dispatch thread of the new generation.
+        //
+        // Only when it is still this thread: a generation that started after
+        // this one has recorded its own EDT, and that one is dispatching.
+        final CodenameOneImplementation departing;
+        synchronized (lock) {
+            // The implementation to tear down, read HERE and not below. An
+            // init() during the teardown installs one this thread has never
+            // served, and deinitializing THAT leaves the display answering
+            // codenameOneRunning true with an implementation saying it is not
+            // initialized -- which init() cannot repair, because it guards on
+            // codenameOneRunning.
+            //
+            // Read at loop exit, not at loop entry: a thread can serve more
+            // than one generation, since an init() while it is still
+            // dispatching adopts it legitimately. What it owes a teardown to is
+            // the implementation it served last.
+            //
+            // EdtHandoverTest holds the adoption window open deterministically.
+            // It does NOT cover this read: the gap between leaving the loop and
+            // taking this reference is two instructions wide and the harness has
+            // no hook inside it. This is fixed by reading the right field, not
+            // by test.
+            departing = impl;
+            if (INSTANCE.edt == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
+                INSTANCE.edtDispatching = false;
+            }
+        }
         // Dispose any window still open, on the EDT, before the implementation goes
         // away. Doing this from the static deinitialize() would run the teardown off
         // the EDT, which is exactly the thread the window's tree expects.
+        //
+        // So `edt` still refers to this thread here, and isEdt() still answers
+        // true. Clearing it early would make the teardown run as a non-EDT
+        // caller, which is the opposite of what the line above is for.
         Desktop.getInstance().disposeAll();
-        impl.deinitialize();
+        departing.deinitialize();
+        if (INSTANCE.edt == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
+            INSTANCE.edt = null;
+        }
         //INSTANCE.impl = null;
         //INSTANCE.codenameOneGraphics = null;
-        INSTANCE.edt = null;
     }
 
     /// Returns the stack trace from the exception on the given
