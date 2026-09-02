@@ -465,6 +465,15 @@
       ]
     },
     {
+      "id": "state-restoration-continuity",
+      "category": "System surfaces",
+      "name": "State restoration and continuity",
+      "description": "Saves and restores what the user was doing, and checks the parts that have to behave identically on every port: the codec both wire formats share, the payload rule that lets a state cross to another device, the checkpoint, and the routeless restore that hands its payload back and shows nothing.",
+      "tests": [
+        "ContinuityStateTest"
+      ]
+    },
+    {
       "id": "document-provider",
       "category": "System surfaces",
       "name": "Document provider",

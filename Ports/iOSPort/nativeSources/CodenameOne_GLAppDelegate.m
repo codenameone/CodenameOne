@@ -110,6 +110,13 @@ extern CN1View *editingComponent;
 // where this class is not translated and the header does not exist.
 #import "com_codename1_impl_ios_IOSIntentCallbacks.h"
 #endif
+#ifdef CN1_USE_CONTINUITY
+// Same reasoning as the intents header above, and the same guard: the continuity branch below
+// calls a translated entry point, and an implicit declaration is a hard error on some slices and
+// a wrong-registers call on the rest. CodenameOne_GLViewController.h undefines
+// CN1_USE_CONTINUITY for watchOS and tvOS, where this class is not translated.
+#import "com_codename1_impl_ios_IOSContinuityCallbacks.h"
+#endif
 
 // A signal handler to handle bad accesses.  This will throw NPEs that we can catch
 // rather than crashing the app.
@@ -279,6 +286,47 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
 #endif
         return YES;
     }
+#ifdef CN1_USE_CONTINUITY
+    // Continuity is matched BEFORE intents, and the order is load-bearing. The intents block
+    // below ends in a general branch that hands any remaining activity type to Java and returns
+    // Java's answer -- and Intents.dispatchUserActivity correctly answers NO for a type it never
+    // declared. An app using both would therefore have its own continuation asked about by the
+    // wrong framework, told no, and dropped. Matching here first keeps each framework answering
+    // only for the types it published.
+    //
+    // Placed after the browsing-web branch rather than before it for the reason that branch is
+    // first: Universal Link behaviour must be bit-identical whether or not continuity is in play.
+    if (userActivity != nil && [userActivity.activityType hasSuffix:@".continuity"]) {
+        NSString *payload = nil;
+        if (userActivity.userInfo != nil
+                && [NSJSONSerialization isValidJSONObject:userActivity.userInfo]) {
+            NSData *data = [NSJSONSerialization dataWithJSONObject:userActivity.userInfo
+                                                           options:0 error:nil];
+            if (data != nil) {
+                // Autoreleased: the app target is manual-reference-counted and this method
+                // returns without a release, so every continuation would otherwise retain its
+                // serialized payload for the life of the process.
+                payload = [[[NSString alloc] initWithData:data
+                                                 encoding:NSUTF8StringEncoding] autorelease];
+            }
+        }
+        JAVA_OBJECT jtype = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG userActivity.activityType);
+        JAVA_OBJECT jpayload = payload == nil ? JAVA_NULL
+                : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG payload);
+#ifdef NEW_CODENAME_ONE_VM
+        JAVA_BOOLEAN claimed = com_codename1_impl_ios_IOSContinuityCallbacks_nativeContinuation___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG jtype, jpayload);
+#else
+        JAVA_BOOLEAN claimed = com_codename1_impl_ios_IOSContinuityCallbacks_nativeContinuation___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG jtype, jpayload);
+#endif
+        if (claimed == JAVA_TRUE) {
+            return YES;
+        }
+        // Not claimed: the suffix matched but the framework did not recognize the type as its
+        // own, which is what a third-party activity whose type happens to end the same way looks
+        // like. Falls through rather than returning NO, so the intents branch below still gets
+        // its chance at it.
+    }
+#endif
 #ifdef CN1_USE_INTENTS
     // Everything below is compiled only for an app that references
     // com.codename1.intents, so a build without it produces exactly the function above.
@@ -523,13 +571,19 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
         if (activityDictionary) {
             NSUserActivity *userActivity = [activityDictionary valueForKey:@"UIApplicationLaunchOptionsUserActivityKey"];
             if (userActivity != nil) {
-#ifdef CN1_USE_INTENTS
-                // A donated activity cold-launching the app arrives here, before the VM
-                // callback below has run the application's init/start -- so the framework's
-                // dispatcher exists (the generated bootstrap installed it from main) while
-                // Display does not, and the handler would run inline with no event thread and
-                // no window. Held until initialization instead; browsing-web keeps its existing
-                // path, which only stores AppArg and is safe this early.
+#if defined(CN1_USE_INTENTS) || defined(CN1_USE_CONTINUITY)
+                // A donated activity or a continuation cold-launching the app arrives here,
+                // before the VM callback below has run the application's init/start -- so the
+                // framework's dispatcher exists (the generated bootstrap installed it from main)
+                // while Display does not, and the handler would run inline with no event thread
+                // and no window. Held until initialization instead; browsing-web keeps its
+                // existing path, which only stores AppArg and is safe this early.
+                //
+                // Continuity needs the hold for a second reason of its own: its Java callback is
+                // installed by Continuity.enable(), which the application calls from init(). An
+                // activity delivered before that finds no callback at all and is dropped -- so an
+                // app that used continuity WITHOUT intents used to lose exactly the cold launch
+                // the feature exists for.
                 if (![NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType]) {
                     cn1PendingLaunchActivity = [userActivity retain];
                 } else {

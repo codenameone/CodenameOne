@@ -1304,6 +1304,21 @@ public class IPhoneBuilder extends Executor {
     // extension, no Swift glue): the surfaces API compiles but answers unsupported at runtime.
     private boolean surfacesExtensionEnabled;
 
+    // Set when the app references com.codename1.continuity. Gates the CN1_USE_CONTINUITY native
+    // define and this app's entry in NSUserActivityTypes -- which is all continuation costs,
+    // there being no entitlement behind NSUserActivity handoff.
+    //
+    // Note what this does NOT gate: saving and restoring state on the device is pure Java over
+    // com.codename1.io.Storage and works in every build. Only the cross-device half is here.
+    private boolean usesContinuity;
+
+    // Set when the app references com.codename1.continuity.sync -- deliberately narrower than
+    // usesContinuity, and for the reason usesHomeAccessoryData is narrower than usesSmartHome.
+    // The synced store is NSUbiquitousKeyValueStore, whose entitlement has to be granted on the
+    // App ID, so handing it to an app that only wanted to pass work to the tablet in the user's
+    // other hand would fail its codesigning for a capability it never asked for.
+    private boolean usesContinuitySync;
+
     // Set when the app references com.codename1.documents. Gates the CN1_USE_DOCUMENTS native
     // define, the CN1Documents file provider extension and the app group that lets the two
     // processes meet.
@@ -2654,6 +2669,20 @@ public class IPhoneBuilder extends Executor {
                     // that publish documents.
                     if (!usesDocuments && cls.indexOf("com/codename1/documents/") == 0) {
                         usesDocuments = true;
+                    }
+                    // State restoration and continuity (com.codename1.continuity.*). Gated on
+                    // actual usage so the CN1_USE_CONTINUITY natives and the NSUserActivityTypes
+                    // entry are only added for apps that hand work between devices.
+                    if (!usesContinuity && cls.indexOf("com/codename1/continuity/") == 0) {
+                        usesContinuity = true;
+                    }
+                    // The synced store, which is the only half that costs an entitlement. Its own
+                    // package, so this prefix is a strict extension of the one above and both
+                    // flags are set for an app that uses it -- which is correct: the store needs
+                    // the native define too.
+                    if (!usesContinuitySync
+                            && cls.indexOf("com/codename1/continuity/sync/") == 0) {
+                        usesContinuitySync = true;
                     }
                     // Phone-to-watch link (com.codename1.wearable.*). Gated on actual usage
                     // so WatchConnectivity.framework and the CN1_USE_WATCHCONNECTIVITY
@@ -4099,6 +4128,19 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_DOCUMENTS", "#define CN1_USE_DOCUMENTS");
             }
 
+            // com.codename1.continuity usage compiles the NSUserActivity / NSUbiquitousKeyValueStore
+            // glue (gated by CN1_USE_CONTINUITY so other builds carry no such symbols), and opens
+            // the continuity branch in the app delegate. The define lives in the shared
+            // CodenameOne_GLViewController.h so it reaches every continuity translation unit,
+            // mirroring CN1_USE_INTENTS.
+            //
+            // Not gated on the sync opt-out below: the store reports its own availability at
+            // runtime from whether the entitlement actually granted one, and the continuation half
+            // needs these symbols regardless.
+            if (usesContinuity) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_CONTINUITY", "#define CN1_USE_CONTINUITY");
+            }
+
             // com.codename1.wearable usage compiles the WatchConnectivity glue (gated by
             // CN1_USE_WATCHCONNECTIVITY so other builds carry no WCSession symbols). The define
             // lives in the shared CodenameOne_GLViewController.h so it reaches every wearable
@@ -5453,6 +5495,38 @@ public class IPhoneBuilder extends Executor {
                         + " false. Remove the hint to build the rest of the"
                         + " app.");
             }
+            // The synced key/value store behind com.codename1.continuity.sync.
+            //
+            // Earned by the sync package alone, never by com.codename1.continuity. This
+            // entitlement has to be granted on the App ID before the app will sign at all,
+            // so giving it to an app that only hands work to a nearby device -- which costs
+            // nothing but a declared activity type -- would fail its codesigning for a
+            // capability it never asked for. Same reasoning as the HomeKit split above.
+            //
+            // The value is the two Xcode variables Apple documents for it rather than a
+            // literal, so it stays correct when the team or the bundle id changes, and so a
+            // build for a second team needs no edit here.
+            if (usesContinuitySync
+                    && !"false".equals(request.getArg("ios.continuity.sync", "true"))) {
+                String kvStore = request.getArg("ios.entitlements.com.apple.developer"
+                        + ".ubiquity-kvstore-identifier", null);
+                // A BLANK hint counts as absent, for the reason the VPN entitlement below
+                // spells out: buildNamespacedEntitlements skips an empty value entirely, so a
+                // project that set this to "" would suppress the generated entry and
+                // contribute nothing itself -- shipping an app whose SyncedStore silently
+                // stores nothing, which fails only at runtime on a device.
+                if (kvStore == null || kvStore.trim().length() == 0) {
+                    request.putArgument("ios.entitlements.com.apple.developer"
+                            + ".ubiquity-kvstore-identifier",
+                            "$(TeamIdentifierPrefix)$(CFBundleIdentifier)");
+                }
+                // An explicit non-blank value is left exactly as the project wrote it. Unlike
+                // the VPN entitlement there IS more than one legitimate value here -- an app
+                // sharing a store with a sibling app names that sibling's container -- so
+                // refusing anything but the default would break a configuration Apple
+                // supports.
+            }
+
             // VPN configuration management.
             //
             // Both entitlements here are single-element arrays, which the
@@ -11601,12 +11675,30 @@ public class IPhoneBuilder extends Executor {
     /// `IOSAppIntentsBuilder.publishesUserActivity` for why advertising the rest is not
     /// harmlessly generous.
     static String userActivityTypesKey(List<Map<String, Object>> intents) {
+        return userActivityTypesKey(intents, null);
+    }
+
+    /// The same key, carrying the continuity activity type alongside the intent ids.
+    ///
+    /// One key, not two. `NSUserActivityTypes` appears once in a property list or iOS reads the
+    /// file unpredictably, so the two features that contribute to it -- app intents and
+    /// continuity -- have to meet here rather than each emitting their own. An app that uses both
+    /// is the ordinary case, not a corner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intents`: the app's intent declarations, possibly empty
+    /// - `continuityType`: this app's continuity activity type, or null when it uses none
+    static String userActivityTypesKey(List<Map<String, Object>> intents, String continuityType) {
         StringBuilder types = new StringBuilder();
         for (Map<String, Object> intent : intents) {
             Object id = intent.get("id");
             if (id instanceof String && IOSAppIntentsBuilder.publishesUserActivity(intent)) {
                 types.append("<string>").append((String) id).append("</string>");
             }
+        }
+        if (continuityType != null && continuityType.length() > 0) {
+            types.append("<string>").append(continuityType).append("</string>");
         }
         if (types.length() == 0) {
             // An app whose only assistant-exposed intent is destructive reaches here and
@@ -11619,6 +11711,18 @@ public class IPhoneBuilder extends Executor {
     }
 
     static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents) {
+        return mergeUserActivityTypes(inject, intents, null);
+    }
+
+    /// The same merge, adding the continuity activity type alongside the intent ids.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inject`: the plist fragment the application supplied
+    /// - `intents`: the app's intent declarations, possibly empty
+    /// - `continuityType`: this app's continuity activity type, or null when it uses none
+    static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents,
+            String continuityType) {
         // The same structural reading the rest of the plist parsing uses: this walks a
         // fragment the application supplied, so "<array >" and "</array >" are shapes it
         // has to accept. Found by enumerating every literal closing tag left in this
@@ -11640,6 +11744,10 @@ public class IPhoneBuilder extends Executor {
                     && !existing.contains("<string>" + (String) id + "</string>")) {
                 add.append("<string>").append((String) id).append("</string>");
             }
+        }
+        if (continuityType != null && continuityType.length() > 0
+                && !existing.contains("<string>" + continuityType + "</string>")) {
+            add.append("<string>").append(continuityType).append("</string>");
         }
         if (add.length() == 0) {
             return inject;
@@ -14178,19 +14286,26 @@ public class IPhoneBuilder extends Executor {
         // Emitted whenever the app declares intents, including the appIntents=false opt-out:
         // donation still runs there, and iOS only offers an activity whose type is declared
         // here, so omitting it would make the opt-out donate into a void.
-        if (declaresAppIntents || appIntentsSuppressed) {
+        //
+        // Continuity contributes to the SAME key. iOS only continues an activity whose type the
+        // app declared here, so an app that references com.codename1.continuity and never lands
+        // in this branch publishes activities no other device is ever offered -- and the symptom
+        // is the feature appearing to do nothing at all, on both devices, with nothing logged.
+        String continuityActivityType = usesContinuity
+                ? request.getPackageName() + ".continuity" : null;
+        if (declaresAppIntents || appIntentsSuppressed || usesContinuity) {
             // Each key is decided on its own. Treating any existing NSUserActivityTypes as
             // complete configuration meant an app that already declared one Handoff activity
             // through ios.plistInject silently lost every intent id -- and lost
             // CoreSpotlightContinuation too, which is a different key entirely, so a Spotlight
             // result could not continue into the app either.
             if (!inject.contains("NSUserActivityTypes")) {
-                inject += userActivityTypesKey(intentsManifest);
+                inject += userActivityTypesKey(intentsManifest, continuityActivityType);
             } else {
                 // Merge into the array the application supplied rather than replacing it: its
                 // own activity types have to keep working. Appended just before the closing
                 // </array> of that key, and only ids it does not already list.
-                inject = mergeUserActivityTypes(inject, intentsManifest);
+                inject = mergeUserActivityTypes(inject, intentsManifest, continuityActivityType);
             }
         }
         // CoreSpotlightContinuation is about Spotlight, not about App Intents, and gating it on

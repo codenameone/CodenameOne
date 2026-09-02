@@ -1417,6 +1417,45 @@ public final class IOSNative {
      */
     native void intentsCompleteInvocation(String token, String resultJson);
 
+    // --- State restoration and continuity -----------------------------------
+    // Backs com.codename1.continuity. Two unrelated Apple mechanisms sit behind these and are
+    // answered separately: NSUserActivity carries the current activity to a device that is
+    // physically nearby, and NSUbiquitousKeyValueStore carries a few durable values to every
+    // device on the account whether they are nearby or not. The first needs no entitlement and
+    // the second needs one, which is why com.codename1.continuity.sync is a package of its own.
+    // Payloads cross as JSON strings, matching the intents natives above.
+
+    /** True when this build linked the continuation natives at all. */
+    native boolean continuitySupported();
+
+    /**
+     * Advertises the current activity to the user's nearby devices, replacing whatever was
+     * advertised before. The JSON is the state; the title is what the receiving device shows.
+     */
+    native void continuityPublish(String activityType, String title, String userInfoJson);
+
+    /** Withdraws the advertised activity. */
+    native void continuityClear();
+
+    /** True when this build linked the synced store and the entitlement granted one. */
+    native boolean continuitySyncedStoreSupported();
+
+    /** Writes a value to the synced store. */
+    native void continuitySyncedStorePut(String key, String value);
+
+    /** Reads a value from the synced store, or null when the key is absent. */
+    native String continuitySyncedStoreGet(String key);
+
+    /** Removes a key from the synced store. */
+    native void continuitySyncedStoreRemove(String key);
+
+    /**
+     * Every key in the synced store, as {@code {"keys":["a","b"]}}. A JSON document rather than
+     * a {@code String[]} because every other native here exchanges JSON, and because a store key
+     * is an application-chosen string that no separator character is safe against.
+     */
+    native String continuitySyncedStoreKeys();
+
     // --- Phone-to-watch link (WatchConnectivity) ----------------------------
     // Backs com.codename1.wearable. The same natives serve both halves of a pair: WCSession is
     // symmetric, so the phone app and the watch app run identical code. Payloads cross as opaque

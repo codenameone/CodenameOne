@@ -105,6 +105,7 @@ public final class Navigation {
         }
         stack.add(new NavigationEntry(path, f));
         f.show();
+        stackChanged();
         return true;
     }
 
@@ -119,6 +120,7 @@ public final class Navigation {
         stack.remove(stack.size() - 1);
         NavigationEntry now = stack.get(stack.size() - 1);
         now.getForm().showBack();
+        stackChanged();
         return true;
     }
 
@@ -162,7 +164,76 @@ public final class Navigation {
             stack.remove(stack.size() - 1);
         }
         entry.getForm().showBack();
+        stackChanged();
         return true;
+    }
+
+    /// Rebuilds the stack from a list of paths, showing only the last one.
+    ///
+    /// This is how `com.codename1.continuity.Continuity` puts the user back where they were: the
+    /// saved state is a list of paths, and every one of them has to become a stack frame or
+    /// `back()` would land on a screen that was never built. Replaying them with `navigate` would
+    /// work and would also flash every intermediate screen past the user with a transition each,
+    /// so the frames are built silently and only the top one is shown.
+    ///
+    /// Paths that no longer match a route are skipped rather than failing the restore. A rebuilt
+    /// app legitimately drops routes, and refusing to restore anything because one deep frame went
+    /// away would lose the whole session over a screen the user was not on.
+    ///
+    /// Replaces whatever was on the stack. Must be called on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paths`: the paths, oldest first
+    ///
+    /// #### Returns
+    ///
+    /// true when at least one frame was rebuilt and shown
+    public static boolean restoreStack(List<String> paths) {
+        RouteDispatcher d = dispatcher;
+        if (d == null || paths == null || paths.isEmpty()) {
+            return false;
+        }
+        List<NavigationEntry> rebuilt = new ArrayList<NavigationEntry>();
+        for (int i = 0; i < paths.size(); i++) {
+            String path = paths.get(i);
+            if (path == null || path.length() == 0) {
+                continue;
+            }
+            Form f;
+            try {
+                f = d.dispatch(path);
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+                continue;
+            }
+            if (f != null) {
+                rebuilt.add(new NavigationEntry(path, f));
+            }
+        }
+        if (rebuilt.isEmpty()) {
+            return false;
+        }
+        stack.clear();
+        stack.addAll(rebuilt);
+        // show(), not showBack(): the user is arriving, not going back, and showBack would run
+        // the reverse transition into a screen they have not seen yet.
+        rebuilt.get(rebuilt.size() - 1).getForm().show();
+        stackChanged();
+        return true;
+    }
+
+    /// Tells the continuity framework that the stack moved, so it can checkpoint.
+    ///
+    /// A direct call rather than a listener: `Continuity.routeStackChanged()` returns immediately
+    /// unless an application actually enabled continuity, and a listener registry here would be
+    /// public API earned by one internal caller.
+    private static void stackChanged() {
+        try {
+            com.codename1.continuity.Continuity.routeStackChanged();
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
     }
 
     // ------------------------------------------------------------------------

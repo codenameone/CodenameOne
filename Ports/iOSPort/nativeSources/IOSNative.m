@@ -20545,6 +20545,303 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported___R_boole
     return com_codename1_impl_ios_IOSNative_intentsIndexingSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
+
+// --- State restoration and continuity (com.codename1.continuity) -------------
+//
+// Two unrelated Apple mechanisms, gated together on CN1_USE_CONTINUITY but answered separately
+// to Java, because they cost different things. NSUserActivity with eligibleForHandoff carries
+// what the user is doing to a device they are holding and needs no entitlement at all; the
+// NSUbiquitousKeyValueStore below carries a few durable values to every device on the account
+// and needs one that has to be granted on the App ID. An app wanting only the first must not be
+// made to arrange the second, which is why com.codename1.continuity.sync is a separate package
+// and why the store reports its own availability rather than assuming it.
+//
+// What is NOT here: saving and restoring state on this device. That is pure Java over
+// com.codename1.io.Storage and works in every build, with or without this define.
+
+#ifdef CN1_USE_CONTINUITY
+
+/// The advertised activity, or nil. A single slot rather than the bounded ring the intent
+/// donations use: a donation is a historical fact the system may keep offering, while this is
+/// "what the user is doing right now" and there is only ever one of those. Publishing again
+/// replaces it.
+static NSUserActivity *cn1ContinuityActivity = nil;
+
+/// Retained so the observer can be reasoned about, though nothing ever removes it: the store's
+/// external-change notification is wanted for the entire life of the process.
+static id cn1ContinuityStoreObserver = nil;
+
+// The translated entry point the store observer below calls. Without this it is an implicit
+// declaration, which C99 and every clang that enforces it reject outright -- and where a
+// toolchain still accepts one, the invented prototype passes the thread state through whatever
+// registers the default promotions choose. Same reasoning, and the same fix, as the
+// IOSWearableCallbacks declarations further down this file.
+extern JAVA_VOID com_codename1_impl_ios_IOSContinuityCallbacks_nativeSyncedStoreChanged__(
+        CODENAME_ONE_THREAD_STATE);
+
+static NSDictionary *cn1ContinuityParseJson(NSString *json) {
+    if (json == nil) {
+        return nil;
+    }
+    NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
+    if (data == nil) {
+        return nil;
+    }
+    id parsed = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    return [parsed isKindOfClass:[NSDictionary class]] ? (NSDictionary *)parsed : nil;
+}
+
+/// Reduces a parsed JSON value to what a property list can hold, recursively.
+///
+/// The intent donation path beside this one flattens to strings and numbers, which is all a
+/// donation carries. A continuity payload is nested by construction -- an array of route paths
+/// and a map of the application's own values -- so flattening it would deliver an activity with
+/// the routes silently missing, which looks exactly like the feature not working.
+///
+/// Anything with no property-list representation, NSNull included, is dropped rather than
+/// substituted: the Java side validated the payload where the application produced it, so the
+/// only values that can reach here are ones JSON introduced on its own.
+static id cn1ContinuitySanitize(id value) {
+    if ([value isKindOfClass:[NSString class]] || [value isKindOfClass:[NSNumber class]]) {
+        return value;
+    }
+    if ([value isKindOfClass:[NSArray class]]) {
+        NSMutableArray *out = [NSMutableArray array];
+        for (id item in (NSArray *)value) {
+            id safe = cn1ContinuitySanitize(item);
+            if (safe != nil) {
+                [out addObject:safe];
+            }
+        }
+        return out;
+    }
+    if ([value isKindOfClass:[NSDictionary class]]) {
+        NSMutableDictionary *out = [NSMutableDictionary dictionary];
+        NSDictionary *dict = (NSDictionary *)value;
+        for (id key in dict) {
+            if (![key isKindOfClass:[NSString class]]) {
+                continue;
+            }
+            id safe = cn1ContinuitySanitize([dict objectForKey:key]);
+            if (safe != nil) {
+                [out setObject:safe forKey:key];
+            }
+        }
+        return out;
+    }
+    return nil;
+}
+
+/// The synced store, or nil when this build did not earn one.
+///
+/// Resolved once and cached, because the answer cannot change while the process runs: it is a
+/// property of how the app was signed.
+///
+/// Three guards rather than one, and deliberately so. The entitlement is missing in the ordinary
+/// case that an app references com.codename1.continuity.sync and the App ID never had iCloud
+/// enabled, and what that produces has not been the same across releases of iOS -- a nil store, a
+/// store whose synchronize answers NO, and a raised exception have all been reported. Guessing
+/// which one this OS does would leave the app writing values into nothing on the others, and the
+/// symptom of that is a setting that silently fails to follow the user.
+static NSUbiquitousKeyValueStore *cn1ContinuityStore(void) {
+    static NSUbiquitousKeyValueStore *store = nil;
+    static BOOL resolved = NO;
+    if (resolved) {
+        return store;
+    }
+    resolved = YES;
+    @try {
+        NSUbiquitousKeyValueStore *s = [NSUbiquitousKeyValueStore defaultStore];
+        if (s != nil && [s synchronize]) {
+            store = [s retain];
+            cn1ContinuityStoreObserver = [[[NSNotificationCenter defaultCenter]
+                    addObserverForName:NSUbiquitousKeyValueStoreDidChangeExternallyNotification
+                                object:s
+                                 queue:nil
+                            usingBlock:^(NSNotification *note) {
+                com_codename1_impl_ios_IOSContinuityCallbacks_nativeSyncedStoreChanged__(
+                        CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+            }] retain];
+        }
+    } @catch (NSException *e) {
+        store = nil;
+    }
+    return store;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_TRUE;
+}
+
+void com_codename1_impl_ios_IOSNative_continuityPublish___java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityType, JAVA_OBJECT title, JAVA_OBJECT userInfoJson) {
+    if (activityType == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    NSString *type = toNSString(CN1_THREAD_STATE_PASS_ARG activityType);
+    NSUserActivity *activity = [[NSUserActivity alloc] initWithActivityType:type];
+    // The one property that makes this a continuation rather than a donation. Without it the
+    // activity is only a Siri/Spotlight hint and no other device is ever offered it -- which is
+    // exactly the shape of the intents path beside this one, and the reason the two do not share
+    // a code path despite building the same class.
+    activity.eligibleForHandoff = YES;
+    if (title != JAVA_NULL) {
+        NSString *label = toNSString(CN1_THREAD_STATE_PASS_ARG title);
+        if ([label length] > 0) {
+            activity.title = label;
+        }
+    }
+    if (userInfoJson != JAVA_NULL) {
+        id safe = cn1ContinuitySanitize(cn1ContinuityParseJson(
+                toNSString(CN1_THREAD_STATE_PASS_ARG userInfoJson)));
+        if ([safe isKindOfClass:[NSDictionary class]]) {
+            activity.userInfo = (NSDictionary *)safe;
+        }
+    }
+    [activity becomeCurrent];
+    // Ownership of the alloc's reference moves into the slot; the previous occupant is
+    // invalidated so the system stops offering a state the app has moved on from, and then
+    // released, since this slot held the only reference to it in a manual-reference-counted
+    // target.
+    NSUserActivity *previous = cn1ContinuityActivity;
+    cn1ContinuityActivity = activity;
+    if (previous != nil) {
+        [previous invalidate];
+        [previous release];
+    }
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_continuityClear__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (cn1ContinuityActivity == nil) {
+        return;
+    }
+    POOL_BEGIN();
+    NSUserActivity *activity = cn1ContinuityActivity;
+    // Cleared before the messages, so a second call cannot resign and release the same activity
+    // twice -- which in a manual-reference-counted target is an over-release, not a no-op.
+    cn1ContinuityActivity = nil;
+    [activity resignCurrent];
+    [activity invalidate];
+    [activity release];
+    POOL_END();
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return cn1ContinuityStore() != nil ? JAVA_TRUE : JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT value) {
+    NSUbiquitousKeyValueStore *store = cn1ContinuityStore();
+    if (store == nil || key == JAVA_NULL || value == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    [store setString:toNSString(CN1_THREAD_STATE_PASS_ARG value)
+              forKey:toNSString(CN1_THREAD_STATE_PASS_ARG key)];
+    // Asked for rather than waited on. The system syncs on its own schedule and this only moves
+    // it along; the return value says whether the store is usable at all, which cn1ContinuityStore
+    // already established.
+    [store synchronize];
+    POOL_END();
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key) {
+    NSUbiquitousKeyValueStore *store = cn1ContinuityStore();
+    if (store == nil || key == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    JAVA_OBJECT result = JAVA_NULL;
+    POOL_BEGIN();
+    NSString *value = [store stringForKey:toNSString(CN1_THREAD_STATE_PASS_ARG key)];
+    if (value != nil) {
+        result = fromNSString(CN1_THREAD_STATE_PASS_ARG value);
+    }
+    POOL_END();
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_continuitySyncedStoreRemove___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key) {
+    NSUbiquitousKeyValueStore *store = cn1ContinuityStore();
+    if (store == nil || key == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    [store removeObjectForKey:toNSString(CN1_THREAD_STATE_PASS_ARG key)];
+    [store synchronize];
+    POOL_END();
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreKeys__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    NSUbiquitousKeyValueStore *store = cn1ContinuityStore();
+    if (store == nil) {
+        return JAVA_NULL;
+    }
+    JAVA_OBJECT result = JAVA_NULL;
+    POOL_BEGIN();
+    NSArray *keys = [[store dictionaryRepresentation] allKeys];
+    NSMutableArray *strings = [NSMutableArray array];
+    for (id key in keys) {
+        if ([key isKindOfClass:[NSString class]]) {
+            [strings addObject:key];
+        }
+    }
+    // Wrapped in an object because the Java side parses it with JSONParser, whose entry point
+    // reads a document whose root is an object. A bare array would parse to nothing.
+    NSDictionary *doc = [NSDictionary dictionaryWithObject:strings forKey:@"keys"];
+    NSData *data = [NSJSONSerialization isValidJSONObject:doc]
+            ? [NSJSONSerialization dataWithJSONObject:doc options:0 error:nil] : nil;
+    if (data != nil) {
+        NSString *json = [[[NSString alloc] initWithData:data
+                                                encoding:NSUTF8StringEncoding] autorelease];
+        result = fromNSString(CN1_THREAD_STATE_PASS_ARG json);
+    }
+    POOL_END();
+    return result;
+}
+
+#else // CN1_USE_CONTINUITY
+
+// Continuity not enabled: no NSUserActivity or iCloud references, everything unsupported. The
+// on-device half of the framework is unaffected, being pure Java.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+void com_codename1_impl_ios_IOSNative_continuityPublish___java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityType, JAVA_OBJECT title, JAVA_OBJECT userInfoJson) {
+}
+void com_codename1_impl_ios_IOSNative_continuityClear__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+void com_codename1_impl_ios_IOSNative_continuitySyncedStorePut___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key, JAVA_OBJECT value) {
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key) {
+    return JAVA_NULL;
+}
+void com_codename1_impl_ios_IOSNative_continuitySyncedStoreRemove___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT key) {
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreKeys__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_NULL;
+}
+#endif // CN1_USE_CONTINUITY
+
+// New-VM (return-type-encoded) manglings for the value-returning continuity natives. Defined
+// after the implementations/stubs above so each call targets an already-declared function. The
+// void continuity* methods need no _R_ wrapper. Always defined regardless of CN1_USE_CONTINUITY.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_continuitySupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_continuitySyncedStoreSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT key) {
+    return com_codename1_impl_ios_IOSNative_continuitySyncedStoreGet___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, key);
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_continuitySyncedStoreKeys___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_continuitySyncedStoreKeys__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
 // --- Phone-to-watch link (com.codename1.wearable / WatchConnectivity) --------
 //
 // Compiled into BOTH the phone target and the watch target: WCSession is symmetric, so the two

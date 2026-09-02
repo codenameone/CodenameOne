@@ -101,6 +101,14 @@ final class IOSProvisioningPreflight {
          * not be parsed at all produces no Profile, which is where "cannot tell" still lives.</p>
          */
         List<String> appGroups = new ArrayList<String>();
+        /**
+         * True when the profile grants {@code com.apple.developer.ubiquity-kvstore-identifier},
+         * which is what an App ID with the iCloud capability enabled looks like.
+         *
+         * <p>Read the same way as {@link #appGroups}: false means the profile genuinely grants
+         * none, because a profile that could not be parsed at all produces no Profile.</p>
+         */
+        boolean ubiquityKeyValueStore;
     }
 
     /** A problem found before the build was sent: {@code message} is written for the user. */
@@ -219,6 +227,75 @@ final class IOSProvisioningPreflight {
             return problems;
         }
         collectFileProblems(problems, settings, release, now, path, settingKey, true);
+        return problems;
+    }
+
+    /**
+     * Whether the profile can sign an app that asks for the iCloud key-value store.
+     *
+     * <p>A reference to {@code com.codename1.continuity.sync} makes the build declare
+     * {@code com.apple.developer.ubiquity-kvstore-identifier}, and Apple grants that entitlement
+     * only through an App ID with the iCloud capability enabled. A profile issued before that was
+     * switched on matches the bundle id perfectly and still authorizes none of it, so the build
+     * runs all the way to codesign and fails there -- talking about an entitlement rather than
+     * about the iCloud capability nobody enabled.</p>
+     *
+     * <p>Never fatal, and that is deliberate: unlike the App Group checks beside it, this
+     * entitlement has a documented opt-out. {@code ios.continuity.sync=false} drops it and leaves
+     * the app working with {@code SyncedStore.isSupported()} reporting false, so a warning that
+     * names the two ways out is more useful than a refusal.</p>
+     *
+     * @return one problem when the profile demonstrably lacks the entitlement, none when it has
+     * it, the sync half is switched off, or nothing readable says either way
+     */
+    static List<Problem> checkContinuitySync(Properties settings, boolean release) {
+        List<Problem> problems = new ArrayList<Problem>();
+        if (settings == null) {
+            return problems;
+        }
+        if (!"true".equals(trimmed(settings.getProperty(
+                "codename1.arg.ios.continuity.enabled")))) {
+            // The project has not said it wants a synced store. The builder decides this from
+            // bytecode, which this check cannot read -- so an app that uses the API without
+            // setting the hint is simply not checked here, and finds out at codesign as it does
+            // today. Guessing from anything else would warn projects that use no continuity at
+            // all.
+            return problems;
+        }
+        if ("false".equals(trimmed(settings.getProperty(
+                "codename1.arg.ios.continuity.sync")))) {
+            // Explicitly opted out: the build declares no entitlement, so there is nothing the
+            // profile has to grant.
+            return problems;
+        }
+        String override = trimmed(settings.getProperty("codename1.arg.ios.entitlements.com.apple"
+                + ".developer.ubiquity-kvstore-identifier"));
+        if (override != null && !override.isEmpty()) {
+            // The project named a container of its own, which is the shape of an app sharing a
+            // store with a sibling. Whether the profile grants that particular one is a question
+            // this cannot answer from the key alone, and warning on it would be noise.
+            return problems;
+        }
+        Profile appProfile = appProfile(settings, release);
+        if (appProfile == null || appProfile.applicationIdentifier == null) {
+            // No readable profile: check() reports that, and it is not something to warn about
+            // twice.
+            return problems;
+        }
+        if (appProfile.ubiquityKeyValueStore) {
+            return problems;
+        }
+        problems.add(new Problem("This app uses com.codename1.continuity.sync, so the build asks "
+                + "for the iCloud key-value store entitlement "
+                + "(com.apple.developer.ubiquity-kvstore-identifier) -- and the provisioning "
+                + "profile \"" + appProfile.name + "\" does not grant it.\n"
+                + "Apple grants it only through an App ID with the iCloud capability enabled, so "
+                + "signing will fail on the entitlement rather than on the profile name.\n"
+                + "Either enable iCloud on the App ID at developer.apple.com and regenerate the "
+                + "profile, or set codename1.arg.ios.continuity.sync=false -- which drops the "
+                + "entitlement and leaves SyncedStore reporting itself unsupported at runtime. "
+                + "Handing work to a nearby device is unaffected either way; that half needs no "
+                + "entitlement.", false));
         return problems;
     }
 
@@ -1005,6 +1082,11 @@ final class IOSProvisioningPreflight {
                 }
             }
         }
+        // Same nesting again: this is what says whether the profile can sign a target that asks
+        // for the iCloud key-value store, which a reference to com.codename1.continuity.sync
+        // makes the build declare.
+        Element ubiquity = valueForKey(doc, "com.apple.developer.ubiquity-kvstore-identifier");
+        profile.ubiquityKeyValueStore = ubiquity != null;
         profile.type = deriveType(doc);
         return profile;
     }

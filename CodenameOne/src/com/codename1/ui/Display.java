@@ -5888,6 +5888,18 @@ public final class Display extends CN1Constants {
         return impl.getDocumentProviderBridge();
     }
 
+    /// Returns the platform bridge used by the `com.codename1.continuity` API to advertise the
+    /// user's current activity to their other devices and to reach the platform's synced key/value
+    /// store, or null when unsupported on this port. Internal -- application code uses the
+    /// `com.codename1.continuity` API rather than this bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the continuity bridge, or null
+    public com.codename1.continuity.spi.ContinuityBridge getContinuityBridge() {
+        return impl.getContinuityBridge();
+    }
+
     /// Returns the platform bridge used by the `com.codename1.intents` API to expose the
     /// application's capabilities to the system, or null when unsupported on this port. Internal --
     /// application code uses the `com.codename1.intents` API rather than this bridge directly.

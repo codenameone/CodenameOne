@@ -16590,6 +16590,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private static com.codename1.impl.nearby.LocalNearbyBridge nearbyBridge;
 
+    private static com.codename1.impl.continuity.LocalContinuityBridge continuityBridge;
+
     private static com.codename1.impl.call.LocalCallBridge callBridge;
 
     private static com.codename1.impl.vpn.LocalVpnBridge vpnBridge;
@@ -16666,6 +16668,55 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             return callBridge;
         }
+    }
+
+    /// The continuity bridge for the simulator and desktop builds.
+    ///
+    /// A simulated one rather than none, for the reason
+    /// [#getCallBridge()] carries one: an app's continuity work is deciding
+    /// what belongs in the payload, prompting before a jump and rebuilding a
+    /// screen from a route, none of which has anything to do with the
+    /// operating system that carries the state. A port that reported nothing
+    /// would make every bit of it testable only on a pair of phones.
+    ///
+    /// The simulated synced store is backed by `Preferences`, so it survives
+    /// a simulator restart the way the platform store survives a device one.
+    @Override
+    public com.codename1.continuity.spi.ContinuityBridge getContinuityBridge() {
+        return getSimulatedContinuity();
+    }
+
+    /// The simulated continuity platform, for the Simulate menu to script.
+    ///
+    /// Static and class-guarded for the reason the call bridge is: it holds
+    /// the advertised activity and the framework's callback, and two threads
+    /// racing this getter would each get their own -- an activity published
+    /// through one would be invisible to the menu item that hands it back.
+    public static com.codename1.impl.continuity.LocalContinuityBridge getSimulatedContinuity() {
+        synchronized (JavaSEPort.class) {
+            if (continuityBridge == null) {
+                continuityBridge = new com.codename1.impl.continuity.LocalContinuityBridge();
+            }
+            return continuityBridge;
+        }
+    }
+
+    /// Replaces the simulated continuity platform, so the Simulate menu can
+    /// swap in one that reports a capability as missing.
+    ///
+    /// The framework's inbound seam is re-installed on the replacement:
+    /// without that the new bridge would have no callback, and every menu
+    /// item that delivers a continuation would silently do nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the replacement, never null
+    public static void setSimulatedContinuity(
+            com.codename1.impl.continuity.LocalContinuityBridge b) {
+        synchronized (JavaSEPort.class) {
+            continuityBridge = b;
+        }
+        com.codename1.continuity.Continuity.refreshBridge();
     }
 
     /// The VPN bridge for the simulator and desktop builds: a simulated
