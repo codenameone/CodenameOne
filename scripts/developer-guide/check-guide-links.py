@@ -42,7 +42,7 @@ ATTRIBUTE_LINK_RE = re.compile(r"\blink:\{[^}]+\}")
 # hrefs beginning with "/" because they are not same-page anchors. Between the two
 # gates the route went unchecked, so it is run through the same route model here.
 ROOT_RELATIVE_RE = re.compile(
-    r"""(?:\blink:|\bxref:|\bhref=["'])(/[^\s\[\]"'`>]*)""", re.IGNORECASE
+    r"""(?:\blink:|\bxref:|\bhref\s*=\s*["'])(/[^\s\[\]"'`>]*)""", re.IGNORECASE
 )
 # The one tree that genuinely cannot be enumerated from this repository: the
 # Javadoc is produced from the framework sources at build time. Everything else,
@@ -67,6 +67,24 @@ SITE_HOSTS = {"codenameone.com", "www.codenameone.com"}
 # lives in the rendered book rather than in the site tree. Written as `<<id>>`
 # instead, check-guide-xrefs.py resolves it against the rendered anchors.
 SELF_PATHS = {"/developer-guide", "/developer-guide.html", "/manual", "/manual.html"}
+
+
+def strip_inline_comment(raw: str) -> str:
+    """Drop a YAML/TOML trailing comment, leaving a quoted value untouched.
+
+    `draft: true # not ready` stored the whole tail, so the draft test compared
+    against "true # not ready" and the page counted as published. A quoted value
+    keeps everything inside the quotes -- a url may legitimately contain "#".
+    """
+    text = raw.strip()
+    if text[:1] in {'"', "'"}:
+        quote = text[0]
+        end = text.find(quote, 1)
+        return text[1:end] if end != -1 else text[1:]
+    if text.startswith("#"):
+        return ""
+    cut = re.search(r"\s#", text)
+    return (text[: cut.start()] if cut else text).strip().strip("\"'")
 
 
 def front_matter(page: Path) -> dict[str, object]:
@@ -115,7 +133,7 @@ def front_matter(page: Path) -> dict[str, object]:
             else:
                 aliases.extend(v.strip().strip("\"'") for v in raw.strip("[]").split(",") if v.strip())
             continue
-        out[key] = raw.strip("\"'")
+        out[key] = strip_inline_comment(raw)
     if aliases:
         out["aliases"] = aliases
     return out
