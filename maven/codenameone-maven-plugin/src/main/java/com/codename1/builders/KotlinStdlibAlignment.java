@@ -217,6 +217,48 @@ public class KotlinStdlibAlignment {
                 return true;
             }
         }
+        return containsAVersionRange(text);
+    }
+
+    /**
+     * Whether the text carries a Gradle version range, which needs no keyword
+     * at all.
+     *
+     * <p>{@code 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:[1.7,1.8)'} is an
+     * ordinary coordinate as far as the vocabulary above is concerned, and it
+     * excludes the floor: constraining to 1.8.0 leaves Gradle nothing that
+     * satisfies both, so a build that resolves today stops resolving.</p>
+     *
+     * <p>The signature is the comma, which appears nowhere else inside a
+     * version: a range has digits on its left and either digits or a closing
+     * bracket on its right. Map notation --
+     * {@code group: 'x', name: 'y', version: '1.8.0'} -- puts a quote to the
+     * left of every comma and is the case this must not fire on, since
+     * declaring the family that way is ordinary and gets raised. Anything else
+     * that happens to put a digit either side of a comma is a false match, and
+     * a false match only declines to help.</p>
+     */
+    private static boolean containsAVersionRange(String text) {
+        for (int i = text.indexOf(','); i >= 0; i = text.indexOf(',', i + 1)) {
+            int before = i - 1;
+            while (before >= 0 && text.charAt(before) == ' ') {
+                before--;
+            }
+            int after = i + 1;
+            while (after < text.length() && text.charAt(after) == ' ') {
+                after++;
+            }
+            if (before < 0 || after >= text.length()) {
+                continue;
+            }
+            char left = text.charAt(before);
+            char right = text.charAt(after);
+            if (left >= '0' && left <= '9'
+                    && ((right >= '0' && right <= '9')
+                        || right == ')' || right == ']' || right == '[')) {
+                return true;
+            }
+        }
         return false;
     }
 }

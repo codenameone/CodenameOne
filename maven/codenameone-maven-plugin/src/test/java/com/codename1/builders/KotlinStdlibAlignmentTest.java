@@ -200,6 +200,36 @@ class KotlinStdlibAlignmentTest {
                 "a bounded require holds the family below the floor");
     }
 
+    @Test
+    void aBoundedRangeNeedsNoKeyword() {
+        // The dangerous shape: an ordinary-looking coordinate whose version is
+        // a range that excludes the floor. Nothing in the vocabulary appears.
+        String[] ranges = {
+            "    implementation "
+                    + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:[1.7,1.8)'\n",
+            "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:(1.6,1.8]'\n",
+            "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:[1.7, )'\n",
+        };
+        for (int i = 0; i < ranges.length; i++) {
+            assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
+                            "implementation", false, ranges[i])),
+                    "<<" + ranges[i].trim() + ">> excludes the floor");
+        }
+
+        // And the case the comma test must NOT fire on, because declaring the
+        // family this way is ordinary and the constraint raises it.
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
+                        "    implementation group: 'org.jetbrains.kotlin', "
+                                + "name: 'kotlin-stdlib', version: '1.7.22'\n")
+                        .contains(":1.8.0"),
+                "map notation is a declaration, not a range");
+        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
+                        "    implementation "
+                                + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n")
+                        .contains(":1.8.0"),
+                "and neither is a plain version");
+    }
+
     /** The floor is the version at which the shims became empty. */
     @Test
     void theFloorIsWhereTheClassesMoved() {
