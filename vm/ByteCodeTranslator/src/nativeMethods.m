@@ -1228,14 +1228,23 @@ JAVA_LONG java_io_FileInputStream_skipImpl___long_long_R_long(CODENAME_ONE_THREA
     // Clamped to the real end so the return value is bytes actually skipped, which
     // is what InputStream.skip promises -- seeking past EOF succeeds in C and would
     // otherwise report a skip that did not happen.
-    long start = ftell(f);
-    if(start < 0 || fseek(f, 0, SEEK_END) != 0) {
-        return -1;
-    }
-    long end = ftell(f);
+    long start;
+    long end;
     long remaining;
     long skipped;
     long target;
+    /* Parked for the same reason availableImpl is: on a remote or FUSE filesystem
+       these go over the wire, and the collector cannot stop a thread sitting in the
+       CRT. One yield spans the sequence; the arithmetic below is local and stays
+       outside it. */
+    CN1_YIELD_THREAD;
+    start = ftell(f);
+    if(start < 0 || fseek(f, 0, SEEK_END) != 0) {
+        CN1_RESUME_THREAD;
+        return -1;
+    }
+    end = ftell(f);
+    CN1_RESUME_THREAD;
     if(end < 0) {
         return -1;
     }
@@ -1254,8 +1263,14 @@ JAVA_LONG java_io_FileInputStream_skipImpl___long_long_R_long(CODENAME_ONE_THREA
         skipped = (long)count;
     }
     target = start + skipped;
-    if(fseek(f, target, SEEK_SET) != 0) {
-        return -1;
+    {
+        int failed;
+        CN1_YIELD_THREAD;
+        failed = fseek(f, target, SEEK_SET) != 0;
+        CN1_RESUME_THREAD;
+        if(failed) {
+            return -1;
+        }
     }
     return (JAVA_LONG)skipped;
 }
@@ -1265,19 +1280,35 @@ JAVA_INT java_io_FileInputStream_availableImpl___long_R_int(CODENAME_ONE_THREAD_
     if(f == NULL) {
         return -1;
     }
-    long start = ftell(f);
-    if(start < 0 || fseek(f, 0, SEEK_END) != 0) {
-        return -1;
+    {
+        /* Seeking is not free on every filesystem: a remote mount or a FUSE
+           filesystem services ftell/fseek over the wire, and the thread is inside
+           the CRT for the duration. One yield spans the whole sequence rather than
+           bracketing each call -- the collector only needs the thread parked, and
+           three yield/resume pairs would cost more than the seeks. */
+        long start, end, remaining;
+        int failed = 0;
+        CN1_YIELD_THREAD;
+        start = ftell(f);
+        if(start < 0 || fseek(f, 0, SEEK_END) != 0) {
+            failed = 1;
+        }
+        if(!failed) {
+            end = ftell(f);
+            if(fseek(f, start, SEEK_SET) != 0) {
+                failed = 1;
+            }
+        }
+        CN1_RESUME_THREAD;
+        if(failed) {
+            return -1;
+        }
+        remaining = end - start;
+        if(remaining < 0) {
+            return -1;
+        }
+        return remaining > 0x7fffffffL ? 0x7fffffff : (JAVA_INT)remaining;
     }
-    long end = ftell(f);
-    if(fseek(f, start, SEEK_SET) != 0) {
-        return -1;
-    }
-    long remaining = end - start;
-    if(remaining < 0) {
-        return -1;
-    }
-    return remaining > 0x7fffffffL ? 0x7fffffff : (JAVA_INT)remaining;
 }
 
 JAVA_INT java_io_FileInputStream_closeImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {

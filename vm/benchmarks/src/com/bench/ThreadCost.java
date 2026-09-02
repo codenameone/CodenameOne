@@ -71,6 +71,14 @@ public class ThreadCost {
         }
         Thread.sleep(holdMs);
         System.out.println("threads=" + n + " started=" + started);
+        // Release them, or the process never exits and the documented
+        // "/usr/bin/time -l /tmp/threadcost" invocation never prints its result:
+        // the workers are non-daemon and parked on a wait nobody was notifying, so
+        // returning from main only ends the main thread. The measurement is already
+        // taken by this point, so waking them cannot affect it.
+        synchronized (LOCK) {
+            LOCK.notifyAll();
+        }
     }
 
     private static int envInt(String name, int fallback) {
