@@ -27,6 +27,7 @@
 #define _GNU_SOURCE
 #endif
 #include "cn1_globals.h"
+#include "cn1_virtual_thread.h"
 #include <assert.h>
 #include <time.h>   // clock_gettime: paces the low-memory allocation throttle
 #ifndef _WIN32
@@ -750,14 +751,9 @@ _Atomic long long cn1ConsFirstMarks = 0;
 // This measures the other side: for each site where a mutator can be stopped, how long it
 // was stopped and why. Cost is two clock_gettime calls per PARK -- never per allocation --
 // against a park that is at minimum a 50us sleep, so it cannot distort what it measures.
-#define CN1_STALL_PACING_VOLUME 0   // regime-A run-ahead cap (cn1PacingPark, no budget)
-#define CN1_STALL_PACING_BUDGET 1   // regime-B admission wait (cn1PacingPark, under a ceiling)
-#define CN1_STALL_LOWMEM        2   // the low-memory allocation throttle
-#define CN1_STALL_HANDSHAKE     3   // threadBlockedByGC: this thread's own share of the mark
-#define CN1_STALL_PENDING_FULL  4   // per-thread pending table full: waits out a WHOLE cycle
-#define CN1_STALL_NATIVE_RESUME 5   // returning from a native call into a running mark
-#define CN1_STALL_SIGNAL_STOP   6   // parked inside the GC's stop signal handler
-#define CN1_STALL_CAUSES        7
+/* The cause codes live in cn1_globals.h, beside CN1_STALL_ADD: a macro's
+   operands have to be visible wherever the macro is, and CN1_RESUME_THREAD is
+   used by every native file, not only this one. */
 static const char* cn1StallCauseNames[CN1_STALL_CAUSES] = {
     "pacingVolume", "pacingBudget", "lowMemory", "handshake",
     "pendingFull", "nativeResume", "signalStop"
@@ -1643,6 +1639,11 @@ static void gcMarkDrainParallel(CODENAME_ONE_THREAD_STATE);
 // scan a REAL root source for object-bearing FRAMELESS frames. See the big block below.
 static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadLocalData* t);
 static void cn1GcScanOwnStack(CODENAME_ONE_THREAD_STATE);
+// Virtual threads are a third root source beside the precise object stacks and the
+// native C stacks; see the block that defines these.
+static void cn1GcBuildVirtualThreadSnapshot(void);
+static void cn1GcScanParkedVirtualThreads(CODENAME_ONE_THREAD_STATE);
+static int cn1GcParkedVirtualThreadsScanned;
 static void cn1GcSignalStopThreads(struct ThreadLocalData* self);
 static void cn1GcSignalReleaseThreads(struct ThreadLocalData* self);
 #ifdef CN1_GC_CAN_FORCE_STOP
@@ -2259,6 +2260,31 @@ void codenameOneGCMark() {
     cn1_debugger_mark_issued_roots(d);
 #endif
 
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // Opened around the WHOLE loop, not around each thread. Threads are stopped
+    // and scanned one at a time and the others keep running throughout, so a host
+    // thread finishing a connection can free a virtual thread that an earlier
+    // iteration's snapshot still points at. From here until the matching End, a
+    // free unlinks and parks the virtual thread instead of releasing it.
+    cn1VirtualThreadGcScanBegin();
+    // Taken HERE, once, and deliberately not inside the loop below. Three reasons, and
+    // the first two are correctness rather than cost:
+    //
+    //   - Reading the registry takes its mutex. At this point every mutator is running
+    //     normally, so no thread can be holding that mutex while stopped. Inside the loop
+    //     a thread is signal-frozen at an arbitrary instruction and may be the holder --
+    //     the collector would then block on the thread it just froze.
+    //   - This also resets cn1GcParkedVirtualThreadsScanned. Guarding the call with
+    //     !forcedStop, as the root snapshots below must be, would leave that flag set
+    //     from the previous cycle whenever the first thread needed a forced stop, and the
+    //     parked scan would be skipped for the whole cycle -- silently dropping the roots
+    //     of every parked virtual thread and reclaiming objects that are still live.
+    //   - It is a per-cycle fact, so taking it per thread paid the mutex N times.
+    //
+    // Placed after GcScanBegin so every pointer it captures is held alive by the deferred
+    // release until the matching End.
+    cn1GcBuildVirtualThreadSnapshot();
+#endif
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         lockCriticalSection();
         struct ThreadLocalData* t = allThreads[iter];
@@ -2660,6 +2686,17 @@ void codenameOneGCMark() {
                     forcedStopSeq = 0;
                 }
 #endif
+                // AFTER the release above, deliberately: this scan MARKS, and marking
+                // allocates through cn1MatureObject's adoption buffer. Running it while a
+                // thread is signal-frozen is the exact hazard cn1GcFreezeHeld exists to
+                // prevent, since the frozen thread may own the allocator lock.
+                // Parked virtual threads belong to no OS thread, so they are not
+                // reached by the loop this sits in. Scanning them once per cycle
+                // is enough and is idempotent, since marking is.
+                if(!cn1GcParkedVirtualThreadsScanned) {
+                    cn1GcParkedVirtualThreadsScanned = 1;
+                    cn1GcScanParkedVirtualThreads(d);
+                }
 #ifdef CN1_CONSERVATIVE_GC_SELFCHECK
                 cn1GcSelfCheckThreadStack(t, stackSize);
 #endif
@@ -2698,6 +2735,11 @@ void codenameOneGCMark() {
             }
         }
     }
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // Every snapshot this loop took is dead now, so whatever was retired while it
+    // ran can actually be released.
+    cn1VirtualThreadGcScanEnd();
+#endif
     #if defined(__OBJC__)
     //NSLog(@"Mark set %i objects to %i", marked, currentGcMarkValue);
     #endif
@@ -4090,11 +4132,16 @@ static signed char cn1BibopSizeToClass[CN1_BIBOP_MAX_OBJECT + 1];
 
 // struct CN1BibopPage is defined in cn1_globals.h (shared with the inlined bump).
 
-static CN1BibopPage* _Atomic bibopAllPages = 0;   // registry head (atomic)
+/* No initializer: a static object is zero-initialized by the language, and
+ * clang 14 -- which is what Debian bookworm ships, and therefore what the
+ * glibc builder image uses -- rejects `= 0` on an _Atomic POINTER as "not a
+ * compile-time constant". The integer atomics above are accepted; only the
+ * pointer ones trip it. */
+static CN1BibopPage* _Atomic bibopAllPages;   // registry head (atomic)
 static _Atomic long long bibopAllPagesCount = 0;  // grow-only registration count
 static CN1BibopPage* bibopFreePool = 0;           // bibopMutex
 static CN1BibopPage* bibopPartialPool[CN1_BIBOP_NUM_CLASSES]; // bibopMutex
-static CN1BibopPage* _Atomic bibopSweepStack = 0; // Treiber-ish (push CAS / swap)
+static CN1BibopPage* _Atomic bibopSweepStack; // Treiber-ish (push CAS / swap); see above
 static pthread_mutex_t bibopMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_once_t  bibopOnce  = PTHREAD_ONCE_INIT;
 // Non-static: also read/written by the inlined bump fast path (cn1_globals.h).
@@ -4152,6 +4199,24 @@ __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
 
 static void cn1BibopDoInit() {
     int ci = 0;
+    // DIAGNOSTIC KNOB -- CN1_GC_TRIGGER_MB overrides how many uncollected bytes
+    // start a cycle. The twin of CN1_GC_PACING_CAP_MB above, and like it, it
+    // exists to ANSWER A QUESTION rather than to tune anything: raising it far
+    // enough that no cycle runs during a measured window attributes the remaining
+    // throughput gap to collection work or rules it out. A park counter cannot do
+    // that -- it says parks happened, not what the CPU went on.
+    //
+    // Not a supported setting: the heap grows without bound while it is raised.
+    {
+        const char* s = getenv("CN1_GC_TRIGGER_MB");
+        if(s != 0) {
+            long mb = atol(s);
+            if(mb > 0) {
+                atomic_store_explicit(&bibopGcTriggerBytes, mb * 1024L * 1024L,
+                                      memory_order_relaxed);
+            }
+        }
+    }
     for(int s = 0 ; s <= CN1_BIBOP_MAX_OBJECT ; s++) {
         while(ci < CN1_BIBOP_NUM_CLASSES && cn1BibopClassSize[ci] < s) {
             ci++;
@@ -5059,6 +5124,29 @@ static JAVA_BOOLEAN cn1PacingPastGrowthFloor(void) {
 }
 
 static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
+    // DIAGNOSTIC KNOB -- CN1_GC_PACING_CAP_MB overrides the computed cap outright.
+    //
+    // It exists to ANSWER A QUESTION, not to tune anything: setting it high enough that
+    // cn1PacingVolume can never exceed it removes volume parking from the run entirely,
+    // so a latency measurement taken with and without it attributes the tail to this
+    // backpressure or rules it out. Inferring that from the park counters alone is not
+    // the same evidence -- a counter says parks happened, not that they are what the
+    // slow requests were waiting on.
+    //
+    // Not a supported setting: overriding it discards the memory bound the cap exists to
+    // enforce, so a process run this way can grow until the OS kills it.
+    {
+        static _Atomic long cn1PacingCapOverride = -2;
+        long ov = atomic_load_explicit(&cn1PacingCapOverride, memory_order_relaxed);
+        if(ov == -2) {
+            const char* s = getenv("CN1_GC_PACING_CAP_MB");
+            ov = (s != 0) ? (long)atol(s) * 1024L * 1024L : -1;
+            atomic_store_explicit(&cn1PacingCapOverride, ov, memory_order_relaxed);
+        }
+        if(ov > 0) {
+            return ov;
+        }
+    }
     long trigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
     long base = trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER;
     long fm = atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
@@ -5304,10 +5392,30 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
               spins++ < 200000) {
             atomic_store_explicit(&cn1PacingLastParkMs, (long long)cn1MonotonicMillis(),
                                   memory_order_relaxed);
-            usleep(50);
+            // On a VIRTUAL thread, step off the host instead of sleeping on it.
+            //
+            // This spin is backpressure on the ALLOCATOR, so it fires wherever
+            // Java allocates -- which on a server is everywhere. Sleeping here
+            // holds whichever thread happened to be running the virtual thread,
+            // and a host thread is not a spare resource: it is one of the few
+            // threads that poll. Proved with a debugger rather than reasoned
+            // about: under load all four hosts were in this loop at once, three
+            // of them inside HttpServer.serve on different descriptors, so
+            // nothing was polling and the server had stopped accepting for good
+            // -- the volume this loop waits on only falls when a cycle ends, and
+            // ending one needs the mutator progress this loop is preventing.
+            //
+            // Yielding hands the host back. The virtual thread is RUNNABLE, not
+            // waiting on its socket, so the scheduler must re-queue it rather
+            // than hand it to the poller; see CN1_VT_YIELD_RUNNABLE.
+            if(!cn1VirtualThreadYieldIfVirtual()) {
+                usleep(50);
+            }
         }
         while(threadStateData->threadBlockedByGC) {
-            usleep((JAVA_INT)(500));
+            if(!cn1VirtualThreadYieldIfVirtual()) {
+                usleep((JAVA_INT)(500));
+            }
         }
         threadStateData->threadActive = JAVA_TRUE;
         CN1_STALL_ADD(__stallVol, CN1_STALL_PACING_VOLUME, threadStateData);
@@ -8431,9 +8539,35 @@ void cn1GcInstallSignalHandler(void) {
 
 // Signal-stop one thread, returning its captured SP (or 0 on failure/timeout). The
 // resolver snapshot MUST already be built (we do not realloc after the thread freezes).
-static char* cn1GcSignalStopOne(struct ThreadLocalData* t) {
+/* maySkip: whether this caller tolerates the unresponsive-thread throttle below. The
+   per-cycle native-stack scan does -- a thread it cannot stop is one it does not scan
+   either way. The FORCED-STOP ESCALATION does NOT: it retries every
+   CN1_GC_SAFEPOINT_WAIT_MAX_US precisely to ride out a transient or descheduled
+   handler, and throttling those retries would leave the collector waiting on
+   threadActive for tens of seconds, turning a recoverable timeout into the whole-VM
+   pause the escalation exists to prevent. */
+static char* cn1GcSignalStopOneImpl(struct ThreadLocalData* t, int maySkip) {
 #if !defined(_WIN32)
     if(!t->gcPthreadValid) return 0;
+    // A thread with a history of timing out is PROBED WITH A SHORT BUDGET, never
+    // skipped. Skipping it was wrong, and the reasoning that produced it was wrong:
+    // "a thread it cannot stop is one it does not scan either way" holds only while
+    // the thread genuinely cannot be stopped. A thread whose failures were transient
+    // -- the stop signal briefly masked, say -- recovers, and skipping it then means
+    // cn1GcScanThreadNativeStack returns without scanning a RESPONSIVE thread, so
+    // references held only in frameless C locals or registers go unmarked and can be
+    // reclaimed while in use.
+    //
+    // The cost this exists to avoid was never the signal; it was the WAIT. One
+    // unresponsive thread consumed the whole 2,000,000-spin budget, 267ms of a 280ms
+    // mark. Healthy threads answer within about 200 spins, so a budget of 20,000
+    // keeps a hundredfold margin for a thread that is merely slow while costing one
+    // percent of what a hang used to. A recovered thread is picked up on the very
+    // next cycle rather than up to 64 cycles later.
+    int spinBudget = 2000000;
+    if(maySkip && t->gcStopFailures >= 3) {
+        spinBudget = 20000;
+    }
     // Next generation for this thread (only the GC thread writes it). gcSigRelease
     // is MONOTONIC and never reset -- see the handler's generation handshake.
     int gen = (int)t->gcSigStopGen + 1;
@@ -8446,10 +8580,13 @@ static char* cn1GcSignalStopOne(struct ThreadLocalData* t) {
     // bounded wait for the handler to park THIS generation
     int spins = 0;
     while((int)t->gcSigStopped != gen) {
-        if(++spins > 2000000) { /* ~timeout: could not stop */ break; }
+        if(++spins > spinBudget) { /* ~timeout: could not stop */ break; }
         if((spins & 1023) == 0) usleep(50);
     }
     if((int)t->gcSigStopped != gen) {
+        // Counted only for the caller that can act on it: an escalation timeout says the
+        // thread was busy for 250ms, not that it never answers.
+        if(maySkip && t->gcStopFailures < 1000000) { t->gcStopFailures++; }
         // Abandon: the signal may still be pending, and the handler may ALREADY be
         // past its request gate about to park. PRE-RELEASE the generation so that
         // park (whenever it happens) exits immediately instead of spinning forever
@@ -8458,10 +8595,21 @@ static char* cn1GcSignalStopOne(struct ThreadLocalData* t) {
         t->gcSigStopRequest = 0;
         return 0;
     }
+    t->gcStopFailures = 0;      // answered: stop skipping it
     return (char*)t->gcSigStackPointer;
 #else
     return 0;
 #endif
+}
+
+/* Per-cycle native-stack scan: may skip a thread that has proved unresponsive. */
+static char* cn1GcSignalStopOne(struct ThreadLocalData* t) {
+    return cn1GcSignalStopOneImpl(t, 1);
+}
+
+/* Forced-stop escalation: never skips -- see the note on the impl. */
+static char* cn1GcSignalStopOneForEscalation(struct ThreadLocalData* t) {
+    return cn1GcSignalStopOneImpl(t, 0);
 }
 
 static void cn1GcSignalReleaseOne(struct ThreadLocalData* t) {
@@ -8511,9 +8659,11 @@ static JAVA_BOOLEAN cn1GcMarkForceStopUncooperative(struct ThreadLocalData* t) {
     // decline). Sized well above one thread's plausible adoption count per cycle.
     cn1GcAdoptReserve(16384);
 #endif
-    if(cn1GcSignalStopOne(t) == 0) {
-        // Timed out. cn1GcSignalStopOne has already pre-released the generation, so
-        // nothing is left stranded.
+    if(cn1GcSignalStopOneForEscalation(t) == 0) {
+        // Timed out. cn1GcSignalStopOneImpl has already pre-released the generation,
+        // so nothing is left stranded. This caller does NOT skip on repeated timeouts
+        // -- see the maySkip note on the impl -- so the CN1_GC_SAFEPOINT_WAIT_MAX_US
+        // (250ms) retry loop above keeps signalling until the thread answers.
         return JAVA_FALSE;
     }
 #ifdef CN1_NURSERY
@@ -8549,6 +8699,93 @@ static void cn1GcMarkReleaseForced(struct ThreadLocalData* t) {
     atomic_fetch_sub_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
 }
 #endif
+
+// ---- VIRTUAL THREADS AS A ROOT SOURCE -------------------------------------------
+//
+// A virtual thread runs Java on a stack of its own (cn1_virtual_thread.h), which
+// makes two things true that this scan would otherwise get wrong, both silently:
+//
+//   1. A thread that is RUNNING a virtual thread has its stack pointer inside that
+//      virtual thread's stack, not its own. The [sp, base) bounds check below then
+//      simply fails and the thread is skipped -- losing every conservative root it
+//      holds, with the crash landing somewhere else entirely.
+//   2. A PARKED virtual thread is referenced by nothing the collector walks. Its
+//      stack still holds Java references in C temporaries, and they are reachable
+//      from nowhere else.
+//
+// Both are handled by taking a snapshot of the registry BEFORE the world stops --
+// walking the live registry would mean taking its mutex, and a thread frozen by
+// the stop signal may be the one holding it, which is a deadlock rather than a
+// slowdown. The rest of this collector snapshots its roots for the same reason.
+#define CN1_VT_SNAPSHOT_MAX 4096
+static struct cn1VirtualThread* cn1GcVtSnapshot[CN1_VT_SNAPSHOT_MAX];
+static int cn1GcVtSnapshotCount = 0;
+static int cn1GcVtSnapshotTruncated = 0;
+
+// Reset at the start of every cycle; see the use below.
+static int cn1GcParkedVirtualThreadsScanned = 0;
+
+static void cn1GcBuildVirtualThreadSnapshot(void) {
+    cn1GcParkedVirtualThreadsScanned = 0;
+    int n = cn1VirtualThreadSnapshot(cn1GcVtSnapshot, CN1_VT_SNAPSHOT_MAX);
+    if(n > CN1_VT_SNAPSHOT_MAX) {
+        // Scanning a subset is not a degraded mode, it is a use-after-free waiting
+        // to happen, so say so loudly rather than continue quietly.
+        if(!cn1GcVtSnapshotTruncated) {
+            cn1GcVtSnapshotTruncated = 1;
+            fprintf(stderr, "[CN1-VT] %d virtual threads exceeds the GC snapshot of %d; "
+                            "raise CN1_VT_SNAPSHOT_MAX\n", n, CN1_VT_SNAPSHOT_MAX);
+        }
+        n = CN1_VT_SNAPSHOT_MAX;
+    }
+    cn1GcVtSnapshotCount = n;
+}
+
+// SNAPSHOT SCOPE, since review asks: a virtual thread registered AFTER the
+// once-per-cycle snapshot is invisible to this pass and to
+// cn1VirtualThreadForStackAddress until the next cycle. That is real, and it is a
+// property of the EXPERIMENTAL spawn API rather than of this scan -- inside the VM
+// the only caller of cn1VirtualThreadCreate is cn1SpawnVirtualThread, which nothing
+// in this repository calls. It belongs to the same unfinished design as the other
+// gaps listed above cn1SpawnVirtualThread in nativeMethods.m, and is fixed by the
+// same decision (carrier association), not by widening the snapshot here: taking
+// the registry lock during the scan is what the snapshot exists to avoid, because a
+// thread frozen by the stop signal may be the one holding it.
+//
+// Mark every virtual thread's saved stack region -- the RUNNING ones included, and
+// that redundancy is the point.
+//
+// The obvious version of this skipped anything cn1VirtualThreadIsRunning() reported,
+// on the reasoning that the carrier covers those. The carrier does cover them, but
+// only once its stack pointer is actually INSIDE the virtual stack, and `running` is
+// raised before the switch and lowered after the switch back. In those two windows a
+// stopped carrier still has an OS-stack pointer, so cn1VirtualThreadForStackAddress
+// matches nothing and the carrier pass scans only the OS stack -- while this pass
+// skipped the virtual stack for being "running". Java references living in C
+// temporaries on that stack went unmarked and could be swept. The flag cannot be made
+// atomic with the switch it brackets, because the switch is what changes the very
+// stack the flag would have to be written from.
+//
+// Scanning unconditionally removes the window instead of narrowing it. It is SAFE
+// because [sp, stackHigh) is inside the mapping whenever sp is non-zero, and it is
+// COMPLETE in combination with the carrier pass: while a virtual thread runs, the
+// carrier's pointer is lower than the saved sp, so this pass covers a subset and the
+// carrier covers the rest. Conservative marking is idempotent, so the overlap costs a
+// second walk of a small region and nothing else.
+static void cn1GcScanParkedVirtualThreads(CODENAME_ONE_THREAD_STATE) {
+    int i;
+    for(i = 0 ; i < cn1GcVtSnapshotCount ; i++) {
+        struct cn1VirtualThread* vt = cn1GcVtSnapshot[i];
+        void* lo; void* hi;
+        if(vt == 0) {
+            continue;
+        }
+        cn1VirtualThreadStackBounds(vt, &lo, &hi);
+        if(lo != 0 && hi != 0 && lo < hi) {
+            cn1ConservativeMarkRange(threadStateData, (char*)lo, (char*)hi);
+        }
+    }
+}
 
 // Scan ONE thread's native C stack [sp, base) + its register snapshot, marking every
 // resolved live object. threadStateData = the GC thread; t = the thread being scanned.
@@ -8597,6 +8834,21 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
     int useCoop = t->gcParkCaptured && t->gcStackPointerAtPark != 0 && cn1GcSignalStopMode == 0;
     if(useCoop) {
         char* sp = (char*)t->gcStackPointerAtPark;
+        // Running a virtual thread? Then sp is in ITS stack, and this thread's own
+        // stack holds the frames below the resume. Both halves are live.
+        struct cn1VirtualThread* vt =
+            cn1VirtualThreadForStackAddress(sp, cn1GcVtSnapshotCount, cn1GcVtSnapshot);
+        if(vt != 0) {
+            char* vtHigh = (char*)cn1VirtualThreadStackHigh(vt);
+            char* resumer = (char*)cn1VirtualThreadResumerSp(vt);
+            cn1ConservativeMarkRange(threadStateData, sp, vtHigh);
+            if(resumer >= base - (long)ssz && resumer < base) {
+                cn1ConservativeMarkRange(threadStateData, resumer, base);
+            }
+            cn1ConservativeMarkRange(threadStateData, (char*)&t->gcRegisterSnapshot,
+                                     (char*)&t->gcRegisterSnapshot + sizeof(t->gcRegisterSnapshot));
+            return;
+        }
         if(sp >= base - (long)ssz && sp < base) {
             cn1ConservativeMarkRange(threadStateData, sp, base);
             cn1ConservativeMarkRange(threadStateData, (char*)&t->gcRegisterSnapshot,
@@ -8632,8 +8884,23 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
     }
     // Raised only on the success path, so the sub below always pairs with an add.
     atomic_fetch_add_explicit(&cn1GcFreezeHeld, 1, memory_order_relaxed);
-    if(sp >= base - (long)ssz && sp < base) {
-        cn1ConservativeMarkRange(threadStateData, sp, base);
+    // Same virtual-thread split as the cooperative path above, and it is needed here for
+    // the same reason: the sp the signal handler reports is the one the thread was
+    // actually using, so for a carrier running a virtual thread it points into the
+    // virtual stack and the [sp, base) test below would reject it and skip every root.
+    {
+        struct cn1VirtualThread* vt =
+            cn1VirtualThreadForStackAddress(sp, cn1GcVtSnapshotCount, cn1GcVtSnapshot);
+        if(vt != 0) {
+            char* vtHigh = (char*)cn1VirtualThreadStackHigh(vt);
+            char* resumer = (char*)cn1VirtualThreadResumerSp(vt);
+            cn1ConservativeMarkRange(threadStateData, sp, vtHigh);
+            if(resumer >= base - (long)ssz && resumer < base) {
+                cn1ConservativeMarkRange(threadStateData, resumer, base);
+            }
+        } else if(sp >= base - (long)ssz && sp < base) {
+            cn1ConservativeMarkRange(threadStateData, sp, base);
+        }
     }
     if(t->gcSigRegsLen > 0) {
         cn1ConservativeMarkRange(threadStateData, t->gcSigRegs, t->gcSigRegs + t->gcSigRegsLen);
@@ -10787,17 +11054,208 @@ JAVA_OBJECT alloc4DArray(CODENAME_ONE_THREAD_STATE, int length4, int length3, in
  * Creates a java.lang.String object from an array of integers, this is useful
  * for the constant pool
  */
-JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]) {
-    enteringNativeAllocations();
-    JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, length, &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
-    memcpy((*dat).data, data, length * sizeof(JAVA_ARRAY_CHAR));
-    JAVA_OBJECT o = __NEW_java_lang_String(threadStateData);
+#ifdef _WIN32
+/* MultiByteToWideChar for the native-encoding conversion below. LEAN_AND_MEAN keeps
+   winsock's timeval out, which collides with cn1_win_compat.h's. */
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
+/*
+ * Builds a java.lang.String from decoded UTF-16 code units.
+ *
+ * The representation is not a free choice: the VM stores a string whose units all
+ * fit in a byte as a COMPACT byte[], and as a char[] otherwise, and String.charAt
+ * reads whichever it finds. Handing it the wrong one does not fail loudly -- it
+ * reads 8-bit units out of 16-bit data, so "caf..." comes back as c,NUL,a,NUL,f.
+ *
+ * Used by newString and newStringFromNative. newStringFromCString deliberately keeps
+ * its own copy of this tail: it tracks the Latin-1 flag DURING decoding, and it runs
+ * for every generated string literal at startup, so routing it through here would
+ * add a second pass over every literal in the program to save a dozen duplicated
+ * lines. If that tail changes, change this one with it.
+ */
+static JAVA_OBJECT cn1StringFromUnits(CODENAME_ONE_THREAD_STATE, const JAVA_ARRAY_CHAR* units, int count) {
+    JAVA_ARRAY dat;
+    JAVA_BOOLEAN latin1 = JAVA_TRUE;
+    int i;
+    JAVA_OBJECT o;
+    struct obj__java_lang_String* ss;
+    for(i = 0 ; i < count ; i++) {
+        if(units[i] > 0xff) { latin1 = JAVA_FALSE; break; }
+    }
+    if(latin1) {
+        JAVA_ARRAY_BYTE* b;
+        dat = (JAVA_ARRAY)allocArray(threadStateData, count, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+        b = (JAVA_ARRAY_BYTE*) (*dat).data;
+        for(i = 0 ; i < count ; i++) { b[i] = (JAVA_ARRAY_BYTE)units[i]; }
+    } else {
+        JAVA_ARRAY_CHAR* a;
+        dat = (JAVA_ARRAY)allocArray(threadStateData, count, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
+        a = (JAVA_ARRAY_CHAR*) (*dat).data;
+        for(i = 0 ; i < count ; i++) { a[i] = units[i]; }
+    }
+    o = __NEW_java_lang_String(threadStateData);
     java_lang_String___INIT____(threadStateData, o);
-    struct obj__java_lang_String* str = (struct obj__java_lang_String*)o;
-    str->java_lang_String_value = (JAVA_OBJECT)dat;
-    str->java_lang_String_count = length;
+    ss = (struct obj__java_lang_String*)o;
+    ss->java_lang_String_value = (JAVA_OBJECT)dat;
+    ss->java_lang_String_count = count;
+    return o;
+}
+
+JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]) {
+    /* JAVA_CHAR is an INT and JAVA_ARRAY_CHAR is an unsigned short, so the old
+       body was wrong twice: it sized the allocation with sizeof(JAVA_CHAR) (4 bytes
+       per element, for an array whose readers use 2) and then memcpy'd
+       length * sizeof(JAVA_ARRAY_CHAR) bytes straight out of a 4-byte-element
+       array, which copies half the input at the wrong stride. It went unnoticed
+       because nothing in C called this until now. Narrow element by element. */
+    JAVA_OBJECT o;
+    JAVA_ARRAY_CHAR stackUnits[256];
+    JAVA_ARRAY_CHAR* units = length <= 256 ? stackUnits
+            : (JAVA_ARRAY_CHAR*)malloc((size_t)length * sizeof(JAVA_ARRAY_CHAR));
+    int i;
+    if(units == 0) {
+        return JAVA_NULL;
+    }
+    enteringNativeAllocations();
+    for(i = 0 ; i < length ; i++) {
+        units[i] = (JAVA_ARRAY_CHAR)data[i];
+    }
+    o = cn1StringFromUnits(threadStateData, units, length);
+    if(units != stackUnits) {
+        free(units);
+    }
     finishedNativeAllocations();
     return o;
+}
+
+/**
+ * Creates a java.lang.String by DECODING text that came from the OS, rather than
+ * widening its bytes.
+ *
+ * The encoding is the PLATFORM's, which is why this is not called FromUtf8: UTF-8
+ * on POSIX, and the active code page on Windows, where the CRT has already
+ * converted the wide command line and environment down to it.
+ *
+ * newStringFromCString below widens each byte to a char independently -- its own
+ * comment says so, and that is correct for the generated string literals it exists
+ * to serve, which are ASCII plus ~~uXXXX escapes. It is wrong for any text that
+ * arrives from outside the program: a UTF-8 "e-acute" is two bytes, and widening
+ * them yields two garbage chars instead of one correct one.
+ *
+ * Invalid input decodes to U+FFFD rather than failing, which is what
+ * java.lang.String's own UTF-8 decoder does: a program should not die because one
+ * environment variable holds a stray byte.
+ *
+ * NOTE the Windows gap this does not close: argv and the environment arrive in the
+ * ACTIVE CODE PAGE there, not UTF-8, so they need the wide entry points
+ * (GetCommandLineW / _wgetenv) before any decoding is meaningful. That is the same
+ * unfixed issue recorded against the file layer in nativeMethods.m, and the same
+ * remedy.
+ */
+JAVA_OBJECT newStringFromNative(CODENAME_ONE_THREAD_STATE, const char* str) {
+#ifdef _WIN32
+    /* NOT UTF-8 on Windows. The CRT hands main() and getenv() the wide command line
+       and environment converted down to the ACTIVE CODE PAGE, so decoding those
+       bytes as UTF-8 yields U+FFFD for every non-ASCII character -- which is what
+       the clean-target Windows leg reported for "cafe-acute-euro": 99,97,102,65533,
+       65533. MultiByteToWideChar with CP_ACP is the conversion the platform
+       actually needs, and it produces UTF-16 code units directly, so no decoding
+       follows it. */
+    if(str != 0) {
+        int wide = MultiByteToWideChar(CP_ACP, 0, str, -1, NULL, 0);
+        if(wide > 0) {
+            JAVA_ARRAY_CHAR wstack[256];
+            JAVA_ARRAY_CHAR* wbuf = wide <= 256 ? wstack
+                    : (JAVA_ARRAY_CHAR*)malloc((size_t)wide * sizeof(JAVA_ARRAY_CHAR));
+            if(wbuf != 0) {
+                JAVA_OBJECT wres;
+                int got = MultiByteToWideChar(CP_ACP, 0, str, -1, (LPWSTR)wbuf, wide);
+                /* got includes the terminating NUL; the string does not. */
+                if(got > 0) { got--; } else { got = 0; }
+                enteringNativeAllocations();
+                wres = cn1StringFromUnits(threadStateData, wbuf, got);
+                finishedNativeAllocations();
+                if(wbuf != wstack) { free(wbuf); }
+                return wres;
+            }
+        }
+        return JAVA_NULL;
+    }
+    return JAVA_NULL;
+#endif
+    int in = 0;
+    int out = 0;
+    /* JAVA_ARRAY_CHAR, not JAVA_CHAR: these are UTF-16 code UNITS destined for a
+       string's backing array, and the two types are different widths. */
+    JAVA_ARRAY_CHAR stackBuf[256];
+    JAVA_ARRAY_CHAR* buf;
+    JAVA_OBJECT result;
+    int length;
+    if(str == 0) {
+        return JAVA_NULL;
+    }
+    length = (int)strlen(str);
+    /* One UTF-16 unit per input BYTE is always enough: a 1-byte sequence yields 1,
+       and the only multi-unit case (a 4-byte sequence yielding a surrogate pair)
+       yields 2 units from 4 bytes. An invalid byte yields exactly one U+FFFD. */
+    buf = length <= 256 ? stackBuf : (JAVA_ARRAY_CHAR*)malloc((size_t)length * sizeof(JAVA_ARRAY_CHAR));
+    if(buf == 0) {
+        return JAVA_NULL;
+    }
+    while(in < length) {
+        unsigned char b0 = (unsigned char)str[in];
+        unsigned int cp;
+        int extra;
+        if(b0 < 0x80) {
+            buf[out++] = (JAVA_ARRAY_CHAR)b0;
+            in++;
+            continue;
+        } else if((b0 & 0xE0) == 0xC0) { cp = b0 & 0x1FU; extra = 1; }
+        else if((b0 & 0xF0) == 0xE0) { cp = b0 & 0x0FU; extra = 2; }
+        else if((b0 & 0xF8) == 0xF0) { cp = b0 & 0x07U; extra = 3; }
+        else { buf[out++] = 0xFFFD; in++; continue; }
+
+        if(in + extra >= length + 0) {
+            /* Truncated at the end of the input. */
+            if(in + extra > length - 1) { buf[out++] = 0xFFFD; in++; continue; }
+        }
+        {
+            int k;
+            int ok = 1;
+            for(k = 1 ; k <= extra ; k++) {
+                unsigned char bn = (unsigned char)str[in + k];
+                if((bn & 0xC0) != 0x80) { ok = 0; break; }
+                cp = (cp << 6) | (bn & 0x3FU);
+            }
+            if(!ok) { buf[out++] = 0xFFFD; in++; continue; }
+        }
+        in += extra + 1;
+        /* Overlong forms, surrogates encoded as UTF-8, and out-of-range code points
+           are all rejected the way a conforming decoder must. */
+        if((extra == 1 && cp < 0x80) || (extra == 2 && cp < 0x800) || (extra == 3 && cp < 0x10000)
+                || (cp >= 0xD800 && cp <= 0xDFFF) || cp > 0x10FFFF) {
+            buf[out++] = 0xFFFD;
+            continue;
+        }
+        if(cp >= 0x10000) {
+            cp -= 0x10000;
+            buf[out++] = (JAVA_ARRAY_CHAR)(0xD800 + (cp >> 10));
+            buf[out++] = (JAVA_ARRAY_CHAR)(0xDC00 + (cp & 0x3FF));
+        } else {
+            buf[out++] = (JAVA_ARRAY_CHAR)cp;
+        }
+    }
+    enteringNativeAllocations();
+    result = cn1StringFromUnits(threadStateData, buf, out);
+    finishedNativeAllocations();
+    if(buf != stackBuf) {
+        free(buf);
+    }
+    return result;
 }
 
 /**
@@ -11666,6 +12124,34 @@ void cn1GcProbeInit(void) {
 }
 #endif /* CN1_GC_CONFORM */
 
+// Builds the String[] that main(String[]) receives, from the process argv.
+// Java's args array does NOT include the program name -- argv[0] is the
+// executable path and main()'s first element is the first real argument -- so
+// the copy starts at argv[1] and the array is argc-1 long. A clean-target
+// binary previously passed JAVA_NULL here, so every translated program was
+// unable to read its own command line.
+//
+// CN1_WRITE_BARRIER is required on each store (the array may already be
+// tenured by the time a later element is written); no CN1_SATB_DELETE is
+// needed because the array is freshly allocated and every slot is still NULL,
+// and the deletion barrier is a no-op on a NULL previous value.
+JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]) {
+    int count = argc > 1 ? argc - 1 : 0;
+    enteringNativeAllocations();
+    JAVA_OBJECT arrObj = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
+    JAVA_ARRAY_OBJECT* dest = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)arrObj)->data;
+    for(int iter = 0 ; iter < count ; iter++) {
+        /* Decoded, not widened: an argument is outside text. A UTF-8 "e-acute" is
+           two bytes, and widening them hands main(String[]) two garbage chars --
+           enough to corrupt a path or an option value before the program starts. */
+        JAVA_OBJECT str = newStringFromNative(threadStateData, argv[iter + 1]);
+        CN1_WRITE_BARRIER(arrObj, str);
+        dest[iter] = str;
+    }
+    finishedNativeAllocations();
+    return arrObj;
+}
+
 void initConstantPool() {
     cn1StartupPhase("main");
     __STATIC_INITIALIZER_java_lang_Class(getThreadLocalData());
@@ -11719,7 +12205,13 @@ void initConstantPool() {
     cn1StartSimulatedMemoryWarnings();
 #ifdef CN1_GC_CONFORM
     atexit(cn1ReportStalls);
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // The self test sorts the conservative extent table, which only exists on
+    // this arm. Calling it under CN1_GC_CONFORM alone does not compile, so
+    // -DCN1_GC_CONFORM -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS -- the A/B pair the
+    // header documents -- was not buildable.
     cn1ConsExtSortSelfTest();
+#endif
     cn1GcProbeInit();
 #endif
 
@@ -11863,6 +12355,67 @@ JAVA_OBJECT __NEW_ARRAY_JAVA_DOUBLE(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     return o;
 }
 
+/*
+ * Set by the clean target's generated main(). See the uncaught path at the bottom
+ * of throwException.
+ */
+int cn1AbortOnUncaughtException = 0;
+
+/*
+ * The end of the road for an exception no handler wants.
+ *
+ * Reached only when cn1AbortOnUncaughtException is set, which is the clean
+ * (server-side) target and nothing else -- an app target keeps today's behaviour,
+ * because changing what a shipped app does when it swallows an exception is not
+ * this change's business.
+ */
+static void cn1ReportUncaughtException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    static int reporting = 0;
+    if(reporting) {
+        /* Rendering the trace threw as well. Say so and stop, rather than recurse
+         * until the C stack runs out -- that reports as a segfault and hides the
+         * original failure entirely. */
+        fprintf(stderr, "Uncaught exception while reporting an uncaught exception\n");
+        fflush(stderr);
+        exit(1);
+    }
+    reporting = 1;
+    /* The search above left tryBlockOffset at -1: it decrements once on entry and
+     * then once per frame it rejects. Rendering the trace runs Java, and a Java
+     * method that saves and restores a NEGATIVE try depth corrupts the stack it
+     * restores into -- which is a SIGBUS in the reporter rather than a report.
+     * Every handler has been unwound by now, so the honest depth is zero. */
+    threadStateData->tryBlockOffset = 0;
+    fprintf(stderr, "Uncaught exception");
+    if(exceptionArg != JAVA_NULL && exceptionArg->__codenameOneParentClsReference != NULL
+            && exceptionArg->__codenameOneParentClsReference->clsName != NULL) {
+        fprintf(stderr, " %s", exceptionArg->__codenameOneParentClsReference->clsName);
+    }
+    if(exceptionArg != JAVA_NULL) {
+        /* The message, which the pre-rendered stack string does not carry -- and
+         * on a server it is the actionable half of the report. */
+        JAVA_OBJECT message = java_lang_Throwable_getMessage___R_java_lang_String(
+                threadStateData, exceptionArg);
+        if(message != JAVA_NULL) {
+            const char* text = stringToUTF8(threadStateData, message);
+            if(text != NULL) {
+                fprintf(stderr, ": %s", text);
+            }
+        }
+    }
+    fprintf(stderr, "\n");
+    fflush(stderr);
+    if(exceptionArg != JAVA_NULL) {
+        /* The Java renderer, so the message and the frames come out in the form a
+         * developer sees everywhere else. It runs with an empty try-block stack,
+         * which is what the guard above is for. */
+        java_lang_Throwable_printStackTrace__(threadStateData, exceptionArg);
+    }
+    fflush(stdout);
+    fflush(stderr);
+    exit(1);
+}
+
 void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
     #if defined(__OBJC__)
     //NSLog(@"Throwing exception!"); 
@@ -11885,6 +12438,22 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
         } 
         threadStateData->tryBlockOffset--; 
     } 
+    /*
+     * No handler anywhere on this thread. Historically this simply returned, and
+     * the generated code carried on with the statement AFTER the throw -- a
+     * `throw` that does nothing, with the method's locals in whatever state the
+     * half-finished operation left them. On an app target something upstream (the
+     * EDT's own catch) nearly always exists, so it stayed invisible; a server
+     * binary has no such catch, and the failure mode is a process that keeps
+     * serving with a null where a database connection should be.
+     *
+     * The clean target therefore reports and exits. Every other target keeps the
+     * old behaviour, because making this fatal everywhere would change what apps
+     * that ship today do.
+     */
+    if(cn1AbortOnUncaughtException) {
+        cn1ReportUncaughtException(threadStateData, exceptionArg);
+    }
 }
 
 JAVA_INT throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
@@ -11895,6 +12464,40 @@ JAVA_INT throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionAr
 JAVA_BOOLEAN throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
     throwException(threadStateData, exceptionArg);
     return JAVA_FALSE;
+}
+
+// Thrown by BC_CHECKCAST_CHECKED. The exception carries no detail message: the
+// no-arg constructor is the shape proven to survive dead-code elimination (it is
+// how NullPointerException is thrown from here), whereas a String-argument
+// constructor reachable only from this file would depend on native-use retention.
+// The class names are printed instead, so a failure is still diagnosable, and
+// attaching a real message is a follow-up once the constructor's retention is
+// pinned. Only reached on an actual bad cast, so the fprintf costs nothing on the
+// success path.
+// Shared failure path for BC_CHECKCAST_CHECKED and CN1_ARRAY_STORE_CHECK.
+//
+// The exception object is constructed BY THE CALLER and passed in, deliberately:
+// if this function named __NEW_INSTANCE_java_lang_ClassCastException itself, the
+// runtime would reference that symbol in every build, while the class is only
+// retained when -Dcn1.checkedCasts is on -- an unresolved symbol at link time for
+// everyone else. Keeping the reference in generated code, which only exists under
+// the same flag that retains the class, makes the two impossible to desynchronize.
+// (That is exactly how the first cut of this broke FileClassIntegrationTest.)
+//
+// No detail message on the exception: the no-arg constructor is the shape proven
+// to survive dead-code elimination (it is how NullPointerException is thrown from
+// here), whereas a String constructor reachable only from this file would depend
+// on native-use retention. The names are printed instead, so a failure is still
+// diagnosable. Only reached on an actual bad cast or store, so the fprintf costs
+// nothing on the success path.
+void cn1ThrowTypeError(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exception, const char* fromClass, const char* toClass) {
+    if(toClass == NULL) {
+        fprintf(stderr, "ArrayStoreException: %s\n", fromClass == NULL ? "?" : fromClass);
+    } else {
+        fprintf(stderr, "ClassCastException: %s cannot be cast to %s\n",
+                fromClass == NULL ? "?" : fromClass, toClass);
+    }
+    throwException(threadStateData, exception);
 }
 
 void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index) {

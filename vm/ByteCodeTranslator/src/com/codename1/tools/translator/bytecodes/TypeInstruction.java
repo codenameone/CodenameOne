@@ -24,6 +24,7 @@
 package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.ByteCodeClass;
+import com.codename1.tools.translator.ByteCodeTranslator;
 import com.codename1.tools.translator.Parser;
 import java.util.List;
 import org.objectweb.asm.Opcodes;
@@ -39,6 +40,7 @@ public class TypeInstruction extends Instruction {
     private boolean scalarReplaced = false;
     private int scalarStructId = -1;
     private boolean initBeforePublish = false;
+    private String originalType;
 
     /**
      * Marks this {@code NEW} as INIT-BEFORE-PUBLISH (memset elimination): the
@@ -76,6 +78,10 @@ public class TypeInstruction extends Instruction {
     public TypeInstruction(int opcode, String type) {
         super(opcode);
         this.type = type;
+        // appendInstruction mangles `type` in place (dots/slashes/dollars become
+        // underscores), so the readable name has to be kept aside here if anything
+        // downstream wants to print it -- BC_CHECKCAST_CHECKED's message does.
+        this.originalType = type;
     }
 
     /**
@@ -340,9 +346,38 @@ public class TypeInstruction extends Instruction {
                 b.append("(threadStateData, SP[0].data.i));\n");
                 break;
             case Opcodes.CHECKCAST:
-                b.append("BC_CHECKCAST(");
-                b.append(type);
-                b.append(");\n");
+                if(!ByteCodeTranslator.isCheckedCastsEnabled()) {
+                    // Legacy shape: the macro expands to nothing, so the argument is
+                    // discarded and the raw type name is fine.
+                    b.append("BC_CHECKCAST(");
+                    b.append(type);
+                    b.append(");\n");
+                    break;
+                }
+                // Enforcing shape. The class id has to be resolved the same way
+                // INSTANCEOF resolves it -- array dimensions collapse into one
+                // cn1_array_<n>_id_ token -- because instanceofFunction compares ids.
+                // The readable name is baked in as a literal here rather than looked
+                // up at runtime: the translator already knows it, and that keeps the
+                // failure path free of any class-name table.
+                int castPos = type.indexOf('[');
+                if(castPos > -1) {
+                    int castCount = 1;
+                    while(type.charAt(castPos + 1) == '[') {
+                        castCount++;
+                        castPos++;
+                    }
+                    b.append("BC_CHECKCAST_CHECKED(cn1_array_");
+                    b.append(castCount);
+                    b.append("_id_");
+                    b.append(actualType);
+                } else {
+                    b.append("BC_CHECKCAST_CHECKED(cn1_class_id_");
+                    b.append(actualType);
+                }
+                b.append(", \"");
+                b.append(originalType.replace('/', '.'));
+                b.append("\");\n");
                 break;
             case Opcodes.INSTANCEOF:
                 int pos = type.indexOf('[');

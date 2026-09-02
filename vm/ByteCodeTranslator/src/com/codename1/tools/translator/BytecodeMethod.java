@@ -4178,12 +4178,57 @@ public class BytecodeMethod implements SignatureSet {
         return new CustomIntruction("", "", new ArrayList<String>());
     }
 
+    /**
+     * Drop a CHECKCAST that immediately repeats the one before it.
+     *
+     * Deliberately narrow. Only a LineNumber may sit between the two, because it
+     * carries no semantics; a LabelInstruction may NOT, since another path can
+     * jump there with a different value on the stack, and then the second cast is
+     * the only one guarding it. Same reasoning for anything else in between: if it
+     * can touch the stack, the second cast is not redundant.
+     */
+    private void removeRepeatedCheckcasts() {
+        TypeInstruction previousCast = null;
+        for (int iter = 0 ; iter < instructions.size() ; iter++) {
+            Instruction current = instructions.get(iter);
+            if (current instanceof LineNumber) {
+                continue;                       // no semantics, does not break the pair
+            }
+            if (current instanceof TypeInstruction
+                    && current.getOpcode() == Opcodes.CHECKCAST) {
+                TypeInstruction cast = (TypeInstruction) current;
+                if (previousCast != null
+                        && previousCast.getTypeName() != null
+                        && previousCast.getTypeName().equals(cast.getTypeName())) {
+                    instructions.remove(iter);
+                    iter--;                     // the list shifted under us
+                    continue;                   // previousCast still stands
+                }
+                previousCast = cast;
+                continue;
+            }
+            previousCast = null;
+        }
+    }
+
     boolean optimize() {
         // FUSED OBJECTS, constructor side: rewrite each planned
         // `ALOAD 0; <len>; NEWARRAY T; PUTFIELD f` quadruple into the
         // self-contained KEEP-IF-NULL FusedFieldInit BEFORE any other pass can
         // fold/reorder those instructions. Runs on the raw list (first thing).
         replaceFusedCtorTriples();
+
+        // A CHECKCAST immediately repeated to the SAME type is a no-op: the first
+        // one already proved the type or threw, and neither touches the stack
+        // otherwise. javac emits the pair readily -- 23 of the 122 checkcast sites
+        // in a backend build were duplicates, 9 of them in java.lang.String, whose
+        // charInternal is the hottest String method under a server load.
+        //
+        // Worth removing rather than tolerating because a checked cast is REAL work
+        // here: the clean target enables checked casts unconditionally and other
+        // targets can pass -Dcn1.checkedCasts=true, so BC_CHECKCAST_CHECKED walks
+        // the class hierarchy instead of expanding to nothing.
+        removeRepeatedCheckcasts();
 
         int instructionCount = instructions.size();
 
@@ -4263,7 +4308,15 @@ public class BytecodeMethod implements SignatureSet {
             int currentOpcode = current.getOpcode();
             switch(currentOpcode) {
                 case Opcodes.CHECKCAST: {
-                    // Remove the check cast for now as it gets in the way of other optimizations
+                    // Remove the check cast for now as it gets in the way of other optimizations.
+                    // This removal is WHY a failed cast never throws (issue #5531): dropping the
+                    // instruction here means TypeInstruction never gets to emit anything for it,
+                    // so implementing the BC_CHECKCAST macro alone would have had no effect.
+                    // Under -Dcn1.checkedCasts=true the instruction is kept, at the cost of the
+                    // optimizations this removal was protecting.
+                    if(ByteCodeTranslator.isCheckedCastsEnabled()) {
+                        break;
+                    }
                     instructions.remove(iter);
                     iter--;
                     instructionCount--;
@@ -4641,7 +4694,26 @@ public class BytecodeMethod implements SignatureSet {
                                         "        JAVA_OBJECT __cn1ArrayTmp = " + arrayLiteral + ";\n" +
                                         "        JAVA_INT __cn1IndexTmp = " + indexLiteral + ";\n" +
                                         "        " + valueType + " __cn1ValueTmp = " + valueLiteral + ";\n" +
-                                        "        CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n" +
+                                        // The macro's own comment used to claim it covariance-checks
+                                        // OBJECT stores; it never did. Under -Dcn1.checkedCasts the
+                                        // check is emitted here.
+                                        //
+                                        // GUARDED BY THE ACCESS VALIDATION, because the JLS orders
+                                        // these: NullPointerException, then
+                                        // ArrayIndexOutOfBoundsException, then ArrayStoreException.
+                                        // Run bare, the covariance check reports a bad VALUE on a
+                                        // store whose INDEX is also bad, hiding the exception the
+                                        // program should have seen -- and on a null array it used to
+                                        // dereference null outright. cn1_array_access_validate throws
+                                        // the right one of the first two; the setter re-checks on its
+                                        // in-bounds fast path, which costs a comparison.
+                                        ("OBJECT".equals(elementType) && ByteCodeTranslator.isCheckedCastsEnabled()
+                                                ? "        if(cn1_array_access_in_bounds(__cn1ArrayTmp, __cn1IndexTmp)\n"
+                                                + "                || cn1_array_access_validate(threadStateData, __cn1ArrayTmp, __cn1IndexTmp)) {\n"
+                                                + "            CN1_ARRAY_STORE_CHECK(__cn1ArrayTmp, __cn1ValueTmp);\n"
+                                                + "            CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n"
+                                                + "        }\n"
+                                                : "        CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n") +
                                         "    }\n";
                             }
                             instructions.add(iter-3, new CustomIntruction(code, code, dependentClasses));

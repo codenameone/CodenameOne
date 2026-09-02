@@ -108,6 +108,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_socketRead___long_byte_1ARRAY_int_
     CN1Socket* s = (CN1Socket*) (intptr_t) socket;
     char* data;
     ssize_t n;
+    int readErrno;
     if (!s || s->fd < 0 || buffer == JAVA_NULL || length <= 0) {
         return -1;
     }
@@ -119,6 +120,11 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_socketRead___long_byte_1ARRAY_int_
      * syscall. Every other CN1 port's blocking I/O does the same. */
     CN1_YIELD_THREAD;
     n = read(s->fd, data + offset, (size_t) length);
+    /* Captured before CN1_RESUME_THREAD. The resume is a GC safepoint and can park
+     * this thread on a timed wait, which overwrites errno -- so lastError below
+     * reported the WAIT's outcome rather than the read's, handing Java a misleading
+     * error for a failure that had nothing to do with it. */
+    readErrno = errno;
     CN1_RESUME_THREAD;
     /* Keep the buffer array object reachable across the parked read: only `data` (an
      * interior pointer) is used, so the optimizer may drop `buffer` and the concurrent GC
@@ -126,7 +132,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_socketRead___long_byte_1ARRAY_int_
      * Windows port where this manifested on the cn1ss WebSocket reader). Force liveness. */
     CN1_SOCKET_KEEP_ALIVE(buffer);
     if (n <= 0) {
-        s->lastError = n < 0 ? errno : 0;
+        s->lastError = n < 0 ? readErrno : 0;
         if (n == 0) {
             s->connected = 0;
         }

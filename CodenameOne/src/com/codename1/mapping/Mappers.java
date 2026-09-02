@@ -109,8 +109,18 @@ public final class Mappers {
         if (m == null) {
             throw missing(instance.getClass());
         }
-        Map<String, Object> root = m.toMap(instance);
         StringBuilder sb = new StringBuilder();
+        if (m instanceof Mapper.Direct) {
+            // The generated mapper knows its properties at build time and can
+            // append them in order. Skips a LinkedHashMap, a hash per key and a
+            // walk back over it that rediscovers each value's type -- which on a
+            // small object is most of the cost of serialising it.
+            @SuppressWarnings("unchecked")
+            Mapper.Direct<Object> d = (Mapper.Direct<Object>) m;
+            d.toJson(instance, sb);
+            return sb.toString();
+        }
+        Map<String, Object> root = m.toMap(instance);
         writeJson(sb, root);
         return sb.toString();
     }
@@ -208,6 +218,112 @@ public final class Mappers {
     // Tiny JSON writer
     // ---------------------------------------------------------------
 
+    /// Appends any value a generated codec can hold, producing exactly what the
+    /// map path would.
+    ///
+    /// Public because generated `toJson` methods call it for the property kinds
+    /// they cannot render inline -- a nested mapped object, a `Property`'s value,
+    /// a list element. A nested object goes through ITS mapper, taking that
+    /// mapper's `Mapper.Direct` route when it offers one, so nesting stays free
+    /// of intermediate maps all the way down.
+    ///
+    /// Conversions match `Mapper#toMap` exactly, and must keep matching: a date
+    /// becomes its millisecond value and an enum its `name()`, because that is
+    /// what the map path puts in the map before the writer ever sees it.
+    public static void appendJsonValue(StringBuilder out, Object value) {
+        if (value == null) {
+            out.append("null");
+            return;
+        }
+        if (value instanceof java.util.Date) {
+            out.append(((java.util.Date) value).getTime());
+            return;
+        }
+        if (value instanceof String || value instanceof Boolean
+                || value instanceof Number || value instanceof Map
+                || value instanceof java.util.Collection) {
+            writeJson(out, value);
+            return;
+        }
+        // A mapped object, or something with no mapper at all -- appendJson
+        // decides, and falls back to the string form the map path would use.
+        appendJson(value, out);
+    }
+
+    /// Appends `instance` as a JSON object using its registered mapper, taking
+    /// the `Mapper.Direct` route when that mapper offers one.
+    ///
+    /// Unlike `#toJson(Object)` this appends rather than returning a String, so
+    /// nesting does not build one String per level. An unmapped value falls back
+    /// to its `toString`, which is what `Mapper#toMap` does for the same case
+    /// rather than failing the whole document.
+    public static void appendJson(Object instance, StringBuilder out) {
+        if (instance == null) {
+            out.append("null");
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Mapper<Object> m = (Mapper<Object>) BY_NAME.get(instance.getClass().getName());
+        if (m == null) {
+            writeJsonString(out, instance.toString());
+            return;
+        }
+        if (m instanceof Mapper.Direct) {
+            @SuppressWarnings("unchecked")
+            Mapper.Direct<Object> d = (Mapper.Direct<Object>) m;
+            d.toJson(instance, out);
+            return;
+        }
+        writeJson(out, m.toMap(instance));
+    }
+
+    /// Appends `value` exactly as `JSONWriter` would render it if it had been put
+    /// into the map that `Mapper#toMap` builds.
+    ///
+    /// This is deliberately NOT `#appendJsonValue`: that one is smarter, turning a
+    /// `Date` into epoch milliseconds and a mapped object into nested JSON. Where a
+    /// generated mapper is reproducing what the map path stored RAW -- a `Property`
+    /// value is the case that matters -- being smarter is being different, and
+    /// `Mapper.Direct` promises identical output rather than better output.
+    public static void appendJsonRaw(StringBuilder out, Object value) {
+        writeJson(out, value);
+    }
+
+    /// Appends `instance` through the mapper the CALLER names, rather than the one
+    /// registered for the instance's runtime class.
+    ///
+    /// The distinction is polymorphism. A field declared `Base` holding an instance
+    /// of an unmapped subclass finds no mapper by runtime class, and
+    /// `#appendJson(Object, StringBuilder)` then falls back to the quoted
+    /// `toString`. `Mapper#toMap` looks the mapper up by the DECLARED type and
+    /// serialises the subclass as an object, so a generated mapper reproducing the
+    /// map path has to ask the same question. Mirrors what the map path does with a
+    /// null mapper too: the raw value, which renders as its quoted `toString`.
+    public static void appendJsonUsing(Mapper<?> mapper, Object instance, StringBuilder out) {
+        if (instance == null) {
+            out.append("null");
+            return;
+        }
+        if (mapper == null) {
+            // toString(), not the raw value. emitFieldToMap stores `_v.toString()`
+            // when the declared type has no registered mapper, so JSONWriter quotes
+            // it -- an Object field holding an Integer comes out as "5". Passing the
+            // instance to writeJson would emit 5, changing the field's wire TYPE the
+            // day its mapper gains a direct writer.
+            writeJsonString(out, instance.toString());
+            return;
+        }
+        if (mapper instanceof Mapper.Direct) {
+            @SuppressWarnings("unchecked")
+            Mapper.Direct<Object> d = (Mapper.Direct<Object>) mapper;
+            d.toJson(instance, out);
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Mapper<Object> m = (Mapper<Object>) mapper;
+        writeJson(out, m.toMap(instance));
+    }
+
     static void writeJson(StringBuilder sb, Object value) {
         if (value == null) {
             sb.append("null");
@@ -247,6 +363,19 @@ public final class Mappers {
             return;
         }
         writeJsonString(sb, value.toString());
+    }
+
+    /// Appends `s` as an escaped JSON string, or `null`.
+    ///
+    /// Public because GENERATED mappers call it: a direct writer has to escape
+    /// exactly the way the map path does, and the only way to guarantee that is
+    /// for both to use this method rather than each having its own copy.
+    public static void appendJsonString(StringBuilder sb, String s) {
+        if (s == null) {
+            sb.append("null");
+            return;
+        }
+        writeJsonString(sb, s);
     }
 
     private static void writeJsonString(StringBuilder sb, String s) {

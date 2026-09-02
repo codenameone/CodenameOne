@@ -238,7 +238,29 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
         } else if (accessOrder) {
             cn1MoveToTail(cn1LastPut);
         }
-        if (cn1Head >= 0 && removeEldestEntry(new CompactEntry<K, V>(this, cn1Head))) {
+        // Two things here, both of which cost every caller of a plain
+        // LinkedHashMap:
+        //
+        // 1. The eviction hook belongs AFTER AN INSERTION, not after every put.
+        //    java.util.LinkedHashMap calls afterNodeInsertion (and so
+        //    removeEldestEntry) only when putVal added a NEW node; overwriting an
+        //    existing key does not evict. Calling it unconditionally was a
+        //    deviation from that as well as wasted work.
+        //
+        // 2. The CompactEntry exists only to be handed to removeEldestEntry.
+        //    There are no node objects in this representation, so unlike the JDK
+        //    -- which passes a node it already has -- one has to be built. For a
+        //    plain LinkedHashMap it is built, passed to a method whose body is
+        //    `return false`, and dropped: an allocation per insertion, feeding
+        //    the collector for nothing. cn1MayEvict is false exactly when this
+        //    object's class is LinkedHashMap itself, whose removeEldestEntry
+        //    cannot return true, so skipping is safe; any subclass keeps the old
+        //    behaviour whether or not it overrides the hook.
+        //
+        // Measured on the translated target before this change: building a
+        // four-entry map cost 252-258ns against HashMap's 139-142ns.
+        if (cn1LastInserted && cn1MayEvict && cn1Head >= 0
+                && removeEldestEntry(new CompactEntry<K, V>(this, cn1Head))) {
             @SuppressWarnings("unchecked")
             K eldest = (K) cn1Keys[cn1Head];
             remove(eldest);
@@ -275,6 +297,16 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements Map<K, V> {
     protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
         return false;
     }
+
+    /**
+     * False for a plain LinkedHashMap, whose {@link #removeEldestEntry} returns
+     * false unconditionally, so the eldest entry never has to be materialised.
+     * True for any subclass, which may override it.
+     *
+     * A class comparison rather than anything reflective -- CN1 obfuscates class
+     * names, so a name lookup would not survive a built app.
+     */
+    private final boolean cn1MayEvict = getClass() != LinkedHashMap.class;
 
     /**
      * Removes all elements from this map, leaving it empty.

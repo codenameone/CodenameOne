@@ -464,6 +464,13 @@ public class ByteCodeClass {
         dependsClassesInterfaces.clear();
         exportsClassesInterfaces.clear();
         dependsClassesInterfaces.add("java_lang_NullPointerException");
+        if(ByteCodeTranslator.isCheckedCastsEnabled()) {
+            // Kept alive for BC_CHECKCAST_CHECKED, which is emitted under the same
+            // flag. Retaining it only when the check is emitted keeps the class out
+            // of every build that does not enforce casts.
+            dependsClassesInterfaces.add("java_lang_ClassCastException");
+            dependsClassesInterfaces.add("java_lang_ArrayStoreException");
+        }
         setBaseClass(baseClass);
         if (isAnnotation) {
             dependsClassesInterfaces.add("java_lang_annotation_Annotation");
@@ -888,7 +895,16 @@ public class ByteCodeClass {
                     b.append("_");
                     b.append(bf.getFieldName());
                     if (bf.isVolatile()) {
-                        b.append(" = ATOMIC_VAR_INIT(0);\n");
+                        // No initializer. A static object is zero-initialized by
+                        // the language, and ATOMIC_VAR_INIT expands to a plain
+                        // parenthesized value -- which clang 14 (Debian bookworm,
+                        // and therefore the glibc backend builder image) rejects
+                        // on an atomic POINTER as "initializer element is not a
+                        // compile-time constant". The macro is also deprecated in
+                        // C17 and gone in C23, so this is where it was heading
+                        // regardless. Reached by any `volatile` static reference
+                        // field in user code.
+                        b.append(";\n");
                     } else {
                         b.append(" = 0;\n");
                     }
@@ -1202,6 +1218,25 @@ public class ByteCodeClass {
                     b.append("    setvbuf(stdout, NULL, _IONBF, 0);\n");
                     b.append("    setvbuf(stderr, NULL, _IONBF, 0);\n");
                     b.append("    initConstantPool();\n");
+                    // An exception no handler catches used to be discarded and
+                    // execution continued with the statement after the throw. An
+                    // app target nearly always has something upstream that
+                    // catches (the EDT's own try), so it stayed invisible there;
+                    // a server binary has no such catch, and the symptom is a
+                    // process that keeps serving with a half-built object where a
+                    // connection should be.
+                    //
+                    // GATED, and the gate is the point. This main() is emitted for
+                    // every target that has one -- iOS and macOS included -- so an
+                    // unconditional assignment here would make an uncaught exception
+                    // on any thread terminate a SHIPPED app, which is exactly the
+                    // behaviour change this runtime path is meant not to cause. Only
+                    // the clean target, which has no upstream catch to rely on, opts
+                    // in. (Reported on PR #5658: the comment that used to sit here
+                    // claimed this was already restricted; it was not.)
+                    if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CLEAN) {
+                        b.append("    cn1AbortOnUncaughtException = 1;\n");
+                    }
                     // With the nursery, the main thread allocates and must cooperate with
                     // the concurrent GC's stop-the-world pause (so the GC never scans its
                     // nursery while a minor collection runs). Lightweight threads are the
@@ -1258,9 +1293,14 @@ public class ByteCodeClass {
                                 + "        getThreadLocalData()->lightweightThread = JAVA_TRUE;\n"
                                 + "        getThreadLocalData()->threadActive = JAVA_TRUE;\n"
                                 + "#endif\n");
+                        // Hand main() the real command line. This used to pass
+                        // JAVA_NULL, so a translated program could not read its own
+                        // arguments at all and every knob had to come in through the
+                        // environment (see vm/benchmarks). cn1MainArgs skips argv[0] --
+                        // Java's args array excludes the program name.
                         b.append("        ");
                         b.append(clsName);
-                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n");
+                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), cn1MainArgs(getThreadLocalData(), argc, argv));\n");
                         // main returning does not end the process here -- AppKit
                         // owns the main thread and keeps running -- so leaving
                         // the worker registered would leave the collector
@@ -1279,7 +1319,7 @@ public class ByteCodeClass {
                     } else {
                         b.append("    ");
                         b.append(clsName);
-                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n}\n\n");
+                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), cn1MainArgs(getThreadLocalData(), argc, argv));\n}\n\n");
                     }
                 }
             }

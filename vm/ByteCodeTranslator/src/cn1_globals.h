@@ -37,6 +37,11 @@
 #include <setjmp.h>
 #include <math.h>
 #include <stdatomic.h>
+/* For CN1_RESUME_THREAD, which yields a virtual thread rather than sleeping the
+   carrier it runs on. Where the switch is not implemented, every entry point here
+   is a static inline stub answering "there is no virtual thread", so the macro
+   folds back to the plain sleep and that platform is byte-for-byte unchanged. */
+#include "cn1_virtual_thread.h"
 #include <stdint.h>
 
 // Darwin's setjmp/longjmp SAVE and RESTORE the caller's signal mask -- a sigprocmask
@@ -446,7 +451,62 @@ typedef struct clazz*       JAVA_CLASS;
     }
 
 // todo map instanceof and throw typecast exception
+// CHECKCAST is a no-op by default: ParparVM has always let a failed cast through,
+// so the wrong object reaches the next instruction and the target type's fields
+// get read out of it (issue #5531). That is a native crash no Java catch can see.
+//
+// BC_CHECKCAST_CHECKED is the enforcing form. The translator emits it in place of
+// BC_CHECKCAST only when -Dcn1.checkedCasts=true, and that same flag is what makes
+// the translator retain java.lang.ClassCastException -- so the emission and the
+// class's survival can never disagree and leave an unresolved symbol. Enforcement
+// is opt-in rather than the default because turning it on changes the outcome of
+// app builds that succeed today; server-side (clean-target) builds, which parse
+// untrusted input, should always turn it on.
+//
+// The cost is one instanceofFunction call, the same check INSTANCEOF already pays.
 #define BC_CHECKCAST(type)
+// AASTORE's companion hole: the array store is only bounds-checked, never
+// covariance-checked, so `Object[] o = new String[1]; o[0] = anInteger;` silently
+// stores the wrong type and the next reader gets an Integer where it expects a
+// String. Emitted by BasicInstruction under the same -Dcn1.checkedCasts flag that
+// drives BC_CHECKCAST_CHECKED, so ArrayStoreException's retention and the check's
+// emission cannot disagree.
+//
+/* The arrayObj null test is not redundant. This runs BEFORE
+   CN1_SET_ARRAY_ELEMENT_OBJECT, which is where a null array is turned into a
+   NullPointerException; CN1_CLASS_OF below would dereference the null first and
+   take the process down instead. Java also orders it this way -- NPE wins over
+   ArrayStoreException -- so falling through to the setter is both safe and
+   correct.
+
+   ONE DIMENSION ONLY, and that restriction is load-bearing. arrayType is NOT the
+   immediate component type: a generated array class records the BASE element class,
+   so String[][] has dimensions 2 and arrayType String rather than String[]. Asking
+   whether a String[] is an instance of String is the wrong question and answers no,
+   so without the dimensions test this REJECTED valid stores into every
+   multidimensional array. Skipping them is the conservative direction -- a genuine
+   ArrayStoreException there goes unreported, exactly as it did before this check
+   existed, where the alternative was breaking correct programs. Covering them needs
+   the immediate component type, which means emitting it per array class or
+   reconstructing it from dimensions at runtime. */
+#define CN1_ARRAY_STORE_CHECK(arrayObj, value) { \
+    if((value) != JAVA_NULL && (arrayObj) != JAVA_NULL \
+            && CN1_CLASS_OF(arrayObj)->dimensions == 1) { \
+        struct clazz* cn1__comp = CN1_CLASS_OF(arrayObj)->arrayType; \
+        if(cn1__comp != NULL && !instanceofFunction(cn1__comp->classId, GET_CLASS_ID(value))) { \
+            cn1ThrowTypeError(threadStateData, __NEW_INSTANCE_java_lang_ArrayStoreException(threadStateData), CN1_CLASS_OF(value)->clsName, NULL); \
+        } \
+    } \
+}
+
+#define BC_CHECKCAST_CHECKED(typeOfCheckCast, targetName) { \
+    if(SP[-1].data.o != JAVA_NULL) { \
+        int tmpCheckCastId = GET_CLASS_ID(SP[-1].data.o); \
+        if(!instanceofFunction(typeOfCheckCast, tmpCheckCastId)) { \
+            cn1ThrowTypeError(threadStateData, __NEW_INSTANCE_java_lang_ClassCastException(threadStateData), CN1_CLASS_OF(SP[-1].data.o)->clsName, targetName); \
+        } \
+    } \
+}
 
 #define BC_SWAP() swapStack(SP)
 
@@ -1016,11 +1076,43 @@ struct TryBlock {
     JAVA_OBJECT monitor;
 };
 
+/*
+ * Per-thread sizing. These three are what a thread costs before it runs a single
+ * instruction, so they are the numbers that decide whether a server-side binary
+ * can afford a thread per connection. #ifndef-guarded so an A/B can override them
+ * with -D without editing this file -- an unconditional #define silently ignores
+ * the -D (the redefinition warning is suppressed by the generated code's -w).
+ */
+#ifndef CN1_MAX_STACK_CALL_DEPTH
 #define CN1_MAX_STACK_CALL_DEPTH 1024
+#endif
 #define CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT CN1_MAX_STACK_CALL_DEPTH
+#ifndef CN1_MAX_OBJECT_STACK_DEPTH
 #define CN1_MAX_OBJECT_STACK_DEPTH 16536
+#endif
 
+#ifndef PER_THREAD_ALLOCATION_COUNT
 #define PER_THREAD_ALLOCATION_COUNT 4096
+#endif
+
+/*
+ * Try-block depth. Each entry carries a jmp_buf (~200 bytes on arm64 macOS,
+ * ~320 on arm64 musl), so 500 of them is 100-160KB per thread -- comparable to
+ * the shadow stack and much less obvious.
+ */
+#ifndef CN1_MAX_TRY_BLOCKS
+#define CN1_MAX_TRY_BLOCKS 500
+#endif
+
+/*
+ * Native stack per spawned thread on Linux. musl defaults to 128KB, which the
+ * recursive generated C overflows on a deep call chain, so it is pinned to a
+ * JVM-sized reservation. Reserved, not committed -- but it is the largest single
+ * number attached to a thread, so it is a knob rather than a literal.
+ */
+#ifndef CN1_THREAD_STACK_BYTES
+#define CN1_THREAD_STACK_BYTES (16 * 1024 * 1024)
+#endif
 
 #ifdef CN1_NURSERY
 // Tunables (override with -D). Block size and arena size trade footprint against
@@ -1176,6 +1268,14 @@ struct ThreadLocalData {
 
     // used by the GC to traverse the objects pointed to by this thread
     struct elementStruct* threadObjectStack;
+    /* How threadObjectStack was obtained, because the two allocators are not
+       interchangeable at free time: mmap pairs with munmap, calloc with free.
+       cn1AllocThreadStack falls back to calloc when mmap runs out of MAPPINGS
+       rather than out of memory, and munmap on an allocator-owned pointer fails
+       with EINVAL and leaks the whole shadow stack -- or, if the allocator handed
+       back a page-aligned block, unmaps memory the allocator still believes it
+       owns. */
+    int threadObjectStackMapped;
     int threadObjectStackOffset;
     
     // allocations are stored here and then copied to the big memory pool during
@@ -1292,6 +1392,12 @@ struct ThreadLocalData {
     volatile sig_atomic_t gcSigStopped;     // handler publishes the gen it parked for
     volatile sig_atomic_t gcSigRelease;     // GC publishes highest released gen (monotonic)
     volatile sig_atomic_t gcSigStopGen;     // generation counter (GC thread writes only)
+    /* Consecutive cn1GcSignalStopOne timeouts for this thread. A thread that never
+       answers the stop signal is not scanned either way -- the caller returns without
+       reading its stack -- so signalling it at all, and then waiting, buys nothing.
+       One such thread cost 267ms of a 280ms mark, every cycle. Stop attempting it once
+       it has proved unresponsive, and clear this the moment it answers. */
+    int gcStopFailures;
     void* volatile gcSigStackPointer;        // SP captured inside the signal handler
     // [sp,base) high bound and stack size, resolved BEFORE a forced freeze and reused
     // while it is held. cn1GcStackBase must not be called under one: it is two plain
@@ -1876,7 +1982,38 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
  * signal-stop this just makes the cheaper cooperative path usable; a no-op when conservative
  * roots are off. */
 #define CN1_YIELD_THREAD do { struct ThreadLocalData* __cn1yts = getThreadLocalData(); CN1_GC_PARK_CAPTURE(__cn1yts); __cn1yts->threadActive = JAVA_FALSE; } while(0)
-#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); while (__cn1rts->threadBlockedByGC){ usleep((JAVA_INT)1000);} __cn1rts->threadActive = JAVA_TRUE; __cn1rts->gcParkCaptured = JAVA_FALSE; CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
+/* The capture is cleared through a macro of its own because gcParkCaptured only
+ * EXISTS when conservative roots are compiled in. Referencing it unconditionally
+ * meant -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS -- the A/B arm vm/CLAUDE.md documents
+ * -- did not build at all, so the one measurement that isolates the conservative
+ * scan's cost could not be taken. */
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+#define CN1_GC_PARK_RELEASE(ts) do { (ts)->gcParkCaptured = JAVA_FALSE; } while(0)
+#else
+#define CN1_GC_PARK_RELEASE(ts) do { (void)(ts); } while(0)
+#endif
+/* Sleeping here sleeps the CARRIER, and a carrier hosts many virtual threads --
+ * hostCount is min(workers, cores), so on a 2-core pin 64 connections share 2
+ * carriers. One carrier sleeping a millisecond therefore freezes ~32 connections
+ * that were ready to run, which is why p50 stays good while p99 does not. Yield
+ * instead when this is a virtual thread: the carrier goes and serves the others,
+ * and the collector gets its safepoint just the same. The pacing park already
+ * did this; this site, the hottest of the four (once per syscall return), did
+ * not. Platform threads still sleep -- there is nothing to yield to. */
+/* MARK ACTIVE ONLY WHAT THE COLLECTOR CAN STOP -- that is what gcPthreadValid
+   means here, and the guard is not an optimisation.
+   getThreadLocalData() resolves to the VIRTUAL thread's state while one is running,
+   so without it every bracketed native -- a file read, a socket read -- left a
+   virtual thread's state threadActive on the way out. Nothing lowers it again until
+   the next yield, and the collector's wait for that flag is unbounded while the
+   forced-stop escalation that would break the wait is gated on gcPthreadValid,
+   permanently false for a virtual thread. A virtual thread that read a file and then
+   computed would stall collection forever.
+   This is the same hang as the reverted cn1VirtualThreadResume change, reached by a
+   different path, which is why removing that assignment alone did not close it.
+   Virtual-thread roots do not depend on the flag: cn1GcScanParkedVirtualThreads
+   scans every registered virtual thread whether or not it is running. */
+#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } if(__cn1rts->gcPthreadValid) { __cn1rts->threadActive = JAVA_TRUE; } CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
 
 extern struct ThreadLocalData* getThreadLocalData();
 
@@ -1951,11 +2088,22 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
 extern JAVA_VOID java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ex);
 
 
+/*
+ * When nonzero, an exception that no handler catches prints itself and ends the
+ * process instead of being silently discarded. Set by the clean (server-side)
+ * target's generated main(); left at 0 everywhere else so app targets keep the
+ * behaviour they ship with today.
+ */
+extern int cn1AbortOnUncaughtException;
+
 extern void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg);
 extern JAVA_INT  throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg);
 extern JAVA_BOOLEAN  throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg);
 extern JAVA_OBJECT __NEW_java_lang_NullPointerException(CODENAME_ONE_THREAD_STATE);
 extern JAVA_OBJECT __NEW_INSTANCE_java_lang_NullPointerException(CODENAME_ONE_THREAD_STATE);
+extern JAVA_OBJECT __NEW_INSTANCE_java_lang_ClassCastException(CODENAME_ONE_THREAD_STATE);
+extern JAVA_OBJECT __NEW_INSTANCE_java_lang_ArrayStoreException(CODENAME_ONE_THREAD_STATE);
+extern void cn1ThrowTypeError(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exception, const char* fromClass, const char* toClass);
 extern JAVA_OBJECT __NEW_INSTANCE_java_lang_StackOverflowError(CODENAME_ONE_THREAD_STATE);
 // Throws the PREALLOCATED StackOverflowError (pre-filled trace, no allocation,
 // no trace building) -- safe to call at stack exhaustion. See cn1_globals.m.
@@ -2444,6 +2592,17 @@ extern struct clazz class_array2__JAVA_DOUBLE;
 extern struct clazz class_array3__JAVA_DOUBLE;
 
 extern JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]);
+/**
+ * Like newStringFromCString but DECODES, in the PLATFORM's encoding, instead of
+ * widening bytes. Use it for text that came from outside the program (argv, the
+ * environment); the widening one is right only for generated literals, which are
+ * ASCII plus ~~uXXXX escapes.
+ *
+ * UTF-8 on POSIX; the active code page on Windows, where the CRT has already
+ * converted the wide command line and environment down to it. Not named FromUtf8
+ * for exactly that reason.
+ */
+extern JAVA_OBJECT newStringFromNative(CODENAME_ONE_THREAD_STATE, const char* str);
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str);
 extern JAVA_OBJECT newStringFromAsciiLen(CODENAME_ONE_THREAD_STATE, const char *src, int len);
 // Single-allocation fused compact-String builder (see cn1_globals.m). Returns a valid empty
@@ -2454,6 +2613,7 @@ extern JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_
 // set the real count LAST, after every byte is written, so a concurrent GC never sees count>0 over
 // an unfinished value. Single word store.
 #define cn1FusedLatin1End(so, n) (((struct obj__java_lang_String*)(so))->java_lang_String_count = (n))
+extern JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]);
 extern void initConstantPool();
 
 extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId);
@@ -2715,6 +2875,35 @@ extern JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JA
 extern void codenameOneGCMark();
 extern void codenameOneGCSweep();
 
+/* Thread-state and virtual-thread construction. Declared OUTSIDE the
+   conservative-roots block: neither depends on how the collector finds its roots,
+   and burying them there broke -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS -- the precise
+   threadObjectStack arm vm/CLAUDE.md documents -- with an undeclared
+   cn1SpawnVirtualThread in any native source that spawns one. */
+struct cn1VirtualThread;
+/**
+ * A VM thread state. bindToCallingOsThread false builds one for a VIRTUAL thread,
+ * which owns it rather than borrowing the host's -- see the definition.
+ */
+extern struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThread);
+/**
+ * EXPERIMENTAL and unfinished -- see the block above the definition in
+ * nativeMethods.m for what is open. Nothing in this repository calls either of
+ * these; they ship so the server work can build against them. The coroutine runtime
+ * underneath (cn1_virtual_thread.h) is finished and is not experimental.
+ */
+/** A virtual thread with a Java stack of its own, ready to be resumed. */
+extern struct cn1VirtualThread* cn1SpawnVirtualThread(void (*body)(void*), void* arg,
+                                                      size_t stackBytes);
+/**
+ * The other half of cn1SpawnVirtualThread. Releases the coroutine AND the VM thread
+ * state spawned with it -- including its allThreads slot, without which a virtual
+ * thread per request exhausts NUMBER_OF_SUPPORTED_THREADS. cn1VirtualThreadFree
+ * alone releases only the coroutine. Never call it from inside the virtual thread's
+ * own body; it frees the stack that body is running on.
+ */
+extern void cn1RetireVirtualThread(struct cn1VirtualThread* vt);
+
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // PHASE 3b production conservative-root API. cn1ConservativeResolve maps an
 // arbitrary machine word to the base of the live heap object it points into
@@ -2758,6 +2947,21 @@ extern __thread struct ThreadLocalData* cn1TlsSelf;
 #ifdef CN1_GC_CONFORM
 extern long long cn1StallNowNs(void);
 extern void cn1StallRecord(int cause, long long ns, struct ThreadLocalData* ts);
+/* Stall causes. Declared HERE rather than in cn1_globals.m because
+   CN1_RESUME_THREAD below expands to CN1_STALL_ADD(..., CN1_STALL_NATIVE_RESUME,
+   ...), and every native file that wraps a blocking call uses that macro. With
+   the codes private to cn1_globals.m, any other native source failed to compile
+   under -DCN1_GC_CONFORM with "use of undeclared identifier", which is every port
+   whose sockets, database or crypto natives wrap a blocking call this way. */
+#define CN1_STALL_PACING_VOLUME 0   // regime-A run-ahead cap (cn1PacingPark, no budget)
+#define CN1_STALL_PACING_BUDGET 1   // regime-B admission wait (cn1PacingPark, under a ceiling)
+#define CN1_STALL_LOWMEM        2   // the low-memory allocation throttle
+#define CN1_STALL_HANDSHAKE     3   // threadBlockedByGC: this thread's own share of the mark
+#define CN1_STALL_PENDING_FULL  4   // per-thread pending table full: waits out a WHOLE cycle
+#define CN1_STALL_NATIVE_RESUME 5   // returning from a native call into a running mark
+#define CN1_STALL_SIGNAL_STOP   6   // parked inside the GC's stop signal handler
+#define CN1_STALL_CAUSES        7
+
 #define CN1_STALL_T0(v) long long v = cn1StallNowNs()
 #define CN1_STALL_ADD(v, cause, ts) cn1StallRecord((cause), cn1StallNowNs() - (v), (ts))
 #else

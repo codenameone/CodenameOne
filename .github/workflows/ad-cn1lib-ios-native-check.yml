@@ -21,6 +21,7 @@ on:
       - 'maven/cn1-applovin/**'
       - 'maven/cn1-unity-levelplay/**'
       - 'vm/ByteCodeTranslator/src/cn1_globals.h'
+      - 'vm/ByteCodeTranslator/src/cn1_virtual_thread.h'
       - '.github/workflows/ad-cn1lib-ios-native-check.yml'
   push:
     branches: [master]
@@ -29,6 +30,7 @@ on:
       - 'maven/cn1-applovin/**'
       - 'maven/cn1-unity-levelplay/**'
       - 'vm/ByteCodeTranslator/src/cn1_globals.h'
+      - 'vm/ByteCodeTranslator/src/cn1_virtual_thread.h'
       - '.github/workflows/ad-cn1lib-ios-native-check.yml'
 
 concurrency:
@@ -115,6 +117,11 @@ jobs:
           # cn1_globals.h for them. Reproduce that here, using the port's own
           # header so a change to those macros is caught too.
           cp vm/ByteCodeTranslator/src/cn1_globals.h "$PROBE/"
+          # cn1_globals.h includes this one (CN1_RESUME_THREAD yields a virtual
+          # thread rather than sleeping the carrier it runs on), so staging the
+          # first without the second stops the probe at "file not found" before it
+          # compiles a single line of the cn1lib.
+          cp vm/ByteCodeTranslator/src/cn1_virtual_thread.h "$PROBE/"
           # Generated per translation from the app's class list; nothing in the
           # ad bridges reads it, so an empty stand-in is enough to let
           # cn1_globals.h parse on its own.

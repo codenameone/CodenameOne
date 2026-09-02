@@ -23,6 +23,7 @@
 
 package com.codename1.tools.translator.bytecodes;
 
+import com.codename1.tools.translator.ByteCodeTranslator;
 import java.util.List;
 import org.objectweb.asm.Opcodes;
 
@@ -358,6 +359,8 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append("{ /* BC_AASTORE */\n" +
                         "    JAVA_OBJECT aastoreTmp = SP[-3].data.o; \n" +
+                        (ByteCodeTranslator.isCheckedCastsEnabled()
+                                ? "    CN1_ARRAY_STORE_CHECK(aastoreTmp, SP[-1].data.o); \n" : "") +
                         "    CN1_WRITE_BARRIER(aastoreTmp, SP[-1].data.o); \n" +
                         "    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i]); \n" +
                         "    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \n" +

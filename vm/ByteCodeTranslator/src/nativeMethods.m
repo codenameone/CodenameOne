@@ -26,7 +26,12 @@
 #endif
 
 #include "cn1_globals.h"
+#include "cn1_virtual_thread.h"
 #include <stdint.h>
+#include <stdio.h>
+#ifndef _WIN32
+#include <sys/mman.h> /* cn1AllocThreadStack maps the shadow stack */
+#endif
 #include <ctype.h>
 #include <assert.h>
 #include <errno.h>
@@ -1030,6 +1035,389 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     }
 }
 
+/*
+ * The per-thread shadow stack, mapped rather than malloc'd + memset.
+ *
+ * This is CN1_MAX_OBJECT_STACK_DEPTH * sizeof(elementStruct) -- 258KB at the
+ * default depth. It used to be malloc'd and then memset in full at thread
+ * creation, which is 258KB of stores on the spawn path for a stack the thread
+ * will walk a few frames of. A fresh anonymous mapping is zero-filled by the
+ * kernel and commits per page on first touch, so neither the stores nor the pages
+ * are paid for up front.
+ *
+ * The eager clear was redundant: every frame prologue memsets the slots it claims
+ * (see the frame-entry helpers in cn1_globals.h), and the collector scans only up
+ * to threadObjectStackOffset, so no slot is read before its owning frame zeroed it.
+ *
+ * On RESIDENT memory this is worth less than it looks. Measured on musl/arm64 with
+ * 512 parked threads, per-thread RSS went 258KB -> 240KB: the shadow stack was
+ * already mostly uncommitted, and the per-thread cost actually lives in the
+ * callStack arrays (~50KB), pendingHeapAllocations (~27KB) and the try-block array
+ * (~15KB). Shrinking CN1_MAX_OBJECT_STACK_DEPTH on Linux changes nothing at all.
+ * The win here is the spawn path, not the footprint.
+ *
+ * Growing it is deliberately NOT how depth is solved. Generated frames hold
+ * interior pointers into this array (`locals` and `stack` are C locals pointing
+ * into it), so anything that MOVED the allocation would dangle every frame below
+ * the one that grew it. Reserving the range up front and letting the kernel decide
+ * what is resident keeps every pointer stable.
+ */
+/* Reports through *mapped which allocator answered, because the caller cannot tell
+   from the pointer and the two do not free the same way. */
+static struct elementStruct* cn1AllocThreadStack(int* mapped) {
+    *mapped = 0;
+#if defined(_WIN32)
+    /* VirtualAlloc would be the equivalent; calloc keeps the Windows target on one
+       well-trodden path, and it is not the target where thread counts are large. */
+    return (struct elementStruct*)calloc(CN1_MAX_OBJECT_STACK_DEPTH, sizeof(struct elementStruct));
+#else
+    /* Declared here rather than above the #if: it is used only on this arm, and on
+       Windows it was an unused local the compiler is entitled to warn about. */
+    size_t bytes = CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct);
+    void* p = mmap(NULL, bytes, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if(p == MAP_FAILED) {
+        /* Out of mappings rather than out of memory; calloc may still succeed. The
+           caller must remember this happened -- munmap on the result would fail with
+           EINVAL and leak the stack. */
+        return (struct elementStruct*)calloc(CN1_MAX_OBJECT_STACK_DEPTH, sizeof(struct elementStruct));
+    }
+    *mapped = 1;
+    return (struct elementStruct*)p;
+#endif
+}
+
+/* mapped MUST be the value cn1AllocThreadStack reported for this pointer. */
+static void cn1FreeThreadStack(struct elementStruct* stack, int mapped) {
+    if(stack == NULL) {
+        return;
+    }
+    if(!mapped) {
+        free(stack);
+        return;
+    }
+#if !defined(_WIN32)
+    munmap(stack, CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct));
+#endif
+}
+
+// getenv returns a pointer into the process environment, which is owned by the
+// C runtime and must not be freed. stringToUTF8 hands back the calling thread's
+// scratch buffer, so the lookup must finish with it before anything else on this
+// thread converts another string -- newStringFromNative copies, so building the
+// result here is safe.
+//
+// DECODED, not widened. An environment value is outside text: newStringFromCString
+// turns each byte into its own char, so a UTF-8 value comes back as one garbage
+// char per byte. (On Windows the value is in the ACTIVE CODE PAGE rather than
+// UTF-8, so it needs _wgetenv before any decoding is meaningful -- the same unfixed
+// issue recorded against the file layer below, and the same remedy.)
+/* Renamed from getenv: the null and embedded-NUL checks moved to the Java side,
+   where they are one line each, so this is now the raw lookup. */
+JAVA_OBJECT java_lang_System_getenvImpl___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
+    if(name == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    const char* key = stringToUTF8(threadStateData, name);
+    if(key == NULL) {
+        return JAVA_NULL;
+    }
+    const char* value = getenv(key);
+    if(value == NULL) {
+        return JAVA_NULL;
+    }
+    return newStringFromNative(threadStateData, value);
+}
+
+// ---------------------------------------------------------------------------
+// java.io file streams and standard input.
+//
+// Backed by C stdio (not POSIX fds) so the same code serves the Windows clean
+// target, which has no unistd.h. The Java side stores the FILE* as a long; 0 is
+// the "not open" value, which is why every open returns 0 rather than -1 on
+// failure. Negative returns below -1 mean "error" as opposed to -1's "end of
+// file", and the Java side turns those into IOException.
+//
+// The byte[] is only touched between entry and return, so it needs no GC
+// bracket: under conservative roots the argument is a scanned native local, and
+// nothing here allocates.
+// ---------------------------------------------------------------------------
+
+JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
+    if(name == JAVA_NULL) {
+        return 0;
+    }
+    const char* path = stringToUTF8(threadStateData, name);
+    if(path == NULL) {
+        return 0;
+    }
+    {
+        /* Opening BLOCKS on a FIFO: fopen for read waits until a writer opens the
+           other end, and there may never be one. `path` points into the thread's
+           utf8Buffer, which is C memory and unaffected by a collection, so it stays
+           valid across the safepoint. */
+        FILE* f;
+        CN1_YIELD_THREAD;
+        f = fopen(path, "rb");
+        CN1_RESUME_THREAD;
+        return (JAVA_LONG)(intptr_t)f;
+    }
+}
+
+/*
+ * TWO KNOWN LIMITATIONS of this file layer, recorded here rather than fixed,
+ * because both are pre-existing on every platform and neither is what enabling the
+ * clean target is about. Raised in review on PR #5658; written down so the next
+ * reader finds the analysis instead of rediscovering it.
+ *
+ * 1. FILE POSITIONS ARE 32-BIT WHERE C `long` IS. skipImpl/availableImpl below use
+ *    ftell/fseek, so a file over 2GiB cannot have its position represented on
+ *    Windows (LLP64: long is 32 bits) even though the Java API is `long`
+ *    throughout. The fix is _ftelli64/_fseeki64 against ftello/fseeko, plus
+ *    widening the local arithmetic -- worth doing, and not a build-enablement
+ *    change.
+ *
+ * 2. PATHS ARE PASSED TO THE NARROW CRT. stringToUTF8 produces UTF-8, and the
+ *    Windows CRT's fopen reads it in the active ANSI code page, so a path holding
+ *    a non-ASCII user or file name fails to open. The same mismatch runs through
+ *    java_io_File.m's stat/access/FindFirstFile calls. cn1_db_sqlite_impl.h around
+ *    line 196 already documents this exact problem and converts UTF-8 to UTF-16
+ *    before calling the wide API; the file layer needs the same treatment applied
+ *    across every entry point, which is its own change rather than a line here.
+ */
+
+/* Keeps a Java object provably live past a safepoint. Only an INTERIOR pointer into
+   an array is used across the blocking calls below, so the optimizer is free to drop
+   the array reference itself -- and the concurrent collector, scanning this parked
+   thread, then sees no root and sweeps the buffer while the read is still filling it.
+   The Linux port solves this with an asm barrier; this file also compiles under
+   clang-cl, which has no __asm__ __volatile__, so it uses a volatile store, which no
+   compiler may elide. The sink is written from several threads and never read: that
+   is the entire point of it, and the races are benign because no value is consumed. */
+static volatile JAVA_OBJECT cn1BlockingIoKeepAlive;
+#define CN1_KEEP_ALIVE_ACROSS_SAFEPOINT(obj) do { cn1BlockingIoKeepAlive = (obj); } while(0)
+
+JAVA_INT java_io_FileInputStream_readImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL || buffer == JAVA_NULL) {
+        return -2;
+    }
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    size_t n;
+    int atEof;
+    /* A "file" is not always a file: a FIFO, a device or a network-backed path can
+       block here for as long as the other end stays quiet, and with the thread left
+       ACTIVE the collector spins for a safepoint it cannot reach. Same treatment as
+       the socket reads and StandardInputStream. */
+    CN1_YIELD_THREAD;
+    n = fread(&data[offset], 1, (size_t)length, f);
+    atEof = feof(f);            /* before the resume: the resume is a safepoint */
+    CN1_RESUME_THREAD;
+    CN1_KEEP_ALIVE_ACROSS_SAFEPOINT(buffer);
+    if(n == 0) {
+        return atEof ? -1 : -2;
+    }
+    return (JAVA_INT)n;
+}
+
+JAVA_LONG java_io_FileInputStream_skipImpl___long_long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_LONG count) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL) {
+        return -1;
+    }
+    // Clamped to the real end so the return value is bytes actually skipped, which
+    // is what InputStream.skip promises -- seeking past EOF succeeds in C and would
+    // otherwise report a skip that did not happen.
+    long start;
+    long end;
+    long remaining;
+    long skipped;
+    long target;
+    /* Parked for the same reason availableImpl is: on a remote or FUSE filesystem
+       these go over the wire, and the collector cannot stop a thread sitting in the
+       CRT. One yield spans the sequence; the arithmetic below is local and stays
+       outside it. */
+    CN1_YIELD_THREAD;
+    start = ftell(f);
+    if(start < 0 || fseek(f, 0, SEEK_END) != 0) {
+        CN1_RESUME_THREAD;
+        return -1;
+    }
+    end = ftell(f);
+    CN1_RESUME_THREAD;
+    if(end < 0) {
+        return -1;
+    }
+    /* Clamp against the DISTANCE, never by adding first. skip(Long.MAX_VALUE) after
+       any byte has been read overflows `start + count` before the comparison can
+       clamp it -- signed overflow is undefined behaviour, and in practice wraps
+       negative and seeks backwards, so the caller is told it skipped a negative
+       distance or gets an error instead of landing on EOF. Subtracting cannot
+       overflow: end >= start >= 0, and start + skipped is at most end. */
+    remaining = end - start;
+    if(count <= 0) {
+        skipped = 0;
+    } else if(count >= (JAVA_LONG)remaining) {
+        skipped = remaining;
+    } else {
+        skipped = (long)count;
+    }
+    target = start + skipped;
+    {
+        int failed;
+        CN1_YIELD_THREAD;
+        failed = fseek(f, target, SEEK_SET) != 0;
+        CN1_RESUME_THREAD;
+        if(failed) {
+            return -1;
+        }
+    }
+    return (JAVA_LONG)skipped;
+}
+
+JAVA_INT java_io_FileInputStream_availableImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL) {
+        return -1;
+    }
+    {
+        /* Seeking is not free on every filesystem: a remote mount or a FUSE
+           filesystem services ftell/fseek over the wire, and the thread is inside
+           the CRT for the duration. One yield spans the whole sequence rather than
+           bracketing each call -- the collector only needs the thread parked, and
+           three yield/resume pairs would cost more than the seeks. */
+        long start, end, remaining;
+        int failed = 0;
+        CN1_YIELD_THREAD;
+        start = ftell(f);
+        if(start < 0 || fseek(f, 0, SEEK_END) != 0) {
+            failed = 1;
+        }
+        if(!failed) {
+            end = ftell(f);
+            if(fseek(f, start, SEEK_SET) != 0) {
+                failed = 1;
+            }
+        }
+        CN1_RESUME_THREAD;
+        if(failed) {
+            return -1;
+        }
+        remaining = end - start;
+        if(remaining < 0) {
+            return -1;
+        }
+        return remaining > 0x7fffffffL ? 0x7fffffff : (JAVA_INT)remaining;
+    }
+}
+
+JAVA_INT java_io_FileInputStream_closeImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL) {
+        return 0;
+    }
+    {
+        int r;
+        CN1_YIELD_THREAD;
+        r = fclose(f);
+        CN1_RESUME_THREAD;
+        return r == 0 ? 0 : -1;
+    }
+}
+
+JAVA_LONG java_io_FileOutputStream_openImpl___java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_BOOLEAN append) {
+    if(name == JAVA_NULL) {
+        return 0;
+    }
+    const char* path = stringToUTF8(threadStateData, name);
+    if(path == NULL) {
+        return 0;
+    }
+    {
+        /* The mirror of the read side: opening a FIFO for write waits for a reader. */
+        FILE* f;
+        CN1_YIELD_THREAD;
+        f = fopen(path, append ? "ab" : "wb");
+        CN1_RESUME_THREAD;
+        return (JAVA_LONG)(intptr_t)f;
+    }
+}
+
+JAVA_INT java_io_FileOutputStream_writeImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL || buffer == JAVA_NULL) {
+        return -1;
+    }
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    size_t written;
+    /* Blocks for the same reasons the read does -- a full pipe, a slow device -- and
+       strands the collector the same way. */
+    CN1_YIELD_THREAD;
+    written = fwrite(&data[offset], 1, (size_t)length, f);
+    CN1_RESUME_THREAD;
+    CN1_KEEP_ALIVE_ACROSS_SAFEPOINT(buffer);
+    return (JAVA_INT)written;
+}
+
+JAVA_INT java_io_FileOutputStream_flushImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL) {
+        return -1;
+    }
+    {
+        /* fflush pushes the buffer at the peer and blocks for the same reasons the
+           write does -- a FIFO nobody is draining, a slow network filesystem. */
+        int r;
+        CN1_YIELD_THREAD;
+        r = fflush(f);
+        CN1_RESUME_THREAD;
+        return r == 0 ? 0 : -1;
+    }
+}
+
+JAVA_INT java_io_FileOutputStream_closeImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL) {
+        return 0;
+    }
+    {
+        /* fclose FLUSHES before it closes, so it blocks exactly where the flush
+           above does. */
+        int r;
+        CN1_YIELD_THREAD;
+        r = fclose(f);
+        CN1_RESUME_THREAD;
+        return r == 0 ? 0 : -1;
+    }
+}
+
+// Standard input. Separate from FileInputStream because stdin is not seekable, so
+// skip/available cannot be implemented by the ftell dance above.
+JAVA_INT java_io_StandardInputStream_readImpl___byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
+    if(buffer == JAVA_NULL) {
+        return -2;
+    }
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    size_t n;
+    int atEof;
+    /* System.in.read() on a terminal or pipe waits for as long as nobody types. With
+       the thread left ACTIVE the concurrent collector spins for a safepoint this
+       thread cannot reach until input arrives -- on a target where forced-stop
+       escalation does not succeed, that is the whole VM stalled on a human. */
+    CN1_YIELD_THREAD;
+    n = fread(&data[offset], 1, (size_t)length, stdin);
+    /* Read BEFORE the resume. CN1_RESUME_THREAD is a safepoint and can park this
+       thread on a timed wait, and anything the stream state is asked for afterwards
+       describes the wait rather than the read. */
+    atEof = feof(stdin);
+    CN1_RESUME_THREAD;
+    CN1_KEEP_ALIVE_ACROSS_SAFEPOINT(buffer);
+    if(n == 0) {
+        return atEof ? -1 : -2;
+    }
+    return (JAVA_INT)n;
+}
+
 JAVA_LONG java_lang_System_currentTimeMillis___R_long(CODENAME_ONE_THREAD_STATE) {
     __STATIC_INITIALIZER_java_lang_System(threadStateData);
     struct timeval time;
@@ -1731,134 +2119,363 @@ int nThreadsToKill = 0;         // the number of threads we expect to be finaliz
 
 pthread_key_t   threadIdKey = 0;
 JAVA_LONG threadKeyCounter = 1;
+/**
+ * Build a fresh VM thread state.
+ *
+ * Split out of getThreadLocalData so a VIRTUAL thread can have one too. A
+ * virtual thread needs its own Java locals and operand stack -- that is the
+ * whole point of it, since a request's state lives there -- and it must be
+ * registered in allThreads like any other, or the precise scan never walks its
+ * object stack and its live objects are collected under it.
+ *
+ * The one thing this deliberately does NOT do is bind the state to the calling
+ * OS thread: a virtual thread's state belongs to the virtual thread and travels
+ * with it between hosts.
+ */
+/* Defined with cn1ReleaseThreadLocalData further down; the capacity-failure path
+   below unwinds a partially built state through it. */
+static void cn1FreeThreadLocalDataFields(struct ThreadLocalData* head);
+
+struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThread) {
+    struct ThreadLocalData* i;
+        JAVA_LONG nativeThreadId = threadKeyCounter;
+    threadKeyCounter++;
+    i = malloc(sizeof(struct ThreadLocalData));
+    i->threadId = nativeThreadId;
+    i->tryBlockOffset = 0;
+    
+    i->lightweightThread = JAVA_FALSE;
+    i->threadBlockedByGC = JAVA_FALSE;
+    i->threadActive = JAVA_FALSE;
+    i->threadKilled = JAVA_FALSE;
+#ifdef CN1_GC_CONFORM
+    // Malloc'd, so this starts as garbage. See gcThreadStartMs in cn1_globals.h.
+    { extern void cn1StallRegisterThread(struct ThreadLocalData* t);
+      cn1StallRegisterThread(i); }
+#endif
+    i->interrupted = JAVA_FALSE;
+    
+    i->currentThreadObject = 0;
+    
+    i->utf8Buffer = 0;
+    i->utf8BufferSize = 0;
+    /*
+     * calloc, not malloc+memset. These four buffers are ~300KB per thread and the
+     * eager memset TOUCHED EVERY PAGE, so a thread that never runs a deep call
+     * chain still paid the whole footprint in resident memory -- measured at
+     * ~118KB per parked thread, which is what decides whether a server-side
+     * binary can afford a thread per connection.
+     *
+     * The eager clear was redundant: every frame prologue memsets exactly the
+     * slots it is about to claim (see the frame-entry helpers in cn1_globals.h),
+     * and the collector only scans threadObjectStack up to
+     * threadObjectStackOffset, so no slot is ever read before the frame that owns
+     * it has zeroed it. calloc for a request this size comes from mmap and is
+     * lazily zeroed by the OS, so a shallow thread commits a few pages instead of
+     * all of them.
+     */
+    i->threadObjectStack = cn1AllocThreadStack(&i->threadObjectStackMapped);
+    i->threadObjectStackOffset = 0;
+
+    i->callStackClass = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
+    i->callStackLine = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
+    i->callStackMethod = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
+
+#ifdef CN1_ON_DEVICE_DEBUG
+    i->callStackLocalsAddresses = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
+    memset(i->callStackLocalsAddresses, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
+    i->callStackFrameInfo = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
+    memset(i->callStackFrameInfo, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
+#endif
+
+    i->callStackOffset = 0;
+
+    // ThreadLocalData is malloc'd (not zeroed); 0 means "frameless native-stack
+    // limit not yet computed" -- it is filled in lazily on first frameless entry.
+    i->nativeStackLimit = 0;
+
+    i->pendingHeapAllocations = calloc(PER_THREAD_ALLOCATION_COUNT, sizeof(void *));
+    i->heapAllocationSize = 0;
+    i->threadHeapTotalSize = PER_THREAD_ALLOCATION_COUNT;
+    // ThreadLocalData is malloc'd, NOT zeroed. bibopBytesLocal feeds the GC
+    // trigger/pacing accounting (CN1_BIBOP_FLUSH_BYTES adds it into the global
+    // counters); garbage here means a spurious immediate GC + hard-cap park, or
+    // a dead allocation trigger, on every new thread. nativeAllocationMode is
+    // read by the inlined alloc fast path (cn1BibopFastAlloc) before any setter
+    // runs -- garbage-nonzero silently disables the fast path for the thread.
+    i->bibopBytesLocal = 0;
+    i->bibopEpochBytes = 0;
+#ifndef CN1_DISABLE_BIBOP
+    i->bibopObservedGcEpoch = atomic_load_explicit(&bibopGcEpoch,
+                                        memory_order_relaxed);
+#else
+    i->bibopObservedGcEpoch = 0;
+#endif
+    i->bibopHighThroughputUntilEpoch = 0;
+    for(int __bi = 0 ; __bi < CN1_BIBOP_NUM_CLASSES ; __bi++) {
+#ifndef CN1_DISABLE_BIBOP
+        i->bibopBypassSeen[__bi] = atomic_load_explicit(&bibopBypassGeneration[__bi],
+                                            memory_order_relaxed);
+#else
+        i->bibopBypassSeen[__bi] = 0;
+#endif
+        i->bibopBypassRemaining[__bi] = 0;
+    }
+    i->nativeAllocationMode = JAVA_FALSE;
+    // dead-thread pending-migration queue state (single-writer allObjectsInHeap)
+    i->gcDeadNext = 0;
+    i->gcQueuedForDrain = JAVA_FALSE;
+    i->gcReleaseRequested = JAVA_FALSE;
+    
+    i->blocks = malloc(CN1_MAX_TRY_BLOCKS * sizeof(struct TryBlock));
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // PHASE 3b: record this thread's pthread handle + TLS self pointer so the GC can
+    // signal-stop it and the async-signal-safe stop handler can find its state.
+    i->gcParkCaptured = JAVA_FALSE;
+    // Carried over when this initialisation was extracted into a function: the
+    // forced-stop work (issue #5537) added this field to the inline block that used
+    // to live in the thread runner, and ThreadLocalData is malloc'd, NOT zeroed --
+    // an uninitialised flag here reads as garbage and the collector would believe it
+    // had already force-stopped a thread it never touched.
+    i->gcMarkForcedStop = JAVA_FALSE;
+    i->gcStackPointerAtPark = 0;
+    i->gcSigStopRequest = 0;
+    i->gcSigStopped = 0;
+    i->gcSigRelease = 0;
+    i->gcSigStopGen = 0;
+    i->gcSigStackPointer = 0;
+    // Zeroed for the same reason as the rest of this block: ThreadLocalData is
+    // malloc'd, not zeroed. The forced-stop scan guards on these being non-zero
+    // before it marks [sp, base), so garbage here would pass that guard and hand
+    // the conservative scan a bogus range.
+    i->gcStopFailures = 0;
+    i->gcSigStackBase = 0;
+    i->gcSigStackSize = 0;
+    i->gcSigRegsLen = 0;
+    if(bindToCallingOsThread) {
+        i->gcPthread = pthread_self();
+        i->gcPthreadValid = JAVA_TRUE;
+        cn1TlsSelf = i;
+    } else {
+        // A VIRTUAL thread has no pthread of its own and may run on a different
+        // host next time, so binding either of these to whoever happens to be
+        // creating it would be a lie the collector acts on. gcPthreadValid false
+        // makes cn1GcScanThreadNativeStack skip it, which is right: its C stack is
+        // reached through the virtual-thread registry instead, and its Java object
+        // stack through allThreads like everyone else. cn1TlsSelf must keep naming
+        // the HOST thread, because the async-signal stop handler runs on the host
+        // and needs the host's state.
+        // memset rather than `= 0`: pthread_t is a POINTER on Apple and glibc but a
+        // struct {handle, id} in the Windows compat shim, where assigning 0 is not
+        // even a type error the reader would expect -- it is "assigning to
+        // 'pthread_t' from incompatible type 'int'", and it failed only the Windows
+        // and cross-compile legs. Zeroing the bytes is correct for both shapes, and
+        // gcPthreadValid below is what actually gates every read of this field.
+        memset(&i->gcPthread, 0, sizeof(i->gcPthread));
+        i->gcPthreadValid = JAVA_FALSE;
+    }
+#endif
+    if(bindToCallingOsThread) {
+        pthread_setspecific(threadIdKey, i);
+    }
+    
+    if(!allThreads) {
+        allThreads = malloc(NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
+        memset(allThreads, 0, NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
+    }
+    int threadOffset = -1;
+    lockCriticalSection();
+    for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
+        if(allThreads[iter] == 0) {
+        threadOffset = iter;
+        break;
+        }
+    }
+    /* EXHAUSTION IS A RETURN VALUE, not an assertion. CODENAME_ONE_ASSERT is plain
+       assert(), which NDEBUG compiles out of every release build -- so once all
+       NUMBER_OF_SUPPORTED_THREADS slots were taken this fell through and executed
+       allThreads[-1] = i, corrupting whatever precedes the table instead of failing.
+       A debug build aborted; a shipped one carried on with silent corruption, which
+       is worse. Reporting it lets a caller that can cope do so. */
+    if(threadOffset < 0) {
+        unlockCriticalSection();
+        /* UNBIND BEFORE FREEING. pthread_setspecific ran above, so the key already
+           points at this state; freeing it without clearing leaves every later
+           getThreadLocalData() on this thread returning memory that has been given
+           back -- a use-after-free introduced by the exhaustion check itself, and
+           worse than the out-of-bounds write it replaced, because the thread would
+           keep using the stale pointer instead of retrying. Cleared here rather than
+           by moving the bind below the search: cn1TlsSelf is expected to name the
+           host thread for the whole of the rest of this function. */
+        if(bindToCallingOsThread) {
+            pthread_setspecific(threadIdKey, NULL);
+        }
+        cn1FreeThreadLocalDataFields(i);
+        return 0;
+    }
+    allThreads[threadOffset] = i;
+    unlockCriticalSection();
+    //printf("Thread slot %d assigned to thread %d\n",threadOffset,(int)i->threadId);
+
+    return i;
+}
+
+/**
+ * Create a virtual thread that can run Java: a stack of its own plus a VM thread
+ * state of its own.
+ *
+ * The two halves are both necessary and neither is sufficient. The stack carries
+ * the C activation records of the Java methods it is inside; the thread state
+ * carries their locals and operand stack, which is where a request's objects
+ * actually live. Giving it a stack but sharing the host's state would have two
+ * threads of control writing one Java stack.
+ *
+ * EXPERIMENTAL. This pair -- cn1SpawnVirtualThread and cn1RetireVirtualThread --
+ * is the VM-state half of virtual threads and is NOT FINISHED. Nothing in this
+ * repository calls it; it ships so the server work can build against it, and its
+ * lifecycle is designed against a real workload rather than guessed at. Review
+ * findings against it are noted rather than patched, because each patch so far has
+ * traded one hole for another (a scanning race became a collector hang; a bounds
+ * fix became a use-after-free). The COROUTINE runtime it sits on --
+ * cn1_virtual_thread.{h,c,S} and the collector's stack scanning -- is finished,
+ * tested and used, and is not covered by this notice.
+ *
+ * Known and deliberately open, all of them waiting on one design decision (carrier
+ * association, i.e. making the collector's stop handshake stop being per-TLD):
+ *   - a collection can walk this state's object stack while its virtual thread
+ *     mutates it;
+ *   - retiring a virtual thread retires the CARRIER's BiBOP pages, because
+ *     collectThreadResources works on thread-local state rather than the state it
+ *     is handed;
+ *   - the collector cannot stop a compute-only virtual thread at all, which is why
+ *     marking such a state active is a hang rather than a fix;
+ *   - a virtual thread registered after the collector's once-per-cycle registry
+ *     snapshot is invisible to the stack scan until the next cycle;
+ *   - past CN1_VT_SNAPSHOT_MAX (4096) registered virtual threads the snapshot is
+ *     truncated, and the collector warns but continues, so the overflow is unscanned.
+ *     Reaching that count needs this API, which is why it is listed here rather than
+ *     fixed in the collector.
+ *
+ * KNOWN GAP, stated here because the obvious fix is worse than the problem. The
+ * state this creates is never marked threadActive while its virtual thread runs,
+ * so a collection concurrent with a running virtual thread can walk that state's
+ * object stack and pending-allocation table while the virtual thread mutates them.
+ * Raised in review on PR #5658, and NOT fixed by setting threadActive: the state
+ * has no pthread of its own, the collector's while(threadActive) wait is unbounded,
+ * and the forced-stop escalation that breaks such a wait is gated on
+ * gcPthreadValid, which is permanently false here. Setting the flag converts a
+ * possible race into a certain hang for any virtual thread that computes without
+ * reaching a safepoint. That was measured against, not guessed: the flag was set,
+ * and this is the reverted state.
+ *
+ * The real fix is carrier association -- while a virtual thread runs, its state is
+ * executing ON a carrier that DOES have a stoppable pthread, so the collector
+ * should satisfy the wait by stopping the carrier rather than the state. That needs
+ * the stop handshake to stop being per-TLD (the signal handler records into the TLD
+ * of the thread it runs on, which is the carrier's), which is a change to the
+ * collector's stop protocol rather than to this function.
+ *
+ * The C stack half of the same report IS fixed, independently:
+ * cn1GcScanParkedVirtualThreads scans every registered virtual thread whether or
+ * not it is running, so no virtual stack goes unscanned.
+ *
+ * Sizing: threadObjectStack is mmap'd and lazily faulted, so the 264KB it
+ * reserves costs only the pages a virtual thread touches -- a handler that nests
+ * a dozen frames commits a page or two. That is the difference against the
+ * ~118KB RESIDENT a parked OS thread costs, and it is what decides whether a
+ * context per connection is affordable.
+ */
+#ifdef CN1_VIRTUAL_THREADS
+struct cn1VirtualThread* cn1SpawnVirtualThread(cn1VirtualThreadBody body, void* arg,
+                                               size_t stackBytes) {
+    struct ThreadLocalData* state;
+    struct cn1VirtualThread* vt = cn1VirtualThreadCreate(body, arg, stackBytes);
+    if(vt == 0) {
+        return 0;
+    }
+    // JAVA_FALSE: this state belongs to the virtual thread, not to whoever is
+    // creating it. See cn1CreateThreadLocalData for what that turns off.
+    state = cn1CreateThreadLocalData(JAVA_FALSE);
+    if(state == 0) {
+        cn1VirtualThreadFree(vt);
+        return 0;
+    }
+    state->lightweightThread = JAVA_TRUE;
+    cn1VirtualThreadSetState(vt, state);
+    return vt;
+}
+
+/* All defined further down this file; the virtual-thread retire path and the
+   capacity-failure path in cn1CreateThreadLocalData need them above their bodies. */
+extern void markDeadThread(struct ThreadLocalData* d);
+extern void cn1ReleaseThreadLocalData(struct ThreadLocalData* head);
+
+/**
+ * Retire a virtual thread produced by cn1SpawnVirtualThread, releasing BOTH halves.
+ *
+ * cn1VirtualThreadFree alone is not enough and the difference is not a small leak.
+ * That function knows only about the coroutine: it unregisters it and releases the
+ * stack. The VM thread state spawned alongside it holds a 264KB shadow stack, the
+ * call-stack arrays and the pending-allocation table, and -- the part that ends the
+ * process rather than merely growing it -- one of the NUMBER_OF_SUPPORTED_THREADS
+ * slots in allThreads. A server that spawns a virtual thread per request and never
+ * came through here would consume a slot per completed request and eventually trip
+ * CODENAME_ONE_ASSERT(threadOffset > -1) in cn1CreateThreadLocalData.
+ *
+ * Must NOT be called from inside the virtual thread's own body: this releases the
+ * stack that body is running on. Retire it from whoever resumed it, after
+ * cn1VirtualThreadFinished reports true.
+ */
+void cn1RetireVirtualThread(struct cn1VirtualThread* vt) {
+    struct ThreadLocalData* state;
+    if(vt == 0) {
+        return;
+    }
+    state = (struct ThreadLocalData*)cn1VirtualThreadState(vt);
+    cn1VirtualThreadSetState(vt, 0);
+    if(state != 0) {
+        // Frees the allThreads slot and runs collectThreadResources, exactly as an
+        // OS thread's death does.
+        markDeadThread(state);
+        // ALWAYS deferred, never freed here, and there is deliberately no
+        // synchronous branch to fall into. collectThreadResources -- which
+        // markDeadThread just called, and which has no early return -- sets
+        // gcQueuedForDrain unconditionally, so the release is the drain's job.
+        //
+        // That is required rather than incidental, and the reason is worth stating
+        // because a synchronous free reads as harmless once the allThreads slot is
+        // cleared: codenameOneGCMark copies each ThreadLocalData* out of allThreads
+        // under the critical section and then dereferences it OUTSIDE the lock, so
+        // a mark already past that copy is still reading this state. The drain runs
+        // at the START of a mark, after the previous one has finished, which is the
+        // one point where no collector iteration can still hold the pointer.
+        lockCriticalSection();
+        state->gcReleaseRequested = JAVA_TRUE;
+        unlockCriticalSection();
+    }
+    cn1VirtualThreadFree(vt);
+}
+#endif /* CN1_VIRTUAL_THREADS -- see the capability gate in cn1_virtual_thread.h */
+
 struct ThreadLocalData* getThreadLocalData() {
+    // A running virtual thread supplies its own state; every generated method
+    // reaches its locals through this, so missing it would silently give the
+    // virtual thread the HOST thread's Java stack and corrupt both.
+    {
+        struct cn1VirtualThread* __vt = cn1VirtualThreadCurrent();
+        if(__vt != 0) {
+            struct ThreadLocalData* __s = (struct ThreadLocalData*)cn1VirtualThreadState(__vt);
+            if(__s != 0) {
+                return __s;
+            }
+        }
+    }
     if(threadIdKey == 0) {
         pthread_key_create(&threadIdKey, NULL);
     }
     struct ThreadLocalData* i = pthread_getspecific(threadIdKey);
     if(i == NULL) {
-        JAVA_LONG nativeThreadId = threadKeyCounter;
-        threadKeyCounter++;
-        i = malloc(sizeof(struct ThreadLocalData));
-        i->threadId = nativeThreadId;
-        i->tryBlockOffset = 0;
-        
-        i->lightweightThread = JAVA_FALSE;
-        i->threadBlockedByGC = JAVA_FALSE;
-        i->threadActive = JAVA_FALSE;
-        i->threadKilled = JAVA_FALSE;
-#ifdef CN1_GC_CONFORM
-        // Malloc'd, so this starts as garbage. See gcThreadStartMs in cn1_globals.h.
-        { extern void cn1StallRegisterThread(struct ThreadLocalData* t);
-          cn1StallRegisterThread(i); }
-#endif
-        i->interrupted = JAVA_FALSE;
-        
-        i->currentThreadObject = 0;
-        
-        i->utf8Buffer = 0;
-        i->utf8BufferSize = 0;
-        i->threadObjectStack = malloc(CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct));
-        memset(i->threadObjectStack, 0, CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct));
-        i->threadObjectStackOffset = 0;
-        
-        i->callStackClass = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(int));
-        memset(i->callStackClass, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(int));
-        
-        i->callStackLine = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(int));
-        memset(i->callStackLine, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(int));
-        
-        i->callStackMethod = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(int));
-        memset(i->callStackMethod, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(int));
-
-#ifdef CN1_ON_DEVICE_DEBUG
-        i->callStackLocalsAddresses = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
-        memset(i->callStackLocalsAddresses, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
-        i->callStackFrameInfo = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
-        memset(i->callStackFrameInfo, 0, CN1_MAX_STACK_CALL_DEPTH * sizeof(struct cn1_frame_info*));
-#endif
-
-        i->callStackOffset = 0;
-
-        // ThreadLocalData is malloc'd (not zeroed); 0 means "frameless native-stack
-        // limit not yet computed" -- it is filled in lazily on first frameless entry.
-        i->nativeStackLimit = 0;
-        i->pendingHeapAllocations = malloc(PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
-        memset(i->pendingHeapAllocations, 0, PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
-        i->heapAllocationSize = 0;
-        i->threadHeapTotalSize = PER_THREAD_ALLOCATION_COUNT;
-        // ThreadLocalData is malloc'd, NOT zeroed. bibopBytesLocal feeds the GC
-        // trigger/pacing accounting (CN1_BIBOP_FLUSH_BYTES adds it into the global
-        // counters); garbage here means a spurious immediate GC + hard-cap park, or
-        // a dead allocation trigger, on every new thread. nativeAllocationMode is
-        // read by the inlined alloc fast path (cn1BibopFastAlloc) before any setter
-        // runs -- garbage-nonzero silently disables the fast path for the thread.
-        i->bibopBytesLocal = 0;
-        i->bibopEpochBytes = 0;
-#ifndef CN1_DISABLE_BIBOP
-        i->bibopObservedGcEpoch = atomic_load_explicit(&bibopGcEpoch,
-                                                        memory_order_relaxed);
-#else
-        i->bibopObservedGcEpoch = 0;
-#endif
-        i->bibopHighThroughputUntilEpoch = 0;
-        for(int __bi = 0 ; __bi < CN1_BIBOP_NUM_CLASSES ; __bi++) {
-#ifndef CN1_DISABLE_BIBOP
-            i->bibopBypassSeen[__bi] = atomic_load_explicit(&bibopBypassGeneration[__bi],
-                                                            memory_order_relaxed);
-#else
-            i->bibopBypassSeen[__bi] = 0;
-#endif
-            i->bibopBypassRemaining[__bi] = 0;
-        }
-        i->nativeAllocationMode = JAVA_FALSE;
-        // dead-thread pending-migration queue state (single-writer allObjectsInHeap)
-        i->gcDeadNext = 0;
-        i->gcQueuedForDrain = JAVA_FALSE;
-        i->gcReleaseRequested = JAVA_FALSE;
-        
-        i->blocks = malloc(500 * sizeof(struct TryBlock));
-#ifdef CN1_CONSERVATIVE_GC_ROOTS
-        // PHASE 3b: record this thread's pthread handle + TLS self pointer so the GC can
-        // signal-stop it and the async-signal-safe stop handler can find its state.
-        i->gcPthread = pthread_self();
-        i->gcPthreadValid = JAVA_TRUE;
-        i->gcParkCaptured = JAVA_FALSE;
-        i->gcStackPointerAtPark = 0;
-        i->gcSigStopRequest = 0;
-        i->gcSigStopped = 0;
-        i->gcSigRelease = 0;
-        i->gcSigStopGen = 0;
-        i->gcSigStackPointer = 0;
-        i->gcSigStackBase = 0;
-        i->gcSigStackSize = 0;
-        i->gcSigRegsLen = 0;
-        // ThreadLocalData is malloc'd, NOT zeroed (see the notes on nativeStackLimit and
-        // bibopBytesLocal above). Garbage-nonzero here would tell
-        // cn1GcScanThreadNativeStack that the mark loop already froze this thread, so it
-        // would scan a RUNNING thread's stack from a garbage SP and never signal-stop it
-        // -- missed roots, then a use-after-free on whatever the sweep took.
-        i->gcMarkForcedStop = JAVA_FALSE;
-        cn1TlsSelf = i;
-#endif
-        pthread_setspecific(threadIdKey, i);
-        
-        if(!allThreads) {
-            allThreads = malloc(NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
-            memset(allThreads, 0, NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
-        }
-        int threadOffset = -1;
-        lockCriticalSection();
-        for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
-            if(allThreads[iter] == 0) {
-                threadOffset = iter;
-                break;
-            }
-        }
-        CODENAME_ONE_ASSERT(threadOffset > -1);
-        allThreads[threadOffset] = i;
-        unlockCriticalSection();
-        //printf("Thread slot %d assigned to thread %d\n",threadOffset,(int)i->threadId);
+        i = cn1CreateThreadLocalData(JAVA_TRUE);
     }
     return i;
 }
@@ -2284,9 +2901,16 @@ JAVA_VOID java_lang_Object_notifyAll__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ob
 JAVA_VOID java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t, JAVA_INT p) {
 }
 
-void cn1ReleaseThreadLocalData(struct ThreadLocalData *head) {
+/* Every buffer a thread state owns, and the state itself. Shared with the failure
+   path in cn1CreateThreadLocalData, which must NOT touch nThreadsToKill -- a state
+   that never reached allThreads was never counted as living. */
+static void cn1FreeThreadLocalDataFields(struct ThreadLocalData *head) {
     free(head->blocks);
-    free(head->threadObjectStack);
+    /* Free it the way it was ALLOCATED -- see cn1AllocThreadStack, which falls back
+       to calloc when mmap is out of mappings. Neither mismatch is survivable: free()
+       on a mapping is undefined behaviour, and munmap on an allocator block leaks the
+       stack at best. */
+    cn1FreeThreadStack(head->threadObjectStack, head->threadObjectStackMapped);
     free(head->callStackClass);
     free(head->callStackLine);
     free(head->callStackMethod);
@@ -2296,6 +2920,10 @@ void cn1ReleaseThreadLocalData(struct ThreadLocalData *head) {
 #endif
     free(head->pendingHeapAllocations);
     free(head);
+}
+
+void cn1ReleaseThreadLocalData(struct ThreadLocalData *head) {
+    cn1FreeThreadLocalDataFields(head);
     nThreadsToKill--;
 }
 
@@ -2516,7 +3144,7 @@ JAVA_VOID java_lang_Thread_start__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT th) {
     // transition) easily overflows 128KB, corrupting the thread stack and crashing
     // at a varying site. Pin a JVM-sized 16MB stack so CN1 threads behave the same
     // as on every other port regardless of the linked libc.
-    pthread_attr_setstacksize(&attr, 16 * 1024 * 1024);
+    pthread_attr_setstacksize(&attr, CN1_THREAD_STACK_BYTES);
 #endif
     int rc = pthread_create(&pt, &attr, threadRunner, (void *)th);
     if (rc != 0) {

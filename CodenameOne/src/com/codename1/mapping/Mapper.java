@@ -48,6 +48,35 @@ public interface Mapper<T> {
     /// `JSONParser` and populates a fresh `T`.
     T fromMap(Map<String, Object> map);
 
+    /// Optional: append `instance` as JSON directly, without building a map
+    /// first.
+    ///
+    /// A generated mapper knows every property name and type at build time, so
+    /// it can append them in order rather than filling a `LinkedHashMap` -- with
+    /// a hash per key -- and having the writer walk it back rediscovering each
+    /// value's type. On a small object that map round trip is the majority of
+    /// the serialisation cost, not the escaping.
+    ///
+    /// Measured through `Mappers#toJson` on a four-property object, output
+    /// asserted identical: **2.05x / 1.51x / 2.81x** faster (263 -> 128,
+    /// 214 -> 142, 224 -> 80 ns per call).
+    ///
+    /// That measurement ran on Java SE, so the map it avoids is the JDK's
+    /// LinkedHashMap. On a translated device build the map is
+    /// `vm/JavaAPI`'s, which overrides the natives HashMap gets and costs about
+    /// 1.5x a HashMap to build -- so the saving there is at least this, not less.
+    ///
+    /// Implemented as a separate interface rather than a method on `Mapper` so
+    /// hand-written mappers keep compiling; `Mappers#toJson` uses it when the
+    /// mapper offers it and falls back to `toMap` when it does not.
+    interface Direct<T> {
+
+        /// Appends `instance` as a JSON value -- an object, or the four
+        /// characters `null`. Must produce exactly what
+        /// `JSONWriter.toJson(toMap(instance))` would.
+        void toJson(T instance, StringBuilder out);
+    }
+
     /// XML root element name (`@XmlRoot.value`, falling back to the class
     /// simple name with a lowercase first character).
     String xmlRootName();

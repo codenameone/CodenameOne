@@ -223,6 +223,39 @@ public class ByteCodeTranslator {
         return "true".equals(System.getProperty("cn1.sqlcipher", "false"));
     }
 
+    /**
+     * True when CHECKCAST should actually verify the cast and throw ClassCastException
+     * instead of expanding to nothing (issue #5531). Opt-in, because enforcing it changes
+     * the outcome of app builds that succeed today: a cast that silently produced the wrong
+     * object now throws where nothing threw before. Server-side (clean-target) builds handle
+     * untrusted input and should always enable it.
+     *
+     * <p>This one flag drives both halves and they must stay in agreement: it makes
+     * TypeInstruction emit BC_CHECKCAST_CHECKED, and it makes ByteCodeClass retain
+     * java.lang.ClassCastException. Emitting the check without retaining the class would
+     * leave an unresolved symbol at link time.
+     */
+    /**
+     * EXPERIMENTAL, and deliberately INERT unless asked for.
+     *
+     * Checked casts exist for the server-side clean target, where there is no EDT
+     * catch upstream and a bad cast otherwise walks into generated native field
+     * access. They are OFF by default on purpose -- including on the clean target --
+     * because the feature is not finished and nothing in this repository ships with
+     * it on. Turning it on by default was suggested in review and is wrong: it would
+     * change codegen for every clean-target build in the tree to exercise a path that
+     * is still being designed.
+     *
+     * Enable it deliberately with -Dcn1.checkedCasts=true. The emitted checks
+     * (BC_CHECKCAST_CHECKED, CN1_ARRAY_STORE_CHECK) are maintained and reviewed under
+     * that flag; they are not a claim that the VM validates casts today. See
+     * CLAUDE.md, "Never rely on ClassCastException", which remains the rule for every
+     * shipping target.
+     */
+    public static boolean isCheckedCastsEnabled() {
+        return "true".equalsIgnoreCase(System.getProperty("cn1.checkedCasts", "false"));
+    }
+
     /// Writes the bundled SQLite engine into a source root, or takes it back out.
     ///
     /// Emitted only for an application that uses `com.codename1.db`, and its ciphers only for one
@@ -406,6 +439,11 @@ public class ByteCodeTranslator {
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), Files.newOutputStream(cn1Globals.toPath()));
         File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), Files.newOutputStream(cn1Intrinsics.toPath()));
+        // Virtual threads: the switch is a few instructions of assembly per
+        // architecture, so the .S travels with the runtime rather than being
+        // generated. A project that gets the C and not the .S links against a
+        // missing symbol, which is at least loud.
+        emitVirtualThreadRuntime(srcRoot);
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
@@ -750,6 +788,11 @@ public class ByteCodeTranslator {
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), Files.newOutputStream(cn1Globals.toPath()));
         File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), Files.newOutputStream(cn1Intrinsics.toPath()));
+        // Virtual threads: the switch is a few instructions of assembly per
+        // architecture, so the .S travels with the runtime rather than being
+        // generated. A project that gets the C and not the .S links against a
+        // missing symbol, which is at least loud.
+        emitVirtualThreadRuntime(srcRoot);
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
@@ -915,7 +958,7 @@ public class ByteCodeTranslator {
                 }
             } else {
                 fileListEntry.append("; path = \"");
-                if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") ||
+                if(file.endsWith(".m") || file.endsWith(".S") || file.endsWith(".s") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") ||
                         file.endsWith(".swift") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib") ||
                         file.endsWith(".metal")) {
                     fileListEntry.append(file);
@@ -951,7 +994,7 @@ public class ByteCodeTranslator {
                         .append(" };\n");
             }
             
-            if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".hh") || file.endsWith(".hpp") ||
+            if(file.endsWith(".m") || file.endsWith(".S") || file.endsWith(".s") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".hh") || file.endsWith(".hpp") ||
                     file.endsWith(".swift") || file.endsWith(".mm") || file.endsWith(".h") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".xib") ||
                     file.endsWith(".metal")) {
                 
@@ -1049,14 +1092,34 @@ public class ByteCodeTranslator {
             // generated .S that .incbin's the resource blobs (ASM language).
             boolean embedResources = (windows && new File(srcRoot, "cn1_resources.rc").isFile())
                     || (linux && new File(srcRoot, "cn1_resources_data.S").isFile());
+            // Assembly is driven by what is actually THERE, not by which feature put it
+            // there. The resource .S used to be the only one, so the ASM language and its
+            // glob were gated on embedResources; the virtual-thread context switch is a
+            // second .S, and under that gate the clean target compiled its C half and
+            // failed to link on _cn1VirtualThreadSwitch with the source sitting in the
+            // same directory.
+            boolean hasAsm = false;
+            String[] rootFiles = srcRoot.list();
+            if (rootFiles != null) {
+                for (String f : rootFiles) {
+                    if (f.endsWith(".S") || f.endsWith(".s")) {
+                        hasAsm = true;
+                        break;
+                    }
+                }
+            }
             if (windows) {
+                // Windows declares no ASM: MSVC cannot assemble GNU syntax, and the
+                // cross-compiled case is handled by an enable_language(ASM) guarded on
+                // NOT MSVC further down, once project() has told CMake which it got.
                 writer.append("project(").append(appName).append(embedResources
                         ? " LANGUAGES C CXX RC)\n" : " LANGUAGES C CXX)\n");
-            } else if (linux) {
-                writer.append("project(").append(appName).append(embedResources
-                        ? " LANGUAGES C ASM)\n" : " LANGUAGES C)\n");
             } else {
-                writer.append("project(").append(appName).append(" LANGUAGES C)\n");
+                // Linux and the clean target answer this identically -- assembly is
+                // declared when a .S is actually present -- so they share one branch
+                // rather than two spelled the same way.
+                writer.append("project(").append(appName).append(hasAsm
+                        ? " LANGUAGES C ASM)\n" : " LANGUAGES C)\n");
             }
             // C11 for <stdatomic.h> (cn1_globals.h) and _Static_assert (Win32 shim);
             // supported by clang/clang-cl, gcc and Xcode's clang alike.
@@ -1077,12 +1140,13 @@ public class ByteCodeTranslator {
             writer.append("file(GLOB TRANSLATOR_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.c\")\n");
             writer.append("file(GLOB TRANSLATOR_HEADERS \"${CN1_APP_SOURCE_ROOT}/*.h\")\n");
             if (linux) {
-                // The Linux executable is pure C (GTK/Cairo/Pango/GdkPixbuf are C
-                // libraries). The generated resource .S (.incbin of each classpath
-                // resource) is added when present so getResourceAsStream can read
-                // the blobs straight out of the ELF .rodata.
+                // The Linux executable is otherwise pure C (GTK/Cairo/Pango/GdkPixbuf
+                // are C libraries). Two things can put a .S beside it: the generated
+                // resource blob (.incbin of each classpath resource, so
+                // getResourceAsStream reads straight out of the ELF .rodata) and the
+                // virtual-thread context switch. Both are picked up by presence.
                 String asmGlob = "";
-                if (embedResources) {
+                if (hasAsm) {
                     writer.append("file(GLOB TRANSLATOR_ASM_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.S\")\n");
                     asmGlob = " ${TRANSLATOR_ASM_SOURCES}";
                 }
@@ -1093,13 +1157,26 @@ public class ByteCodeTranslator {
             } else if (windows) {
                 // The port's nativeSources contribute the C++ DirectWrite layer.
                 writer.append("file(GLOB TRANSLATOR_CXX_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.cpp\")\n");
+                // Assembly is a COMPILER question here, not an app-type one. MSVC cannot
+                // assemble GNU syntax, but the Windows app type is also cross-built with
+                // clang on a POSIX host, where _WIN32 is undefined, the virtual-thread
+                // switch is live, and the link fails without it. CMake knows which one it
+                // got only after project() has enabled C, so ask it there rather than
+                // guessing from the app type. Under MSVC the variable stays unset and
+                // expands to nothing.
+                if (hasAsm) {
+                    writer.append("if(NOT MSVC)\n");
+                    writer.append("    enable_language(ASM)\n");
+                    writer.append("    file(GLOB TRANSLATOR_ASM_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.S\")\n");
+                    writer.append("endif()\n");
+                }
                 if (embedResources) {
                     // The resource script compiles to a .res linked into the exe,
                     // putting the app's classpath resources in the PE resource section.
                     writer.append("file(GLOB TRANSLATOR_RC_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.rc\")\n");
-                    writer.append("add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_CXX_SOURCES} ${TRANSLATOR_RC_SOURCES} ${TRANSLATOR_HEADERS})\n");
+                    writer.append("add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_CXX_SOURCES} ${TRANSLATOR_ASM_SOURCES} ${TRANSLATOR_RC_SOURCES} ${TRANSLATOR_HEADERS})\n");
                 } else {
-                    writer.append("add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_CXX_SOURCES} ${TRANSLATOR_HEADERS})\n");
+                    writer.append("add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_CXX_SOURCES} ${TRANSLATOR_ASM_SOURCES} ${TRANSLATOR_HEADERS})\n");
                 }
                 writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
                 // Math lives in the CRT under MSVC (no separate libm to link); every
@@ -1171,7 +1248,13 @@ public class ByteCodeTranslator {
                 writer.append("    target_link_libraries(${PROJECT_NAME} m)\n");
                 writer.append("endif()\n");
             } else {
-                writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
+                String asmGlob = "";
+                if (hasAsm) {
+                    writer.append("file(GLOB TRANSLATOR_ASM_SOURCES \"${CN1_APP_SOURCE_ROOT}/*.S\")\n");
+                    asmGlob = " ${TRANSLATOR_ASM_SOURCES}";
+                }
+                writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES}")
+                        .append(asmGlob).append(" ${TRANSLATOR_HEADERS})\n");
                 writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
             }
 
@@ -1344,6 +1427,20 @@ public class ByteCodeTranslator {
         if(s.endsWith(".m") || s.endsWith(".c")) {
             return "sourcecode.c.objc";
         }
+        // Assembly. An extension Xcode does not recognise becomes
+        // `lastKnownFileType = file`, which lands the file in the RESOURCES phase: it
+        // ships into the bundle and is never assembled, so the link fails naming a
+        // symbol whose source is sitting right there in the project.
+        //
+        // sourcecode.asm is the identifier to use for BOTH spellings. Xcode's
+        // StandardFileTypes.xcspec lists it as `Extensions = (s)` with
+        // `GccDialectName = assembler-with-cpp`, so it runs the preprocessor -- which
+        // the capability gate in cn1_virtual_thread_asm.S needs. .S is not in any
+        // Extensions list of its own, and the neighbouring sourcecode.asm.asm is for
+        // .asm, not for it.
+        if(s.endsWith(".S") || s.endsWith(".s")) {
+            return "sourcecode.asm";
+        }
         if(s.endsWith(".xcassets")) {
             return "folder.assetcatalog";
         }
@@ -1456,6 +1553,26 @@ public class ByteCodeTranslator {
      * @param i source
      * @param o destination
      */
+    /**
+     * Emit the virtual-thread runtime beside the generated sources.
+     *
+     * Three files rather than one because the switch has to be assembly: glibc
+     * aborts a cross-stack longjmp under _FORTIFY_SOURCE and musl has no
+     * makecontext, so neither portable route survives every target we ship.
+     */
+    private static void emitVirtualThreadRuntime(File srcRoot) throws IOException {
+        String[] names = { "cn1_virtual_thread.h", "cn1_virtual_thread.c", "cn1_virtual_thread_asm.S" };
+        for (String name : names) {
+            InputStream in = ByteCodeTranslator.class.getResourceAsStream("/" + name);
+            if (in == null) {
+                // Missing here means the build did not stage it; failing now names the
+                // cause, where the link error later names only a symbol.
+                throw new IOException("virtual-thread runtime resource missing: " + name);
+            }
+            copy(in, Files.newOutputStream(new File(srcRoot, name).toPath()));
+        }
+    }
+
     public static void copy(InputStream i, OutputStream o) throws IOException {
         copy(i, o, 8192);
     }

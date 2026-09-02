@@ -1714,10 +1714,18 @@ class CleanTargetIntegrationTest {
         String linkLine = CompilerHelper.isWindows()
                 ? ""
                 : "\ntarget_link_libraries(${PROJECT_NAME} m)";
-        String replacement = content.replace(
-                "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})" + linkLine
-        );
+        // Match the CALL, not the whole argument list. Spelling the arguments out here
+        // means any source set the generator adds (the assembly glob was the one that
+        // caught this) silently stops matching, and every clean-target test then builds
+        // a LIBRARY and fails looking for an executable that was never asked for.
+        int at = content.indexOf("add_library(${PROJECT_NAME}");
+        assertTrue(at >= 0, "the generated CMakeLists no longer declares add_library(${PROJECT_NAME}...):\n" + content);
+        int end = content.indexOf(')', at);
+        assertTrue(end >= 0, "unterminated add_library() in the generated CMakeLists:\n" + content);
+        String replacement = content.substring(0, at)
+                + "add_executable(" + content.substring(at + "add_library(".length(), end + 1)
+                + linkLine
+                + content.substring(end + 1);
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -1814,6 +1822,127 @@ class CleanTargetIntegrationTest {
                 "}\n";
     }
 
+
+    /**
+     * argv and the environment must be DECODED as UTF-8, not widened byte by byte.
+     *
+     * newStringFromCString turns each byte into its own char, which is right for the
+     * generated string literals it serves and wrong for anything that arrives from
+     * outside: a two-byte UTF-8 character reaches main(String[]) as two garbage
+     * chars, quietly corrupting a path or an option value. The program below reports
+     * code points rather than the text itself, so the assertion does not depend on
+     * the console encoding of whatever runs it.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void argumentsAndEnvironmentDecodeAsUtf8(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+        Path sourceDir = Files.createTempDirectory("utf8-args-sources");
+        Path classesDir = Files.createTempDirectory("utf8-args-classes");
+        Path javaApiDir = Files.createTempDirectory("utf8-args-java-api");
+        Files.write(sourceDir.resolve("Utf8ArgsApp.java"), utf8ArgsSource().getBytes(StandardCharsets.UTF_8));
+        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("utf8-args-output");
+        runTranslator(classesDir, outputDir, "Utf8ArgsApp");
+        Path distDir = outputDir.resolve("dist");
+        replaceLibraryWithExecutableTarget(distDir.resolve("CMakeLists.txt"), "Utf8ArgsApp-src");
+        Path buildDir = distDir.resolve("build");
+        Files.createDirectories(buildDir);
+        List<String> configure = new java.util.ArrayList<>(Arrays.asList(
+                "cmake", "-S", distDir.toString(), "-B", buildDir.toString(), "-DCMAKE_BUILD_TYPE=Release"));
+        configure.addAll(CompilerHelper.cmakeToolchainArgs());
+        runCommand(configure, distDir);
+        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+
+        // U+00E9 (two UTF-8 bytes) and U+20AC (three), so both the 2- and 3-byte
+        // paths are covered; widening would report the individual bytes instead.
+        String arg = "caf\u00e9\u20ac";
+        Path exe = buildDir.resolve(CompilerHelper.executableName("Utf8ArgsApp"));
+        ProcessBuilder pb = new ProcessBuilder(exe.toString(), arg);
+        pb.directory(buildDir.toFile());
+        pb.redirectErrorStream(true);
+        pb.environment().put("CN1_UTF8_PROBE", arg);
+        Process p = pb.start();
+        String out;
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+            out = r.lines().collect(Collectors.joining("\n"));
+        }
+        assertEquals(0, p.waitFor(), "Utf8ArgsApp failed:\n" + out);
+        assertTrue(out.contains("ARG=99,97,102,233,8364"),
+                "argv must decode to the right code points, got:\n" + out);
+        assertTrue(out.contains("ENV=99,97,102,233,8364"),
+                "the environment must decode to the right code points, got:\n" + out);
+    }
+
+    /**
+     * Closing System.in must make the next read fail, not silently keep consuming it.
+     *
+     * InputStream.close() is a no-op, so the class had to opt in. Without the fix the
+     * read below returns -1 at EOF (stdin is empty here) and the program prints
+     * CLOSE_NOT_HONOURED; with it the read throws and the program prints CLOSE_OK.
+     * Driven through a real clean-target binary because the behaviour only exists
+     * once the native read is wired up.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void closingStandardInputIsHonoured(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+        Path sourceDir = Files.createTempDirectory("stdin-close-sources");
+        Path classesDir = Files.createTempDirectory("stdin-close-classes");
+        Path javaApiDir = Files.createTempDirectory("stdin-close-java-api");
+        Files.write(sourceDir.resolve("StdinCloseApp.java"), stdinCloseSource().getBytes(StandardCharsets.UTF_8));
+        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("stdin-close-output");
+        runTranslator(classesDir, outputDir, "StdinCloseApp");
+        Path distDir = outputDir.resolve("dist");
+        replaceLibraryWithExecutableTarget(distDir.resolve("CMakeLists.txt"), "StdinCloseApp-src");
+        Path buildDir = distDir.resolve("build");
+        Files.createDirectories(buildDir);
+        List<String> configure = new java.util.ArrayList<>(Arrays.asList(
+                "cmake", "-S", distDir.toString(), "-B", buildDir.toString(), "-DCMAKE_BUILD_TYPE=Release"));
+        configure.addAll(CompilerHelper.cmakeToolchainArgs());
+        runCommand(configure, distDir);
+        runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+
+        String output = runCommand(
+                Arrays.asList(buildDir.resolve(CompilerHelper.executableName("StdinCloseApp")).toString()), buildDir);
+        assertTrue(output.contains("CLOSE_OK"),
+                "a read after close must throw IOException, got:\n" + output);
+    }
+
+    private static String stdinCloseSource() {
+        return "public class StdinCloseApp {\n"
+                + "    public static void main(String[] args) throws Exception {\n"
+                + "        System.in.close();\n"
+                + "        try {\n"
+                + "            System.in.read();\n"
+                + "            System.out.println(\"CLOSE_NOT_HONOURED\");\n"
+                + "        } catch (java.io.IOException e) {\n"
+                + "            System.out.println(\"CLOSE_OK\");\n"
+                + "        }\n"
+                + "    }\n"
+                + "}\n";
+    }
+
+    private static String utf8ArgsSource() {
+        return "public class Utf8ArgsApp {\n"
+                + "    private static String points(String s) {\n"
+                + "        StringBuilder b = new StringBuilder();\n"
+                + "        for (int i = 0; i < s.length(); i++) {\n"
+                + "            if (i > 0) { b.append(','); }\n"
+                + "            b.append((int) s.charAt(i));\n"
+                + "        }\n"
+                + "        return b.toString();\n"
+                + "    }\n"
+                + "    public static void main(String[] args) {\n"
+                + "        System.out.println(\"ARG=\" + (args.length > 0 ? points(args[0]) : \"none\"));\n"
+                + "        String e = System.getenv(\"CN1_UTF8_PROBE\");\n"
+                + "        System.out.println(\"ENV=\" + (e == null ? \"none\" : points(e)));\n"
+                + "    }\n"
+                + "}\n";
+    }
 
     private static void restoreProperty(String key, String value) {
         if (value == null) {
