@@ -614,14 +614,35 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                         ? read : read + ".asList()";
                 sb.append("        {\n");
                 sb.append("            java.util.List _src = ").append(src).append(";\n");
-                sb.append("            if (_src == null) { out.append(\"null\"); }\n");
+                // EMPTY ARRAY, not null. emitFieldToMap unconditionally builds an
+                // ArrayList and fills it only when the source is non-null, so the map
+                // path serialises a null list as []. The direct path has to agree:
+                // Mapper.Direct's contract is to produce exactly what
+                // JSONWriter.toJson(toMap(instance)) would, and a mapper silently
+                // changing a field's wire representation the day it gains a direct
+                // writer is the one thing that contract exists to prevent.
+                sb.append("            if (_src == null) { out.append(\"[]\"); }\n");
                 sb.append("            else {\n");
                 sb.append("                out.append('[');\n");
                 sb.append("                boolean _first = true;\n");
                 sb.append("                for (java.util.Iterator _it = _src.iterator(); _it.hasNext(); ) {\n");
                 sb.append("                    if (!_first) { out.append(','); }\n");
                 sb.append("                    _first = false;\n");
-                sb.append("                    com.codename1.mapping.Mappers.appendJsonValue(out, _it.next());\n");
+                if (f.elementIsEnum) {
+                    // name(), not toString(). The map path uses Enum.name() and
+                    // deserialisation matches against the declared constants, so an
+                    // enum that overrides toString() would serialise to something
+                    // that cannot be read back.
+                    sb.append("                    Object _e = _it.next();\n");
+                    sb.append("                    com.codename1.mapping.Mappers.appendJsonValue(out, _e == null ? null : ((")
+                      .append(f.kind.elementBinaryName).append(") _e).name());\n");
+                } else {
+                    // Every other element kind already agrees: appendJsonValue maps
+                    // Date to getTime(), scalars and collections to writeJson, and a
+                    // mapped object through its own mapper -- the same three answers
+                    // emitFieldToMap produces.
+                    sb.append("                    com.codename1.mapping.Mappers.appendJsonValue(out, _it.next());\n");
+                }
                 sb.append("                }\n");
                 sb.append("                out.append(']');\n");
                 sb.append("            }\n");

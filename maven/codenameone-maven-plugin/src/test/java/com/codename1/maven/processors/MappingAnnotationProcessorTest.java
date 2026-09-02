@@ -1,6 +1,24 @@
 /*
  * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.maven.processors;
 
@@ -275,6 +293,102 @@ public class MappingAnnotationProcessorTest {
                 testClassesDir().toURI().toURL()
         };
         return new URLClassLoader(urls, getClass().getClassLoader());
+    }
+
+    /**
+     * The direct JSON writer must produce byte-for-byte what the map path produces.
+     *
+     * That is Mapper.Direct's entire contract, and nothing was checking it: two
+     * divergences shipped past review because every existing test exercises one path
+     * or the other, never both against each other. A null list serialised as `null`
+     * on the direct path and `[]` through the map, and enum elements went through
+     * toString() rather than name() -- so an enum that overrides toString() produced
+     * JSON that could not be read back at all.
+     *
+     * Asserting equality of the two paths rather than against a literal is deliberate:
+     * it keeps holding when a new field kind is added, without anyone remembering to
+     * come back and extend a hand-written expectation.
+     */
+    @Test
+    public void directJsonMatchesTheMapPathExactly() throws Exception {
+        File classes = tmp.newFolder("direct-parity-classes");
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        // toString() deliberately disagrees with name(): if the direct path uses the
+        // wrong one, the two outputs differ and this test says so.
+        sources.put("com.example.Shade",
+                "package com.example;\n"
+                        + "public enum Shade {\n"
+                        + "    LIGHT, DARK;\n"
+                        + "    @Override public String toString() { return \"shade-\" + name().toLowerCase(); }\n"
+                        + "}\n");
+        sources.put("com.example.Swatch",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.Mapped;\n"
+                        + "import java.util.List;\n"
+                        + "@Mapped public class Swatch {\n"
+                        + "    public String name;\n"
+                        + "    public int count;\n"
+                        + "    public Shade shade;\n"
+                        + "    public List<Shade> shades;\n"
+                        + "    public List<String> tags;\n"
+                        + "    public java.util.Date when;\n"
+                        + "    public Swatch() {}\n"
+                        + "}\n");
+        JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
+        runProcessorOrFail(classes);
+
+        try (URLClassLoader cl = childLoader(classes)) {
+            Class<?> shadeCls = cl.loadClass("com.example.Shade");
+            Class<?> swatchCls = cl.loadClass("com.example.Swatch");
+            Class<?> mapperCls = cl.loadClass("com.example.SwatchCn1Mapper");
+            Object mapper = mapperCls.newInstance();
+            Method valueOf = shadeCls.getMethod("valueOf", String.class);
+            Object dark = valueOf.invoke(null, "DARK");
+
+            // The generated mapper must actually BE on the direct path, or this test
+            // compares the map path with itself and passes while proving nothing.
+            Class<?> directCls = cl.loadClass("com.codename1.mapping.Mapper$Direct");
+            assertTrue("the generated mapper should implement Mapper.Direct",
+                    directCls.isInstance(mapper));
+
+            Object populated = swatchCls.newInstance();
+            swatchCls.getField("name").set(populated, "teal");
+            swatchCls.getField("count").setInt(populated, 3);
+            swatchCls.getField("shade").set(populated, dark);
+            List<Object> shades = new ArrayList<Object>();
+            shades.add(valueOf.invoke(null, "LIGHT"));
+            shades.add(dark);
+            swatchCls.getField("shades").set(populated, shades);
+            swatchCls.getField("tags").set(populated, Arrays.asList("a", "b"));
+            swatchCls.getField("when").set(populated, new java.util.Date(1234567890L));
+
+            // Every list left null: the case that diverged.
+            Object empty = swatchCls.newInstance();
+
+            assertDirectMatchesMap(cl, mapperCls, mapper, populated);
+            assertDirectMatchesMap(cl, mapperCls, mapper, empty);
+        }
+    }
+
+    /** Both routes, on one instance, compared as text. */
+    private static void assertDirectMatchesMap(URLClassLoader cl, Class<?> mapperCls,
+                                               Object mapper, Object instance) throws Exception {
+        Class<?> writerCls = cl.loadClass("com.codename1.io.JSONWriter");
+
+        Method toMap = mapperCls.getMethod("toMap", instance.getClass());
+        Object asMap = toMap.invoke(mapper, instance);
+        String viaMap = (String) writerCls.getMethod("toJson", Object.class).invoke(null, asMap);
+
+        // The generated mapper's OWN direct writer, not Mappers.appendJson: that
+        // goes through the registry, which this isolated classloader never
+        // populates, so it would quietly fall back to toString() and compare the
+        // map path against an object identity string.
+        StringBuilder out = new StringBuilder();
+        mapperCls.getMethod("toJson", instance.getClass(), StringBuilder.class)
+                .invoke(mapper, instance, out);
+        String viaDirect = out.toString();
+
+        assertEquals("direct JSON must match the map path exactly", viaMap, viaDirect);
     }
 
     private static File testClassesDir() throws Exception {

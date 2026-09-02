@@ -69,7 +69,7 @@ public interface Mapper<T> {
     /// Implemented as a separate interface rather than a method on `Mapper` so
     /// hand-written mappers keep compiling; `Mappers#toJson` uses it when the
     /// mapper offers it and falls back to `toMap` when it does not.
-    public interface Direct<T> {
+    interface Direct<T> {
 
         /// Appends `instance` as a JSON value -- an object, or the four
         /// characters `null`. Must produce exactly what
