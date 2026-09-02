@@ -223,19 +223,10 @@ public class KotlinStdlibAlignment {
             if (!callsNamed(active[i], "failOnVersionConflict")) {
                 continue;
             }
-            // Applied to configurations.classpath it governs the PLUGIN classpath and
-            // nothing this block writes: the constraints go into the app's
-            // dependencies, which that strategy never sees, so standing down there
-            // would leave a real duplicate unfixed for a setting that cannot conflict
-            // with us.
-            //
-            // Only that spelling, because it names the configuration outright.
-            // `buildscript { configurations.all { ... } }` is also plugin-only and
-            // still stands the block down: knowing that needs the surrounding block,
-            // and being wrong in the other direction breaks a build that works.
-            if (namesTheBuildscriptClasspath(active[i])) {
-                continue;
-            }
+            // A statement that governs the plugin classpath never arrives here:
+            // both spellings of it -- a buildscript block and configurations
+            // .classpath -- are blanked with the rest of that graph before any
+            // scan runs. See governsThePluginClasspath.
             return "";
         }
         // The two shims cannot be suppressed independently when the app holds one of
@@ -972,6 +963,52 @@ public class KotlinStdlibAlignment {
     }
 
     /**
+     * Where a declaration may start in this statement.
+     *
+     * <p>A block opener shares the statement with what it opens --
+     * {@code if (cond) { String dep = '...'}} -- and the walk that separates a
+     * declaration from an assignment begins at the first token, which there is
+     * {@code if}. It stopped at the parenthesis and the declaration behind it
+     * was never recorded, so the pin that declaration held went unseen. The
+     * {@code def} spelling never had this because it is searched for anywhere
+     * in the statement.</p>
+     *
+     * <p>Only a brace BEFORE the assignment counts. In {@code Closure c = { .. }}
+     * the brace IS the value, and starting after it would skip the name being
+     * assigned to -- which is a declaration this already reads.</p>
+     */
+    private static int afterAnyBlockOpener(String statement) {
+        int start = 0;
+        for (int i = 0; i < statement.length(); i++) {
+            if (isLiteralStart(statement, i)) {
+                i = endOfStringLiteral(statement, i);
+                continue;
+            }
+            char c = statement.charAt(i);
+            if (c == '{') {
+                start = i + 1;
+            } else if (isAssignmentAt(statement, i)) {
+                break;
+            }
+        }
+        return start;
+    }
+
+    /** Whether the character at {@code at} is an assignment, not a comparison. */
+    private static boolean isAssignmentAt(String statement, int at) {
+        if (statement.charAt(at) != '=') {
+            return false;
+        }
+        if (at + 1 < statement.length() && statement.charAt(at + 1) == '=') {
+            return false;
+        }
+        // `>=`, `!=`, `+=` and the rest end in the same character and none of them
+        // opens a declaration, so a comparison in an `if` would otherwise stop the
+        // search before the brace it guards.
+        return at == 0 || "=!<>+-*/%&|^~".indexOf(statement.charAt(at - 1)) < 0;
+    }
+
+    /**
      * Whether a dotted Gradle path ends in the given segment.
      *
      * <p>`ext`, `project.ext` and `rootProject.ext` all name the one extra
@@ -983,11 +1020,18 @@ public class KotlinStdlibAlignment {
     }
 
     /**
-     * Whether the statement applies its strategy to the plugin classpath.
+     * Whether the statement names the plugin classpath outright.
      *
      * <p>{@code configurations.classpath} is the buildscript's own, and a
      * strategy on it governs which plugin jars load -- never the app's
-     * dependencies, which is all this class writes to.</p>
+     * dependencies, which is all this class writes to. It is the spelling that
+     * works at the top level, where there is no {@code buildscript} block
+     * around it to say the same thing.</p>
+     *
+     * <p>Every scan sees the result, not just the one that reads
+     * {@code failOnVersionConflict}: a force or a strict pin on that
+     * configuration cannot conflict with these constraints either, and reading
+     * one as the app managing the family left a real duplicate unfixed.</p>
      */
     private static boolean namesTheBuildscriptClasspath(String line) {
         int at = line.indexOf(BUILDSCRIPT_CLASSPATH);
@@ -1915,8 +1959,37 @@ public class KotlinStdlibAlignment {
         if (i >= 0 && line.charAt(i) == '(') {
             i = skipBlanksBackward(line, i - 1);
         }
-        return i >= 2 && "add".equals(line.substring(i - 2, i + 1))
-                && (i - 3 < 0 || !isIdentifierChar(line.charAt(i - 3)));
+        if (i < 2 || !"add".equals(line.substring(i - 2, i + 1))
+                || (i - 3 >= 0 && isIdentifierChar(line.charAt(i - 3)))) {
+            return false;
+        }
+        // And the receiver has to BE a dependency handler. `add` is an ordinary
+        // method name -- `catalog.add('implementation', '...')` adds to a version
+        // catalog and declares nothing -- so reading one as a declaration skipped
+        // the constraint for an artifact the app had never put in its graph, and
+        // an old transitive shim beside a merged stdlib stayed unaligned.
+        //
+        // A bare `add` is the shorthand inside a dependencies closure and has no
+        // receiver to check; only a qualified one does.
+        if (i - 3 < 0) {
+            return true;
+        }
+        int dot = skipBlanksBackward(line, i - 3);
+        if (dot < 0 || line.charAt(dot) != '.') {
+            return true;
+        }
+        int end = skipBlanksBackward(line, dot - 1);
+        if (end < 0) {
+            return false;
+        }
+        int start = end;
+        while (start >= 0 && (isIdentifierChar(line.charAt(start))
+                || (line.charAt(start) == '.' && start > 0
+                        && isIdentifierChar(line.charAt(start - 1))))) {
+            start--;
+        }
+        return end > start
+                && lastSegmentIs(line.substring(start + 1, end + 1), "dependencies");
     }
 
     /**
@@ -2224,11 +2297,33 @@ public class KotlinStdlibAlignment {
         // keeps working.
         int braceDepth = 0;
         ScopedNames scope = new ScopedNames();
+        // A buildscript block configures the PLUGIN classpath, which is a separate
+        // resolution from the app's and cannot conflict with what this writes into
+        // dependencies { }. A force, a strict pin or a shim declaration in there was
+        // being read as the app managing the family, so an app graph carrying a
+        // pre-merge shim was left unaligned and still failed checkDuplicateClasses.
+        //
+        // The statements are blanked rather than dropped, and only AFTER their
+        // definitions have been recorded: `buildscript { ext.kotlin_version = .. }`
+        // followed by a dependency interpolating $kotlin_version is the ordinary
+        // shape of a Kotlin project, and the definition really does bind
+        // script-wide even though the declarations around it do not.
+        int buildscriptDepth = 0;
         for (int i = 0; i < statements.size(); i++) {
             String statement = statements.get(i);
-            out.add(literals.isEmpty()
+            boolean opensBuildscript = buildscriptDepth == 0
+                    && opensBlockNamed(statement, BUILDSCRIPT);
+            boolean pluginScoped = buildscriptDepth > 0 || opensBuildscript
+                    || namesTheBuildscriptClasspath(statement);
+            out.add(pluginScoped ? "" : (literals.isEmpty()
                     ? statement
-                    : withLiteralsInlined(statement, literals));
+                    : withLiteralsInlined(statement, literals)));
+            if (pluginScoped) {
+                buildscriptDepth += braceBalance(statement);
+                if (buildscriptDepth < 0) {
+                    buildscriptDepth = 0;
+                }
+            }
             boolean opensExt = extDepth == 0 && opensAnExtraPropertiesBlock(statement);
             updateLiteralDefinitions(statement, literals, extDepth > 0 || opensExt,
                     braceDepth > 0, braceDepth, scope);
@@ -2303,9 +2398,14 @@ public class KotlinStdlibAlignment {
      * token so that a dependency on {@code com.example:extras} does not.
      */
     private static boolean opensAnExtraPropertiesBlock(String statement) {
-        int at = statement.indexOf(EXTRA_PROPERTIES);
+        return opensBlockNamed(statement, EXTRA_PROPERTIES);
+    }
+
+    /** Whether the statement opens a block named {@code name}. */
+    private static boolean opensBlockNamed(String statement, String name) {
+        int at = statement.indexOf(name);
         while (at >= 0) {
-            int after = at + EXTRA_PROPERTIES.length();
+            int after = at + name.length();
             boolean startsToken = at == 0 || !isIdentifierChar(statement.charAt(at - 1));
             int brace = skipBlanks(statement, after);
             if (startsToken && (after >= statement.length()
@@ -2313,7 +2413,7 @@ public class KotlinStdlibAlignment {
                     && brace < statement.length() && statement.charAt(brace) == '{') {
                 return true;
             }
-            at = statement.indexOf(EXTRA_PROPERTIES, at + 1);
+            at = statement.indexOf(name, at + 1);
         }
         return false;
     }
@@ -2387,6 +2487,15 @@ public class KotlinStdlibAlignment {
         int i = 0;
         boolean declared = false;
         boolean subscript = false;
+        // An extra property is NOT block scoped. A local declared inside a block
+        // leaves with it, which is why declarations carry their depth -- but
+        // `buildscript { ext.kotlin_version = '1.9.22' }` sets a project-wide
+        // property, and it is the standard shape of a Kotlin Android script.
+        // Recorded at the depth of the brace it sat in, it was discarded at the
+        // closing brace, so the version every dependency below interpolated read
+        // as unreadable, counted as below the floor, and stood the whole block
+        // down -- the alignment never ran for the commonest project there is.
+        boolean extraProperty = false;
         // Outside literals, like every other question about syntax. An unrestricted
         // search found `def` inside quoted prose -- println "def dep = '...'" -- and
         // recorded a declaration that never executes, overwriting the real binding
@@ -2396,7 +2505,7 @@ public class KotlinStdlibAlignment {
             declared = true;
             i = skipBlanks(statement, at);
         } else {
-            i = skipBlanks(statement, 0);
+            i = skipBlanks(statement, afterAnyBlockOpener(statement));
             // Past any annotations first. A script field is written
             // `@groovy.transform.Field String dep = '...'`, and the walk below reads
             // identifier tokens -- so it stopped dead on the `@`, recorded nothing,
@@ -2511,6 +2620,7 @@ public class KotlinStdlibAlignment {
                 if (dot > 0 && !subscripted
                         && lastSegmentIs(only.substring(0, dot), EXTRA_PROPERTIES)) {
                     declared = true;
+                    extraProperty = true;
                     i = lastTokenStart + dot + 1;
                 } else if (subscripted && lastSegmentIs(only, EXTRA_PROPERTIES)) {
                     // ext['dep'] = '...' is the subscript spelling of the same
@@ -2525,6 +2635,7 @@ public class KotlinStdlibAlignment {
                             && delimiterLength(statement, nameAt) == 1) {
                         declared = true;
                         subscript = true;
+                        extraProperty = true;
                         i = nameAt + 1;
                     }
                 }
@@ -2552,8 +2663,18 @@ public class KotlinStdlibAlignment {
         if (!declared && !literals.containsKey(name)) {
             return;
         }
+        // A brace this statement opened before the name guards it just as one on an
+        // earlier line does. The flag arriving here is the depth the statement
+        // STARTED at, so `if (cond) { dep = '...' }` written on one line read as an
+        // unconditional reassignment and threw away the coordinate the condition
+        // might never replace -- which is the pin, hidden, that this whole rule
+        // exists to keep.
+        if (depthAt(statement, nameStart, depth) > depth) {
+            conditional = true;
+        }
         if (declared) {
-            scope.declared(depthAt(statement, nameStart, depth), name, literals);
+            scope.declared(extraProperty
+                    ? 0 : depthAt(statement, nameStart, depth), name, literals);
         }
         i = skipBlanks(statement, i);
         if (i >= statement.length() || statement.charAt(i) != '='
@@ -2625,7 +2746,8 @@ public class KotlinStdlibAlignment {
                 return;
             }
             if (declared) {
-                scope.declared(depthAt(statement, nextName, depth), name, literals);
+                scope.declared(extraProperty
+                        ? 0 : depthAt(statement, nextName, depth), name, literals);
             }
             i = assign;
         }
@@ -2785,6 +2907,9 @@ public class KotlinStdlibAlignment {
 
     /** Gradle's extra-properties prefix, the one dotted assignment worth reading. */
     private static final String EXTRA_PROPERTIES = "ext";
+
+    /** The block that configures the plugin classpath rather than the app's. */
+    private static final String BUILDSCRIPT = "buildscript";
 
     /**
      * Whether the text so far is a control header whose body is the next line.

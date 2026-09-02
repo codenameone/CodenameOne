@@ -734,6 +734,153 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * {@code add} is an ordinary method name. Reading any call of it as a
+     * dependency declaration let an unrelated API -- a version catalog, a list --
+     * claim an artifact the app had never put in its graph, and the constraint
+     * that artifact needed was skipped as already handled.
+     */
+    @Test
+    public void anAddCallMustBeOnADependencyHandler() {
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22";
+        String[] handlers = {
+            "    dependencies.add('implementation', '" + pin + "')\n",
+            "    project.dependencies.add('implementation', '" + pin + "')\n",
+            "    dependencies {\n        add 'implementation', '" + pin + "'\n    }\n",
+        };
+        for (int i = 0; i < handlers.length; i++) {
+            check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                            "implementation", handlers[i])),
+                    "<<" + handlers[i].trim() + ">> declares a dependency");
+        }
+
+        String[] strangers = {
+            "    catalog.add('implementation', '" + pin + "')\n",
+            "    myList.add('implementation', '" + pin + "')\n",
+            "    deps.add('implementation', '" + pin + "')\n",
+        };
+        for (int i = 0; i < strangers.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            strangers[i]).contains("kotlin-stdlib-jdk8:1.8.0"),
+                    "<<" + strangers[i].trim() + ">> declares nothing");
+        }
+    }
+
+    /**
+     * A block opener shares the statement with what it opens. The walk that
+     * reads a typed declaration began at the first token -- {@code if} -- and
+     * stopped at its parenthesis, so the declaration behind it, and the pin that
+     * declaration held, were never recorded.
+     */
+    @Test
+    public void aDeclarationMayFollowABlockOpenerOnTheSameStatement() {
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22";
+        String tail = " implementation(dep) { version { strictly '1.7.22' } } }\n";
+        String[] openers = {
+            "    if (true) { String dep = '" + pin + "';",
+            "    if (a >= b) { String dep = '" + pin + "';",
+            "    if (true) { def dep = '" + pin + "';",
+            "    if (a) { if (b) { Map<String, String> m = [:]; String dep = '" + pin + "';",
+        };
+        for (int i = 0; i < openers.length; i++) {
+            check("".equals(KotlinStdlibAlignment.constraintsBlock(
+                            "implementation", openers[i] + tail)),
+                    "<<" + openers[i].trim() + ">> declares dep");
+        }
+
+        // The brace that IS the value must not be mistaken for one that opens a
+        // block, or the name being assigned to is skipped.
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    Closure c = { }\n    String dep = '" + pin + "'\n"
+                        + "    implementation(dep) { version { strictly '1.7.22' } }\n")),
+                "a closure assignment is still a declaration");
+
+        // And a reassignment the brace GUARDS is still conditional, however it is
+        // spelled -- taking it unconditionally throws away the coordinate the
+        // condition may never replace.
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def dep = 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'; "
+                        + "if (project.hasProperty('other')) "
+                        + "{ dep = 'com.example:other:1.0' }; "
+                        + "implementation(dep) { version { strictly '1.7.22' } }\n")),
+                "a one-line conditional reassignment stays conditional");
+    }
+
+    /**
+     * A {@code buildscript} block configures the plugin classpath. That is a
+     * separate resolution from the app's and cannot conflict with anything
+     * written into {@code dependencies { }}, so an override or a shim
+     * declaration there is not the app managing the family -- reading it as one
+     * left an app graph carrying a pre-merge shim unaligned.
+     */
+    @Test
+    public void aBuildscriptBlockIsNotTheApplicationGraph() {
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22";
+        String[] pluginOnly = {
+            "    buildscript { configurations.all { resolutionStrategy.force "
+                    + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22' } }\n",
+            "    buildscript {\n        dependencies {\n"
+                    + "            classpath '" + pin + "!!'\n        }\n    }\n",
+            "    buildscript {\n        dependencies {\n            classpath('" + pin
+                    + "') { version { strictly '1.7.22' } }\n        }\n    }\n",
+            // The spelling that names the configuration outright still counts
+            // wherever it is written, including outside a buildscript block.
+            "    configurations.classpath.resolutionStrategy.force '" + pin + "'\n",
+        };
+        for (int i = 0; i < pluginOnly.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation", pluginOnly[i])
+                            .contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + pluginOnly[i].trim() + ">> is the plugin's graph");
+        }
+
+        // The app's own declarations are unaffected, before or after one.
+        String after = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    buildscript { dependencies { classpath "
+                + "'com.android.tools.build:gradle:8.1.0' } }\n"
+                + "    dependencies { implementation '" + pin + "!!' }\n");
+        check("".equals(after), "an app pin after a buildscript block still counts, "
+                + "got <<" + after + ">>");
+    }
+
+    /**
+     * An extra property is not block scoped, and
+     * {@code buildscript { ext.kotlin_version = '..' }} is how a Kotlin Android
+     * script is written. Discarded with the brace it sat in, the version every
+     * dependency below interpolated read as unreadable -- which counts as below
+     * the floor -- and the alignment never ran at all.
+     */
+    @Test
+    public void anExtraPropertyOutlivesTheBlockItWasSetIn() {
+        String[] definitions = {
+            "    buildscript {\n        ext.kv = 'V'\n    }\n",
+            "    buildscript { ext.kv = 'V' }\n",
+            "    buildscript {\n        ext['kv'] = 'V'\n    }\n",
+            "    someBlock {\n        ext.kv = 'V'\n    }\n",
+            "    ext.kv = 'V'\n",
+            "    ext { kv = 'V' }\n",
+        };
+        String use = "    dependencies {\n        implementation "
+                + "\"org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kv\"\n    }\n";
+        for (int i = 0; i < definitions.length; i++) {
+            String merged = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    definitions[i].replace("'V'", "'1.9.22'") + use);
+            check(merged.contains("kotlin-stdlib-jdk7:1.8.0")
+                            && !merged.contains("kotlin-stdlib-jdk8:1.8.0"),
+                    "<<" + definitions[i].trim() + ">> is readable below, got <<"
+                            + merged + ">>");
+            check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            definitions[i].replace("'V'", "'1.7.22'") + use)),
+                    "and a pre-merge one stands the block down");
+        }
+
+        // A local really is block scoped, and must not start outliving its block
+        // just because an extra property does.
+        String local = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    someBlock {\n        def kv = '1.9.22'\n    }\n" + use);
+        check("".equals(local),
+                "a local does not escape its block, got <<" + local + ">>");
+    }
+
+    /**
      * A type is a type however it is spelled. The walk that separates a
      * declaration from an assignment stopped at the first character that is not
      * part of an identifier, so a generic or array type ended the statement and
