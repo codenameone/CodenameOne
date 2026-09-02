@@ -443,8 +443,8 @@ def javadoc_path_exists(target: str) -> bool:
     case-sensitive host served 404s while this reported success.
 
     Anything that is not a recognisable package or class page is still accepted:
-    javadoc emits index pages, class-use trees and frames this does not model, and
-    reporting those would be a false alarm rather than a finding.
+    javadoc emits index and overview pages this does not model, and reporting those
+    would be a false alarm rather than a finding.
     """
     if _JAVADOC_ROOT is None:
         return True
@@ -456,9 +456,10 @@ def javadoc_path_exists(target: str) -> bool:
     page = PurePosixPath(path).name
     if package == ".":
         return True  # a top-level index or overview page, outside the model
-    # class-use/ holds one page per type, alongside the package it belongs to.
-    if package.endswith("/class-use"):
-        package = package[: -len("/class-use")]
+    # No class-use/ exemption: the generator does not pass -use, and without it
+    # javadoc emits no usage pages at all -- verified by running it both ways. An
+    # earlier version stripped the segment and validated the enclosing package,
+    # which accepted a link to a page that is never built.
     if package not in packages:
         # The package itself will not exist in the generated tree. This is the
         # case that mattered: com/codename1/JavaScript is spelt lowercase in the
