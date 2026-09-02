@@ -150,29 +150,28 @@ class Walker:
                 # it, because the same chapter under two exclusive branches
                 # appears twice in the source and once in the output.
                 self.direct.add(target)
-                if self._inside_conditional(lines, index):
-                    # Nothing in the manifest is conditional today (measured: zero
-                    # include:: lines sit inside a conditional anywhere in the guide),
-                    # and the two checks that matter cannot see one. The duplicate
-                    # count has to skip it, because the same chapter under two
-                    # exclusive branches is one chapter in the output; the
-                    # rendered-title check has to skip it too, because only one
-                    # branch renders. Skipping BOTH silently means a chapter
-                    # included twice inside a single active branch would pass.
-                    # So refuse the construct instead of quietly not validating it.
-                    self.conditional.add(target)
-                    self.errors.append(
-                        f"developer-guide.asciidoc:{index + 1}: {target_raw} is included "
-                        f"inside a conditional. Neither the duplicate check nor the "
-                        f"rendered-title check can validate a conditional entry, so this "
-                        f"refuses it rather than skipping it silently. Teach the checker "
-                        f"which branches are mutually exclusive before adding one."
-                    )
-                else:
-                    self.include_edges[(path, target)] += 1
-            if path != self.root and not self._inside_conditional(lines, index):
-                # A conditional edge is excluded for the same reason as at the
-                # root: two mutually exclusive branches are one rendering.
+            # Conditional includes are refused at EVERY depth, not just in the
+            # manifest. Nothing in the guide is conditional today (measured: zero
+            # include:: lines sit inside a conditional anywhere), and neither
+            # check that matters can validate one. The edge count has to skip it,
+            # because the same file under two exclusive branches is one rendering;
+            # the rendered-title check has to skip it too, for the same reason.
+            # Skipping BOTH silently means a file included twice inside a single
+            # ACTIVE branch passes -- _visit() deduplicates the second target and
+            # the title check only requires the title once. Refusing the construct
+            # is the honest answer while nothing uses it; an earlier version
+            # refused it only under path == self.root and left exactly that hole
+            # one level down.
+            if self._inside_conditional(lines, index):
+                self.conditional.add(target)
+                self.errors.append(
+                    f"{path.name}:{index + 1}: {target_raw} is included inside a "
+                    f"conditional. Neither the duplicate check nor the rendered-title "
+                    f"check can validate a conditional include, so this refuses it "
+                    f"rather than skipping it silently. Teach the checker which "
+                    f"branches are mutually exclusive before adding one."
+                )
+            else:
                 self.include_edges[(path, target)] += 1
             self._visit(target, attrs)
 
