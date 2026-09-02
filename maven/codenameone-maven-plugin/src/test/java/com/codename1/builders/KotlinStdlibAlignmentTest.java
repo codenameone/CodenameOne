@@ -848,6 +848,94 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A component-selection rule is normally written over several lines, and
+     * then its opener, its predicate and its reject are three statements. The
+     * one-statement reading saw none of them together, so a rule that removes
+     * the very version this writes left the constraint nothing to resolve to.
+     */
+    @Test
+    public void aComponentSelectionRuleIsReadAcrossItsWholeBody() {
+        String multiline = "    configurations.all {\n        resolutionStrategy {\n"
+                + "            componentSelection {\n                all { selection ->\n"
+                + "                    if (selection.candidate.module == "
+                + "'kotlin-stdlib-jdk8'\n"
+                + "                            && selection.candidate.version == "
+                + "'1.8.0') {\n"
+                + "                        selection.reject('unsupported')\n"
+                + "                    }\n                }\n            }\n"
+                + "        }\n    }\n";
+        String out = KotlinStdlibAlignment.constraintsBlock("implementation", multiline);
+        check("".equals(out), "the rule may reject the floor, got <<" + out + ">>");
+
+        String[] harmless = {
+            // Rejecting something else.
+            "    configurations.all {\n        resolutionStrategy {\n"
+                    + "            componentSelection {\n                all { s ->\n"
+                    + "                    if (s.candidate.module == 'okhttp') {\n"
+                    + "                        s.reject('unsupported')\n"
+                    + "                    }\n                }\n            }\n"
+                    + "        }\n    }\n",
+            // Rejecting nothing.
+            "    configurations.all {\n        resolutionStrategy {\n"
+                    + "            componentSelection {\n                all { s ->\n"
+                    + "                    logger.info(s.candidate.module)\n"
+                    + "                }\n            }\n        }\n    }\n",
+            // On a configuration the constraint never reaches.
+            "    configurations.create('tooling') {\n        resolutionStrategy {\n"
+                    + "            componentSelection {\n                all { if "
+                    + "(it.candidate.group == 'org.jetbrains.kotlin') it.reject('x') }\n"
+                    + "            }\n        }\n    }\n",
+        };
+        for (int i = 0; i < harmless.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation", harmless[i])
+                            .contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "rule " + i + " rejects nothing this writes");
+        }
+
+        // And the scan does not swallow what comes after a harmless rule.
+        check(!KotlinStdlibAlignment.constraintsBlock("implementation",
+                        harmless[1] + "    implementation 'org.jetbrains.kotlin:"
+                        + "kotlin-stdlib-jdk8:1.9.22'\n")
+                        .contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a declaration after the rule is still read");
+    }
+
+    /**
+     * A call with no literal argument still HAPPENED, and what it set is
+     * unknown. Recorded as nothing at all, a conditional mixing an unreadable
+     * arm with a readable one looked like a single readable branch -- so the
+     * lowest was the arm that could be read, and the constraints went in beside
+     * a pin that may well be pre-merge.
+     */
+    @Test
+    public void anUnreadableArmIsAnAlternativeToo() {
+        String jdk8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
+        String[] mixed = {
+            "    implementation('" + jdk8 + "') { version { if (legacy) "
+                    + "strictly providers.gradleProperty('k').get() "
+                    + "else strictly '1.9.22' } }\n",
+            "    implementation('" + jdk8 + "') { version { legacy ? "
+                    + "strictly(providers.gradleProperty('k').get()) "
+                    + ": strictly('1.9.22') } }\n",
+        };
+        for (int i = 0; i < mixed.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    mixed[i]);
+            check("".equals(out), "the unreadable arm may be the live one, got <<"
+                    + out + ">>");
+        }
+
+        // A SEQUENCE ending in a readable call is still read: there the last one
+        // wins, and it is known.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation('" + jdk8 + "') { version { "
+                        + "strictly providers.gradleProperty('k').get(); "
+                        + "strictly '1.9.22' } }\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a sequence ending readable is read");
+    }
+
+    /**
      * A component-selection rule rejects CANDIDATES, outside any declaration, so
      * the rejection reading that lives on a declaration never saw it. Such a rule
      * can remove the very version this writes, and the constraint then has

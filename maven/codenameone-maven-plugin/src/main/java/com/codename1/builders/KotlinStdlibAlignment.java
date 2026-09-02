@@ -219,25 +219,10 @@ public class KotlinStdlibAlignment {
         // "Conflict found ... between versions 1.8 and 1.7". Nothing here can be
         // written that would not conflict, so nothing is.
         String[] active = activeLines(combined(appGradleFragments));
+        if (aComponentSelectionRuleRejectsTheFloor(active, config)) {
+            return "";
+        }
         for (int i = 0; i < active.length; i++) {
-            // A component-selection rule rejects CANDIDATES, outside any
-            // declaration, so the rejection reading that lives on a declaration
-            // never saw it: `componentSelection { all { if (it.candidate.module
-            // == 'kotlin-stdlib-jdk8' && it.candidate.version == '1.8.0')
-            // it.reject('..') } }` removes the very version this writes, and the
-            // constraint then has nothing to resolve to.
-            //
-            // Any rejecting rule that mentions this family at all stands the block
-            // down. Which candidates a closure will reject cannot be read here,
-            // and being wrong the other way emits a requirement into a graph that
-            // has excluded it.
-            if (callsNamed(active[i], "componentSelection")
-                    && callsNamed(active[i], "reject")
-                    && (namesOneOfTheFamily(active[i])
-                            || holdsLiteral(active[i], KOTLIN_GROUP))
-                    && governsTheConstrainedGraph(active[i], config)) {
-                return "";
-            }
             // An ENFORCED platform is the one case a Kotlin BOM stands this down.
             // A plain `platform()` does not, and the class comment says why it was
             // measured not to: a BOM's constraints are ordinary, so the higher
@@ -521,6 +506,64 @@ public class KotlinStdlibAlignment {
             return mapped;
         }
         return null;
+    }
+
+    /**
+     * Whether a component-selection rule may reject the version this writes.
+     *
+     * <p>Such a rule rejects CANDIDATES, outside any declaration, so the
+     * rejection reading that lives on a declaration never saw it:
+     * {@code componentSelection { all { if (it.candidate.module ==
+     * 'kotlin-stdlib-jdk8' && it.candidate.version == '1.8.0')
+     * it.reject('..') } }} removes the very version this writes, and the
+     * constraint then has nothing to resolve to.</p>
+     *
+     * <p>Read across the whole body rather than one statement, because the
+     * opener, the predicate and the reject are three statements as soon as the
+     * rule is written over several lines -- which is how it is normally
+     * written. Any rejecting rule that mentions this family stands the block
+     * down: which candidates a closure will reject cannot be read here, and
+     * being wrong the other way emits a requirement into a graph that has
+     * excluded it.</p>
+     */
+    private static boolean aComponentSelectionRuleRejectsTheFloor(String[] active,
+            String configuration) {
+        boolean governs = true;
+        int depth = 0;
+        int openedAt = -1;
+        boolean rejects = false;
+        boolean namesKotlin = false;
+        for (int i = 0; i < active.length; i++) {
+            if (openedAt < 0) {
+                // The configuration a rule belongs to may be named on an earlier
+                // statement than the one opening the rule, so it is carried.
+                if (configurationNamedIn(active[i]) != null
+                        || active[i].indexOf(CONFIGURATIONS) >= 0) {
+                    governs = governsTheConstrainedGraph(active[i], configuration);
+                }
+                if (opensBlockNamed(active[i], "componentSelection")) {
+                    openedAt = depth;
+                    rejects = false;
+                    namesKotlin = false;
+                }
+            }
+            if (openedAt >= 0) {
+                rejects = rejects || callsNamed(active[i], "reject");
+                namesKotlin = namesKotlin || namesOneOfTheFamily(active[i])
+                        || holdsLiteral(active[i], KOTLIN_GROUP);
+            }
+            depth += braceBalance(active[i]);
+            if (depth < 0) {
+                depth = 0;
+            }
+            if (openedAt >= 0 && depth <= openedAt) {
+                if (rejects && namesKotlin && governs) {
+                    return true;
+                }
+                openedAt = -1;
+            }
+        }
+        return openedAt >= 0 && rejects && namesKotlin && governs;
     }
 
     /**
@@ -1313,8 +1356,13 @@ public class KotlinStdlibAlignment {
         if (!containsAConditional(statement) && !holdsATernary(statement)) {
             return found.get(found.size() - 1);
         }
+        // An arm this cannot read is an alternative like any other, and the one
+        // that may be live: unknown wins over every readable branch beside it.
         String lowest = null;
         for (int i = 0; i < found.size(); i++) {
+            if (found.get(i) == null) {
+                return null;
+            }
             lowest = lower(lowest, found.get(i));
         }
         return lowest;
@@ -1399,11 +1447,18 @@ public class KotlinStdlibAlignment {
             if (after < statement.length() && statement.charAt(after) == '(') {
                 after = skipBlanks(statement, after + 1);
             }
+            // A call with no literal argument still HAPPENED, and what it set is
+            // unknown. Recorded as nothing at all, `if (legacy) strictly
+            // providers.gradleProperty('k').get() else strictly '1.9.22'` looked
+            // like a single readable branch, so the lowest was 1.9.22 and the
+            // constraints went in beside a pin that may well be pre-merge.
+            boolean read = false;
             while (after < statement.length() && isLiteralStart(statement, after)) {
                 int end = endOfStringLiteral(statement, after);
                 if (end >= statement.length()) {
                     break;
                 }
+                read = true;
                 // The literal's own delimiters, however many it has. Written
                 // strictly """1.7.22""", the one-per-side slice returned
                 // ""1.7.22"" -- which parsed as no version at all and only
@@ -1415,6 +1470,9 @@ public class KotlinStdlibAlignment {
                     break;
                 }
                 after = skipBlanks(statement, after + 1);
+            }
+            if (!read) {
+                found.add(null);
             }
             // One BEFORE the next unread character, because the loop's own step
             // lands on it. Advancing straight to it skipped a character, and while
@@ -1596,6 +1654,11 @@ public class KotlinStdlibAlignment {
         // the exclusion is only safe once the add site carries the platform.
         List<String> enforced = versionsInCall(line, ENFORCED_PLATFORM);
         for (int i = 0; i < enforced.size(); i++) {
+            if (enforced.get(i) == null) {
+                // The call carried no literal, which is the map form: the entries
+                // below answer it.
+                continue;
+            }
             String coordinate = enforced.get(i).trim();
             if (!coordinate.startsWith(KOTLIN_GROUP + ":")) {
                 continue;
@@ -1748,6 +1811,11 @@ public class KotlinStdlibAlignment {
         // its graph to resolve to a version it excluded.
         List<String> rejected = versionsInCall(line, "reject");
         for (int i = 0; i < rejected.size(); i++) {
+            if (rejected.get(i) == null) {
+                // A rejection whose selector cannot be read may be the one that
+                // removes the floor.
+                return true;
+            }
             if (rejectionRemovesTheFloor(rejected.get(i).trim())) {
                 return true;
             }
