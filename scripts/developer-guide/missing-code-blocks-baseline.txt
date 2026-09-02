@@ -249,10 +249,6 @@ The-EDT---Event-Dispatch-Thread.asciidoc	This is best explained by an example. T
 The-EDT---Event-Dispatch-Thread.asciidoc	To explain how invokeAndBlock works you can return to the sample above of how the EDT works:
 The-EDT---Event-Dispatch-Thread.asciidoc	You can visualize the EDT as a loop such as this:
 The-EDT---Event-Dispatch-Thread.asciidoc	`invokeAndBlock()` works in a similar way to this pseudo-code:
-Video-Capture-Constraints.asciidoc	Find out if this constraint will be obeyed:
-Video-Capture-Constraints.asciidoc	For example:
-Video-Capture-Constraints.asciidoc	Suppose you want to allow the user to capture a short (5 second) clip, in a low resolution, appropriate for sharing on a social media platform. You create your `VideoCaptureConstraints` object as follows:
-Video-Capture-Constraints.asciidoc	This constraint can then be passed to `Capture.captureVideo()` to get the captured file:
 Working-With-iOS.asciidoc	Repeating notifications will continue until they're canceled by the app. You can cancel a single notification by calling:
 appendix_goal_generate_graphql.adoc	The `@GraphQLClient` interface looks like:
 appendix_goal_generate_graphql.adoc	an `OnComplete<GraphQLResponse<T>>`:
