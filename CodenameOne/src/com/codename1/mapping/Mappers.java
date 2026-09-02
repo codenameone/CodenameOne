@@ -305,7 +305,12 @@ public final class Mappers {
             return;
         }
         if (mapper == null) {
-            writeJson(out, instance);
+            // toString(), not the raw value. emitFieldToMap stores `_v.toString()`
+            // when the declared type has no registered mapper, so JSONWriter quotes
+            // it -- an Object field holding an Integer comes out as "5". Passing the
+            // instance to writeJson would emit 5, changing the field's wire TYPE the
+            // day its mapper gains a direct writer.
+            writeJsonString(out, instance.toString());
             return;
         }
         if (mapper instanceof Mapper.Direct) {
