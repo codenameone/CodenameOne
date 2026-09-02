@@ -68,6 +68,11 @@ LIST_MARKER_RE = re.compile(r"^([*\-]+|\.{1,5}|[0-9]+\.)\s+")
 # already span [source], [listing], [cols=...], [options=...], [quote] and an
 # anchored image, and a whitelist would report the next kind nobody thought of.
 ADMONITION = "NOTE|TIP|IMPORTANT|WARNING|CAUTION"
+# A bracketed attribute list or a block title. Both attach to the block BELOW them,
+# so neither answers the question "is a listing here".
+ATTRIBUTE_LINE_RE = re.compile(
+    r'^\[(?!(?:' + "NOTE|TIP|IMPORTANT|WARNING|CAUTION" + r')[,\]])[a-zA-Z%.#"][^\]]*\]\s*$'
+)
 BLOCK_START_RE = re.compile(
     # The name may be followed by "]" or by further attributes, as in
     # [NOTE,caption="Aside"] -- requiring the bracket immediately made an
@@ -112,6 +117,16 @@ def scan(path: Path) -> list[tuple[int, str]]:
         following = index + 1
         while following < len(lines) and not lines[following].strip():
             following += 1
+        # An attribute line decorates whatever comes next; it is not itself the
+        # block. [source,java] is followed by the delimiter, [cols=...] by the
+        # table, an anchor by an image -- and [#next-section] by nothing but an
+        # ordinary paragraph, which is exactly the hole this gate looks for. So
+        # step over attribute lines and block titles and classify what they attach
+        # to. Admonitions never reach here; ADMONITION excludes them above.
+        while following < len(lines) and ATTRIBUTE_LINE_RE.match(lines[following].strip()):
+            following += 1
+            while following < len(lines) and not lines[following].strip():
+                following += 1
         if following < len(lines) and BLOCK_START_RE.match(lines[following].strip()):
             continue
         findings.append((index + 1, normalize(stripped)))
