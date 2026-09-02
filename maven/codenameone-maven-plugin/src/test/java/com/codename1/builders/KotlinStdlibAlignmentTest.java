@@ -645,6 +645,69 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A map factored into a variable is a declaration too. Recorded as
+     * nothing, the statement using it named no artifact and the strict pin it
+     * carried was invisible.
+     */
+    @Test
+    public void aMapMayBeFactoredIntoAVariable() {
+        String pinned = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = [group: 'org.jetbrains.kotlin', "
+                + "name: 'kotlin-stdlib-jdk8', version: '1.7.22']\n"
+                + "    implementation(dep) { version { strictly '1.7.22' } }\n");
+        check("".equals(pinned), "the map is carried to its usage, got <<" + pinned + ">>");
+
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def dep = [group: 'org.jetbrains.kotlin', "
+                + "name: 'kotlin-stdlib-jdk7', version: '1.9.22']\n"
+                + "    implementation(dep)\n");
+        check(modern.contains("kotlin-stdlib-jdk8:1.8.0")
+                        && !modern.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and read for what it declares, got <<" + modern + ">>");
+
+        // A map of unrelated strings is still not a declaration.
+        String catalog = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def catalog = [legacy: "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!']\n"
+                + "    implementation 'androidx.appcompat:appcompat:1.6.1'\n");
+        check(catalog.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a catalog still decides nothing, got <<" + catalog + ">>");
+    }
+
+    /**
+     * A rejection is read for exactly what it removes, and it decides
+     * reachability on its own -- a requirement beside it cannot select what
+     * the rejection has taken away.
+     */
+    @Test
+    public void aRejectionIsReadForWhatItRemoves() {
+        String[][] cases = {
+            {"reject '[1.8.0,)'", ""},
+            {"reject '[1.7.0,)'", ""},
+            {"rejectAll()", ""},
+            // require cannot select what reject removed
+            {"require '1.+'; reject '[1.8.0,)'", ""},
+            // an EXCLUSIVE lower bound leaves the floor itself selectable
+            {"reject '(1.8.0,)'", "kotlin-stdlib-jdk7:1.8.0"},
+            {"reject ']1.8.0,)'", "kotlin-stdlib-jdk7:1.8.0"},
+            {"reject '[1.9.0,)'", "kotlin-stdlib-jdk7:1.8.0"},
+            {"require '1.+'", "kotlin-stdlib-jdk7:1.8.0"},
+        };
+        for (int i = 0; i < cases.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') "
+                    + "{ version { " + cases[i][0] + " } }\n");
+            if (cases[i][1].length() == 0) {
+                check("".equals(out),
+                        cases[i][0] + " leaves nothing at the floor, got <<" + out + ">>");
+            } else {
+                check(out.contains(cases[i][1]),
+                        cases[i][0] + " leaves the floor selectable, got <<" + out + ">>");
+            }
+        }
+    }
+
+    /**
      * A strategy on {@code configurations.classpath} governs the plugin
      * classpath, which is not where these constraints go -- so standing the
      * block down for it would leave a real duplicate unfixed for a setting

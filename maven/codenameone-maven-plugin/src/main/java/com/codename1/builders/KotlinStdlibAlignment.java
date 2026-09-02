@@ -294,6 +294,15 @@ public class KotlinStdlibAlignment {
                 if (!namesArtifactAnywhere(lines[j], artifact)) {
                     continue;
                 }
+                // A rejection that removes the floor decides this on its own, whatever
+                // the requirement beside it says. `require '1.+'; reject '[1.8.0,)'`
+                // can only select a pre-merge 1.x, and reading the requirement alone
+                // called that merged-era -- so its own constraint was skipped as
+                // satisfied while the sibling was raised around it, which is the
+                // duplicate again.
+                if (rejectsTheFloor(lines[j])) {
+                    return true;
+                }
                 String declared = declaredVersionOf(lines[j], artifact);
                 if (declared != null && declared.endsWith(STRICT_SUFFIX)) {
                     declared = declared.substring(0,
@@ -584,11 +593,7 @@ public class KotlinStdlibAlignment {
         // `reject '1.7.0'` does not -- 1.8.0 and everything after it are still
         // available, the graph still needs aligning, and treating every rejection as
         // management left the original duplicate unfixed.
-        if (callsNamed(line, "rejectAll")) {
-            return true;
-        }
-        String rejected = versionInCall(line, "reject");
-        if (rejected != null && rejectionLeavesNothingAtTheFloor(rejected)) {
+        if (rejectsTheFloor(line)) {
             return true;
         }
         String declared = declaredVersionOf(line, artifact);
@@ -958,8 +963,24 @@ public class KotlinStdlibAlignment {
             return false;
         }
         String lower = rejection.substring(1, comma).trim();
-        return lower.length() == 0
-                || compareVersions(lower, MERGED_STDLIB_FLOOR) <= 0;
+        if (lower.length() == 0) {
+            return true;
+        }
+        int compared = compareVersions(lower, MERGED_STDLIB_FLOOR);
+        // An exclusive lower bound does not reject the bound itself, so
+        // `(1.8.0,)` leaves exactly the floor selectable and the constraint has
+        // somewhere to land; `[1.8.0,)` does not.
+        boolean excludesItsOwnBound = opening == '(' || opening == ']';
+        return excludesItsOwnBound ? compared < 0 : compared <= 0;
+    }
+
+    /** Whether the statement rejects the floor and everything past it. */
+    private static boolean rejectsTheFloor(String line) {
+        if (callsNamed(line, "rejectAll")) {
+            return true;
+        }
+        String rejected = versionInCall(line, "reject");
+        return rejected != null && rejectionLeavesNothingAtTheFloor(rejected);
     }
 
     /** Whether a range excludes every version at or above the floor. */
@@ -2113,6 +2134,31 @@ public class KotlinStdlibAlignment {
      * leaving a stale value behind.
      */
     /**
+     * The index of the {@code ]} closing the bracket at {@code from}, or -1.
+     * Nested brackets and literals are skipped, so a map inside a list closes
+     * where it really closes.
+     */
+    private static int closingBracket(String text, int from) {
+        int depth = 0;
+        for (int i = from; i < text.length(); i++) {
+            if (isLiteralStart(text, i)) {
+                i = endOfStringLiteral(text, i);
+                continue;
+            }
+            char c = text.charAt(i);
+            if (c == '[') {
+                depth++;
+            } else if (c == ']') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /**
      * Records a definition, or forgets it, unless doing so under a condition
      * would throw away the value that decides suppression.
      */
@@ -2352,6 +2398,17 @@ public class KotlinStdlibAlignment {
                 if (closes < statement.length()) {
                     end = closes;
                     value = expandedLiteral(statement, i, closes, literals);
+                }
+            } else if (i < statement.length() && statement.charAt(i) == '[') {
+                // A map factored into a variable is a declaration too:
+                //   def dep = [group: '...', name: '...', version: '1.7.22']
+                // Recorded as nothing, the statement using it named no artifact and
+                // the strict pin it carried was invisible. Stored whole, it inlines
+                // back into the usage and reads as the map form it is.
+                int closes = closingBracket(statement, i);
+                if (closes > i) {
+                    end = closes;
+                    value = statement.substring(i, closes + 1);
                 }
             }
             recordDefinition(literals, name, value, conditional);
