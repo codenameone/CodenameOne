@@ -6,7 +6,6 @@
 About-This-Guide.asciidoc	http://github.com/chen-fishbein/
 About-This-Guide.asciidoc	http://github.com/shannah/
 Advanced-Theming.asciidoc	http://freebiesbug.com/psd-freebies/iphone-6-ui-kit/
-Advanced-Theming.asciidoc	https://www.codenameone.com/files/iOS_UI-Kit.psd
 Advanced-Topics-Under-The-Hood.asciidoc	http://developer.android.com/reference/android/content/Context.html
 Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/Mobihelp.html
 Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/Mobihelp.html
