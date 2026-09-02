@@ -1562,12 +1562,6 @@ public class EditorView extends Component implements TextInputClient {
 
     @Override
     public void pointerDragged(int x, int y) {
-        // Deliberately NOT guarded by isScrollWheeling, unlike Slider, OnOffSwitch and the
-        // SplitPane divider: the editor scrolls itself from the drag delta below rather
-        // than through a scrollable parent, so declining the synthetic gesture a wheel
-        // plays would stop the wheel scrolling the editor at all. Nothing it latches
-        // outlives the gesture -- pointerPressed re-decides touchScrolling and
-        // multiClickSelecting on every press.
         if (draggingHandle != 0) {
             caret = offsetAtPoint(x, y);
             loupeActive = true;

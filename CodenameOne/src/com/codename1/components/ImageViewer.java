@@ -556,6 +556,28 @@ public class ImageViewer extends Component {
     }
 
     /// {@inheritDoc}
+    ///
+    /// A wheel pans a zoomed image, which is what a wheel over a picture means on a
+    /// desktop, and leaves an unzoomed one alone so the page it sits on scrolls instead.
+    /// Zoom is the wheel with a modifier, which the ports already deliver as a magnify
+    /// gesture -- see `#pinch(float)`.
+    @Override
+    protected boolean mouseWheel(com.codename1.ui.events.WheelEvent ev) {
+        if (getZoom() <= 1 || getWidth() <= 0 || getHeight() <= 0) {
+            return false;
+        }
+        panPositionX = clampPan(panPositionX - ((float) ev.getDeltaX()) / ((float) getWidth()));
+        panPositionY = clampPan(panPositionY - ((float) ev.getDeltaY()) / ((float) getHeight()));
+        updatePositions();
+        repaint();
+        return true;
+    }
+
+    private static float clampPan(float value) {
+        return Math.min(1, Math.max(0, value));
+    }
+
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
         if (pointerPressedAction != ACTION_NONE) {
@@ -578,17 +600,6 @@ public class ImageViewer extends Component {
                 p.pointerDragged(x, y);
                 return;
             }
-        }
-        // Below the delegation above, and deliberately: a wheel gesture must still reach a
-        // scrollable ancestor through this method, which is the only thing that forwards it
-        // -- guarding the whole handler would stop a wheel scrolling a form that holds an
-        // image viewer. What it must not do is pan or swipe. Those move panPositionX and are
-        // settled by pointerReleased, which animates the partial swipe back or commits the
-        // navigation, and a wheel gets no release: the viewer would be left painted between
-        // two images until something else touched it. A zoomed viewer no longer pans from
-        // the wheel either, which is the same answer every non-scrollable thing gives it.
-        if (Display.getInstance().isScrollWheeling()) {
-            return;
         }
         // could be a pan
         float distanceX = ((float) pressX - x) / getZoom();

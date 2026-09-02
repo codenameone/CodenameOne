@@ -4588,56 +4588,6 @@ public class Form extends Container implements TopLevelContainer {
             setPressedCmp(null);
             boolean isScrollWheeling = Display.impl.isScrollWheeling();
             Container actual = getActualPane(formLayeredPane, x, y);
-            // A wheel notch is a scroll, never a tap. The gesture the implementation
-            // plays for it is a synthetic press/drag/release, and that only reads as a
-            // scroll while something actually scrolls: over content already fully
-            // visible no drag is ever activated, so the release fell through to the
-            // component under the cursor and activated it. Wheeling over a table row
-            // opened its details dialog (issue #5655). Button already refuses to fire
-            // while wheeling, but a pointerReleased LISTENER had no such guard, and
-            // neither does any component that acts on the release itself.
-            //
-            // The drag half is still delivered: that is the scroll, and the container
-            // it was played into needs its release to settle the momentum. Only the
-            // paths that treat a release as a click are skipped -- which is also why
-            // the tap dispatches below no longer test isScrollWheeling before moving
-            // focus: none of them is reachable during a wheel gesture any more.
-            if (isScrollWheeling) {
-                // Consuming a form level release listener means the gesture was handled and
-                // must not be dispatched further, and that holds for a wheel as much as for
-                // a finger: the ordinary path returns on it. Ignoring the answer here let a
-                // consumed release still reach an activated sticky target and commit a
-                // spinner's value -- fireReleaseListeners clears `dragged` itself on that
-                // path, but nothing else, so only the sticky half slipped through.
-                boolean consumed = fireReleaseListeners(x, y);
-                // Whatever the drag was actually delivered to, which is not only the
-                // scrolling container: a component that opts into sticky drag keeps the
-                // gesture once it starts, and a Spinner is one -- its drag rolls the value
-                // and its release is what settles the roll and commits it. Dropping that
-                // release left the spinner mid-roll with the new value uncommitted until
-                // something else touched it.
-                //
-                // Requiring an ACTIVATED drag is what keeps this from being the tap the
-                // rest of this branch exists to suppress: List fires its action event only
-                // on the release of a gesture that never became a drag, and takes the
-                // settling path when it did.
-                Component wheelDragged = consumed ? null
-                        : (dragged != null ? dragged
-                                : (stickyDrag != null && stickyDrag.isDragActivated() ? stickyDrag : null));
-                if (wheelDragged != null) {
-                    if (wheelDragged.isDragAndDropInitialized()) {
-                        LeadUtil.dragFinished(wheelDragged, x, y);
-                    } else {
-                        LeadUtil.pointerReleased(wheelDragged, x, y);
-                    }
-                    repaint();
-                }
-                dragged = null;
-                stickyDrag = null;
-                dragStopFlag = false;
-                releaseComponentsAwaitingRelease();
-                return;
-            }
             if (componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
                 // special case allowing drag within a button
                 Component atXY = actual.getComponentAt(x, y);
@@ -4723,7 +4673,7 @@ public class Form extends Container implements TopLevelContainer {
                     }
                     cmp = LeadUtil.leadParentImpl(cmp);
                     if (cmp.isEnabled()) {
-                        if (cmp.isFocusable()) {
+                        if (!isScrollWheeling && cmp.isFocusable()) {
                             setFocused(cmp);
                         }
                         LeadUtil.pointerReleased(cmp, x, y);
@@ -4749,7 +4699,7 @@ public class Form extends Container implements TopLevelContainer {
                             cmp = LeadUtil.leadParentImpl(cmp);
 
                             if (cmp.isEnabled()) {
-                                if (cmp.isFocusable()) {
+                                if (!isScrollWheeling && cmp.isFocusable()) {
                                     setFocused(cmp);
                                 }
                                 LeadUtil.pointerReleased(cmp, x, y);
@@ -4765,7 +4715,7 @@ public class Form extends Container implements TopLevelContainer {
                             if (cmp != null) {
                                 cmp = LeadUtil.leadParentImpl(cmp);
 
-                                if (cmp.isEnabled() && cmp.isFocusable()) {
+                                if (cmp.isEnabled() && !isScrollWheeling && cmp.isFocusable()) {
                                     setFocused(cmp);
                                 }
                                 LeadUtil.pointerReleased(cmp, x, y);
@@ -4781,7 +4731,7 @@ public class Form extends Container implements TopLevelContainer {
 
                                     cmp = LeadUtil.leadParentImpl(cmp);
 
-                                    if (cmp.isEnabled() && cmp.isFocusable()) {
+                                    if (!isScrollWheeling && cmp.isEnabled() && cmp.isFocusable()) {
                                         setFocused(cmp);
                                     }
                                     LeadUtil.pointerReleased(cmp, x, y);
@@ -4801,25 +4751,17 @@ public class Form extends Container implements TopLevelContainer {
                 }
             }
             stickyDrag = null;
-            releaseComponentsAwaitingRelease();
+            if (componentsAwaitingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
+                for (Component c : componentsAwaitingRelease) {
+                    if (LeadUtil.leadComponentImpl(c) instanceof ReleasableComponent) {
+                        ReleasableComponent rc = (ReleasableComponent) LeadUtil.leadComponentImpl(c);
+                        rc.setReleased();
+                    }
+                }
+                componentsAwaitingRelease = null;
+            }
         } finally {
             currentPointerPress = null;
-        }
-    }
-
-    /// Clears the pressed look of everything still waiting for this gesture's release.
-    /// Shared with the scroll-wheel path above, which returns before the end of
-    /// `#pointerReleased(int, int)` and would otherwise leave a component painted
-    /// pressed until the next gesture.
-    private void releaseComponentsAwaitingRelease() {
-        if (componentsAwaitingRelease != null && !Display.getInstance().isRecursivePointerRelease()) {
-            for (Component c : componentsAwaitingRelease) {
-                if (LeadUtil.leadComponentImpl(c) instanceof ReleasableComponent) {
-                    ReleasableComponent rc = (ReleasableComponent) LeadUtil.leadComponentImpl(c);
-                    rc.setReleased();
-                }
-            }
-            componentsAwaitingRelease = null;
         }
     }
 

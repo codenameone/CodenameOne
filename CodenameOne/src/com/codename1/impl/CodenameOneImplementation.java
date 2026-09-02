@@ -9261,26 +9261,29 @@ public abstract class CodenameOneImplementation {
         t.setIdentity();
     }
 
-    /// True while a scroll-wheel gesture started by `#pointerWheelMoved` is still
-    /// animating. The framework uses this to tell a wheel scroll apart from a
-    /// finger drag (e.g. it suppresses opening the native text editor mid-scroll).
+    /// True while a wheel scroll started by `#pointerWheelMoved` is being handled.
+    ///
+    /// It used to mean something stronger: that synthetic pointer events were in flight,
+    /// because a wheel was emulated as a press, drag and release into the component tree.
+    /// Components tested this to tell that impostor from a finger. Nothing is synthesized
+    /// any more -- the wheel scrolls the container directly -- so those tests can no longer
+    /// fail to be written, and the flag survives for application code that reads it.
     private boolean scrollWheeling;
 
     public boolean isScrollWheeling() {
         return scrollWheeling;
     }
 
-    /// Maps a physical scroll-wheel / trackpad scroll into a Codename One scroll
-    /// gesture. Ports call this from their native wheel callback instead of
-    /// fabricating raw pointer (or key) events of their own, so the mapping lives
-    /// in one place and behaves identically everywhere.
+    /// Maps a physical scroll-wheel / trackpad scroll into a Codename One scroll.
+    /// Ports call this from their native wheel callback instead of fabricating raw
+    /// pointer (or key) events of their own, so the mapping lives in one place and
+    /// behaves identically everywhere.
     ///
-    /// The shared implementation replays the scroll as a synthetic
-    /// press/drag/release over the component under `(x, y)` -- spread across a few
-    /// EDT cycles so Codename One's own drag/tensile/deceleration logic animates
-    /// it like a real drag rather than a single jump -- and temporarily makes that
-    /// component non-focusable so the synthetic press is not registered as a
-    /// click. While it runs `#isScrollWheeling` reports `true`.
+    /// The component under `(x, y)` is offered the wheel first, through
+    /// `Component#mouseWheel` and the mouse wheel listeners, walking up the hierarchy
+    /// until something consumes it. If nothing does, the nearest scrollable ancestor is
+    /// scrolled. No pointer event is synthesized: that is what this used to do, and what
+    /// every component reacting to a pointer then had to defend itself against.
     ///
     /// #### Parameters
     ///
@@ -9353,131 +9356,29 @@ public abstract class CodenameOneImplementation {
             return;
         }
         final Display d = Display.getInstance();
-        // First give mouse wheel listeners a chance to handle (and consume) the event on the EDT.
-        // Only when no listener consumes it do we fall through to the default scrolling gesture.
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                if (Desktop.getInstance().windowMouseWheelEvent(
-                        windowId, x, y, scrollX, scrollY, precise, modifiers)) {
-                    return;
-                }
-                playWheelScrollGesture(d, windowId, x, y, scrollX, scrollY);
-            }
-        });
-    }
-
-    /// Resolves the top level a wheel gesture should play into: the window with the
-    /// given id, or the current form for the main surface.
-    private Container wheelRoot(Display d, int windowId) {
-        // Modality is rechecked on every step, not only when the wheel arrived. The
-        // gesture is played as four queued steps and an unconsumed wheel listener can
-        // show a modal in between, after which the remaining synthetic press, drags
-        // and release would scroll or activate content behind it.
-        if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
-            return null;
-        }
-        if (windowId > 0) {
-            Window w = Desktop.getInstance().windowById(windowId);
-            // Visibility as well as modality, and for the same reason: an unconsumed
-            // wheel listener can hide or minimize its own window before the gesture
-            // starts, and a hidden window stays registered -- so the synthetic press,
-            // drags and release would scroll and activate components in a hierarchy
-            // nobody can see.
-            if (w == null || !w.isWindowShowing()) {
-                return null;
-            }
-            return w;
-        }
-        return d.getCurrent();
-    }
-
-    /// Plays the default scroll gesture for a wheel movement. Quarter the gesture across four EDT
-    /// cycles: a single press->drag(full)->release would read as a fling and overshoot, whereas
-    /// stepped drags let the scroll container settle the way a finger drag does. While it runs
-    /// `#isScrollWheeling` reports `true`.
-    private void playWheelScrollGesture(final Display d, final int windowId, final int x,
-            final int y, final int scrollX, final int scrollY) {
-        // The root is resolved once, by the step that dispatches the press, and the
-        // remaining steps reuse it. Re-checking modality on every step -- which is
-        // what the previous version did -- suppressed the later steps including the
-        // only release, so a gesture whose press had already been delivered never
-        // completed and left the top level's pressed and drag bookkeeping stranded.
-        // A gesture blocked *before* its press still never starts, which is the case
-        // modality is there to stop.
-        final Container[] started = new Container[1];
-        d.callSerially(new Runnable() {
-            @Override
-            public void run() {
-                Container f = wheelRoot(d, windowId);
-                if (f != null) {
-                    started[0] = f;
-                    scrollWheeling = true;
-                    dragWheelStep(f, x, y, scrollX / 4, scrollY / 4, true, false);
+                // The whole of it: dispatch the wheel event, and if nobody took it, scroll
+                // the container under the cursor. No pointer events are synthesized.
+                //
+                // They used to be. A wheel was replayed as a press, three drags and a
+                // release into the component tree so the scroll would animate like a finger
+                // drag, and every component that reacts to a pointer had to be taught to
+                // recognise and refuse the impostor -- Button, Slider and ComboBox already
+                // carried that guard, and each new one that did not was a bug: a switch
+                // toggled by scrolling past it, a list row selected, a table row opening a
+                // dialog (issue #5655). The ports have reported real wheel deltas for a
+                // while now, so the emulation had nothing left to buy.
+                scrollWheeling = true;
+                try {
+                    Desktop.getInstance().windowMouseWheelEvent(windowId, x, y, scrollX, scrollY,
+                            precise, modifiers);
+                } finally {
+                    scrollWheeling = false;
                 }
             }
         });
-        d.callSerially(new Runnable() {
-            @Override
-            public void run() {
-                Container f = started[0];
-                if (f != null) {
-                    dragWheelStep(f, x, y, scrollX / 2, scrollY / 2, false, false);
-                }
-            }
-        });
-        d.callSerially(new Runnable() {
-            @Override
-            public void run() {
-                Container f = started[0];
-                if (f != null) {
-                    dragWheelStep(f, x, y, scrollX * 3 / 4, scrollY * 3 / 4, false, false);
-                }
-            }
-        });
-        d.callSerially(new Runnable() {
-            @Override
-            public void run() {
-                // The release, which must reach the same root the press did -- a
-                // modal shown mid-gesture must not strand the pressed component.
-                Container f = started[0];
-                if (f != null) {
-                    dragWheelStep(f, x, y, scrollX, scrollY, false, true);
-                }
-                scrollWheeling = false;
-            }
-        });
-    }
-
-    /// One synthetic step of a `#pointerWheelMoved` gesture, on the EDT: optionally
-    /// presses, drags to the accumulated `(dx, dy)` offset, and optionally
-    /// releases. The component under the cursor is made non-focusable around the
-    /// step so the synthetic press is not turned into a selection/click.
-    private void dragWheelStep(Container f, int x, int y, int dx, int dy, boolean press, boolean release) {
-        Component cmp;
-        try {
-            cmp = f.getComponentAt(x, y);
-        } catch (Throwable t) {
-            // getComponentAt can transiently fault while the UI is mutating off-EDT.
-            cmp = null;
-        }
-        boolean unfocus = cmp != null && cmp.isFocusable();
-        if (unfocus) {
-            cmp.setFocusable(false);
-        }
-        try {
-            if (press) {
-                f.pointerPressed(x, y);
-            }
-            f.pointerDragged(x + dx, y + dy);
-            if (release) {
-                f.pointerReleased(x + dx, y + dy);
-            }
-        } finally {
-            if (unfocus) {
-                cmp.setFocusable(true);
-            }
-        }
     }
 
     /// Blocks or enables copy and paste in the entire app.

@@ -1126,11 +1126,6 @@ public class SplitPane extends Container {
 
             super.pointerPressed(x, y);
 
-            if (Display.getInstance().isScrollWheeling()) {
-                // See pointerDragged: the whole synthetic gesture is declined, so the
-                // press does not arm a drag whose release the wheel will not deliver.
-                return;
-            }
             pressedX = x;
             pressedY = y;
             pressedConstraint = ((LayeredLayout) getLayout()).getOrCreateConstraint(this).copy();
@@ -1142,14 +1137,6 @@ public class SplitPane extends Container {
         public void pointerDragged(int x, int y) {
 
             super.pointerDragged(x, y);
-            // A scroll wheel plays a synthetic press and drag over whatever is under the
-            // cursor, and moving the divider because someone scrolled past it is not what
-            // the wheel is for. The divider carries no scrollable content of its own -- the
-            // panes either side are ordinary containers the wheel reaches directly -- so it
-            // declines the gesture the way Slider does rather than filtering part of it.
-            if (Display.getInstance().isScrollWheeling()) {
-                return;
-            }
             if (!inDrag) {
                 return;
             }

@@ -169,19 +169,9 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private int pressY;
     private int deltaX; //pressX - currentdragX
     private int deltaY;
-    /// The three of these decline a scroll wheel outright, the way `Slider` and
-    /// `OnOffSwitch` do in their overridden handlers: a wheel plays a synthetic press,
-    /// drag and release over whatever is under the cursor, and a switch someone scrolled
-    /// past is not what it is aimed at. Written as LISTENERS rather than as overrides,
-    /// which is why a sweep of the components that override pointerDragged does not find
-    /// this one -- the guard belongs wherever the gesture is acted on, not wherever it is
-    /// declared.
     private final ActionListener pointerPressed = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
-            if (Display.getInstance().isScrollWheeling()) {
-                return;
-            }
             // The top level rather than the Form, so this still registers inside a
             // Window where getComponentForm() is null.
             TopLevelContainer t = getTopLevelContainer();
@@ -199,9 +189,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private final ActionListener pointerDragged = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
-            if (Display.getInstance().isScrollWheeling()) {
-                return;
-            }
+
             dragged = true;
             deltaX = pressX - evt.getX();
             deltaY = pressY - evt.getY();
@@ -224,9 +212,6 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
         @Override
         public void actionPerformed(ActionEvent evt) {
-            if (Display.getInstance().isScrollWheeling()) {
-                return;
-            }
             if (animationLock) {
                 return;
             }

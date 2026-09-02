@@ -319,6 +319,23 @@ public class MapComponent extends Container {
 
     /// {@inheritDoc}
     @Override
+    protected boolean mouseWheel(com.codename1.ui.events.WheelEvent ev) {
+        // The same translation a drag applies, from the wheel's own deltas. A wheel used to
+        // reach this map as a synthetic drag; the synthetic drags are gone, so the pan it
+        // did buy is asked for directly instead of being lost with them.
+        if (_map == null || (ev.getDeltaX() == 0 && ev.getDeltaY() == 0)) {
+            return false;
+        }
+        Coord scale = _map.scale(_zoom);
+        _center = _center.translate(ev.getDeltaY() * scale.getLatitude(),
+                -ev.getDeltaX() * scale.getLongitude());
+        _needTiles = true;
+        super.repaint();
+        return true;
+    }
+
+    /// {@inheritDoc}
+    @Override
     public void pointerDragged(int x, int y) {
         super.pointerDragged(x, y);
         if (oldDistance == -1) {

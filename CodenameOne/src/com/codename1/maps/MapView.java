@@ -540,22 +540,24 @@ public class MapView extends Container implements MapSurface {
     }
 
     /// {@inheritDoc}
+    ///
+    /// A wheel pans the camera, and tells the listeners about it -- which is the half a
+    /// synthetic drag could never deliver, because the gesture it emulated had no end that
+    /// meant "the pan is finished".
+    @Override
+    protected boolean mouseWheel(com.codename1.ui.events.WheelEvent ev) {
+        if (ev.getDeltaX() == 0 && ev.getDeltaY() == 0) {
+            return false;
+        }
+        engine.panPixels(ev.getDeltaX(), ev.getDeltaY());
+        repaint();
+        fireCameraChanged();
+        return true;
+    }
+
+    /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
-        // A scroll wheel plays a synthetic press, drag and release over whatever is under
-        // the cursor, and panning the camera from one is worse than ignoring it: the pan
-        // itself is only half of the gesture. pointerReleased is where a completed pan
-        // calls fireCameraChanged, and a wheel gets no release -- delivering one would take
-        // the tap branch below the pan threshold and select a marker or zoom in. So the map
-        // would move while every listener that reloads markers or tiles for the new
-        // viewport heard nothing about it.
-        //
-        // MapComponent beside this one is deliberately left alone: its drag applies the
-        // whole pan as it goes and its release is only tap bookkeeping, so a wheel over it
-        // leaves nothing half done.
-        if (Display.getInstance().isScrollWheeling()) {
-            return;
-        }
         int dx = x - lastX;
         int dy = y - lastY;
         lastX = x;

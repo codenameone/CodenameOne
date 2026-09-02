@@ -3424,21 +3424,7 @@ public class Window extends Container implements TopLevelContainer {
             endGesture(releasing);
             return;
         }
-        // A wheel notch is a scroll, never a tap, exactly as in Form: the synthetic
-        // gesture the implementation plays for it activates no drag when there is
-        // nothing left to scroll, and the release then reached the pressed component
-        // and acted like a click on it (issue #5655). The dragged component still gets
-        // its release -- that one IS the scroll, and it has momentum to settle.
-        final boolean wheeling = Display.impl.isScrollWheeling();
-        // A wheel releases what it was actually dragging, and nothing else. A window has no
-        // sticky-drag bookkeeping of its own, so a component that keeps the gesture -- a
-        // Spinner rolling its value -- is reached here as the pressed component, and the
-        // drag it activated is what tells it apart from the tap this branch suppresses.
-        Component target = releasingDragged != null ? releasingDragged
-                : (wheeling
-                        ? (releasingPressed != null && releasingPressed.isDragActivated()
-                                ? releasingPressed : null)
-                        : releasingPressed);
+        Component target = releasingDragged != null ? releasingDragged : releasingPressed;
         if (target != null) {
             if (releasingDragged != null && releasingDragged.isDragAndDropInitialized()) {
                 // An activated drag ends with dragFinished, not pointerReleased.
@@ -3450,28 +3436,6 @@ public class Window extends Container implements TopLevelContainer {
             } else {
                 LeadUtil.pointerReleased(target, x, y);
             }
-        }
-        // Guarded by the token for the same reason endGesture is: a release handler can
-        // enter invokeAndBlock, whose nested loop dispatches a fresh press in this window,
-        // and emptying the list then would erase the replacement gesture's pending
-        // component rather than this one's.
-        if (wheeling && currentPointerPress == releasing) { //NOPMD CompareObjectsWithEquals
-            // Emptied rather than released, unlike Form's equivalent, and deliberately: a
-            // wheel gesture cannot leave a ReleasableComponent looking pressed, so there is
-            // no pressed look to undo. Button reaches its pressed state only through
-            // pressed(), which returns early while isScrollWheeling, and Switch implements
-            // setReleased() as a no-op. Form calls setReleased because its path also serves
-            // ordinary gestures; this one serves only the wheel.
-            //
-            // Nothing pressed by a wheel gesture is ever released: the release above went
-            // to the scrolling container or nowhere at all, and it is Button's own
-            // pointerReleased that takes it off this list. A stale entry makes the NEXT
-            // gesture's list hold two, which takes autoRelease out of its single component
-            // branch -- so dragging off the newly pressed button no longer cancels it and
-            // releasing outside fires its action. The same reasoning, and the same remedy,
-            // as the cancelled-gesture path above; Form clears its list on the equivalent
-            // path.
-            clearComponentsAwaitingRelease();
         }
         endGesture(releasing);
     }

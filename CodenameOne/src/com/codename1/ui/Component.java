@@ -6714,6 +6714,9 @@ public class Component implements Animation, StyleListener, Editable {
     boolean fireMouseWheelEvent(com.codename1.ui.events.WheelEvent ev) {
         Component c = this;
         while (c != null) {
+            if (c.mouseWheel(ev) || ev.isConsumed()) {
+                return true;
+            }
             if (c.mouseWheelListeners != null && c.mouseWheelListeners.hasListeners()) {
                 c.mouseWheelListeners.fireActionEvent(ev);
                 if (ev.isConsumed()) {
@@ -6722,6 +6725,30 @@ public class Component implements Animation, StyleListener, Editable {
             }
             c = c.getParent();
         }
+        return false;
+    }
+
+    /// Handles a scroll wheel or trackpad scroll over this component, before its listeners
+    /// and before anything above it in the hierarchy.
+    ///
+    /// A component that moves its own content -- an editor that scrolls itself, a viewer
+    /// that pans -- implements this. Everything else leaves it alone and the wheel scrolls
+    /// the nearest scrollable ancestor, which is what a wheel means.
+    ///
+    /// This exists because a wheel used to arrive as a synthetic press, drag and release
+    /// played into the component tree: a component that wanted the wheel got it by handling
+    /// pointer events, and so did every component that did not want it. The events are gone
+    /// and this is what replaces them, for the few components that have something of their
+    /// own to move.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the wheel event, carrying the scroll deltas in display pixels
+    ///
+    /// #### Returns
+    ///
+    /// true when this component handled the wheel and nothing else should act on it
+    protected boolean mouseWheel(com.codename1.ui.events.WheelEvent ev) {
         return false;
     }
 

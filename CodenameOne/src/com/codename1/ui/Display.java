@@ -8678,7 +8678,69 @@ public final class Display extends CN1Constants {
             return false;
         }
         com.codename1.ui.events.WheelEvent we = new com.codename1.ui.events.WheelEvent(cmp, x, y, scrollX, scrollY, precise, modifiers);
-        return cmp.fireMouseWheelEvent(we);
+        if (cmp.fireMouseWheelEvent(we)) {
+            return true;
+        }
+        return scrollForWheel(cmp, scrollX, scrollY);
+    }
+
+    /// Scrolls the nearest scrollable ancestor of `cmp` for a wheel nobody handled.
+    ///
+    /// A wheel is a scroll, and this is where it happens: the framework used to emulate one
+    /// by playing a synthetic press, drag and release into the component tree, which every
+    /// component that reacts to a pointer then had to defend itself against -- a switch
+    /// toggled, a list selected a row, an image viewer panned half way. There is a wheel
+    /// API now, so the scroll is applied to the container that scrolls and no pointer event
+    /// is invented at all.
+    ///
+    /// A component that wants the wheel for itself takes it before this, by consuming the
+    /// event in `Component#mouseWheel` or in a listener.
+    private boolean scrollForWheel(Component cmp, int scrollX, int scrollY) {
+        boolean scrolled = false;
+        if (scrollY != 0) {
+            Component target = scrollableAncestor(cmp, true);
+            if (target != null) {
+                // Clamped here rather than left to setScrollY: that one only clamps for a
+                // component with tensile drag off, because a finger is allowed to overshoot
+                // and spring back. A wheel notch has nothing to spring back from.
+                int max = target.getScrollDimension().getHeight() - target.getHeight();
+                scrolled = applyScroll(target, true, target.getScrollY() - scrollY, max);
+            }
+        }
+        if (scrollX != 0) {
+            Component target = scrollableAncestor(cmp, false);
+            if (target != null) {
+                int max = target.getScrollDimension().getWidth() - target.getWidth();
+                scrolled = applyScroll(target, false, target.getScrollX() - scrollX, max) || scrolled;
+            }
+        }
+        return scrolled;
+    }
+
+    private boolean applyScroll(Component target, boolean vertical, int position, int max) {
+        int next = Math.max(0, Math.min(max < 0 ? 0 : max, position));
+        if (vertical ? next == target.getScrollY() : next == target.getScrollX()) {
+            return false;
+        }
+        if (vertical) {
+            target.setScrollY(next);
+        } else {
+            target.setScrollX(next);
+        }
+        target.repaint();
+        return true;
+    }
+
+    /// The closest component from `cmp` up that actually scrolls on this axis.
+    private Component scrollableAncestor(Component cmp, boolean vertical) {
+        Component c = cmp;
+        while (c != null) {
+            if (vertical ? c.isScrollableY() : c.isScrollableX()) {
+                return c;
+            }
+            c = c.getParent();
+        }
+        return null;
     }
 
     /// Dispatches a magnify (pinch) gesture aimed at one native window. Invoked by the

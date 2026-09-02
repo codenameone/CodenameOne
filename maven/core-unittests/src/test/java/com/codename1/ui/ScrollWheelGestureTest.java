@@ -26,6 +26,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
@@ -33,143 +34,50 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// A wheel notch is a scroll, never a tap.
+/// A wheel scrolls the container under it, and dispatches nothing else.
 ///
-/// The implementation plays a wheel movement as a synthetic press, three drags and a
-/// release, so the scroll animates the way a finger drag does. That reads as a scroll
-/// only while something actually scrolls: over content that is already fully visible no
-/// drag is ever activated, and the release then fell through to whatever sat under the
-/// cursor and activated it. In the signing wizard a wheel over a row of the profile
-/// table opened that row's details dialog (issue #5655).
+/// It used to be emulated: a press, three drags and a release played into the component
+/// tree so the scroll would animate like a finger drag. Every component that reacts to a
+/// pointer then had to recognise the impostor and refuse it -- Button, Slider and ComboBox
+/// carry that guard to this day -- and every component that did not was a bug. Scrolling
+/// past a switch toggled it; a row of a table opened its dialog (issue #5655).
+///
+/// The ports report real wheel deltas, so these tests say what the wheel now does: it moves
+/// the nearest scrollable ancestor, a component that wants it takes it through
+/// `Component#mouseWheel`, and no pointer event is invented for anybody.
 class ScrollWheelGestureTest extends UITestBase {
 
     @FormTest
-    void aWheelOverAnUnscrollableRowIsNotDeliveredAsATap() {
-        int[] taps = new int[1];
-        Form f = form(taps);
-        Component row = f.getContentPane().getComponentAt(0);
+    void aWheelScrollsTheContainerUnderIt() {
+        Form f = scrollingForm();
+        Container content = f.getContentPane();
+        assertTrue(content.isScrollableY(), "the content has to overflow for this to mean anything");
 
-        wheel(row, -Display.getInstance().convertToPixels(20));
+        wheel(content.getComponentAt(0), 0, -px(20));
 
-        assertEquals(0, taps[0], "a wheel notch must not activate the component under the cursor");
+        assertTrue(content.getScrollY() > 0, "a wheel notch scrolls the container it is over");
     }
 
     @FormTest
-    void aWheelOverAScrollableRowIsNotDeliveredAsATapEither() {
-        int[] taps = new int[1];
-        Form f = form(taps);
-        // Tall enough to scroll: this is the case where a drag IS activated, so the release
-        // goes to the scrolling container and never reaches the row. That was already true
-        // before the fix -- this one GUARDS the good case rather than demonstrating the bug,
-        // which only appears when the gesture activates no drag at all, exactly as the
-        // report described it ("there was nothing available to scroll to").
-        f.getContentPane().setScrollableY(true);
-        for (int i = 0; i < 60; i++) {
-            f.getContentPane().add(filler());
-        }
+    void aWheelDispatchesNoPointerEventAtAll() {
+        Form f = new Form("no pointers", new BorderLayout());
+        PointerCountingComponent target = new PointerCountingComponent();
+        target.setPreferredH(px(15));
+        f.getContentPane().setLayout(BoxLayout.y());
+        f.getContentPane().add(target);
+        f.getContentPane().add(filler());
+        f.show();
         f.revalidate();
-        assertTrue(f.getContentPane().isScrollableY(),
-                "the content has to overflow, or this repeats the case above");
-        Component row = f.getContentPane().getComponentAt(0);
-
-        wheel(row, -Display.getInstance().convertToPixels(20));
-
-        assertEquals(0, taps[0], "scrolling past a row must not activate it");
-    }
-
-    @FormTest
-    void anOrdinaryTapStillReachesTheRow() {
-        int[] taps = new int[1];
-        Form f = form(taps);
-        Component row = f.getContentPane().getComponentAt(0);
-        int x = row.getAbsoluteX() + row.getWidth() / 2;
-        int y = row.getAbsoluteY() + row.getHeight() / 2;
-
-        f.pointerPressed(x, y);
-        f.pointerReleased(x, y);
         DisplayTest.flushEdt();
 
-        assertEquals(1, taps[0], "without a wheel gesture the release is still a tap");
+        wheel(target, 0, -px(20));
+
+        assertEquals(0, target.pointerEvents(),
+                "a wheel is a scroll: nothing may be told a pointer was pressed, dragged or released");
     }
 
     @FormTest
-    void aWheelInADesktopWindowIsNotATapEither() {
-        implementation.setMultiWindowSupported(true);
-        final int[] taps = new int[1];
-        Window w = new Window("wheel", new BorderLayout());
-        Label row = new Label("row");
-        row.setPreferredH(Display.getInstance().convertToPixels(10));
-        row.addPointerReleasedListener(new ActionListener<ActionEvent>() {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                taps[0]++;
-            }
-        });
-        w.add(BorderLayout.NORTH, row);
-        w.add(BorderLayout.CENTER, new Label("body"));
-        w.setWindowSize(300, 200);
-        w.show();
-        w.revalidate();
-        DisplayTest.flushEdt();
-
-        // A window resolves the release itself rather than through Form, so the same rule
-        // has to be written there too: its own copy is what a desktop window's wheel goes
-        // through.
-        Display.impl.windowPointerWheelMoved(w.getWindowId(),
-                row.getAbsoluteX() + row.getWidth() / 2, row.getAbsoluteY() + row.getHeight() / 2,
-                0, -Display.getInstance().convertToPixels(20), false, 0);
-        for (int i = 0; i < 6; i++) {
-            DisplayTest.flushEdt();
-        }
-
-        assertEquals(0, taps[0], "a wheel notch in a window must not activate the row under it");
-        w.dispose();
-    }
-
-    @FormTest
-    void aWheelOverAButtonInAWindowDoesNotStrandItAwaitingRelease() {
-        implementation.setMultiWindowSupported(true);
-        final int[] fired = new int[1];
-        Window w = new Window("wheel then press", new BorderLayout());
-        Button b = new Button("press me");
-        b.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                fired[0]++;
-            }
-        });
-        w.add(BorderLayout.CENTER, b);
-        w.setWindowSize(300, 200);
-        w.show();
-        w.revalidate();
-        DisplayTest.flushEdt();
-
-        // The wheel gesture presses the button and is then denied its release, which is
-        // the point of the fix above -- but Button takes itself off the window's
-        // awaiting-release list in its OWN pointerReleased. Left there, the next real
-        // press makes that list hold two, autoRelease leaves its single component branch,
-        // and a press dragged off the button stops being cancelled.
-        Display.impl.windowPointerWheelMoved(w.getWindowId(), 150, 120, 0,
-                -Display.getInstance().convertToPixels(20), false, 0);
-        for (int i = 0; i < 6; i++) {
-            DisplayTest.flushEdt();
-        }
-        assertEquals(0, fired[0], "the wheel itself must not fire the button");
-
-        // Now the ordinary gesture that has to keep working: press, drag well clear of
-        // the button, release out there.
-        w.pointerPressed(150, 120);
-        w.pointerDragged(-20, -20);
-        w.pointerReleased(-20, -20);
-        int firedCount = fired[0];
-        w.dispose();
-
-        assertEquals(0, firedCount,
-                "releasing outside the button must still not fire its action after a wheel");
-    }
-
-    @FormTest
-    void aWheelOverAnOnOffSwitchNeitherFlipsItNorSpoilsTheNextTap() {
+    void aWheelOverASwitchLeavesItAlone() {
         Form f = new Form("switch", new BorderLayout());
         com.codename1.components.OnOffSwitch sw = new com.codename1.components.OnOffSwitch();
         sw.setValue(true);
@@ -179,233 +87,154 @@ class ScrollWheelGestureTest extends UITestBase {
         f.show();
         f.revalidate();
         DisplayTest.flushEdt();
-        assertTrue(sw.getHeight() > 0, "the switch has to be laid out for a pointer test to mean anything");
 
-        wheel(sw, -Display.getInstance().convertToPixels(20));
+        wheel(sw, 0, -px(20));
 
-        assertTrue(sw.isValue(), "a wheel must not change the switch it scrolled past");
+        // No guard inside the switch says so any more. Nothing reaches it to guard against.
+        assertTrue(sw.isValue(), "a wheel must not change a switch it scrolled past");
 
-        // And the drag half must not be left applied either. The switch reads its own
-        // "dragged" flag on release to tell a tap from the end of a slide, so a latched
-        // one turns the next real tap into the tail of a gesture nobody made -- it stops
-        // toggling and settles on whatever the stale coordinates say.
         int x = sw.getAbsoluteX() + sw.getWidth() / 2;
         int y = sw.getAbsoluteY() + sw.getHeight() / 2;
         f.pointerPressed(x, y);
         f.pointerReleased(x, y);
         DisplayTest.flushEdt();
-
-        assertFalse(sw.isValue(), "the tap after the wheel still has to toggle the switch");
+        assertFalse(sw.isValue(), "and a real tap still toggles it");
     }
 
     @FormTest
-    void aWheelStillSettlesAComponentThatKeptTheDrag() {
-        Form f = new Form("sticky", new BorderLayout());
-        StickyDragComponent sticky = new StickyDragComponent();
-        sticky.setPreferredH(Display.getInstance().convertToPixels(15));
-        f.getContentPane().setLayout(BoxLayout.y());
-        f.getContentPane().add(sticky);
-        f.getContentPane().add(filler());
-        f.show();
-        f.revalidate();
-        DisplayTest.flushEdt();
-
-        wheel(sticky, -Display.getInstance().convertToPixels(20));
-
-        // A Spinner rolls its value from the drag and commits it on the release, and it
-        // keeps the gesture through the form's sticky-drag path rather than by becoming
-        // the scrolling container. Suppressing that release left the roll uncommitted.
-        assertEquals(1, sticky.releases(), "a drag that was activated still has to be settled");
-        assertTrue(sticky.drags() > 0, "the drag has to have reached it for this to mean anything");
-    }
-
-    @FormTest
-    void aConsumedWheelReleaseSettlesNothing() {
-        Form f = new Form("consumed", new BorderLayout());
-        StickyDragComponent sticky = new StickyDragComponent();
-        sticky.setPreferredH(Display.getInstance().convertToPixels(15));
-        f.getContentPane().setLayout(BoxLayout.y());
-        f.getContentPane().add(sticky);
-        f.getContentPane().add(filler());
-        // Consuming a form level release listener means the gesture was handled and must
-        // not be dispatched further. The ordinary path returns on it, and a wheel is no
-        // different -- a listener that took the gesture did not ask for a spinner's value
-        // to be committed behind it.
-        f.addPointerReleasedListener(new ActionListener<ActionEvent>() {
+    void aWheelOverAButtonDoesNotFireIt() {
+        Form f = new Form("button", new BorderLayout());
+        final int[] fired = new int[1];
+        Button b = new Button("press me");
+        b.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                evt.consume();
+                fired[0]++;
             }
         });
+        f.getContentPane().setLayout(BoxLayout.y());
+        f.getContentPane().add(b);
+        f.getContentPane().add(filler());
         f.show();
         f.revalidate();
         DisplayTest.flushEdt();
 
-        wheel(sticky, -Display.getInstance().convertToPixels(20));
+        wheel(b, 0, -px(20));
 
-        assertTrue(sticky.drags() > 0, "the drag has to have reached it for this to mean anything");
-        assertEquals(0, sticky.releases(), "a consumed release must not be dispatched onwards");
+        assertEquals(0, fired[0], "a wheel over a button is not a click on it");
     }
 
     @FormTest
-    void aWheelSettlesAKeptDragInAWindowToo() {
+    void aComponentThatWantsTheWheelTakesIt() {
+        Form f = scrollingForm();
+        Container content = f.getContentPane();
+        WheelHandlingComponent target = new WheelHandlingComponent();
+        target.setPreferredH(px(15));
+        content.addComponent(0, target);
+        f.revalidate();
+        DisplayTest.flushEdt();
+
+        wheel(target, 0, -px(20));
+
+        assertEquals(1, target.wheels(), "the component under the cursor is offered the wheel first");
+        assertEquals(0, content.getScrollY(), "and consuming it stops the container scrolling");
+    }
+
+    @FormTest
+    void aWheelInADesktopWindowScrollsThatWindow() {
         implementation.setMultiWindowSupported(true);
-        Window w = new Window("sticky", new BorderLayout());
-        StickyDragComponent sticky = new StickyDragComponent();
-        w.add(BorderLayout.CENTER, sticky);
+        Window w = new Window("scroller", new BorderLayout());
+        Container content = new Container(BoxLayout.y());
+        content.setScrollableY(true);
+        PointerCountingComponent target = new PointerCountingComponent();
+        target.setPreferredH(px(15));
+        content.add(target);
+        for (int i = 0; i < 40; i++) {
+            content.add(filler());
+        }
+        w.add(BorderLayout.CENTER, content);
         w.setWindowSize(300, 200);
         w.show();
         w.revalidate();
         DisplayTest.flushEdt();
 
         Display.impl.windowPointerWheelMoved(w.getWindowId(),
-                sticky.getAbsoluteX() + sticky.getWidth() / 2,
-                sticky.getAbsoluteY() + sticky.getHeight() / 2,
-                0, -Display.getInstance().convertToPixels(20), false, 0);
-        for (int i = 0; i < 6; i++) {
-            DisplayTest.flushEdt();
-        }
+                target.getAbsoluteX() + target.getWidth() / 2,
+                target.getAbsoluteY() + target.getHeight() / 2, 0, -px(20), false, 0);
+        DisplayTest.flushEdt();
 
-        assertEquals(1, sticky.releases(), "a window has no sticky-drag list, so the pressed"
-                + " component is where a kept drag arrives");
+        assertTrue(content.getScrollY() > 0, "a window's own content scrolls");
+        assertEquals(0, target.pointerEvents(), "and nothing in it is told about a pointer");
         w.dispose();
     }
 
-    @FormTest
-    void aWheelStillScrollsThroughAChildThatForwardsItsDrags() {
-        // The trap the ImageViewer guard has to avoid, and the reason EditorView has none at
-        // all: a component can be the only thing that forwards a drag to the scrollable
-        // ancestor -- ImageViewer does exactly this for a vertical drag -- so declining the
-        // whole gesture there would stop a wheel scrolling the page it sits on.
-        Form f = new Form("forwarding", new BorderLayout());
-        // The scroller has to actually overflow: isScrollableY() reports false for a
-        // container whose content fits, and a child looking for a scrollable ancestor would
-        // find none.
-        Container scroller = f.getContentPane();
-        scroller.setLayout(BoxLayout.y());
-        scroller.setScrollableY(true);
-        ForwardingComponent child = new ForwardingComponent();
-        child.setPreferredH(Display.getInstance().convertToPixels(15));
-        scroller.add(child);
+    private Form scrollingForm() {
+        Form f = new Form("scroller", new BorderLayout());
+        Container content = f.getContentPane();
+        content.setLayout(BoxLayout.y());
+        content.setScrollableY(true);
         for (int i = 0; i < 60; i++) {
-            scroller.add(filler());
+            content.add(filler());
         }
         f.show();
         f.revalidate();
         DisplayTest.flushEdt();
-        assertTrue(scroller.isScrollableY(), "the container has to have something to scroll");
-        assertEquals(0, scroller.getScrollY(), "nothing is scrolled before the wheel");
-
-        wheel(child, -Display.getInstance().convertToPixels(20));
-
-        assertTrue(child.forwarded(), "the child has to have forwarded for this to mean anything");
-        assertTrue(scroller.getScrollY() > 0,
-                "a wheel forwarded by a child still has to scroll the container it names");
+        return f;
     }
 
-    /// Forwards its drags to the scrollable ancestor instead of handling them, the way
-    /// `ImageViewer` forwards a vertical drag.
-    private static final class ForwardingComponent extends Component {
-        private boolean forwarded;
+    /// Plays one wheel notch over the middle of `over` and lets it be handled.
+    private void wheel(Component over, int deltaX, int deltaY) {
+        Display.impl.pointerWheelMoved(over.getAbsoluteX() + over.getWidth() / 2,
+                over.getAbsoluteY() + over.getHeight() / 2, deltaX, deltaY, false, 0);
+        DisplayTest.flushEdt();
+    }
 
-        boolean forwarded() {
-            return forwarded;
+    private static int px(int mm) {
+        return Display.getInstance().convertToPixels(mm);
+    }
+
+    private Component filler() {
+        Label l = new Label("filler");
+        l.setPreferredH(px(30));
+        return l;
+    }
+
+    /// Counts every pointer event it is told about, so a test can assert none arrived.
+    private static final class PointerCountingComponent extends Component {
+        private int pointerEvents;
+
+        int pointerEvents() {
+            return pointerEvents;
+        }
+
+        @Override
+        public void pointerPressed(int x, int y) {
+            pointerEvents++;
         }
 
         @Override
         public void pointerDragged(int x, int y) {
-            Container p = getParent();
-            while (p != null && !p.isScrollableY()) {
-                p = p.getParent();
-            }
-            if (p != null) {
-                if (!forwarded) {
-                    p.pointerPressed(x, y);
-                }
-                forwarded = true;
-                p.pointerDragged(x, y);
-            }
-        }
-    }
-
-    /// Keeps the gesture the way `Spinner` does, and activates a drag on the first move --
-    /// which is what tells a settle apart from a tap.
-    private static final class StickyDragComponent extends Component {
-        private int releases;
-        private int drags;
-
-        int releases() {
-            return releases;
-        }
-
-        int drags() {
-            return drags;
-        }
-
-        @Override
-        protected boolean isStickyDrag() {
-            return true;
-        }
-
-        @Override
-        public void pointerDragged(int x, int y) {
-            drags++;
-            setDragActivated(true);
+            pointerEvents++;
         }
 
         @Override
         public void pointerReleased(int x, int y) {
-            releases++;
+            pointerEvents++;
         }
     }
 
-    /// Plays one wheel notch over the middle of `over`, then drains the queued steps.
-    /// Through the implementation entry point rather than by fabricating pointer events,
-    /// because the gesture it queues -- and the isScrollWheeling window around it -- is
-    /// exactly what is under test.
-    private void wheel(Component over, int amount) {
-        Display.impl.pointerWheelMoved(over.getAbsoluteX() + over.getWidth() / 2,
-                over.getAbsoluteY() + over.getHeight() / 2, 0, amount, false, 0);
-        // One flush per queued step, plus the one that dispatches the listeners.
-        for (int i = 0; i < 6; i++) {
-            DisplayTest.flushEdt();
+    /// Moves content of its own, the way an editor or a viewer does.
+    private static final class WheelHandlingComponent extends Component {
+        private int wheels;
+
+        int wheels() {
+            return wheels;
         }
-    }
 
-    /// A form holding one row that counts the releases delivered to it, the way the
-    /// wizard's table rows report a click into their details dialog.
-    ///
-    /// The listener sits on the leaf, because that is where a release lands: the form
-    /// hit tests to the deepest component under the pointer, and Component fires only
-    /// its own listeners. The wizard reaches the same place from the other end, by
-    /// adding its listener to a row and to everything inside it.
-    private Form form(final int[] taps) {
-        Form f = new Form("wheel", new BorderLayout());
-        Container content = f.getContentPane();
-        content.setLayout(BoxLayout.y());
-        Label row = new Label("row");
-        row.setPreferredH(Display.getInstance().convertToPixels(10));
-        row.addPointerReleasedListener(new ActionListener<ActionEvent>() {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                taps[0]++;
-            }
-        });
-        content.add(row);
-        content.add(filler());
-        f.show();
-        f.revalidate();
-        DisplayTest.flushEdt();
-        assertTrue(row.getHeight() > 0, "the row has to be laid out for a pointer test to mean anything");
-        return f;
-    }
-
-    /// Tall enough that a screenful of them overflows. A container whose content fits
-    /// reports isScrollableY() false however it was configured, so a test that means to
-    /// exercise scrolling has to make it actually overflow -- and say so.
-    private Component filler() {
-        Label l = new Label("filler");
-        l.setPreferredH(Display.getInstance().convertToPixels(30));
-        return l;
+        @Override
+        protected boolean mouseWheel(WheelEvent ev) {
+            wheels++;
+            return true;
+        }
     }
 }
