@@ -28,6 +28,15 @@ from urllib.parse import urlsplit
 
 ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
 URL_RE = re.compile(r"\bhttps?://[^\s\[\]<>\"'`)]+")
+# A URL assembled from an attribute is invisible to the scan above: the
+# declaration holds a valid site root and the use site holds only "{name}", so the
+# path that actually ships is never checked. Expanding attributes properly means
+# reimplementing asciidoctor's attribute resolution, including inheritance through
+# includes, which is a lot of machinery for a construct the guide does not use --
+# measured: zero URL-valued attribute declarations and zero link:{...} targets.
+# So both spellings are refused instead, which keeps the gap from opening quietly.
+ATTRIBUTE_URL_DECL_RE = re.compile(r"^:[A-Za-z0-9_-]+:\s*https?://")
+ATTRIBUTE_LINK_RE = re.compile(r"\blink:\{[^}]+\}")
 # The one tree that genuinely cannot be enumerated from this repository: the
 # Javadoc is produced from the framework sources at build time. Everything else,
 # /developer-guide/ included, is derived below -- whitelisting a prefix silently
@@ -378,6 +387,10 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
     # comments do exist here, for editorial notes; none carries a URL.)
     out: list[tuple[str, str]] = []
     for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
+        if ATTRIBUTE_URL_DECL_RE.match(line.strip()):
+            out.append((line.strip().split()[0], "an attribute holding a URL: any link built from it is unchecked, because this does not expand attributes"))
+        if ATTRIBUTE_LINK_RE.search(line):
+            out.append((ATTRIBUTE_LINK_RE.search(line).group(0), "a link target built from an attribute, which this cannot expand or check"))
         for url in URL_RE.findall(line):
             url = url.rstrip(".,;:")
             split = urlsplit(url)

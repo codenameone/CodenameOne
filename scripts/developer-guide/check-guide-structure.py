@@ -64,6 +64,13 @@ FENCE_RE = re.compile(r"^(-{4,}|\.{4,}|`{4,}|\+{4,}|/{4,})\s*$")
 # FENCE_RE -- a heading in a listing really is only text -- while the include walk
 # and the conditional test use this narrower one.
 COMMENT_FENCE_RE = re.compile(r"^(/{4,})\s*$")
+# Only the BLOCK forms vanish. ifdef/ifndef with empty brackets open a region and
+# leave nothing behind, and endif closes one; but the single-line form carries its
+# content in the brackets and EXPANDS to it -- measured, `ifdef::feature[== Inline
+# Chapter]` renders as a real chapter when the attribute is set. So the spacing
+# scan may step over the first kind and must treat the second as content, or it
+# would walk past a heading that the preceding paragraph is about to swallow.
+BLOCK_DIRECTIVE_RE = re.compile(r"^(ifdef|ifndef)::[^\[]*\[\s*\]\s*$|^ifeval::\[|^endif::")
 # Inline AsciiDoc markup that never survives into the rendered heading text.
 INLINE_MARKUP_RE = re.compile(r"[`*_#]|\[\[[^\]]*\]\]|\[[^\]]*\]")
 
@@ -273,9 +280,7 @@ class Walker:
         # there. An earlier version of this rule returned here and would have
         # passed that.
         cursor = index + 1
-        while cursor < len(lines) and re.match(
-            r"^(ifdef|ifndef|ifeval|endif)::", lines[cursor].strip()
-        ):
+        while cursor < len(lines) and BLOCK_DIRECTIVE_RE.match(lines[cursor].strip()):
             cursor += 1
         following = lines[cursor] if cursor < len(lines) else ""
         if not following.strip():
