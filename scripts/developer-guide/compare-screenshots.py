@@ -60,8 +60,12 @@ def compare(generated: Path, committed: Path, tolerance: tuple[int, float] | Non
     if tolerance is None:
         return "differs and has no tolerance sidecar"
     max_delta, max_percent = tolerance
-    a = Image.open(generated).convert("RGB")
-    b = Image.open(committed).convert("RGB")
+    # RGBA, not RGB: these figures are saved with an alpha channel, and dropping
+    # it would make a change that touches only transparency invisible here --
+    # including one that turned the whole figure see-through while leaving every
+    # colour channel intact.
+    a = Image.open(generated).convert("RGBA")
+    b = Image.open(committed).convert("RGBA")
     if a.size != b.size:
         return f"size changed: generated {a.size[0]}x{a.size[1]}, committed {b.size[0]}x{b.size[1]}"
     pa, pb = a.load(), b.load()
@@ -81,7 +85,7 @@ def compare(generated: Path, committed: Path, tolerance: tuple[int, float] | Non
             # one pixel would be counted and a completely different image would
             # pass.
             changed += 1
-            worst = max(worst, max(abs(first[i] - second[i]) for i in range(3)))
+            worst = max(worst, max(abs(first[i] - second[i]) for i in range(4)))
     percent = 100.0 * changed / (width * height)
     if percent > max_percent:
         return f"{percent:.3f}% of pixels changed (allowed {max_percent}%)"
