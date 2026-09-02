@@ -19,6 +19,7 @@ shrink, never grow.
 from __future__ import annotations
 
 import argparse
+import datetime
 import re
 import sys
 from pathlib import Path
@@ -64,7 +65,7 @@ def front_matter(page: Path) -> dict[str, object]:
                 aliases.append(stripped.lstrip("- ").strip().strip("\"'"))
                 continue
             in_aliases = False
-        match = re.match(r'^(url|slug|aliases)\s*[:=]\s*(.*)$', line)
+        match = re.match(r'^(url|slug|aliases|draft|date)\s*[:=]\s*(.*)$', line)
         if not match:
             continue
         key, raw = match.group(1), match.group(2).strip()
@@ -78,6 +79,19 @@ def front_matter(page: Path) -> dict[str, object]:
     if aliases:
         out["aliases"] = aliases
     return out
+
+
+def is_published(meta: dict[str, object], today: str) -> bool:
+    """Hugo defaults buildDrafts and buildFuture to false, so neither reaches the site.
+
+    The date test makes the result depend on the day it runs, which is not ideal in
+    a gate. It is kept because it mirrors what the site actually serves: a link to a
+    post that has not been published yet is genuinely broken until it is.
+    """
+    if str(meta.get("draft", "")).strip().strip("\"'").lower() in {"true", "yes"}:
+        return False
+    date = str(meta.get("date", "")).strip().strip("\"'")
+    return not (re.match(r"^\d{4}-\d{2}-\d{2}", date) and date[:10] > today)
 
 
 def normalize_path(value: str) -> str:
@@ -126,19 +140,23 @@ def site_paths(repo_root: Path) -> tuple[set[str], list[re.Pattern[str]]]:
                 patterns.append(compiled)
             else:
                 paths.add(normalize_path(parts[0]))
-            if len(parts) > 1 and parts[1].startswith("/"):
-                target = redirect_pattern(parts[1])
-                if target is None:
-                    paths.add(normalize_path(parts[1]))
+            # Only the SOURCE counts. A rule whose destination was deleted still
+            # sits in this file, so trusting destinations would accept a guide
+            # link to a page that no longer exists.
 
     # Hugo's published route is the section path plus the page's slug, which
     # 1055 of the content pages override; deriving it from the filename instead
     # both invents routes that are never generated and rejects real ones.
+    paths.add("/")  # Hugo always renders the home page, _index.md or not
+
+    today = datetime.date.today().isoformat()
     content = repo_root / "docs/website/content"
     if content.exists():
         for page in content.rglob("*.md"):
             relative = page.relative_to(content).with_suffix("")
             meta = front_matter(page)
+            if not is_published(meta, today):
+                continue
             for alias in meta.get("aliases", []) or []:
                 if isinstance(alias, str):
                     paths.add(normalize_path(alias))
