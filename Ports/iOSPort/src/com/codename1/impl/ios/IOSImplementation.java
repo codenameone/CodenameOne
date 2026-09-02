@@ -9272,14 +9272,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         NativeDragAndDrop.dragExit(0);
     }
 
-    /// The operation whose representations the item providers may still be asked for.
+    /// The two most recent exported drags, each under the session id its load handlers carry.
     ///
     /// Deliberately not the active drag: an item provider's load handler is asynchronous by
     /// design, and a receiving application is free to defer reading a representation until
     /// after the session has ended -- by which point the active drag has been cleared and the
-    /// lookup would answer with nothing at all. Held until the next drag replaces it, which is
-    /// one payload and the price of letting a receiver read late.
+    /// lookup would answer with nothing at all.
+    ///
+    /// Two of them, and matched by id, because a single slot answered a late read with
+    /// *whatever was being dragged by then*: a handler from the previous drag resolving after
+    /// the next one began produced that one's bytes. Wrong data is worse than none, so a read
+    /// older than these answers null instead. Two payloads is the bound: a receiver would have
+    /// to sit on an unread representation across two further complete drags to fall off it.
     private static NativeDragOperation exportedDrag;
+    private static int exportedDragId;
+    private static NativeDragOperation previousExportedDrag;
+    private static int previousExportedDragId;
+    private static int nextDragSessionId;
 
     /// The drop being assembled by CN1DragAndDrop.m, one representation at a time.
     ///
@@ -9376,9 +9385,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (op == null) {
             return 0;
         }
+        previousExportedDrag = exportedDrag;
+        previousExportedDragId = exportedDragId;
         exportedDrag = op;
+        exportedDragId = ++nextDragSessionId;
         ClipboardContent content = op.getContent();
-        nativeInstance.beginNativeDragPayload();
+        nativeInstance.beginNativeDragPayload(exportedDragId);
         // Names, not values. Reading a representation here would build every promised file and
         // encode every promised image at the moment the drag begins -- including for a drag the
         // user then abandons -- which is the opposite of what setDataProvider promises. The
@@ -9407,13 +9419,20 @@ public class IOSImplementation extends CodenameOneImplementation {
     ///
     /// - `mimeType`: the representation being read
     ///
+    /// - `sessionId`: the drag the reading item provider belongs to
+    ///
     /// #### Returns
     ///
-    /// its bytes, or null when the operation cannot supply it
-    public static byte[] nativeDragResolveCallback(String mimeType) {
-        // exportedDrag, not the active drag: see the field. A receiver that reads a
-        // representation after the session has ended still gets it.
-        NativeDragOperation op = exportedDrag;
+    /// its bytes, or null when that drag can no longer supply it
+    public static byte[] nativeDragResolveCallback(String mimeType, int sessionId) {
+        // Matched by session id, not simply the latest: a handler from an earlier drag must
+        // answer for that drag or not at all. See the fields.
+        NativeDragOperation op = null;
+        if (exportedDrag != null && sessionId == exportedDragId) {
+            op = exportedDrag;
+        } else if (previousExportedDrag != null && sessionId == previousExportedDragId) {
+            op = previousExportedDrag;
+        }
         if (op == null || mimeType == null || mimeType.length() == 0) {
             return null;
         }

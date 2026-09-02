@@ -66,7 +66,7 @@ void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragI
                           int touchX, int touchY) {
 }
 
-void CN1BeginNativeDragPayload(void) {
+void CN1BeginNativeDragPayload(int sessionId) {
 }
 
 void CN1DeclareNativeDragPayload(NSString* mimeType) {
@@ -101,6 +101,10 @@ static CGPoint cn1PreparedTouch;
 /// not their values, which are fetched only if a receiver reads them.
 static NSMutableArray* cn1DragMimes = nil;
 static NSMutableArray* cn1DragFileUrls = nil;
+
+/// The framework's id for the session being built, captured by every load handler it registers
+/// so a late read resolves against its own operation and not the next drag's.
+static int cn1DragSessionId = 0;
 
 /// The last action the framework agreed to, reused when a drop arrives without one.
 static int cn1LastDropAction = CN1_DND_ACTION_NONE;
@@ -387,13 +391,14 @@ void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragI
 #endif
 }
 
-void CN1BeginNativeDragPayload(void) {
+void CN1BeginNativeDragPayload(int sessionId) {
 #ifndef CN1_USE_ARC
     [cn1DragMimes release];
     [cn1DragFileUrls release];
 #endif
     cn1DragMimes = [[NSMutableArray alloc] init];
     cn1DragFileUrls = [[NSMutableArray alloc] init];
+    cn1DragSessionId = sessionId;
 }
 
 void CN1DeclareNativeDragPayload(NSString* mimeType) {
@@ -463,12 +468,47 @@ API_AVAILABLE(ios(11.0))
     cn1LocalDropResult = -1;
 
     NSMutableArray<UIDragItem *>* items = [NSMutableArray array];
+    const int sessionId = cn1DragSessionId;
+
+    // Every representation the operation declared, registered lazily. The value is fetched when
+    // a receiver reads that type, not now: a drag that is begun and abandoned must not have
+    // written the file or encoded the image it was merely offering. NSItemProvider allows a
+    // load handler to answer asynchronously, which is what lets the fetch happen on the main
+    // thread where every other call into the framework from this file happens. Nothing is
+    // retained by hand either -- copying a block retains what it captures, and an explicit
+    // retain here leaked the whole payload of every drag.
+    void (^registerDeclared)(NSItemProvider*) = ^(NSItemProvider* provider) {
+        for (NSString* mime in cn1DragMimes) {
+            NSString* uti = cn1UtiForMime(mime);
+            if (uti == nil) {
+                continue;
+            }
+            [provider registerDataRepresentationForTypeIdentifier:uti
+                                                       visibility:NSItemProviderRepresentationVisibilityAll
+                                                      loadHandler:^NSProgress *(void (^completion)(NSData *, NSError *)) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    completion(CN1NativeDragDeliverResolve(mime, sessionId), nil);
+                });
+                return nil;
+            }];
+        }
+    };
+
     // Files first, one item each: a receiver that copies documents expects one item per
     // document, and collapsing several into one loses all but the first.
+    BOOL declaredAttached = NO;
     for (NSURL* url in cn1DragFileUrls) {
         NSItemProvider* provider = [[NSItemProvider alloc] initWithContentsOfURL:url];
         if (provider == nil) {
             continue;
+        }
+        if (!declaredAttached) {
+            // The other representations belong to this same object, not to one of their own.
+            // Given a file and a text fallback, adding a second item made UIKit expose them as
+            // two dragged things, so a receiver could import the document *and* a stray piece
+            // of text instead of choosing the best form of one.
+            registerDeclared(provider);
+            declaredAttached = YES;
         }
         UIDragItem* item = [[UIDragItem alloc] initWithItemProvider:provider];
         [items addObject:item];
@@ -477,29 +517,9 @@ API_AVAILABLE(ios(11.0))
         [item release];
 #endif
     }
-    if (cn1DragMimes.count > 0) {
+    if (!declaredAttached && cn1DragMimes.count > 0) {
         NSItemProvider* provider = [[NSItemProvider alloc] init];
-        for (NSString* mime in cn1DragMimes) {
-            NSString* uti = cn1UtiForMime(mime);
-            if (uti == nil) {
-                continue;
-            }
-            // The value is fetched when a receiver reads this type, not now: a drag that is
-            // begun and abandoned must not have written the file or encoded the image it was
-            // merely offering. NSItemProvider allows a load handler to answer asynchronously,
-            // which is what lets the fetch happen on the main thread where every other call
-            // into the framework from this file happens. No retain of the captured strings
-            // either -- copying a block retains what it captures, and an explicit retain here
-            // leaked the whole payload of every drag.
-            [provider registerDataRepresentationForTypeIdentifier:uti
-                                                       visibility:NSItemProviderRepresentationVisibilityAll
-                                                      loadHandler:^NSProgress *(void (^completion)(NSData *, NSError *)) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    completion(CN1NativeDragDeliverResolve(mime), nil);
-                });
-                return nil;
-            }];
-        }
+        registerDeclared(provider);
         UIDragItem* item = [[UIDragItem alloc] initWithItemProvider:provider];
         [items addObject:item];
 #ifndef CN1_USE_ARC

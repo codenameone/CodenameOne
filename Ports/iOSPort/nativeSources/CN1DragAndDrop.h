@@ -89,9 +89,13 @@ void CN1EnableNativeDropTarget(void);
 void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragImagePng,
                           int touchX, int touchY);
 
-/// Clears the payload, ready for the representations of the session UIKit has just started.
-/// Called from Java, from inside the session-started callback below.
-void CN1BeginNativeDragPayload(void);
+/// Clears the payload, ready for the representations of the session UIKit has just started,
+/// and records the id the framework has given that session.
+///
+/// The id travels with every load handler this session registers, so a representation read
+/// late -- after the user has begun another drag -- is resolved against the operation it
+/// belongs to rather than whatever is being dragged by then.
+void CN1BeginNativeDragPayload(int sessionId);
 
 /// Names a representation the drag can offer without producing it.
 ///
@@ -146,9 +150,9 @@ void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path);
 /// it.
 int CN1NativeDragDeliverDropCommit(int x, int y, int action);
 
-/// Produces one representation of the drag in progress, on demand. Returns nil when the
-/// operation cannot supply it.
-NSData* CN1NativeDragDeliverResolve(NSString* mimeType);
+/// Produces one representation of a drag on demand. Returns nil when the operation that
+/// session belongs to can no longer supply it.
+NSData* CN1NativeDragDeliverResolve(NSString* mimeType, int sessionId);
 
 /// Announces that UIKit has started a drag session. Returns the actions the framework's staged
 /// operation allows, or 0 when it has none -- in which case no drag begins. The Java side calls

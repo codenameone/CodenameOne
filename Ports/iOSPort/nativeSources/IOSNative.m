@@ -1095,8 +1095,8 @@ void com_codename1_impl_ios_IOSNative_prepareNativeDrag___java_lang_String_int_b
     POOL_END();
 }
 
-void com_codename1_impl_ios_IOSNative_beginNativeDragPayload__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    CN1BeginNativeDragPayload();
+void com_codename1_impl_ios_IOSNative_beginNativeDragPayload___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT sessionId) {
+    CN1BeginNativeDragPayload((int)sessionId);
 }
 
 void com_codename1_impl_ios_IOSNative_declareNativeDragPayload___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
@@ -1157,9 +1157,9 @@ void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path) {
             fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
 }
 
-NSData* CN1NativeDragDeliverResolve(NSString* mimeType) {
-    JAVA_OBJECT bytes = com_codename1_impl_ios_IOSImplementation_nativeDragResolveCallback___java_lang_String_R_byte_1ARRAY(
-            CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType));
+NSData* CN1NativeDragDeliverResolve(NSString* mimeType, int sessionId) {
+    JAVA_OBJECT bytes = com_codename1_impl_ios_IOSImplementation_nativeDragResolveCallback___java_lang_String_int_R_byte_1ARRAY(
+            CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType), sessionId);
     return bytes == JAVA_NULL ? nil : arrayToData(bytes);
 }
 

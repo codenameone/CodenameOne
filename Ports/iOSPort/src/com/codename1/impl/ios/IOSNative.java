@@ -375,10 +375,16 @@ public final class IOSNative {
     native void prepareNativeDrag(String mimeTypes, int allowedActions, byte[] dragImagePng,
             int touchX, int touchY);
 
-    /// Clears the payload, ready for the representations of the session UIKit has just started.
-    /// Called from inside the session-started callback, so that a promised representation is
-    /// built only once a drag really happens.
-    native void beginNativeDragPayload();
+    /// Clears the payload, ready for the representations of the session UIKit has just started,
+    /// and records the id the framework gave that session. Called from inside the
+    /// session-started callback, so that a promised representation is built only once a drag
+    /// really happens.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sessionId`: travels with every load handler this session registers, so a
+    ///   representation read after another drag has begun resolves against its own operation
+    native void beginNativeDragPayload(int sessionId);
 
     /// Names a representation the drag can offer, without producing it.
     ///

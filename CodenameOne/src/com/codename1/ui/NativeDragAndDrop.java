@@ -296,13 +296,13 @@ public final class NativeDragAndDrop {
         if (op != null) {
             op.setSource(source);
             try {
-                if (op.getDragImage() == null && Display.impl.isNativeDragImageNeededOnPrepare()) {
+                if (needsGeneratedImage(op) && Display.impl.isNativeDragImageNeededOnPrepare()) {
                     // The platform asks for the preview from inside its own gesture callback,
                     // which is not a moment at which a component can be rendered. Rendering here
                     // costs a snapshot per press on a drag source, which is what the lightweight
                     // drag has always cost when one starts.
-                    op.setDragImage(source.getDragImage());
-                    op.setDragImageOffset(x - source.getAbsoluteX(), y - source.getAbsoluteY());
+                    op.setGeneratedDragImage(source.getDragImage(),
+                            x - source.getAbsoluteX(), y - source.getAbsoluteY());
                 }
             } catch (Throwable err) {
                 Log.e(err);
@@ -384,13 +384,14 @@ public final class NativeDragAndDrop {
             grabX = pressX;
             grabY = pressY;
         }
-        if (op.getDragImage() == null && source != null) {
+        if (needsGeneratedImage(op) && source != null) {
             try {
-                op.setDragImage(source.getDragImage());
-                // Only when the image is the one we just rendered from the component. An
-                // application that supplied its own image may also have positioned it, and
+                // Rendered afresh for this gesture, and recorded as generated rather than
+                // written in as though the application had supplied it. An application's own
+                // image is never touched -- it may have been positioned deliberately, and
                 // overwriting that offset would tear the image away from the pointer.
-                op.setDragImageOffset(grabX - source.getAbsoluteX(), grabY - source.getAbsoluteY());
+                op.setGeneratedDragImage(source.getDragImage(),
+                        grabX - source.getAbsoluteX(), grabY - source.getAbsoluteY());
             } catch (Throwable err) {
                 Log.e(err);
             }
@@ -435,6 +436,13 @@ public final class NativeDragAndDrop {
                 Log.e(err);
             }
         }
+    }
+
+    /// True when this gesture should render its own preview: either the operation has no image
+    /// at all, or the one it has was rendered for an earlier drag of the same reusable
+    /// operation and is now out of date.
+    private static boolean needsGeneratedImage(NativeDragOperation op) {
+        return op.getDragImage() == null || op.isDragImageGenerated();
     }
 
     private static int dragThreshold() {
@@ -508,7 +516,7 @@ public final class NativeDragAndDrop {
     ///
     /// the action a drop would perform right now, or `NativeDragOperation#ACTION_NONE`
     public static int dragOver(int windowId, int x, int y, ClipboardContent content, int allowedActions) {
-        Component target = findTarget(windowId, x, y, content);
+        Component target = findTarget(windowId, x, y, content, allowedActions);
         Component previous;
         boolean changed;
         boolean dispatchOver = false;
@@ -594,7 +602,7 @@ public final class NativeDragAndDrop {
     /// the action actually accepted, or `NativeDragOperation#ACTION_NONE` when nothing under
     /// the pointer took the drop and the port should report the transfer as failed
     public static int drop(int windowId, int x, int y, ClipboardContent content, int action) {
-        Component target = findTarget(windowId, x, y, content);
+        Component target = findTarget(windowId, x, y, content, action);
         int accepted;
         synchronized (LOCK) {
             if (target != null && target == currentTarget) { // NOPMD CompareObjectsWithEquals
@@ -652,7 +660,7 @@ public final class NativeDragAndDrop {
     /// the action the drop would perform, or `NativeDragOperation#ACTION_NONE`
     public static int plannedDropAction(int windowId, int x, int y, ClipboardContent content,
             int action) {
-        Component target = findTarget(windowId, x, y, content);
+        Component target = findTarget(windowId, x, y, content, action);
         synchronized (LOCK) {
             if (target != null && target == currentTarget) { // NOPMD CompareObjectsWithEquals
                 return currentAction;
@@ -697,7 +705,16 @@ public final class NativeDragAndDrop {
     ///
     /// Runs on the native drag thread and reads the component tree without mutating it, which
     /// is the same thing the ports already do to route a native pointer press.
-    private static Component findTarget(int windowId, int x, int y, ClipboardContent content) {
+    /// #### Parameters
+    ///
+    /// - `actions`: the actions in play, so a target that can perform none of them is passed
+    ///   over rather than selected and then found to have nothing to offer. A move-only target
+    ///   nested in a copy-capable one used to swallow a copy-only drag: it was chosen on the
+    ///   content alone, answered with nothing, and the ancestor that would have taken the drop
+    ///   was never reached. Refusing on the action is the same kind of refusal as refusing on
+    ///   the MIME type, and the walk treats it the same way.
+    private static Component findTarget(int windowId, int x, int y, ClipboardContent content,
+            int actions) {
         Container root = surfaceFor(windowId);
         if (root == null) {
             return null;
@@ -711,7 +728,8 @@ public final class NativeDragAndDrop {
             return null;
         }
         while (cmp != null) {
-            if (cmp.isNativeDropTarget() && !cmp.isIgnorePointerEvents() && cmp.isEnabled()) {
+            if (cmp.isNativeDropTarget() && !cmp.isIgnorePointerEvents() && cmp.isEnabled()
+                    && (actions & cmp.getAcceptedDropActions()) != 0) {
                 try {
                     if (cmp.canAcceptNativeDrop(content)) {
                         return cmp;

@@ -72,6 +72,9 @@ public class NativeDragOperation {
     private int dragImageOffsetY;
     private String label;
     private int performedAction = ACTION_NONE;
+    /// True when the image below is the one the framework rendered from the source component,
+    /// rather than one the application supplied.
+    private boolean dragImageGenerated;
     private Component source;
     private EventDispatcher completionListeners;
 
@@ -154,7 +157,28 @@ public class NativeDragOperation {
     /// this instance, for chaining
     public NativeDragOperation setDragImage(Image dragImage) {
         this.dragImage = dragImage;
+        this.dragImageGenerated = false;
         return this;
+    }
+
+    /// Installs the image the framework rendered from the source component, and the point of it
+    /// the press landed on.
+    ///
+    /// Kept apart from `#setDragImage(com.codename1.ui.Image)` because the operation is reused
+    /// for every drag of its component: writing a generated snapshot in as though the
+    /// application had supplied it meant every later drag showed the first one's picture, taken
+    /// before whatever the component has done since, grabbed at a point the user did not press.
+    void setGeneratedDragImage(Image image, int offsetX, int offsetY) {
+        this.dragImage = image;
+        this.dragImageOffsetX = offsetX;
+        this.dragImageOffsetY = offsetY;
+        this.dragImageGenerated = true;
+    }
+
+    /// True when the current image was rendered by the framework, so a later gesture should
+    /// render a fresh one rather than reuse it.
+    boolean isDragImageGenerated() {
+        return dragImageGenerated;
     }
 
     /// Returns the x offset of the cursor within the drag image.

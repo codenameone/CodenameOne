@@ -358,6 +358,82 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aTargetThatCannotPerformTheActionLetsAnAncestorHaveIt() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder outer = addTarget(form);
+        outer.setAcceptedDropActions(NativeDragOperation.ACTION_COPY);
+        DropRecorder inner = new DropRecorder();
+        inner.setNativeDropTarget(true);
+        inner.setAcceptedDropActions(NativeDragOperation.ACTION_MOVE);
+        outer.setLayout(new BorderLayout());
+        outer.add(BorderLayout.CENTER, inner);
+        form.revalidate();
+
+        // A copy-only drag over a move-only target nested in a copy-capable one. Choosing the
+        // inner target on the content alone and only then finding it can do nothing swallowed
+        // the drag: refusing on the action is the same kind of refusal as refusing on the MIME
+        // type, and the walk has to treat it the same way.
+        int x = inner.getAbsoluteX() + 2;
+        int y = inner.getAbsoluteY() + 2;
+        assertEquals(NativeDragOperation.ACTION_COPY,
+                NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"),
+                        NativeDragOperation.ACTION_COPY),
+                "the copy-capable ancestor takes it");
+        NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        assertTrue(outer.events.contains("drop"));
+        assertFalse(inner.events.contains("drop"));
+    }
+
+    @FormTest
+    void eachGestureRendersItsOwnDragImage() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            Container source = new Container();
+            NativeDragOperation op = new NativeDragOperation("reused");
+            source.setNativeDragOperation(op);
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            int x = source.getAbsoluteX() + 10;
+            int y = source.getAbsoluteY() + 10;
+            form.pointerPressed(x, y);
+            form.pointerDragged(x + 200, y + 200);
+            Image first = op.getDragImage();
+            assertNotNull(first);
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
+            flushSerialCalls();
+
+            // The same reusable operation, dragged again. The generated snapshot must not have
+            // become the operation's permanent image: the component may look different now and
+            // the press landed somewhere else.
+            form.pointerPressed(x + 4, y + 4);
+            form.pointerDragged(x + 200, y + 200);
+            Image second = op.getDragImage();
+            assertNotNull(second);
+            assertNotSame(first, second,
+                    "a framework-rendered preview belongs to its gesture, not to the operation");
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
+            flushSerialCalls();
+
+            // An image the application supplied is never replaced.
+            Image supplied = Image.createImage(4, 4);
+            op.setDragImage(supplied);
+            form.pointerPressed(x, y);
+            form.pointerDragged(x + 200, y + 200);
+            assertSame(supplied, op.getDragImage(), "an application's own image is left alone");
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void dropOnNothingReportsFailureSoThePortCanTellTheSource() {
         Form form = Display.getInstance().getCurrent();
         addTarget(form);
