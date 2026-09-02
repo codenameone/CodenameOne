@@ -328,6 +328,34 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aSecondDragIsRefusedWhileOneIsStillRunning() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            NativeDragOperation first = new NativeDragOperation("first");
+            NativeDragOperation second = new NativeDragOperation("second");
+            assertTrue(NativeDragAndDrop.startDrag(null, first));
+            assertFalse(NativeDragAndDrop.startDrag(null, second),
+                    "one drag at a time; the second must not displace the first");
+            assertSame(first, NativeDragAndDrop.getActiveDrag());
+
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_MOVE);
+            flushSerialCalls();
+            assertEquals(NativeDragOperation.ACTION_MOVE, first.getPerformedAction(),
+                    "the first source still learns its outcome, which is what tells it to delete");
+            assertEquals(NativeDragOperation.ACTION_NONE, second.getPerformedAction());
+
+            assertTrue(NativeDragAndDrop.startDrag(null, second),
+                    "and once the session is over the next drag starts normally");
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void becomingADragSourceTellsThePort() {
         implementation.resetNativeDragState();
         try {

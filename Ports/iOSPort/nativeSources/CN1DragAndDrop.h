@@ -129,6 +129,14 @@ void CN1NativeDragDeliverDropBegin(void);
 /// paths in `text`.
 void CN1NativeDragDeliverDropAdd(NSString* mimeType, NSString* text, NSData* binary);
 
+/// Adds a representation of the drop that is backed by a file already on disk.
+///
+/// A provider that vends a file commonly advertises the document's own content type as well.
+/// Loading that as data would read the whole document into memory on top of the copy this
+/// already makes -- fatal for a large one -- so the type is named against the copy instead and
+/// read only if a target asks for it.
+void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path);
+
 /// Delivers the assembled drop and returns the action actually accepted, or 0 when nothing took
 /// it.
 int CN1NativeDragDeliverDropCommit(int x, int y, int action);

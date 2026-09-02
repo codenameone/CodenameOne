@@ -78,6 +78,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.ClipboardContent;
+import com.codename1.ui.ClipboardDataProvider;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.VirtualKeyboardInterface;
@@ -10618,7 +10619,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }
                         continue;
                     }
-                    // Non-image URI -> file reference
+                    // A typed URI is a file reference *and* that type. Reducing it to a file
+                    // alone let a target filtering on, say, application/pdf accept the hover --
+                    // the description advertised the type -- and then be refused the drop,
+                    // because the content it is filtered against a second time no longer had
+                    // it. The bytes are promised rather than read: a target that only wants the
+                    // path should not pay for a document it never opens.
+                    if (type != null && type.length() > 0 && !content.hasMimeType(type)) {
+                        content.setDataProvider(type.toLowerCase(), uriBytesProvider(uri));
+                    }
                     fileUris.add(uri.toString());
                     continue;
                 }
@@ -10649,6 +10658,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             fillAdvertisedTypes(content, description, plain, fileUris);
         }
         return content;
+    }
+
+    /// Reads a content URI's bytes when something actually asks for them.
+    ///
+    /// The drag-and-drop permission this drop was granted lasts for the life of the activity --
+    /// nothing calls release() on it -- so a read that happens a moment later on the event
+    /// dispatch thread still succeeds.
+    private ClipboardDataProvider uriBytesProvider(final Uri uri) {
+        return new ClipboardDataProvider() {
+            @Override
+            public Object getClipboardData(String mimeType) {
+                try {
+                    InputStream in = getContext().getContentResolver().openInputStream(uri);
+                    if (in == null) {
+                        return null;
+                    }
+                    try {
+                        return Util.readInputStream(in);
+                    } finally {
+                        in.close();
+                    }
+                } catch (Throwable t) {
+                    com.codename1.io.Log.e(t);
+                    return null;
+                }
+            }
+        };
     }
 
     /// Fills the MIME types the drag advertised but the read did not produce, from what it did.

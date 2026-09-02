@@ -151,18 +151,27 @@ public final class NativeDragAndDrop {
     /// #### Returns
     ///
     /// true when the operating system took the drag; false when the platform has no native drag
-    /// and drop, or refused to start a session
+    /// and drop, refused to start a session, or is already running one
     public static boolean startDrag(Component source, NativeDragOperation op) {
         if (op == null || !isSupported()) {
             return false;
         }
-        op.setSource(source);
-        op.resetPerformedAction();
         synchronized (LOCK) {
+            if (active != null) {
+                // One drag at a time, which is all any of these platforms runs. Installing the
+                // second operation before the port has answered would strand the first: a
+                // refusal clears the session entirely and a success attributes the first
+                // session's completion to the second operation, so the original source never
+                // learns what happened -- and a source waiting for ACTION_MOVE to delete its
+                // data would wait forever.
+                return false;
+            }
             active = op;
             currentTarget = null;
             currentAction = NativeDragOperation.ACTION_NONE;
         }
+        op.setSource(source);
+        op.resetPerformedAction();
         boolean started = false;
         try {
             started = Display.impl.startNativeDrag(op);
@@ -194,6 +203,11 @@ public final class NativeDragAndDrop {
         NativeDragOperation op;
         final Component source;
         synchronized (LOCK) {
+            if (active != null) {
+                // A session is already running; see startDrag for why a second one must not
+                // displace it. The port refuses to start the drag on a null answer.
+                return null;
+            }
             op = pending;
             if (op == null) {
                 return null;

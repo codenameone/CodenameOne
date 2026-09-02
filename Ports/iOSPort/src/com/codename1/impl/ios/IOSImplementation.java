@@ -9304,6 +9304,39 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// Invoked from CN1DragAndDrop.m for a representation that is a file already on disk.
+    ///
+    /// A document provider advertises the document's own content type as well as a file URL,
+    /// and a target may filter on either. Promising the type against the copy rather than
+    /// loading it keeps the two in agreement without reading a large document into memory on
+    /// top of copying it -- the bytes are only read if something asks for that type.
+    public static void nativeDropAddFileCallback(String mimeType, final String path) {
+        if (pendingDrop == null || mimeType == null || mimeType.length() == 0
+                || path == null || path.length() == 0 || pendingDrop.hasMimeType(mimeType)) {
+            return;
+        }
+        pendingDrop.setDataProvider(mimeType, new ClipboardDataProvider() {
+            @Override
+            public Object getClipboardData(String requested) {
+                try {
+                    java.io.InputStream in = com.codename1.io.FileSystemStorage.getInstance()
+                            .openInputStream(path.startsWith("/") ? "file://" + path : path);
+                    if (in == null) {
+                        return null;
+                    }
+                    try {
+                        return com.codename1.io.Util.readInputStream(in);
+                    } finally {
+                        in.close();
+                    }
+                } catch (Throwable err) {
+                    com.codename1.io.Log.e(err);
+                    return null;
+                }
+            }
+        });
+    }
+
     /// Invoked from CN1DragAndDrop.m once every representation has arrived. Returns the action
     /// accepted, or zero when nothing under the pointer took it.
     public static int nativeDropCommitCallback(int x, int y, int action) {

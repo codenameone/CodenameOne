@@ -1146,6 +1146,13 @@ void CN1NativeDragDeliverDropAdd(NSString* mimeType, NSString* text, NSData* bin
             binary == nil ? JAVA_NULL : nsDataToByteArr(binary));
 }
 
+void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path) {
+    com_codename1_impl_ios_IOSImplementation_nativeDropAddFileCallback___java_lang_String_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
+}
+
 int CN1NativeDragDeliverDropCommit(int x, int y, int action) {
     return (int)com_codename1_impl_ios_IOSImplementation_nativeDropCommitCallback___int_int_int_R_int(
             CN1_THREAD_GET_STATE_PASS_ARG x, y, action);

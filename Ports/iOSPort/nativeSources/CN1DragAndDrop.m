@@ -540,11 +540,21 @@ API_AVAILABLE(ios(11.0))
     // would give the application several drops for one gesture, each missing the others.
     NSMutableDictionary* collected = [[NSMutableDictionary alloc] init];
     NSMutableArray* files = [[NSMutableArray alloc] init];
+    // The representations a file-vending provider also advertises, named against the copy of
+    // its file rather than loaded: pairs of {MIME type, path}.
+    NSMutableArray* fileBacked = [[NSMutableArray alloc] init];
     dispatch_group_t group = dispatch_group_create();
 
     for (UIDragItem* item in session.items) {
         NSItemProvider* provider = item.itemProvider;
-        if ([provider hasItemConformingToTypeIdentifier:@"public.file-url"]) {
+        BOOL vendsFile = [provider hasItemConformingToTypeIdentifier:@"public.file-url"];
+        if (vendsFile) {
+            // A document provider commonly offers both a file URL and the document's own
+            // content type. Taking only the file made cn1MimesForSession advertise a type the
+            // drop could not then produce, so a target filtered to it accepted the hover and
+            // was refused the drop. The other types are named against the copied file below
+            // rather than loaded, because they all describe that same file and reading a large
+            // one into memory on top of copying it is how an application runs out of it.
             dispatch_group_enter(group);
             [provider loadFileRepresentationForTypeIdentifier:@"public.file-url"
                                            completionHandler:^(NSURL* url, NSError* error) {
@@ -566,10 +576,25 @@ API_AVAILABLE(ios(11.0))
                         @synchronized (files) {
                             [files addObject:target];
                         }
+                        for (NSString* uti in provider.registeredTypeIdentifiers) {
+                            if ([uti isEqualToString:@"public.file-url"]) {
+                                continue;
+                            }
+                            NSString* mime = cn1MimeForUti(uti);
+                            if (mime == nil) {
+                                continue;
+                            }
+                            @synchronized (fileBacked) {
+                                [fileBacked addObject:@[mime, target]];
+                            }
+                        }
                     }
                 }
                 dispatch_group_leave(group);
             }];
+        }
+        if (vendsFile) {
+            // Its other representations are the file, handled above.
             continue;
         }
         for (NSString* uti in provider.registeredTypeIdentifiers) {
@@ -608,6 +633,9 @@ API_AVAILABLE(ios(11.0))
                 CN1NativeDragDeliverDropAdd(mime, nil, data);
             }
         }
+        for (NSArray* pair in fileBacked) {
+            CN1NativeDragDeliverDropAddFile([pair objectAtIndex:0], [pair objectAtIndex:1]);
+        }
         if (files.count > 0) {
             CN1NativeDragDeliverDropAdd(@"application/x-file-list",
                                         [files componentsJoinedByString:@"\n"], nil);
@@ -626,6 +654,7 @@ API_AVAILABLE(ios(11.0))
 #ifndef CN1_USE_ARC
         [collected release];
         [files release];
+        [fileBacked release];
 #endif
     });
 #ifndef CN1_USE_ARC
