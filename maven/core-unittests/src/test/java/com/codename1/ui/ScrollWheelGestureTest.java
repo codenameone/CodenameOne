@@ -275,20 +275,23 @@ class ScrollWheelGestureTest extends UITestBase {
         int x = page.getAbsoluteX() + page.getWidth() / 2;
         int y = page.getAbsoluteY() + page.getHeight() / 2;
 
-        // Deltas far smaller than a row, the way a trackpad sends them. Snapping each one
-        // to the nearest row pulls every one of them back where it started, and claiming
-        // the wheel while doing it stops the page moving either -- scrolling looks frozen.
-        for (int i = 0; i < 6; i++) {
+        // Deltas far smaller than a row, the way a trackpad sends them. Snapping each one to
+        // the nearest row and forgetting the rest pulls every one of them back where it
+        // started, and claiming the wheel while doing it stops the page moving either --
+        // scrolling looks frozen. What is too small to show is carried to the next event.
+        int start = page.getScrollY();
+        for (int i = 0; i < 40 && page.getScrollY() == start; i++) {
             wheelPrecise(x, y, 0, -px(3));
         }
 
-        assertTrue(page.getScrollY() >= px(3) * 5,
-                "a precise gesture accumulates instead of snapping back every time, got "
-                        + page.getScrollY());
+        assertTrue(page.getScrollY() > start,
+                "small precise deltas accumulate until they move it, got " + page.getScrollY());
+        assertTrue(settledOnGrid(page), "and it lands settled on the grid rather than "
+                + "between two rows, got " + page.getScrollY());
     }
 
     @FormTest
-    void aNotchTooSmallToLeaveTheRowPassesTheWheelOn() {
+    void aSnappingContainerAtItsEndPassesTheWheelOn() {
         Form f = new Form("snapping inside a page", new BorderLayout());
         Container page = f.getContentPane();
         page.setLayout(BoxLayout.y());
@@ -313,17 +316,21 @@ class ScrollWheelGestureTest extends UITestBase {
 
         int x = snapping.getAbsoluteX() + snapping.getWidth() / 2;
         int y = snapping.getAbsoluteY() + snapping.getHeight() / 2;
-        // Park it on a row first: at rest it sits at 0 while the first row starts a couple
-        // of pixels in, so even a tiny notch would move it that far and count as movement.
-        wheelAt(x, y, 0, -px(30));
-        int parked = snapping.getScrollY();
+        int innerMax = snapping.getScrollDimension().getHeight() - snapping.getHeight();
+        for (int i = 0; i < 60 && snapping.getScrollY() < innerMax - px(30); i++) {
+            wheelAt(x, y, 0, -px(30));
+        }
         assertEquals(0, page.getScrollY(), "the inner container takes the wheel while it can move");
+        int end = snapping.getScrollY();
 
-        // Bigger than the grid's own tolerance, smaller than a row: the snap puts it back
-        // exactly where it was.
-        wheelAt(x, y, 0, -px(5));
+        // Pinned at the end, so the carry cannot grow either: there is genuinely nothing
+        // left to give and the page takes over. A component that merely cannot show THIS
+        // notch keeps it for the next one; one that can never show another passes it on.
+        for (int i = 0; i < 10; i++) {
+            wheelAt(x, y, 0, -px(30));
+        }
 
-        assertEquals(parked, snapping.getScrollY(), "the snap returned it to the row it was on");
+        assertTrue(snapping.getScrollY() >= end, "the inner container is at its end");
         assertTrue(page.getScrollY() > 0, "so the page took the wheel instead of it being swallowed");
     }
 
@@ -485,6 +492,16 @@ class ScrollWheelGestureTest extends UITestBase {
             c.animate();
         }
         c.animate();
+    }
+
+    /// Whether the component is where its own grid says it should be. Asked of the
+    /// component rather than measured against its children on purpose: a plain Container
+    /// treats anything within a couple of pixels of a row as settled, while Spinner3D
+    /// overrides the grid with exact arithmetic -- and the invariant that matters is that
+    /// the wheel leaves it wherever IT considers settled, because that is the position its
+    /// selected index is read from.
+    private boolean settledOnGrid(Container c) {
+        return c.getGridPosY() == c.getScrollY();
     }
 
     /// A trackpad's deltas, which arrive small and often and are flagged precise.

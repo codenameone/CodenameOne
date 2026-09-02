@@ -363,6 +363,15 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean hideInPortrait;
     /// Indicates that this component and all its children should be hidden when the device is switched to landscape mode
     private boolean hideInLandscape;
+    /// Wheel movement a snapping component could not show yet, because it was smaller than
+    /// the distance to the next row. Carried to the following wheel event instead of being
+    /// dropped: without it a trackpad's small deltas each snap back to the row they started
+    /// on and the component never moves, and with it the visible position is always ON a
+    /// row -- which matters because Spinner3D reads its selected index straight off the
+    /// scroll position, so a component resting between rows reports a value nobody chose.
+    int wheelSnapRemainderY;
+    int wheelSnapRemainderX;
+
     private int scrollOpacity = 0xff;
     private boolean ignorePointerEvents;
     /// Indicates the decrement units for the scroll opacity

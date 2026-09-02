@@ -8695,7 +8695,7 @@ public final class Display extends CN1Constants {
         if (!wheelTargetStillOnScreen(root, cmp, windowId)) {
             return false;
         }
-        return scrollForWheel(cmp, scrollX, scrollY, precise);
+        return scrollForWheel(cmp, scrollX, scrollY);
     }
 
     /// Scrolls the nearest scrollable ancestor of `cmp` for a wheel nobody handled.
@@ -8723,63 +8723,65 @@ public final class Display extends CN1Constants {
         return TopLevelSupport.rootOf(cmp) == root; //NOPMD CompareObjectsWithEquals
     }
 
-    private boolean scrollForWheel(Component cmp, int scrollX, int scrollY, boolean precise) {
+    private boolean scrollForWheel(Component cmp, int scrollX, int scrollY) {
         boolean scrolled = false;
         if (scrollY != 0) {
-            scrolled = scrollAxisForWheel(cmp, true, scrollY, precise);
+            scrolled = scrollAxisForWheel(cmp, true, scrollY);
         }
         if (scrollX != 0) {
-            scrolled = scrollAxisForWheel(cmp, false, scrollX, precise) || scrolled;
+            scrolled = scrollAxisForWheel(cmp, false, scrollX) || scrolled;
         }
         return scrolled;
     }
 
-    private boolean applyScroll(Component target, boolean vertical, int position, int max, boolean precise) {
+    private boolean applyScroll(Component target, boolean vertical, int position, int max) {
         int ceiling = max < 0 ? 0 : max;
         int before = vertical ? target.getScrollY() : target.getScrollX();
-        int next = Math.max(0, Math.min(ceiling, position));
-        if (next == before) {
+        boolean snapping = target.isSnapToGrid();
+        // A snapping component moves in whole rows, so anything left over from the last
+        // event is carried into this one. The position the gesture has actually asked for
+        // is therefore the visible one plus that carry -- and comparing THAT before and
+        // after is what says whether the component has anything left to give: a component
+        // pinned at an edge reports nothing moved and the wheel goes to the page, while one
+        // that merely cannot show this notch yet keeps it and shows it on a later one.
+        int carry = snapping ? (vertical ? target.wheelSnapRemainderY : target.wheelSnapRemainderX) : 0;
+        int wantedBefore = before + carry;
+        int wanted = Math.max(0, Math.min(ceiling, position + carry));
+        if (wanted == wantedBefore) {
             return false;
         }
-        if (vertical) {
-            target.setScrollY(next);
-        } else {
-            target.setScrollX(next);
-        }
-        // A container that snaps to a grid has to land on it. That used to happen when the
-        // deceleration a drag left behind ran out -- which is where the wheel emulation got
-        // it from, and there is no deceleration here. Spinner3D scrolls a snapping container,
-        // so a notch that is not an exact multiple of the row height would otherwise leave
-        // it stopped between two rows.
-        //
-        // Not for a precise device. A trackpad sends many small deltas, and snapping each
-        // one to the nearest row pulls every one of them back to the row it started on: the
-        // component sticks, and because the wheel was claimed the page underneath cannot
-        // move either. Free scrolling leaves it wherever the gesture ended, which is where
-        // a finger drag leaves it too until something settles it.
-        if (!precise && target.isSnapToGrid()) {
-            int snapped = Math.max(0, Math.min(ceiling,
+        setScrollPosition(target, vertical, wanted);
+        int shown = wanted;
+        if (snapping) {
+            // Every event lands on the grid, and whether the device is precise no longer
+            // enters into it: carrying the remainder is what keeps a trackpad moving, so
+            // there is nothing left for a precise flag to decide. Snapping only notched
+            // wheels left a trackpad gesture resting between rows with no release, motion
+            // or idle callback to settle it -- and Spinner3D derives its selected index
+            // from where the scroll actually is, so resting between rows is a value nobody
+            // chose.
+            shown = Math.max(0, Math.min(ceiling,
                     vertical ? target.getGridPosY() : target.getGridPosX()));
-            if (vertical ? snapped != target.getScrollY() : snapped != target.getScrollX()) {
-                if (vertical) {
-                    target.setScrollY(snapped);
-                } else {
-                    target.setScrollX(snapped);
-                }
+            if (shown != wanted) {
+                setScrollPosition(target, vertical, shown);
             }
         }
-        // Whether anything actually moved, which a snap can undo: a notch too small to
-        // leave the current row snaps straight back to it, and reporting that as handled
-        // would swallow the wheel instead of letting the page take it.
-        if ((vertical ? target.getScrollY() : target.getScrollX()) == before) {
-            return false;
+        if (vertical) {
+            target.wheelSnapRemainderY = snapping ? wanted - shown : 0;
+        } else {
+            target.wheelSnapRemainderX = snapping ? wanted - shown : 0;
         }
-        // The scrollbar comes back, exactly as a press or a release would bring it back.
-        // Otherwise the first fade is permanent for anyone using a wheel: the content moves
-        // and nothing on screen says where in it they are.
         target.restoreFadingScrollbar();
         target.repaint();
         return true;
+    }
+
+    private void setScrollPosition(Component target, boolean vertical, int position) {
+        if (vertical) {
+            target.setScrollY(position);
+        } else {
+            target.setScrollX(position);
+        }
     }
 
     /// Scrolls the first ancestor that can actually move on this axis, which is not always
@@ -8789,7 +8791,7 @@ public final class Display extends CN1Constants {
     /// the edge it is being pushed against, and the page takes over -- which is what every
     /// other toolkit does with nested scrollers, and what the drag this replaced did by
     /// handing the gesture up.
-    private boolean scrollAxisForWheel(Component cmp, boolean vertical, int delta, boolean precise) {
+    private boolean scrollAxisForWheel(Component cmp, boolean vertical, int delta) {
         Component c = cmp;
         while (c != null) {
             if (vertical ? c.isScrollableY() : c.isScrollableX()) {
@@ -8804,7 +8806,7 @@ public final class Display extends CN1Constants {
                                 + c.getInvisibleAreaUnderVKB()
                         : c.getScrollDimension().getWidth() - c.getWidth();
                 int from = vertical ? c.getScrollY() : c.getScrollX();
-                if (applyScroll(c, vertical, from - delta, max, precise)) {
+                if (applyScroll(c, vertical, from - delta, max)) {
                     return true;
                 }
             }
