@@ -347,6 +347,40 @@ class Walker:
         cursor = index + 1
         while cursor < len(lines) and BLOCK_DIRECTIVE_RE.match(lines[cursor].strip()):
             cursor += 1
+        # The same hazard on the other side: paragraph text immediately BEFORE the
+        # include absorbs the included file's first heading, and the rendered-title
+        # count cannot see it when another file happens to share that title --
+        # "Getting started" is in the book three times. Measured, the exemptions
+        # are the same ones: a blank line, a line that closes the paragraph, or a
+        # leveloffset, whose attribute entry does the closing.
+        if "leveloffset" not in attrs:
+            back = index - 1
+            while back >= 0 and re.match(
+                r"^(ifdef|ifndef|ifeval|endif)::", lines[back].strip()
+            ):
+                back -= 1
+            preceding = lines[back].strip() if back >= 0 else ""
+            if preceding and not self._CLOSES_PARAGRAPH.match(preceding):
+                try:
+                    first = next(
+                        (
+                            line
+                            for line in parse_lines(target)
+                            if line.strip()
+                        ),
+                        "",
+                    )
+                except OSError:
+                    first = ""
+                if HEADING_RE.match(first):
+                    self.errors.append(
+                        f"{path.name}:{index + 1}: include of {target_raw} follows a "
+                        f"paragraph with no blank line between them, so that paragraph "
+                        f"absorbs {target.name}'s heading and the section disappears. "
+                        f"Add a blank line before the include, or a leveloffset "
+                        f"attribute."
+                    )
+
         following = lines[cursor] if cursor < len(lines) else ""
         if not following.strip():
             return
