@@ -5,9 +5,11 @@
 # total, 0.113% of the image. Java2D rasterizes the same glyph from the same
 # bundled font at the same size slightly differently on macOS and Linux.
 #
-# The area bound is what does the work here: a per-pixel delta this large is
-# meaningless on its own (a glyph edge flips between white and the green block
-# behind it), but a regression that changed the icon would move far more than
-# 0.3% of the image.
+# The two bounds are independent and both bind. maxMismatchPercent limits how
+# much of the image may change AT ALL -- every differing pixel counts, not only
+# those past the delta -- so a wholesale recolour cannot slip through by moving
+# each channel a little at a time. maxChannelDelta then caps how far any single
+# pixel may move: 160 clears the measured worst of 141 with room, while a solid
+# overwrite still fails on it.
 maxChannelDelta=160
 maxMismatchPercent=0.3
