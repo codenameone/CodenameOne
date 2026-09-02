@@ -8678,8 +8678,22 @@ public final class Display extends CN1Constants {
             return false;
         }
         com.codename1.ui.events.WheelEvent we = new com.codename1.ui.events.WheelEvent(cmp, x, y, scrollX, scrollY, precise, modifiers);
-        if (cmp.fireMouseWheelEvent(we)) {
+        if (cmp.fireMouseWheelListeners(we)) {
             return true;
+        }
+        // Looked at again between the phases. A listener that did not consume can still
+        // have shown a form, disposed the window or removed the component, and the rest of
+        // this would then pan a detached image viewer or scroll a form nobody is looking
+        // at -- state that surfaces later when that UI comes back. The gesture this
+        // replaced re-checked the same way between its queued steps.
+        if (!wheelTargetStillOnScreen(root, cmp, windowId)) {
+            return false;
+        }
+        if (cmp.fireMouseWheelHandlers(we)) {
+            return true;
+        }
+        if (!wheelTargetStillOnScreen(root, cmp, windowId)) {
+            return false;
         }
         return scrollForWheel(cmp, scrollX, scrollY, precise);
     }
@@ -8695,6 +8709,20 @@ public final class Display extends CN1Constants {
     ///
     /// A component that wants the wheel for itself takes it before this, by consuming the
     /// event in `Component#mouseWheel` or in a listener.
+    /// Whether the component a wheel was aimed at is still in the tree it was found in,
+    /// and that tree is still what the user is looking at.
+    private boolean wheelTargetStillOnScreen(Container root, Component cmp, int windowId) {
+        if (windowId > 0) {
+            Window w = Desktop.getInstance().windowById(windowId);
+            if (w != root || !w.isWindowShowing()) { //NOPMD CompareObjectsWithEquals
+                return false;
+            }
+        } else if (getCurrent() != root) { //NOPMD CompareObjectsWithEquals
+            return false;
+        }
+        return TopLevelSupport.rootOf(cmp) == root; //NOPMD CompareObjectsWithEquals
+    }
+
     private boolean scrollForWheel(Component cmp, int scrollX, int scrollY, boolean precise) {
         boolean scrolled = false;
         if (scrollY != 0) {

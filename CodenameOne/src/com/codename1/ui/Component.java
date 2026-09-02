@@ -6719,12 +6719,21 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// true if a listener consumed the wheel event
     boolean fireMouseWheelEvent(com.codename1.ui.events.WheelEvent ev) {
-        // The whole listener chain first, then the built-in handlers. Consuming is
-        // documented to prevent the DEFAULT behaviour, and a component that pans itself on
-        // a wheel is exactly that, so a listener anywhere above the component has to be
-        // able to stop it: an application that binds control plus wheel to its own zoom on
-        // the form cannot be pre-empted by a viewer inside it. Interleaving the two let the
-        // nearest built-in win over every listener further up.
+        return fireMouseWheelListeners(ev) || fireMouseWheelHandlers(ev);
+    }
+
+    /// The listener half of a wheel dispatch, walking up from this component.
+    ///
+    /// Separate from the handlers below because a listener can change the UI out from
+    /// under the gesture -- show a form, dispose a window, remove this component -- and
+    /// whoever called this has to be able to look again before anything else acts on a
+    /// tree that may no longer be on screen.
+    boolean fireMouseWheelListeners(com.codename1.ui.events.WheelEvent ev) {
+        // The whole chain, and before any built-in handling. Consuming is documented to
+        // prevent the DEFAULT behaviour, and a component that pans itself on a wheel is
+        // exactly that, so a listener anywhere above it has to be able to stop it: an
+        // application that binds control plus wheel to its own zoom on the form cannot be
+        // pre-empted by a viewer inside it.
         Component c = this;
         while (c != null) {
             if (c.mouseWheelListeners != null && c.mouseWheelListeners.hasListeners()) {
@@ -6735,7 +6744,12 @@ public class Component implements Animation, StyleListener, Editable {
             }
             c = c.getParent();
         }
-        c = this;
+        return false;
+    }
+
+    /// The built-in half: the components that move content of their own.
+    boolean fireMouseWheelHandlers(com.codename1.ui.events.WheelEvent ev) {
+        Component c = this;
         while (c != null) {
             if (c.mouseWheel(ev) || ev.isConsumed()) {
                 return true;

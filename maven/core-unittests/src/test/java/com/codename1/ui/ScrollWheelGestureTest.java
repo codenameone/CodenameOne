@@ -397,6 +397,34 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aListenerThatChangesTheScreenStopsTheGestureThere() {
+        Form f = scrollingForm();
+        final Container page = f.getContentPane();
+        final WheelHandlingComponent target = new WheelHandlingComponent();
+        target.setPreferredH(px(15));
+        page.addComponent(0, target);
+        // Does not consume, but shows another form: the tree the wheel was aimed at is no
+        // longer what anyone is looking at by the time the built-in handlers would run.
+        target.addMouseWheelListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                new Form("elsewhere", new BorderLayout()).show();
+            }
+        });
+        f.revalidate();
+        DisplayTest.flushEdt();
+        int before = page.getScrollY();
+
+        wheel(target, 0, -px(20));
+
+        assertEquals(0, target.wheels(),
+                "nothing built in may act on a component whose form has been left behind");
+        assertEquals(before, page.getScrollY(), "and the form nobody is looking at is not scrolled");
+        f.show();
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
     void aWheelInADesktopWindowScrollsThatWindow() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("scroller", new BorderLayout());
