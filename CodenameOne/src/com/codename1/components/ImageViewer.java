@@ -575,26 +575,30 @@ public class ImageViewer extends Component {
         if (!pansX && !pansY) {
             return false;
         }
-        float nextX = pansX
-                ? clampPan(panPositionX - ((float) ev.getDeltaX()) / ((float) getWidth()))
-                : panPositionX;
-        float nextY = pansY
-                ? clampPan(panPositionY - ((float) ev.getDeltaY()) / ((float) getHeight()))
-                : panPositionY;
-        // Float.compare rather than ==, and not because the values are approximate: the
-        // question is whether the clamp handed back the identical position, which is what
-        // "already as far as it goes" looks like. An epsilon would answer a different and
-        // vaguer question.
-        if (Float.compare(nextX, panPositionX) == 0 && Float.compare(nextY, panPositionY) == 0) {
-            // Panned as far as it goes in the direction being asked for. Claiming the wheel
-            // anyway would swallow it: the page the viewer sits on could not scroll while
-            // the pointer stayed over an image that had stopped moving. The same rule the
-            // nested scrollers follow -- what cannot move passes the wheel on.
+        float wasPanX = panPositionX;
+        float wasPanY = panPositionY;
+        int wasX = constrainedImageX();
+        int wasY = constrainedImageY();
+        if (pansX) {
+            panPositionX = clampPan(panPositionX - ((float) ev.getDeltaX()) / ((float) getWidth()));
+        }
+        if (pansY) {
+            panPositionY = clampPan(panPositionY - ((float) ev.getDeltaY()) / ((float) getHeight()));
+        }
+        updatePositions();
+        // Judged on where the image is DRAWN, not on the pan position. The two are not the
+        // same range: an image a little larger than the viewer reaches its painted edge
+        // while the logical position still has most of its travel left, and counting that
+        // as movement swallows every further notch without anything moving -- the page it
+        // sits on could not scroll while the pointer stayed over a picture that had stopped.
+        if (constrainedImageX() == wasX && constrainedImageY() == wasY) {
+            // Put the logical position back too, or the pan drifts into the range that
+            // paints nothing and the next wheel the other way has to travel through it.
+            panPositionX = wasPanX;
+            panPositionY = wasPanY;
+            updatePositions();
             return false;
         }
-        panPositionX = nextX;
-        panPositionY = nextY;
-        updatePositions();
         repaint();
         return true;
     }
@@ -723,6 +727,24 @@ public class ImageViewer extends Component {
         prefY = s.getPaddingTop() + (height - prefH) / 2;
     }
 
+    /// Where the image is actually drawn horizontally, which is not where panPositionX
+    /// says it is: the pan position spans the whole image while the drawing is clamped to
+    /// the part of it that can leave the viewport. An image barely larger than the viewer
+    /// reaches its painted edge within a fraction of the logical range.
+    private int constrainedImageX() {
+        if (imageDrawWidth > getInnerWidth()) {
+            return Math.max(Math.min(0, imageX), -imageDrawWidth + getInnerWidth());
+        }
+        return imageX;
+    }
+
+    private int constrainedImageY() {
+        if (imageDrawHeight > getInnerHeight()) {
+            return Math.max(Math.min(0, imageY), -imageDrawHeight + getInnerHeight());
+        }
+        return imageY;
+    }
+
     private void updatePositions() {
         if (zoom == 1) {
             imageAspectCalc(image);
@@ -777,22 +799,8 @@ public class ImageViewer extends Component {
         }
 
         // Apply the same constraints used in paint() method to ensure cropBox matches what's actually visible
-        int constrainedImageX = imageX;
-        int constrainedImageY = imageY;
-
-        if (imageDrawWidth > getInnerWidth()) {
-            constrainedImageX = Math.max(
-                    Math.min(0, imageX),
-                    -imageDrawWidth + getInnerWidth()
-            );
-        }
-
-        if (imageDrawHeight > getInnerHeight()) {
-            constrainedImageY = Math.max(
-                    Math.min(0, imageY),
-                    -imageDrawHeight + getInnerHeight()
-            );
-        }
+        int constrainedImageX = constrainedImageX();
+        int constrainedImageY = constrainedImageY();
 
         cropBox.set(-constrainedImageY / (double) imageDrawHeight, (constrainedImageX + imageDrawWidth - getWidth()) / (double) imageDrawWidth, (constrainedImageY + imageDrawHeight - getHeight()) / (double) imageDrawHeight, -constrainedImageX / (double) imageDrawWidth);
     }

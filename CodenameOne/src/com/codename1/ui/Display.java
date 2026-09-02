@@ -8712,6 +8712,14 @@ public final class Display extends CN1Constants {
     /// Whether the component a wheel was aimed at is still in the tree it was found in,
     /// and that tree is still what the user is looking at.
     private boolean wheelTargetStillOnScreen(Container root, Component cmp, int windowId) {
+        // Modality as well as identity. A listener that did not consume can still put a
+        // modal up, and its window blocks the one the wheel came from while that window's
+        // tree stays perfectly visible and attached -- so every other check here passes and
+        // the wheel would scroll content behind the modal. The entry point tests this once,
+        // before the listeners run; this is the same test after they have.
+        if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
+            return false;
+        }
         if (windowId > 0) {
             Window w = Desktop.getInstance().windowById(windowId);
             if (w != root || !w.isWindowShowing()) { //NOPMD CompareObjectsWithEquals

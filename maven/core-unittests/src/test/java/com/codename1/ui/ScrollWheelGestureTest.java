@@ -438,6 +438,55 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aDragBetweenNotchesDropsWhatTheWheelWasCarrying() {
+        Form f = new Form("carry", new BorderLayout());
+        // An exact grid, the way Spinner3D overrides it. A plain Container calls anything
+        // within two pixels of a row settled, and that tolerance is noise in a test about
+        // what the carry is worth.
+        ExactGridContainer page = new ExactGridContainer();
+        page.setScrollableY(true);
+        for (int i = 0; i < 60; i++) {
+            Label l = new Label("row");
+            l.setPreferredH(px(30));
+            page.add(l);
+        }
+        f.getContentPane().setLayout(BoxLayout.y());
+        f.getContentPane().add(page);
+        f.getContentPane().setScrollableY(false);
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        page.setSnapToGrid(true);
+        assertTrue(page.isScrollableY() && page.isSnapToGrid(), "the container has to scroll and snap");
+        int x = page.getAbsoluteX() + page.getWidth() / 2;
+        int y = page.getAbsoluteY() + page.getHeight() / 2;
+        int pitch = page.getComponentAt(1).getY() - page.getComponentAt(0).getY();
+
+        // One notch short of the row: carried, not shown.
+        int carried = 0;
+        while (page.getScrollY() == 0 && carried < 40) {
+            wheelPrecise(x, y, 0, -(pitch / 4));
+            carried++;
+        }
+        assertTrue(page.getScrollY() > 0, "it advances a row once enough has accumulated");
+        int onARow = page.getScrollY();
+        wheelPrecise(x, y, 0, -(pitch / 4));
+        assertEquals(onARow, page.getScrollY(), "and the next quarter-notch is carried, not shown");
+
+        // Something else moves it. The carry describes a distance from a position this
+        // component is no longer at, so keeping it would make the next notch travel further
+        // than the notch asked for.
+        page.setScrollY(0);
+        wheelPrecise(x, y, 0, -(pitch / 4));
+
+        // Less than a row: a fresh quarter-notch settles on the first row, while a carry
+        // left over from before the drag would have been nearly a full row and jumped one.
+        assertTrue(page.getScrollY() < pitch,
+                "a quarter-notch after a drag moves no further than a quarter-notch does, got "
+                        + page.getScrollY() + " with rows " + pitch + " apart");
+    }
+
+    @FormTest
     void aWheelInADesktopWindowScrollsThatWindow() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("scroller", new BorderLayout());
@@ -543,6 +592,28 @@ class ScrollWheelGestureTest extends UITestBase {
         Label l = new Label("filler");
         l.setPreferredH(px(30));
         return l;
+    }
+
+    /// Snaps to its own rows exactly, with none of the tolerance a plain Container allows
+    /// -- which is what Spinner3D does, and what makes a grid assertion mean one thing.
+    private static final class ExactGridContainer extends Container {
+        ExactGridContainer() {
+            super(BoxLayout.y());
+        }
+
+        @Override
+        protected int getGridPosY() {
+            if (getComponentCount() < 2) {
+                return getScrollY();
+            }
+            int first = getComponentAt(0).getY();
+            int pitch = getComponentAt(1).getY() - first;
+            if (pitch <= 0) {
+                return getScrollY();
+            }
+            int rows = Math.round((getScrollY() - first) / (float) pitch);
+            return Math.max(first, first + rows * pitch);
+        }
     }
 
     /// Counts every pointer event it is told about, so a test can assert none arrived.

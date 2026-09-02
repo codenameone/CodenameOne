@@ -3653,6 +3653,9 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `scrollX`: the X position of the scrolling
     protected void setScrollX(int scrollX) {
+        if (!Display.getInstance().isScrollWheeling()) {
+            wheelSnapRemainderX = 0;
+        }
         // the setter must always update the value regardless...
         int scrollXtmp = scrollX;
         if (!isSmoothScrolling() || !isTensileDragEnabled()) {
@@ -3698,6 +3701,13 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `scrollY`: the Y position of the scrolling
     protected void setScrollY(int scrollY) {
+        if (!Display.getInstance().isScrollWheeling()) {
+            // Anything that is not the wheel invalidates what the wheel was carrying: the
+            // remainder describes a distance from a position this component is no longer
+            // at, so adding it to the next notch would move further than the notch asked
+            // for. A drag, a selection change and a programmatic scroll all land here.
+            wheelSnapRemainderY = 0;
+        }
         int oldAccessibilityScrollY = this.scrollY;
         if (this.scrollY != scrollY) {
             CodenameOneImplementation ci = Display.impl;
