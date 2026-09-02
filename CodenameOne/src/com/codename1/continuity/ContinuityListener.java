@@ -41,6 +41,14 @@ public interface ContinuityListener {
     /// prompts before jumping: keep the state, return false, and call
     /// `Continuity.restore(AppState)` when the user accepts.
     ///
+    /// If you handle it yourself and never call `restore`, call
+    /// `Continuity.acknowledge(AppState)` instead. Restoring records that the state was acted on
+    /// so it is not offered again after a relaunch; handling it silently does not, and without
+    /// the acknowledgement the relay's unchanged document is accepted on the next launch and your
+    /// side effects run a second time. It is not inferred from the false return, because false
+    /// also means "I am going to prompt" -- and marking that handled before the user answers
+    /// would lose the state if the process died first.
+    ///
     /// #### Parameters
     ///
     /// - `state`: the state that arrived

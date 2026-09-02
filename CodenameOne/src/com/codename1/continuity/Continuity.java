@@ -130,6 +130,12 @@ public final class Continuity {
     /// How long a non-EDT caller waits for the EDT to take its capture.
     private static final int EDT_WAIT_MILLIS = 2000;
 
+    /// How much longer a caller waits for work the EDT has already STARTED.
+    ///
+    /// Separate from the first wait because the two questions differ: the first asks whether the
+    /// EDT is free at all, and this one waits out an operation that cannot be cancelled.
+    private static final long EDT_STARTED_CAP_MILLIS = 8000L;
+
     /// Passed to deliver() by a caller that has no relay session to tie the state to -- a platform
     /// continuation, or a test.
     private static final long NO_ERA = Long.MIN_VALUE;
@@ -625,7 +631,8 @@ public final class Continuity {
         // show its initial screen, and the restore ran afterwards and replaced it -- while
         // capture() returned null and still consumed a sequence when the EDT got round to it.
         // A caller told the operation did not happen has to be right about that.
-        final boolean[] flags = new boolean[2];
+        // [0] cancelled, [1] completed, [2] started.
+        final boolean[] flags = new boolean[3];
         Runnable guarded = new Runnable() {
             @Override
             public void run() {
@@ -633,6 +640,7 @@ public final class Continuity {
                     if (flags[0]) {
                         return;
                     }
+                    flags[2] = true;
                 }
                 r.run();
                 synchronized (flags) {
@@ -646,11 +654,37 @@ public final class Continuity {
             Log.e(t);
         }
         synchronized (flags) {
-            if (!flags[1]) {
+            if (flags[1]) {
+                return true;
+            }
+            if (!flags[2]) {
+                // Never started: cancelling it is honest, and the caller is told nothing happened.
                 flags[0] = true;
                 return false;
             }
-            return true;
+        }
+        // STARTED and still running. There is nothing to cancel -- the provider or the navigation
+        // is midway through -- so reporting failure and letting it finish afterwards is the one
+        // outcome that lies to the caller: restore() returned false, the application showed its
+        // initial screen, and the restore landed on top of it a moment later. Waiting is the only
+        // truthful answer, so this waits again, bounded, and only gives up if the operation
+        // outruns even that.
+        long deadline = System.currentTimeMillis() + EDT_STARTED_CAP_MILLIS;
+        while (System.currentTimeMillis() < deadline) {
+            synchronized (flags) {
+                if (flags[1]) {
+                    return true;
+                }
+            }
+            try {
+                Thread.sleep(25);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        synchronized (flags) {
+            return flags[1];
         }
     }
 
@@ -864,6 +898,29 @@ public final class Continuity {
             setParked(null);
         }
         return shown;
+    }
+
+    /// Records that the application has handled `state` itself, so it is not offered again.
+    ///
+    /// For the pattern `ContinuityListener` documents: do the work yourself and return false. That
+    /// path never reaches restore(), so nothing recorded the acknowledgement durably -- the
+    /// sequence stayed in this process only, and after a relaunch the relay's unchanged document
+    /// was accepted again and the listener repeated its side effects, against the act-once
+    /// guarantee.
+    ///
+    /// Deliberately NOT inferred from a false return. False also means "keep it, I will prompt and
+    /// call restore() when the user accepts", and marking that handled immediately would lose the
+    /// state if the process died before they answered -- which is the same data loss as marking a
+    /// parked state. The two intentions are different, so the application says which it means.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: the state that has been dealt with
+    public static void acknowledge(AppState state) {
+        if (state == null) {
+            return;
+        }
+        noteActedOn(state);
     }
 
     /// Restores a specific state: hands its payload to the provider, then replays its route stack.
@@ -1500,7 +1557,7 @@ public final class Continuity {
                 // and be queued BEHIND the newer one that overtook it. The event thread then
                 // restored the newer state and overwrote it with the stale one.
                 if (stillDeliverable(state, era)) {
-                    dispatch(state);
+                    dispatch(state, era);
                 }
             }
         });
@@ -1524,6 +1581,11 @@ public final class Continuity {
     }
 
     private static void dispatch(AppState state) {
+        dispatch(state, NO_ERA);
+    }
+
+    /// As above, for a delivery queued in a known run of the framework.
+    private static void dispatch(AppState state, long era) {
         // COMMIT_LOCK for the whole dispatch, which is what actually serializes it against
         // clear(). stillDeliverable() checked the era and released STATE_LOCK, so a logout landing
         // after that let this run listeners, restore navigation and persist the PREVIOUS account's
@@ -1535,6 +1597,16 @@ public final class Continuity {
         // blocks on a THREAD that wants COMMIT_LOCK would stall, and that is the price of a logout
         // being able to stop a restore it has already superseded.
         synchronized (COMMIT_LOCK) {
+            synchronized (STATE_LOCK) {
+                if (era != NO_ERA && era != deliveryEra) {
+                    // Re-asked HERE, after the lock is held. stillDeliverable() answered before
+                    // COMMIT_LOCK was taken, so a clear() that got the lock first completed while
+                    // this was still queued -- and taking the lock afterwards without re-checking
+                    // dispatched the previous account's state anyway. A lock around a stale answer
+                    // is not serialization.
+                    return;
+                }
+            }
             dispatchLocked(state);
         }
     }
@@ -1683,17 +1755,18 @@ public final class Continuity {
             // Our own work needs no mark: deliver() drops an echo on the device id alone.
             return;
         }
-        boolean changed;
         synchronized (STATE_LOCK) {
             Long seen = lastSeen.get(from);
-            changed = seen == null || seen.longValue() < state.getSequence();
-            if (changed) {
+            if (seen == null || seen.longValue() < state.getSequence()) {
                 lastSeen.put(from, Long.valueOf(state.getSequence()));
             }
         }
-        if (changed) {
-            rememberSeen();
-        }
+        // ALWAYS, not only when the in-memory map moved. That condition was written when the
+        // durable copy tracked memory exactly; it no longer does -- the mark goes into memory at
+        // admission and reaches disk only when the state is acted on -- so by the time anything
+        // calls this, memory already holds the entry and "unchanged" meant "write nothing". Both
+        // acknowledge() and the restore path were silently persisting nothing at all.
+        rememberSeen();
     }
 
     /// Reads the persisted high-water marks. Never null.

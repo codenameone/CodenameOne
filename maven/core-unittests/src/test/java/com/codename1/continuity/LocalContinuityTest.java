@@ -687,6 +687,65 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * The listener contract documents "do the work yourself and return false". That path never
+     * reaches restore(), so nothing recorded the acknowledgement durably: after a relaunch the
+     * relay's unchanged document was accepted again and the listener repeated its side effects.
+     * acknowledge() is the explicit answer, and it is explicit on purpose -- false also means "I
+     * am going to prompt", and marking THAT handled would lose the state if the process died
+     * before the user answered.
+     */
+    @EdtTest
+    public void acknowledgingAHandledStateSurvivesARestart() {
+        Continuity.enable();
+        final AppState handled = foreign("device-self-handled", 5);
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                // Did the work here; nothing to restore.
+                Continuity.acknowledge(state);
+                return false;
+            }
+        });
+
+        Continuity.deliver(handled);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+        // The relaunch.
+        Continuity.reset();
+        Continuity.setBridge(bridge);
+        Continuity.enable();
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return false;
+            }
+        });
+
+        Continuity.deliver(handled);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+        assertEquals(0, seen[0],
+                "an acknowledged state came back after the restart, so the listener's side "
+                        + "effects would run a second time");
+    }
+
+    /**
      * An app that only registers a store listener keeps continuity OFF by design -- a key/value
      * store is not consent to broadcast a route stack. refreshBridge() tested `enabled` alone, so
      * the simulator's capability menu, which swaps the bridge and calls it, left the replacement
