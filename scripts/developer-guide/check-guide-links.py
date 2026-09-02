@@ -19,6 +19,7 @@ shrink, never grow.
 from __future__ import annotations
 
 import argparse
+import collections
 import datetime
 import re
 import sys
@@ -271,14 +272,21 @@ def findings_for(path: Path, known: set[str], patterns: list) -> list[tuple[str,
     return out
 
 
-def load_baseline(path: Path) -> set[str]:
+def load_baseline(path: Path) -> collections.Counter:
+    """Read the baseline as a multiset: one line per occurrence.
+
+    A file that mentions the same broken URL twice has two problems, not one.
+    Collapsing them into a set understated the real count -- 35 recorded against
+    38 occurrences -- and left a second occurrence of an already-baselined link
+    free to appear without the check noticing.
+    """
     if not path.exists():
-        return set()
-    return {
+        return collections.Counter()
+    return collections.Counter(
         line.rstrip("\n")
         for line in path.read_text(encoding="utf-8").split("\n")
         if line.strip() and not line.startswith("#")
-    }
+    )
 
 
 def main() -> int:
@@ -301,20 +309,23 @@ def main() -> int:
     if not known:
         raise SystemExit("could not derive any site paths; is --repo-root correct?")
 
-    current: dict[str, str] = {}
+    current: collections.Counter = collections.Counter()
+    reasons: dict[str, str] = {}
     for path in sorted(guide_dir.rglob("*")):
         if path.suffix not in ASCIIDOC_EXTENSIONS or not path.is_file():
             continue
         name = path.relative_to(guide_dir).as_posix()
         for url, reason in findings_for(path, known, patterns):
-            current[f"{name}\t{url}"] = reason
+            entry = f"{name}\t{url}"
+            current[entry] += 1
+            reasons[entry] = reason
 
     if args.write_baseline:
         # The command that banks a fix is the same command that could bury a new
         # failure. Shrinking is free; growing needs --allow-new, so recording new
         # debt is a deliberate act that shows up in the command as well as in the
         # baseline diff a reviewer reads.
-        added = sorted(set(current) - load_baseline(args.baseline))
+        added = sorted((current - load_baseline(args.baseline)).elements())
         if added and not args.allow_new:
             for entry in added:
                 name, _, url = entry.partition("\t")
@@ -329,28 +340,30 @@ def main() -> int:
             "\n".join(
                 [
                     "# Developer guide links that do not resolve, or are not TLS.",
+                    "# One line per occurrence: a file naming the same bad URL twice gets",
+                    "# two lines, because that is two things to fix.",
                     "# A ratchet: entries may be removed as links are fixed, never added.",
                     "# Regenerate with check-guide-links.py --write-baseline.",
                 ]
-                + sorted(current)
+                + sorted(current.elements())
             )
             + "\n",
             encoding="utf-8",
         )
-        print(f"Wrote baseline with {len(current)} entr(ies).")
+        print(f"Wrote baseline with {sum(current.values())} entr(ies).")
         return 0
 
     baseline = load_baseline(args.baseline)
-    new = sorted(set(current) - baseline)
+    new = sorted((current - baseline).elements())
     # A baselined entry that no longer reproduces has to leave the file. Leaving it
     # keeps a slot open: a later change can restore that exact file+URL and
     # `current - baseline` stays empty, so the regression sails through. The
     # ratchet only ratchets if fixes are banked.
-    stale = sorted(baseline - set(current))
+    stale = sorted((baseline - current).elements())
     if new or stale:
         for entry in new:
             name, _, url = entry.partition("\t")
-            print(f"{name}: {url} -- {current[entry]}", file=sys.stderr)
+            print(f"{name}: {url} -- {reasons[entry]}", file=sys.stderr)
         for entry in stale:
             name, _, url = entry.partition("\t")
             print(
@@ -365,7 +378,7 @@ def main() -> int:
         return 1
 
     print(
-        f"Links: {len(current)} known bad link(s) against {len(known)} known site paths "
+        f"Links: {sum(current.values())} known bad link(s) against {len(known)} known site paths "
         f"and {len(patterns)} redirect rule(s); none new, none stale."
     )
     return 0

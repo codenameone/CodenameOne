@@ -20,6 +20,7 @@ elsewhere in a chapter does not churn the file.
 from __future__ import annotations
 
 import argparse
+import collections
 import re
 import sys
 from pathlib import Path
@@ -58,17 +59,21 @@ def scan(path: Path) -> list[tuple[int, str]]:
     return findings
 
 
-def load_baseline(path: Path) -> dict[str, set[str]]:
-    baseline: dict[str, set[str]] = {}
+def load_baseline(path: Path) -> collections.Counter:
+    """Read the baseline as a multiset: one line per occurrence.
+
+    Two identical introducing sentences in one chapter are two holes to fill, and
+    keying by text alone would let the second appear for free.
+    """
+    baseline: collections.Counter = collections.Counter()
     if not path.exists():
         return baseline
     for raw in path.read_text(encoding="utf-8").split("\n"):
-        line = raw.split("#", 1)[0].rstrip() if raw.startswith("#") else raw.rstrip()
-        if not line.strip():
+        if raw.startswith("#") or not raw.strip():
             continue
-        name, _, text = line.partition("\t")
+        name, _, text = raw.rstrip("\n").partition("\t")
         if text:
-            baseline.setdefault(name, set()).add(text)
+            baseline[f"{name}\t{text}"] += 1
     return baseline
 
 
@@ -93,25 +98,21 @@ def main() -> int:
     args = parser.parse_args()
 
     guide_dir = args.guide_dir.resolve()
-    current: dict[str, set[str]] = {}
-    located: dict[tuple[str, str], int] = {}
+    current: collections.Counter = collections.Counter()
+    located: dict[str, list[int]] = {}
     for path in sorted(guide_dir.rglob("*")):
         if path.suffix not in ASCIIDOC_EXTENSIONS or not path.is_file():
             continue
         name = path.relative_to(guide_dir).as_posix()
         for number, text in scan(path):
-            current.setdefault(name, set()).add(text)
-            located[(name, text)] = number
+            entry = f"{name}\t{text}"
+            current[entry] += 1
+            located.setdefault(entry, []).append(number)
 
     if args.write_baseline:
         # Same reasoning as check-guide-links.py: the command that banks a fix
         # must not silently bury a new hole.
-        previous = load_baseline(args.baseline)
-        added = sorted(
-            f"{name}\t{text}"
-            for name in current
-            for text in current[name] - previous.get(name, set())
-        )
+        added = sorted((current - load_baseline(args.baseline)).elements())
         if added and not args.allow_new:
             for entry in added:
                 print(entry.replace("\t", ": "), file=sys.stderr)
@@ -126,33 +127,31 @@ def main() -> int:
             "# A ratchet: entries may be removed as holes are filled, never added.",
             "# Regenerate with check-missing-code-blocks.py --write-baseline.",
         ]
-        for name in sorted(current):
-            for text in sorted(current[name]):
-                lines.append(f"{name}\t{text}")
+        lines.extend(sorted(current.elements()))
         args.baseline.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        total = sum(len(v) for v in current.values())
-        print(f"Wrote baseline with {total} entr(ies) across {len(current)} file(s).")
+        total = sum(current.values())
+        print(f"Wrote baseline with {total} entr(ies).")
         return 0
 
     baseline = load_baseline(args.baseline)
     new: list[str] = []
-    for name in sorted(current):
-        for text in sorted(current[name] - baseline.get(name, set())):
-            number = located[(name, text)]
-            new.append(f"{name}:{number}: promises a code block that is not there: {text[:100]}")
+    for entry in sorted((current - baseline).elements()):
+        name, _, text = entry.partition("\t")
+        where = ", ".join(str(n) for n in located.get(entry, []))
+        new.append(f"{name}:{where}: promises a code block that is not there: {text[:100]}")
 
     # A filled hole has to leave the baseline. Leaving it keeps a slot open: a
     # later change can empty that exact block again and `current - baseline` stays
     # empty, so the regression passes. The ratchet only ratchets if fixes are banked.
     stale: list[str] = []
-    for name in sorted(baseline):
-        for text in sorted(baseline[name] - current.get(name, set())):
-            stale.append(
-                f"{name}: filled, but still in the baseline: {text[:80]}. Run "
-                f"check-missing-code-blocks.py --write-baseline to bank the fix."
-            )
+    for entry in sorted((baseline - current).elements()):
+        name, _, text = entry.partition("\t")
+        stale.append(
+            f"{name}: filled, but still in the baseline: {text[:80]}. Run "
+            f"check-missing-code-blocks.py --write-baseline to bank the fix."
+        )
 
-    total = sum(len(v) for v in current.values())
+    total = sum(current.values())
     if new or stale:
         for entry in new + stale:
             print(entry, file=sys.stderr)

@@ -1,4 +1,6 @@
 # Developer guide links that do not resolve, or are not TLS.
+# One line per occurrence: a file naming the same bad URL twice gets
+# two lines, because that is two things to fix.
 # A ratchet: entries may be removed as links are fixed, never added.
 # Regenerate with check-guide-links.py --write-baseline.
 About-This-Guide.asciidoc	http://github.com/chen-fishbein/
@@ -7,8 +9,11 @@ Advanced-Theming.asciidoc	http://freebiesbug.com/psd-freebies/iphone-6-ui-kit/
 Advanced-Theming.asciidoc	https://www.codenameone.com/files/iOS_UI-Kit.psd
 Advanced-Topics-Under-The-Hood.asciidoc	http://developer.android.com/reference/android/content/Context.html
 Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/Mobihelp.html
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/Mobihelp.html
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/package-summary.html
 Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/package-summary.html
 Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/integration_guide/
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/ios/api/
 Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/ios/api/
 Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/ios/integration_guide/
 Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/ios/integration_guide/#getting-started
