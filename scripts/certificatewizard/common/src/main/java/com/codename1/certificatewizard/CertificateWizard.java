@@ -1635,15 +1635,17 @@ public class CertificateWizard extends Lifecycle {
     /// `ios.includePush`, defaulting to off, compared the way IPhoneBuilder compares it.
     ///
     /// The builder also infers push for an app that uses `com.codename1.call.voip`
-    /// without setting the hint. That inference needs a scan of the compiled classes,
-    /// which the wizard has no access to; such a project should set the hint, and the
-    /// bundle ID page can turn the capability on afterwards either way.
+    /// without setting the hint, from a scan of the compiled classes the wizard does not
+    /// have. A project that declares the voip background mode says the same thing in the
+    /// settings file, and that much is read here -- see
+    /// [WizardDecisions#pushRequested(String,String)] for what is left over.
     private boolean projectWantsPush() {
         if (binding == null) {
             return false;
         }
         return WizardDecisions.pushRequested(
-                readSetting(binding.settings(), "codename1.arg.ios.includePush"));
+                readSetting(binding.settings(), "codename1.arg.ios.includePush"),
+                readSetting(binding.settings(), "codename1.arg.ios.background_modes"));
     }
 
     /// How an App ID's push capability reads in the tables.

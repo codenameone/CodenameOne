@@ -102,6 +102,18 @@ class CertificateWizardPushCapabilityTest {
                 "and not on the macOS one that merely came back first");
     }
 
+    @Test
+    void aVoipProjectGetsPushWithoutHavingSetTheHint() throws Exception {
+        // The builder turns an absent ios.includePush into true for a VoIP app, so an App
+        // ID without the capability means a build that stamps a push entitlement nothing
+        // grants. The project declaring the background mode is the part of that the wizard
+        // can read without guessing at compiled classes.
+        MockSigningService service = runAutoSetup("codename1.arg.ios.background_modes=audio,voip\n");
+
+        assertTrue(service.pushEnabledOn().contains(EXISTING_BUNDLE_APPLE_ID),
+                "a declared VoIP project needs the capability, got " + service.pushEnabledOn());
+    }
+
     /// Runs the wizard's Auto Setup against a project whose settings carry `extraSettings`,
     /// and hands back the service it ran through.
     private MockSigningService runAutoSetup(String extraSettings) throws Exception {

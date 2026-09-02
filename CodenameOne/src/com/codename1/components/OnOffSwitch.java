@@ -322,8 +322,20 @@ public class OnOffSwitch extends Container implements ActionSource {
     }
 
     /// {@inheritDoc}
+    ///
+    /// A scroll wheel plays a synthetic press, drag and release over whatever sits under
+    /// the cursor so the scroll animates like a finger drag, and this switch is not what
+    /// the wheel is for: acting on it once toggled the value of a switch someone scrolled
+    /// past, and now that a wheel is no longer delivered as a tap it would instead leave
+    /// the drag half applied -- `dragged` latched on and the button painted mid-slide,
+    /// which the next real click then reads as the tail of a drag instead of a tap. The
+    /// switch declines the whole gesture rather than any part of it, exactly as `Slider`
+    /// does in all three of its handlers.
     @Override
     public void pointerPressed(int x, int y) {
+        if (Display.getInstance().isScrollWheeling()) {
+            return;
+        }
         if (iosMode) {
             super.pointerPressed(x, y);
         }
@@ -333,6 +345,9 @@ public class OnOffSwitch extends Container implements ActionSource {
     /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
+        if (Display.getInstance().isScrollWheeling()) {
+            return;
+        }
         dragged = true;
         deltaX = pressX - x;
         if (!iosMode) {
@@ -406,6 +421,9 @@ public class OnOffSwitch extends Container implements ActionSource {
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        if (Display.getInstance().isScrollWheeling()) {
+            return;
+        }
         if (animationLock) {
             return;
         }

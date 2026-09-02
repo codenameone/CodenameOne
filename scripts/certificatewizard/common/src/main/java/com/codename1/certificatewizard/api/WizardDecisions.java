@@ -307,6 +307,48 @@ public final class WizardDecisions {
         return includePushHint != null && "true".equalsIgnoreCase(includePushHint.trim());
     }
 
+    /// Whether a project needs the push capability, reading the hint AND the one other
+    /// thing in the settings file that implies it.
+    ///
+    /// IPhoneBuilder turns an absent `ios.includePush` into true for an app that
+    /// references `com.codename1.call.voip`, because a VoIP call rings through a push --
+    /// and it makes that inference from a scan of the compiled classes, which the wizard
+    /// does not have and must not guess at. What the wizard can read is the project
+    /// declaring the voip background mode, which is the same statement made in the
+    /// settings file, and provisions it without inferring anything.
+    ///
+    /// Only when the hint is absent. An explicit value is the project speaking, and the
+    /// builder refuses a VoIP app that turned push off rather than overriding it.
+    ///
+    /// The residue is a VoIP app that declares neither: the builder infers push for it
+    /// from the class scan and the App ID will not grant it. That one is fixed by setting
+    /// `ios.includePush=true`, which is what the builder's own error tells a VoIP project
+    /// whose hint disagrees.
+    public static boolean pushRequested(String includePushHint, String backgroundModesHint) {
+        if (pushRequested(includePushHint)) {
+            return true;
+        }
+        boolean hintAbsent = includePushHint == null || includePushHint.trim().isEmpty();
+        return hintAbsent && declaresVoipBackgroundMode(backgroundModesHint);
+    }
+
+    /// Whether `ios.background_modes` lists the VoIP mode.
+    ///
+    /// Matched as a whole token, the way IPhoneBuilder matches it: "remote-notification"
+    /// contains no mode as a substring, but "myvoipmode" contains "voip", and a substring
+    /// test reads that as VoIP already being declared.
+    public static boolean declaresVoipBackgroundMode(String backgroundModes) {
+        if (backgroundModes == null) {
+            return false;
+        }
+        for (String token : backgroundModes.split("[,\\s]+")) {
+            if ("voip".equalsIgnoreCase(token.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Apple's BundleIdPlatform for the devices a profile of this type can name.
     public static String devicePlatformFor(String profileType) {
         return profileType != null

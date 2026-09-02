@@ -30,6 +30,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// A wheel notch is a scroll, never a tap.
@@ -161,6 +162,36 @@ class ScrollWheelGestureTest extends UITestBase {
 
         assertEquals(0, firedCount,
                 "releasing outside the button must still not fire its action after a wheel");
+    }
+
+    @FormTest
+    void aWheelOverAnOnOffSwitchNeitherFlipsItNorSpoilsTheNextTap() {
+        Form f = new Form("switch", new BorderLayout());
+        com.codename1.components.OnOffSwitch sw = new com.codename1.components.OnOffSwitch();
+        sw.setValue(true);
+        f.getContentPane().setLayout(BoxLayout.y());
+        f.getContentPane().add(sw);
+        f.getContentPane().add(filler());
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        assertTrue(sw.getHeight() > 0, "the switch has to be laid out for a pointer test to mean anything");
+
+        wheel(sw, -Display.getInstance().convertToPixels(20));
+
+        assertTrue(sw.isValue(), "a wheel must not change the switch it scrolled past");
+
+        // And the drag half must not be left applied either. The switch reads its own
+        // "dragged" flag on release to tell a tap from the end of a slide, so a latched
+        // one turns the next real tap into the tail of a gesture nobody made -- it stops
+        // toggling and settles on whatever the stale coordinates say.
+        int x = sw.getAbsoluteX() + sw.getWidth() / 2;
+        int y = sw.getAbsoluteY() + sw.getHeight() / 2;
+        f.pointerPressed(x, y);
+        f.pointerReleased(x, y);
+        DisplayTest.flushEdt();
+
+        assertFalse(sw.isValue(), "the tap after the wheel still has to toggle the switch");
     }
 
     /// Plays one wheel notch over the middle of `over`, then drains the queued steps.

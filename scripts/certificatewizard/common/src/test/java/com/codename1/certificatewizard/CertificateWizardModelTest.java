@@ -684,6 +684,29 @@ class CertificateWizardModelTest {
         assertFalse(WizardDecisions.pushRequested("yes"));
     }
 
+    @Test
+    void aProjectThatDeclaresTheVoipBackgroundModeNeedsPush() {
+        // IPhoneBuilder turns an ABSENT ios.includePush into true for a VoIP app, because
+        // the call rings through a push. It knows the app is one from a scan of the
+        // compiled classes; the wizard has none, but a project that declares the voip
+        // background mode has said so in the settings file.
+        assertTrue(WizardDecisions.pushRequested(null, "voip"));
+        assertTrue(WizardDecisions.pushRequested("", "audio, voip"));
+        assertTrue(WizardDecisions.pushRequested(null, "voip fetch"));
+        assertFalse(WizardDecisions.pushRequested(null, "remote-notification"));
+        assertFalse(WizardDecisions.pushRequested(null, null));
+
+        // Whole tokens, the way the builder matches them: a mode merely CONTAINING "voip"
+        // is a different mode, and a substring test reads it as VoIP already declared.
+        assertFalse(WizardDecisions.declaresVoipBackgroundMode("myvoipmode"));
+        assertTrue(WizardDecisions.declaresVoipBackgroundMode("myvoipmode voip"));
+
+        // An explicit hint is the project speaking, and the builder refuses a VoIP app
+        // that turned push off rather than overriding it -- so neither does this.
+        assertFalse(WizardDecisions.pushRequested("false", "voip"));
+        assertTrue(WizardDecisions.pushRequested("true", "remote-notification"));
+    }
+
     private static SigningState stateWithDevices() {
         List<SigningState.Device> devices = new ArrayList<SigningState.Device>();
         devices.add(new SigningState.Device("DEV_1", "iPhone", "UDID_1", "IOS", "ENABLED"));
