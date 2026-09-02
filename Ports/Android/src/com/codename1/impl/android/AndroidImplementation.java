@@ -10754,12 +10754,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     } else {
                         unnamedUris.add(uri);
                     }
-                    // Every URI item is a file reference as well as whatever its type made of
-                    // it. The image branch returned before reaching this, so dragging a PNG
-                    // *file* produced image bytes and no file at all -- and a target filtering
-                    // on MIME_FILE accepted the hover, because the description still advertised
-                    // text/uri-list, and was then refused the drop.
-                    fileUris.add(uri.toString());
+                    // A URI item is a file reference as well as whatever its type made of it --
+                    // unless it is one this exporter minted to carry bytes. The image branch
+                    // used to return before reaching this at all, so dragging a PNG *file*
+                    // produced image bytes and no file, and a target filtering on MIME_FILE
+                    // accepted the hover -- the description still advertised text/uri-list --
+                    // and was refused the drop. Adding every URI unconditionally is the other
+                    // error: a payload of nothing but application/pdf bytes travels as a
+                    // content URI without text/uri-list ever being advertised, and calling that
+                    // a file both invents a representation the source never published and lets
+                    // a nested file-only target take a drop the PDF-capable one was chosen for
+                    // while it hovered.
+                    //
+                    // The two are told apart exactly, not guessed at: writeAsProviderUri names
+                    // what it mints, and a real file keeps its own name.
+                    if (!isGeneratedClipFile(uri)) {
+                        fileUris.add(uri.toString());
+                    }
                     continue;
                 }
             } catch (Throwable t) {
@@ -10807,6 +10818,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             fillAdvertisedTypes(content, description, plain, fileUris, unnamedUris);
         }
         return content;
+    }
+
+    /// True when this content URI is one `#writeAsProviderUri(byte[], java.lang.String,
+    /// java.lang.String)` minted to carry a representation's bytes, rather than a file the
+    /// source published.
+    ///
+    /// Every generated file is named with the same prefix and a real one keeps its own name, so
+    /// this is the exporter's own record rather than an inference from the type -- which cannot
+    /// answer it, since a PDF published as bytes and a PDF published as a file both arrive as
+    /// application/pdf.
+    private boolean isGeneratedClipFile(Uri uri) {
+        String name = displayNameFor(uri);
+        return name != null && name.startsWith(CLIP_FILE_PREFIX);
     }
 
     /// A MIME type without its parameters, lower case, or null when there is none.

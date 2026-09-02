@@ -4262,16 +4262,24 @@ public class Form extends Container implements TopLevelContainer {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerDrag, x, y);
             }
         }
-        // A press that landed on a native drag source becomes an operating system drag here,
-        // as soon as it has moved far enough to be a drag rather than a click. From that point
-        // the platform owns the gesture, so nothing below runs for it.
-        if (NativeDragAndDrop.pointerDragged(x, y)) {
-            return;
-        }
         // disable the drag stop flag if we are dragging again
         boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (dragStopFlag) {
             pointerPressed(x, y);
+        }
+        // A press that landed on a native drag source becomes an operating system drag here,
+        // as soon as it has moved far enough to be a drag rather than a click. From that point
+        // the platform owns the gesture, so nothing below runs for it.
+        //
+        // After the dragStopFlag recovery above, deliberately. A press that lands on a
+        // momentum-scrolling container is stopping the glide, and the press it was is only
+        // dispatched by that recovery -- so asking first handed the row to the operating system
+        // on the very first motion packet, and grabbing a moving list started an outbound drag
+        // instead of stopping it. Run afterwards, the recovery restages the press at this
+        // position, which leaves this packet below the drag threshold; a gesture that really
+        // does go on to drag still starts one on the next.
+        if (NativeDragAndDrop.pointerDragged(x, y)) {
+            return;
         }
         autoRelease(x, y);
         boolean localPointerPressedAgainDuringDrag = pointerPressedAgainDuringDrag;

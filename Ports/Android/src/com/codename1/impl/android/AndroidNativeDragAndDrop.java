@@ -226,6 +226,14 @@ final class AndroidNativeDragAndDrop {
                 case DragEvent.ACTION_DROP:
                     return drop(impl, event);
                 case DragEvent.ACTION_DRAG_ENDED:
+                    // Whatever happened, nothing is hovered any more. Android delivers this to
+                    // every subscribed view, and it is the only event that arrives on the paths
+                    // that otherwise clear nothing: a drop the target refused returns before
+                    // NativeDragAndDrop.drop(), and a drag from another application never
+                    // reaches the dragCompleted() below. A stale target left the component
+                    // stuck at its refusal for the next drag, which was then routed as a move
+                    // over it rather than an entry.
+                    NativeDragAndDrop.dragExit(0);
                     if (exporting() != null) {
                         // Settled *before* the operation is forgotten. Reading the allowed
                         // actions afterwards is how this reported every move as a copy: with

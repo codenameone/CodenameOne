@@ -486,6 +486,21 @@ public final class NativeDragAndDrop {
     /// the action a drop would perform right now, or `NativeDragOperation#ACTION_NONE` when
     /// nothing under the pointer will take it
     public static int dragEnter(int windowId, int x, int y, ClipboardContent content, int allowedActions) {
+        boolean stillHovered;
+        synchronized (LOCK) {
+            stillHovered = currentTarget != null;
+        }
+        if (stillHovered) {
+            // The platform says this is an entry, so it is one, and nothing can still be hovered
+            // from before it. A session that ended without an exit -- a drop the target refused,
+            // a drag cancelled while inside the surface -- used to leave the previous target in
+            // place, and the next entry was then routed as a move over it: no enter callback
+            // ever arrived and the component stayed at the ended session's answer, which for a
+            // refusal is ACTION_NONE and is deliberately never recomputed. The ports clear this
+            // on their own end-of-session paths as well; this is the one place that cannot be
+            // reached by a platform forgetting to tell us.
+            dragExit(windowId);
+        }
         return dragOver(windowId, x, y, content, allowedActions);
     }
 

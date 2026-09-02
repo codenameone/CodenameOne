@@ -112,6 +112,15 @@ static int cn1LastDropAction = CN1_DND_ACTION_NONE;
 /// True while this application is the source of the session in progress.
 static BOOL cn1DraggingOut = NO;
 
+/// A drop whose representations are still loading.
+///
+/// UIKit ends the session as soon as performDrop: returns, which is long before the
+/// asynchronous loads that drop depends on have answered. The end must not clear the hover
+/// state while the drop that is about to use it is still in flight -- doing so made the commit
+/// find its own target gone and fall back to the declarative answer, discarding whatever the
+/// target's callbacks had decided.
+static BOOL cn1DropInFlight = NO;
+
 /// A drop of this application's own session onto its own surface, still loading.
 ///
 /// UIKit asks the source what happened -- dragInteraction:session:didEndWithOperation: -- as
@@ -737,12 +746,29 @@ API_AVAILABLE(ios(11.0))
     CN1NativeDragDeliverExit();
 }
 
+- (void)dropInteraction:(UIDropInteraction *)interaction sessionDidEnd:(id<UIDropSession>)session {
+    // UIKit sends this whether or not sessionDidExit ran: a session cancelled, or ended, while
+    // still inside this surface never exits. Without it the framework kept the last target
+    // hovered, and the next session entering that same component was routed as a move over it
+    // -- inheriting the ended session's answer, with no enter callback ever arriving.
+    //
+    // Not while a drop is still loading, though. This arrives as soon as performDrop: returns,
+    // which is before the asynchronous loads have answered, and clearing the target there would
+    // leave the commit to find it gone. That path clears the hover state itself.
+    if (cn1DropInFlight) {
+        return;
+    }
+    cn1LastDropAction = CN1_DND_ACTION_NONE;
+    CN1NativeDragDeliverExit();
+}
+
 - (void)dropInteraction:(UIDropInteraction *)interaction performDrop:(id<UIDropSession>)session {
     CGPoint point = [session locationInView:interaction.view];
     const int x = (int)(point.x * scaleValue);
     const int y = (int)(point.y * scaleValue);
     const int action = cn1LastDropAction == CN1_DND_ACTION_NONE
             ? cn1DefaultAction(cn1AllowedActionsFor(session)) : cn1LastDropAction;
+    cn1DropInFlight = YES;
     if (session.localDragSession != nil) {
         cn1LocalDropInFlight = YES;
         cn1EndDeferred = NO;
@@ -876,6 +902,9 @@ API_AVAILABLE(ios(11.0))
         }
         int accepted = CN1NativeDragDeliverDropCommit(x, y, action);
         cn1LastDropAction = CN1_DND_ACTION_NONE;
+        // The commit cleared the hover state itself, so the end that already went past can stop
+        // holding off.
+        cn1DropInFlight = NO;
         if (cn1LocalDropInFlight) {
             cn1LocalDropInFlight = NO;
             if (cn1EndDeferred) {

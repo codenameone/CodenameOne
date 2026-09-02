@@ -26,6 +26,7 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
 import org.junit.jupiter.api.Test;
@@ -712,6 +713,97 @@ class NativeDragAndDropTest extends UITestBase {
                 "the first drag's move decision must not be handed to the second, copy-only drag");
         NativeDragAndDrop.dragExit(0);
         flushSerialCalls();
+    }
+
+    @FormTest
+    void anEntryAfterASessionThatNeverExitedIsStillAnEntry() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+
+        // A session that refuses and then ends without ever leaving the component. Ports have
+        // paths that reach neither drop() nor dragExit() -- an Android drop the target refused,
+        // an iOS session cancelled inside the surface -- so the framework can be left hovering.
+        target.rejectAction = NativeDragOperation.ACTION_NONE;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("first"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        assertEquals("[enter]", target.events.toString());
+
+        // The next session enters the same component.
+        target.rejectAction = -1;
+        target.events.clear();
+        int answer = NativeDragAndDrop.dragEnter(0, x, y, textContent("second"),
+                NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertEquals("[exit, enter]", target.events.toString(),
+                "an entry is an entry: routed as a move over a target left behind by the last "
+                        + "session, the component never hears about the new drag at all");
+        assertEquals(NativeDragOperation.ACTION_COPY, answer,
+                "and it must not inherit the refusal the ended session left, which is never "
+                        + "recomputed because a refusal is a decision");
+
+        NativeDragAndDrop.dragExit(0);
+        flushSerialCalls();
+    }
+
+    /// A form that leaves the "grab a moving list" press to the dragStopFlag recovery, which
+    /// is what `Form#resumeDragAfterScrolling(int, int)` documents overriding it for.
+    private static final class NoResumeForm extends Form {
+        @Override
+        protected void initGlobalToolbar() {
+        }
+
+        @Override
+        protected boolean resumeDragAfterScrolling(int x, int y) {
+            return false;
+        }
+    }
+
+    @FormTest
+    void grabbingAScrollingContainerStopsItRatherThanDraggingOut() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        NoResumeForm form = new NoResumeForm();
+        try {
+            Container scroller = new Container(new BorderLayout());
+            scroller.setScrollableY(true);
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("row"));
+            scroller.add(BorderLayout.CENTER, source);
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, scroller);
+            form.show();
+            flushSerialCalls();
+
+            // A glide in progress, which is what makes this press a "stop the scroll" press:
+            // Form defers the real pointerPressed to the first drag packet.
+            scroller.draggedMotionY = Motion.createLinearMotion(0, 100, 1000);
+            scroller.draggedMotionY.start();
+
+            int x = source.getAbsoluteX() + 5;
+            int y = source.getAbsoluteY() + 5;
+            form.pointerPressed(x, y);
+            form.pointerDragged(x + 200, y + 200);
+            assertNull(implementation.getStartedNativeDrag(),
+                    "grabbing a moving list stops it; handing the row to the operating system "
+                            + "on that first packet makes the list impossible to stop");
+
+            // The glide is over, and a deliberate drag from here still starts one.
+            scroller.draggedMotionY = null;
+            form.pointerDragged(x + 400, y + 400);
+            assertNotNull(implementation.getStartedNativeDrag(),
+                    "and the feature still works once the scroll has been taken over");
+
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+        }
     }
 
     @FormTest

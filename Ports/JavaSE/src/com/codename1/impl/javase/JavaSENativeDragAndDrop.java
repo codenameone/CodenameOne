@@ -659,6 +659,18 @@ final class JavaSENativeDragAndDrop {
                 } catch (Throwable ignored) {
                     // The drop is already over; nothing left to report to.
                 }
+            } finally {
+                // The drop is the end of the session, and AWT sends no dragExit after it: a
+                // rejected drop returns above without reaching NativeDragAndDrop.drop(), and a
+                // drag that arrived from another application has no exportDone() either, so
+                // without this the target stayed hovered at its own refusal and the next drag
+                // over it was routed as a move rather than an entry. Free after a drop that did
+                // go through, which clears the target itself.
+                try {
+                    NativeDragAndDrop.dragExit(canvas.windowId);
+                } catch (Throwable ignored) {
+                    // Nothing left to clean up.
+                }
             }
         }
 
