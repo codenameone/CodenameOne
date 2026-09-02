@@ -27,333 +27,132 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The alignment is a Gradle constraint plus one blunt reason not to write it.
+ * The alignment emits one script and takes no input, so there is little here.
  *
- * <p>These cover what the feature promises: the graph it fixes, the graphs it
- * must not touch, and the guarantee that it can never fail a build. There is
- * deliberately nothing here about Groovy syntax -- the class no longer reads
- * any, and the suite that did was 5,652 lines chasing spellings that never
- * changed an outcome.</p>
+ * <p>What the script MEANS was measured against a real Gradle 6.5 and 8.5
+ * resolving from Maven Central -- the duplicate graph, a strict pin, a reject, a
+ * force, an enforced BOM, a range, an all-1.7 project and a Kotlin-free one. No
+ * unit test can see resolution, so these pin the properties that make those
+ * outcomes hold, and the class javadoc records the runs.</p>
  */
 class KotlinStdlibAlignmentTest {
 
-    private static final String JDK7 = "org.jetbrains.kotlin:kotlin-stdlib-jdk7";
-    private static final String JDK8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
-
-    /**
-     * The graph this exists for: the old shim arrives transitively and the app's
-     * own Gradle never mentions Kotlin at all.
-     */
+    /** The overlap is stated as a capability, for both shims. */
     @Test
-    void aGraphThatNamesNoKotlinIsAligned() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                "    implementation 'androidx.appcompat:appcompat:1.6.1'\n",
-                "    implementation 'com.android.billingclient:billing:9.1.0'\n");
-        assertTrue(out.contains("'" + JDK7 + ":1.8.0'"), "jdk7 is raised: " + out);
-        assertTrue(out.contains("'" + JDK8 + ":1.8.0'"), "jdk8 is raised: " + out);
-        assertTrue(out.startsWith("    constraints {"), "as a constraints block: " + out);
-        assertTrue(out.contains("because 'Codename One:"),
-                "with a because, which is what dependencyInsight prints: " + out);
-    }
-
-    /** A constraint pulls nothing into a graph that does not have it. */
-    @Test
-    void anEmptyProjectStillGetsTheFloor() {
-        String out = KotlinStdlibAlignment.constraintsBlock("implementation", false, "");
-        assertTrue(out.contains(":1.8.0"), "the block is written unconditionally");
+    void theScriptStatesTheOverlapAsACapability() {
+        String s = KotlinStdlibAlignment.alignmentScript();
+        assertTrue(s.contains("components.withModule('org.jetbrains.kotlin:kotlin-stdlib')"),
+                "the rule is on kotlin-stdlib, which is what gained the classes");
+        assertTrue(s.contains("addCapability('org.jetbrains.kotlin', 'kotlin-stdlib-jdk7'"),
+                "jdk7");
+        assertTrue(s.contains("addCapability('org.jetbrains.kotlin', 'kotlin-stdlib-jdk8'"),
+                "jdk8");
     }
 
     /**
-     * The constraint goes on the configuration the caller is already using, so a
-     * legacy {@code compile} project stays consistent with itself.
+     * NO VERSION IS EVER RAISED. This is the whole reason the class has no
+     * inputs: a constraint raises a version, which an app can be holding down,
+     * and detecting that from Gradle text is unbounded. A capability moves
+     * nothing, so a shim version must appear nowhere as a requested version.
      */
     @Test
-    void theConstraintFollowsTheCallersConfiguration() {
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("compile", false, "")
-                .contains("compile('" + JDK7 + ":1.8.0')"), "compile");
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false, "")
-                .contains("implementation('" + JDK7 + ":1.8.0')"), "implementation");
-        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(null, false, "")),
-                "and no configuration means no block");
-        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock("  ", false, "")),
-                "nor does a blank one");
-    }
-
-    /**
-     * An ordinary version is a SOFT requirement in Gradle: the constraint raises
-     * it and the two agree. Declaring the shim is therefore not a reason to
-     * stand down -- if it were, the app that declares an old one directly would
-     * keep the duplicate this exists to remove.
-     */
-    @Test
-    void anOrdinaryDeclarationIsRaisedNotHonoured() {
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                        "    implementation '" + JDK8 + ":1.7.22'\n")
-                        .contains(":1.8.0"),
-                "a pre-merge declaration is raised");
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                        "    implementation '" + JDK8 + ":1.9.22'\n")
-                        .contains(":1.8.0"),
-                "and a merged-era one is unaffected by a floor beneath it");
-    }
-
-    /**
-     * The one thing a constraint at the floor can break: an app that firmly
-     * holds a member of the family below it resolves coherently today, and a
-     * constraint requiring 1.8.0 turns that into a resolution failure.
-     */
-    @Test
-    void anAppThatPinsTheFamilyIsLeftAlone() {
-        String[] pinned = {
-            "    implementation '" + JDK8 + ":1.7.22!!'\n",
-            "    implementation('" + JDK8 + "') { version { strictly '1.7.22' } }\n",
-            "    configurations.all { resolutionStrategy.force '" + JDK8 + ":1.7.22' }\n",
-            "    implementation('" + JDK8 + "') { version { reject '[1.8.0,)' } }\n",
-            // kotlin-bom, which is the coordinate that exists. This asserted
-            // against kotlin-stdlib-bom, so it passed while the real BOM went
-            // unseen -- the artifact under test has to be a real one.
-            "    implementation(enforcedPlatform("
-                    + "'org.jetbrains.kotlin:kotlin-bom:1.7.22'))\n",
-            "    configurations.all { resolutionStrategy.eachDependency { d ->\n"
-                    + "        if (d.requested.name == 'kotlin-stdlib') "
-                    + "d.useVersion '1.7.22'\n    } }\n",
-            "    configurations.all { resolutionStrategy.componentSelection { all { s ->\n"
-                    + "        if (s.candidate.module == 'kotlin-stdlib-jdk8') "
-                    + "s.reject('x')\n    } } }\n",
-            "    configurations.all { resolutionStrategy.failOnVersionConflict() }\n"
-                    + "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n",
-        };
-        for (int i = 0; i < pinned.length; i++) {
-            String out = KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                    pinned[i]);
-            assertTrue("".equals(out),
-                    "<<" + pinned[i].trim() + ">> holds the family, got <<" + out + ">>");
+    void theScriptRequiresNoVersionOfAnything() {
+        // The DIRECTIVES, not the prose: the script's own comment explains that
+        // it cannot conflict with a force, and matching that read as the script
+        // issuing one.
+        StringBuilder code = new StringBuilder();
+        String[] lines = KotlinStdlibAlignment.alignmentScript().split("\n");
+        for (int i = 0; i < lines.length; i++) {
+            if (!lines[i].trim().startsWith("//")) {
+                code.append(lines[i]).append('\n');
+            }
         }
+        String s = code.toString();
+        assertTrue(!s.contains("constraints {"),
+                "a constraints block would raise a version: " + s);
+        assertTrue(!s.contains("kotlin-stdlib-jdk7:" + KotlinStdlibAlignment.MERGED_STDLIB_FLOOR)
+                        && !s.contains("kotlin-stdlib-jdk8:"
+                                + KotlinStdlibAlignment.MERGED_STDLIB_FLOOR),
+                "no shim is asked for at a version");
+        assertTrue(!s.contains("strictly") && !s.contains("force")
+                        && !s.contains("substitute"),
+                "and nothing else moves a version either");
     }
 
     /**
-     * Both halves are required, and the asymmetry is deliberate. A pinning word
-     * with no mention of this family cannot be pinning it; a mention with no
-     * pinning word is an ordinary declaration, which the constraint raises.
+     * The capability is declared only from the floor up. Below it the shims
+     * still carry the only copy of their classes, so dropping one would remove
+     * them -- and a project compiling against an older Kotlin keeps its own
+     * stdlib untouched, which is why the compiler version cannot be a problem.
      */
     @Test
-    void bothHalvesOfTheGuardAreRequired() {
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                        "    configurations.all { resolutionStrategy.force "
-                        + "'com.squareup.okhttp3:okhttp:4.0.0' }\n")
-                        .contains(":1.8.0"),
-                "a force on someone else is not a pin on this family");
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                        "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'\n")
-                        .contains(":1.8.0"),
-                "and naming the family without pinning it is an ordinary declaration");
-
-        // It over-suppresses on purpose: the words are matched as plain text, so
-        // one in a comment or an unrelated string counts. That costs an app the
-        // duplicate it already had, which android.kotlinStdlibAlignment=false
-        // does deliberately; the other direction breaks a build that works.
-        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                        "    // we used to force kotlin-stdlib here\n")),
-                "a pinning word in a comment stands it down, which is the safe way "
-                        + "to be wrong");
-    }
-
-    @Test
-    void theProjectsOwnKotlinPluginOwnsTheFamily() {
-        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
-                        "implementation", true,
-                        "    implementation 'androidx.appcompat:appcompat:1.6.1'\n")),
-                "a project with Kotlin sources gets a Kotlin plugin and a stdlib at "
-                        + "the compiler's own version, which is below this floor on the "
-                        + "Gradle 6 and 7 path -- raising the shims would drag the base "
-                        + "stdlib past the compiler");
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                        "    implementation 'androidx.appcompat:appcompat:1.6.1'\n")
-                        .contains(":1.8.0"),
-                "and the Java-only graph this exists for is still aligned");
-    }
-
-    @Test
-    void aPinIsFoundWhateverItsCase() {
-        // force the command and setForcedModules the setter are the same act.
-        String[] spellings = {
-            "    configurations.all { resolutionStrategy.setForcedModules("
-                    + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22') }\n",
-            "    configurations.all { resolutionStrategy.FORCE "
-                    + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22' }\n",
-            "    implementation('org.jetbrains.kotlin:kotlin-stdlib') "
-                    + "{ version { STRICTLY '1.7.22' } }\n",
-        };
-        for (int i = 0; i < spellings.length; i++) {
-            assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
-                            "implementation", false, spellings[i])),
-                    "<<" + spellings[i].trim() + ">> holds the family");
-        }
-    }
-
-    @Test
-    void aBoundedRequireIsAPin() {
-        // require '[1.7,1.8)' excludes the floor, so a constraint demanding it
-        // leaves no version satisfying both. The unbounded form is soft and
-        // would be raised happily; standing down for it too is the cheap side.
-        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
-                        "implementation", false,
-                        "    implementation('org.jetbrains.kotlin:kotlin-stdlib') "
-                                + "{ version { require '[1.7,1.8)' } }\n")),
-                "a bounded require holds the family below the floor");
-    }
-
-    @Test
-    void aBoundedRangeNeedsNoKeyword() {
-        // The dangerous shape: an ordinary-looking coordinate whose version is
-        // a range that excludes the floor. Nothing in the vocabulary appears.
-        String[] ranges = {
-            "    implementation "
-                    + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:[1.7,1.8)'\n",
-            "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:(1.6,1.8]'\n",
-            "    implementation 'org.jetbrains.kotlin:kotlin-stdlib:[1.7, )'\n",
-        };
-        for (int i = 0; i < ranges.length; i++) {
-            assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
-                            "implementation", false, ranges[i])),
-                    "<<" + ranges[i].trim() + ">> excludes the floor");
-        }
-
-        // And the case the comma test must NOT fire on, because declaring the
-        // family this way is ordinary and the constraint raises it.
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                        "    implementation group: 'org.jetbrains.kotlin', "
-                                + "name: 'kotlin-stdlib', version: '1.7.22'\n")
-                        .contains(":1.8.0"),
-                "map notation is a declaration, not a range");
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                        "    implementation "
-                                + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n")
-                        .contains(":1.8.0"),
-                "and neither is a plain version");
-    }
-
-    @Test
-    void theKotlinToolchainOwnsTheFamilyWhereverItCameFrom() {
-        // hasKotlinSources scans src/main/java. Kotlin can arrive from a source
-        // set it never looks at, with the app applying the plugin itself -- and
-        // then nothing names the stdlib, so naming it cannot be the test.
-        String[] applied = {
-            "    classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.7.22'\n",
-            "apply plugin: 'kotlin-android'\n",
-            "    id 'org.jetbrains.kotlin.android' version '1.7.22'\n",
-        };
-        for (int i = 0; i < applied.length; i++) {
-            assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
-                            "implementation", false, applied[i])),
-                    "<<" + applied[i].trim() + ">> puts the Kotlin toolchain in "
-                            + "this build, and it declares the stdlib itself");
-        }
-    }
-
-    @Test
-    void aSingleVersionRangeIsARange() {
-        // [1.7.22] admits exactly one version and contains no comma at all.
-        assertTrue("".equals(KotlinStdlibAlignment.constraintsBlock(
-                        "implementation", false,
-                        "    implementation "
-                                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:[1.7.22]'\n")),
-                "a single-version range admits nothing else");
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                        "    implementation "
-                                + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n")
-                        .contains(":1.8.0"),
-                "and a plain version is still raised");
-    }
-
-    /** The floor is the version at which the shims became empty. */
-    @Test
-    void theFloorIsWhereTheClassesMoved() {
+    void theCapabilityStartsWhereTheClassesMoved() {
+        String s = KotlinStdlibAlignment.alignmentScript();
         assertTrue("1.8.0".equals(KotlinStdlibAlignment.MERGED_STDLIB_FLOOR),
                 "1.8.0 is where kotlin-stdlib absorbed the jdk7/jdk8 classes");
+        assertTrue(s.contains("major > 1 || (major == 1 && minor >= 8)"),
+                "the guard is derived from that floor: " + s);
+    }
+
+    /** The conflict resolves to the stdlib, never to whichever version is higher. */
+    @Test
+    void theConflictResolvesToTheStdlib() {
+        String s = KotlinStdlibAlignment.alignmentScript();
+        assertTrue(s.contains("withCapability('org.jetbrains.kotlin:kotlin-stdlib-jdk7')")
+                        && s.contains("withCapability('org.jetbrains.kotlin:kotlin-stdlib-jdk8')"),
+                "both capabilities are resolved");
+        assertTrue(s.contains("candidates.find { it.id.module == 'kotlin-stdlib' }"),
+                "the stdlib is the candidate selected");
+        assertTrue(s.contains("if (stdlib != null)"),
+                "and it is not selected when it is absent");
     }
 
     /**
-     * Null and empty fragments are ordinary input: the builder passes whatever
-     * hints the project happens to have, and most projects have none of them.
+     * The rule runs on every AndroidX build, so its worst case has to be
+     * "do nothing". A version it cannot parse leaves the graph exactly as it
+     * found it, which is the duplicate the app already had.
      */
     @Test
-    void missingFragmentsAreNotAnError() {
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                        (String[]) null).contains(":1.8.0"),
-                "no fragments at all");
-        assertTrue(KotlinStdlibAlignment.constraintsBlock("implementation", false,
-                        null, "", null).contains(":1.8.0"),
-                "and a mix of null and empty ones");
+    void theRuleCannotFailTheBuild() {
+        String s = KotlinStdlibAlignment.alignmentScript();
+        int rule = s.indexOf("components.withModule");
+        int guard = s.indexOf("try {");
+        int caught = s.indexOf("catch (Exception ignored)");
+        assertTrue(rule >= 0 && guard > rule && caught > guard,
+                "the version read is inside a try/catch: " + s);
     }
 
     /**
-     * Every fragment the app controls has to reach the scan. A hint that is
-     * added to the generated script and not collected here is a pin this cannot
-     * see, which is the one way to get the dangerous answer. The same list has
-     * to feed both questions, too -- asking "does the app pin this" over one set
-     * of fragments and then aligning over another is the same defect wearing a
-     * different shape.
+     * It carries its own scopes. The metadata rule has to be inside
+     * {@code dependencies} and the resolution strategy outside it, so the script
+     * opens both rather than being spliced into two places by the caller.
      */
     @Test
-    void theBuilderPassesEveryAppControlledFragment() throws Exception {
+    void theScriptBringsItsOwnScopes() {
+        String s = KotlinStdlibAlignment.alignmentScript();
+        assertTrue(s.contains("dependencies {") && s.contains("configurations.all {"),
+                "both scopes: " + s);
+        assertTrue(s.contains("android.kotlinStdlibAlignment=false"),
+                "and it names the hint that switches it off, in the generated file "
+                        + "where somebody debugging a build will actually see it");
+    }
+
+    /**
+     * Appended AFTER the dependencies block. Inside it, the
+     * {@code configurations.all} half would be a syntax error in the generated
+     * script -- which no unit test on the emitted string alone would catch.
+     */
+    @Test
+    void theBuilderAppendsItAfterTheDependenciesBlock() throws Exception {
         String src = new String(java.nio.file.Files.readAllBytes(new java.io.File(
-                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java")
-                .toPath()), "UTF-8");
-        int at = src.indexOf("String[] appGradle = {");
-        assertTrue(at >= 0, "the builder collects the app's Gradle fragments");
-        String list = src.substring(at, src.indexOf("};", at));
-        String[] hints = {
-            "android.gradlePlugin", "android.topDependency",
-            "android.gradle.androidx",
-            "android.xgradle_default_config", "android.supportv4Dep",
-            "android.gradleDep", "android.xgradle",
-        };
-        for (String hint : hints) {
-            // With the quotes. One hint name is a prefix of another, so a bare
-            // contains() stayed true after the argument was deleted.
-            assertTrue(list.contains("\"" + hint + "\""),
-                    "the alignment is not told about the " + hint
-                            + " hint, which reaches the generated script");
-        }
-        String[] locals = {
-            "kotlinRuntimeDependency", "additionalDependencies",
-            "aiExtraGradleDependencies", "aarDependencies", "injectRepo",
-            "gradleDependency",
-            // This builder has desugaring; the daemon twin does not.
-            "coreLibraryDesugaringDependency",
-        };
-        for (String local : locals) {
-            assertTrue(list.contains(local),
-                    "the alignment is not told about " + local
-                            + ", which reaches the generated script");
-        }
-        String uses = src.substring(src.indexOf("};", at));
-        assertTrue(uses.contains("appPinsTheStdlibFamily(appGradle)"),
-                "the stand-down question is asked over that same list");
-        // The whole argument list, not the names one at a time: hasKotlinSources
-        // also appears in the log branch just above, so a looser assertion stayed
-        // true after the argument itself was replaced with a literal.
-        assertTrue(uses.contains("compile, hasKotlinSources, appGradle)"),
-                "the alignment is asked over the caller's configuration, that same "
-                        + "fragment list, and whether this project compiles Kotlin");
-    }
-    /**
-     * The alignment is an optimisation over a build that already worked apart
-     * from one duplicate class, and it runs on every AndroidX build -- so its
-     * worst case has to be "emit nothing", never a failed build.
-     */
-    @Test
-    void theAlignmentCannotFailTheBuild() {
-        String[] hostile = {
-            null, "", "   ", "'", "{", "}", "(((", ")))",
-            "implementation '", "kotlin-stdlib", "!!", "strictly",
-            "kotlin-stdlib   strictly",
-        };
-        for (int i = 0; i < hostile.length; i++) {
-            KotlinStdlibAlignment.constraintsBlock("implementation", false, hostile[i]);
-            KotlinStdlibAlignment.appPinsTheStdlibFamily(hostile[i]);
-        }
-        assertTrue(true, "no input produces an exception");
+                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath()), "UTF-8");
+        int at = src.indexOf("+ kotlinStdlibAlignment");
+        assertTrue(at >= 0, "the builder appends the alignment");
+        String before = src.substring(0, at);
+        assertTrue(before.lastIndexOf("+ \"}\\n\"") > before.lastIndexOf("\"dependencies {"),
+                "the dependencies block is closed before the alignment is appended");
+        assertTrue(src.contains("KotlinStdlibAlignment.alignmentScript()"),
+                "and it is the whole script, with no arguments to get wrong");
     }
 }
+
