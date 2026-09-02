@@ -27,7 +27,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
 ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
-URL_RE = re.compile(r"\bhttps?://[^\s\[\]<>\"'`)]+")
+URL_RE = re.compile(r"\bhttps?://[^\s\[\]<>\"'`)]+", re.IGNORECASE)
 # A URL assembled from an attribute is invisible to the scan above: the
 # declaration holds a valid site root and the use site holds only "{name}", so the
 # path that actually ships is never checked. Expanding attributes properly means
@@ -41,7 +41,7 @@ ATTRIBUTE_LINK_RE = re.compile(r"\blink:\{[^}]+\}")
 # it carries no scheme, so URL_RE never sees it -- and check-guide-xrefs.py skips
 # hrefs beginning with "/" because they are not same-page anchors. Between the two
 # gates the route went unchecked, so it is run through the same route model here.
-ROOT_RELATIVE_RE = re.compile(r"""(?:\blink:|\bhref=["'])(/[^\s\[\]"'`>]*)""")
+ROOT_RELATIVE_RE = re.compile(r"""(?:\blink:|\bhref=["'])(/[^\s\[\]"'`>]*)""", re.IGNORECASE)
 # The one tree that genuinely cannot be enumerated from this repository: the
 # Javadoc is produced from the framework sources at build time. Everything else,
 # /developer-guide/ included, is derived below -- whitelisting a prefix silently
@@ -488,6 +488,22 @@ def bare_authority(split, host: str, port: int | None) -> bool:
     return netloc == (host if port is None else f"{host}:{port}")
 
 
+def undeclared_file_slash(path: str, declared: set[str]) -> bool:
+    """A file-like path wearing a trailing slash the redirect table does not spell out.
+
+    The site treats "/x.html" and "/x.html/" as separate routes and declares both
+    where both work -- 32 such pairs in _redirects. Every rule compiled here is
+    slash-insensitive, so normalising would silently validate the variant that was
+    not asked for. Directory routes such as /blog/ and /javadoc/com/codename1/io/
+    have no dot in the last segment and never match.
+    """
+    return (
+        path.endswith("/")
+        and "." in path.rstrip("/").rsplit("/", 1)[-1]
+        and path not in declared
+    )
+
+
 def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]) -> list[tuple[str, str]]:
     # Only http:// and https:// are extracted. Protocol-relative links were raised
     # as a gap; measured, the guide contains no `link://` macro at all, and its one
@@ -519,6 +535,11 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
             out.append((ATTRIBUTE_LINK_RE.search(line).group(0), "a link target built from an attribute, which this cannot expand or check"))
         for target in ROOT_RELATIVE_RE.findall(line):
             path = target.split("#", 1)[0].split("?", 1)[0]
+            if undeclared_file_slash(path, declared):
+                # Same rule as for an absolute URL: normalize_path would drop the
+                # slash and validate the variant that was not asked for.
+                out.append((target, "a file path with a trailing slash that _redirects does not declare"))
+                continue
             normalized = normalize_path(path)
             if not resolves(normalized, known, patterns):
                 out.append((target, "the website serves no such path (checked _redirects and the content tree)"))
@@ -574,21 +595,7 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
                 target = split.path.rstrip("/") or "/"
                 if split.fragment and target in SELF_PATHS:
                     out.append((url, "links into this book's own body; use an xref so the anchor is checked"))
-                elif (
-                    split.path.endswith("/")
-                    and "." in split.path.rstrip("/").rsplit("/", 1)[-1]
-                    and split.path not in declared
-                ):
-                    # The site treats "/x.html" and "/x.html/" as separate routes and
-                    # spells both out where both work -- 32 such pairs in _redirects.
-                    # Every rule here compiles slash-insensitively, so the normalised
-                    # lookup below would silently validate the variant that was NOT
-                    # asked for. Hence: a file path wearing a trailing slash is
-                    # reported, UNLESS _redirects declares that exact spelling, which
-                    # is the site saying it serves it -- "/videos.html/" is declared
-                    # and must not be reported. Directory routes such as /blog/ and
-                    # /javadoc/com/codename1/io/ have no dot in the last segment and
-                    # never reach this branch.
+                elif undeclared_file_slash(split.path, declared):
                     out.append((url, "a file path with a trailing slash that _redirects does not declare"))
                 elif not resolves(target, known, patterns):
                     out.append((url, "the website serves no such path (checked _redirects and the content tree)"))
