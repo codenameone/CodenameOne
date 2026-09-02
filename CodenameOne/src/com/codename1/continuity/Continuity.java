@@ -926,15 +926,35 @@ public final class Continuity {
             lastSeen.put(state.getDeviceId(), Long.valueOf(state.getSequence()));
         }
         if (!Display.isInitialized()) {
-            setParked(state);
+            if (isStillNewest(state)) {
+                setParked(state);
+            }
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                dispatch(state);
+                // Rechecked here, not only above. Recording the high-water mark and reaching this
+                // queue are two steps, and two channels -- a continuation and a relay poll --
+                // deliver on threads of their own: an older state could pass the check, pause,
+                // and be queued BEHIND the newer one that overtook it. The event thread then
+                // restored the newer state and overwrote it with the stale one.
+                if (isStillNewest(state)) {
+                    dispatch(state);
+                }
             }
         });
+    }
+
+    /// Whether this state is still the newest seen from its device.
+    ///
+    /// False once a later one has overtaken it, which is what makes a delivery that lost the race
+    /// to the queue drop itself rather than undo the winner.
+    private static boolean isStillNewest(AppState state) {
+        synchronized (lastSeen) {
+            Long seen = lastSeen.get(state.getDeviceId());
+            return seen != null && seen.longValue() == state.getSequence();
+        }
     }
 
     private static void dispatch(AppState state) {

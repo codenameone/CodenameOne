@@ -374,6 +374,27 @@ public class AppStateWireTest {
         assertNull(StateCodec.fromMap(null));
     }
 
+    /**
+     * A relay answering {@code {}}, or an activity arriving with no usable userInfo, is not a
+     * state. Returning a default one meant the continuation callback CLAIMED it and delivered it:
+     * the application's listeners ran, and an app that prompts before moving the user put a
+     * "continue what you were doing?" dialog in front of them over nothing at all.
+     */
+    @Test
+    public void aDocumentWithNoStateFieldsIsNotAState() throws Exception {
+        assertNull(StateCodec.fromJson("{}"));
+        assertNull(StateCodec.fromMap(new HashMap<String, Object>()));
+        assertNull(StateCodec.fromJson("{\"somethingElse\":1,\"unrelated\":\"x\"}"));
+    }
+
+    /** One recognized field is enough -- a state with only routes is a real state. */
+    @Test
+    public void aDocumentWithAnyKnownFieldIsAState() throws Exception {
+        assertNotNull(StateCodec.fromJson("{\"routes\":[\"/home\"]}"));
+        assertNotNull(StateCodec.fromJson("{\"device\":\"other\"}"));
+        assertNotNull(StateCodec.fromJson("{\"ts\":\"1\"}"));
+    }
+
     @Test
     public void blankRoutePathsAreDropped() {
         AppState state = new AppState().setRoutes(Arrays.asList("/a", null, "", "/b"));

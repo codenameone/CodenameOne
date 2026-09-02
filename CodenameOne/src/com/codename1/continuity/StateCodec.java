@@ -50,6 +50,12 @@ public final class StateCodec {
     private static final String KEY_SEQUENCE = "seq";
     private static final String KEY_TIMESTAMP = "ts";
 
+    /// The fields this codec writes. A document carrying none of them is not a state, whatever
+    /// else it contains.
+    private static final String[] KNOWN_KEYS = {
+        KEY_ROUTES, KEY_PAYLOAD, KEY_DEVICE, KEY_TITLE, KEY_SEQUENCE, KEY_TIMESTAMP,
+    };
+
     private StateCodec() {
     }
 
@@ -92,6 +98,20 @@ public final class StateCodec {
     /// the state, or null when the map is null or carries nothing recognizable
     public static AppState fromMap(Map<String, Object> m) {
         if (m == null) {
+            return null;
+        }
+        // Something recognizable has to be in there. An empty object, or an unrelated one, used
+        // to come back as a default AppState -- which the continuation callback then CLAIMED and
+        // delivered, so a relay answering "{}" ran the application's listeners and could put a
+        // "continue what you were doing?" prompt in front of the user over nothing at all.
+        boolean recognized = false;
+        for (String known : KNOWN_KEYS) {
+            if (m.containsKey(known)) {
+                recognized = true;
+                break;
+            }
+        }
+        if (!recognized) {
             return null;
         }
         AppState state = new AppState();

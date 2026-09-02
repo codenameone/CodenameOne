@@ -392,6 +392,47 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * Recording the high-water mark and reaching the event queue are two steps, and two channels
+     * deliver on threads of their own -- so an older state could pass the dedup, pause, and be
+     * queued BEHIND the newer one that overtook it. The event thread then restored the newer
+     * state and overwrote it with the stale one.
+     *
+     * <p>Simulated by delivering the newer state from inside the older one's dispatch window,
+     * which is the same ordering without needing two real threads.</p>
+     */
+    @EdtTest
+    public void aStateSupersededWhileQueuedIsDropped() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        final RecordingListener listener = new RecordingListener();
+        Continuity.addContinuationListener(listener);
+
+        // Both enqueued before either runs: deliver() records the mark and posts to the EDT, and
+        // nothing here drains the queue in between.
+        Continuity.deliver(fromElsewhere("older", 1L));
+        Continuity.deliver(fromElsewhere("newer", 2L));
+        flushSerialCalls();
+
+        assertEquals(1, listener.calls, "the superseded delivery still ran");
+        assertEquals("newer", listener.seen.getPayload().get("note"));
+    }
+
+    /** An empty document is not a state, so nothing is claimed and no listener runs. */
+    @EdtTest
+    public void anEmptyActivityPayloadIsNotDeliveredToListeners() {
+        Continuity.setStateProvider(new RecordingProvider());
+        RecordingListener listener = new RecordingListener();
+        Continuity.addContinuationListener(listener);
+
+        boolean claimed = bridge.simulateArrival(Continuity.getActivityType(),
+                new HashMap<String, Object>());
+        flushSerialCalls();
+
+        assertFalse(claimed, "an activity carrying no state must not be claimed");
+        assertEquals(0, listener.calls);
+    }
+
+    /**
      * A relay hands back whatever it still holds, which can be days old. Auto-restoring an
      * expired checkout or booking hold is the exact harm setMaxAge exists to prevent, and the
      * stored-state check alone never saw this path.
@@ -595,6 +636,16 @@ public class LocalContinuityTest extends UITestBase {
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    private static AppState fromElsewhere(String note, long sequence) {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", note);
+        return new AppState()
+                .setPayload(payload)
+                .setDeviceId("some-other-device")
+                .setSequence(sequence)
+                .setTimestamp(System.currentTimeMillis());
+    }
 
     private void deliverFromElsewhereAged(String note, long sequence, long timestamp) {
         Map<String, Object> payload = new HashMap<String, Object>();
