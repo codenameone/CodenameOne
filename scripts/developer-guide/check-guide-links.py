@@ -157,6 +157,9 @@ def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
         match = compiled.match(target)
         if not match:
             continue
+        # The FIRST matching rule wins and the others never run, which is how the
+        # host evaluates this file. Trying later rules after an early one leads
+        # somewhere dead would pass a link whose reader lands on a deleted page.
         if not destination or not destination.startswith("/"):
             return True  # redirects off-site; nothing here can verify it
         resolved = destination
@@ -165,8 +168,7 @@ def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
         resolved = normalize_path(resolved)
         if resolved == target:
             return False
-        if resolves(resolved, known, rules, depth + 1):
-            return True
+        return resolves(resolved, known, rules, depth + 1)
     return False
 
 
