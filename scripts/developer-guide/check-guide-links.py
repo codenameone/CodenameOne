@@ -183,9 +183,13 @@ def site_paths(repo_root: Path) -> tuple[set[str], list[re.Pattern[str]]]:
     static = repo_root / "docs/website/static"
     if static.exists():
         for asset in static.rglob("*"):
-            relative = asset.relative_to(static).as_posix()
-            paths.add(normalize_path(relative))
-            if asset.is_file() and asset.name == "index.html":
+            if not asset.is_file():
+                # A directory is not a route. static/uploads holds assets and no
+                # index page, so recording the directory itself would accept a
+                # link to /uploads that resolves to nothing.
+                continue
+            paths.add(normalize_path(asset.relative_to(static).as_posix()))
+            if asset.name == "index.html":
                 paths.add(normalize_path(asset.parent.relative_to(static).as_posix()))
 
     return paths, patterns
@@ -201,7 +205,7 @@ def findings_for(path: Path, known: set[str], patterns: list[re.Pattern[str]]) -
             if "." not in host and host not in LOCAL_HOSTS:
                 out.append((url, f"host '{host}' has no dot in it and resolves nowhere"))
                 continue
-            if split.scheme == "http" and host not in TLS_EXEMPT_HOSTS:
+            if split.scheme == "http" and host not in TLS_EXEMPT_HOSTS | LOCAL_HOSTS:
                 out.append((url, "plain http, not https"))
             if host in SITE_HOSTS:
                 target = split.path.rstrip("/") or "/"
