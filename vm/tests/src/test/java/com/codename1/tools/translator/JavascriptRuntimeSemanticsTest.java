@@ -257,6 +257,30 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void weakReferenceHoldsTheReferentItWasConstructedWith(CompilerHelper.CompilerConfig config) throws Exception {
+        // ParparVM's java.lang.ref.WeakReference constructor assigned the field
+        // to itself and dropped its argument, so get() was hardwired to null on
+        // every reference the VM ever made. Nothing at build time can see that,
+        // and the failure downstream is silent: everything built on
+        // CodenameOneImplementation.createSoftWeakRef -- the EncodedImage decode
+        // cache, Image's scale cache, Border's round-rect cache -- degrades to a
+        // cache that never hits rather than to an error. On the JavaScript port
+        // the EncodedImage case is visible, because a permanent miss hands the
+        // bytes back to the browser on every draw and paints nothing until the
+        // decode lands, with no repaint scheduled for when it does.
+        //
+        // This runs the real vm/JavaAPI class through the translator and the
+        // worker runtime, which is the only place the bug was observable.
+        WorkerRunResult result = translateAndRunFixture(config, "JsWeakReferenceApp.java", "JsWeakReferenceApp");
+
+        assertEquals(511, result.result,
+                "WeakReference must answer the referent it was constructed with until it is cleared. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesBroaderJavaApiCoverageInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsJavaApiCoverageApp.java", "JsJavaApiCoverageApp");
 
