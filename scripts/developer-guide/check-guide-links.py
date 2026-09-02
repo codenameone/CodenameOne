@@ -276,6 +276,14 @@ def site_paths(repo_root: Path) -> tuple[set[str], list]:
 
 
 def findings_for(path: Path, known: set[str], patterns: list) -> list[tuple[str, str]]:
+    # Every URL in the source is checked, including any inside an AsciiDoc `//`
+    # line comment or `////` block. That is deliberate. Across the guide's 120
+    # files there is not one commented-out URL and not one `////` block, so
+    # tracking comment state would buy nothing today -- and it would hand the
+    # gate a way to be silenced: comment the line out, the finding disappears,
+    # the ratchet shrinks, and the dead link is still sitting in the source
+    # waiting to be uncommented. Deleting the link is the fix. (Ordinary `//`
+    # comments do exist here, for editorial notes; none carries a URL.)
     out: list[tuple[str, str]] = []
     for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
         for url in URL_RE.findall(line):
