@@ -631,7 +631,7 @@ Here are the pros/cons and logic behind every image type. This covers the logic 
 ==== Loaded Image
 
 This is the basic image you get when loading an image from the jar or network using
-https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(java.lang.String)[Image.createImage(String)], https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(java.io.InputStream)[Image.createImage(InputStream)] & https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(byte[],int,int)[Image.`createImage(byte[], int, int)`],...
+https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(java.lang.String)[Image.createImage(String)], https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(java.io.InputStream)[Image.createImage(InputStream)] & https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(byte%5B%5D,int,int)[Image.`createImage(byte array, int, int)`],...
 
 TIP: Some other APIs might return this image type but those APIs do so explicitly!
 
@@ -659,7 +659,7 @@ There are two types of RGB constructed images that are different from one anothe
 
 ===== Internal
 
-This is a close cousin of the loaded image. This image is created using the method https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(int[],int,int)[Image.createImage(int array, int, int)] and receives the AARRGGBB data to form the image. It's more efficient than the Codename One RGB image but can't be modified, at least not on the pixel level.
+This is a close cousin of the loaded image. This image is created using the method https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(int%5B%5D,int,int)[Image.createImage(int array, int, int)] and receives the AARRGGBB data to form the image. It's more efficient than the Codename One RGB image but can't be modified, at least not on the pixel level.
 
 The goal of this image type is to provide an easy way to render RGB data that isn't modified efficiently at platform native speeds. It's technically a <<loaded-image-section,standard "Loaded Image">> internally.
 

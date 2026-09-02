@@ -37,6 +37,12 @@ URL_RE = re.compile(r"\bhttps?://[^\s\[\]<>\"'`)]+", re.IGNORECASE)
 # So both spellings are refused instead, which keeps the gap from opening quietly.
 ATTRIBUTE_URL_DECL_RE = re.compile(r"^:[A-Za-z0-9_-]+:\s*https?://")
 ATTRIBUTE_LINK_RE = re.compile(r"\blink:\{[^}]+\}")
+# An array parameter written raw ends the AsciiDoc link macro at the "[", so the
+# URL is cut mid-signature and the label is lost -- #createImage(byte[],int,int)
+# rendered as a bare link to "#createImage(byte". It has to be written %5B%5D.
+# Detected in the source, because URL_RE stops at that "[" and never sees it. An
+# empty bracket pair is unambiguous: a label is never empty.
+RAW_ARRAY_IN_JAVADOC_RE = re.compile(r"/javadoc/[^\s\[]*#[^\s\[]*\[\]")
 # A root-relative target names a website route just as an absolute URL does, but
 # it carries no scheme, so URL_RE never sees it -- and check-guide-xrefs.py skips
 # hrefs beginning with "/" because they are not same-page anchors. Between the two
@@ -117,7 +123,7 @@ def front_matter(page: Path) -> dict[str, object]:
             # YAML block sequence ("- /x") and TOML/flow array ("\"/x\",") both
             # appear in this tree, so accept either continuation shape.
             if stripped.startswith("-") or stripped.startswith(("\"", "'")):
-                aliases.append(stripped.lstrip("- ").strip().rstrip(",").strip("\"'"))
+                aliases.append(strip_inline_comment(stripped.lstrip("- ").strip().rstrip(",")))
                 continue
             in_aliases = False
         # Hugo treats front-matter keys case-insensitively, and this tree mixes
@@ -134,7 +140,7 @@ def front_matter(page: Path) -> dict[str, object]:
             if raw in {"", "[", "[]"}:
                 in_aliases = raw != "[]"
             else:
-                aliases.extend(v.strip().strip("\"'") for v in raw.strip("[]").split(",") if v.strip())
+                aliases.extend(strip_inline_comment(v) for v in raw.strip("[]").split(",") if v.strip())
             continue
         out[key] = strip_inline_comment(raw)
     if aliases:
@@ -746,6 +752,8 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
     for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
         if ATTRIBUTE_URL_DECL_RE.match(line.strip()):
             out.append((line.strip().split()[0], "an attribute holding a URL: any link built from it is unchecked, because this does not expand attributes"))
+        for hit in RAW_ARRAY_IN_JAVADOC_RE.findall(line):
+            out.append((hit, "an unencoded array bracket ends the link macro here; write %5B%5D"))
         if ATTRIBUTE_LINK_RE.search(line):
             out.append((ATTRIBUTE_LINK_RE.search(line).group(0), "a link target built from an attribute, which this cannot expand or check"))
         for target in ROOT_RELATIVE_RE.findall(line):
