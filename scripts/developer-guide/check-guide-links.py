@@ -38,6 +38,8 @@ GENERATED_PREFIXES = ("/javadoc/",)
 TLS_EXEMPT_HOSTS = {"timestamp.digicert.com", "example.com", "www.example.com"}
 # Hosts with no dot that are still real destinations.
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0"}
+# Writing a scheme's own default port changes nothing about where the request goes.
+DEFAULT_PORTS = {"http": 80, "https": 443}
 # Only the marketing site is served from the redirect table and the Hugo content
 # tree. cloud.codenameone.com and friends are separate services.
 SITE_HOSTS = {"codenameone.com", "www.codenameone.com"}
@@ -370,12 +372,18 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
                 continue
             if split.scheme == "http" and host not in TLS_EXEMPT_HOSTS | LOCAL_HOSTS:
                 out.append((url, "plain http, not https"))
-            if host in SITE_HOSTS and port is not None:
+            if (
+                host in SITE_HOSTS
+                and port is not None
+                and port != DEFAULT_PORTS.get(split.scheme)
+            ):
                 # The route model below describes the site on its default port. A
-                # nonstandard port is a different endpoint that model says nothing
+                # NONSTANDARD port is a different endpoint that model says nothing
                 # about, so accepting the path would be accepting an unchecked URL.
-                # Local services keep their ports: http://localhost:11434 is the
-                # Ollama endpoint the AI chapter documents on purpose.
+                # Spelling out the scheme's own default (":443" under https) is
+                # redundant but reaches the identical endpoint, so it is allowed.
+                # Local services keep their ports either way: http://localhost:11434
+                # is the Ollama endpoint the AI chapter documents on purpose.
                 out.append((url, f"port {port} is not where the site is served"))
                 continue
             if host in SITE_HOSTS:

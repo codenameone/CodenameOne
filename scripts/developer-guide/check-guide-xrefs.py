@@ -23,10 +23,11 @@ from pathlib import Path
 from urllib.parse import unquote
 
 ASCIIDOC_SUFFIXES = {".adoc", ".asciidoc"}
-# Literal and comment blocks, matching the other guide scanners: a delimiter may
-# be longer than four characters and closes on one of the same character and
-# length.
-FENCE_RE = re.compile(r"^(-{4,}|\.{4,}|`{4,}|\+{4,}|/{4,})\s*$")
+# Only a comment block. A conditional written inside a listing is not displayed
+# text -- asciidoctor resolves ifdef/ifeval before block parsing, so it fires from
+# in there exactly as it would outside. Measured; an earlier version treated a
+# listing as a hiding place and would have skipped a genuinely active directive.
+FENCE_RE = re.compile(r"^(/{4,})\s*$")
 ID_RE = re.compile(r'\bid="([^"]+)"')
 HREF_RE = re.compile(r'href="#([^"]+)"')
 # The guide renders as one page, so a RELATIVE href resolves against wherever that
@@ -65,8 +66,13 @@ BACKENDS = (("html", ()), ("pdf", ("backend-pdf",)))
 # leaves dangling. The guide has no such conditional, so rather than model a
 # construct that is not there -- or shell out to asciidoctor-pdf and try to read
 # anchors back out of a PDF -- notice if one appears.
+# Both spellings of the same thing: the boolean attribute the converter defines,
+# and an ifeval comparing the {backend} value. The surrogate can model neither --
+# it sets backend-pdf on an HTML render, so backend-html5 stays defined AND
+# {backend} still reads "html5".
 UNMODELLED_CONDITIONAL_RE = re.compile(
-    r"^\s*if(n?def|eval)::.*\b(backend-html5|basebackend-html)\b"
+    r"^\s*if(n?def|eval)::.*"
+    r"(\bbackend-html5\b|\bbasebackend-html\b|\{backend\}|\{basebackend\})"
 )
 
 
@@ -76,8 +82,8 @@ def reject_unmodelled_conditionals(guide_dir: Path) -> None:
             continue
         open_fence: str | None = None
         for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
-            # A directive DISPLAYED inside a source block or a comment block does
-            # not take part in preprocessing, so it must not abort the gate.
+            # A directive inside a comment block is dropped by asciidoctor, so it
+            # cannot affect the render and must not abort the gate.
             fence = FENCE_RE.match(line)
             if fence:
                 token = fence.group(1)

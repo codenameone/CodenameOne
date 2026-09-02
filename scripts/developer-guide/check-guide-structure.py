@@ -50,6 +50,20 @@ HEADING_RE = re.compile(r"^(=+) +(\S.*)$")
 # commented-out include as reachable states something about the book that is
 # simply untrue.
 FENCE_RE = re.compile(r"^(-{4,}|\.{4,}|`{4,}|\+{4,}|/{4,})\s*$")
+# Directives are a different question from content, and asciidoctor answers them
+# differently. Measured:
+#
+#                       inside ---- / ----- / ....      inside ////
+#   include::           PROCESSED                       dropped
+#   ifdef:: / ifeval::  ACTIVE                           dropped
+#   heading / prose     literal text                    dropped
+#
+# A literal block hides CONTENT but not DIRECTIVES: include:: and ifdef:: are
+# resolved before block parsing and fire from inside a listing exactly as they
+# would outside it. Only a comment block removes them. So first_heading() keeps
+# FENCE_RE -- a heading in a listing really is only text -- while the include walk
+# and the conditional test use this narrower one.
+COMMENT_FENCE_RE = re.compile(r"^(/{4,})\s*$")
 # Inline AsciiDoc markup that never survives into the rendered heading text.
 INLINE_MARKUP_RE = re.compile(r"[`*_#]|\[\[[^\]]*\]\]|\[[^\]]*\]")
 
@@ -121,7 +135,7 @@ class Walker:
         lines = parse_lines(path)
         open_fence: str | None = None
         for index, line in enumerate(lines):
-            fence = FENCE_RE.match(line)
+            fence = COMMENT_FENCE_RE.match(line)
             if fence:
                 token = fence.group(1)
                 if open_fence is None:
@@ -184,7 +198,22 @@ class Walker:
         valid markup.
         """
         depth = 0
+        open_fence: str | None = None
         for line in lines[:index]:
+            # Only a comment block, for the reason given at COMMENT_FENCE_RE: a
+            # conditional written inside a listing is not "displayed", it is
+            # active, so treating the listing as a hiding place would make this
+            # disagree with the renderer.
+            fence = COMMENT_FENCE_RE.match(line)
+            if fence:
+                token = fence.group(1)
+                if open_fence is None:
+                    open_fence = token
+                elif token == open_fence:
+                    open_fence = None
+                continue
+            if open_fence is not None:
+                continue
             # ifdef/ifndef open a block only with EMPTY brackets -- with content
             # they are the single-line form and guard just that line. ifeval has
             # no single-line form and always carries its expression in the
