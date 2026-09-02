@@ -397,6 +397,14 @@ public final class CertificateWizardStructureHarness {
         check(selectedChoice(form, "pick.bundle.BID_A1"),
                 "widening the list does not lose the selection");
         check(find(form, "btn.profileShowProjectBundles") != null, "and the narrowing is reversible");
+        // Narrowing the list again has to take the selection with it. A hidden bundle left
+        // selected is a choice nothing on screen accounts for, and Create submitted it.
+        fire(form, "pick.bundle.BID_B2");
+        check(selectedChoice(form, "pick.bundle.BID_B2"), "an unrelated bundle can still be chosen");
+        fire(form, "btn.profileShowProjectBundles");
+        check(find(form, "pick.bundle.BID_B2") == null, "narrowing hides the unrelated bundle");
+        check(selectedChoice(form, "pick.bundle.BID_A1"),
+                "and moves the selection back to a row that is on screen");
         // The account holds the same identifier registered for both platforms. A default
         // chosen platform-neutrally picked the iOS one and kept it when the type became a
         // Mac one, so Create sent Apple an App ID that cannot carry the profile.

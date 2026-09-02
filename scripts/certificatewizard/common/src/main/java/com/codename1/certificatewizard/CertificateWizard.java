@@ -1223,29 +1223,6 @@ public class CertificateWizard extends Lifecycle {
             c.add(actionRow(Component.LEFT, typeButtons[3], typeButtons[4], typeButtons[5]));
 
             label(c, "Bundle ID", "CWFieldLabel");
-            // A bundle selection outlives the profile type it was made under, and an App ID
-            // registered for one platform cannot carry a profile for the other -- Apple
-            // rejects the request. So it is dropped here, at the one place every type change
-            // goes through, exactly as the device selection above is. The wizard offers a
-            // default rather than a filtered list: the list is what the account holds, and
-            // the remedy under an empty one can only register an iOS App ID.
-            final String bundlePlatform = platformForProfile(profileType[0]);
-            SigningState.BundleId selectedBundle = findBundleById(bundleId[0]);
-            if (selectedBundle != null && !WizardDecisions.bundlePlatformSatisfies(
-                    bundlePlatform, selectedBundle.platform())) {
-                bundleId[0] = null;
-            }
-            if (bundleId[0] == null) {
-                // The project's own App ID for THIS profile type's platform. Choosing it
-                // platform-neutrally picked the iOS record of an identifier registered for
-                // both, and that selection then survived a switch to a Mac profile type: the
-                // request went to Apple naming an App ID that cannot carry it.
-                SigningState.BundleId projectBundle =
-                        findBundleByIdentifier(projectDefaults().bundleId, bundlePlatform);
-                if (projectBundle != null) {
-                    bundleId[0] = projectBundle.id();
-                }
-            }
             // The project's own App ID and the ones derived from it for its extensions,
             // unless the user asked for the rest. Every App ID on the account was listed
             // here with equal weight, so the one identifier that can actually sign this
@@ -1255,6 +1232,33 @@ public class CertificateWizard extends Lifecycle {
                     WizardDecisions.projectBundleIds(state.bundleIds, projectDefaults().bundleId);
             final boolean narrowed = !showAllBundles[0] && !ownBundles.isEmpty();
             final List<SigningState.BundleId> shownBundles = narrowed ? ownBundles : state.bundleIds;
+            // A bundle selection outlives both the profile type it was made under and the
+            // list it was made from, and neither may be left standing out of sight. An App
+            // ID registered for one platform cannot carry a profile for the other -- Apple
+            // rejects the request -- and one that narrowing the list has hidden is a choice
+            // nothing on screen accounts for; in both cases Create stayed enabled and
+            // submitted it. Dropped here, which is the one place every type change and every
+            // widening or narrowing of the list goes through, exactly as the device
+            // selection above is.
+            final String bundlePlatform = platformForProfile(profileType[0]);
+            SigningState.BundleId selectedBundle = findBundleById(bundleId[0]);
+            if (selectedBundle != null && (!shownBundles.contains(selectedBundle)
+                    || !WizardDecisions.bundlePlatformSatisfies(
+                            bundlePlatform, selectedBundle.platform()))) {
+                bundleId[0] = null;
+            }
+            if (bundleId[0] == null) {
+                // The project's own App ID for THIS profile type's platform. Choosing it
+                // platform-neutrally picked the iOS record of an identifier registered for
+                // both, and that selection then survived a switch to a Mac profile type: the
+                // request went to Apple naming an App ID that cannot carry it. It is always
+                // one of the rows on screen -- narrowing the list is what narrows it TO.
+                SigningState.BundleId projectBundle =
+                        findBundleByIdentifier(projectDefaults().bundleId, bundlePlatform);
+                if (projectBundle != null) {
+                    bundleId[0] = projectBundle.id();
+                }
+            }
             final List<Button> bundleButtons = new ArrayList<Button>();
             for (SigningState.BundleId b : shownBundles) {
                 Button pick = choice(b.identifier(), b.name(), b.id().equals(bundleId[0]));
