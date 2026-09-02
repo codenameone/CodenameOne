@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.developerguide.screenshots;
 
 import com.codename1.components.SpanLabel;
@@ -40,10 +62,29 @@ public final class PreAdvancedThemingScreenshots {
     private static final int BLUE = 0x0b57d0;
     private static final int GREEN = 0x06a806;
     private static final int WHITE = 0xffffff;
-    private static final Font TITLE_FONT = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE)
-            .derive(35, Font.STYLE_PLAIN);
-    private static final Font BLOCK_FONT = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE)
-            .derive(24, Font.STYLE_PLAIN);
+    private static final Font TITLE_FONT = screenshotFont(35);
+    private static final Font BLOCK_FONT = screenshotFont(24);
+
+    /// Loads a figure font from the port's bundled Roboto rather than from the host.
+    ///
+    /// `Font.createSystemFont` resolves through `JavaSEPort.fontFaceSystem`, which is
+    /// "Arial" on macOS and Linux alike. Arial exists on a developer's Mac and not on a
+    /// stock CI runner, so AWT silently substitutes a different face and every glyph in
+    /// every figure changes -- which is why none of these screenshots could be
+    /// regenerated outside CI and byte-compared against what was committed. The
+    /// `native:` scheme reads `/com/codename1/impl/javase/Roboto-*.ttf` off the
+    /// classpath, so the result does not depend on what the machine happens to have
+    /// installed. It is also what this project's font rule requires everywhere.
+    private static Font screenshotFont(int pixelSize) {
+        Font font = Font.createTrueTypeFont("native:MainRegular", "native:MainRegular");
+        if (font == null) {
+            // Falling back to a host font would quietly restore the very
+            // non-determinism this exists to remove, so refuse instead.
+            throw new IllegalStateException(
+                    "the native font scheme is unavailable, so figures would render with a host font");
+        }
+        return font.derive(pixelSize, Font.STYLE_PLAIN);
+    }
 
     private PreAdvancedThemingScreenshots() {
     }
