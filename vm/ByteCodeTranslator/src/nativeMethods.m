@@ -2062,6 +2062,10 @@ JAVA_LONG threadKeyCounter = 1;
  * OS thread: a virtual thread's state belongs to the virtual thread and travels
  * with it between hosts.
  */
+/* Defined with cn1ReleaseThreadLocalData further down; the capacity-failure path
+   below unwinds a partially built state through it. */
+static void cn1FreeThreadLocalDataFields(struct ThreadLocalData* head);
+
 struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThread) {
     struct ThreadLocalData* i;
         JAVA_LONG nativeThreadId = threadKeyCounter;
@@ -2217,7 +2221,17 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
         break;
         }
     }
-    CODENAME_ONE_ASSERT(threadOffset > -1);
+    /* EXHAUSTION IS A RETURN VALUE, not an assertion. CODENAME_ONE_ASSERT is plain
+       assert(), which NDEBUG compiles out of every release build -- so once all
+       NUMBER_OF_SUPPORTED_THREADS slots were taken this fell through and executed
+       allThreads[-1] = i, corrupting whatever precedes the table instead of failing.
+       A debug build aborted; a shipped one carried on with silent corruption, which
+       is worse. Reporting it lets a caller that can cope do so. */
+    if(threadOffset < 0) {
+        unlockCriticalSection();
+        cn1FreeThreadLocalDataFields(i);
+        return 0;
+    }
     allThreads[threadOffset] = i;
     unlockCriticalSection();
     //printf("Thread slot %d assigned to thread %d\n",threadOffset,(int)i->threadId);
@@ -2284,7 +2298,8 @@ struct cn1VirtualThread* cn1SpawnVirtualThread(cn1VirtualThreadBody body, void* 
     return vt;
 }
 
-/* Both are defined further down this file; cn1RetireVirtualThread needs them here. */
+/* All defined further down this file; the virtual-thread retire path and the
+   capacity-failure path in cn1CreateThreadLocalData need them above their bodies. */
 extern void markDeadThread(struct ThreadLocalData* d);
 extern void cn1ReleaseThreadLocalData(struct ThreadLocalData* head);
 
@@ -2779,7 +2794,10 @@ JAVA_VOID java_lang_Object_notifyAll__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ob
 JAVA_VOID java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t, JAVA_INT p) {
 }
 
-void cn1ReleaseThreadLocalData(struct ThreadLocalData *head) {
+/* Every buffer a thread state owns, and the state itself. Shared with the failure
+   path in cn1CreateThreadLocalData, which must NOT touch nThreadsToKill -- a state
+   that never reached allThreads was never counted as living. */
+static void cn1FreeThreadLocalDataFields(struct ThreadLocalData *head) {
     free(head->blocks);
     /* Free it the way it was ALLOCATED -- see cn1AllocThreadStack, which falls back
        to calloc when mmap is out of mappings. Neither mismatch is survivable: free()
@@ -2795,6 +2813,10 @@ void cn1ReleaseThreadLocalData(struct ThreadLocalData *head) {
 #endif
     free(head->pendingHeapAllocations);
     free(head);
+}
+
+void cn1ReleaseThreadLocalData(struct ThreadLocalData *head) {
+    cn1FreeThreadLocalDataFields(head);
     nThreadsToKill--;
 }
 
