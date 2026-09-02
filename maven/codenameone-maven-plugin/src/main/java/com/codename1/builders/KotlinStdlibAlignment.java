@@ -1120,7 +1120,13 @@ public class KotlinStdlibAlignment {
                         && isIdentifierChar(line.charAt(start - 1))))) {
             start--;
         }
-        return lastSegmentIs(line.substring(start + 1, end + 1), "dependencies");
+        // The constraint handler is the other one that takes a configuration and a
+        // notation: `constraints.add('implementation', 'g:a:1.7.22!!')` is a
+        // strict pin the app really has, and rejecting it because the receiver is
+        // not `dependencies` wrote the shim constraints against it.
+        String receiver = line.substring(start + 1, end + 1);
+        return lastSegmentIs(receiver, "dependencies")
+                || lastSegmentIs(receiver, "constraints");
     }
 
     /** Gradle's strict-version shorthand, written after the version. */
@@ -3446,6 +3452,30 @@ public class KotlinStdlibAlignment {
         return versionComponentOf(coordinate.substring(artifact + 1));
     }
 
+    /** The artifact of a {@code group:artifact[:version]} coordinate. */
+    private static String artifactOf(String coordinate) {
+        int group = coordinate.indexOf(':');
+        if (group < 0) {
+            return "";
+        }
+        int end = coordinate.indexOf(':', group + 1);
+        return end < 0 ? coordinate.substring(group + 1)
+                : coordinate.substring(group + 1, end);
+    }
+
+    /** Whether the name is the base library or one of its shims. */
+    private static boolean isOneOfTheFamily(String artifact) {
+        if (BASE_STDLIB.equals(artifact)) {
+            return true;
+        }
+        for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
+            if (ALIGNED_ARTIFACTS[i].equals(artifact)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Whether the statement mentions this group at all, in any of the shapes a
      * selection rule names a module by.
@@ -3454,6 +3484,12 @@ public class KotlinStdlibAlignment {
      * with a whole coordinate, which is neither the bare artifact name nor the
      * group on its own -- so a rule written that way looked like it concerned
      * nothing of ours and the rejected version was written anyway.</p>
+     *
+     * <p>The ARTIFACT in such a coordinate has to be one of ours. Matching the
+     * group prefix alone read a rule on {@code kotlin-reflect} as one on this
+     * family, and the block stood down for a rejection that cannot touch either
+     * shim -- which leaves the duplicate exactly where it was. A rule keyed on
+     * the group with no artifact at all still counts, because it covers them.</p>
      */
     private static boolean mentionsTheKotlinGroup(String line) {
         if (namesOneOfTheFamily(line) || holdsLiteral(line, KOTLIN_GROUP)) {
@@ -3464,7 +3500,9 @@ public class KotlinStdlibAlignment {
                 continue;
             }
             int end = endOfStringLiteral(line, i);
-            if (stringLiteralContent(line, i).startsWith(KOTLIN_GROUP + ":")) {
+            String held = stringLiteralContent(line, i);
+            if (held.startsWith(KOTLIN_GROUP + ":")
+                    && isOneOfTheFamily(artifactOf(held))) {
                 return true;
             }
             i = end;
@@ -3534,6 +3572,13 @@ public class KotlinStdlibAlignment {
             int after = at + name.length();
             boolean startsToken = at == 0 || !isIdentifierChar(statement.charAt(at - 1));
             int brace = skipBlanks(statement, after);
+            // Groovy takes a trailing closure with or without the parentheses, and
+            // `componentSelection({ rules -> .. })` is the same call as
+            // `componentSelection { .. }` -- requiring the brace to follow the name
+            // missed the parenthesised form before anything could read its body.
+            if (brace < statement.length() && statement.charAt(brace) == '(') {
+                brace = skipBlanks(statement, brace + 1);
+            }
             if (startsToken && (after >= statement.length()
                     || !isIdentifierChar(statement.charAt(after)))
                     && brace < statement.length() && statement.charAt(brace) == '{') {
@@ -4145,7 +4190,12 @@ public class KotlinStdlibAlignment {
      */
     private static final String[] FOREIGN_SCOPES = {
         "buildscript",
-        "testing"
+        "testing",
+        // `subprojects { dependencies { .. } }` configures the CHILDREN, not the
+        // application this writes into. `allprojects` is deliberately absent: it
+        // does include this project, which is the distinction the note above is
+        // about.
+        "subprojects"
     };
 
     /** Whether the statement opens a block that is not the app's own graph. */

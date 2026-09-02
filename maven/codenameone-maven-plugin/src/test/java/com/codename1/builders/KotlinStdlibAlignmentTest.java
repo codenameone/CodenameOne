@@ -897,6 +897,66 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * The shapes this round found, each a valid Gradle spelling that read as
+     * something it is not.
+     */
+    @Test
+    public void everySelectorAndHandlerSpellingIsRead() {
+        String open = "    configurations.all {\n        resolutionStrategy {\n"
+                + "            componentSelection {\n";
+        String close = "            }\n        }\n    }\n";
+
+        // A closure passed in parentheses is the same call as a trailing one.
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    configurations.all { resolutionStrategy"
+                        + ".componentSelection({ rules ->\n        rules.all { s -> if "
+                        + "(s.candidate.module == 'kotlin-stdlib-jdk8') "
+                        + "s.reject('x') }\n    }) }\n")),
+                "a parenthesised componentSelection is still one");
+
+        // A rule keyed on another Kotlin module cannot reject either shim, so
+        // matching the group prefix alone gave away the alignment for nothing.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        open + "                withModule('org.jetbrains.kotlin:"
+                        + "kotlin-reflect') { s -> s.reject('x') }\n" + close)
+                        .contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a rule on kotlin-reflect touches neither shim");
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        open + "                withModule('org.jetbrains.kotlin:"
+                        + "kotlin-stdlib-jdk8') { s -> s.reject('x') }\n" + close)),
+                "and one on a shim still stands the block down");
+
+        // The constraint handler takes a configuration and a notation too.
+        String[] handlers = {
+            "    constraints.add('implementation', "
+                    + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!')\n",
+            "    dependencies.constraints.add('implementation', "
+                    + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!')\n",
+        };
+        for (int i = 0; i < handlers.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    handlers[i]);
+            check("".equals(out), "<<" + handlers[i].trim() + ">> is a strict pin, "
+                    + "got <<" + out + ">>");
+        }
+
+        // A subprojects block configures the children, not this application.
+        String children = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    subprojects {\n        dependencies {\n            implementation("
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22')\n        }\n    }\n");
+        check(children.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a subproject declaration is not the app's, got <<" + children + ">>");
+
+        // allprojects DOES include this one, which is the distinction.
+        String every = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    allprojects {\n        dependencies {\n            implementation("
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22')\n        }\n    }\n");
+        check(!every.contains("kotlin-stdlib-jdk8:1.8.0")
+                        && every.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "an allprojects declaration is the app's too, got <<" + every + ">>");
+    }
+
+    /**
      * A selection rule may name its module by whole coordinate --
      * {@code withModule('org.jetbrains.kotlin:kotlin-stdlib-jdk8')} -- which is
      * neither the bare artifact name nor the group on its own, so a rule written
