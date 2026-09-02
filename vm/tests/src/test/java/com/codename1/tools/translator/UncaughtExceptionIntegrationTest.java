@@ -91,10 +91,37 @@ class UncaughtExceptionIntegrationTest {
         Path executable = buildDir.resolve(CompilerHelper.executableName("UncaughtApp"));
         ProcessBuilder run = new ProcessBuilder(executable.toString());
         run.redirectErrorStream(true);
-        Process p = run.start();
-        String output = new String(readFully(p), StandardCharsets.UTF_8);
-        if (!p.waitFor(2, TimeUnit.MINUTES)) {
+        final Process p = run.start();
+        // Drained on a separate thread. Reading inline blocks until the child closes
+        // stdout, so a program that HANGS -- which is one of the regressions this test
+        // exists to catch -- never reaches the timeout below, and the job sits until
+        // CI kills it instead of failing here. A timeout the guarded failure prevents
+        // from being evaluated is not a timeout.
+        final java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+        Thread drain = new Thread(new Runnable() {
+            public void run() {
+                byte[] chunk = new byte[4096];
+                int read;
+                try {
+                    while ((read = p.getInputStream().read(chunk)) > 0) {
+                        synchronized (buf) { buf.write(chunk, 0, read); }
+                    }
+                } catch (java.io.IOException ignored) {
+                    // expected when the process is destroyed under the reader
+                }
+            }
+        }, "uncaught-app-output");
+        drain.setDaemon(true);
+        drain.start();
+
+        boolean finished = p.waitFor(2, TimeUnit.MINUTES);
+        if (!finished) {
             p.destroyForcibly();
+        }
+        drain.join(TimeUnit.SECONDS.toMillis(30));
+        String output;
+        synchronized (buf) { output = new String(buf.toByteArray(), StandardCharsets.UTF_8); }
+        if (!finished) {
             fail("the program did not finish:\n" + output);
         }
 
@@ -110,15 +137,6 @@ class UncaughtExceptionIntegrationTest {
                 "a program killed by an uncaught exception must not report success:\n" + output);
     }
 
-    private static byte[] readFully(Process p) throws Exception {
-        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-        byte[] buffer = new byte[4096];
-        int read;
-        while ((read = p.getInputStream().read(buffer)) > 0) {
-            out.write(buffer, 0, read);
-        }
-        return out.toByteArray();
-    }
 
     /**
      * open() throws with nothing above it that catches. UNCAUGHT_AFTER lines mark
