@@ -69,7 +69,10 @@ LIST_MARKER_RE = re.compile(r"^([*\-]+|\.{1,5}|[0-9]+\.)\s+")
 # anchored image, and a whitelist would report the next kind nobody thought of.
 ADMONITION = "NOTE|TIP|IMPORTANT|WARNING|CAUTION"
 BLOCK_START_RE = re.compile(
-    r'^(\[(?!(?:' + ADMONITION + r')\])[a-zA-Z%.#"]'
+    # The name may be followed by "]" or by further attributes, as in
+    # [NOTE,caption="Aside"] -- requiring the bracket immediately made an
+    # attributed admonition look like the listing the sentence promised.
+    r'^(\[(?!(?:' + ADMONITION + r')[,\]])[a-zA-Z%.#"]'
     r'|image::|include::|\|===|(----|\.\.\.\.|````|\+\+\+\+|====|\*\*\*\*|____)\s*$)'
 )
 

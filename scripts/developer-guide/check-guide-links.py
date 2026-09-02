@@ -121,29 +121,50 @@ def front_matter(page: Path) -> dict[str, object]:
     return out
 
 
-def is_published(meta: dict[str, object], today: str) -> bool:
+def parse_moment(value: str) -> datetime.datetime | None:
+    """Parse a Hugo front-matter timestamp, with or without a time of day."""
+    text = value.strip().strip("\"'")
+    if not text:
+        return None
+    text = text.replace("Z", "+00:00")
+    if " " in text and "T" not in text:
+        text = text.replace(" ", "T", 1)
+    try:
+        moment = datetime.datetime.fromisoformat(text)
+    except ValueError:
+        try:
+            moment = datetime.datetime.fromisoformat(text[:10])
+        except ValueError:
+            return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=datetime.timezone.utc)
+    return moment
+
+
+def is_published(meta: dict[str, object], now: datetime.datetime) -> bool:
     """Hugo defaults buildDrafts and buildFuture to false, so neither reaches the site.
 
-    The date test makes the result depend on the day it runs, which is not ideal in
-    a gate. It is kept because it mirrors what the site actually serves: a link to a
+    The date test makes the result depend on when it runs, which is not ideal in a
+    gate. It is kept because it mirrors what the site actually serves: a link to a
     post that has not been published yet is genuinely broken until it is.
+
+    publishDate DECIDES availability when it is set; date is only the fallback.
+    Treating either as disqualifying rejected a page that carries a future `date`
+    and a past `publishDate`, which Hugo publishes. And the comparison keeps the
+    time of day: the site rebuilds once a day, so a page scheduled for later today
+    is genuinely absent until the next build, and truncating to the calendar day
+    called it live.
     """
     if str(meta.get("draft", "")).strip().strip("\"'").lower() in {"true", "yes"}:
         return False
 
-    def day(key: str) -> str | None:
-        value = str(meta.get(key, "")).strip().strip("\"'")
-        return value[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", value) else None
-
-    # Hugo builds neither a future page nor an expired one. publishDate overrides
-    # date for scheduling, and expiryDate withdraws a page that was published; a
-    # date-only expiry lapses at midnight, so the day itself is already too late.
-    for key in ("date", "publishdate"):
-        scheduled = day(key)
-        if scheduled and scheduled > today:
-            return False
-    expiry = day("expirydate")
-    return not (expiry and expiry <= today)
+    published_at = parse_moment(str(meta.get("publishdate", ""))) or parse_moment(
+        str(meta.get("date", ""))
+    )
+    if published_at and published_at > now:
+        return False
+    expires_at = parse_moment(str(meta.get("expirydate", "")))
+    return not (expires_at and expires_at <= now)
 
 
 def normalize_path(value: str) -> str:
@@ -226,7 +247,7 @@ def is_public_type(source: Path, stem: str) -> bool:
         text = source.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return False
-    text = JAVA_LINE_COMMENT_RE.sub("", JAVA_BLOCK_COMMENT_RE.sub("", text))
+    text = blank_java_noise(text)
     return re.search(PUBLIC_TYPE_RE.format(stem=re.escape(stem)), text) is not None
 
 
@@ -256,17 +277,107 @@ def javadoc_index(repo_root: Path) -> tuple[set[str], set[str]]:
     return _javadoc_index
 
 
-def declares_nested_type(package: str, outer: str, nested: str) -> bool:
-    """Whether the outer type's source declares a documented nested type."""
+JAVA_TOKEN_RE = re.compile(
+    r"(?P<decl>\b(?:class|interface|enum|record)\s+(?P<name>[A-Za-z_$][\w$]*))"
+    r"|(?P<open>\{)|(?P<close>\})"
+)
+
+
+def blank_java_noise(text: str) -> str:
+    """Blank comments and literals in one pass, preserving every offset.
+
+    Order matters and separate regexes get it wrong in both directions: running the
+    line-comment pattern first eats from the "//" inside "https://..." to the end of
+    that line, which silently swallowed an opening brace and sent the depth count
+    negative; running the literal pattern first lets an apostrophe inside a comment
+    open a char literal that runs to the next one, somewhere else entirely. A single
+    scan has no ordering to get wrong.
+    """
+    out = list(text)
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == "/" and i + 1 < n and text[i + 1] in "/*":
+            block = text[i + 1] == "*"
+            end = text.find("*/", i + 2) if block else text.find("\n", i)
+            end = (end + 2) if (block and end != -1) else (n if end == -1 else end)
+            for j in range(i, end):
+                if out[j] != "\n":
+                    out[j] = " "
+            i = end
+            continue
+        if ch in "\"'":
+            quote, j = ch, i + 1
+            while j < n:
+                if text[j] == "\\":
+                    j += 2
+                    continue
+                if text[j] == quote or text[j] == "\n":
+                    break
+                j += 1
+            for k in range(i, min(j + 1, n)):
+                if out[k] != "\n":
+                    out[k] = " "
+            i = j + 1
+            continue
+        i += 1
+    return "".join(out)
+
+
+def documented_type_chains(source: Path) -> set[str]:
+    """Every dotted type chain javadoc will emit a page for, from one source file.
+
+    The earlier version asked only whether each name was declared SOMEWHERE in the
+    file, which accepts two siblings written as if one contained the other --
+    CommonProgressAnimations.CircleProgress.EmptyAnimation named two types that are
+    both real and neither nested in the other. Getting that right needs the actual
+    nesting, so this walks braces and keeps the enclosing stack.
+
+    Comments and string literals are blanked first, or a brace inside either would
+    shift the depth for the rest of the file. A chain is recorded only when every
+    level of it is public or protected, which is what javadoc -protected emits.
+    """
+    text = blank_java_noise(source.read_text(encoding="utf-8", errors="ignore"))
+
+    chains: set[str] = set()
+    stack: list[tuple[str, bool, int]] = []
+    pending: tuple[str, bool] | None = None
+    depth = 0
+    for match in JAVA_TOKEN_RE.finditer(text):
+        if match.group("decl"):
+            # Modifiers sit between the previous statement boundary and the keyword.
+            boundary = max(
+                text.rfind(";", 0, match.start()),
+                text.rfind("{", 0, match.start()),
+                text.rfind("}", 0, match.start()),
+            )
+            modifiers = text[boundary + 1 : match.start()]
+            documented = re.search(r"\b(?:public|protected)\b", modifiers) is not None
+            pending = (match.group("name"), documented)
+        elif match.group("open"):
+            depth += 1
+            if pending is not None:
+                name, documented = pending
+                stack.append((name, documented, depth))
+                if all(level[1] for level in stack):
+                    chains.add(".".join(level[0] for level in stack))
+                pending = None
+        else:
+            if stack and stack[-1][2] == depth:
+                stack.pop()
+            depth -= 1
+            pending = None
+    return chains
+
+
+def documented_chain_exists(package: str, chain: list[str]) -> bool:
+    """Whether javadoc emits a page for this dotted chain in this package."""
     if _JAVADOC_ROOT is None:
         return True
     for root_name in JAVADOC_SOURCE_ROOTS:
-        source = _JAVADOC_ROOT / root_name / package / f"{outer}.java"
-        if not source.exists():
-            continue
-        text = source.read_text(encoding="utf-8", errors="ignore")
-        text = JAVA_LINE_COMMENT_RE.sub("", JAVA_BLOCK_COMMENT_RE.sub("", text))
-        return re.search(NESTED_TYPE_RE.format(stem=re.escape(nested)), text) is not None
+        source = _JAVADOC_ROOT / root_name / package / f"{chain[0]}.java"
+        if source.exists():
+            return ".".join(chain) in documented_type_chains(source)
     return True  # the outer source moved; the class check above already spoke
 
 
@@ -318,9 +429,7 @@ def javadoc_path_exists(target: str) -> bool:
     # now. What this still does not verify is that they nest in the ORDER given --
     # that needs brace-depth parsing, and a page naming two real siblings the wrong
     # way round is a far less likely mistake than naming one that does not exist.
-    return all(
-        declares_nested_type(package, parts[0], nested) for nested in parts[1:]
-    )
+    return documented_chain_exists(package, parts)
 
 
 def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
@@ -477,13 +586,13 @@ def site_paths(repo_root: Path) -> tuple[set[str], list, set[str]]:
                 f"until then every link it accepts is unverified."
             )
 
-    today = datetime.date.today().isoformat()
+    now = datetime.datetime.now(datetime.timezone.utc)
     content = repo_root / "docs/website/content"
     if content.exists():
         for page in content.rglob("*.md"):
             relative = page.relative_to(content).with_suffix("")
             meta = front_matter(page)
-            if not is_published(meta, today):
+            if not is_published(meta, now):
                 continue
             for alias in meta.get("aliases", []) or []:
                 if isinstance(alias, str):
