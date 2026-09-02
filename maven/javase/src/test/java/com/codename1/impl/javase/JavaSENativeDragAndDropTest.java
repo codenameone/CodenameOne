@@ -252,6 +252,30 @@ class JavaSENativeDragAndDropTest {
     }
 
     @Test
+    void aTextFlavorCarriedAsBytesStillReadsAsText() throws Exception {
+        DataFlavor htmlBytes = new DataFlavor("text/html;charset=UTF-8;class=\"[B\"");
+        FakeTransferable t = new FakeTransferable()
+                .add(DataFlavor.stringFlavor, "plain")
+                .add(htmlBytes, "<b>hi</b>".getBytes("UTF-8"));
+
+        ClipboardContent content = JavaSENativeDragAndDrop.contentFor(t, t.getTransferDataFlavors(), true);
+        assertEquals("<b>hi</b>", content.getText(ClipboardContent.MIME_HTML),
+                "the flavor declares its own charset; storing its bytes as a binary payload "
+                        + "made getText() null for a type the drop had just accepted");
+    }
+
+    @Test
+    void aTextFlavorCarriedAsAStreamStillReadsAsText() throws Exception {
+        DataFlavor htmlStream = new DataFlavor("text/html;charset=UTF-16;class=java.io.InputStream");
+        FakeTransferable t = new FakeTransferable()
+                .add(htmlStream, new ByteArrayInputStream("<i>x</i>".getBytes("UTF-16")));
+
+        ClipboardContent content = JavaSENativeDragAndDrop.contentFor(t, t.getTransferDataFlavors(), true);
+        assertEquals("<i>x</i>", content.getText(ClipboardContent.MIME_HTML),
+                "and a charset that is not UTF-8 has to be honoured rather than assumed");
+    }
+
+    @Test
     void aDroppedFileListBecomesFilePaths() {
         FakeTransferable t = new FakeTransferable()
                 .add(DataFlavor.javaFileListFlavor,

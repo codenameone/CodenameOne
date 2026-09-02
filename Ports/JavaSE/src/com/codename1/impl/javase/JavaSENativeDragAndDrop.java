@@ -407,6 +407,18 @@ final class JavaSENativeDragAndDrop {
                 }
                 return null;
             }
+            if (mime.startsWith("text/") && !(out instanceof String) && flavor.isFlavorTextType()) {
+                // A text flavor is free to hand over bytes -- text/html;class="[B" and
+                // text/plain;class=java.io.InputStream are both ordinary on the desktop -- and
+                // the encoding those bytes are in is a parameter of the flavor, not something
+                // to assume. Storing them as a binary payload made getText() answer null for a
+                // type the drop had just accepted, and decoding them as UTF-8 by hand would get
+                // a charset=UTF-16 flavor wrong. DataFlavor's own reader is what knows.
+                String text = textFromFlavor(transferable, flavor);
+                if (text != null) {
+                    return text;
+                }
+            }
             if (out instanceof byte[]) {
                 return out;
             }
@@ -416,6 +428,31 @@ final class JavaSENativeDragAndDrop {
                 return readBytes((InputStream) out);
             }
             return JavaSEPort.clipboardText(out);
+        } catch (Throwable err) {
+            return null;
+        }
+    }
+
+    /// Reads a text flavor through the reader the flavor itself supplies, which applies the
+    /// charset the flavor declares. Returns null when the flavor will not produce one, leaving
+    /// the caller's own handling to run.
+    private static String textFromFlavor(Transferable transferable, DataFlavor flavor) {
+        try {
+            java.io.Reader reader = flavor.getReaderForText(transferable);
+            if (reader == null) {
+                return null;
+            }
+            try {
+                StringBuilder out = new StringBuilder();
+                char[] buffer = new char[2048];
+                int read;
+                while ((read = reader.read(buffer)) >= 0) {
+                    out.append(buffer, 0, read);
+                }
+                return out.toString();
+            } finally {
+                reader.close();
+            }
         } catch (Throwable err) {
             return null;
         }

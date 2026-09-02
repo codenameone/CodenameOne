@@ -10382,7 +10382,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             imageExt = "gif";
         }
         if (imageBytes != null) {
-            Uri imageUri = writeAsProviderUri(imageBytes, imageExt);
+            Uri imageUri = writeAsProviderUri(imageBytes, imageExt, imageMime);
             if (imageUri != null) {
                 if (!mimeTypes.contains(imageMime)) {
                     mimeTypes.add(imageMime);
@@ -10456,7 +10456,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 bytes = (byte[]) value;
             }
             if (bytes != null) {
-                Uri uri = writeAsProviderUri(bytes, extensionForMime(mime));
+                Uri uri = writeAsProviderUri(bytes, extensionForMime(mime), mime);
                 if (uri != null) {
                     mimeTypes.add(mime);
                     items.add(new ClipData.Item(uri));
@@ -10470,7 +10470,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     ///
     /// AndroidGradleBuilder exposes cache/intent_files through the app's FileProvider, so
     /// generated payloads stay inside that root and FileProvider can safely name them.
-    private Uri writeAsProviderUri(byte[] bytes, String extension) throws IOException {
+    ///
+    /// The name carries `mime` so the read back is an answer rather than a guess -- see
+    /// `#decodeMimeFromFileName(java.lang.String)`.
+    private Uri writeAsProviderUri(byte[] bytes, String extension, String mime) throws IOException {
         if (bytes == null) {
             return null;
         }
@@ -10482,9 +10485,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // A name built from the clock and the payload's length collided: two representations of
         // one payload that share an extension and a byte length are written within the same
         // millisecond, and the second overwrote the first -- leaving both clip items pointing at
-        // the second one's bytes. createTempFile is the guarantee rather than a longer guess,
-        // and it keeps the extension, which is what names the type this URI carries.
-        File file = File.createTempFile("cn1-clip-", "." + extension, dir);
+        // the second one's bytes. createTempFile is the guarantee rather than a longer guess.
+        String encoded = encodeMimeForFileName(mime);
+        File file = File.createTempFile(
+                encoded == null ? CLIP_FILE_PREFIX : CLIP_FILE_PREFIX + encoded + "-",
+                "." + extension, dir);
         OutputStream os = new FileOutputStream(file);
         try {
             os.write(bytes);
@@ -10496,6 +10501,63 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // Grant broadly so any paste or drop target can read the content:// URI
         getContext().grantUriPermission("android", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
         return uri;
+    }
+
+    /// The name every generated clip file starts with, and the alphabet
+    /// `#encodeMimeForFileName(java.lang.String)` writes the type in.
+    private static final String CLIP_FILE_PREFIX = "cn1-clip-";
+    private static final String CLIP_MIME_HEX = "0123456789abcdef";
+
+    /// Writes a MIME type into something that is legal in a file name and reads back as itself.
+    ///
+    /// The extension cannot do this job. It is derived from the type and the derivation is
+    /// lossy -- `application/x-foo` and `application/x-foo+json` both reduce to `xfoo` -- so two
+    /// representations of one payload can produce URIs no reader can tell apart, and both are
+    /// then dropped rather than mispaired. Hex is unlovely for a file name nobody reads, and it
+    /// is exact: every byte of the type survives, and no character it produces means anything to
+    /// a file system, a URI or `#decodeMimeFromFileName(java.lang.String)`.
+    ///
+    /// Answers null for a type this cannot carry, and the file is then named without one.
+    private static String encodeMimeForFileName(String mime) {
+        if (mime == null || mime.length() == 0 || mime.length() > 60) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < mime.length(); iter++) {
+            int c = mime.charAt(iter);
+            if (c > 0xff) {
+                return null;
+            }
+            out.append(CLIP_MIME_HEX.charAt((c >> 4) & 0xf)).append(CLIP_MIME_HEX.charAt(c & 0xf));
+        }
+        return out.toString();
+    }
+
+    /// The MIME type `#encodeMimeForFileName(java.lang.String)` wrote into this name, or null
+    /// when the name did not come from there -- a clip another application published, or one
+    /// whose type was too long to carry.
+    private static String decodeMimeFromFileName(String name) {
+        if (name == null || !name.startsWith(CLIP_FILE_PREFIX)) {
+            return null;
+        }
+        int end = name.indexOf('-', CLIP_FILE_PREFIX.length());
+        if (end < 0) {
+            return null;
+        }
+        String hex = name.substring(CLIP_FILE_PREFIX.length(), end);
+        if (hex.length() == 0 || (hex.length() & 1) != 0) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < hex.length(); iter += 2) {
+            int hi = Character.digit(hex.charAt(iter), 16);
+            int lo = Character.digit(hex.charAt(iter + 1), 16);
+            if (hi < 0 || lo < 0) {
+                return null;
+            }
+            out.append((char) ((hi << 4) | lo));
+        }
+        return out.toString().toLowerCase();
     }
 
     /// A file extension for a MIME type, used to name the temporary file a content URI is
@@ -10658,31 +10720,40 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if (uri != null) {
                     String type = getContext().getContentResolver().getType(uri);
                     if (type != null && type.startsWith("image/")) {
-                        InputStream in = getContext().getContentResolver().openInputStream(uri);
-                        if (in != null) {
-                            try {
-                                byte[] bytes = Util.readInputStream(in);
-                                content.setData(imageMimeFor(type), bytes);
-                            } finally {
-                                in.close();
+                        try {
+                            InputStream in = getContext().getContentResolver().openInputStream(uri);
+                            if (in != null) {
+                                try {
+                                    byte[] bytes = Util.readInputStream(in);
+                                    content.setData(imageMimeFor(type), bytes);
+                                } finally {
+                                    in.close();
+                                }
                             }
+                        } catch (Throwable t) {
+                            // The bytes are one representation of this URI, not the whole of
+                            // it. A read that fails must still leave the file reference below.
+                            com.codename1.io.Log.e(t);
                         }
-                        continue;
-                    }
-                    // A typed URI is a file reference *and* that type. Reducing it to a file
-                    // alone let a target filtering on, say, application/pdf accept the hover --
-                    // the description advertised the type -- and then be refused the drop,
-                    // because the content it is filtered against a second time no longer had
-                    // it. The bytes are promised rather than read: a target that only wants the
-                    // path should not pay for a document it never opens.
-                    if (type != null && type.length() > 0
+                    } else if (type != null && type.length() > 0
                             && !"application/octet-stream".equals(type.toLowerCase())) {
+                        // A typed URI is a file reference *and* that type. Reducing it to a file
+                        // alone let a target filtering on, say, application/pdf accept the hover
+                        // -- the description advertised the type -- and then be refused the
+                        // drop, because the content it is filtered against a second time no
+                        // longer had it. The bytes are promised rather than read: a target that
+                        // only wants the path should not pay for a document it never opens.
                         if (!content.hasMimeType(type)) {
                             content.setDataProvider(type.toLowerCase(), uriBytesProvider(uri));
                         }
                     } else {
                         unnamedUris.add(uri);
                     }
+                    // Every URI item is a file reference as well as whatever its type made of
+                    // it. The image branch returned before reaching this, so dragging a PNG
+                    // *file* produced image bytes and no file at all -- and a target filtering
+                    // on MIME_FILE accepted the hover, because the description still advertised
+                    // text/uri-list, and was then refused the drop.
                     fileUris.add(uri.toString());
                     continue;
                 }
@@ -10841,16 +10912,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// serves.
     ///
     /// ContentResolver could not name it -- MimeTypeMap has no entry for an application defined
-    /// type, so the FileProvider serving it reports octet-stream -- but the extension is still
-    /// exactly what `#extensionForMime(java.lang.String)` produced for the type that was
-    /// written, so the association the resolver lost is recoverable rather than guessed. That is
-    /// what lets more than one unnameable representation survive the round trip. An extension
-    /// two advertised types share answers nothing, as does a clip this application did not
-    /// write.
+    /// type, so the FileProvider serving it reports octet-stream. What this application wrote
+    /// still says so in its own name, exactly, which is the answer; a clip from elsewhere gets
+    /// the extension read as a type, which is a good guess and is treated as one -- an extension
+    /// two advertised types share answers nothing.
     private String mimeForUnnamedUri(Uri uri, List<String> binary, List<String> text) {
         String name = displayNameFor(uri);
         if (name == null) {
             return null;
+        }
+        String declared = decodeMimeFromFileName(name);
+        if (declared != null) {
+            // Written by this application, which named the type outright. It answers even when
+            // it names a type that is not among the candidates -- that means the type is already
+            // satisfied, or was never advertised, and either way this URI is not the missing
+            // one. Guessing past an exact answer would be strictly worse.
+            return binary.contains(declared) || text.contains(declared) ? declared : null;
         }
         int dot = name.lastIndexOf('.');
         if (dot < 0 || dot == name.length() - 1) {
