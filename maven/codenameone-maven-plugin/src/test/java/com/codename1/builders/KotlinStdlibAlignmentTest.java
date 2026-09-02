@@ -738,6 +738,84 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * The two shapes a value takes that the bare-assignment path did not read.
+     * An {@code ext { dep = [..] }} block is the project-wide spelling of a map
+     * definition, and a name on the right copies an earlier binding; reading
+     * only literals left both unknown, so the declaration using one named no
+     * artifact and the pin it carried went unread.
+     */
+    @Test
+    public void anExtraPropertiesClosureReadsEveryKindOfValue() {
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22!!";
+        String use = "    implementation(dep)\n";
+        String[] bound = {
+            "    ext {\n        dep = [group: 'org.jetbrains.kotlin', "
+                    + "name: 'kotlin-stdlib-jdk8', version: '1.7.22!!']\n    }\n",
+            "    def coord = '" + pin + "'\n    ext {\n        dep = coord\n    }\n",
+            "    ext {\n        dep = '" + pin + "'\n    }\n",
+        };
+        for (int i = 0; i < bound.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    bound[i] + use);
+            check("".equals(out), "<<" + bound[i].trim() + ">> binds dep, got <<"
+                    + out + ">>");
+        }
+
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    ext {\n        dep = [group: 'org.jetbrains.kotlin', "
+                        + "name: 'kotlin-stdlib-jdk8', version: '1.9.22']\n    }\n" + use)
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a merged-era map through the same route is read too");
+    }
+
+    /**
+     * Groovy's multiple assignment binds several names at once. The walk for a
+     * single declaration expects an identifier after {@code def} and finds a
+     * parenthesis, so it recorded nothing and the pin one of the names carried
+     * was invisible.
+     */
+    @Test
+    public void aMultipleAssignmentBindsEveryName() {
+        // The coordinate in the list is SOFT and the pin is at the use site, so
+        // the binding is the only thing that can connect them. Putting the pin
+        // in the list instead makes the list itself suppress, and the test then
+        // passes whether the names are bound or not -- which is how the first
+        // version of this went vacuous.
+        String coord = "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22";
+        String use = "    implementation(dep) { version { strictly '1.7.22' } }\n";
+        String[] destructured = {
+            "    def (other, dep) = ['com.example:x:1.0', '" + coord + "']\n",
+            "    def (dep, other) = ['" + coord + "', 'com.example:x:1.0']\n",
+            // Each name may carry a type, as a single declaration may.
+            "    def (String other, String dep) = ['com.example:x:1.0', '"
+                    + coord + "']\n",
+        };
+        for (int i = 0; i < destructured.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    destructured[i] + use);
+            check("".equals(out), "<<" + destructured[i].trim()
+                    + ">> binds dep, got <<" + out + ">>");
+        }
+
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def (other, dep) = ['com.example:x:1.0', "
+                        + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22']\n"
+                        + "    implementation(dep)\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a merged-era element is read too");
+        // A list this cannot read binds every name to something unknown, which
+        // is what recording nothing already means.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def (other, dep) = someCall()\n"
+                        + "    implementation(dep)\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "an unreadable list binds nothing");
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    def dep = '" + coord + "'\n" + use)),
+                "and a plain def still works");
+    }
+
+    /**
      * A value that is a NAME rather than a literal copies a binding that is
      * already known. Reading only literals recorded the new name as unknown, so
      * a force through it named nothing and the constraints went in beside a pin

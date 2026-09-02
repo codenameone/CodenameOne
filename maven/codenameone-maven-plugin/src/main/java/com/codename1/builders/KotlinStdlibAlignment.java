@@ -3204,6 +3204,91 @@ public class KotlinStdlibAlignment {
     }
 
     /**
+     * Records a Groovy multiple assignment, and says whether the statement was
+     * one.
+     *
+     * <p>{@code def (other, dep) = ['com.example:x:1.0', 'g:a:1.7.22!!']} binds
+     * both names positionally. The walk for a single declaration expects an
+     * identifier after {@code def} and finds a parenthesis, so it recorded
+     * nothing at all and the pin the second name carried went unread.</p>
+     *
+     * <p>Each name may carry a type, as a single declaration may, so the NAME is
+     * the last identifier of its element. An element whose value is neither a
+     * literal nor a known name records nothing, which leaves it unknown rather
+     * than wrong.</p>
+     */
+    private static boolean recordsADestructuring(String statement, int at,
+            Map<String, String> literals, boolean conditional) {
+        int i = skipBlanks(statement, at);
+        if (i >= statement.length() || statement.charAt(i) != '(') {
+            return false;
+        }
+        List<String> names = new ArrayList<String>();
+        i++;
+        while (i < statement.length() && statement.charAt(i) != ')') {
+            i = skipBlanks(statement, i);
+            String last = null;
+            while (i < statement.length() && isIdentifierChar(statement.charAt(i))) {
+                int start = i;
+                while (i < statement.length() && isIdentifierChar(statement.charAt(i))) {
+                    i++;
+                }
+                last = statement.substring(start, i);
+                i = skipBlanks(statement, i);
+            }
+            names.add(last);
+            if (i < statement.length() && statement.charAt(i) == ',') {
+                i++;
+            } else {
+                break;
+            }
+        }
+        if (i >= statement.length() || statement.charAt(i) != ')' || names.isEmpty()) {
+            return false;
+        }
+        i = skipBlanks(statement, i + 1);
+        if (i >= statement.length() || !isAssignmentAt(statement, i)) {
+            return false;
+        }
+        i = skipBlanks(statement, i + 1);
+        if (i >= statement.length() || statement.charAt(i) != '[') {
+            // A list this cannot read binds every name to something unknown,
+            // which is what recording nothing already means.
+            return true;
+        }
+        int closes = closingBracket(statement, i);
+        i++;
+        for (int n = 0; n < names.size() && i < statement.length()
+                && (closes < 0 || i < closes); n++) {
+            i = skipBlanks(statement, i);
+            String value = null;
+            if (isLiteralStart(statement, i)) {
+                int end = endOfStringLiteral(statement, i);
+                if (end < statement.length()) {
+                    value = expandedLiteral(statement, i, end, literals);
+                    i = end + 1;
+                }
+            } else {
+                int start = i;
+                while (i < statement.length() && isIdentifierChar(statement.charAt(i))) {
+                    i++;
+                }
+                if (i > start) {
+                    value = literals.get(statement.substring(start, i));
+                }
+            }
+            if (names.get(n) != null && value != null) {
+                recordDefinition(literals, names.get(n), value, conditional);
+            }
+            i = skipBlanks(statement, i);
+            if (i < statement.length() && statement.charAt(i) == ',') {
+                i++;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Records a definition, or forgets it, unless doing so under a condition
      * would throw away the value that decides suppression.
      */
@@ -3340,6 +3425,9 @@ public class KotlinStdlibAlignment {
         // recorded a declaration that never executes, overwriting the real binding
         // and making a later use read as something it is not.
         int at = afterCall(statement, DEF);
+        if (at >= 0 && recordsADestructuring(statement, at, literals, conditional)) {
+            return;
+        }
         if (at >= 0) {
             declared = true;
             i = skipBlanks(statement, at);
@@ -3784,6 +3872,31 @@ public class KotlinStdlibAlignment {
             int end = endOfStringLiteral(body, i);
             if (end < body.length()) {
                 literals.put(name, expandedLiteral(body, i, end, literals));
+            }
+            return;
+        }
+        // The other two shapes a value takes, which the ordinary definition path
+        // already reads: a map, and a name that copies an earlier binding. An
+        // `ext { dep = [group: '..', name: '..', version: '1.7.22!!'] }` block is
+        // the project-wide spelling of the same thing, and reading only literals
+        // left `dep` unknown -- so the declaration using it named no artifact and
+        // the pin it carried went unread.
+        if (i < body.length() && body.charAt(i) == '[') {
+            int closes = closingBracket(body, i);
+            if (closes > i) {
+                literals.put(name,
+                        withLiteralsInlined(body.substring(i, closes + 1), literals));
+            }
+            return;
+        }
+        if (i < body.length() && isIdentifierChar(body.charAt(i))) {
+            int end = i;
+            while (end < body.length() && isIdentifierChar(body.charAt(end))) {
+                end++;
+            }
+            String alias = literals.get(body.substring(i, end));
+            if (alias != null && !followedByMapKeyColon(body, end)) {
+                literals.put(name, alias);
             }
         }
     }
