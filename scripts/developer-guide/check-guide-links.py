@@ -306,6 +306,15 @@ def findings_for(path: Path, known: set[str], patterns: list) -> list[tuple[str,
                 target = split.path.rstrip("/") or "/"
                 if split.fragment and target in SELF_PATHS:
                     out.append((url, "links into this book's own body; use an xref so the anchor is checked"))
+                elif split.path.endswith("/") and "." in split.path.rstrip("/").rsplit("/", 1)[-1]:
+                    # The site treats "/x.html" and "/x.html/" as separate routes and
+                    # declares both explicitly where both work -- 32 such pairs in
+                    # _redirects. Normalising the slash away below would validate the
+                    # variant that was not asked for, so a file path wearing a trailing
+                    # slash is reported rather than quietly rewritten. Directory routes
+                    # (/blog/, /javadoc/com/codename1/io/) have no dot in the last
+                    # segment and are untouched.
+                    out.append((url, "a file path with a trailing slash; the site serves that as a separate route"))
                 elif not resolves(target, known, patterns):
                     out.append((url, "the website serves no such path (checked _redirects and the content tree)"))
     return out
