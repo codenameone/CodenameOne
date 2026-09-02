@@ -111,15 +111,41 @@ class VirtualThreadRuntimeTest {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.redirectErrorStream(true);
         Process p = builder.start();
-        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-        byte[] buffer = new byte[4096];
-        int read;
-        while ((read = p.getInputStream().read(buffer)) > 0) {
-            out.write(buffer, 0, read);
-        }
-        String output = new String(out.toByteArray(), StandardCharsets.UTF_8);
-        if (!p.waitFor(timeoutMinutes, TimeUnit.MINUTES)) {
+
+        // Drained on a SEPARATE thread, because the timeout below is worthless
+        // otherwise. Reading inline blocks until the child closes stdout, so a
+        // context-switch regression that hangs the binary would never reach waitFor
+        // -- the Maven job would sit until CI killed it, instead of this test
+        // failing. A timeout that the hang it guards against prevents from ever
+        // being evaluated is not a timeout.
+        final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        Thread drain = new Thread(new Runnable() {
+            public void run() {
+                byte[] buffer = new byte[4096];
+                int read;
+                try {
+                    while ((read = p.getInputStream().read(buffer)) > 0) {
+                        synchronized (out) { out.write(buffer, 0, read); }
+                    }
+                } catch (java.io.IOException ignored) {
+                    // the stream closes under us when the process is destroyed
+                }
+            }
+        }, "vt-runtime-output");
+        drain.setDaemon(true);
+        drain.start();
+
+        boolean finished = p.waitFor(timeoutMinutes, TimeUnit.MINUTES);
+        if (!finished) {
             p.destroyForcibly();
+        }
+        // Bounded join: the drain ends when the stream closes, which destroying the
+        // process guarantees, but a bound here keeps a wedged reader from replacing
+        // the hang this method just avoided.
+        drain.join(TimeUnit.SECONDS.toMillis(30));
+        String output;
+        synchronized (out) { output = new String(out.toByteArray(), StandardCharsets.UTF_8); }
+        if (!finished) {
             fail("timed out: " + command + "\n" + output);
         }
         assertEquals(0, p.exitValue(), "failed: " + command + "\n" + output);

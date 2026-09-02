@@ -472,16 +472,26 @@ typedef struct clazz*       JAVA_CLASS;
 // drives BC_CHECKCAST_CHECKED, so ArrayStoreException's retention and the check's
 // emission cannot disagree.
 //
-// arrayType is the component class (0 for a non-array, which cannot happen here
-// after CHECK_ARRAY_ACCESS, but is tolerated rather than dereferenced).
 /* The arrayObj null test is not redundant. This runs BEFORE
    CN1_SET_ARRAY_ELEMENT_OBJECT, which is where a null array is turned into a
    NullPointerException; CN1_CLASS_OF below would dereference the null first and
    take the process down instead. Java also orders it this way -- NPE wins over
    ArrayStoreException -- so falling through to the setter is both safe and
-   correct. */
+   correct.
+
+   ONE DIMENSION ONLY, and that restriction is load-bearing. arrayType is NOT the
+   immediate component type: a generated array class records the BASE element class,
+   so String[][] has dimensions 2 and arrayType String rather than String[]. Asking
+   whether a String[] is an instance of String is the wrong question and answers no,
+   so without the dimensions test this REJECTED valid stores into every
+   multidimensional array. Skipping them is the conservative direction -- a genuine
+   ArrayStoreException there goes unreported, exactly as it did before this check
+   existed, where the alternative was breaking correct programs. Covering them needs
+   the immediate component type, which means emitting it per array class or
+   reconstructing it from dimensions at runtime. */
 #define CN1_ARRAY_STORE_CHECK(arrayObj, value) { \
-    if((value) != JAVA_NULL && (arrayObj) != JAVA_NULL) { \
+    if((value) != JAVA_NULL && (arrayObj) != JAVA_NULL \
+            && CN1_CLASS_OF(arrayObj)->dimensions == 1) { \
         struct clazz* cn1__comp = CN1_CLASS_OF(arrayObj)->arrayType; \
         if(cn1__comp != NULL && !instanceofFunction(cn1__comp->classId, GET_CLASS_ID(value))) { \
             cn1ThrowTypeError(threadStateData, __NEW_INSTANCE_java_lang_ArrayStoreException(threadStateData), CN1_CLASS_OF(value)->clsName, NULL); \
