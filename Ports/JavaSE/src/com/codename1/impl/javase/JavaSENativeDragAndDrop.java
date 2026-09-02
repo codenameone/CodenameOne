@@ -356,10 +356,15 @@ final class JavaSENativeDragAndDrop {
             }
         }
         // A file list is also a URI list as far as most applications are concerned, and a drag
-        // out of a Linux file manager offers only the latter. Presenting both means a drop
-        // target that asks for files gets them either way. Declared the same way the rest of
-        // the content is -- eagerly on a drop, on demand during a drag -- so describing a drag
-        // still reads nothing.
+        // out of a Linux file manager offers only the latter while one out of the Finder offers
+        // only the former. Presenting both means a drop target that asks for either gets them
+        // whichever spelling the source used -- the same pair this port publishes on the way
+        // out. Declared the same way the rest of the content is -- eagerly on a drop, on demand
+        // during a drag -- so describing a drag still reads nothing.
+        //
+        // Only one of the two can fire for any one content, since each is conditioned on the
+        // other spelling being the one that is present, so neither provider can end up reading
+        // the other.
         if (!content.hasMimeType(ClipboardContent.MIME_FILE) && content.hasMimeType(ClipboardContent.MIME_URI_LIST)) {
             if (eager) {
                 content.setFiles(pathsFromUriList(content.getText(ClipboardContent.MIME_URI_LIST)));
@@ -376,8 +381,46 @@ final class JavaSENativeDragAndDrop {
                     }
                 });
             }
+        } else if (!content.hasMimeType(ClipboardContent.MIME_URI_LIST)
+                && content.hasMimeType(ClipboardContent.MIME_FILE)) {
+            // The other direction, which was missing: a Finder or Explorer drag offers only
+            // javaFileListFlavor, so a component filtered to MIME_URI_LIST refused an ordinary
+            // file drag from the one source every desktop user has.
+            if (eager) {
+                String uris = uriListFrom(content);
+                if (uris != null) {
+                    content.setData(ClipboardContent.MIME_URI_LIST, uris);
+                }
+            } else {
+                final ClipboardContent describing = content;
+                content.setDataProvider(ClipboardContent.MIME_URI_LIST, new ClipboardDataProvider() {
+                    @Override
+                    public Object getClipboardData(String requested) {
+                        return uriListFrom(describing);
+                    }
+                });
+            }
         }
         return content;
+    }
+
+    /// The `text/uri-list` spelling of a content's files: one `file:` URI per line, CRLF
+    /// separated as RFC 2483 has it, or null when it names none.
+    private static String uriListFrom(ClipboardContent content) {
+        String[] paths = content.getFiles();
+        if (paths == null || paths.length == 0) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < paths.length; iter++) {
+            String path = paths[iter];
+            if (path == null || path.length() == 0) {
+                continue;
+            }
+            out.append(path.startsWith("file:") ? path : new File(path).toURI().toString());
+            out.append("\r\n");
+        }
+        return out.length() == 0 ? null : out.toString();
     }
 
     /// Reads one representation out of a transferable, converting it into the value type the

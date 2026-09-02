@@ -507,7 +507,11 @@ public final class NativeDragAndDrop {
     /// A target that refuses a drop outright should say so through
     /// `Component#canAcceptNativeDrop(com.codename1.ui.ClipboardContent)` or the accepted MIME
     /// list instead, both of which are consulted here and are therefore exact from the first
-    /// event.
+    /// event -- and from every event, including the drop itself. A `NativeDropEvent#reject()`
+    /// in a callback is a change of mind rather than a refusal: it is honoured from the next
+    /// event onward, and a drop landing before the callback has run reads what the target
+    /// declared. `#drop(int, int, int, com.codename1.ui.ClipboardContent, int)` says why that
+    /// cannot be closed without doing something worse.
     ///
     /// #### Parameters
     ///
@@ -621,6 +625,27 @@ public final class NativeDragAndDrop {
                 // in a callback that has since run would have had that decision quietly
                 // discarded here, and a refusal turned back into a delivered drop on every
                 // port rather than only the one that was noticed.
+                //
+                // "Latest word" is as far as this can go, and deliberately so. A drop that
+                // arrives before the queued nativeDragEnter has run reads what the target
+                // *declared* rather than what that callback was about to say, and no
+                // rearrangement of this method fixes that:
+                //
+                //  - Waiting for the callback deadlocks. This runs on the native drag thread,
+                //    which the event dispatch thread blocks on to paint.
+                //  - Refusing whenever a callback is outstanding refuses every ordinary drop
+                //    that lands while the event dispatch thread is a frame behind.
+                //  - Withholding delivery afterwards is worse than delivering. The platform has
+                //    already been told the action; on ACTION_MOVE the source deletes its copy on
+                //    that word, so a drop withheld after the fact destroys the data instead of
+                //    misplacing it.
+                //
+                // What is exact is the declarative refusal: canAcceptNativeDrop and
+                // getAcceptedDropActions are consulted by findTarget on this thread, here as
+                // well as on every drag event, so a target refusing through either is never
+                // selected and never receives the drop, whatever the event dispatch thread is
+                // doing. That is what a target refusing outright must use -- reject() in a
+                // callback is a late change of mind, honoured from the next event onward.
                 accepted = currentAction;
             } else {
                 // A different component from the one the callbacks were about: the pointer

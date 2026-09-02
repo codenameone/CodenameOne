@@ -470,6 +470,48 @@ void CN1CancelNativeDrag(void) {
 
 @end
 
+/// Reads a text representation with the encoding its uniform type identifier declares.
+///
+/// cn1MimeForUti maps public.utf8-plain-text, public.utf16-plain-text and
+/// public.utf16-external-plain-text all onto text/plain, because that is the MIME type they all
+/// are -- but they do not agree about the bytes. Decoding UTF-16 as UTF-8 answers nil, which
+/// dropped a representation the drag had advertised and refused the very target that accepted
+/// it on the strength of it. Worse, UTF-16 in little endian without a byte order mark decodes
+/// as UTF-8 *successfully*, into text full of NULs, so trying UTF-8 first and falling back is
+/// not a substitute for reading what the identifier says.
+///
+/// Anything the identifier does not pin down is handed to NSString's own detection rather than
+/// assumed, and only a representation nothing can read at all comes back nil.
+static NSString* cn1TextFromData(NSData* data, NSString* uti) {
+    NSStringEncoding declared = 0;
+    if ([uti isEqualToString:@"public.utf16-plain-text"]
+            || [uti isEqualToString:@"public.utf16-external-plain-text"]) {
+        declared = NSUTF16StringEncoding;
+    } else if ([uti isEqualToString:@"public.utf8-plain-text"]) {
+        declared = NSUTF8StringEncoding;
+    }
+    if (declared != 0) {
+        NSString* exact = [[[NSString alloc] initWithData:data encoding:declared] autorelease];
+        if (exact != nil) {
+            return exact;
+        }
+    }
+    NSString* utf8 = [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
+    if (utf8 != nil) {
+        return utf8;
+    }
+    NSString* detected = nil;
+    [NSString stringEncodingForData:data
+                    encodingOptions:@{NSStringEncodingDetectionSuggestedEncodingsKey:
+                                          @[@(NSUTF16StringEncoding),
+                                            @(NSUTF16LittleEndianStringEncoding),
+                                            @(NSUTF16BigEndianStringEncoding),
+                                            @(NSISOLatin1StringEncoding)]}
+                    convertedString:&detected
+                usedLossyConversion:NULL];
+    return detected;
+}
+
 /// Copies a file a drop handed over into somewhere that outlives the handler, and returns the
 /// path -- or nil when the copy failed.
 ///
@@ -710,6 +752,9 @@ API_AVAILABLE(ios(11.0))
     // Every representation is loaded asynchronously and independently, so the framework is only
     // told about the drop once they have all answered. Delivering per representation instead
     // would give the application several drops for one gesture, each missing the others.
+    //
+    // MIME type -> {data, the uniform type identifier it arrived under}. The identifier is kept
+    // because it is what says how to read the bytes; see cn1TextFromData.
     NSMutableDictionary* collected = [[NSMutableDictionary alloc] init];
     NSMutableArray* files = [[NSMutableArray alloc] init];
     // The representations a file-vending provider also advertises, each named against a file on
@@ -795,7 +840,10 @@ API_AVAILABLE(ios(11.0))
                 if (data != nil) {
                     @synchronized (collected) {
                         if ([collected objectForKey:mime] == nil) {
-                            [collected setObject:data forKey:mime];
+                            // The identifier is kept beside the bytes because it is what says
+                            // how to read them: several standard text UTIs map to the same MIME
+                            // type and disagree about the encoding.
+                            [collected setObject:@[data, uti] forKey:mime];
                         }
                     }
                 }
@@ -811,11 +859,10 @@ API_AVAILABLE(ios(11.0))
         // it.
         CN1NativeDragDeliverDropBegin();
         for (NSString* mime in collected) {
-            NSData* data = [collected objectForKey:mime];
+            NSArray* pair = [collected objectForKey:mime];
+            NSData* data = [pair objectAtIndex:0];
             if ([mime hasPrefix:@"text/"]) {
-                NSString* text = [[[NSString alloc] initWithData:data
-                                                        encoding:NSUTF8StringEncoding] autorelease];
-                CN1NativeDragDeliverDropAdd(mime, text, nil);
+                CN1NativeDragDeliverDropAdd(mime, cn1TextFromData(data, [pair objectAtIndex:1]), nil);
             } else {
                 CN1NativeDragDeliverDropAdd(mime, nil, data);
             }

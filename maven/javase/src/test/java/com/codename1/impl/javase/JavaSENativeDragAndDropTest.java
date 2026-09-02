@@ -286,6 +286,31 @@ class JavaSENativeDragAndDropTest {
     }
 
     @Test
+    void aDroppedFileListAlsoBecomesAUriList() {
+        FakeTransferable t = new FakeTransferable()
+                .add(DataFlavor.javaFileListFlavor, Arrays.asList(new File("/tmp/a.txt"), new File("/tmp/b.txt")));
+
+        ClipboardContent content = JavaSENativeDragAndDrop.contentFor(t, t.getTransferDataFlavors(), true);
+        String uris = content.getText(ClipboardContent.MIME_URI_LIST);
+        assertNotNull(uris, "the Finder and Explorer offer only javaFileListFlavor, so a target "
+                + "filtered to text/uri-list refused the one source every desktop user has");
+        assertTrue(uris.contains("file:/"), uris);
+        assertTrue(uris.contains("a.txt") && uris.contains("b.txt"), uris);
+    }
+
+    @Test
+    void describingAFileDragDeclaresTheUriListWithoutReadingIt() {
+        FakeTransferable t = new FakeTransferable()
+                .add(DataFlavor.javaFileListFlavor, Arrays.asList(new File("/tmp/a.txt")));
+
+        ClipboardContent content = JavaSENativeDragAndDrop.contentFor(t, t.getTransferDataFlavors(), false);
+        assertTrue(content.hasMimeType(ClipboardContent.MIME_URI_LIST),
+                "a hover is filtered against the advertised types, so the pair has to be "
+                        + "declared before the drop as well");
+        assertEquals(0, t.reads, "and declaring it must still read nothing");
+    }
+
+    @Test
     void aDroppedUriListAlsoBecomesFilePaths() throws Exception {
         DataFlavor uriList = new DataFlavor(ClipboardContent.MIME_URI_LIST + ";class=java.lang.String",
                 ClipboardContent.MIME_URI_LIST);
