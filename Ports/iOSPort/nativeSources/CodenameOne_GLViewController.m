@@ -43,6 +43,7 @@
 #import "METALView.h"
 #import "CN1Metalcompat.h"
 #endif
+#import "CN1DragAndDrop.h"
 #import "ExecutableOp.h"
 #import "FillRect.h"
 #import "ClipRect.h"
@@ -3262,6 +3263,8 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self cn1InstallHoverRecognizer];
     [self cn1InstallScrollRecognizer];
     [self cn1InstallPinchRecognizer];
+    // Native drag and drop, both directions. Inert where the platform has no drag interaction.
+    CN1InstallDragAndDrop(self.view);
     [self cn1InstallRotationRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
@@ -3283,6 +3286,8 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self cn1InstallHoverRecognizer];
     [self cn1InstallScrollRecognizer];
     [self cn1InstallPinchRecognizer];
+    // Native drag and drop, both directions. Inert where the platform has no drag interaction.
+    CN1InstallDragAndDrop(self.view);
     [self cn1InstallRotationRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];

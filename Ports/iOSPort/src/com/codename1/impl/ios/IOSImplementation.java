@@ -23,6 +23,11 @@
 package com.codename1.impl.ios;
 
 import com.codename1.ui.Desktop;
+import com.codename1.ui.ClipboardContent;
+import com.codename1.ui.ClipboardDataProvider;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.NativeDragAndDrop;
+import com.codename1.ui.NativeDragOperation;
 import com.codename1.background.BackgroundFetch;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
@@ -9132,6 +9137,177 @@ public class IOSImplementation extends CodenameOneImplementation {
         return super.getPasteDataFromClipboard();
     }
     
+
+    // ------------------------------------------------------------------------------------
+    // Native drag and drop.
+    //
+    // UIKit owns the drag gesture: UIDragInteraction has its own recognizer and asks what is
+    // being dragged when it fires, so the framework cannot start a session on its own drag
+    // threshold the way the desktop port does. It stages the operation on the press instead,
+    // and CN1DragAndDrop.m calls nativeDragSessionStartedCallback below when UIKit decides a
+    // drag has begun. The payload is fetched at that moment rather than on the press, so a
+    // drag offering a file the application has not written yet does not write it every time
+    // the user merely touches the component.
+    // ------------------------------------------------------------------------------------
+
+    @Override
+    public boolean isNativeDragAndDropSupported() {
+        return nativeInstance.isNativeDragAndDropSupported();
+    }
+
+    @Override
+    public boolean isNativeDragOutsideApplicationSupported() {
+        return nativeInstance.isNativeDragOutsideAppSupported();
+    }
+
+    @Override
+    public boolean isNativeDragImageNeededOnPrepare() {
+        // UIKit asks for the lift preview at the instant its own recognizer fires, which is
+        // not a moment at which this port can render a component.
+        return true;
+    }
+
+    @Override
+    public void prepareNativeDrag(NativeDragOperation op) {
+        ClipboardContent content = op.getContent();
+        nativeInstance.prepareNativeDrag(join(content.getMimeTypes()), op.getAllowedActions(),
+                pngBytes(op.getDragImage()), op.getDragImageOffsetX(), op.getDragImageOffsetY());
+    }
+
+    @Override
+    public void cancelNativeDrag() {
+        nativeInstance.cancelNativeDrag();
+    }
+
+    /// Encodes a drag preview as PNG, the one image format the whole bridge speaks.
+    private static byte[] pngBytes(Image image) {
+        if (image == null) {
+            return null;
+        }
+        try {
+            return EncodedImage.createFromImage(image, false).getImageData();
+        } catch (Throwable err) {
+            com.codename1.io.Log.e(err);
+            return null;
+        }
+    }
+
+    private static String join(String[] values) {
+        if (values == null || values.length == 0) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < values.length; iter++) {
+            if (iter > 0) {
+                out.append('\n');
+            }
+            out.append(values[iter]);
+        }
+        return out.toString();
+    }
+
+    private static String[] split(String value) {
+        if (value == null || value.length() == 0) {
+            return null;
+        }
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        int start = 0;
+        while (start <= value.length()) {
+            int next = value.indexOf('\n', start);
+            String entry = next < 0 ? value.substring(start) : value.substring(start, next);
+            if (entry.length() > 0) {
+                out.add(entry);
+            }
+            if (next < 0) {
+                break;
+            }
+            start = next + 1;
+        }
+        return out.isEmpty() ? null : out.toArray(new String[out.size()]);
+    }
+
+    /// Describes a drag in progress from its MIME types alone. UIKit hands over no data until
+    /// the drop, and a drop target only needs the names in order to say whether it wants the
+    /// drag; the providers registered here answer null until the real content arrives.
+    private static ClipboardContent describe(String mimeTypes) {
+        ClipboardContent content = new ClipboardContent();
+        String[] mimes = split(mimeTypes);
+        if (mimes == null) {
+            return content;
+        }
+        for (int iter = 0; iter < mimes.length; iter++) {
+            content.setDataProvider(mimes[iter], new ClipboardDataProvider() {
+                public Object getClipboardData(String mimeType) {
+                    return null;
+                }
+            });
+        }
+        return content;
+    }
+
+    /// Invoked from CN1DragAndDrop.m as a drag moves over the surface. Returns the action a
+    /// drop would perform right now, or zero.
+    public static int nativeDragOverCallback(int x, int y, String mimeTypes, int allowedActions,
+            boolean entering) {
+        ClipboardContent content = describe(mimeTypes);
+        if (entering) {
+            return NativeDragAndDrop.dragEnter(0, x, y, content, allowedActions);
+        }
+        return NativeDragAndDrop.dragOver(0, x, y, content, allowedActions);
+    }
+
+    /// Invoked from CN1DragAndDrop.m when a drag leaves the surface without dropping.
+    public static void nativeDragExitCallback() {
+        NativeDragAndDrop.dragExit(0);
+    }
+
+    /// Invoked from CN1DragAndDrop.m with a fully loaded drop. Returns the action accepted, or
+    /// zero when nothing under the pointer took it.
+    public static int nativeDropCallback(int x, int y, String plain, String html, String rtf,
+            byte[] image, String fileUris, int action) {
+        ClipboardContent content = new ClipboardContent();
+        if (plain != null) {
+            content.setData(ClipboardContent.MIME_TEXT, plain);
+        }
+        if (html != null) {
+            content.setData(ClipboardContent.MIME_HTML, html);
+        }
+        if (rtf != null) {
+            content.setData(ClipboardContent.MIME_RTF, rtf);
+        }
+        if (image != null && image.length > 0) {
+            content.setData(ClipboardContent.MIME_PNG, image);
+        }
+        content.setFiles(split(fileUris));
+        return NativeDragAndDrop.drop(0, x, y, content, action);
+    }
+
+    /// Invoked from CN1DragAndDrop.m when UIKit starts a drag session. Hands the payload down
+    /// -- which is where a promised representation is finally built -- and returns the actions
+    /// the operation allows, or zero when the framework has nothing staged and no drag should
+    /// begin.
+    public static int nativeDragSessionStartedCallback() {
+        NativeDragOperation op = NativeDragAndDrop.dragSessionStarted();
+        if (op == null) {
+            return 0;
+        }
+        ClipboardContent content = op.getContent();
+        byte[] image = content.getBytes(ClipboardContent.MIME_PNG);
+        if (image == null) {
+            image = content.getBytes(ClipboardContent.MIME_JPEG);
+        }
+        nativeInstance.setNativeDragPayload(content.getText(ClipboardContent.MIME_TEXT),
+                content.getText(ClipboardContent.MIME_HTML),
+                content.getText(ClipboardContent.MIME_RTF),
+                image, join(content.getFiles()));
+        return op.getAllowedActions();
+    }
+
+    /// Invoked from CN1DragAndDrop.m when a session this application started has ended.
+    public static void nativeDragCompletedCallback(int action) {
+        NativeDragAndDrop.dragCompleted(action);
+    }
+
     @Override
     public void copyToClipboard(Object obj) {
         if(obj instanceof com.codename1.ui.ClipboardContent) {

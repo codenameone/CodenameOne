@@ -4256,6 +4256,12 @@ public class Form extends Container implements TopLevelContainer {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerDrag, x, y);
             }
         }
+        // A press that landed on a native drag source becomes an operating system drag here,
+        // as soon as it has moved far enough to be a drag rather than a click. From that point
+        // the platform owns the gesture, so nothing below runs for it.
+        if (NativeDragAndDrop.pointerDragged(x, y)) {
+            return;
+        }
         // disable the drag stop flag if we are dragging again
         boolean isScrollWheeling = Display.impl.isScrollWheeling();
         if (dragStopFlag) {
@@ -4582,6 +4588,9 @@ public class Form extends Container implements TopLevelContainer {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerReleased, x, y);
             }
         }
+        // A press that never became a drag releases the operation the press staged, so a
+        // later gesture somewhere else cannot start the drag this one declined to.
+        NativeDragAndDrop.pointerReleased();
         try {
             Component origPressedCmp = pressedCmp;
             setRippleMotion(null);

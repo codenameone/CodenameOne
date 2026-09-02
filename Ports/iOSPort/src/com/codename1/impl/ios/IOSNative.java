@@ -348,6 +348,54 @@ public final class IOSNative {
     native String getClipboardContent(String mimeType);
     native byte[] getClipboardImage();
     native String getClipboardFileUris();
+
+    /// Native drag and drop. UIKit owns the drag gesture, so the framework stages what a press
+    /// has made draggable and the native side asks for the payload once UIDragInteraction
+    /// decides a drag has begun. See `Ports/iOSPort/nativeSources/CN1DragAndDrop.m`.
+    native boolean isNativeDragAndDropSupported();
+
+    /// True where a drag started in this application can be dropped in another one, which is
+    /// iPadOS and Mac Catalyst rather than a phone in full screen.
+    native boolean isNativeDragOutsideAppSupported();
+
+    /// Stages the representations a drag could offer -- named, not built -- along with what a
+    /// receiver may do with them and the image to show under the finger.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeTypes`: newline separated MIME types
+    ///
+    /// - `allowedActions`: the `com.codename1.ui.NativeDragOperation` action bit set
+    ///
+    /// - `dragImagePng`: the preview as PNG bytes, or null for the platform default
+    ///
+    /// - `touchX`: the press position within the drag image
+    ///
+    /// - `touchY`: the press position within the drag image
+    native void prepareNativeDrag(String mimeTypes, int allowedActions, byte[] dragImagePng,
+            int touchX, int touchY);
+
+    /// Delivers the payload for the session UIKit has just started, called from inside the
+    /// session-started callback so that a promised file is written only once a drag really
+    /// happens.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plain`: the plain text representation, or null
+    ///
+    /// - `html`: the HTML representation, or null
+    ///
+    /// - `rtf`: the rich text representation, or null
+    ///
+    /// - `image`: image bytes, or null
+    ///
+    /// - `fileUris`: newline separated file paths or `file:` URIs, or null
+    native void setNativeDragPayload(String plain, String html, String rtf, byte[] image,
+            String fileUris);
+
+    /// Drops whatever `#prepareNativeDrag(java.lang.String, int, byte[], int, int)` staged,
+    /// because the press turned out to be a tap.
+    native void cancelNativeDrag();
     
     native void setPinchToZoomEnabled(long peer, boolean e);
     native void setNativeBrowserScrollingEnabled(long peer, boolean e);

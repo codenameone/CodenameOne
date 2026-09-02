@@ -635,6 +635,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean fullScreen;
     public float screenshotActualZoomLevel;
     private InputEvent lastInputEvent;
+    /// The canvas the gesture currently in progress started on, so a native drag can be
+    /// exported from the window the user is actually dragging in rather than the main one.
+    C dndGestureCanvas;
+
+    /// The most recent mouse event, which is what `javax.swing.TransferHandler#exportAsDrag`
+    /// needs in order to seed a drag session.
+    InputEvent dndLastInputEvent() {
+        return lastInputEvent;
+    }
     public static double retinaScale = 1.0;
     
     static JMenuItem pause;
@@ -1881,6 +1890,32 @@ public class JavaSEPort extends CodenameOneImplementation {
         formChangeListener.addListener(al);
     }
 
+    // ------------------------------------------------------------------------------------
+    // Native drag and drop. The desktop is the one platform where a drag genuinely leaves the
+    // application -- onto another window, into a file manager, onto the desktop itself -- so
+    // this port implements the whole contract. See JavaSENativeDragAndDrop.
+    // ------------------------------------------------------------------------------------
+
+    @Override
+    public boolean isNativeDragAndDropSupported() {
+        return !java.awt.GraphicsEnvironment.isHeadless();
+    }
+
+    @Override
+    public boolean isNativeDragOutsideApplicationSupported() {
+        return isNativeDragAndDropSupported();
+    }
+
+    @Override
+    public boolean startNativeDrag(com.codename1.ui.NativeDragOperation op) {
+        return JavaSENativeDragAndDrop.startDrag(this, op);
+    }
+
+    @Override
+    public void cancelNativeDrag() {
+        JavaSENativeDragAndDrop.cancelDrag(this);
+    }
+
     @Override
     public void copyToClipboard(Object obj) {
         if (obj instanceof String || obj instanceof ClipboardContent) {
@@ -1909,31 +1944,75 @@ public class JavaSEPort extends CodenameOneImplementation {
         super.copyToClipboard(obj); //To change body of generated methods, choose Tools | Templates.
     }
 
-    private static final class RichTransferable implements Transferable {
+    /// Publishes a `ClipboardContent` to AWT, for a clipboard copy and for a native drag alike.
+    ///
+    /// The flavors are derived from the MIME types alone, never by reading the values. That is
+    /// deliberate: a drag may offer a representation registered through
+    /// `ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`
+    /// -- the file that is only written if the user actually drops on the desktop -- and reading
+    /// values here in order to decide what to advertise would build every one of them at the
+    /// moment the drag starts, which is exactly what the providers exist to avoid.
+    static final class RichTransferable implements Transferable {
         private final ClipboardContent data;
         private final DataFlavor[] flavors;
 
         RichTransferable(ClipboardContent data) {
             this.data = data;
             ArrayList<DataFlavor> available = new ArrayList<DataFlavor>();
-            if (data.getText(ClipboardContent.MIME_TEXT) != null) {
+            String[] mimeTypes = data.getMimeTypes();
+            boolean hasFiles = data.hasMimeType(ClipboardContent.MIME_FILE);
+            if (data.hasMimeType(ClipboardContent.MIME_TEXT)) {
                 available.add(DataFlavor.stringFlavor);
             }
-            if (imageBytes(data) != null) {
-                available.add(DataFlavor.imageFlavor);
-            }
-            if (fileList(data) != null) {
+            if (hasFiles) {
                 available.add(DataFlavor.javaFileListFlavor);
+                // GTK and a good deal of the web offer files this way and nothing else, so a
+                // drag that names files advertises both spellings of "these are files".
+                addTextFlavor(available, ClipboardContent.MIME_URI_LIST);
             }
-            String[] mimeTypes = data.getMimeTypes();
             for (int i = 0; i < mimeTypes.length; i++) {
-                if (!ClipboardContent.MIME_TEXT.equals(mimeTypes[i])
-                        && !ClipboardContent.MIME_FILE.equals(mimeTypes[i])
-                        && data.getText(mimeTypes[i]) != null) {
-                    available.add(new DataFlavor(mimeTypes[i] + ";class=java.lang.String", mimeTypes[i]));
+                String mime = mimeTypes[i];
+                if (ClipboardContent.MIME_TEXT.equals(mime) || ClipboardContent.MIME_FILE.equals(mime)) {
+                    continue;
+                }
+                if (mime.startsWith("image/")) {
+                    if (!available.contains(DataFlavor.imageFlavor)) {
+                        available.add(DataFlavor.imageFlavor);
+                    }
+                    addBinaryFlavor(available, mime);
+                } else if (mime.startsWith("text/")) {
+                    addTextFlavor(available, mime);
+                } else {
+                    addBinaryFlavor(available, mime);
                 }
             }
             flavors = available.toArray(new DataFlavor[available.size()]);
+        }
+
+        /// Adds a flavor whose representation class is `String`, which is how AWT carries text
+        /// of a specific MIME type -- `text/html` and `text/rtf` among them.
+        private static void addTextFlavor(ArrayList<DataFlavor> available, String mime) {
+            try {
+                DataFlavor flavor = new DataFlavor(mime + ";class=java.lang.String", mime);
+                if (!available.contains(flavor)) {
+                    available.add(flavor);
+                }
+            } catch (Exception ex) {
+                // A MIME type AWT will not parse simply is not advertised.
+            }
+        }
+
+        /// Adds a flavor whose representation is a stream of bytes, which is the only way to
+        /// hand an arbitrary binary payload -- a PDF, an archive -- to another application.
+        private static void addBinaryFlavor(ArrayList<DataFlavor> available, String mime) {
+            try {
+                DataFlavor flavor = new DataFlavor(mime + ";class=java.io.InputStream", mime);
+                if (!available.contains(flavor)) {
+                    available.add(flavor);
+                }
+            } catch (Exception ex) {
+                // As above.
+            }
         }
 
         private static byte[] imageBytes(ClipboardContent data) {
@@ -1950,16 +2029,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         /// Resolves the `application/x-file-list` representation (a single path/URI `String` or a
         /// `String[]` of them) to AWT `File` objects for the native file-list clipboard flavor.
         private static java.util.List<java.io.File> fileList(ClipboardContent data) {
-            Object value = data.getData(ClipboardContent.MIME_FILE);
-            if (value == null) {
-                return null;
-            }
-            String[] paths;
-            if (value instanceof String[]) {
-                paths = (String[]) value;
-            } else if (value instanceof String) {
-                paths = new String[] { (String) value };
-            } else {
+            String[] paths = data.getFiles();
+            if (paths == null) {
                 return null;
             }
             java.util.List<java.io.File> files = new java.util.ArrayList<java.io.File>();
@@ -2000,20 +2071,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             return false;
         }
 
-        public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException {
+        public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException, IOException {
             if (DataFlavor.stringFlavor.equals(flavor)) {
-                return data.getText(ClipboardContent.MIME_TEXT);
+                String text = data.getText(ClipboardContent.MIME_TEXT);
+                if (text != null) {
+                    return text;
+                }
+                throw new UnsupportedFlavorException(flavor);
             }
             if (DataFlavor.imageFlavor.equals(flavor)) {
                 byte[] bytes = imageBytes(data);
                 if (bytes != null) {
-                    try {
-                        java.awt.Image img = ImageIO.read(new ByteArrayInputStream(bytes));
-                        if (img != null) {
-                            return img;
-                        }
-                    } catch (IOException ex) {
-                        // fall through to unsupported
+                    java.awt.Image img = ImageIO.read(new ByteArrayInputStream(bytes));
+                    if (img != null) {
+                        return img;
                     }
                 }
                 throw new UnsupportedFlavorException(flavor);
@@ -2025,9 +2096,32 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 throw new UnsupportedFlavorException(flavor);
             }
-            String value = data.getText(flavor.getPrimaryType() + "/" + flavor.getSubType());
-            if (value != null) {
+            String mime = (flavor.getPrimaryType() + "/" + flavor.getSubType()).toLowerCase();
+            if (ClipboardContent.MIME_URI_LIST.equals(mime) && !data.hasMimeType(ClipboardContent.MIME_URI_LIST)) {
+                // Synthesized from the file list rather than stored, so a source only has to
+                // name its files once.
+                java.util.List<java.io.File> files = fileList(data);
+                if (files != null) {
+                    StringBuilder uris = new StringBuilder();
+                    for (java.io.File f : files) {
+                        uris.append(f.toURI().toString()).append("\r\n");
+                    }
+                    return uris.toString();
+                }
+                throw new UnsupportedFlavorException(flavor);
+            }
+            Object value = data.getData(mime);
+            if (value instanceof String) {
+                if (InputStream.class.equals(flavor.getRepresentationClass())) {
+                    return new ByteArrayInputStream(((String) value).getBytes("UTF-8"));
+                }
                 return value;
+            }
+            if (value instanceof byte[]) {
+                if (InputStream.class.equals(flavor.getRepresentationClass())) {
+                    return new ByteArrayInputStream((byte[]) value);
+                }
+                return new String((byte[]) value, "UTF-8");
             }
             throw new UnsupportedFlavorException(flavor);
         }
@@ -2104,7 +2198,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// Encodes an AWT clipboard image as PNG bytes so it can travel through the CN1 clipboard as an
     /// {@code image/png} representation.
-    private static byte[] imageToPngBytes(java.awt.Image image) {
+    static byte[] imageToPngBytes(java.awt.Image image) {
         try {
             BufferedImage buffered;
             if (image instanceof BufferedImage) {
@@ -2127,7 +2221,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private static String clipboardText(Object value) throws IOException {
+    static String clipboardText(Object value) throws IOException {
         if (value instanceof String) {
             return (String)value;
         }
@@ -3109,6 +3203,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             addHierarchyBoundsListener(this);
             setFocusable(true);
             setOpaque(false);
+            // Native drag and drop, both directions: this canvas becomes an AWT drop target
+            // and gets a transfer handler that can export a Codename One drag to the desktop.
+            JavaSENativeDragAndDrop.install(this);
             installNativeMagnificationListeners();
             addHierarchyListener(new HierarchyListener() {
                 public void hierarchyChanged(HierarchyEvent e) {
@@ -4044,7 +4141,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return true;
         }
 
-        private int scaleCoordinateX(int coordinate) {
+        int scaleCoordinateX(int coordinate) {
             if (getScreenCoordinates() != null) {
                 return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().x + x));
             }
@@ -4053,7 +4150,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return (int)(coordinate * canvasScale());
         }
 
-        private int scaleCoordinateY(int coordinate) {
+        int scaleCoordinateY(int coordinate) {
             if (getScreenCoordinates() != null) {
                 return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().y + y));
             }
@@ -4071,6 +4168,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             this.mouseDown = true;
+            JavaSEPort.this.dndGestureCanvas = this;
             com.codename1.ui.TopLevelContainer f = canvasTopLevel();
             if (f != null) {
                 int x = scaleCoordinateX(e.getX());

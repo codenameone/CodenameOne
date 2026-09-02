@@ -3320,6 +3320,12 @@ public class Window extends Container implements TopLevelContainer {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerDrag, x, y);
             }
         }
+        // A press that landed on a native drag source becomes an operating system drag
+        // here, exactly as it does on a Form, once it has moved far enough to be a drag
+        // rather than a click. The platform owns the gesture from that point.
+        if (NativeDragAndDrop.pointerDragged(x, y)) {
+            return;
+        }
         // Read and cleared here, exactly as Form does: the flag describes the drag that
         // took a momentum scroll over, and leaving it set would tell every later drag in
         // the session that it too continued out of a glide.
@@ -3386,6 +3392,9 @@ public class Window extends Container implements TopLevelContainer {
                 stylusCmp.fireStylusEvent(ActionEvent.Type.PointerReleased, x, y);
             }
         }
+        // A press that never became a drag releases the operation the press staged, so a
+        // later gesture somewhere else cannot start the drag this one declined to.
+        NativeDragAndDrop.pointerReleased();
         // The token identifying *this* gesture. A release handler may enter
         // invokeAndBlock, whose nested event loop can dispatch a fresh press in this
         // same window before the handler returns; tearing down unconditionally then

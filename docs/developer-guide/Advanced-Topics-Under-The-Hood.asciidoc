@@ -1257,7 +1257,9 @@ Unlike other platforms that tried to create overly generic catch all APIs Codena
 
 In Codename One components can be dragged and drop targets are always components. The logic of actually performing the operation indicated by the drop is the responsibility of the person implementing the drop.
 
-NOTE: Some platforms for example: AWT allow dragging abstract concepts such as mime type elements. This allows dragging things like a text file into the app, but that use case isn't realistic in mobile
+This lightweight dragging never leaves the application. To drag content into another
+application, onto the desktop or into a file manager -- and to accept a drag coming the other
+way -- see <<_native_operating_system_drag_drop>> below.
 
 The code below allows you to rearrange the items based on a sensible order. Notice it relies on the default `Container` drop behavior:
 
@@ -1288,6 +1290,107 @@ In the drop target you can override the following methods:
 * `dragEnter/Exit` - useful to track and cleanup state related to dragging over a specific component.
 
 * `drop` - the logic for dropping/moving the component must be implemented here!
+
+==== Native operating system drag & drop
+
+The section above moves a component around inside one form. Native dragging hands the gesture to
+the operating system instead, so a drag can end in another application, on the desktop or in a
+file manager, and a drag started anywhere on the machine can end on one of your components.
+
+The payload is a `ClipboardContent`, the same object a copy publishes. That's the whole idea: a
+drag is a copy that the user aims with the pointer, so whatever the application can already put
+on the clipboard it can already drag out, and whatever it can paste it can already accept as a
+drop. Offering several representations lets one drag land correctly in unrelated applications --
+a text editor takes the `text/html` representation, a plain text field takes `text/plain`, and
+the desktop takes the file list.
+
+To drag something out, give the component an operation:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/NativeDragAndDropDemo.java[tag=nativeDragSource,indent=0]
+----
+
+Dragging a file works the same way, except that the file often doesn't exist yet and the user
+may drop it nowhere at all. Register it as a provider and it's written at the moment a receiver
+asks for it, and never otherwise:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/NativeDragAndDropDemo.java[tag=nativeFileDrag,indent=0]
+----
+
+`NativeDragOperation.ACTION_MOVE` means the receiver takes ownership and the source deletes its
+copy. The source only learns whether that happened once the operating system has finished, which
+is why the outcome arrives through the completion listener rather than from the call that started
+the drag.
+
+Receiving a drop is the mirror image. The deepest component under the pointer that's a native
+drop target and accepts the content wins, so a target nested inside another takes precedence and
+a target that refuses a particular payload lets an ancestor have it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/NativeDragAndDropDemo.java[tag=nativeDropTarget,indent=0]
+----
+
+`NativeDropEvent` also reports whether the drag started inside this application, which is how a
+container that reorders its own items tells that case from an import.
+
+===== Where it works
+
+Native dragging needs the platform to have it, and platforms differ on whether a drag may leave
+the application at all -- a desktop can drop onto any other window, a tablet can drop into an
+application beside it, and a phone in full screen has nowhere for a drag to go even though drags
+within the application still work. Check both before offering the affordance:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/NativeDragAndDropDemo.java[tag=nativeDragSupport,indent=0]
+----
+
+Where the platform has none of this, the calls are harmless no-ops: the component simply can't be
+dragged through the operating system, and the lightweight dragging above is unaffected.
+
+[cols="2,1,1,4"]
+|===
+|Platform |Drags |Leaves the app |Notes
+
+|Desktop (the simulator and "run as desktop app")
+|yes |yes
+|Drops onto other windows, the desktop and file managers. Text, HTML, images, arbitrary
+binary payloads and multiple files.
+
+|Android
+|yes |Nougat and later
+|A drag crosses applications through `DRAG_FLAG_GLOBAL`, which arrived in Nougat. Files
+travel as content URIs, the same way the clipboard carries them.
+
+|iPadOS and Mac Catalyst
+|yes |yes
+|Drops into another application beside this one, and into Files or the Finder.
+
+|iPhone
+|yes |no
+|The session works, but a phone in full screen has no second application to drop into.
+
+|Everything else
+|no |no
+|`isSupported()` answers false and the lightweight dragging above is unaffected.
+|===
+
+===== Threading
+
+Drops arrive on the operating system's own drag thread rather than the event dispatch thread. The
+framework resolves which component a drag is over on that thread, from the accepted MIME types
+and actions alone, and dispatches the callbacks -- `nativeDragEnter`, `nativeDragOver`,
+`nativeDragExit` and `nativeDrop` -- on the event dispatch thread. A filter set through
+`setAcceptedDropMimeTypes` therefore takes effect from the first drag event, while a decision
+made inside a callback reaches the cursor one event later.
+
+The one method that runs off the event dispatch thread is `canAcceptNativeDrop`, which exists for
+a target whose answer depends on more than the MIME type. Read the content and the component's
+own configuration there; leave the user interface alone.
 
 
 

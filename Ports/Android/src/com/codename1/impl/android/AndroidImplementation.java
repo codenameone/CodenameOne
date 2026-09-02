@@ -2192,6 +2192,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 myView = new AndroidAsyncView(getActivity(), AndroidImplementation.this);
             }
             myView.getAndroidView().setVisibility(View.VISIBLE);
+            // Makes the surface an Android drop target, so a drag from another application --
+            // or from elsewhere in this one -- reaches the components that asked for it.
+            AndroidNativeDragAndDrop.install(this, myView.getAndroidView());
 
             if (hideOverlayWindowsRequested) {
                 setHideOverlayWindows(true);
@@ -10242,34 +10245,75 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     clipboard.setText(obj.toString());
                 } else {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    android.content.ClipData clip = null;
-                    if (sdk >= 16 && obj instanceof ClipboardContent
-                            && ((ClipboardContent) obj).getText(ClipboardContent.MIME_HTML) != null) {
-                        ClipboardContent rich = (ClipboardContent) obj;
-                        clip = ClipData.newHtmlText("Codename One",
-                                rich.getText(ClipboardContent.MIME_TEXT),
-                                rich.getText(ClipboardContent.MIME_HTML));
-                    } else if (obj instanceof ClipboardContent
-                            && ((ClipboardContent) obj).getText(ClipboardContent.MIME_TEXT) != null) {
-                        clip = ClipData.newPlainText("Codename One",
-                                ((ClipboardContent)obj).getText(ClipboardContent.MIME_TEXT));
-                    } else if (!(obj instanceof ClipboardContent)) {
-                        clip = ClipData.newPlainText("Codename One", obj.toString());
-                    }
+                    android.content.ClipData clip;
                     if (obj instanceof ClipboardContent) {
-                        try {
-                            clip = enrichClipWithBinaryContent((ClipboardContent) obj, clip);
-                        } catch (Throwable t) {
-                            com.codename1.io.Log.e(t);
-                        }
-                    }
-                    if (clip == null) {
-                        clip = ClipData.newPlainText("Codename One", "");
+                        clip = clipDataFor((ClipboardContent) obj);
+                    } else {
+                        clip = ClipData.newPlainText("Codename One", obj.toString());
                     }
                     clipboard.setPrimaryClip(clip);
                 }
             }
         });
+    }
+
+    /// Builds the Android clip that publishes a `ClipboardContent`, for a clipboard copy and
+    /// for a native drag alike -- both hand another application the same thing, so both go
+    /// through the same conversion, including the file provider URIs that let the receiving
+    /// application read generated image bytes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the representations to publish
+    ///
+    /// #### Returns
+    ///
+    /// the clip, never null
+    ClipData clipDataFor(ClipboardContent content) {
+        int sdk = android.os.Build.VERSION.SDK_INT;
+        ClipData clip = null;
+        if (sdk >= 16 && content.getText(ClipboardContent.MIME_HTML) != null) {
+            clip = ClipData.newHtmlText("Codename One",
+                    content.getText(ClipboardContent.MIME_TEXT),
+                    content.getText(ClipboardContent.MIME_HTML));
+        } else if (content.getText(ClipboardContent.MIME_TEXT) != null) {
+            clip = ClipData.newPlainText("Codename One", content.getText(ClipboardContent.MIME_TEXT));
+        }
+        try {
+            clip = enrichClipWithBinaryContent(content, clip);
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        if (clip == null) {
+            clip = ClipData.newPlainText("Codename One", "");
+        }
+        return clip;
+    }
+
+    // ------------------------------------------------------------------------------------
+    // Native drag and drop. See AndroidNativeDragAndDrop; the payload is the same ClipData a
+    // copy publishes, which is why a drag out of the application lands in another application
+    // exactly as a paste would.
+    // ------------------------------------------------------------------------------------
+
+    @Override
+    public boolean isNativeDragAndDropSupported() {
+        return AndroidNativeDragAndDrop.isSupported();
+    }
+
+    @Override
+    public boolean isNativeDragOutsideApplicationSupported() {
+        return AndroidNativeDragAndDrop.isOutsideApplicationSupported();
+    }
+
+    @Override
+    public boolean startNativeDrag(com.codename1.ui.NativeDragOperation op) {
+        return AndroidNativeDragAndDrop.startDrag(this, op);
+    }
+
+    @Override
+    public void cancelNativeDrag() {
+        AndroidNativeDragAndDrop.cancelDrag();
     }
 
     /**
@@ -10393,67 +10437,90 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     if (clip == null || clip.getItemCount() == 0) {
                         return;
                     }
-                    ClipboardContent content = new ClipboardContent();
-                    String plain = null;
-                    String html = null;
-                    boolean hasImage = false;
-                    List<String> fileUris = new ArrayList<String>();
-                    for (int i = 0; i < clip.getItemCount(); i++) {
-                        ClipData.Item item = clip.getItemAt(i);
-                        try {
-                            Uri uri = item.getUri();
-                            if (uri != null) {
-                                String type = getContext().getContentResolver().getType(uri);
-                                if (type != null && type.startsWith("image/")) {
-                                    InputStream in = getContext().getContentResolver().openInputStream(uri);
-                                    if (in != null) {
-                                        try {
-                                            byte[] bytes = Util.readInputStream(in);
-                                            content.setData(mimeForImageType(type), bytes);
-                                            hasImage = true;
-                                        } finally {
-                                            in.close();
-                                        }
-                                    }
-                                    continue;
-                                }
-                                // Non-image URI -> file reference
-                                fileUris.add(uri.toString());
-                                continue;
-                            }
-                        } catch (Throwable t) {
-                            com.codename1.io.Log.e(t);
-                        }
-                        if (html == null && sdk >= 16) {
-                            String itemHtml = item.getHtmlText();
-                            if (itemHtml != null && itemHtml.length() > 0) {
-                                html = itemHtml;
-                            }
-                        }
-                        if (plain == null) {
-                            CharSequence text = item.coerceToText(getContext());
-                            if (text != null && text.length() > 0) {
-                                plain = text.toString();
-                            }
-                        }
-                    }
-                    if (html != null) {
-                        content.setData(ClipboardContent.MIME_HTML, html);
-                    }
-                    if (!fileUris.isEmpty()) {
-                        content.setData(ClipboardContent.MIME_FILE,
-                                fileUris.size() == 1 ? (Object) fileUris.get(0) : (Object) fileUris.toArray(new String[0]));
-                    }
-                    content.setData(ClipboardContent.MIME_TEXT, plain == null ? "" : plain);
-                    if (hasImage || html != null || !fileUris.isEmpty()) {
+                    ClipboardContent content = contentFromClip(clip);
+                    String plain = content.getText(ClipboardContent.MIME_TEXT);
+                    if (content.getMimeTypes().length > 1) {
                         response[0] = content;
                     } else {
-                        response[0] = plain;
+                        response[0] = plain != null && plain.length() > 0 ? plain : null;
                     }
                 }
             }
         });
         return response[0];
+    }
+
+    /// Reads an Android `android.content.ClipData` into the framework's `ClipboardContent`.
+    ///
+    /// Shared by paste and by a native drop, because Android describes both the same way: a
+    /// list of items that are each text, HTML or a URI, and a URI is either an image to be read
+    /// or a file reference to be passed along. The plain text representation is always present,
+    /// even when empty, so a caller can tell "nothing but text" from "something richer" by the
+    /// number of MIME types.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clip`: the clip data, which may be null
+    ///
+    /// #### Returns
+    ///
+    /// the content, never null
+    ClipboardContent contentFromClip(ClipData clip) {
+        ClipboardContent content = new ClipboardContent();
+        if (clip == null) {
+            content.setData(ClipboardContent.MIME_TEXT, "");
+            return content;
+        }
+        int sdk = android.os.Build.VERSION.SDK_INT;
+        String plain = null;
+        String html = null;
+        List<String> fileUris = new ArrayList<String>();
+        for (int i = 0; i < clip.getItemCount(); i++) {
+            ClipData.Item item = clip.getItemAt(i);
+            try {
+                Uri uri = item.getUri();
+                if (uri != null) {
+                    String type = getContext().getContentResolver().getType(uri);
+                    if (type != null && type.startsWith("image/")) {
+                        InputStream in = getContext().getContentResolver().openInputStream(uri);
+                        if (in != null) {
+                            try {
+                                byte[] bytes = Util.readInputStream(in);
+                                content.setData(mimeForImageType(type), bytes);
+                            } finally {
+                                in.close();
+                            }
+                        }
+                        continue;
+                    }
+                    // Non-image URI -> file reference
+                    fileUris.add(uri.toString());
+                    continue;
+                }
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+            }
+            if (html == null && sdk >= 16) {
+                String itemHtml = item.getHtmlText();
+                if (itemHtml != null && itemHtml.length() > 0) {
+                    html = itemHtml;
+                }
+            }
+            if (plain == null) {
+                CharSequence text = item.coerceToText(getContext());
+                if (text != null && text.length() > 0) {
+                    plain = text.toString();
+                }
+            }
+        }
+        if (html != null) {
+            content.setData(ClipboardContent.MIME_HTML, html);
+        }
+        if (!fileUris.isEmpty()) {
+            content.setFiles(fileUris.toArray(new String[fileUris.size()]));
+        }
+        content.setData(ClipboardContent.MIME_TEXT, plain == null ? "" : plain);
+        return content;
     }
 
     public static MediaException createMediaException(int extra) {

@@ -80,6 +80,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.ClipboardContent;
+import com.codename1.ui.NativeDragOperation;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -5564,6 +5565,91 @@ public abstract class CodenameOneImplementation {
     /// might replace the DefaultLookAndFeel instance and the default transitions.
     public void installNativeTheme() {
         throw new RuntimeException();
+    }
+
+    // ------------------------------------------------------------------------------------
+    // Native (operating system) drag and drop. The payload is a ClipboardContent, the same one
+    // copyToClipboard publishes, because a drag is a copy the user aims with the pointer.
+    //
+    // A port implements the outbound half here and calls
+    // com.codename1.ui.NativeDragAndDrop for the inbound half.
+    // ------------------------------------------------------------------------------------
+
+    /// Returns true when this platform can hand a drag to the operating system. False here
+    /// leaves the framework with only its lightweight in-form drag and drop, which is what
+    /// every port had before.
+    ///
+    /// #### Returns
+    ///
+    /// true when native drag and drop is available
+    public boolean isNativeDragAndDropSupported() {
+        return false;
+    }
+
+    /// Returns true when a drag started in this application can be dropped outside it -- on the
+    /// desktop, in a file manager, or in another application's window. Ports that can route a
+    /// drag between their own components but not out of the application return false while
+    /// still returning true from `#isNativeDragAndDropSupported()`.
+    ///
+    /// #### Returns
+    ///
+    /// true when a drag can leave the application
+    public boolean isNativeDragOutsideApplicationSupported() {
+        return isNativeDragAndDropSupported();
+    }
+
+    /// Hands the port the drag that would start if the press currently down turns into a drag.
+    ///
+    /// Ports whose platform owns the gesture -- where the operating system's own recognizer
+    /// decides a drag has begun and then asks what is being dragged -- answer from what they
+    /// were given here. Ports that start the session themselves can ignore this and use
+    /// `#startNativeDrag(com.codename1.ui.NativeDragOperation)`.
+    ///
+    /// Invoked on the event dispatch thread, once per press. A press that produces no drag is
+    /// followed by `#cancelNativeDrag()`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `op`: the drag that is now possible
+    public void prepareNativeDrag(NativeDragOperation op) {
+    }
+
+    /// Starts a native drag session now, because the pointer has moved far enough to be a drag.
+    /// Invoked on the event dispatch thread while the pointer is still down.
+    ///
+    /// A port that starts the session must eventually report the outcome through
+    /// `com.codename1.ui.NativeDragAndDrop#dragCompleted(int)`, or a source that offered a move
+    /// never learns whether to delete its copy.
+    ///
+    /// #### Parameters
+    ///
+    /// - `op`: what is being dragged
+    ///
+    /// #### Returns
+    ///
+    /// true when the operating system took the drag
+    public boolean startNativeDrag(NativeDragOperation op) {
+        return false;
+    }
+
+    /// Discards whatever `#prepareNativeDrag(com.codename1.ui.NativeDragOperation)` staged,
+    /// because the press turned out to be a click.
+    public void cancelNativeDrag() {
+    }
+
+    /// True when the port needs the drag image at the moment the operation is staged rather
+    /// than when the drag begins.
+    ///
+    /// A port that starts the session itself renders the image then, which costs nothing for a
+    /// press that turns out to be a click. A port whose platform owns the drag gesture is asked
+    /// for the preview from inside that platform's own callback, which is not a moment at which
+    /// a component can be rendered, so it has to have the image already.
+    ///
+    /// #### Returns
+    ///
+    /// true to render the drag image on every press over a native drag source
+    public boolean isNativeDragImageNeededOnPrepare() {
+        return false;
     }
 
     /// Performs a clipboard copy operation, if the native clipboard is supported by the implementation it would be used

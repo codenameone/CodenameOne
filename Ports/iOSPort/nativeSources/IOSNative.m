@@ -53,6 +53,7 @@
 #endif
 #import "CN1AudioUnit.h"
 #import "CN1AppleUI.h"
+#import "CN1DragAndDrop.h"
 
 #if TARGET_OS_OSX
 /*
@@ -1067,6 +1068,83 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_Str
 
 extern NSData* arrayToData(JAVA_OBJECT arr);
 extern JAVA_OBJECT nsDataToByteArr(NSData *data);
+
+/*
+ * Native drag and drop. The UIKit half lives in CN1DragAndDrop.m; everything here is the
+ * ParparVM boundary, kept in this file with the other bridges so all the thread-state handling
+ * stays in one place.
+ */
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isNativeDragAndDropSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return CN1DragAndDropSupported() ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isNativeDragOutsideAppSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return CN1DragOutsideAppSupported() ? JAVA_TRUE : JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_prepareNativeDrag___java_lang_String_int_byte_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeTypes, JAVA_INT allowedActions, JAVA_OBJECT dragImagePng, JAVA_INT touchX, JAVA_INT touchY) {
+    POOL_BEGIN();
+    NSString* mimes = mimeTypes == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeTypes);
+    NSData* preview = dragImagePng == JAVA_NULL ? nil : arrayToData(dragImagePng);
+    // On the main thread: the interactions and the state they read live there, and this is
+    // called from the event dispatch thread as the press is dispatched.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1PrepareNativeDrag(mimes, (int)allowedActions, preview, (int)touchX, (int)touchY);
+    });
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_setNativeDragPayload___java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT plain, JAVA_OBJECT html, JAVA_OBJECT rtf, JAVA_OBJECT image, JAVA_OBJECT fileUris) {
+    POOL_BEGIN();
+    // Synchronously, unlike prepare: this runs inside the session-started callback on the main
+    // thread and the item providers are built from it the moment it returns.
+    CN1SetNativeDragPayload(plain == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG plain),
+                            html == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG html),
+                            rtf == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG rtf),
+                            image == JAVA_NULL ? nil : arrayToData(image),
+                            fileUris == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG fileUris));
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_cancelNativeDrag__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CN1CancelNativeDrag();
+    });
+}
+
+int CN1NativeDragDeliverOver(int x, int y, NSString* mimeTypes, int allowedActions, BOOL entering) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDragOverCallback___int_int_java_lang_String_int_boolean_R_int(
+            CN1_THREAD_GET_STATE_PASS_ARG x, y,
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeTypes),
+            allowedActions, entering ? JAVA_TRUE : JAVA_FALSE);
+}
+
+void CN1NativeDragDeliverExit(void) {
+    com_codename1_impl_ios_IOSImplementation_nativeDragExitCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+int CN1NativeDragDeliverDrop(int x, int y, NSString* plain, NSString* html, NSString* rtf,
+                             NSData* image, NSString* fileUris, int action) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDropCallback___int_int_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_java_lang_String_int_R_int(
+            CN1_THREAD_GET_STATE_PASS_ARG x, y,
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG plain),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG html),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG rtf),
+            image == nil ? JAVA_NULL : nsDataToByteArr(image),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG fileUris),
+            action);
+}
+
+int CN1NativeDragDeliverSessionStarted(void) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDragSessionStartedCallback___R_int(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1NativeDragDeliverCompleted(int action) {
+    com_codename1_impl_ios_IOSImplementation_nativeDragCompletedCallback___int(
+            CN1_THREAD_GET_STATE_PASS_ARG action);
+}
 
 #if TARGET_OS_OSX
 /// The pasteboard type the bytes actually are, by magic number, or nil when

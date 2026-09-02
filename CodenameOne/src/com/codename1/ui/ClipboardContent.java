@@ -46,12 +46,40 @@ public class ClipboardContent {
     public static final String MIME_GIF = "image/gif";
     /// A local file reference (a file path / URI `String`, or a `String[]` for several files).
     public static final String MIME_FILE = "application/x-file-list";
+    /// A newline separated list of URIs, the format desktop browsers and file managers use when
+    /// a link or a file is dragged out of them.
+    public static final String MIME_URI_LIST = "text/uri-list";
 
     private final List<String> mimeTypes = new ArrayList<String>();
     private final List<Object> values = new ArrayList<Object>();
 
     /// Adds or replaces a representation. Passing null removes the MIME type.
     public ClipboardContent setData(String mimeType, Object value) {
+        return put(mimeType, value);
+    }
+
+    /// Declares a representation that is only built if something reads it, which is how a drag
+    /// offers a file it has not written yet or an image it has not encoded yet.
+    ///
+    /// The provider is asked at most once and its answer is then cached, so
+    /// `#getData(java.lang.String)` behaves exactly as it would for a value passed to
+    /// `#setData(java.lang.String, java.lang.Object)`. It may run on a native clipboard or drag
+    /// thread; see `ClipboardDataProvider`. Passing a null provider removes the MIME type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeType`: the MIME type this provider can produce
+    ///
+    /// - `provider`: the provider, or null to remove the representation
+    ///
+    /// #### Returns
+    ///
+    /// this instance, for chaining
+    public ClipboardContent setDataProvider(String mimeType, ClipboardDataProvider provider) {
+        return put(mimeType, provider == null ? null : new LazyValue(provider));
+    }
+
+    private ClipboardContent put(String mimeType, Object value) {
         String normalized = normalizeMimeType(mimeType);
         if (normalized.length() == 0) {
             throw new IllegalArgumentException("MIME type must not be empty");
@@ -74,9 +102,41 @@ public class ClipboardContent {
     }
 
     /// Returns the representation for a MIME type, or null when it isn't available.
+    ///
+    /// A representation registered through
+    /// `#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)` is produced
+    /// here, on the first call for that MIME type.
     public Object getData(String mimeType) {
         int index = mimeTypes.indexOf(normalizeMimeType(mimeType));
-        return index < 0 ? null : values.get(index);
+        if (index < 0) {
+            return null;
+        }
+        Object value = values.get(index);
+        if (value instanceof LazyValue) {
+            return ((LazyValue) value).resolve(mimeTypes.get(index));
+        }
+        return value;
+    }
+
+    /// A provider plus the value it produced. The value is resolved once and remembered, so a
+    /// target that asks twice -- as a drop does when it queries and then reads -- does not run
+    /// the provider twice and does not, for instance, write the promised file twice.
+    private static final class LazyValue {
+        private final ClipboardDataProvider provider;
+        private Object resolved;
+        private boolean done;
+
+        LazyValue(ClipboardDataProvider provider) {
+            this.provider = provider;
+        }
+
+        synchronized Object resolve(String mimeType) {
+            if (!done) {
+                done = true;
+                resolved = provider.getClipboardData(mimeType);
+            }
+            return resolved;
+        }
     }
 
     /// Returns the binary (`byte[]`) representation for a MIME type -- e.g. the raw bytes of an image
@@ -100,6 +160,43 @@ public class ClipboardContent {
     /// Returns the available MIME types in preference order.
     public String[] getMimeTypes() {
         return mimeTypes.toArray(new String[mimeTypes.size()]);
+    }
+
+    /// Sets the `#MIME_FILE` representation from a list of file paths or `file:` URIs.
+    ///
+    /// Ports differ on whether a single file is carried as a `String` or a one element
+    /// `String[]`; this writes the form the rest of the framework expects, and
+    /// `#getFiles()` reads either.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paths`: the file paths, or null to remove the representation
+    ///
+    /// #### Returns
+    ///
+    /// this instance, for chaining
+    public ClipboardContent setFiles(String[] paths) {
+        if (paths == null || paths.length == 0) {
+            return setData(MIME_FILE, null);
+        }
+        if (paths.length == 1) {
+            return setData(MIME_FILE, paths[0]);
+        }
+        return setData(MIME_FILE, paths.clone());
+    }
+
+    /// Returns the `#MIME_FILE` representation as a path array regardless of whether the
+    /// producer stored one `String` or a `String[]`, or null when no files are available.
+    public String[] getFiles() {
+        Object value = getData(MIME_FILE);
+        if (value instanceof String[]) {
+            String[] paths = (String[]) value;
+            return paths.length == 0 ? null : paths.clone();
+        }
+        if (value instanceof String && ((String) value).length() > 0) {
+            return new String[] { (String) value };
+        }
+        return null;
     }
 
     /// Returns the first available MIME type from the caller's preference list, or null.

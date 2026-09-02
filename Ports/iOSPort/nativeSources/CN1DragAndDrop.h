@@ -1,0 +1,102 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+
+#ifndef CN1DragAndDrop_h
+#define CN1DragAndDrop_h
+
+#import <Foundation/Foundation.h>
+#include "TargetConditionals.h"
+#import "CN1AppleUI.h"
+
+/*
+ * Native drag and drop for the UIKit ports: iOS, iPadOS and Mac Catalyst.
+ *
+ * UIKit owns the drag gesture. UIDragInteraction has its own recognizer -- a long press on a
+ * phone, a lift on a trackpad -- and asks the delegate what is being dragged at the moment it
+ * fires. So the framework cannot start a session on its own drag threshold the way the desktop
+ * port does; instead it stages the operation on the press (CN1PrepareNativeDrag) and this file
+ * calls back into Java when UIKit decides a drag has begun.
+ *
+ * The payload itself is fetched at that later moment rather than on the press, because a drag
+ * that may carry a file the application has not written yet must not write it every time the
+ * user merely touches the component.
+ *
+ * watchOS, tvOS and the native AppKit port have no UIDragInteraction; there the whole file
+ * compiles to the unsupported answers below and the framework keeps its lightweight in-form
+ * drag and drop.
+ */
+
+/// True when this build can drag through the operating system at all.
+BOOL CN1DragAndDropSupported(void);
+
+/// True when a drag started here can be dropped outside the application. On iPadOS and Mac
+/// Catalyst it can; on iPhone a drag stays inside the application, because there is no second
+/// application on screen to drop it into.
+BOOL CN1DragOutsideAppSupported(void);
+
+/// Attaches the drag and the drop interactions to the Codename One surface.
+void CN1InstallDragAndDrop(CN1View* view);
+
+/// Stages the drag a press has made possible: which representations it can offer, what the
+/// receiver may do with them, and the image to show under the finger. The representations are
+/// named but not built -- CN1SetNativeDragPayload delivers the bytes once the drag really
+/// starts.
+///
+/// mimeTypes is newline separated.
+void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragImagePng,
+                          int touchX, int touchY);
+
+/// Delivers the payload for the session UIKit has just started. Called from Java, from inside
+/// the session-started callback below.
+///
+/// fileUris is newline separated and may be nil.
+void CN1SetNativeDragPayload(NSString* plain, NSString* html, NSString* rtf,
+                             NSData* image, NSString* fileUris);
+
+/// Drops whatever CN1PrepareNativeDrag staged, because the press turned out to be a tap.
+void CN1CancelNativeDrag(void);
+
+/*
+ * The Java side of the bridge. Defined in IOSNative.m, where every piece of ParparVM thread
+ * state handling lives, so that this file stays plain UIKit.
+ */
+
+/// Reports a drag moving over the surface and returns the action a drop would perform, or 0.
+int CN1NativeDragDeliverOver(int x, int y, NSString* mimeTypes, int allowedActions, BOOL entering);
+
+/// Reports a drag leaving the surface.
+void CN1NativeDragDeliverExit(void);
+
+/// Delivers a drop and returns the action actually accepted, or 0 when nothing took it.
+int CN1NativeDragDeliverDrop(int x, int y, NSString* plain, NSString* html, NSString* rtf,
+                             NSData* image, NSString* fileUris, int action);
+
+/// Announces that UIKit has started a drag session. Returns the actions the framework's staged
+/// operation allows, or 0 when it has none -- in which case no drag begins. The Java side calls
+/// CN1SetNativeDragPayload from inside this call.
+int CN1NativeDragDeliverSessionStarted(void);
+
+/// Reports the outcome of a session this application started.
+void CN1NativeDragDeliverCompleted(int action);
+
+#endif

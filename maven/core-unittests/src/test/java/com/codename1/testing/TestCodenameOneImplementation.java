@@ -122,6 +122,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Message lastSentMessage;
     private int refreshContactsCount;
 
+    /// Native drag and drop, faked so the framework's outbound path can be exercised without a
+    /// real operating system drag: the last operation prepared and the last one started are
+    /// recorded, and startNativeDrag reports success only while nativeDragAndDropSupported is on.
+    private boolean nativeDragAndDropSupported;
+    private com.codename1.ui.NativeDragOperation preparedNativeDrag;
+    private com.codename1.ui.NativeDragOperation startedNativeDrag;
+    private int cancelledNativeDrags;
+    private boolean nativeDragStartRefused;
+
     private final TestFont defaultFont = new TestFont(8, 16);
     private int displayWidth = 1080;
     private int displayHeight = 1920;
@@ -5565,5 +5574,68 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     /// Delivers a pointer release into one of the additional native windows.
     public void windowPointerReleasedForTest(int windowId, int x, int y) {
         windowPointerReleased(windowId, x, y);
+    }
+
+    // ------------------------------------------------------------------------------------
+    // Native drag and drop test hooks
+    // ------------------------------------------------------------------------------------
+
+    /// Turns the fake native drag and drop on, which is what makes
+    /// `com.codename1.ui.NativeDragAndDrop#isSupported()` true for a test.
+    public void setNativeDragAndDropSupported(boolean supported) {
+        this.nativeDragAndDropSupported = supported;
+    }
+
+    @Override
+    public boolean isNativeDragAndDropSupported() {
+        return nativeDragAndDropSupported;
+    }
+
+    @Override
+    public void prepareNativeDrag(com.codename1.ui.NativeDragOperation op) {
+        preparedNativeDrag = op;
+    }
+
+    @Override
+    public boolean startNativeDrag(com.codename1.ui.NativeDragOperation op) {
+        if (!nativeDragAndDropSupported || nativeDragStartRefused) {
+            return false;
+        }
+        startedNativeDrag = op;
+        return true;
+    }
+
+    /// Makes startNativeDrag refuse, which is how a port whose operating system owns the drag
+    /// gesture behaves: it starts no session of its own and announces the platform's later.
+    public void setNativeDragStartRefused(boolean refused) {
+        this.nativeDragStartRefused = refused;
+    }
+
+    @Override
+    public void cancelNativeDrag() {
+        cancelledNativeDrags++;
+        preparedNativeDrag = null;
+    }
+
+    /// The operation the last press staged, or null.
+    public com.codename1.ui.NativeDragOperation getPreparedNativeDrag() {
+        return preparedNativeDrag;
+    }
+
+    /// The operation the last drag actually started, or null.
+    public com.codename1.ui.NativeDragOperation getStartedNativeDrag() {
+        return startedNativeDrag;
+    }
+
+    /// How many prepared operations were dropped because the press turned out to be a click.
+    public int getCancelledNativeDrags() {
+        return cancelledNativeDrags;
+    }
+
+    /// Forgets everything recorded, so one test does not see another's drag.
+    public void resetNativeDragState() {
+        preparedNativeDrag = null;
+        startedNativeDrag = null;
+        cancelledNativeDrags = 0;
     }
 }

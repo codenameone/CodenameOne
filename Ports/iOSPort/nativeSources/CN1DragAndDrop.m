@@ -1,0 +1,521 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+
+#import "CN1DragAndDrop.h"
+
+#define CN1_DND_ACTION_NONE 0
+#define CN1_DND_ACTION_COPY 1
+#define CN1_DND_ACTION_MOVE 2
+#define CN1_DND_ACTION_LINK 4
+
+#if TARGET_OS_OSX || TARGET_OS_WATCH || TARGET_OS_TV
+
+// No UIDragInteraction on these targets. The framework asks first and falls back to its
+// lightweight in-form drag and drop, so these answers are the whole implementation.
+
+BOOL CN1DragAndDropSupported(void) {
+    return NO;
+}
+
+BOOL CN1DragOutsideAppSupported(void) {
+    return NO;
+}
+
+void CN1InstallDragAndDrop(CN1View* view) {
+}
+
+void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragImagePng,
+                          int touchX, int touchY) {
+}
+
+void CN1SetNativeDragPayload(NSString* plain, NSString* html, NSString* rtf,
+                             NSData* image, NSString* fileUris) {
+}
+
+void CN1CancelNativeDrag(void) {
+}
+
+#else
+
+/// The device pixel scale, owned by the view controller. UIKit reports drag positions in
+/// points and the framework works in pixels, exactly as the touch path does.
+extern float scaleValue;
+
+/// What the press staged: the representations the drag could offer, what a receiver may do
+/// with them, and the preview. Named but not built -- see CN1DragAndDrop.h.
+static NSArray* cn1PreparedMimes = nil;
+static int cn1PreparedActions = CN1_DND_ACTION_NONE;
+static UIImage* cn1PreparedPreview = nil;
+static CGPoint cn1PreparedTouch;
+
+/// The payload of the session UIKit is currently running, delivered by
+/// CN1SetNativeDragPayload once the drag has actually begun. Keyed by uniform type identifier
+/// so the item provider can register each one directly.
+static NSMutableDictionary* cn1DragData = nil;
+static NSArray* cn1DragFileUrls = nil;
+
+/// The last action the framework agreed to, reused when a drop arrives without one.
+static int cn1LastDropAction = CN1_DND_ACTION_NONE;
+
+/// True while this application is the source of the session in progress.
+static BOOL cn1DraggingOut = NO;
+
+/// The MIME types the framework names, mapped onto the uniform type identifiers UIKit and
+/// every other application on the system speak.
+static NSString* cn1UtiForMime(NSString* mime) {
+    if ([mime isEqualToString:@"text/plain"]) {
+        return @"public.utf8-plain-text";
+    }
+    if ([mime isEqualToString:@"text/html"]) {
+        return @"public.html";
+    }
+    if ([mime isEqualToString:@"text/rtf"]) {
+        return @"public.rtf";
+    }
+    if ([mime isEqualToString:@"text/markdown"]) {
+        return @"net.daringfireball.markdown";
+    }
+    if ([mime isEqualToString:@"image/png"]) {
+        return @"public.png";
+    }
+    if ([mime isEqualToString:@"image/jpeg"]) {
+        return @"public.jpeg";
+    }
+    if ([mime isEqualToString:@"image/gif"]) {
+        return @"com.compuserve.gif";
+    }
+    if ([mime isEqualToString:@"application/x-file-list"]) {
+        return @"public.file-url";
+    }
+    if ([mime isEqualToString:@"text/uri-list"]) {
+        return @"public.url";
+    }
+    return nil;
+}
+
+static NSString* cn1MimeForUti(NSString* uti) {
+    if ([uti isEqualToString:@"public.utf8-plain-text"] || [uti isEqualToString:@"public.plain-text"]
+            || [uti isEqualToString:@"public.text"]) {
+        return @"text/plain";
+    }
+    if ([uti isEqualToString:@"public.html"]) {
+        return @"text/html";
+    }
+    if ([uti isEqualToString:@"public.rtf"]) {
+        return @"text/rtf";
+    }
+    if ([uti isEqualToString:@"net.daringfireball.markdown"]) {
+        return @"text/markdown";
+    }
+    if ([uti isEqualToString:@"public.png"]) {
+        return @"image/png";
+    }
+    if ([uti isEqualToString:@"public.jpeg"]) {
+        return @"image/jpeg";
+    }
+    if ([uti isEqualToString:@"com.compuserve.gif"]) {
+        return @"image/gif";
+    }
+    if ([uti isEqualToString:@"public.file-url"]) {
+        return @"application/x-file-list";
+    }
+    if ([uti isEqualToString:@"public.url"]) {
+        return @"text/uri-list";
+    }
+    return nil;
+}
+
+/// Files one representation under the uniform type identifier the rest of the system knows it
+/// by, so the mapping lives in cn1UtiForMime rather than being spelled out again here.
+static void cn1PutRepresentation(NSMutableDictionary* data, NSString* mime, NSData* value) {
+    if (value == nil || value.length == 0) {
+        return;
+    }
+    NSString* uti = cn1UtiForMime(mime);
+    if (uti != nil) {
+        [data setObject:value forKey:uti];
+    }
+}
+
+static UIDropOperation cn1DropOperationFor(int action) {
+    if ((action & CN1_DND_ACTION_MOVE) != 0) {
+        return UIDropOperationMove;
+    }
+    if ((action & CN1_DND_ACTION_LINK) != 0) {
+        // UIKit has no "link"; a receiver that wanted one still wants the transfer to happen,
+        // and copy is the operation that says so without claiming the source loses its data.
+        return UIDropOperationCopy;
+    }
+    if ((action & CN1_DND_ACTION_COPY) != 0) {
+        return UIDropOperationCopy;
+    }
+    return UIDropOperationCancel;
+}
+
+/// The MIME types a drag in progress is offering, newline separated, derived from the type
+/// identifiers alone. UIKit does not hand over the data until the drop and the framework only
+/// needs the names in order to decide whether any component wants the drag.
+static NSString* cn1MimesForSession(id<UIDropSession> session) {
+    NSMutableArray* mimes = [NSMutableArray array];
+    for (UIDragItem* item in session.items) {
+        for (NSString* uti in item.itemProvider.registeredTypeIdentifiers) {
+            NSString* mime = cn1MimeForUti(uti);
+            if (mime != nil && ![mimes containsObject:mime]) {
+                [mimes addObject:mime];
+            }
+        }
+        // A provider that can vend a file is a file drag whatever else it also offers, which is
+        // how a document dragged out of Files reaches a target that asked for files.
+        if ([item.itemProvider hasItemConformingToTypeIdentifier:@"public.file-url"]
+                && ![mimes containsObject:@"application/x-file-list"]) {
+            [mimes addObject:@"application/x-file-list"];
+        }
+    }
+    return [mimes componentsJoinedByString:@"\n"];
+}
+
+BOOL CN1DragAndDropSupported(void) {
+    if (@available(iOS 11.0, *)) {
+        return YES;
+    }
+    return NO;
+}
+
+BOOL CN1DragOutsideAppSupported(void) {
+    if (@available(iOS 11.0, *)) {
+#if TARGET_OS_MACCATALYST
+        return YES;
+#else
+        // UIDragInteraction only carries a drag out of the application where the system has
+        // somewhere to carry it to: an iPad, or an iPhone running iPadOS style multitasking.
+        // On a phone in full screen the same session works, but it can only end on one of this
+        // application's own components.
+        return [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad;
+#endif
+    }
+    return NO;
+}
+
+void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragImagePng,
+                          int touchX, int touchY) {
+    NSArray* mimes = mimeTypes == nil || mimeTypes.length == 0
+            ? nil : [mimeTypes componentsSeparatedByString:@"\n"];
+#ifndef CN1_USE_ARC
+    [cn1PreparedMimes release];
+    [cn1PreparedPreview release];
+#endif
+    cn1PreparedMimes = mimes;
+    cn1PreparedActions = allowedActions;
+    cn1PreparedPreview = dragImagePng == nil ? nil : [UIImage imageWithData:dragImagePng];
+    cn1PreparedTouch = CGPointMake(touchX / scaleValue, touchY / scaleValue);
+#ifndef CN1_USE_ARC
+    [cn1PreparedMimes retain];
+    [cn1PreparedPreview retain];
+#endif
+}
+
+void CN1SetNativeDragPayload(NSString* plain, NSString* html, NSString* rtf,
+                             NSData* image, NSString* fileUris) {
+    NSMutableDictionary* data = [NSMutableDictionary dictionary];
+    cn1PutRepresentation(data, @"text/plain", plain == nil ? nil : [plain dataUsingEncoding:NSUTF8StringEncoding]);
+    cn1PutRepresentation(data, @"text/html", html == nil ? nil : [html dataUsingEncoding:NSUTF8StringEncoding]);
+    cn1PutRepresentation(data, @"text/rtf", rtf == nil ? nil : [rtf dataUsingEncoding:NSUTF8StringEncoding]);
+    cn1PutRepresentation(data, @"image/png", image);
+    NSMutableArray* urls = [NSMutableArray array];
+    if (fileUris != nil && fileUris.length > 0) {
+        for (NSString* entry in [fileUris componentsSeparatedByString:@"\n"]) {
+            if (entry.length == 0) {
+                continue;
+            }
+            // ClipboardContent's file representation permits a raw local path as well as a
+            // file: URI, and URLWithString: turns a path into a scheme-less relative URL that
+            // no receiver can open.
+            NSURL* url = ([entry hasPrefix:@"/"] || [entry hasPrefix:@"~"])
+                    ? [NSURL fileURLWithPath:[entry stringByExpandingTildeInPath]]
+                    : [NSURL URLWithString:entry];
+            if (url != nil) {
+                [urls addObject:url];
+            }
+        }
+    }
+#ifndef CN1_USE_ARC
+    [cn1DragData release];
+    [cn1DragFileUrls release];
+#endif
+    cn1DragData = data;
+    cn1DragFileUrls = urls;
+#ifndef CN1_USE_ARC
+    [cn1DragData retain];
+    [cn1DragFileUrls retain];
+#endif
+}
+
+void CN1CancelNativeDrag(void) {
+#ifndef CN1_USE_ARC
+    [cn1PreparedMimes release];
+    [cn1PreparedPreview release];
+#endif
+    cn1PreparedMimes = nil;
+    cn1PreparedPreview = nil;
+    cn1PreparedActions = CN1_DND_ACTION_NONE;
+}
+
+API_AVAILABLE(ios(11.0))
+@interface CN1DragAndDropDelegate : NSObject <UIDragInteractionDelegate, UIDropInteractionDelegate>
+@end
+
+@implementation CN1DragAndDropDelegate
+
+// ---- the drag out half ------------------------------------------------------------------
+
+- (NSArray<UIDragItem *> *)dragInteraction:(UIDragInteraction *)interaction
+                  itemsForBeginningSession:(id<UIDragSession>)session {
+    if (cn1PreparedMimes == nil || cn1PreparedMimes.count == 0) {
+        return @[];
+    }
+    // Asking the framework now, rather than on the press, is what lets a promised file stay
+    // unwritten until a drag really happens. The Java side fills cn1DragData from inside this
+    // call through CN1SetNativeDragPayload.
+    int allowed = CN1NativeDragDeliverSessionStarted();
+    if (allowed == CN1_DND_ACTION_NONE) {
+        return @[];
+    }
+    cn1DraggingOut = YES;
+
+    NSMutableArray<UIDragItem *>* items = [NSMutableArray array];
+    // Files first, one item each: a receiver that copies documents expects one item per
+    // document, and collapsing several into one loses all but the first.
+    for (NSURL* url in cn1DragFileUrls) {
+        NSItemProvider* provider = [[NSItemProvider alloc] initWithContentsOfURL:url];
+        if (provider == nil) {
+            continue;
+        }
+        UIDragItem* item = [[UIDragItem alloc] initWithItemProvider:provider];
+        [items addObject:item];
+#ifndef CN1_USE_ARC
+        [provider release];
+        [item release];
+#endif
+    }
+    if (cn1DragData.count > 0) {
+        NSItemProvider* provider = [[NSItemProvider alloc] init];
+        for (NSString* uti in cn1DragData) {
+            NSData* payload = [cn1DragData objectForKey:uti];
+#ifndef CN1_USE_ARC
+            [payload retain];
+#endif
+            [provider registerDataRepresentationForTypeIdentifier:uti
+                                                       visibility:NSItemProviderRepresentationVisibilityAll
+                                                      loadHandler:^NSProgress *(void (^completion)(NSData *, NSError *)) {
+                completion(payload, nil);
+                return nil;
+            }];
+        }
+        UIDragItem* item = [[UIDragItem alloc] initWithItemProvider:provider];
+        [items addObject:item];
+#ifndef CN1_USE_ARC
+        [provider release];
+        [item release];
+#endif
+    }
+    if (items.count == 0) {
+        cn1DraggingOut = NO;
+        CN1NativeDragDeliverCompleted(CN1_DND_ACTION_NONE);
+    }
+    return items;
+}
+
+- (UIDragPreview *)dragInteraction:(UIDragInteraction *)interaction
+                previewForLiftingItem:(UIDragItem *)item
+                              session:(id<UIDragSession>)session {
+    if (cn1PreparedPreview == nil) {
+        // Without one UIKit snapshots the interaction's view, which is the whole Codename One
+        // surface; nil here leaves UIKit to its default rather than dragging the entire screen.
+        return nil;
+    }
+    UIImageView* view = [[UIImageView alloc] initWithImage:cn1PreparedPreview];
+    UIDragPreview* preview = [[UIDragPreview alloc] initWithView:view];
+#ifndef CN1_USE_ARC
+    [view release];
+    [preview autorelease];
+#endif
+    return preview;
+}
+
+- (void)dragInteraction:(UIDragInteraction *)interaction
+                session:(id<UIDragSession>)session
+    didEndWithOperation:(UIDropOperation)operation {
+    cn1DraggingOut = NO;
+    int action = CN1_DND_ACTION_NONE;
+    if (operation == UIDropOperationCopy) {
+        action = CN1_DND_ACTION_COPY;
+    } else if (operation == UIDropOperationMove) {
+        action = CN1_DND_ACTION_MOVE;
+    }
+    CN1NativeDragDeliverCompleted(action);
+}
+
+// ---- the drop half ----------------------------------------------------------------------
+
+- (BOOL)dropInteraction:(UIDropInteraction *)interaction canHandleSession:(id<UIDropSession>)session {
+    return YES;
+}
+
+- (void)dropInteraction:(UIDropInteraction *)interaction sessionDidEnter:(id<UIDropSession>)session {
+    CGPoint point = [session locationInView:interaction.view];
+    cn1LastDropAction = CN1NativeDragDeliverOver((int)(point.x * scaleValue), (int)(point.y * scaleValue),
+                                                 cn1MimesForSession(session), CN1_DND_ACTION_COPY, YES);
+}
+
+- (UIDropProposal *)dropInteraction:(UIDropInteraction *)interaction
+                   sessionDidUpdate:(id<UIDropSession>)session {
+    CGPoint point = [session locationInView:interaction.view];
+    cn1LastDropAction = CN1NativeDragDeliverOver((int)(point.x * scaleValue), (int)(point.y * scaleValue),
+                                                 cn1MimesForSession(session), CN1_DND_ACTION_COPY, NO);
+    UIDropProposal* proposal = [[UIDropProposal alloc] initWithDropOperation:cn1DropOperationFor(cn1LastDropAction)];
+#ifndef CN1_USE_ARC
+    [proposal autorelease];
+#endif
+    return proposal;
+}
+
+- (void)dropInteraction:(UIDropInteraction *)interaction sessionDidExit:(id<UIDropSession>)session {
+    cn1LastDropAction = CN1_DND_ACTION_NONE;
+    CN1NativeDragDeliverExit();
+}
+
+- (void)dropInteraction:(UIDropInteraction *)interaction performDrop:(id<UIDropSession>)session {
+    CGPoint point = [session locationInView:interaction.view];
+    const int x = (int)(point.x * scaleValue);
+    const int y = (int)(point.y * scaleValue);
+    const int action = cn1LastDropAction == CN1_DND_ACTION_NONE ? CN1_DND_ACTION_COPY : cn1LastDropAction;
+
+    // Every representation is loaded asynchronously and independently, so the framework is only
+    // told about the drop once they have all answered. Delivering per representation instead
+    // would give the application several drops for one gesture, each missing the others.
+    NSMutableDictionary* collected = [[NSMutableDictionary alloc] init];
+    NSMutableArray* files = [[NSMutableArray alloc] init];
+    dispatch_group_t group = dispatch_group_create();
+
+    for (UIDragItem* item in session.items) {
+        NSItemProvider* provider = item.itemProvider;
+        if ([provider hasItemConformingToTypeIdentifier:@"public.file-url"]) {
+            dispatch_group_enter(group);
+            [provider loadFileRepresentationForTypeIdentifier:@"public.file-url"
+                                           completionHandler:^(NSURL* url, NSError* error) {
+                if (url != nil) {
+                    // The URL is only valid inside this handler, so the file is copied out
+                    // before it is named to the application. A path handed over without
+                    // copying is unreadable by the time the event dispatch thread sees it.
+                    NSString* name = url.lastPathComponent;
+                    if (name == nil || name.length == 0) {
+                        name = @"dropped";
+                    }
+                    NSString* target = [NSTemporaryDirectory() stringByAppendingPathComponent:
+                                        [NSString stringWithFormat:@"cn1-drop-%@-%@",
+                                         [[NSUUID UUID] UUIDString], name]];
+                    NSError* copyError = nil;
+                    if ([[NSFileManager defaultManager] copyItemAtURL:url
+                                                                toURL:[NSURL fileURLWithPath:target]
+                                                                error:&copyError]) {
+                        @synchronized (files) {
+                            [files addObject:target];
+                        }
+                    }
+                }
+                dispatch_group_leave(group);
+            }];
+            continue;
+        }
+        for (NSString* uti in provider.registeredTypeIdentifiers) {
+            NSString* mime = cn1MimeForUti(uti);
+            if (mime == nil) {
+                continue;
+            }
+            dispatch_group_enter(group);
+            [provider loadDataRepresentationForTypeIdentifier:uti
+                                            completionHandler:^(NSData* data, NSError* error) {
+                if (data != nil) {
+                    @synchronized (collected) {
+                        if ([collected objectForKey:mime] == nil) {
+                            [collected setObject:data forKey:mime];
+                        }
+                    }
+                }
+                dispatch_group_leave(group);
+            }];
+        }
+    }
+
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        NSData* plainData = [collected objectForKey:@"text/plain"];
+        NSData* htmlData = [collected objectForKey:@"text/html"];
+        NSData* rtfData = [collected objectForKey:@"text/rtf"];
+        NSData* imageData = [collected objectForKey:@"image/png"];
+        if (imageData == nil) {
+            imageData = [collected objectForKey:@"image/jpeg"];
+        }
+        NSString* plain = plainData == nil ? nil
+                : [[[NSString alloc] initWithData:plainData encoding:NSUTF8StringEncoding] autorelease];
+        NSString* html = htmlData == nil ? nil
+                : [[[NSString alloc] initWithData:htmlData encoding:NSUTF8StringEncoding] autorelease];
+        NSString* rtf = rtfData == nil ? nil
+                : [[[NSString alloc] initWithData:rtfData encoding:NSUTF8StringEncoding] autorelease];
+        NSString* fileUris = files.count == 0 ? nil : [files componentsJoinedByString:@"\n"];
+        CN1NativeDragDeliverDrop(x, y, plain, html, rtf, imageData, fileUris, action);
+        cn1LastDropAction = CN1_DND_ACTION_NONE;
+#ifndef CN1_USE_ARC
+        [collected release];
+        [files release];
+#endif
+    });
+#ifndef CN1_USE_ARC
+    dispatch_release(group);
+#endif
+}
+
+@end
+
+void CN1InstallDragAndDrop(CN1View* view) {
+    if (view == nil || !CN1DragAndDropSupported()) {
+        return;
+    }
+    if (@available(iOS 11.0, *)) {
+        CN1DragAndDropDelegate* delegate = [[CN1DragAndDropDelegate alloc] init];
+        UIDragInteraction* drag = [[UIDragInteraction alloc] initWithDelegate:delegate];
+        // Without this a drag never begins on iPhone: UIKit enables drag interactions on iPad
+        // by default and leaves them off elsewhere.
+        drag.enabled = YES;
+        [view addInteraction:drag];
+        UIDropInteraction* drop = [[UIDropInteraction alloc] initWithDelegate:delegate];
+        [view addInteraction:drop];
+        // The delegate is deliberately not released: the interactions hold their delegate
+        // weakly and it has to outlive the surface, which lives for the life of the process.
+#ifndef CN1_USE_ARC
+        [drag release];
+        [drop release];
+#endif
+    }
+}
+
+#endif
