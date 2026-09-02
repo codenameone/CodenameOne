@@ -200,11 +200,20 @@ class Walker:
         What is left -- an adjacent include, no leveloffset, whose file ends on
         ordinary paragraph text -- is the one shape that silently deletes content.
         """
-        following = lines[index + 1] if index + 1 < len(lines) else ""
+        # Look PAST preprocessor directives rather than treating one as a
+        # separator. Asciidoctor removes ifdef/ifndef/ifeval/endif during
+        # preprocessing, so they leave nothing behind to close the paragraph --
+        # measured: a heading with `ifdef::backend-html5[]` between it and the
+        # preceding paragraph is swallowed exactly as if the directive were not
+        # there. An earlier version of this rule returned here and would have
+        # passed that.
+        cursor = index + 1
+        while cursor < len(lines) and re.match(
+            r"^(ifdef|ifndef|ifeval|endif)::", lines[cursor].strip()
+        ):
+            cursor += 1
+        following = lines[cursor] if cursor < len(lines) else ""
         if not following.strip():
-            return
-        # A preprocessor directive is not content and cannot absorb a paragraph.
-        if re.match(r"^(ifdef|ifndef|ifeval|endif)::", following.strip()):
             return
         # A leveloffset on EITHER include protects: asciidoctor brackets the
         # included content with :leveloffset: attribute entries, and an attribute
