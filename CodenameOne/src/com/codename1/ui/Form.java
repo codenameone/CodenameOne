@@ -4604,14 +4604,28 @@ public class Form extends Container implements TopLevelContainer {
             // focus: none of them is reachable during a wheel gesture any more.
             if (isScrollWheeling) {
                 fireReleaseListeners(x, y);
-                if (dragged != null) {
-                    if (dragged.isDragAndDropInitialized()) {
-                        LeadUtil.dragFinished(dragged, x, y);
+                // Whatever the drag was actually delivered to, which is not only the
+                // scrolling container: a component that opts into sticky drag keeps the
+                // gesture once it starts, and a Spinner is one -- its drag rolls the value
+                // and its release is what settles the roll and commits it. Dropping that
+                // release left the spinner mid-roll with the new value uncommitted until
+                // something else touched it.
+                //
+                // Requiring an ACTIVATED drag is what keeps this from being the tap the
+                // rest of this branch exists to suppress: List fires its action event only
+                // on the release of a gesture that never became a drag, and takes the
+                // settling path when it did.
+                Component wheelDragged = dragged != null ? dragged
+                        : (stickyDrag != null && stickyDrag.isDragActivated() ? stickyDrag : null);
+                if (wheelDragged != null) {
+                    if (wheelDragged.isDragAndDropInitialized()) {
+                        LeadUtil.dragFinished(wheelDragged, x, y);
                     } else {
-                        LeadUtil.pointerReleased(dragged, x, y);
+                        LeadUtil.pointerReleased(wheelDragged, x, y);
                     }
-                    dragged = null;
+                    repaint();
                 }
+                dragged = null;
                 stickyDrag = null;
                 dragStopFlag = false;
                 releaseComponentsAwaitingRelease();

@@ -3430,8 +3430,15 @@ public class Window extends Container implements TopLevelContainer {
         // and acted like a click on it (issue #5655). The dragged component still gets
         // its release -- that one IS the scroll, and it has momentum to settle.
         final boolean wheeling = Display.impl.isScrollWheeling();
+        // A wheel releases what it was actually dragging, and nothing else. A window has no
+        // sticky-drag bookkeeping of its own, so a component that keeps the gesture -- a
+        // Spinner rolling its value -- is reached here as the pressed component, and the
+        // drag it activated is what tells it apart from the tap this branch suppresses.
         Component target = releasingDragged != null ? releasingDragged
-                : (wheeling ? null : releasingPressed);
+                : (wheeling
+                        ? (releasingPressed != null && releasingPressed.isDragActivated()
+                                ? releasingPressed : null)
+                        : releasingPressed);
         if (target != null) {
             if (releasingDragged != null && releasingDragged.isDragAndDropInitialized()) {
                 // An activated drag ends with dragFinished, not pointerReleased.

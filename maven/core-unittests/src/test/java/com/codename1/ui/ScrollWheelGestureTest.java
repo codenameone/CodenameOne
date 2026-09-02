@@ -194,6 +194,82 @@ class ScrollWheelGestureTest extends UITestBase {
         assertFalse(sw.isValue(), "the tap after the wheel still has to toggle the switch");
     }
 
+    @FormTest
+    void aWheelStillSettlesAComponentThatKeptTheDrag() {
+        Form f = new Form("sticky", new BorderLayout());
+        StickyDragComponent sticky = new StickyDragComponent();
+        sticky.setPreferredH(Display.getInstance().convertToPixels(15));
+        f.getContentPane().setLayout(BoxLayout.y());
+        f.getContentPane().add(sticky);
+        f.getContentPane().add(filler());
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+
+        wheel(sticky, -Display.getInstance().convertToPixels(20));
+
+        // A Spinner rolls its value from the drag and commits it on the release, and it
+        // keeps the gesture through the form's sticky-drag path rather than by becoming
+        // the scrolling container. Suppressing that release left the roll uncommitted.
+        assertEquals(1, sticky.releases(), "a drag that was activated still has to be settled");
+        assertTrue(sticky.drags() > 0, "the drag has to have reached it for this to mean anything");
+    }
+
+    @FormTest
+    void aWheelSettlesAKeptDragInAWindowToo() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("sticky", new BorderLayout());
+        StickyDragComponent sticky = new StickyDragComponent();
+        w.add(BorderLayout.CENTER, sticky);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.revalidate();
+        DisplayTest.flushEdt();
+
+        Display.impl.windowPointerWheelMoved(w.getWindowId(),
+                sticky.getAbsoluteX() + sticky.getWidth() / 2,
+                sticky.getAbsoluteY() + sticky.getHeight() / 2,
+                0, -Display.getInstance().convertToPixels(20), false, 0);
+        for (int i = 0; i < 6; i++) {
+            DisplayTest.flushEdt();
+        }
+
+        assertEquals(1, sticky.releases(), "a window has no sticky-drag list, so the pressed"
+                + " component is where a kept drag arrives");
+        w.dispose();
+    }
+
+    /// Keeps the gesture the way `Spinner` does, and activates a drag on the first move --
+    /// which is what tells a settle apart from a tap.
+    private static final class StickyDragComponent extends Component {
+        private int releases;
+        private int drags;
+
+        int releases() {
+            return releases;
+        }
+
+        int drags() {
+            return drags;
+        }
+
+        @Override
+        protected boolean isStickyDrag() {
+            return true;
+        }
+
+        @Override
+        public void pointerDragged(int x, int y) {
+            drags++;
+            setDragActivated(true);
+        }
+
+        @Override
+        public void pointerReleased(int x, int y) {
+            releases++;
+        }
+    }
+
     /// Plays one wheel notch over the middle of `over`, then drains the queued steps.
     /// Through the implementation entry point rather than by fabricating pointer events,
     /// because the gesture it queues -- and the isScrollWheeling window around it -- is
