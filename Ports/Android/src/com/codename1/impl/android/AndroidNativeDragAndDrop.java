@@ -64,7 +64,16 @@ final class AndroidNativeDragAndDrop {
     /// UI thread, so the lock is what publishes one to the other.
     private static final Object LOCK = new Object();
     private static NativeDragOperation exporting;
-    private static int lastAction = NativeDragOperation.ACTION_NONE;
+
+    /// What the framework last answered about a drag over this surface, or `UNDECIDED` before it
+    /// has answered anything.
+    ///
+    /// The distinction matters: `NativeDragOperation#ACTION_NONE` is a refusal, and Android
+    /// hands ACTION_DROP to a subscribed view whatever it answered to the location events -- so
+    /// treating a refusal as "no answer yet" and substituting a default turned a target's
+    /// reject() back into a delivered drop.
+    private static final int UNDECIDED = -1;
+    private static int lastAction = UNDECIDED;
 
     /// What a drop of *our own* session onto one of our own components settled on, kept until
     /// the session ends so the source is told what really happened. Android's drag events carry
@@ -161,7 +170,7 @@ final class AndroidNativeDragAndDrop {
             return false;
         }
         setExporting(op);
-        setLastAction(NativeDragOperation.ACTION_NONE);
+        setLastAction(UNDECIDED);
         setLocalDropAction(NativeDragOperation.ACTION_NONE);
         view.post(new Runnable() {
             @Override
@@ -212,7 +221,7 @@ final class AndroidNativeDragAndDrop {
                     return true;
                 case DragEvent.ACTION_DRAG_EXITED:
                     NativeDragAndDrop.dragExit(0);
-                    setLastAction(NativeDragOperation.ACTION_NONE);
+                    setLastAction(UNDECIDED);
                     return true;
                 case DragEvent.ACTION_DROP:
                     return drop(impl, event);
@@ -225,7 +234,7 @@ final class AndroidNativeDragAndDrop {
                         setExporting(null);
                         NativeDragAndDrop.dragCompleted(completed);
                     }
-                    setLastAction(NativeDragOperation.ACTION_NONE);
+                    setLastAction(UNDECIDED);
                     setLocalDropAction(NativeDragOperation.ACTION_NONE);
                     return true;
                 default:
@@ -247,8 +256,9 @@ final class AndroidNativeDragAndDrop {
     /// protocol carries no notion of copy versus move, and ACTION_DRAG_ENDED reports only a
     /// boolean. Copy is the honest reading of "it succeeded and we do not know how", and it is
     /// also the safe one, because reporting a move the receiver may not have performed would
-    /// have the source delete data nothing else holds. An operation that allows only a move
-    /// still reports a move, since there is nothing else it could have been.
+    /// have the source delete data nothing else holds. That holds even for an operation that
+    /// allows only a move: what the source was willing to permit says nothing about what the
+    /// receiver did, and an ordinary Android target simply copies the clip.
     private static int completedAction(boolean result) {
         if (!result) {
             return NativeDragOperation.ACTION_NONE;
@@ -257,7 +267,12 @@ final class AndroidNativeDragAndDrop {
         if (local != NativeDragOperation.ACTION_NONE) {
             return local;
         }
-        return preferred(allowedActions());
+        // A copy, whatever the source was willing to allow. An external receiver has read the
+        // clip and Android gives it no way to say more than that, so a copy is what actually
+        // happened. Answering ACTION_MOVE because the source offered nothing else would infer
+        // ownership from our own wishes: the receiver may simply have copied, and a source that
+        // deletes on ACTION_MOVE would then destroy the only remaining copy.
+        return NativeDragOperation.ACTION_COPY;
     }
 
     private static boolean drop(AndroidImplementation impl, DragEvent event) {
@@ -276,8 +291,14 @@ final class AndroidNativeDragAndDrop {
         // the content the drop is filtered against -- otherwise a target that accepted the
         // hover on MIME_URI_LIST is refused the drop it was promised.
         ClipboardContent content = impl.contentFromClip(event.getClipData(), event.getClipDescription());
-        int action = lastAction() == NativeDragOperation.ACTION_NONE
-                ? preferred(allowedActions()) : lastAction();
+        int decided = lastAction();
+        if (decided == NativeDragOperation.ACTION_NONE) {
+            // Refused while it hovered. Android delivers ACTION_DROP to a subscribed view even
+            // so, and substituting a default here is what turned a target's reject() back into
+            // a delivered drop. Reporting failure also makes ACTION_DRAG_ENDED report no action.
+            return false;
+        }
+        int action = decided == UNDECIDED ? preferred(allowedActions()) : decided;
         int accepted = NativeDragAndDrop.drop(0, (int) event.getX(), (int) event.getY(), content, action);
         setLastAction(NativeDragOperation.ACTION_NONE);
         if (exporting() != null) {

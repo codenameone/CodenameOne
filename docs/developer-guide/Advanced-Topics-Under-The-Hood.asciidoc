@@ -1371,8 +1371,10 @@ travel as content URIs, the same way the clipboard carries them.
 |Drops into another application beside this one, and into Files or the Finder.
 
 |iPhone
-|yes |no
-|The session works, but a phone in full screen has no second application to drop into.
+|yes |iOS 15 and later
+|iOS 15 brought dragging between applications to the phone: hold the item with one finger,
+switch applications with another, drop. Before that the session worked but could only end on one
+of the application's own components.
 
 |Everything else
 |no |no

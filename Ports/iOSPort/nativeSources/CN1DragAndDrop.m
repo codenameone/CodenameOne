@@ -295,18 +295,25 @@ BOOL CN1DragAndDropSupported(void) {
 }
 
 BOOL CN1DragOutsideAppSupported(void) {
-    if (@available(iOS 11.0, *)) {
 #if TARGET_OS_MACCATALYST
+    if (@available(iOS 11.0, *)) {
         return YES;
-#else
-        // UIDragInteraction only carries a drag out of the application where the system has
-        // somewhere to carry it to: an iPad, or an iPhone running iPadOS style multitasking.
-        // On a phone in full screen the same session works, but it can only end on one of this
-        // application's own components.
-        return [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad;
-#endif
     }
     return NO;
+#else
+    // iOS 15 brought drag and drop between applications to the phone -- hold the item with one
+    // finger, switch applications with another, drop -- so from there on the idiom no longer
+    // decides it. Before that a drag could only leave the application on an iPad, where a
+    // second application can be on screen to receive it; on a phone the same session worked but
+    // could only end on one of this application's own components.
+    if (@available(iOS 15.0, *)) {
+        return YES;
+    }
+    if (@available(iOS 11.0, *)) {
+        return [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad;
+    }
+    return NO;
+#endif
 }
 
 void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragImagePng,
