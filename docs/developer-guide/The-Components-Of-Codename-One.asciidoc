@@ -25,7 +25,7 @@ Some components are composites and derive from the https://www.codenameone.com/j
 
 - You can't cast it to the type it relates to. For example, you can't cast `MultiButton` to `Button`.
 
-- Events can be more nuanced. For example, if you rely on https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.html#getSource--[ActionEvent.getSource()] or https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.html#getComponent--[ActionEvent.getComponent()], they may not behave as expected. For a `MultiButton`, they return the underlying `Button`. To work around that, use https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.html#getActualComponent--[ActionEvent.getActualComponent()].
+- Events can be more nuanced. For example, if you rely on https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.html#getSource()[ActionEvent.getSource()] or https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.html#getComponent()[ActionEvent.getComponent()], they may not behave as expected. For a `MultiButton`, they return the underlying `Button`. To work around that, use https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.html#getActualComponent()[ActionEvent.getActualComponent()].
 
 [[lead-component-sidebar]]
 .Lead Component
@@ -34,7 +34,7 @@ Codename One includes a feature for creating composite components called "lead c
 
 Lead components work by assigning one component as the "leader." That leader determines the style state for every component in the hierarchy. If a `Container` is led by a `Button`, the button determines whether the selected or pressed state applies to the entire hierarchy.
 
-This means a single `Component` can contain multiple nested `UIID`s. For example, `MultiButton` has `UIID`s such as `MultiLine1`, which you can customize with APIs such as https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html#setUIIDLine1-java.lang.String-[setUIIDLine1].
+This means a single `Component` can contain multiple nested `UIID`s. For example, `MultiButton` has `UIID`s such as `MultiLine1`, which you can customize with APIs such as https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html#setUIIDLine1(java.lang.String)[setUIIDLine1].
 
 The lead component also handles events from a single source. Clicking another component in the hierarchy sends the event to the leading `Button`, which can make action events route to a different target than the apparent click target. That's why `getActualComponent()` exists.
 
@@ -188,8 +188,8 @@ NOTE: `hi` is the name of the parent `Form` in the sample above.
 
 ==== Styling dialogs
 
-It's important to style a `Dialog` using https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html#getDialogStyle--[getDialogStyle()] or
-https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html#setDialogUIID-java.lang.String-[setDialogUIID] methods rather than styling the dialog object directly.
+It's important to style a `Dialog` using https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html#getDialogStyle()[getDialogStyle()] or
+https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html#setDialogUIID(java.lang.String)[setDialogUIID] methods rather than styling the dialog object directly.
 
 The reason for this is that the `Dialog` is a `Form` that takes up the whole screen. The `Form` that's visible behind the `Dialog` is rendered as a screenshot. Customizing the actual `UIID` of the `Dialog` won't produce the desired results.
 
@@ -367,7 +367,7 @@ Codename One.
 
 - Blinking cursor is rendered on `TextField`
 - https://www.codenameone.com/javadoc/com/codename1/ui/events/DataChangedListener.html[DataChangeListener] is available in `TextField`. This is crucial for character by character input event tracking
-- https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html#setDoneListener-com.codename1.ui.events.ActionListener-[Done listener] is available in the `TextField`
+- https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html#setDoneListener(com.codename1.ui.events.ActionListener)[Done listener] is available in the `TextField`
 - Different `UIID`
 
 NOTE: The semantic difference between `TextField` & `TextArea` dates back to the ancestor of Codename One: LWUIT. Feature phones don’t have "proper" in-place editing capabilities & thus `TextField` was introduced to allow such input.
@@ -375,7 +375,7 @@ NOTE: The semantic difference between `TextField` & `TextArea` dates back to the
 Because it lacks the blinking cursor capability `TextArea` is often used as a multi-line label and is used internally in `SpanLabel`, `SpanButton` etc.
 
 
-TIP: A common use case is to have an important text component in edit mode as you enter a `Form`. Codename One forms support this exact use case through the https://www.codenameone.com/javadoc/com/codename1/ui/Form.html#setEditOnShow-com.codename1.ui.TextArea-[Form.setEditOnShow(TextArea)] method.
+TIP: A common use case is to have an important text component in edit mode as you enter a `Form`. Codename One forms support this exact use case through the https://www.codenameone.com/javadoc/com/codename1/ui/Form.html#setEditOnShow(com.codename1.ui.TextArea)[Form.setEditOnShow(TextArea)] method.
 
 
 `TextField` & `TextArea` support constraints for various types of input such as `NUMERIC`, `EMAIL`, `URL`, etc. Those usually
@@ -820,7 +820,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 .Infinite progress
 image::img/infinite-progress.png[Infinite progress,scaledwidth=10%]
 
-The image used in the `InfiniteProgress` animation is defined by the native theme. You can override that definition either by defining the theme constant `infiniteImage` or by invoking the https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgress.html#setAnimation-com.codename1.ui.Image-[setAnimation] method.
+The image used in the `InfiniteProgress` animation is defined by the native theme. You can override that definition either by defining the theme constant `infiniteImage` or by invoking the https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgress.html#setAnimation(com.codename1.ui.Image)[setAnimation] method.
 
 NOTE: Despite the name of the method `setAnimation` expects a static image that will be rotated internally. Don't use an animated image.
 
@@ -1734,7 +1734,7 @@ You can bind a `BrowserNavigationCallback` by invoking `setBrowserNavigationCall
 IMPORTANT: The `shouldNavigate` method from the `BrowserNavigationCallback` is invoked in a native thread and **NOT ON THE EDT**! +
 it's crucial that this method returns and that it won't do any changes on the UI.
 
-The `shouldNavigate` indicates to the native code whether navigation should proceed or not. For example: if a user clicks a specific link you might choose to do something in the Java code so you can return false and block the navigation. You can invoke https://www.codenameone.com/javadoc/com/codename1/ui/Display.html#callSerially java.lang.Runnable-[callSerially] to do the actual task in the Java side:
+The `shouldNavigate` indicates to the native code whether navigation should proceed or not. For example: if a user clicks a specific link you might choose to do something in the Java code so you can return false and block the navigation. You can invoke https://www.codenameone.com/javadoc/com/codename1/ui/Display.html#callSerially(java.lang.Runnable)[callSerially] to do the actual task in the Java side:
 
 [source,java]
 ----
@@ -1773,7 +1773,7 @@ The new API fully embraces the asynchronous nature of JavaScript. It uses callba
 NOTE: In all the sample code below, you can assume that variables named `bc` represent an instance of https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html[BrowserComponent]:
 
 
-This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute-java.lang.String-com.codename1.util.SuccessCallback-[execute()] method is:
+This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute(java.lang.String,com.codename1.util.SuccessCallback)[execute()] method is:
 
 
 The first parameter is a JavaScript expression. This JavaScript *MUST* call either `callback.onSuccess(result)` or `callback.onError(message, errCode)` at some point in order for your callback to be called.
@@ -1809,7 +1809,7 @@ Now it will work no matter how many times the button is clicked.
 
 ===== Passing parameters to JavaScript
 
-Often, the JavaScript expressions that you execute will include parameters from your Java code. Escaping these parameters is tricky at worst, and annoying at best. For example: If you’re passing a string, you need to make sure that it escapes quotes and new lines or it will cause the JavaScript to have a syntax error. You provide variants of `execute()` and https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#addJSCallback-java.lang.String-com.codename1.util.SuccessCallback-[addJSCallback()] that allow you to pass your parameters and have them automatically escaped.
+Often, the JavaScript expressions that you execute will include parameters from your Java code. Escaping these parameters is tricky at worst, and annoying at best. For example: If you’re passing a string, you need to make sure that it escapes quotes and new lines or it will cause the JavaScript to have a syntax error. You provide variants of `execute()` and https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#addJSCallback(java.lang.String,com.codename1.util.SuccessCallback)[addJSCallback()] that allow you to pass your parameters and have them automatically escaped.
 
 For example, suppose you want to pass a string with text to set in a textarea within the webpage. You can do something like:
 

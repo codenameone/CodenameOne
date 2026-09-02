@@ -728,7 +728,7 @@ Will set the foreground color of the https://www.codenameone.com/javadoc/com/cod
 
 When a Codename One https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component] is instantiated it requests a https://www.codenameone.com/javadoc/com/codename1/ui/plaf/Style.html[Style] object from the https://www.codenameone.com/javadoc/com/codename1/ui/plaf/UIManager.html[UIManager] class. The `Style` object is based on the settings within the theme and can be modified through code or by using the theme.
 
-You can replace the theme dynamically in runtime and refresh the styles assigned to the various components using the https://www.codenameone.com/javadoc/com/codename1/ui/Component.html#refreshTheme--[refreshTheme()] method.
+You can replace the theme dynamically in runtime and refresh the styles assigned to the various components using the https://www.codenameone.com/javadoc/com/codename1/ui/Component.html#refreshTheme()[refreshTheme()] method.
 
 NOTE: It's a common mistake to invoke `refreshTheme()` without actually changing the theme. You see developers doing it when all they need is a `repaint()` or `revalidate()`. Since `refreshTheme()` is **** expensive recommend that you don't use it unless you need to...
 

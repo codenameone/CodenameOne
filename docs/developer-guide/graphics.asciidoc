@@ -198,14 +198,14 @@ to allow for smoother edges by using quadratic curves instead of lines.
 
 Codename One's `GeneralPath` class includes two methods for drawing curves:
 
-1. https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html#quadTo(float,%20float,%20float,%20float)[`quadTo()`] :
+1. https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html#quadTo(float,float,float,float)[`quadTo()`] :
  Appends a quadratic Bézier curve. It takes 2 points: a control point, and an end point.
-2. link:https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html#curveTo(float,%20float,%20float,%20float,%20float,%20float)[`curveTo()`] :
+2. link:https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html#curveTo(float,float,float,float,float,float)[`curveTo()`] :
  Appends a cubic Bézier curve, taking 3 points: 2 control points, and an end point.
 
 See the https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html[General Path javadocs] for the full API.
 
-You will make use of the link:https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html#quadTo(float,%20float,%20float,%20float)[`quadTo()`]
+You will make use of the link:https://www.codenameone.com/javadoc/com/codename1/ui/geom/GeneralPath.html#quadTo(float,float,float,float)[`quadTo()`]
 method to append curves to the drawing as follows:
 
 
@@ -450,7 +450,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 .Shape Clipping used to clip the image of duke within the given shape
 image::img/shaped-clipping.png[Shape Clipping used to clip the image of duke within the given shape,scaledwidth=20%]
 
-TIP: Notice that this functionality isn't available on all platforms so you need to test if shaped clipping is supported using https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeClipSupported--[isShapeClipSupported()].
+TIP: Notice that this functionality isn't available on all platforms so you need to test if shaped clipping is supported using https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeClipSupported()[isShapeClipSupported()].
 
 
 === The coordinate system
@@ -631,7 +631,7 @@ Here are the pros/cons and logic behind every image type. This covers the logic 
 ==== Loaded Image
 
 This is the basic image you get when loading an image from the jar or network using
-https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-java.lang.String-[Image.createImage(String)], https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-java.io.InputStream-[Image.createImage(InputStream)] & https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-byte:A-int-int-[Image.`createImage(byte[], int, int)`],...
+https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(java.lang.String)[Image.createImage(String)], https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(java.io.InputStream)[Image.createImage(InputStream)] & https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(byte[],int,int)[Image.`createImage(byte[], int, int)`],...
 
 TIP: Some other APIs might return this image type but those APIs do so explicitly!
 
@@ -659,7 +659,7 @@ There are two types of RGB constructed images that are different from one anothe
 
 ===== Internal
 
-This is a close cousin of the loaded image. This image is created using the method https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage-int:A-int-int-[Image.createImage(int array, int, int)] and receives the AARRGGBB data to form the image. It's more efficient than the Codename One RGB image but can't be modified, at least not on the pixel level.
+This is a close cousin of the loaded image. This image is created using the method https://www.codenameone.com/javadoc/com/codename1/ui/Image.html#createImage(int[],int,int)[Image.createImage(int array, int, int)] and receives the AARRGGBB data to form the image. It's more efficient than the Codename One RGB image but can't be modified, at least not on the pixel level.
 
 The goal of this image type is to provide an easy way to render RGB data that isn't modified efficiently at platform native speeds. It's technically a <<loaded-image-section,standard "Loaded Image">> internally.
 
@@ -689,7 +689,7 @@ When drawing an `EncodedImage` it checks the weak reference cache and if the ima
 
 `EncodedImage` isn't final and can be derived to produce complex image fetching strategies for example: the https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.html[URLImage] class that can dynamically download its content from the web.
 
-`EncodedImage` can be instantiated through the create methods in the `EncodedImage` class. Pretty much any image can be converted into an `EncodedImage` through the https://www.codenameone.com/javadoc/com/codename1/ui/EncodedImage.html#createFromImage-com.codename1.ui.Image-boolean-[createFromImage(Image, boolean)] method.
+`EncodedImage` can be instantiated through the create methods in the `EncodedImage` class. Pretty much any image can be converted into an `EncodedImage` through the https://www.codenameone.com/javadoc/com/codename1/ui/EncodedImage.html#createFromImage(com.codename1.ui.Image,boolean)[createFromImage(Image, boolean)] method.
 
 
 .EncodedImage Locking

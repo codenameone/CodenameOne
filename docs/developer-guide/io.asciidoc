@@ -905,11 +905,11 @@ For example, the `URLImage` assumes that you know the size of the image in advan
 The download methods mentioned above are great alternatives but they're a bit verbose when working with images and don't provide fine grained control over the `ConnectionRequest` for example: making a `POST` request to get an image.
 
 TIP: Adding global headers is another use case but you can use
-https://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html#addDefaultHeader-java.lang.String-java.lang.String-[addDefaultHeader]
+https://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html#addDefaultHeader(java.lang.String,java.lang.String)[addDefaultHeader]
 to add those.
 
 To make this process simpler there is a set of helper methods in
-https://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html#downloadImageToStorage-java.lang.String-com.codename1.util.SuccessCallback-[ConnectionRequest that downloads images directly].
+https://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html#downloadImageToStorage(java.lang.String,com.codename1.util.SuccessCallback)[ConnectionRequest that downloads images directly].
 
 These methods complement the `Util` methods but go a bit further and feature terse syntax for example: you can
 download a `ConnectionRequest` to `Storage` using code like this:

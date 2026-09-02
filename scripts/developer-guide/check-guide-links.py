@@ -405,6 +405,24 @@ def documented_chain_exists(package: str, chain: list[str]) -> bool:
     return True  # the outer source moved; the class check above already spoke
 
 
+# What javadoc actually emits, confirmed by generating some and reading the ids:
+# a method is "name(java.lang.String)" or "name()" with NO spaces, an array is
+# "byte[]", and a field or enum constant is a bare name. The dashed spelling
+# "name-java.lang.String-" was a JDK 9-only style; the generator here runs JDK 25
+# and emits none of it, so a dashed fragment names an anchor that is not on the
+# page. Thirty-five links in the guide still carried it.
+LEGACY_JAVADOC_FRAGMENT_RE = re.compile(r"^[A-Za-z_$][\w$.]*(-|\s)")
+
+
+def javadoc_fragment_is_current(fragment: str) -> bool:
+    """Whether a /javadoc/ fragment is a shape modern javadoc can emit."""
+    if not fragment:
+        return True
+    if "%20" in fragment or " " in fragment:
+        return False  # an id never contains a space
+    return not LEGACY_JAVADOC_FRAGMENT_RE.match(fragment)
+
+
 def javadoc_path_exists(target: str) -> bool:
     """Whether a /javadoc/ path names something the generated tree will hold.
 
@@ -789,6 +807,10 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
                 # is the Ollama endpoint the AI chapter documents on purpose.
                 out.append((url, f"port {port} is not where the site is served"))
                 continue
+            if host in SITE_HOSTS and split.path.startswith("/javadoc/"):
+                if not javadoc_fragment_is_current(split.fragment):
+                    out.append((url, "a javadoc anchor in the retired JDK 9 dashed form; modern javadoc emits name(Type)"))
+                    continue
             if host in SITE_HOSTS:
                 target = split.path.rstrip("/") or "/"
                 if links_into_this_book(target, split.fragment):

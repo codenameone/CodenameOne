@@ -102,7 +102,7 @@ rendered positions between physics states:
 `update(double)` runs on the render thread, together with drawing. Keep it
 non-blocking -- offload asset loading, networking or other long work to a background
 thread and hand the result back with
-https://www.codenameone.com/javadoc/com/codename1/ui/CN.html#callSerially-java.lang.Runnable-[`CN.callSerially`].
+https://www.codenameone.com/javadoc/com/codename1/ui/CN.html#callSerially(java.lang.Runnable)[`CN.callSerially`].
 
 === Input: `GameInput`
 
