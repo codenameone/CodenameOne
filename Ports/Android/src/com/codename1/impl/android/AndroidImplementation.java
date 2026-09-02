@@ -10440,14 +10440,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 continue;
             }
             Object value = content.getData(mime);
+            byte[] bytes = null;
             if (value instanceof String) {
                 if (carriedText != null && carriedText.equals(value)) {
+                    // The same text the clip already carries, so naming the type is enough.
                     mimeTypes.add(mime);
+                    continue;
                 }
-                continue;
+                // A *different* reading -- Markdown source beside its plain rendering, say.
+                // A clip carries one text payload, so this one travels as a typed content URI
+                // the way binary does. Dropping it instead, which is what this did, lost a
+                // representation the application deliberately published.
+                bytes = ((String) value).getBytes("UTF-8");
+            } else if (value instanceof byte[]) {
+                bytes = (byte[]) value;
             }
-            if (value instanceof byte[]) {
-                Uri uri = writeAsProviderUri((byte[]) value, extensionForMime(mime));
+            if (bytes != null) {
+                Uri uri = writeAsProviderUri(bytes, extensionForMime(mime));
                 if (uri != null) {
                     mimeTypes.add(mime);
                     items.add(new ClipData.Item(uri));
@@ -10498,6 +10507,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
         return out.length() == 0 ? "bin" : out.toString();
+    }
+
+    /// The MIME type to file an incoming image's bytes under: the framework's constant for the
+    /// three formats it names, and the type the content resolver reported for anything else.
+    ///
+    /// `#mimeForImageType(java.lang.String)` answers PNG for everything it does not recognize,
+    /// which for a WebP meant filing WebP bytes as a PNG -- undecodable by anything that
+    /// believed the label, and invisible to a target filtering on the type the drag advertised,
+    /// so the hover was accepted and the drop refused.
+    private static String imageMimeFor(String type) {
+        String lower = type.toLowerCase();
+        if (lower.startsWith(ClipboardContent.MIME_PNG)
+                || lower.startsWith(ClipboardContent.MIME_JPEG)
+                || lower.startsWith(ClipboardContent.MIME_GIF)) {
+            return mimeForImageType(lower);
+        }
+        return lower;
     }
 
     /**
@@ -10612,7 +10638,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         if (in != null) {
                             try {
                                 byte[] bytes = Util.readInputStream(in);
-                                content.setData(mimeForImageType(type), bytes);
+                                content.setData(imageMimeFor(type), bytes);
                             } finally {
                                 in.close();
                             }
@@ -10674,11 +10700,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     if (in == null) {
                         return null;
                     }
+                    byte[] bytes;
                     try {
-                        return Util.readInputStream(in);
+                        bytes = Util.readInputStream(in);
                     } finally {
                         in.close();
                     }
+                    // A text type reads back as text: the framework's getText() answers null
+                    // for a byte array, so a Markdown representation that went out as a typed
+                    // URI would come back unreadable to the very API that asked for it.
+                    if (bytes != null && mimeType != null && mimeType.startsWith("text/")) {
+                        return new String(bytes, "UTF-8");
+                    }
+                    return bytes;
                 } catch (Throwable t) {
                     com.codename1.io.Log.e(t);
                     return null;

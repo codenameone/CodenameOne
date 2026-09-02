@@ -290,6 +290,30 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aRejectionMadeWhileHoveringSurvivesTheDrop() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        // The target refuses from inside its callback, which is the only place it can change
+        // its mind about a payload the declarative filters already let through.
+        target.rejectAction = NativeDragOperation.ACTION_NONE;
+
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        // The port drops carrying the action it was handed before that callback ran -- its
+        // answer is one drag event behind by construction -- so the refusal only survives if
+        // the drop honours the target's own latest word rather than recomputing.
+        assertEquals(NativeDragOperation.ACTION_NONE,
+                NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY),
+                "a target that refused while hovering must not be handed the drop anyway");
+        flushSerialCalls();
+        assertFalse(target.events.contains("drop"),
+                "and no drop event is delivered, which is what reject() promises");
+    }
+
+    @FormTest
     void dropOnNothingReportsFailureSoThePortCanTellTheSource() {
         Form form = Display.getInstance().getCurrent();
         addTarget(form);

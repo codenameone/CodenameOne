@@ -581,9 +581,23 @@ public final class NativeDragAndDrop {
     /// the pointer took the drop and the port should report the transfer as failed
     public static int drop(int windowId, int x, int y, ClipboardContent content, int action) {
         Component target = findTarget(windowId, x, y, content);
-        int accepted = target == null ? NativeDragOperation.ACTION_NONE
-                : preferredAction(action & target.getAcceptedDropActions());
+        int accepted;
         synchronized (LOCK) {
+            if (target != null && target == currentTarget) { // NOPMD CompareObjectsWithEquals
+                // The target's own latest word, not a recomputation from the action the port
+                // supplied. That action is by construction one event behind -- it is what the
+                // last drag event answered -- so a target that rejected, or changed its mind,
+                // in a callback that has since run would have had that decision quietly
+                // discarded here, and a refusal turned back into a delivered drop on every
+                // port rather than only the one that was noticed.
+                accepted = currentAction;
+            } else {
+                // A different component from the one the callbacks were about: the pointer
+                // moved between the last drag event and the drop, so there is no decision of
+                // its own to honour and the declarative answer is the right one.
+                accepted = target == null ? NativeDragOperation.ACTION_NONE
+                        : preferredAction(action & target.getAcceptedDropActions());
+            }
             currentTarget = null;
             targetGeneration++;
             overDispatchPending = false;
