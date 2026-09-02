@@ -1843,6 +1843,18 @@
         "url": "https://medium.com/@Codename_One/tapjacking-protection-rejecting-android-touches-behind-an-overlay-fa35242e24ce?postPublishedType=initial",
         "syndicated_at": "2026-09-01T19:01:24+00:00"
       }
+    },
+    "camera-vision-scanners": {
+      "hashnode": {
+        "url": "https://debugagent.com/codescanner-scan-barcode-scanning-without-rebuilding-the-camera-pipeline",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a97670fc38c24ad81c57025",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-09-02T00:01:11+00:00"
+      }
     }
   }
 }
