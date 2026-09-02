@@ -81,6 +81,35 @@ public class VideoCaptureConstraintsTest extends UITestBase {
         Assertions.assertTrue(vcc.isSupported());
     }
 
+    /// A support predicate must resolve the constraint before it answers. These two
+    /// did not, so asking one of them FIRST -- before any getter had triggered
+    /// build() -- compared the caller's preference against a field the platform had
+    /// never filled in. isSupported() hid it, because isSizeSupported() runs first
+    /// and does build. The call order in each case below is the whole point.
+    @FormTest
+    public void testSupportPredicatesResolveBeforeAnswering() {
+        try {
+            VideoCaptureConstraints.init(new VideoCaptureConstraints.Compiler() {
+                public VideoCaptureConstraints compile(VideoCaptureConstraints cnst) {
+                    // A platform that honours everything it is handed.
+                    return new VideoCaptureConstraints(cnst);
+                }
+            });
+
+            VideoCaptureConstraints quality = new VideoCaptureConstraints()
+                    .preferredQuality(VideoCaptureConstraints.QUALITY_HIGH);
+            Assertions.assertTrue(quality.isQualitySupported(),
+                    "isQualitySupported() must resolve before comparing");
+
+            VideoCaptureConstraints fileSize = new VideoCaptureConstraints()
+                    .preferredMaxFileSize(1024);
+            Assertions.assertTrue(fileSize.isMaxFileSizeSupported(),
+                    "isMaxFileSizeSupported() must resolve before comparing");
+        } finally {
+            VideoCaptureConstraints.init(null);
+        }
+    }
+
     /// Partial support: the platform limits duration but not to the requested value.
     /// Installing a compiler is safe to undo because Java SE never registers one.
     @FormTest
