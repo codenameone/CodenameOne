@@ -1263,6 +1263,28 @@ public class KotlinStdlibAlignment {
         // coordinate), and a dependency substitution. All of them win silently over
         // a constraint.
         //
+        // An override is read as applying to any artifact the statement names, and
+        // NOT bound to the branch that names it. Reported as imprecise, correctly: a
+        // rule whose branches handle several Kotlin modules can override a sibling
+        // while merely mentioning this one, and the block then stands down for an
+        // artifact nobody managed.
+        //
+        // Binding the call to its predicate means modelling branches -- which
+        // condition governs which statement -- and this class deliberately has no
+        // such model. Everywhere a branch cannot be evaluated it resolves the
+        // ambiguity toward suppression, for the reason written on the conditional
+        // assignment path: emitting beside an override this could not see is the
+        // failure that reaches the device, while suppressing costs an app the
+        // duplicate it already had, which fails in checkDuplicateClasses where it
+        // already was.
+        //
+        // The trade is the same here and the asymmetry is sharper, because a branch
+        // model has far more spellings to get wrong than a version range -- and this
+        // rule's narrowings have needed correcting in three consecutive commits, each
+        // time for a spelling that looked handled. Revisit with a real project whose
+        // rule branches this way, and a way to test the branch reading that does not
+        // rest on the same reasoning that keeps being wrong.
+        //
         // A substitution names TWO coordinates, which is why it was left out once:
         // the version scan takes the first literal, and that is the side being
         // REPLACED. The scan reads from after `using` now, so it takes the
@@ -2408,7 +2430,13 @@ public class KotlinStdlibAlignment {
                 int closes = closingBracket(statement, i);
                 if (closes > i) {
                     end = closes;
-                    value = statement.substring(i, closes + 1);
+                    // Through the same expansion a string definition gets, so a map
+                    // that interpolates a known version -- version: "$v" -- carries
+                    // the version rather than the text of the reference. Stored
+                    // verbatim, "$v" read as no version at all, which counts as
+                    // below the floor and stood the whole block down.
+                    value = withLiteralsInlined(
+                            statement.substring(i, closes + 1), literals);
                 }
             }
             recordDefinition(literals, name, value, conditional);

@@ -645,6 +645,32 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A stored map goes through the same expansion a stored string does, so a
+     * version interpolated into it carries the version rather than the text of
+     * the reference -- {@code "$v"} read as no version at all, which counts as
+     * below the floor and stood the whole block down.
+     */
+    @Test
+    public void aStoredMapExpandsWhatItInterpolates() {
+        String modern = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def v = '1.9.22'\n"
+                + "    def dep = [group: 'org.jetbrains.kotlin', "
+                + "name: 'kotlin-stdlib-jdk7', version: \"$v\"]\n"
+                + "    implementation(dep)\n");
+        check(modern.contains("kotlin-stdlib-jdk8:1.8.0")
+                        && !modern.contains("kotlin-stdlib-jdk7:1.8.0"),
+                "the interpolated version is read, got <<" + modern + ">>");
+
+        String old = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    def v = '1.7.22'\n"
+                + "    def dep = [group: 'org.jetbrains.kotlin', "
+                + "name: 'kotlin-stdlib-jdk7', version: \"$v\"]\n"
+                + "    implementation(dep)\n");
+        check("".equals(old),
+                "and a pre-merge one still suppresses, got <<" + old + ">>");
+    }
+
+    /**
      * A map factored into a variable is a declaration too. Recorded as
      * nothing, the statement using it named no artifact and the strict pin it
      * carried was invisible.
