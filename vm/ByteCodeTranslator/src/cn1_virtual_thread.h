@@ -75,6 +75,20 @@
 
 struct cn1VirtualThread;
 
+/*
+ * Tells the VM that the state attached to a virtual thread has started or stopped
+ * running Java, so the collector stops or resumes treating it as parked.
+ *
+ * It is a WEAK symbol with a no-op default rather than a function pointer for two
+ * reasons: an indirect call on a path whose whole point is that it costs 2.1ns is
+ * not free, and this file has to keep linking on its own -- the standalone runtime
+ * test builds it without any VM at all. nativeMethods.m provides the real one.
+ *
+ * Kept out of the header's no-op section deliberately: it is about the VM's view of
+ * a virtual thread, not about the switch, so it exists on every target.
+ */
+void cn1VirtualThreadVmStateActive(void* vmState, int active);
+
 /** The body of a virtual thread. Returning from it finishes the virtual thread. */
 typedef void (*cn1VirtualThreadBody)(void* arg);
 

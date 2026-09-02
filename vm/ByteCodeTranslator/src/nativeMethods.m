@@ -1062,8 +1062,11 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
  * the one that grew it. Reserving the range up front and letting the kernel decide
  * what is resident keeps every pointer stable.
  */
-static struct elementStruct* cn1AllocThreadStack(void) {
+/* Reports through *mapped which allocator answered, because the caller cannot tell
+   from the pointer and the two do not free the same way. */
+static struct elementStruct* cn1AllocThreadStack(int* mapped) {
     size_t bytes = CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct);
+    *mapped = 0;
 #if defined(_WIN32)
     /* VirtualAlloc would be the equivalent; calloc keeps the Windows target on one
        well-trodden path, and it is not the target where thread counts are large. */
@@ -1072,20 +1075,26 @@ static struct elementStruct* cn1AllocThreadStack(void) {
     void* p = mmap(NULL, bytes, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if(p == MAP_FAILED) {
-        /* Out of mappings rather than out of memory; calloc may still succeed. */
+        /* Out of mappings rather than out of memory; calloc may still succeed. The
+           caller must remember this happened -- munmap on the result would fail with
+           EINVAL and leak the stack. */
         return (struct elementStruct*)calloc(CN1_MAX_OBJECT_STACK_DEPTH, sizeof(struct elementStruct));
     }
+    *mapped = 1;
     return (struct elementStruct*)p;
 #endif
 }
 
-static void cn1FreeThreadStack(struct elementStruct* stack) {
+/* mapped MUST be the value cn1AllocThreadStack reported for this pointer. */
+static void cn1FreeThreadStack(struct elementStruct* stack, int mapped) {
     if(stack == NULL) {
         return;
     }
-#if defined(_WIN32)
-    free(stack);
-#else
+    if(!mapped) {
+        free(stack);
+        return;
+    }
+#if !defined(_WIN32)
     munmap(stack, CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct));
 #endif
 }
@@ -1237,6 +1246,17 @@ JAVA_INT java_io_FileOutputStream_closeImpl___long_R_int(CODENAME_ONE_THREAD_STA
     return fclose(f) == 0 ? 0 : -1;
 }
 
+/* Keeps a Java object provably live past a safepoint. Only an INTERIOR pointer into
+   an array is used across the blocking calls below, so the optimizer is free to drop
+   the array reference itself -- and the concurrent collector, scanning this parked
+   thread, then sees no root and sweeps the buffer while the read is still filling it.
+   The Linux port solves this with an asm barrier; this file also compiles under
+   clang-cl, which has no __asm__ __volatile__, so it uses a volatile store, which no
+   compiler may elide. The sink is written from several threads and never read: that
+   is the entire point of it, and the races are benign because no value is consumed. */
+static volatile JAVA_OBJECT cn1BlockingIoKeepAlive;
+#define CN1_KEEP_ALIVE_ACROSS_SAFEPOINT(obj) do { cn1BlockingIoKeepAlive = (obj); } while(0)
+
 // Standard input. Separate from FileInputStream because stdin is not seekable, so
 // skip/available cannot be implemented by the ftell dance above.
 JAVA_INT java_io_StandardInputStream_readImpl___byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
@@ -1244,9 +1264,22 @@ JAVA_INT java_io_StandardInputStream_readImpl___byte_1ARRAY_int_int_R_int(CODENA
         return -2;
     }
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
-    size_t n = fread(&data[offset], 1, (size_t)length, stdin);
+    size_t n;
+    int atEof;
+    /* System.in.read() on a terminal or pipe waits for as long as nobody types. With
+       the thread left ACTIVE the concurrent collector spins for a safepoint this
+       thread cannot reach until input arrives -- on a target where forced-stop
+       escalation does not succeed, that is the whole VM stalled on a human. */
+    CN1_YIELD_THREAD;
+    n = fread(&data[offset], 1, (size_t)length, stdin);
+    /* Read BEFORE the resume. CN1_RESUME_THREAD is a safepoint and can park this
+       thread on a timed wait, and anything the stream state is asked for afterwards
+       describes the wait rather than the read. */
+    atEof = feof(stdin);
+    CN1_RESUME_THREAD;
+    CN1_KEEP_ALIVE_ACROSS_SAFEPOINT(buffer);
     if(n == 0) {
-        return feof(stdin) ? -1 : -2;
+        return atEof ? -1 : -2;
     }
     return (JAVA_INT)n;
 }
@@ -2003,7 +2036,7 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
      * lazily zeroed by the OS, so a shallow thread commits a few pages instead of
      * all of them.
      */
-    i->threadObjectStack = cn1AllocThreadStack();
+    i->threadObjectStack = cn1AllocThreadStack(&i->threadObjectStackMapped);
     i->threadObjectStackOffset = 0;
 
     i->callStackClass = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
@@ -2156,6 +2189,64 @@ struct cn1VirtualThread* cn1SpawnVirtualThread(cn1VirtualThreadBody body, void* 
     state->lightweightThread = JAVA_TRUE;
     cn1VirtualThreadSetState(vt, state);
     return vt;
+}
+
+/* Both are defined further down this file; cn1RetireVirtualThread needs them here. */
+extern void markDeadThread(struct ThreadLocalData* d);
+extern void cn1ReleaseThreadLocalData(struct ThreadLocalData* head);
+
+/*
+ * The strong definition of the weak hook cn1VirtualThreadResume calls. See the
+ * comment there for why the flag has to move with the switch.
+ */
+void cn1VirtualThreadVmStateActive(void* vmState, int active) {
+    struct ThreadLocalData* state = (struct ThreadLocalData*)vmState;
+    if(state != 0) {
+        state->threadActive = active ? JAVA_TRUE : JAVA_FALSE;
+    }
+}
+
+/**
+ * Retire a virtual thread produced by cn1SpawnVirtualThread, releasing BOTH halves.
+ *
+ * cn1VirtualThreadFree alone is not enough and the difference is not a small leak.
+ * That function knows only about the coroutine: it unregisters it and releases the
+ * stack. The VM thread state spawned alongside it holds a 264KB shadow stack, the
+ * call-stack arrays and the pending-allocation table, and -- the part that ends the
+ * process rather than merely growing it -- one of the NUMBER_OF_SUPPORTED_THREADS
+ * slots in allThreads. A server that spawns a virtual thread per request and never
+ * came through here would consume a slot per completed request and eventually trip
+ * CODENAME_ONE_ASSERT(threadOffset > -1) in cn1CreateThreadLocalData.
+ *
+ * Must NOT be called from inside the virtual thread's own body: this releases the
+ * stack that body is running on. Retire it from whoever resumed it, after
+ * cn1VirtualThreadFinished reports true.
+ */
+void cn1RetireVirtualThread(struct cn1VirtualThread* vt) {
+    struct ThreadLocalData* state;
+    if(vt == 0) {
+        return;
+    }
+    state = (struct ThreadLocalData*)cn1VirtualThreadState(vt);
+    cn1VirtualThreadSetState(vt, 0);
+    if(state != 0) {
+        // Frees the allThreads slot and runs collectThreadResources, exactly as an
+        // OS thread's death does.
+        markDeadThread(state);
+        // Then the state itself, with the same deferral an OS thread's finalizer
+        // uses: if the collector has this TLD queued for drain, its pending
+        // allocations have not been migrated into allObjectsInHeap yet and freeing
+        // now would hand the drain a dangling pointer.
+        lockCriticalSection();
+        if(state->gcQueuedForDrain) {
+            state->gcReleaseRequested = JAVA_TRUE;
+            unlockCriticalSection();
+        } else {
+            unlockCriticalSection();
+            cn1ReleaseThreadLocalData(state);
+        }
+    }
+    cn1VirtualThreadFree(vt);
 }
 #endif /* CN1_VIRTUAL_THREADS -- see the capability gate in cn1_virtual_thread.h */
 
@@ -2605,9 +2696,11 @@ JAVA_VOID java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA
 
 void cn1ReleaseThreadLocalData(struct ThreadLocalData *head) {
     free(head->blocks);
-    /* Mapped, not malloc'd -- see cn1AllocThreadStack. free() on a mapping is
-       undefined behaviour, not a leak, so this pairing matters. */
-    cn1FreeThreadStack(head->threadObjectStack);
+    /* Free it the way it was ALLOCATED -- see cn1AllocThreadStack, which falls back
+       to calloc when mmap is out of mappings. Neither mismatch is survivable: free()
+       on a mapping is undefined behaviour, and munmap on an allocator block leaks the
+       stack at best. */
+    cn1FreeThreadStack(head->threadObjectStack, head->threadObjectStackMapped);
     free(head->callStackClass);
     free(head->callStackLine);
     free(head->callStackMethod);

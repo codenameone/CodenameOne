@@ -1252,6 +1252,14 @@ struct ThreadLocalData {
 
     // used by the GC to traverse the objects pointed to by this thread
     struct elementStruct* threadObjectStack;
+    /* How threadObjectStack was obtained, because the two allocators are not
+       interchangeable at free time: mmap pairs with munmap, calloc with free.
+       cn1AllocThreadStack falls back to calloc when mmap runs out of MAPPINGS
+       rather than out of memory, and munmap on an allocator-owned pointer fails
+       with EINVAL and leaks the whole shadow stack -- or, if the allocator handed
+       back a page-aligned block, unmaps memory the allocator still believes it
+       owns. */
+    int threadObjectStackMapped;
     int threadObjectStackOffset;
     
     // allocations are stored here and then copied to the big memory pool during
@@ -2841,6 +2849,14 @@ extern struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCalli
 /** A virtual thread with a Java stack of its own, ready to be resumed. */
 extern struct cn1VirtualThread* cn1SpawnVirtualThread(void (*body)(void*), void* arg,
                                                       size_t stackBytes);
+/**
+ * The other half of cn1SpawnVirtualThread. Releases the coroutine AND the VM thread
+ * state spawned with it -- including its allThreads slot, without which a virtual
+ * thread per request exhausts NUMBER_OF_SUPPORTED_THREADS. cn1VirtualThreadFree
+ * alone releases only the coroutine. Never call it from inside the virtual thread's
+ * own body; it frees the stack that body is running on.
+ */
+extern void cn1RetireVirtualThread(struct cn1VirtualThread* vt);
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // PHASE 3b production conservative-root API. cn1ConservativeResolve maps an
