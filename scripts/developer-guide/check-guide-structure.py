@@ -110,13 +110,13 @@ class Walker:
                     f"{path.name}:{index + 1}: include target does not exist: {target_raw}"
                 )
                 continue
+            self._check_include_spacing(path, index, lines, target_raw, attrs, target)
             if path == self.root:
                 # A conditional entry is still a chapter: it must open at chapter
                 # level and be spaced correctly. Only the DUPLICATE count skips
                 # it, because the same chapter under two exclusive branches
                 # appears twice in the source and once in the output.
                 self.direct.add(target)
-                self._check_manifest_spacing(index, lines, target_raw)
                 if self._inside_conditional(lines, index):
                     # Nothing in the manifest is conditional today (measured: zero
                     # include:: lines sit inside a conditional anywhere in the guide),
@@ -161,26 +161,79 @@ class Walker:
                 depth = max(0, depth - 1)
         return depth > 0
 
-    def _check_manifest_spacing(self, index: int, lines: list[str], target_raw: str) -> None:
-        """Require a blank line after every include in the top-level manifest.
+    # A delimited block, a heading, an attribute entry or a directive all close the
+    # paragraph context. Only ordinary paragraph text leaves it open, and only an
+    # open paragraph can absorb the heading that follows it.
+    _CLOSES_PARAGRAPH = re.compile(
+        r"^(=+\s|:[^:]+:|//|\[|\||([-=_.*+/])\2{3,}\s*$)"
+    )
 
-        Two adjacent include lines put the first target's last line next to the
-        second target's first line. When the first ends on a paragraph, the second
-        chapter's title becomes a continuation of it and the chapter disappears
-        without a single warning -- which is exactly how the native Linux chapter
-        spent its life rendered as subsections of the Windows one.
+    def _check_include_spacing(
+        self,
+        path: Path,
+        index: int,
+        lines: list[str],
+        target_raw: str,
+        attrs: str,
+        target: Path,
+    ) -> None:
+        """Reject an include whose target can swallow whatever follows it.
+
+        This is the defect the whole checker was written for: two adjacent
+        include:: lines put the first file's last line against the second file's
+        first line, and if the first ends mid-paragraph the second's title becomes
+        a continuation of it. Asciidoctor emits no warning, and the native Linux
+        chapter spent its life rendered as subsections of the Windows one.
+
+        Measured with a minimal reproduction rather than assumed, because three of
+        the four ways out are not obvious:
+
+        * a blank line in the parent separates them -- safe;
+        * leveloffset= wraps the include in :leveloffset: attribute entries, and
+          those lines close the paragraph -- safe, which is why the five adjacent
+          includes in Maven-Project-Workflow.asciidoc render correctly;
+        * the included file ending on a blank line -- safe;
+        * the included file ending on a delimiter, table row, heading, attribute or
+          comment -- safe, which is why _generated-build-hints.adoc ending on
+          "|===" does not eat the "Versioned builds" heading after it.
+
+        What is left -- an adjacent include, no leveloffset, whose file ends on
+        ordinary paragraph text -- is the one shape that silently deletes content.
         """
         following = lines[index + 1] if index + 1 < len(lines) else ""
-        # A preprocessor directive is not content and cannot absorb a paragraph,
-        # so an include closed by endif:: on the next line is correctly spaced.
+        if not following.strip():
+            return
+        # A preprocessor directive is not content and cannot absorb a paragraph.
         if re.match(r"^(ifdef|ifndef|ifeval|endif)::", following.strip()):
             return
-        if following.strip():
-            self.errors.append(
-                f"developer-guide.asciidoc:{index + 1}: include of {target_raw} is not "
-                f"followed by a blank line. Two adjacent includes let the first "
-                f"chapter's trailing paragraph swallow the second chapter's title."
-            )
+        # A leveloffset on EITHER include protects: asciidoctor brackets the
+        # included content with :leveloffset: attribute entries, and an attribute
+        # entry closes the paragraph. The one on the following include lands
+        # between the paragraph and the heading, so it works just as well as the
+        # one on this include. Measured both ways.
+        if "leveloffset" in attrs:
+            return
+        following_include = INCLUDE_RE.match(following.strip())
+        if following_include and "leveloffset" in following_include.group(2):
+            return
+        try:
+            text = target.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return
+        if text.endswith("\n\n") or not text.strip():
+            return
+        last = next(
+            (line for line in reversed(text.split("\n")) if line.strip()), ""
+        )
+        if self._CLOSES_PARAGRAPH.match(last.strip()):
+            return
+        self.errors.append(
+            f"{path.name}:{index + 1}: include of {target_raw} is followed immediately "
+            f"by content, and {target.name} ends on a paragraph. That paragraph will "
+            f"absorb whatever comes next, deleting it from the book without a warning. "
+            f"Add a blank line after the include, or a leveloffset attribute, or end "
+            f"{target.name} with a blank line."
+        )
 
 
 def render(root: Path) -> str:
