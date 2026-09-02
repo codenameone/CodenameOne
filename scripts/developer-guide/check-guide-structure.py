@@ -20,6 +20,7 @@ chapter's title survives into the output; the third by walking the include graph
 from __future__ import annotations
 
 import argparse
+import collections
 import html
 import re
 import subprocess
@@ -72,6 +73,9 @@ class Walker:
         self.guide_dir = guide_dir
         self.reachable: dict[Path, str] = {}
         self.direct: set[Path] = set()
+        # Counted at the EDGE, not per visited file: _visit returns early on a
+        # revisit, so a document included twice would otherwise leave no trace.
+        self.include_count: collections.Counter = collections.Counter()
         self.errors: list[str] = []
         self._visit(root, "")
 
@@ -99,6 +103,7 @@ class Walker:
                     f"{path.name}:{index + 1}: include target does not exist: {target_raw}"
                 )
                 continue
+            self.include_count[target] += 1
             if path == self.root:
                 self.direct.add(target)
                 self._check_manifest_spacing(index, lines, target_raw)
@@ -160,6 +165,16 @@ def main() -> int:
 
     walker = Walker(root, guide_dir)
     errors = list(walker.errors)
+
+    # A document included twice is rendered twice. The title check below cannot
+    # see it, because it only asks whether a title appears AT LEAST as often as
+    # it is declared.
+    for path, count in sorted(walker.include_count.items()):
+        if count > 1:
+            errors.append(
+                f"{path.name}: is included {count} times, so the book renders it "
+                f"{count} times. Remove the duplicate include."
+            )
 
     # 1. Every chapter in the tree is either in the book or declared out of it.
     declared_path = guide_dir / "not-in-book.txt"
