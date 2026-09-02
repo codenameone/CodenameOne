@@ -67,6 +67,10 @@ import java.util.List;
 public final class SyncedStore {
     private static final List<SyncedStoreListener> listeners = new ArrayList<SyncedStoreListener>();
 
+    /// Guards `listeners`. Registration happens on whatever thread the application chooses and the
+    /// notification runs on the EDT, so every read and write of the list takes this.
+    private static final Object LISTENER_LOCK = new Object();
+
     private SyncedStore() {
     }
 
@@ -196,8 +200,15 @@ public final class SyncedStore {
     ///
     /// - `l`: the listener
     public static void addChangeListener(SyncedStoreListener l) {
-        if (l != null && !listeners.contains(l)) {
-            listeners.add(l);
+        synchronized (LISTENER_LOCK) {
+            // Guarded, because the registration API carries no EDT-only contract: an application
+            // registering from a worker raced the notification path's check and copy on the EDT,
+            // so a new listener could be missed, a removed one still called, or the snapshot
+            // taken mid-mutation. The same fix Continuity's own registry needed -- and this one
+            // is its sibling, which is exactly why it was missed the first time.
+            if (l != null && !listeners.contains(l)) {
+                listeners.add(l);
+            }
         }
         // The callback the port delivers change notifications through, and NOT Continuity.enable():
         // an app that only ever uses the synced store never touches Continuity itself, and would
@@ -220,13 +231,20 @@ public final class SyncedStore {
     ///
     /// - `l`: the listener
     public static void removeChangeListener(SyncedStoreListener l) {
-        listeners.remove(l);
+        synchronized (LISTENER_LOCK) {
+            listeners.remove(l);
+        }
     }
 
     /// Internal. Invoked by the continuity framework when a port reports that the store changed
     /// underneath the app. Application code registers a `SyncedStoreListener` instead.
     public static void notifyChanged() {
-        if (listeners.isEmpty() || !Display.isInitialized()) {
+        synchronized (LISTENER_LOCK) {
+            if (listeners.isEmpty()) {
+                return;
+            }
+        }
+        if (!Display.isInitialized()) {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
@@ -234,8 +252,10 @@ public final class SyncedStore {
             public void run() {
                 // Copied before iterating: a listener that reacts to a change by unregistering
                 // itself is ordinary, and would otherwise mutate the list being walked.
-                List<SyncedStoreListener> snapshot =
-                        new ArrayList<SyncedStoreListener>(listeners);
+                List<SyncedStoreListener> snapshot;
+                synchronized (LISTENER_LOCK) {
+                    snapshot = new ArrayList<SyncedStoreListener>(listeners);
+                }
                 // The element cast the compiler inserts sits in the loop header, outside the
                 // handler -- a failed cast does not throw on the iOS virtual machine, so a
                 // handler wrapped around one could not run there anyway.
@@ -262,6 +282,8 @@ public final class SyncedStore {
 
     /// Test seam: forgets every registered listener.
     static void reset() {
-        listeners.clear();
+        synchronized (LISTENER_LOCK) {
+            listeners.clear();
+        }
     }
 }
