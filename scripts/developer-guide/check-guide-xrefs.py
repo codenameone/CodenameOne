@@ -32,14 +32,24 @@ RAW_ID_LINK_RE = re.compile(r'<a href="#([^"]+)">\[\1\]</a>')
 ANCHOR_SOURCE_RE = re.compile(r"<<([^>,]+)")
 
 
-def render(root: Path) -> str:
+# The book has ifdef::backend-pdf[] branches, and the PDF is published alongside
+# the HTML. Rendering only the default backend drops that content before any
+# reference in it can be examined, so a dangling PDF-only xref would ship
+# unchecked. Setting the attribute on an HTML render selects exactly the content
+# the PDF build includes, without needing asciidoctor-pdf here. The two runs are
+# checked SEPARATELY, never pooled: an anchor that exists only in the HTML branch
+# must not be allowed to satisfy a reference made in the PDF branch.
+BACKENDS = (("html", ()), ("pdf", ("backend-pdf",)))
+
+
+def render(root: Path, attributes: tuple[str, ...] = ()) -> str:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "guide.html"
-        result = subprocess.run(
-            ["asciidoctor", "--require", "rouge", "-o", str(out), str(root)],
-            capture_output=True,
-            text=True,
-        )
+        command = ["asciidoctor", "--require", "rouge"]
+        for attribute in attributes:
+            command += ["-a", attribute]
+        command += ["-o", str(out), str(root)]
+        result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode != 0:
             print(result.stderr, file=sys.stderr)
             raise SystemExit("asciidoctor failed to render the guide")
@@ -66,28 +76,37 @@ def main() -> int:
 
     guide_dir = args.guide_dir.resolve()
     root = guide_dir / "developer-guide.asciidoc"
-    markup = render(root)
-
-    ids = set(ID_RE.findall(markup))
     dangling: dict[str, int] = defaultdict(int)
-    for target in HREF_RE.findall(markup):
-        if target not in ids:
-            dangling[target] += 1
-
     raw_id_links: dict[str, int] = defaultdict(int)
-    for target in RAW_ID_LINK_RE.findall(markup):
-        raw_id_links[target] += 1
+    branches: dict[str, set[str]] = defaultdict(set)
+    anchor_total = 0
+
+    for name, attributes in BACKENDS:
+        markup = render(root, attributes)
+        ids = set(ID_RE.findall(markup))
+        anchor_total = max(anchor_total, len(ids))
+        for target in HREF_RE.findall(markup):
+            if target not in ids:
+                dangling[target] += 1
+                branches[target].add(name)
+        for target in RAW_ID_LINK_RE.findall(markup):
+            raw_id_links[target] += 1
+            branches[target].add(name)
 
     if not dangling and not raw_id_links:
-        print(f"Cross-references OK: {len(ids)} anchors, every internal link resolves.")
+        print(
+            f"Cross-references OK: {anchor_total} anchors, every internal link "
+            f"resolves in both the default and backend-pdf renders."
+        )
         return 0
 
     for target in sorted(dangling):
         where = source_locations(guide_dir, target)
         location = ", ".join(where) if where else "not found in source (generated content?)"
+        where_rendered = "/".join(sorted(branches[target])) + " render"
         print(
             f"{location}: <<{target}>> points at an id that does not exist in the "
-            f"rendered book ({dangling[target]} reference(s)).",
+            f"rendered book ({dangling[target]} reference(s), {where_rendered}).",
             file=sys.stderr,
         )
     for target in sorted(raw_id_links):

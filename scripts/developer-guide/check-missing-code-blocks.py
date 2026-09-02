@@ -47,8 +47,15 @@ LIST_MARKER_RE = re.compile(r"^([*\-]+|\.{1,5}|[0-9]+\.)\s+")
 # listing by more than one blank line is untidy, not a hole, and reporting it
 # would make the gate reject valid AsciiDoc spacing. Deliberately conservative:
 # only unambiguous starts, so a genuine hole is never explained away.
+# An admonition is prose, so it can never be the listing a sentence promised.
+# Excluded by name rather than by whitelisting the block kinds that ARE code:
+# measured, the bracket lines that legitimately answer a promising sentence
+# already span [source], [listing], [cols=...], [options=...], [quote] and an
+# anchored image, and a whitelist would report the next kind nobody thought of.
+ADMONITION = "NOTE|TIP|IMPORTANT|WARNING|CAUTION"
 BLOCK_START_RE = re.compile(
-    r'^(\[[a-zA-Z%.#"]|image::|include::|\|===|(----|\.\.\.\.|````|\+\+\+\+|====|\*\*\*\*|____)\s*$)'
+    r'^(\[(?!(?:' + ADMONITION + r')\])[a-zA-Z%.#"]'
+    r'|image::|include::|\|===|(----|\.\.\.\.|````|\+\+\+\+|====|\*\*\*\*|____)\s*$)'
 )
 
 
