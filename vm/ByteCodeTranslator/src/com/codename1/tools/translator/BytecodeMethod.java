@@ -4695,10 +4695,24 @@ public class BytecodeMethod implements SignatureSet {
                                         "        " + valueType + " __cn1ValueTmp = " + valueLiteral + ";\n" +
                                         // The macro's own comment used to claim it covariance-checks
                                         // OBJECT stores; it never did. Under -Dcn1.checkedCasts the
-                                        // check is emitted here, ahead of the store.
+                                        // check is emitted here.
+                                        //
+                                        // GUARDED BY THE ACCESS VALIDATION, because the JLS orders
+                                        // these: NullPointerException, then
+                                        // ArrayIndexOutOfBoundsException, then ArrayStoreException.
+                                        // Run bare, the covariance check reports a bad VALUE on a
+                                        // store whose INDEX is also bad, hiding the exception the
+                                        // program should have seen -- and on a null array it used to
+                                        // dereference null outright. cn1_array_access_validate throws
+                                        // the right one of the first two; the setter re-checks on its
+                                        // in-bounds fast path, which costs a comparison.
                                         ("OBJECT".equals(elementType) && ByteCodeTranslator.isCheckedCastsEnabled()
-                                                ? "        CN1_ARRAY_STORE_CHECK(__cn1ArrayTmp, __cn1ValueTmp);\n" : "") +
-                                        "        CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n" +
+                                                ? "        if(cn1_array_access_in_bounds(__cn1ArrayTmp, __cn1IndexTmp)\n"
+                                                + "                || cn1_array_access_validate(threadStateData, __cn1ArrayTmp, __cn1IndexTmp)) {\n"
+                                                + "            CN1_ARRAY_STORE_CHECK(__cn1ArrayTmp, __cn1ValueTmp);\n"
+                                                + "            CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n"
+                                                + "        }\n"
+                                                : "        CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n") +
                                         "    }\n";
                             }
                             instructions.add(iter-3, new CustomIntruction(code, code, dependentClasses));
