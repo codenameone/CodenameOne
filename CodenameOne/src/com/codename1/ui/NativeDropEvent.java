@@ -76,7 +76,7 @@ public final class NativeDropEvent extends ActionEvent {
         this.content = content;
         this.allowedActions = allowedActions;
         this.local = local;
-        this.acceptedAction = defaultAction(allowedActions);
+        this.acceptedAction = defaultAction(permittedActions());
     }
 
     /// Picks the action a target that expresses no preference gets: a copy when the source
@@ -143,7 +143,21 @@ public final class NativeDropEvent extends ActionEvent {
     /// - `action`: one of `NativeDragOperation#ACTION_COPY`, `NativeDragOperation#ACTION_MOVE`
     ///   or `NativeDragOperation#ACTION_LINK`
     public void accept(int action) {
-        acceptedAction = (action & allowedActions) == action ? action : NativeDragOperation.ACTION_NONE;
+        int permitted = permittedActions();
+        acceptedAction = (action & permitted) == action ? action : NativeDragOperation.ACTION_NONE;
+    }
+
+    /// What may actually be agreed to here: what the source offers, narrowed by what the
+    /// target said it accepts.
+    ///
+    /// Both halves, because a target that declared itself copy-only and then accepted a move
+    /// in a listener used to have that move honoured -- and a move is the source deleting its
+    /// copy. The declaration is what made this component eligible for the drag in the first
+    /// place, and it is what the framework's own default already respects; a listener widening
+    /// past it is a contradiction, and the safe reading of a contradiction is a refusal, which
+    /// is what accept() already does for an action the source never offered.
+    private int permittedActions() {
+        return target == null ? allowedActions : allowedActions & target.getAcceptedDropActions();
     }
 
     /// Refuses the drag, so the user sees a "no drop" cursor over this component and no drop

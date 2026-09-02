@@ -878,6 +878,30 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aTargetCannotAcceptMoreThanItDeclared() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        // Declared copy-only, and its listener asks for a move anyway.
+        target.setAcceptedDropActions(NativeDragOperation.ACTION_COPY);
+        target.rejectAction = NativeDragOperation.ACTION_MOVE;
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        int both = NativeDragOperation.ACTION_COPY | NativeDragOperation.ACTION_MOVE;
+
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), both);
+        flushSerialCalls();
+        int answer = NativeDragAndDrop.dragOver(0, x, y, textContent("hi"), both);
+
+        assertEquals(NativeDragOperation.ACTION_NONE, answer,
+                "a move is the source deleting its copy, and this target said it does not do "
+                        + "moves -- honouring the listener over the declaration that made the "
+                        + "component eligible would destroy data on its word");
+
+        NativeDragAndDrop.dragExit(0);
+        flushSerialCalls();
+    }
+
+    @FormTest
     void theDropEventReportsWhatTheSourceAllowedAndWhatIsHappening() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder target = addTarget(form);

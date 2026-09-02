@@ -144,7 +144,11 @@ void CN1NativeDragDeliverDropAdd(NSString* mimeType, NSString* text, NSData* bin
 /// Loading that as data would read the whole document into memory on top of the copy this
 /// already makes -- fatal for a large one -- so the type is named against the copy instead and
 /// read only if a target asks for it.
-void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path);
+///
+/// `charset` is the encoding the representation's uniform type identifier declared, or nil
+/// when it declared none. Without it the Java side has only the path and reads every text
+/// representation as UTF-8, which turns a public.utf16-plain-text alternative into rubbish.
+void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path, NSString* charset);
 
 /// Delivers the assembled drop and returns the action actually accepted, or 0 when nothing took
 /// it.

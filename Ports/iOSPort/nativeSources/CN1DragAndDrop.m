@@ -505,12 +505,29 @@ void CN1CancelNativeDrag(void) {
 ///
 /// Anything the identifier does not pin down is handed to NSString's own detection rather than
 /// assumed, and only a representation nothing can read at all comes back nil.
-static NSString* cn1TextFromData(NSData* data, NSString* uti) {
-    NSStringEncoding declared = 0;
+/// The charset a uniform type identifier declares, by the name java.nio understands, or nil
+/// when the identifier says nothing about the encoding.
+///
+/// A representation handed over as a file keeps only its path, so this is what travels with
+/// it: the Java side reads the bytes later and would otherwise have to assume UTF-8, which
+/// turns a public.utf16-plain-text alternative into rubbish.
+static NSString* cn1CharsetNameForUti(NSString* uti) {
     if ([uti isEqualToString:@"public.utf16-plain-text"]
             || [uti isEqualToString:@"public.utf16-external-plain-text"]) {
+        return @"UTF-16";
+    }
+    if ([uti isEqualToString:@"public.utf8-plain-text"]) {
+        return @"UTF-8";
+    }
+    return nil;
+}
+
+static NSString* cn1TextFromData(NSData* data, NSString* uti) {
+    NSStringEncoding declared = 0;
+    NSString* charset = cn1CharsetNameForUti(uti);
+    if ([charset isEqualToString:@"UTF-16"]) {
         declared = NSUTF16StringEncoding;
-    } else if ([uti isEqualToString:@"public.utf8-plain-text"]) {
+    } else if ([charset isEqualToString:@"UTF-8"]) {
         declared = NSUTF8StringEncoding;
     }
     if (declared != 0) {
@@ -811,9 +828,11 @@ API_AVAILABLE(ios(11.0))
     NSMutableDictionary* collected = [[NSMutableDictionary alloc] init];
     NSMutableArray* files = [[NSMutableArray alloc] init];
     // The representations a file-vending provider also advertises, each named against a file on
-    // disk rather than read into memory: pairs of {MIME type, path}. One that is another name
+    // disk rather than read into memory: {MIME type, path, charset}. One that is another name
     // for the document shares the document's own copy; one that is a representation of its own
-    // gets a copy of its own.
+    // gets a copy of its own. The charset is empty unless the identifier declared one, which
+    // is the only thing that can tell the Java side how to read a text file it never saw the
+    // identifier for.
     NSMutableArray* fileBacked = [[NSMutableArray alloc] init];
     dispatch_group_t group = dispatch_group_create();
 
@@ -828,20 +847,28 @@ API_AVAILABLE(ios(11.0))
             dispatch_group_enter(group);
             [provider loadFileRepresentationForTypeIdentifier:@"public.file-url"
                                            completionHandler:^(NSURL* url, NSError* error) {
-                if (url != nil) {
-                    // The URL is only valid inside this handler, so the file is copied out
-                    // before it is named to the application. A path handed over without
-                    // copying is unreadable by the time the event dispatch thread sees it.
-                    NSString* target = cn1CopyDroppedFile(url);
-                    if (target != nil) {
-                        @synchronized (files) {
-                            [files addObject:target];
-                        }
-                        // The document's own location, which is what tells one of its other
-                        // names apart from a representation of its own.
-                        NSString* documentPath = url.path;
-                        // Issued from in here, rather than beside the file load, so that
-                        // comparison is possible at all.
+                // The URL is only valid inside this handler, so the file is copied out before
+                // it is named to the application. A path handed over without copying is
+                // unreadable by the time the event dispatch thread sees it.
+                //
+                // A failure here is not the end of the item: a cloud-backed document that
+                // will not materialize still leaves whatever else the provider advertised,
+                // and the hover has already promised those. Nesting the alternatives under
+                // this meant an unavailable file took every one of them with it and the
+                // target that accepted the drag got nothing at all.
+                NSString* target = url == nil ? nil : cn1CopyDroppedFile(url);
+                // The document's own location, which is what tells one of its other names
+                // apart from a representation of its own. Nil when there is no document.
+                NSString* documentPath = target == nil ? nil : url.path;
+                if (target != nil) {
+                    @synchronized (files) {
+                        [files addObject:target];
+                    }
+                }
+                {
+                    {
+                        // Issued from in here, rather than beside the file load, so that the
+                        // comparison above is possible at all.
                         for (NSString* uti in provider.registeredTypeIdentifiers) {
                             if ([uti isEqualToString:@"public.file-url"]) {
                                 continue;
@@ -867,8 +894,10 @@ API_AVAILABLE(ios(11.0))
                                             ? target             // another name for the document
                                             : cn1CopyDroppedFile(alt);
                                     if (altTarget != nil) {
+                                        NSString* charset = cn1CharsetNameForUti(uti);
                                         @synchronized (fileBacked) {
-                                            [fileBacked addObject:@[mime, altTarget]];
+                                            [fileBacked addObject:@[mime, altTarget,
+                                                                    charset == nil ? @"" : charset]];
                                         }
                                     }
                                 }
@@ -920,8 +949,10 @@ API_AVAILABLE(ios(11.0))
                 CN1NativeDragDeliverDropAdd(mime, nil, data);
             }
         }
-        for (NSArray* pair in fileBacked) {
-            CN1NativeDragDeliverDropAddFile([pair objectAtIndex:0], [pair objectAtIndex:1]);
+        for (NSArray* named in fileBacked) {
+            NSString* charset = [named objectAtIndex:2];
+            CN1NativeDragDeliverDropAddFile([named objectAtIndex:0], [named objectAtIndex:1],
+                                            charset.length == 0 ? nil : charset);
         }
         if (files.count > 0) {
             CN1NativeDragDeliverDropAdd(@"application/x-file-list",

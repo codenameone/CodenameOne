@@ -1150,11 +1150,12 @@ void CN1NativeDragDeliverDropAdd(NSString* mimeType, NSString* text, NSData* bin
             binary == nil ? JAVA_NULL : nsDataToByteArr(binary));
 }
 
-void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path) {
-    com_codename1_impl_ios_IOSImplementation_nativeDropAddFileCallback___java_lang_String_java_lang_String(
+void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path, NSString* charset) {
+    com_codename1_impl_ios_IOSImplementation_nativeDropAddFileCallback___java_lang_String_java_lang_String_java_lang_String(
             CN1_THREAD_GET_STATE_PASS_ARG
             fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType),
-            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG charset));
 }
 
 NSData* CN1NativeDragDeliverResolve(NSString* mimeType, int sessionId) {

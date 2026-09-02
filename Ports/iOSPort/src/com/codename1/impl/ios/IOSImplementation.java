@@ -9334,7 +9334,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// and a target may filter on either. Promising the type against the copy rather than
     /// loading it keeps the two in agreement without reading a large document into memory on
     /// top of copying it -- the bytes are only read if something asks for that type.
-    public static void nativeDropAddFileCallback(String mimeType, final String path) {
+    public static void nativeDropAddFileCallback(String mimeType, final String path,
+            final String charset) {
         if (pendingDrop == null || mimeType == null || mimeType.length() == 0
                 || path == null || path.length() == 0 || pendingDrop.hasMimeType(mimeType)) {
             return;
@@ -9358,8 +9359,13 @@ public class IOSImplementation extends CodenameOneImplementation {
                     // offers a plain text representation beside its file URL, and answering
                     // that with bytes made getText() and NativeDropEvent.getText() null for a
                     // type the drop had just accepted.
+                    //
+                    // In the encoding the representation's own type identifier declared, when
+                    // it declared one. This side never sees that identifier -- it has a path
+                    // and a MIME type -- so assuming UTF-8 turned a UTF-16 alternative into
+                    // rubbish while the same representation read as data came through intact.
                     if (bytes != null && requested != null && requested.startsWith("text/")) {
-                        return new String(bytes, "UTF-8");
+                        return new String(bytes, charsetOrUtf8(charset));
                     }
                     return bytes;
                 } catch (Throwable err) {
@@ -9368,6 +9374,15 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
         });
+    }
+
+    /// The named charset when this platform has it, and UTF-8 otherwise -- which is what the
+    /// unnamed case means anyway.
+    private static String charsetOrUtf8(String charset) {
+        if (charset == null || charset.length() == 0) {
+            return "UTF-8";
+        }
+        return charset;
     }
 
     /// Invoked from CN1DragAndDrop.m once every representation has arrived. Returns the action
