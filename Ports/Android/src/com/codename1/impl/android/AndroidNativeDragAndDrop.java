@@ -344,6 +344,14 @@ final class AndroidNativeDragAndDrop {
     /// provider that answers null. That is enough: a drop target decides whether it wants the
     /// drag from the MIME types, and the real content arrives on the drop.
     private static ClipboardContent describe(ClipDescription description) {
+        NativeDragOperation op = exporting();
+        if (op != null) {
+            // This application's own drag, so there is nothing to infer: the operation says
+            // what it offers. Android has already built the whole clip by now, so handing the
+            // source's own content to the hover costs nothing and cannot disagree with the
+            // drop -- which is the failure every rule below is trying to avoid.
+            return op.getContent();
+        }
         ClipboardContent content = new ClipboardContent();
         if (description == null) {
             return content;
@@ -357,11 +365,28 @@ final class AndroidNativeDragAndDrop {
             if ("text/uri-list".equals(mime)) {
                 // Android carries a dragged file as a URI, which is what the framework calls a
                 // file list; advertise both so either kind of target matches.
+                //
+                // This is the one thing a hover cannot get right on Android. A file manager
+                // and a browser both describe themselves as text/uri-list, and the clip that
+                // would tell them apart -- content: against https: -- is withheld until the
+                // drop. Promising files is the useful way to be wrong: a link drag is then
+                // refused at the drop rather than never accepted at all.
                 declare(content, ClipboardContent.MIME_FILE);
                 declare(content, ClipboardContent.MIME_URI_LIST);
                 continue;
             }
             declare(content, mime);
+            if (!mime.startsWith("text/")) {
+                // A type that is not text is carried by a URI, because that is the only way
+                // an Android clip carries anything else -- and a URI another application put
+                // in a clip is a file reference as well as that type. Without this, an
+                // ordinary content:// PDF from another app describes itself as application/pdf
+                // alone, a target restricted to files refused every hover event, and the drop
+                // never happened -- while contentFromClip went on to call the very same URI a
+                // file.
+                declare(content, ClipboardContent.MIME_FILE);
+                declare(content, ClipboardContent.MIME_URI_LIST);
+            }
         }
         return content;
     }

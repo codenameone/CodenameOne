@@ -10801,6 +10801,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         String plain = null;
         String html = null;
         List<String> fileUris = new ArrayList<String>();
+        // Every URI the clip carried that the source published, files or not. A link dragged out
+        // of a browser belongs here and not in fileUris: it is a URI, and it is not a document on
+        // disk. The two lists differ only by that, and by the transport URIs this exporter mints,
+        // which are in neither because the source never published them as URIs at all.
+        List<String> publishedUris = new ArrayList<String>();
         // URIs the content resolver could not name. An application defined type has no entry in
         // Android's table, so a FileProvider serving it reports octet-stream or nothing at all.
         List<Uri> unnamedUris = new ArrayList<Uri>();
@@ -10861,7 +10866,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     // not by anything about the URI or its name -- an application may publish a
                     // file called anything at all.
                     if (!isGeneratedClipFile(uri)) {
-                        fileUris.add(uri.toString());
+                        publishedUris.add(uri.toString());
+                        if (namesALocalFile(uri)) {
+                            fileUris.add(uri.toString());
+                        }
                     }
                     // No continue: an item carrying a URI carries the clip's text too, because
                     // that is where this exporter puts it -- a text item of its own would be a
@@ -10921,7 +10929,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             content.setData(ClipboardContent.MIME_TEXT, "");
         }
         if (description != null) {
-            fillAdvertisedTypes(content, description, plain, fileUris, unnamedUris);
+            fillAdvertisedTypes(content, description, plain, publishedUris, unnamedUris);
         }
         return content;
     }
@@ -10961,6 +10969,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         synchronized (GENERATED_CLIP_URIS) {
             return GENERATED_CLIP_URIS.contains(uri.toString());
         }
+    }
+
+    /// True when this URI names something on this device rather than somewhere on the web.
+    ///
+    /// A link dragged out of a browser arrives as a text/uri-list item whose URI is https,
+    /// and calling that a file handed a file-only target a URL through getFiles() as though
+    /// it were a document on disk. It is still carried, under MIME_URI_LIST, which is what
+    /// it actually is.
+    private static boolean namesALocalFile(Uri uri) {
+        String scheme = uri.getScheme();
+        if (scheme == null) {
+            // A bare path, which is a local file by construction.
+            return true;
+        }
+        scheme = scheme.toLowerCase();
+        return "content".equals(scheme) || "file".equals(scheme);
     }
 
     /// A MIME type without its parameters, lower case, or null when there is none.
@@ -11015,7 +11039,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// `text/uri-list` excepted, which is the list of URIs the clip carried. A type with no
     /// value to give it is left absent rather than advertised empty.
     private void fillAdvertisedTypes(ClipboardContent content, ClipDescription description,
-            String plain, List<String> fileUris, List<Uri> unnamedUris) {
+            String plain, List<String> publishedUris, List<Uri> unnamedUris) {
         List<String> unsatisfiedBinary = new ArrayList<String>();
         List<String> unsatisfiedText = new ArrayList<String>();
         for (int iter = 0; iter < description.getMimeTypeCount(); iter++) {
@@ -11028,13 +11052,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 continue;
             }
             if ("text/uri-list".equals(mime)) {
-                if (!fileUris.isEmpty()) {
+                // Every URI, not only the ones that name files: a URI list is a URI list, and a
+                // link the source published belongs in it even though it is not a document.
+                if (!publishedUris.isEmpty()) {
                     StringBuilder uris = new StringBuilder();
-                    for (int j = 0; j < fileUris.size(); j++) {
+                    for (int j = 0; j < publishedUris.size(); j++) {
                         if (j > 0) {
                             uris.append("\r\n");
                         }
-                        uris.append(fileUris.get(j));
+                        uris.append(publishedUris.get(j));
                     }
                     content.setData(ClipboardContent.MIME_URI_LIST, uris.toString());
                 }
