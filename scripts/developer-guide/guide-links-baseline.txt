@@ -33,8 +33,6 @@ io.asciidoc	http://twillo.com/
 io.asciidoc	http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3
 io.asciidoc	http://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html
 io.asciidoc	http://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html
-performance.asciidoc	http://github.com/codenameone/CodenameOne
-performance.asciidoc	http://github.com/codenameone/codenameone-skins
 performance.asciidoc	http://optipng.sourceforge.net/
 signing.asciidoc	http://developer.android.com/guide/publishing/app-signing.html
 signing.asciidoc	http://developer.apple.com/

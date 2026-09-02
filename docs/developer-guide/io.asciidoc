@@ -1466,7 +1466,7 @@ You ignored functions, joins, transactions and a lot of other SQL capabilities.
 
 You can use SQL directly to use all these capabilities for example: if you begin a transaction before inserting/updating or deleting this will work as advertised but if a rollback occurs your mapping will be unaware of that so you will need to re-fetch the data.
 
-You will notice you mapped autoincrement so you will try to map things that make sense for various use cases, if you've such a use case you'd appreciate pull requests and feedback on the implementation.
+The mapping covers autoincrement and the cases that map cleanly onto a table; a use case that needs more than that subset is better served by dropping to SQL directly.
 
 ====== Caching/Collision
 

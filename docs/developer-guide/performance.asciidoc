@@ -449,20 +449,8 @@ For this purpose the Codename One simulator allows you to slow down networking o
 
 When you debug your app with your source code you can place breakpoints deep within Codename One and gain unique insight. You can also use the profilers and profile into Codename One to gain similar performance specific insight.
 
-When you run into a bug or a missing feature you can push that feature/fix back to https://www.codenameone.com/[Codename One] using a pull request. GitHub makes that process trivial and in this new video and slides below you show you how.
-The steps to use the code are:
-
-. Signup for GitHub
-. Fork http://github.com/codenameone/CodenameOne and
- http://github.com/codenameone/codenameone-skins
- (also star and watch the projects for good measure).
-. Clone the git URLs from the projects into the IDE using the #Team# -> #Git# -> #Clone# menu option. Notice that you must deselect projects in the IDE for the menu to appear.
-
-. Download the cn1-binaries project from GitHub https://github.com/codenameone/cn1-binaries/archive/master.zip[here].
-. Unzip the cn1-binaries project and make sure the directory has the name cn1-binaries. Verify that cn1-binaries, CodenameOne and codenameone-skins are within the same parent directory.
-.In your own project remove the jars both in the build & run libraries section. Replace the build libraries with the `CodenameOne/CodenameOne` project. Replace the runtime libraries with the `CodenameOne/Ports/JavaSEPort` project.
-
-This allows you to run the existing Codename One project with the Codename One source code and debug into Codename One. You can now also commit, push and send a pull request with the changes.
+Running against the framework sources rather than the released jars is covered in
+<<working-with-codename-one-sources,working with Codename One sources>>.
 
 === Device testing Framework/Unit testing
 
