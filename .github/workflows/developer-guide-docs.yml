@@ -50,8 +50,13 @@ jobs:
             docs:
               - 'docs/developer-guide/**'
               - 'docs/demos/common/src/main/snippets/**'
-              - 'scripts/developer-guide/migrate-inline-guide-snippets.py'
-              - 'scripts/developer-guide/validate-guide-snippets.py'
+              # The whole directory, not two named files. on.pull_request.paths
+              # already triggers on scripts/developer-guide/**, so a change to any
+              # other script here started the workflow while leaving this filter
+              # false -- which skipped the very steps that script governs. A
+              # change to compare-screenshots.py could have merged without the
+              # screenshot check ever running it.
+              - 'scripts/developer-guide/**'
               - '.github/workflows/developer-guide-docs.yml'
               # Triggering the workflow is not enough on its own: the HTML and PDF
               # build and the steps beside it are gated on this filter, so the
@@ -122,6 +127,7 @@ jobs:
         run: |
           set -euo pipefail
           GENERATED_DIR="$RUNNER_TEMP/pre-advanced-theming-screenshots"
+          echo "GUIDE_GENERATED_SCREENSHOTS=$GENERATED_DIR" >> "$GITHUB_ENV"
           rm -rf "$GENERATED_DIR"
           mkdir -p "$GENERATED_DIR"
           xvfb-run -a mvn -B -ntp \
@@ -131,23 +137,25 @@ jobs:
             -P guide-screenshot-generator \
             -Dguide.screenshot.output="$GENERATED_DIR" \
             verify
-          COUNT="$(find "$GENERATED_DIR" -maxdepth 1 -type f -name '*.png' | wc -l | tr -d ' ')"
-          if [ "$COUNT" != "24" ]; then
-            echo "::error::Expected 24 generated pre-Advanced Theming screenshots, found $COUNT"
-            exit 1
-          fi
-          for generated in "$GENERATED_DIR"/*.png; do
-            name="$(basename "$generated")"
-            committed="docs/developer-guide/img/$name"
-            if [ ! -f "$committed" ]; then
-              echo "::error::Generated screenshot has no committed counterpart: $name"
-              exit 1
-            fi
-            if ! cmp -s "$generated" "$committed"; then
-              echo "::error::Committed screenshot is stale: $name"
-              exit 1
-            fi
-          done
+          pip install --user --quiet Pillow
+          # Byte equality is still the rule; a figure only gets a bounded
+          # difference if it carries a .tolerance sidecar saying why.
+          python3 scripts/developer-guide/compare-screenshots.py \
+            --generated "$GENERATED_DIR" \
+            --committed docs/developer-guide/img \
+            --expected-count 24
+
+      # When the byte compare fails, the message names the file but not what it
+      # actually rendered, which leaves no way to tell a real regression from an
+      # environment difference. Publishing what this runner produced makes the
+      # two distinguishable without adding a debugging round trip to CI.
+      - name: Upload generated screenshots when they do not match
+        if: failure() && env.GUIDE_GENERATED_SCREENSHOTS != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: guide-generated-screenshots
+          path: ${{ env.GUIDE_GENERATED_SCREENSHOTS }}
+          if-no-files-found: warn
 
       - name: Verify developer guide images are referenced
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
