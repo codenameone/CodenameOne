@@ -380,21 +380,28 @@ public final class IOSNative {
     /// built only once a drag really happens.
     native void beginNativeDragPayload();
 
-    /// Adds one representation to the payload being built.
+    /// Names a representation the drag can offer, without producing it.
     ///
     /// Every MIME type the operation advertises goes through here rather than a fixed list, so
     /// nothing the application published is silently left behind -- a drag offering only
-    /// `text/markdown` used to advertise it and then carry nothing, which UIKit cancels.
+    /// `text/markdown` used to advertise it and then carry nothing, which UIKit cancels. The
+    /// value is produced only if a receiver reads that type, which is what
+    /// `com.codename1.ui.ClipboardContent#setDataProvider(java.lang.String, com.codename1.ui.ClipboardDataProvider)`
+    /// promises.
     ///
     /// #### Parameters
     ///
     /// - `mimeType`: the representation's MIME type
+    native void declareNativeDragPayload(String mimeType);
+
+    /// Adds the file list, the one representation that cannot be deferred: UIKit needs the
+    /// number of items when the session begins, and for a file drag that is the number of
+    /// files.
     ///
-    /// - `text`: the value when it is text, or newline separated paths for
-    ///   `com.codename1.ui.ClipboardContent#MIME_FILE`; null otherwise
+    /// #### Parameters
     ///
-    /// - `binary`: the value when it is binary; null otherwise
-    native void addNativeDragPayload(String mimeType, String text, byte[] binary);
+    /// - `paths`: newline separated file paths or `file:` URIs
+    native void addNativeDragFiles(String paths);
 
     /// Drops whatever `#prepareNativeDrag(java.lang.String, int, byte[], int, int)` staged,
     /// because the press turned out to be a tap.

@@ -9356,29 +9356,64 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         ClipboardContent content = op.getContent();
         nativeInstance.beginNativeDragPayload();
-        // Every advertised representation, not a fixed list of the framework's own. prepare
-        // advertises whatever the content holds, so forwarding less than that left an operation
-        // carrying only, say, MIME_MARKDOWN advertising a type it then could not produce -- and
-        // a drag with no items at all is cancelled the moment it starts.
+        // Names, not values. Reading a representation here would build every promised file and
+        // encode every promised image at the moment the drag begins -- including for a drag the
+        // user then abandons -- which is the opposite of what setDataProvider promises. The
+        // native side asks for one through nativeDragResolveCallback if a receiver reads it.
         String[] mimeTypes = content.getMimeTypes();
         for (int iter = 0; iter < mimeTypes.length; iter++) {
             String mime = mimeTypes[iter];
             if (ClipboardContent.MIME_FILE.equals(mime)) {
-                // Normalized through getFiles(), which reads back both the single-String and
-                // the String[] spellings a producer may have used.
-                nativeInstance.addNativeDragPayload(mime, join(content.getFiles()), null);
+                // The exception, and it is UIKit's: the session needs its item count when it
+                // begins, and for a file drag that count is the number of files. So this one
+                // representation is resolved now.
+                nativeInstance.addNativeDragFiles(join(content.getFiles()));
                 continue;
             }
-            // Reading the value here is what resolves a promised representation, which is the
-            // whole point of doing this at session start rather than on the press.
-            Object value = content.getData(mime);
-            if (value instanceof String) {
-                nativeInstance.addNativeDragPayload(mime, (String) value, null);
-            } else if (value instanceof byte[]) {
-                nativeInstance.addNativeDragPayload(mime, null, (byte[]) value);
-            }
+            nativeInstance.declareNativeDragPayload(mime);
         }
         return op.getAllowedActions();
+    }
+
+    /// Invoked from CN1DragAndDrop.m when a receiver reads one of the drag's representations.
+    ///
+    /// This is where a promised value is finally produced -- the file written, the image
+    /// encoded -- so a drag that nobody reads costs nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mimeType`: the representation being read
+    ///
+    /// #### Returns
+    ///
+    /// its bytes, or null when the operation cannot supply it
+    public static byte[] nativeDragResolveCallback(String mimeType) {
+        NativeDragOperation op = NativeDragAndDrop.getActiveDrag();
+        if (op == null || mimeType == null || mimeType.length() == 0) {
+            return null;
+        }
+        // Only the provider call is inside the broad catch: it runs application code, which may
+        // throw anything. The casts below sit outside it deliberately -- a cast reached through
+        // catch(Throwable) is exactly what ParparVM cannot report, since its CHECKCAST does not
+        // throw and the handler would never run on iOS.
+        Object value;
+        try {
+            value = op.getContent().getData(mimeType);
+        } catch (Throwable err) {
+            com.codename1.io.Log.e(err);
+            return null;
+        }
+        if (value instanceof byte[]) {
+            return (byte[]) value;
+        }
+        if (value instanceof String) {
+            try {
+                return ((String) value).getBytes("UTF-8");
+            } catch (java.io.UnsupportedEncodingException err) {
+                com.codename1.io.Log.e(err);
+            }
+        }
+        return null;
     }
 
     /// Invoked from CN1DragAndDrop.m when a session this application started has ended.

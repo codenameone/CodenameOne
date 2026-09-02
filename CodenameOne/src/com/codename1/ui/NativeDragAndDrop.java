@@ -610,6 +610,44 @@ public final class NativeDragAndDrop {
         return accepted;
     }
 
+    /// The action a drop at this position would perform, without dispatching anything or
+    /// disturbing the drag in progress.
+    ///
+    /// A port whose platform commits to an action *before* it can read the transferred data --
+    /// AWT does, because a drop has to be accepted before it becomes readable -- asks here
+    /// first, so that what it commits to is what `#drop(int, int, int,
+    /// com.codename1.ui.ClipboardContent, int)` will go on to report. Committing the platform's
+    /// own stale action instead told the source a copy had happened while the target was handed
+    /// a move.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id of the window the drag is over, or zero for the main surface
+    ///
+    /// - `x`: the pointer position within that surface
+    ///
+    /// - `y`: the pointer position within that surface
+    ///
+    /// - `content`: the representations the drag is offering, which may still be a description
+    ///   rather than the materialized payload
+    ///
+    /// - `action`: the action the platform is proposing
+    ///
+    /// #### Returns
+    ///
+    /// the action the drop would perform, or `NativeDragOperation#ACTION_NONE`
+    public static int plannedDropAction(int windowId, int x, int y, ClipboardContent content,
+            int action) {
+        Component target = findTarget(windowId, x, y, content);
+        synchronized (LOCK) {
+            if (target != null && target == currentTarget) { // NOPMD CompareObjectsWithEquals
+                return currentAction;
+            }
+            return target == null ? NativeDragOperation.ACTION_NONE
+                    : preferredAction(action & target.getAcceptedDropActions());
+        }
+    }
+
     /// Reports that the session started by `#startDrag(com.codename1.ui.Component,
     /// com.codename1.ui.NativeDragOperation)` has finished, whatever the outcome, so that a
     /// source offering `NativeDragOperation#ACTION_MOVE` learns whether to delete its copy.

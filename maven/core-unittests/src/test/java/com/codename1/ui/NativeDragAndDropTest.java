@@ -478,6 +478,38 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDragSourceInTheTitleAreaIsStaged() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            // The title area has its own press branch, and it is the one branch that never
+            // primed drag and drop -- so a Toolbar component given an operation could not be
+            // dragged while the same component in the content pane could.
+            Container source = new Container();
+            source.setNativeDragOperation(new NativeDragOperation("from the title"));
+            source.setPreferredSize(new com.codename1.ui.geom.Dimension(40, 40));
+            form.getTitleArea().add(BorderLayout.EAST, source);
+            form.revalidate();
+
+            int x = source.getAbsoluteX() + 2;
+            int y = source.getAbsoluteY() + 2;
+            assertTrue(y < form.getContentPane().getAbsoluteY(),
+                    "the fixture has to sit in the title area for this to test anything");
+
+            form.pointerPressed(x, y);
+            assertNotNull(implementation.getPreparedNativeDrag());
+            form.pointerDragged(x + 200, y + 200);
+            assertNotNull(implementation.getStartedNativeDrag());
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aDisabledDragSourceIsNotDraggable() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

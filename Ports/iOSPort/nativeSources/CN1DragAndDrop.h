@@ -93,15 +93,20 @@ void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragI
 /// Called from Java, from inside the session-started callback below.
 void CN1BeginNativeDragPayload(void);
 
-/// Adds one representation to the payload being built.
+/// Names a representation the drag can offer without producing it.
 ///
-/// Every MIME type the operation advertises is pushed through here, rather than a fixed list of
-/// the framework's own -- an operation carrying only, say, `text/markdown` was advertised but
-/// never forwarded, so the drag began with no items and UIKit cancelled it at once.
+/// The bytes are fetched through CN1NativeDragDeliverResolve when a receiver actually reads
+/// that type, which is what setDataProvider promises: beginning a drag and abandoning it must
+/// not build anything. Every MIME type the operation advertises is declared here, rather than a
+/// fixed list of the framework's own -- an operation carrying only `text/markdown` was
+/// advertised and never forwarded, so the drag began with no items and UIKit cancelled it.
+void CN1DeclareNativeDragPayload(NSString* mimeType);
+
+/// Adds the file list, which is the one representation that cannot be deferred: UIKit needs the
+/// number of items when the session begins, and that is the number of files.
 ///
-/// `text` and `binary` are alternatives; `application/x-file-list` arrives as newline separated
-/// paths in `text`.
-void CN1AddNativeDragPayload(NSString* mimeType, NSString* text, NSData* binary);
+/// `paths` is newline separated.
+void CN1AddNativeDragFiles(NSString* paths);
 
 /// Drops whatever CN1PrepareNativeDrag staged, because the press turned out to be a tap.
 void CN1CancelNativeDrag(void);
@@ -140,6 +145,10 @@ void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path);
 /// Delivers the assembled drop and returns the action actually accepted, or 0 when nothing took
 /// it.
 int CN1NativeDragDeliverDropCommit(int x, int y, int action);
+
+/// Produces one representation of the drag in progress, on demand. Returns nil when the
+/// operation cannot supply it.
+NSData* CN1NativeDragDeliverResolve(NSString* mimeType);
 
 /// Announces that UIKit has started a drag session. Returns the actions the framework's staged
 /// operation allows, or 0 when it has none -- in which case no drag begins. The Java side calls

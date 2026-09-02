@@ -1099,13 +1099,17 @@ void com_codename1_impl_ios_IOSNative_beginNativeDragPayload__(CN1_THREAD_STATE_
     CN1BeginNativeDragPayload();
 }
 
-void com_codename1_impl_ios_IOSNative_addNativeDragPayload___java_lang_String_java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType, JAVA_OBJECT text, JAVA_OBJECT binary) {
+void com_codename1_impl_ios_IOSNative_declareNativeDragPayload___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
     POOL_BEGIN();
     // Synchronously, unlike prepare: these run inside the session-started callback on the main
     // thread and the item providers are built from them the moment it returns.
-    CN1AddNativeDragPayload(mimeType == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeType),
-                            text == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG text),
-                            binary == JAVA_NULL ? nil : arrayToData(binary));
+    CN1DeclareNativeDragPayload(mimeType == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG mimeType));
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_addNativeDragFiles___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT paths) {
+    POOL_BEGIN();
+    CN1AddNativeDragFiles(paths == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG paths));
     POOL_END();
 }
 
@@ -1151,6 +1155,12 @@ void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path) {
             CN1_THREAD_GET_STATE_PASS_ARG
             fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType),
             fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
+}
+
+NSData* CN1NativeDragDeliverResolve(NSString* mimeType) {
+    JAVA_OBJECT bytes = com_codename1_impl_ios_IOSImplementation_nativeDragResolveCallback___java_lang_String_R_byte_1ARRAY(
+            CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType));
+    return bytes == JAVA_NULL ? nil : arrayToData(bytes);
 }
 
 int CN1NativeDragDeliverDropCommit(int x, int y, int action) {

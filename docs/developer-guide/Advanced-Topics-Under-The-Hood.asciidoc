@@ -1313,12 +1313,17 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/advancedto
 
 Dragging a file works the same way, except that the file often doesn't exist yet and the user
 may drop it nowhere at all. Register it as a provider and it's written at the moment a receiver
-asks for it, and never otherwise:
+asks for it rather than when the drag starts:
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/NativeDragAndDropDemo.java[tag=nativeFileDrag,indent=0]
 ----
+
+Two platforms can't defer quite that far. An Android clip has to be complete before the drag
+begins, so a provider runs there as the drag starts; an iOS drag resolves its file list at the
+same moment, because the system needs to know how many items the drag carries. Keep a provider
+cheap enough to run once per drag.
 
 `NativeDragOperation.ACTION_MOVE` means the receiver takes ownership and the source deletes its
 copy. The source only learns whether that happened once the operating system has finished, which

@@ -541,6 +541,16 @@ final class JavaSENativeDragAndDrop {
                 if (action == NativeDragOperation.ACTION_NONE) {
                     action = preferred(allowed);
                 }
+                Point at = e.getLocation();
+                int x = canvas.scaleCoordinateX(at.x);
+                int y = canvas.scaleCoordinateY(at.y);
+                // What the framework will settle on, asked before anything is committed. AWT
+                // has to be told the action when the drop is accepted, and that is before the
+                // transferable can be read -- so accepting the action AWT proposed and only
+                // then learning the target had chosen another reported a copy to the source
+                // through exportDone while handing the target a move.
+                action = NativeDragAndDrop.plannedDropAction(canvas.windowId, x, y,
+                        contentFor(e.getTransferable(), e.getCurrentDataFlavors(), false), action);
                 if (action == NativeDragOperation.ACTION_NONE) {
                     e.rejectDrop();
                     return;
@@ -551,10 +561,7 @@ final class JavaSENativeDragAndDrop {
                 // than handed to the event dispatch thread as a live view of the transfer.
                 e.acceptDrop(toAwtAction(action));
                 ClipboardContent content = contentFor(e.getTransferable(), e.getCurrentDataFlavors(), true);
-                Point at = e.getLocation();
-                int accepted = NativeDragAndDrop.drop(canvas.windowId,
-                        canvas.scaleCoordinateX(at.x), canvas.scaleCoordinateY(at.y),
-                        content, action);
+                int accepted = NativeDragAndDrop.drop(canvas.windowId, x, y, content, action);
                 e.dropComplete(accepted != NativeDragOperation.ACTION_NONE);
             } catch (Throwable err) {
                 Log.e(err);

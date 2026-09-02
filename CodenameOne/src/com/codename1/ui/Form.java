@@ -4145,6 +4145,12 @@ public class Form extends Container implements TopLevelContainer {
                 if (cmp != null) {
 
                     cmp = LeadUtil.leadParentImpl(cmp);
+                    // Native drag and drop is primed here too. This branch does not call
+                    // initDragAndDrop -- the lightweight drag has never worked in the title
+                    // area -- so without this a Toolbar component given a native drag operation
+                    // silently could not be dragged, while the same component in the content
+                    // pane could.
+                    NativeDragAndDrop.pressedOn(cmp, x, y);
                     setPressedCmp(cmp);
                     LeadUtil.pointerPressed(cmp, x, y);
 

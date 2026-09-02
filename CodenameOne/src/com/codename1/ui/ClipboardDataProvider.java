@@ -39,6 +39,18 @@ package com.codename1.ui;
 /// A provider is invoked at most once per `ClipboardContent` and MIME type -- the result is
 /// cached -- and it may be invoked from a native drag or clipboard thread rather than the event
 /// dispatch thread, so it must not touch the user interface.
+///
+/// #### When it actually runs
+///
+/// On the desktop and on iOS the provider runs when a receiver reads that representation, so a
+/// drag the user abandons costs nothing. Android is the exception: `startDragAndDrop` takes a
+/// complete clip, and a clip carries text or a reference to a file that already exists, so
+/// every provider runs as the drag begins. A drag out of an iOS application resolves its *file
+/// list* at the same moment for a related reason -- the system needs the number of items the
+/// drag carries, and for a file drag that is the number of files.
+///
+/// So a provider should be cheap enough to run once per drag, and must not assume it will only
+/// run when its data is wanted.
 public interface ClipboardDataProvider {
     /// Produces the value for one representation.
     ///

@@ -69,7 +69,10 @@ void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragI
 void CN1BeginNativeDragPayload(void) {
 }
 
-void CN1AddNativeDragPayload(NSString* mimeType, NSString* text, NSData* binary) {
+void CN1DeclareNativeDragPayload(NSString* mimeType) {
+}
+
+void CN1AddNativeDragFiles(NSString* paths) {
 }
 
 void CN1CancelNativeDrag(void) {
@@ -94,9 +97,9 @@ static UIImage* cn1PreparedPreview = nil;
 static CGPoint cn1PreparedTouch;
 
 /// The payload of the session UIKit is currently running, delivered by
-/// CN1AddNativeDragPayload once the drag has actually begun. Keyed by uniform type identifier
-/// so the item provider can register each one directly.
-static NSMutableDictionary* cn1DragData = nil;
+/// CN1DeclareNativeDragPayload once the drag has actually begun -- the MIME types it can offer,
+/// not their values, which are fetched only if a receiver reads them.
+static NSMutableArray* cn1DragMimes = nil;
 static NSMutableArray* cn1DragFileUrls = nil;
 
 /// The last action the framework agreed to, reused when a drop arrives without one.
@@ -363,47 +366,38 @@ void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragI
 
 void CN1BeginNativeDragPayload(void) {
 #ifndef CN1_USE_ARC
-    [cn1DragData release];
+    [cn1DragMimes release];
     [cn1DragFileUrls release];
 #endif
-    cn1DragData = [[NSMutableDictionary alloc] init];
+    cn1DragMimes = [[NSMutableArray alloc] init];
     cn1DragFileUrls = [[NSMutableArray alloc] init];
 }
 
-void CN1AddNativeDragPayload(NSString* mimeType, NSString* text, NSData* binary) {
-    if (mimeType == nil || mimeType.length == 0 || cn1DragData == nil) {
+void CN1DeclareNativeDragPayload(NSString* mimeType) {
+    if (mimeType == nil || mimeType.length == 0 || cn1DragMimes == nil
+            || [cn1DragMimes containsObject:mimeType]) {
         return;
     }
-    if ([mimeType isEqualToString:@"application/x-file-list"]) {
-        if (text == nil || text.length == 0) {
-            return;
+    [cn1DragMimes addObject:mimeType];
+}
+
+void CN1AddNativeDragFiles(NSString* paths) {
+    if (paths == nil || paths.length == 0 || cn1DragFileUrls == nil) {
+        return;
+    }
+    for (NSString* entry in [paths componentsSeparatedByString:@"\n"]) {
+        if (entry.length == 0) {
+            continue;
         }
-        for (NSString* entry in [text componentsSeparatedByString:@"\n"]) {
-            if (entry.length == 0) {
-                continue;
-            }
-            // ClipboardContent's file representation permits a raw local path as well as a
-            // file: URI, and URLWithString: turns a path into a scheme-less relative URL that
-            // no receiver can open.
-            NSURL* url = ([entry hasPrefix:@"/"] || [entry hasPrefix:@"~"])
-                    ? [NSURL fileURLWithPath:[entry stringByExpandingTildeInPath]]
-                    : [NSURL URLWithString:entry];
-            if (url != nil) {
-                [cn1DragFileUrls addObject:url];
-            }
+        // ClipboardContent's file representation permits a raw local path as well as a file:
+        // URI, and URLWithString: turns a path into a scheme-less relative URL that no receiver
+        // can open.
+        NSURL* url = ([entry hasPrefix:@"/"] || [entry hasPrefix:@"~"])
+                ? [NSURL fileURLWithPath:[entry stringByExpandingTildeInPath]]
+                : [NSURL URLWithString:entry];
+        if (url != nil) {
+            [cn1DragFileUrls addObject:url];
         }
-        return;
-    }
-    NSData* data = binary;
-    if (data == nil && text != nil) {
-        data = [text dataUsingEncoding:NSUTF8StringEncoding];
-    }
-    if (data == nil || data.length == 0) {
-        return;
-    }
-    NSString* uti = cn1UtiForMime(mimeType);
-    if (uti != nil && [cn1DragData objectForKey:uti] == nil) {
-        [cn1DragData setObject:data forKey:uti];
     }
 }
 
@@ -431,8 +425,9 @@ API_AVAILABLE(ios(11.0))
         return @[];
     }
     // Asking the framework now, rather than on the press, is what lets a promised file stay
-    // unwritten until a drag really happens. The Java side fills cn1DragData from inside this
-    // call, one representation at a time, through CN1AddNativeDragPayload.
+    // unwritten until a drag really happens. The Java side names its representations from
+    // inside this call, through CN1DeclareNativeDragPayload; their values are fetched only if a
+    // receiver reads them.
     int allowed = CN1NativeDragDeliverSessionStarted();
     if (allowed == CN1_DND_ACTION_NONE) {
         return @[];
@@ -459,17 +454,26 @@ API_AVAILABLE(ios(11.0))
         [item release];
 #endif
     }
-    if (cn1DragData.count > 0) {
+    if (cn1DragMimes.count > 0) {
         NSItemProvider* provider = [[NSItemProvider alloc] init];
-        for (NSString* uti in cn1DragData) {
-            NSData* payload = [cn1DragData objectForKey:uti];
-            // No retain of its own. Copying a block retains the objects it captures, which is
-            // what registering the load handler does, so an explicit retain here had nothing to
-            // balance it and every drag leaked its whole payload.
+        for (NSString* mime in cn1DragMimes) {
+            NSString* uti = cn1UtiForMime(mime);
+            if (uti == nil) {
+                continue;
+            }
+            // The value is fetched when a receiver reads this type, not now: a drag that is
+            // begun and abandoned must not have written the file or encoded the image it was
+            // merely offering. NSItemProvider allows a load handler to answer asynchronously,
+            // which is what lets the fetch happen on the main thread where every other call
+            // into the framework from this file happens. No retain of the captured strings
+            // either -- copying a block retains what it captures, and an explicit retain here
+            // leaked the whole payload of every drag.
             [provider registerDataRepresentationForTypeIdentifier:uti
                                                        visibility:NSItemProviderRepresentationVisibilityAll
                                                       loadHandler:^NSProgress *(void (^completion)(NSData *, NSError *)) {
-                completion(payload, nil);
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    completion(CN1NativeDragDeliverResolve(mime), nil);
+                });
                 return nil;
             }];
         }
