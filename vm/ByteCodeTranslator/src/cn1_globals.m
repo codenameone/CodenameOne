@@ -8549,13 +8549,24 @@ void cn1GcInstallSignalHandler(void) {
 static char* cn1GcSignalStopOneImpl(struct ThreadLocalData* t, int maySkip) {
 #if !defined(_WIN32)
     if(!t->gcPthreadValid) return 0;
-    // SKIP a thread that has proved unresponsive rather than waiting on it again.
-    // Re-probe every 64th attempt so one that becomes responsive is picked back up.
+    // A thread with a history of timing out is PROBED WITH A SHORT BUDGET, never
+    // skipped. Skipping it was wrong, and the reasoning that produced it was wrong:
+    // "a thread it cannot stop is one it does not scan either way" holds only while
+    // the thread genuinely cannot be stopped. A thread whose failures were transient
+    // -- the stop signal briefly masked, say -- recovers, and skipping it then means
+    // cn1GcScanThreadNativeStack returns without scanning a RESPONSIVE thread, so
+    // references held only in frameless C locals or registers go unmarked and can be
+    // reclaimed while in use.
+    //
+    // The cost this exists to avoid was never the signal; it was the WAIT. One
+    // unresponsive thread consumed the whole 2,000,000-spin budget, 267ms of a 280ms
+    // mark. Healthy threads answer within about 200 spins, so a budget of 20,000
+    // keeps a hundredfold margin for a thread that is merely slow while costing one
+    // percent of what a hang used to. A recovered thread is picked up on the very
+    // next cycle rather than up to 64 cycles later.
+    int spinBudget = 2000000;
     if(maySkip && t->gcStopFailures >= 3) {
-        if(t->gcStopFailures < 1000000000) { t->gcStopFailures++; }
-        if((t->gcStopFailures & 63) != 0) {
-            return 0;
-        }
+        spinBudget = 20000;
     }
     // Next generation for this thread (only the GC thread writes it). gcSigRelease
     // is MONOTONIC and never reset -- see the handler's generation handshake.
@@ -8569,7 +8580,7 @@ static char* cn1GcSignalStopOneImpl(struct ThreadLocalData* t, int maySkip) {
     // bounded wait for the handler to park THIS generation
     int spins = 0;
     while((int)t->gcSigStopped != gen) {
-        if(++spins > 2000000) { /* ~timeout: could not stop */ break; }
+        if(++spins > spinBudget) { /* ~timeout: could not stop */ break; }
         if((spins & 1023) == 0) usleep(50);
     }
     if((int)t->gcSigStopped != gen) {
