@@ -54,14 +54,41 @@ import com.codename1.ui.NativeDragOperation;
 /// reader serves both. A URI from another application is only readable while the drop's
 /// permission grant is held, which is why the content is read inside the drop callback rather
 /// than handed to the event dispatch thread to read later.
-class AndroidNativeDragAndDrop {
+final class AndroidNativeDragAndDrop {
     /// The operation currently being dragged out of this application, so that the outcome
-    /// reported when the drag ends can be attributed to it.
+    /// reported when the drag ends can be attributed to it, and the action last agreed with the
+    /// framework, reported back when the drop is accepted -- Android's drag events carry no
+    /// copy/move/link distinction of their own.
+    ///
+    /// Both are written from the Codename One event dispatch thread and read from the Android
+    /// UI thread, so the lock is what publishes one to the other.
+    private static final Object LOCK = new Object();
     private static NativeDragOperation exporting;
-
-    /// The action last agreed with the framework, reported back when the drop is accepted.
-    /// Android's drag events carry no copy/move/link distinction of their own.
     private static int lastAction = NativeDragOperation.ACTION_NONE;
+
+    private static NativeDragOperation exporting() {
+        synchronized (LOCK) {
+            return exporting;
+        }
+    }
+
+    private static void setExporting(NativeDragOperation op) {
+        synchronized (LOCK) {
+            exporting = op;
+        }
+    }
+
+    private static int lastAction() {
+        synchronized (LOCK) {
+            return lastAction;
+        }
+    }
+
+    private static void setLastAction(int action) {
+        synchronized (LOCK) {
+            lastAction = action;
+        }
+    }
 
     private AndroidNativeDragAndDrop() {
     }
@@ -90,8 +117,9 @@ class AndroidNativeDragAndDrop {
         }
         try {
             view.setOnDragListener(new View.OnDragListener() {
+                @Override
                 public boolean onDrag(View v, DragEvent event) {
-                    return handle(impl, v, event);
+                    return handle(impl, event);
                 }
             });
         } catch (Throwable err) {
@@ -115,9 +143,10 @@ class AndroidNativeDragAndDrop {
         if (clip == null) {
             return false;
         }
-        exporting = op;
-        lastAction = NativeDragOperation.ACTION_NONE;
+        setExporting(op);
+        setLastAction(NativeDragOperation.ACTION_NONE);
         view.post(new Runnable() {
+            @Override
             public void run() {
                 boolean started = false;
                 try {
@@ -132,7 +161,7 @@ class AndroidNativeDragAndDrop {
                     Log.e(err);
                 }
                 if (!started) {
-                    exporting = null;
+                    setExporting(null);
                     NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
                 }
             }
@@ -142,12 +171,12 @@ class AndroidNativeDragAndDrop {
 
     /// Forgets a prepared operation because the press turned out to be a click.
     static void cancelDrag() {
-        exporting = null;
+        setExporting(null);
     }
 
     // ------------------------------------------------------------------------------------
 
-    private static boolean handle(AndroidImplementation impl, View view, DragEvent event) {
+    private static boolean handle(AndroidImplementation impl, DragEvent event) {
         try {
             switch (event.getAction()) {
                 case DragEvent.ACTION_DRAG_STARTED:
@@ -156,26 +185,27 @@ class AndroidNativeDragAndDrop {
                     // is unconditional and the real filtering happens per position below.
                     return true;
                 case DragEvent.ACTION_DRAG_ENTERED:
-                    lastAction = NativeDragAndDrop.dragEnter(0, (int) event.getX(), (int) event.getY(),
-                            describe(event.getClipDescription()), allowedActions());
+                    setLastAction(NativeDragAndDrop.dragEnter(0, (int) event.getX(), (int) event.getY(),
+                            describe(event.getClipDescription()), allowedActions()));
                     return true;
                 case DragEvent.ACTION_DRAG_LOCATION:
-                    lastAction = NativeDragAndDrop.dragOver(0, (int) event.getX(), (int) event.getY(),
-                            describe(event.getClipDescription()), allowedActions());
+                    setLastAction(NativeDragAndDrop.dragOver(0, (int) event.getX(), (int) event.getY(),
+                            describe(event.getClipDescription()), allowedActions()));
                     return true;
                 case DragEvent.ACTION_DRAG_EXITED:
                     NativeDragAndDrop.dragExit(0);
-                    lastAction = NativeDragOperation.ACTION_NONE;
+                    setLastAction(NativeDragOperation.ACTION_NONE);
                     return true;
                 case DragEvent.ACTION_DROP:
-                    return drop(impl, view, event);
+                    return drop(impl, event);
                 case DragEvent.ACTION_DRAG_ENDED:
-                    if (exporting != null) {
-                        exporting = null;
+                    if (exporting() != null) {
+                        int allowed = allowedActions();
+                        setExporting(null);
                         NativeDragAndDrop.dragCompleted(event.getResult()
-                                ? preferred(allowedActions()) : NativeDragOperation.ACTION_NONE);
+                                ? preferred(allowed) : NativeDragOperation.ACTION_NONE);
                     }
-                    lastAction = NativeDragOperation.ACTION_NONE;
+                    setLastAction(NativeDragOperation.ACTION_NONE);
                     return true;
                 default:
                     return false;
@@ -186,7 +216,7 @@ class AndroidNativeDragAndDrop {
         }
     }
 
-    private static boolean drop(AndroidImplementation impl, View view, DragEvent event) {
+    private static boolean drop(AndroidImplementation impl, DragEvent event) {
         // A URI dropped by another application is only readable while this grant is held, and
         // the grant only exists from here on. Reading the content inside this method rather
         // than on the event dispatch thread is what keeps a dropped file readable.
@@ -199,10 +229,10 @@ class AndroidNativeDragAndDrop {
             }
         }
         ClipboardContent content = impl.contentFromClip(event.getClipData());
-        int action = lastAction == NativeDragOperation.ACTION_NONE
-                ? preferred(allowedActions()) : lastAction;
+        int action = lastAction() == NativeDragOperation.ACTION_NONE
+                ? preferred(allowedActions()) : lastAction();
         int accepted = NativeDragAndDrop.drop(0, (int) event.getX(), (int) event.getY(), content, action);
-        lastAction = NativeDragOperation.ACTION_NONE;
+        setLastAction(NativeDragOperation.ACTION_NONE);
         return accepted != NativeDragOperation.ACTION_NONE;
     }
 
@@ -210,7 +240,7 @@ class AndroidNativeDragAndDrop {
     /// one arriving from another application is a copy, because Android's cross-application
     /// drag has no way to express anything else.
     private static int allowedActions() {
-        NativeDragOperation op = exporting;
+        NativeDragOperation op = exporting();
         return op == null ? NativeDragOperation.ACTION_COPY : op.getAllowedActions();
     }
 
@@ -260,6 +290,7 @@ class AndroidNativeDragAndDrop {
             return;
         }
         content.setDataProvider(mime, new ClipboardDataProvider() {
+            @Override
             public Object getClipboardData(String requested) {
                 // Android reveals nothing until the drop; the drop callback replaces this with
                 // the real content.

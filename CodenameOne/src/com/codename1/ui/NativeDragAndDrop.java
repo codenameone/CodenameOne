@@ -73,36 +73,45 @@ import com.codename1.ui.events.ActionEvent;
 /// into another application beside it, and a phone in full screen has nowhere for a drag to go
 /// even though drags within the application still work. Where nothing is supported the calls
 /// here are harmless no-ops and the lightweight drag and drop is unaffected.
+///
+/// #### Threading
+///
+/// The gesture half runs on the event dispatch thread; the receiving half is called from
+/// whatever thread the platform hands the port. All of the shared state below is therefore
+/// guarded by one lock, and no callback into component or port code is ever made while holding
+/// it -- the framework's own event dispatch thread blocks on the platform's UI thread to paint
+/// on some ports, so a lock held across a callback is a deadlock waiting for the first drag.
 public final class NativeDragAndDrop {
     /// A press further than this from where it started is a drag rather than a click. Measured
     /// in millimetres so it is a finger on a phone and a pointer on a desktop.
     private static final float DRAG_THRESHOLD_MM = 1.5f;
 
+    /// Guards every field below. Held only across field access, never across a call out.
+    private static final Object LOCK = new Object();
+
     /// The operation prepared by the press that is currently down, waiting to see whether the
-    /// user drags.
-    ///
-    /// Written on the event dispatch thread. Read from a native drag thread as well, because a
-    /// platform that owns the drag gesture itself -- iOS and iPadOS do -- announces the session
-    /// it started through `#dragSessionStarted()` and this is the operation it started.
-    private static volatile NativeDragOperation pending;
-    private static volatile Component pendingSource;
+    /// user drags, and the component it came from.
+    private static NativeDragOperation pending;
+    private static Component pendingSource;
+
+    /// Where that press landed, which is both the drag threshold's origin and the point the
+    /// drag image is grabbed by.
     private static int pressX;
     private static int pressY;
+
     /// Set once this press has been offered to the port, so a platform that declined to start
     /// the session is not asked again on every drag event of the same gesture.
     private static boolean startOffered;
 
-    /// The session the operating system is currently running, or null. Written on the event
-    /// dispatch thread and read from the native drag thread, hence volatile.
-    private static volatile NativeDragOperation active;
+    /// The session the operating system is currently running, or null.
+    private static NativeDragOperation active;
 
-    /// The drop target the drag is currently over, and the action it last agreed to. Both are
-    /// read and written from the native drag thread; see the note on
-    /// `#dragOver(int, int, int, com.codename1.ui.ClipboardContent, int)` about why the answer
-    /// given to the operating system is the previous callback's.
-    private static volatile Component currentTarget;
-    private static volatile int currentAction = NativeDragOperation.ACTION_NONE;
-    private static volatile boolean overDispatchPending;
+    /// The drop target the drag is currently over, and the action it last agreed to. See the
+    /// note on `#dragOver(int, int, int, com.codename1.ui.ClipboardContent, int)` about why the
+    /// answer given to the operating system is the previous callback's.
+    private static Component currentTarget;
+    private static int currentAction = NativeDragOperation.ACTION_NONE;
+    private static boolean overDispatchPending;
 
     private NativeDragAndDrop() {
     }
@@ -148,9 +157,11 @@ public final class NativeDragAndDrop {
             return false;
         }
         op.setSource(source);
-        active = op;
-        currentTarget = null;
-        currentAction = NativeDragOperation.ACTION_NONE;
+        synchronized (LOCK) {
+            active = op;
+            currentTarget = null;
+            currentAction = NativeDragOperation.ACTION_NONE;
+        }
         boolean started = false;
         try {
             started = Display.impl.startNativeDrag(op);
@@ -160,7 +171,11 @@ public final class NativeDragAndDrop {
             Log.e(err);
         }
         if (!started) {
-            active = null;
+            synchronized (LOCK) {
+                if (active == op) { // NOPMD CompareObjectsWithEquals
+                    active = null;
+                }
+            }
         }
         return started;
     }
@@ -175,21 +190,26 @@ public final class NativeDragAndDrop {
     /// the operation the session is carrying, or null when nothing was prepared -- in which case
     /// the port should refuse to start a session
     public static NativeDragOperation dragSessionStarted() {
-        NativeDragOperation op = pending;
-        if (op == null) {
-            return null;
+        NativeDragOperation op;
+        final Component source;
+        synchronized (LOCK) {
+            op = pending;
+            if (op == null) {
+                return null;
+            }
+            source = pendingSource;
+            pending = null;
+            pendingSource = null;
+            active = op;
+            currentTarget = null;
+            currentAction = NativeDragOperation.ACTION_NONE;
         }
-        final Component source = pendingSource;
-        pending = null;
-        pendingSource = null;
-        active = op;
-        currentTarget = null;
-        currentAction = NativeDragOperation.ACTION_NONE;
         if (source != null) {
             // On the event dispatch thread, because it repaints. A component that is draggable
             // as well as a native drag source would otherwise be left mid-drag with its image
             // stranded, since the platform stops delivering pointer drags once it takes over.
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     source.cancelLightweightDrag();
                 }
@@ -202,7 +222,9 @@ public final class NativeDragAndDrop {
     /// null when it is not dragging. A drop target uses this to tell a drag it started itself
     /// from one that arrived from elsewhere, which `NativeDropEvent#isLocal()` reports.
     public static NativeDragOperation getActiveDrag() {
-        return active;
+        synchronized (LOCK) {
+            return active;
+        }
     }
 
     // ------------------------------------------------------------------------------------
@@ -216,55 +238,78 @@ public final class NativeDragAndDrop {
     /// source that was pressed and released from being dragged by a later gesture somewhere
     /// else.
     static void pressedOn(Component cmp, int x, int y) {
-        if (pending != null && x == pressX && y == pressY) {
-            // The same press, dispatched a second time. A top level primes drag and drop on the
-            // component under the pointer and then again on its nearest draggable ancestor, and
-            // the ancestor walk below would not find a drag source that sits *between* the two
-            // -- so clearing here would throw away what the first call correctly staged. Every
-            // release clears the pending operation, so a later press cannot land on a stale one
-            // even at the very same pixel.
+        if (isStagedFor(x, y)) {
             return;
         }
-        pending = null;
-        pendingSource = null;
-        startOffered = false;
-        if (cmp == null || !isSupported()) {
-            return;
-        }
+        // Everything that can call out -- into the component for its payload and its drag
+        // image, and into the port -- happens outside the lock, and what this press staged is
+        // then installed in one go. Installing it unconditionally, rather than clearing first
+        // and filling in later, is also what keeps the two writes from reading as a botched
+        // lazy initialization of a static field.
+        NativeDragOperation op = null;
         Component source = cmp;
-        while (source != null && !source.isNativeDragSource()) {
-            source = source.getParent();
-        }
-        if (source == null) {
-            return;
-        }
-        NativeDragOperation op;
-        try {
-            op = source.createNativeDragOperation(x, y);
-        } catch (Throwable err) {
-            Log.e(err);
-            return;
-        }
-        if (op == null || op.getAllowedActions() == NativeDragOperation.ACTION_NONE) {
-            return;
-        }
-        op.setSource(source);
-        pending = op;
-        pendingSource = source;
-        pressX = x;
-        pressY = y;
-        try {
-            if (op.getDragImage() == null && Display.impl.isNativeDragImageNeededOnPrepare()) {
-                // The platform asks for the preview from inside its own gesture callback, which
-                // is not a moment at which a component can be rendered. Rendering here costs a
-                // snapshot per press on a drag source, which is what the lightweight drag has
-                // always cost when one starts.
-                op.setDragImage(source.getDragImage());
-                op.setDragImageOffset(x - source.getAbsoluteX(), y - source.getAbsoluteY());
+        if (cmp != null && isSupported()) {
+            while (source != null && !source.isNativeDragSource()) {
+                source = source.getParent();
             }
-            Display.impl.prepareNativeDrag(op);
-        } catch (Throwable err) {
-            Log.e(err);
+            if (source != null) {
+                try {
+                    op = source.createNativeDragOperation(x, y);
+                } catch (Throwable err) {
+                    Log.e(err);
+                }
+            }
+        }
+        if (op != null && op.getAllowedActions() == NativeDragOperation.ACTION_NONE) {
+            op = null;
+        }
+        if (op != null) {
+            op.setSource(source);
+            try {
+                if (op.getDragImage() == null && Display.impl.isNativeDragImageNeededOnPrepare()) {
+                    // The platform asks for the preview from inside its own gesture callback,
+                    // which is not a moment at which a component can be rendered. Rendering here
+                    // costs a snapshot per press on a drag source, which is what the lightweight
+                    // drag has always cost when one starts.
+                    op.setDragImage(source.getDragImage());
+                    op.setDragImageOffset(x - source.getAbsoluteX(), y - source.getAbsoluteY());
+                }
+            } catch (Throwable err) {
+                Log.e(err);
+            }
+        }
+        stage(op, source, x, y);
+        if (op != null) {
+            try {
+                Display.impl.prepareNativeDrag(op);
+            } catch (Throwable err) {
+                Log.e(err);
+            }
+        }
+    }
+
+    /// True when this exact press has already staged an operation.
+    ///
+    /// A top level primes drag and drop on the component under the pointer and then again on
+    /// its nearest draggable ancestor, and the ancestor walk in `#pressedOn(Component, int,
+    /// int)` would not find a drag source that sits *between* the two -- so restaging would
+    /// throw away what the first call correctly staged. Every release clears the pending
+    /// operation, so a later press cannot land on a stale one even at the very same pixel.
+    private static boolean isStagedFor(int x, int y) {
+        synchronized (LOCK) {
+            return pending != null && x == pressX && y == pressY;
+        }
+    }
+
+    /// Installs what a press staged, or clears it when the press staged nothing. Unconditional
+    /// rather than a clear followed by a fill, so that one press leaves one consistent state.
+    private static void stage(NativeDragOperation op, Component source, int x, int y) {
+        synchronized (LOCK) {
+            pending = op;
+            pendingSource = op == null ? null : source;
+            pressX = x;
+            pressY = y;
+            startOffered = false;
         }
     }
 
@@ -282,32 +327,40 @@ public final class NativeDragAndDrop {
     /// true when the native drag has taken the gesture over and the framework should not also
     /// treat it as a scroll or a lightweight drag
     static boolean pointerDragged(int x, int y) {
-        NativeDragOperation op = pending;
-        if (op == null) {
-            // A session already running owns the gesture. Ports differ on whether they keep
-            // delivering pointer drags during a native drag; swallowing them here means the
-            // ones that do cannot scroll the surface out from under the drag.
-            return active != null;
-        }
         int threshold = dragThreshold();
-        if (Math.abs(x - pressX) < threshold && Math.abs(y - pressY) < threshold) {
-            return false;
+        NativeDragOperation op;
+        Component source;
+        int grabX;
+        int grabY;
+        synchronized (LOCK) {
+            if (pending == null) {
+                // A session already running owns the gesture. Ports differ on whether they keep
+                // delivering pointer drags during a native drag; swallowing them here means the
+                // ones that do cannot scroll the surface out from under the drag.
+                return active != null;
+            }
+            if (Math.abs(x - pressX) < threshold && Math.abs(y - pressY) < threshold) {
+                return false;
+            }
+            if (startOffered) {
+                // Already offered for this gesture and not taken, which is what a platform that
+                // starts the session on its own recognizer looks like. Leave the gesture alone
+                // until that recognizer fires; it announces itself through dragSessionStarted().
+                return active != null;
+            }
+            startOffered = true;
+            op = pending;
+            source = pendingSource;
+            grabX = pressX;
+            grabY = pressY;
         }
-        if (startOffered) {
-            // Already offered for this gesture and not taken, which is what a platform that
-            // starts the session on its own recognizer looks like. Leave the gesture alone
-            // until that recognizer fires; it announces itself through dragSessionStarted().
-            return active != null;
-        }
-        startOffered = true;
-        Component source = pendingSource;
         if (op.getDragImage() == null && source != null) {
             try {
                 op.setDragImage(source.getDragImage());
                 // Only when the image is the one we just rendered from the component. An
                 // application that supplied its own image may also have positioned it, and
                 // overwriting that offset would tear the image away from the pointer.
-                op.setDragImageOffset(pressX - source.getAbsoluteX(), pressY - source.getAbsoluteY());
+                op.setDragImageOffset(grabX - source.getAbsoluteX(), grabY - source.getAbsoluteY());
             } catch (Throwable err) {
                 Log.e(err);
             }
@@ -319,8 +372,12 @@ public final class NativeDragAndDrop {
             // in the first place, so there is nothing to keep.
             return false;
         }
-        pending = null;
-        pendingSource = null;
+        synchronized (LOCK) {
+            if (pending == op) { // NOPMD CompareObjectsWithEquals
+                pending = null;
+                pendingSource = null;
+            }
+        }
         if (source != null) {
             // A component can be both draggable and a native drag source. The native session
             // owns the gesture from here, and the port stops delivering pointer drags, so the
@@ -334,10 +391,14 @@ public final class NativeDragAndDrop {
     /// Drops the operation prepared by a press that turned out to be a click. Called as the
     /// pointer is released.
     static void pointerReleased() {
-        startOffered = false;
-        if (pending != null) {
+        boolean hadPending;
+        synchronized (LOCK) {
+            startOffered = false;
+            hadPending = pending != null;
             pending = null;
             pendingSource = null;
+        }
+        if (hadPending) {
             try {
                 Display.impl.cancelNativeDrag();
             } catch (Throwable err) {
@@ -416,28 +477,32 @@ public final class NativeDragAndDrop {
     /// #### Returns
     ///
     /// the action a drop would perform right now, or `NativeDragOperation#ACTION_NONE`
-    public static int dragOver(final int windowId, final int x, final int y,
-            final ClipboardContent content, final int allowedActions) {
+    public static int dragOver(int windowId, int x, int y, ClipboardContent content, int allowedActions) {
         Component target = findTarget(windowId, x, y, content);
-        Component previous = currentTarget;
-        if (previous != target) { // NOPMD CompareObjectsWithEquals
-            currentTarget = target;
-            currentAction = target == null ? NativeDragOperation.ACTION_NONE
-                    : (allowedActions & target.getAcceptedDropActions()) == 0
-                            ? NativeDragOperation.ACTION_NONE
-                            : preferredAction(allowedActions & target.getAcceptedDropActions());
+        Component previous;
+        boolean changed;
+        boolean dispatchOver = false;
+        int answer;
+        synchronized (LOCK) {
+            previous = currentTarget;
+            changed = previous != target; // NOPMD CompareObjectsWithEquals
+            if (changed) {
+                currentTarget = target;
+                currentAction = target == null ? NativeDragOperation.ACTION_NONE
+                        : preferredAction(allowedActions & target.getAcceptedDropActions());
+            } else if (target != null && !overDispatchPending) {
+                overDispatchPending = true;
+                dispatchOver = true;
+            }
+            answer = target == null ? NativeDragOperation.ACTION_NONE : currentAction;
+        }
+        if (changed) {
             dispatch(previous, ActionEvent.Type.NativeDragExit, content, x, y, allowedActions);
             dispatch(target, ActionEvent.Type.NativeDragEnter, content, x, y, allowedActions);
-            return currentAction;
-        }
-        if (target == null) {
-            return NativeDragOperation.ACTION_NONE;
-        }
-        if (!overDispatchPending) {
-            overDispatchPending = true;
+        } else if (dispatchOver) {
             dispatch(target, ActionEvent.Type.NativeDragOver, content, x, y, allowedActions);
         }
-        return currentAction;
+        return answer;
     }
 
     /// Reports that a native drag has left the application's surfaces without dropping.
@@ -446,9 +511,12 @@ public final class NativeDragAndDrop {
     ///
     /// - `windowId`: the id of the window the drag left, or zero for the main surface
     public static void dragExit(int windowId) {
-        Component previous = currentTarget;
-        currentTarget = null;
-        currentAction = NativeDragOperation.ACTION_NONE;
+        Component previous;
+        synchronized (LOCK) {
+            previous = currentTarget;
+            currentTarget = null;
+            currentAction = NativeDragOperation.ACTION_NONE;
+        }
         dispatch(previous, ActionEvent.Type.NativeDragExit, null, 0, 0, NativeDragOperation.ACTION_NONE);
     }
 
@@ -477,19 +545,16 @@ public final class NativeDragAndDrop {
     /// the pointer took the drop and the port should report the transfer as failed
     public static int drop(int windowId, int x, int y, ClipboardContent content, int action) {
         Component target = findTarget(windowId, x, y, content);
-        currentTarget = null;
-        overDispatchPending = false;
-        if (target == null) {
-            currentAction = NativeDragOperation.ACTION_NONE;
-            return NativeDragOperation.ACTION_NONE;
+        int accepted = target == null ? NativeDragOperation.ACTION_NONE
+                : preferredAction(action & target.getAcceptedDropActions());
+        synchronized (LOCK) {
+            currentTarget = null;
+            overDispatchPending = false;
+            currentAction = accepted;
         }
-        int accepted = action & target.getAcceptedDropActions();
         if (accepted == NativeDragOperation.ACTION_NONE) {
-            currentAction = NativeDragOperation.ACTION_NONE;
             return NativeDragOperation.ACTION_NONE;
         }
-        accepted = preferredAction(accepted);
-        currentAction = accepted;
         dispatch(target, ActionEvent.Type.NativeDrop, content, x, y, accepted);
         return accepted;
     }
@@ -503,15 +568,19 @@ public final class NativeDragAndDrop {
     /// - `performedAction`: the action the receiver performed, or
     ///   `NativeDragOperation#ACTION_NONE` when the drag was cancelled or refused
     public static void dragCompleted(final int performedAction) {
-        final NativeDragOperation op = active;
-        active = null;
-        currentTarget = null;
-        currentAction = NativeDragOperation.ACTION_NONE;
-        overDispatchPending = false;
+        final NativeDragOperation op;
+        synchronized (LOCK) {
+            op = active;
+            active = null;
+            currentTarget = null;
+            currentAction = NativeDragOperation.ACTION_NONE;
+            overDispatchPending = false;
+        }
         if (op == null) {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 op.fireCompleted(performedAction);
             }
@@ -588,12 +657,20 @@ public final class NativeDragAndDrop {
             final ClipboardContent content, final int x, final int y, final int allowedActions) {
         if (target == null) {
             if (type == ActionEvent.Type.NativeDragOver) {
-                overDispatchPending = false;
+                synchronized (LOCK) {
+                    overDispatchPending = false;
+                }
             }
             return;
         }
-        final boolean local = active != null;
+        final boolean local;
+        final int startingAction;
+        synchronized (LOCK) {
+            local = active != null;
+            startingAction = currentAction;
+        }
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 try {
                     NativeDropEvent ev = new NativeDropEvent(target, type, content, x, y, allowedActions, local);
@@ -601,19 +678,23 @@ public final class NativeDragAndDrop {
                         // The target starts from what the framework already agreed to, so a
                         // target that does not care keeps the answer stable instead of
                         // resetting it to the default on every event.
-                        ev.accept(currentAction);
+                        ev.accept(startingAction);
                     }
                     target.dispatchNativeDropEvent(ev);
                     if (type == ActionEvent.Type.NativeDragOver || type == ActionEvent.Type.NativeDragEnter) {
-                        if (currentTarget == target) { // NOPMD CompareObjectsWithEquals
-                            currentAction = ev.getAcceptedAction();
+                        synchronized (LOCK) {
+                            if (currentTarget == target) { // NOPMD CompareObjectsWithEquals
+                                currentAction = ev.getAcceptedAction();
+                            }
                         }
                     }
                 } catch (Throwable err) {
                     Log.e(err);
                 } finally {
                     if (type == ActionEvent.Type.NativeDragOver) {
-                        overDispatchPending = false;
+                        synchronized (LOCK) {
+                            overDispatchPending = false;
+                        }
                     }
                 }
             }

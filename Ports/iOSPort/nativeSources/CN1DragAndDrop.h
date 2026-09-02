@@ -54,8 +54,31 @@ BOOL CN1DragAndDropSupported(void);
 /// application on screen to drop it into.
 BOOL CN1DragOutsideAppSupported(void);
 
-/// Attaches the drag and the drop interactions to the Codename One surface.
+/// Remembers the Codename One surface, so the interactions can be attached to it later.
+///
+/// Neither interaction is attached here. UIDragInteraction recognizes its gesture with a
+/// recognizer installed on the view, and installing one changes how every touch on that view is
+/// delivered -- a plain tap stopped reaching the framework at all. The overwhelming majority of
+/// applications never drag anything and must not pay for that; the drop half is withheld on the
+/// same principle rather than on measurement.
+///
+/// The parameter degrades to `id` on watchOS, which has no CN1View at all -- WatchKit draws
+/// through WKInterface objects and CN1AppleUI.h deliberately leaves the alias undefined there.
+/// CN1RenderingView's peer argument does the same thing for the same reason. Naming the type
+/// unconditionally broke every watch build, since this header reaches that slice too.
+#if TARGET_OS_WATCH
+void CN1InstallDragAndDrop(id view);
+#else
 void CN1InstallDragAndDrop(CN1View* view);
+#endif
+
+/// Attaches the drag interaction, because the application has a component that can be dragged
+/// out. Idempotent, and safe to call from any thread.
+void CN1EnableNativeDragSource(void);
+
+/// Attaches the drop interaction, because the application has a component that accepts drops.
+/// Idempotent, and safe to call from any thread.
+void CN1EnableNativeDropTarget(void);
 
 /// Stages the drag a press has made possible: which representations it can offer, what the
 /// receiver may do with them, and the image to show under the finger. The representations are

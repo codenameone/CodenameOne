@@ -5637,6 +5637,32 @@ public abstract class CodenameOneImplementation {
     public void cancelNativeDrag() {
     }
 
+    /// Notifies the port that the application has a component that can be dragged through the
+    /// operating system.
+    ///
+    /// A platform whose drag gesture is its own -- UIKit's is -- recognizes that gesture with a
+    /// recognizer installed on the surface, and installing one changes how every touch on that
+    /// surface is delivered. Doing it unconditionally would alter touch handling for every
+    /// application, including the overwhelming majority that never drags anything; a port that
+    /// needs a recognizer therefore installs it here, the first time an application says it
+    /// wants one.
+    ///
+    /// Called on the event dispatch thread, possibly many times; a port must make it idempotent.
+    public void nativeDragSourceRegistered() {
+    }
+
+    /// Notifies the port that the application has a component that accepts drops from the
+    /// operating system.
+    ///
+    /// The counterpart of `#nativeDragSourceRegistered()`, for the same reason: a port attaches
+    /// whatever the platform needs in order to receive drops only for applications that asked
+    /// to receive them, so an application that never does keeps exactly the input handling it
+    /// had.
+    ///
+    /// Called on the event dispatch thread, possibly many times; a port must make it idempotent.
+    public void nativeDropTargetRegistered() {
+    }
+
     /// True when the port needs the drag image at the moment the operation is staged rather
     /// than when the drag begins.
     ///

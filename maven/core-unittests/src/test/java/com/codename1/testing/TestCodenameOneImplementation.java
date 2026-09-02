@@ -130,6 +130,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private com.codename1.ui.NativeDragOperation startedNativeDrag;
     private int cancelledNativeDrags;
     private boolean nativeDragStartRefused;
+    private int nativeDragSourceRegistrations;
+    private int nativeDropTargetRegistrations;
 
     private final TestFont defaultFont = new TestFont(8, 16);
     private int displayWidth = 1080;
@@ -5632,10 +5634,33 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return cancelledNativeDrags;
     }
 
+    @Override
+    public void nativeDragSourceRegistered() {
+        nativeDragSourceRegistrations++;
+    }
+
+    /// How many times the framework has told the port that this application wants to drag. A
+    /// port whose platform needs a gesture recognizer installs it on the strength of this.
+    public int getNativeDragSourceRegistrations() {
+        return nativeDragSourceRegistrations;
+    }
+
+    @Override
+    public void nativeDropTargetRegistered() {
+        nativeDropTargetRegistrations++;
+    }
+
+    /// How many times the framework has told the port that this application accepts drops.
+    public int getNativeDropTargetRegistrations() {
+        return nativeDropTargetRegistrations;
+    }
+
     /// Forgets everything recorded, so one test does not see another's drag.
     public void resetNativeDragState() {
         preparedNativeDrag = null;
         startedNativeDrag = null;
         cancelledNativeDrags = 0;
+        nativeDragSourceRegistrations = 0;
+        nativeDropTargetRegistrations = 0;
     }
 }

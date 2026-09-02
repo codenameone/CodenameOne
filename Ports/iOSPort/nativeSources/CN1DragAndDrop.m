@@ -41,7 +41,18 @@ BOOL CN1DragOutsideAppSupported(void) {
     return NO;
 }
 
+#if TARGET_OS_WATCH
+void CN1InstallDragAndDrop(id view) {
+}
+#else
 void CN1InstallDragAndDrop(CN1View* view) {
+}
+#endif
+
+void CN1EnableNativeDragSource(void) {
+}
+
+void CN1EnableNativeDropTarget(void) {
 }
 
 void CN1PrepareNativeDrag(NSString* mimeTypes, int allowedActions, NSData* dragImagePng,
@@ -79,6 +90,12 @@ static int cn1LastDropAction = CN1_DND_ACTION_NONE;
 
 /// True while this application is the source of the session in progress.
 static BOOL cn1DraggingOut = NO;
+
+/// The surface, remembered so the drag interaction can be attached later, and the delegate that
+/// serves both interactions. The delegate outlives the surface, which lives for the life of the
+/// process, and the interactions hold it weakly.
+static CN1View* cn1DragSurface = nil;
+static id cn1DragDelegate = nil;
 
 /// The MIME types the framework names, mapped onto the uniform type identifiers UIKit and
 /// every other application on the system speak.
@@ -501,21 +518,63 @@ void CN1InstallDragAndDrop(CN1View* view) {
         return;
     }
     if (@available(iOS 11.0, *)) {
-        CN1DragAndDropDelegate* delegate = [[CN1DragAndDropDelegate alloc] init];
-        UIDragInteraction* drag = [[UIDragInteraction alloc] initWithDelegate:delegate];
-        // Without this a drag never begins on iPhone: UIKit enables drag interactions on iPad
-        // by default and leaves them off elsewhere.
-        drag.enabled = YES;
-        [view addInteraction:drag];
-        UIDropInteraction* drop = [[UIDropInteraction alloc] initWithDelegate:delegate];
-        [view addInteraction:drop];
+        cn1DragSurface = view;
         // The delegate is deliberately not released: the interactions hold their delegate
         // weakly and it has to outlive the surface, which lives for the life of the process.
-#ifndef CN1_USE_ARC
-        [drag release];
-        [drop release];
-#endif
+        cn1DragDelegate = [[CN1DragAndDropDelegate alloc] init];
     }
+}
+
+/// True when an interaction of this class is already on the surface. Both enable calls run for
+/// every component an application marks, which for a list is every row.
+static BOOL cn1HasInteraction(Class kind) {
+    for (id<UIInteraction> existing in cn1DragSurface.interactions) {
+        if ([existing isKindOfClass:kind]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+void CN1EnableNativeDragSource(void) {
+    if (!CN1DragAndDropSupported()) {
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (@available(iOS 11.0, *)) {
+            if (cn1DragSurface == nil || cn1DragDelegate == nil
+                    || cn1HasInteraction([UIDragInteraction class])) {
+                return;
+            }
+            UIDragInteraction* drag = [[UIDragInteraction alloc] initWithDelegate:cn1DragDelegate];
+            // Without this a drag never begins on iPhone: UIKit enables drag interactions on
+            // iPad by default and leaves them off elsewhere.
+            drag.enabled = YES;
+            [cn1DragSurface addInteraction:drag];
+#ifndef CN1_USE_ARC
+            [drag release];
+#endif
+        }
+    });
+}
+
+void CN1EnableNativeDropTarget(void) {
+    if (!CN1DragAndDropSupported()) {
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (@available(iOS 11.0, *)) {
+            if (cn1DragSurface == nil || cn1DragDelegate == nil
+                    || cn1HasInteraction([UIDropInteraction class])) {
+                return;
+            }
+            UIDropInteraction* drop = [[UIDropInteraction alloc] initWithDelegate:cn1DragDelegate];
+            [cn1DragSurface addInteraction:drop];
+#ifndef CN1_USE_ARC
+            [drop release];
+#endif
+        }
+    });
 }
 
 #endif

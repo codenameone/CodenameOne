@@ -6546,6 +6546,12 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `nativeDragSource`: true to hand drags on this component to the operating system
     public void setNativeDragSource(boolean nativeDragSource) {
         this.nativeDragSource = nativeDragSource;
+        if (nativeDragSource) {
+            // Tells the port that this application wants to drag. Ports whose platform needs a
+            // gesture recognizer on the surface install it here rather than at startup, so an
+            // application that never drags keeps exactly the touch handling it has today.
+            Display.impl.nativeDragSourceRegistered();
+        }
     }
 
     /// Returns the operation this component drags, or null when it supplies one per press by
@@ -6567,7 +6573,7 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `nativeDragOperation`: what to drag, or null to stop being a drag source
     public void setNativeDragOperation(NativeDragOperation nativeDragOperation) {
         this.nativeDragOperation = nativeDragOperation;
-        this.nativeDragSource = nativeDragOperation != null;
+        setNativeDragSource(nativeDragOperation != null);
     }
 
     /// Produces the operation for a drag starting at the given position, invoked on the event
@@ -6611,6 +6617,11 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `nativeDropTarget`: true to accept operating system drops
     public void setNativeDropTarget(boolean nativeDropTarget) {
         this.nativeDropTarget = nativeDropTarget;
+        if (nativeDropTarget) {
+            // As with setNativeDragSource: the port attaches whatever the platform needs to
+            // receive drops only once an application says it wants them.
+            Display.impl.nativeDropTargetRegistered();
+        }
     }
 
     /// Returns the MIME types this component accepts, or null when it accepts anything.

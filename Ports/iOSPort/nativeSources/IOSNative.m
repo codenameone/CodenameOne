@@ -1113,6 +1113,14 @@ void com_codename1_impl_ios_IOSNative_cancelNativeDrag__(CN1_THREAD_STATE_MULTI_
     });
 }
 
+void com_codename1_impl_ios_IOSNative_enableNativeDragSource__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    CN1EnableNativeDragSource();
+}
+
+void com_codename1_impl_ios_IOSNative_enableNativeDropTarget__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    CN1EnableNativeDropTarget();
+}
+
 int CN1NativeDragDeliverOver(int x, int y, NSString* mimeTypes, int allowedActions, BOOL entering) {
     return (int)com_codename1_impl_ios_IOSImplementation_nativeDragOverCallback___int_int_java_lang_String_int_boolean_R_int(
             CN1_THREAD_GET_STATE_PASS_ARG x, y,

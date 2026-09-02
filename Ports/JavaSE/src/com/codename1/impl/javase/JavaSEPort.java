@@ -1913,7 +1913,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void cancelNativeDrag() {
-        JavaSENativeDragAndDrop.cancelDrag(this);
+        JavaSENativeDragAndDrop.cancelDrag();
     }
 
     @Override

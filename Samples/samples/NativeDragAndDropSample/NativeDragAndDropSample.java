@@ -123,6 +123,7 @@ public class NativeDragAndDropSample {
         ClipboardContent content = new ClipboardContent()
                 .setData(ClipboardContent.MIME_TEXT, "codenameone-note.txt")
                 .setDataProvider(ClipboardContent.MIME_FILE, new ClipboardDataProvider() {
+                    @Override
                     public Object getClipboardData(String mimeType) {
                         return writeNote();
                     }

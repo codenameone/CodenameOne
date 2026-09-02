@@ -9179,6 +9179,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.cancelNativeDrag();
     }
 
+    @Override
+    public void nativeDragSourceRegistered() {
+        nativeInstance.enableNativeDragSource();
+    }
+
+    @Override
+    public void nativeDropTargetRegistered() {
+        nativeInstance.enableNativeDropTarget();
+    }
+
     /// Encodes a drag preview as PNG, the one image format the whole bridge speaks.
     private static byte[] pngBytes(Image image) {
         if (image == null) {
@@ -9237,6 +9247,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         for (int iter = 0; iter < mimes.length; iter++) {
             content.setDataProvider(mimes[iter], new ClipboardDataProvider() {
+                @Override
                 public Object getClipboardData(String mimeType) {
                     return null;
                 }

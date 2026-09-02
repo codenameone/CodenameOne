@@ -50,5 +50,5 @@ public interface ClipboardDataProvider {
     ///
     /// the value, normally a `String`, a `String[]` of file paths or a `byte[]`, or null when
     /// the representation turned out to be unavailable
-    public Object getClipboardData(String mimeType);
+    Object getClipboardData(String mimeType);
 }

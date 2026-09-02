@@ -303,6 +303,36 @@ class NativeDragAndDropTest extends UITestBase {
     // ------------------------------------------------------------------------------------
 
     @FormTest
+    void becomingADragSourceTellsThePort() {
+        implementation.resetNativeDragState();
+        try {
+            Container cmp = new Container();
+            assertEquals(0, implementation.getNativeDragSourceRegistrations());
+
+            cmp.setNativeDragOperation(new NativeDragOperation("x"));
+            assertEquals(1, implementation.getNativeDragSourceRegistrations(),
+                    "a platform that needs a gesture recognizer installs it on the strength of "
+                            + "this, so an application that never drags keeps its touch handling");
+
+            cmp.setNativeDragSource(true);
+            assertEquals(2, implementation.getNativeDragSourceRegistrations());
+
+            cmp.setNativeDragOperation(null);
+            cmp.setNativeDragSource(false);
+            assertEquals(2, implementation.getNativeDragSourceRegistrations(),
+                    "giving up on dragging is not a request for a recognizer");
+
+            assertEquals(0, implementation.getNativeDropTargetRegistrations());
+            cmp.setNativeDropTarget(true);
+            assertEquals(1, implementation.getNativeDropTargetRegistrations());
+            cmp.setNativeDropTarget(false);
+            assertEquals(1, implementation.getNativeDropTargetRegistrations());
+        } finally {
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aDragOnANativeDragSourceIsHandedToThePlatform() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

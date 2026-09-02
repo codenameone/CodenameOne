@@ -80,8 +80,22 @@ import javax.swing.TransferHandler;
 final class JavaSENativeDragAndDrop {
     /// The operation the Codename One event thread has asked to export, read by the transfer
     /// handler on the AWT thread when the drag actually starts. One process drags one thing at
-    /// a time, so a single slot is the whole of the state.
-    private static volatile NativeDragOperation exporting;
+    /// a time, so a single slot is the whole of the state; the lock is what publishes it from
+    /// one thread to the other.
+    private static final Object LOCK = new Object();
+    private static NativeDragOperation exporting;
+
+    private static NativeDragOperation exporting() {
+        synchronized (LOCK) {
+            return exporting;
+        }
+    }
+
+    private static void setExporting(NativeDragOperation op) {
+        synchronized (LOCK) {
+            exporting = op;
+        }
+    }
 
     private JavaSENativeDragAndDrop() {
     }
@@ -130,8 +144,9 @@ final class JavaSENativeDragAndDrop {
         final Point offset = new Point(
                 (int) (op.getDragImageOffsetX() / target.canvasScale()),
                 (int) (op.getDragImageOffsetY() / target.canvasScale()));
-        exporting = op;
+        setExporting(op);
         EventQueue.invokeLater(new Runnable() {
+            @Override
             public void run() {
                 try {
                     TransferHandler handler = target.getTransferHandler();
@@ -146,7 +161,7 @@ final class JavaSENativeDragAndDrop {
                     handler.exportAsDrag(target, trigger, toAwtAction(preferred(op.getAllowedActions())));
                 } catch (Throwable err) {
                     Log.e(err);
-                    exporting = null;
+                    setExporting(null);
                     NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
                 }
             }
@@ -155,8 +170,8 @@ final class JavaSENativeDragAndDrop {
     }
 
     /// Forgets a prepared operation because the press turned out to be a click.
-    static void cancelDrag(JavaSEPort port) {
-        exporting = null;
+    static void cancelDrag() {
+        setExporting(null);
     }
 
     /// Renders the operation's drag image at the size AWT expects.
@@ -307,6 +322,7 @@ final class JavaSENativeDragAndDrop {
                 }
             } else {
                 content.setDataProvider(mime, new ClipboardDataProvider() {
+                    @Override
                     public Object getClipboardData(String requested) {
                         return readValue(transferable, flavor, requested);
                     }
@@ -324,6 +340,7 @@ final class JavaSENativeDragAndDrop {
             } else {
                 final ClipboardContent describing = content;
                 content.setDataProvider(ClipboardContent.MIME_FILE, new ClipboardDataProvider() {
+                    @Override
                     public Object getClipboardData(String requested) {
                         String[] paths = pathsFromUriList(describing.getText(ClipboardContent.MIME_URI_LIST));
                         if (paths == null) {
@@ -445,19 +462,19 @@ final class JavaSENativeDragAndDrop {
     private static final class Cn1TransferHandler extends TransferHandler {
         @Override
         public int getSourceActions(JComponent c) {
-            NativeDragOperation op = exporting;
+            NativeDragOperation op = exporting();
             return op == null ? NONE : toAwtActions(op.getAllowedActions());
         }
 
         @Override
         protected Transferable createTransferable(JComponent c) {
-            NativeDragOperation op = exporting;
+            NativeDragOperation op = exporting();
             return op == null ? null : new JavaSEPort.RichTransferable(op.getContent());
         }
 
         @Override
         protected void exportDone(JComponent source, Transferable data, int action) {
-            exporting = null;
+            setExporting(null);
             NativeDragAndDrop.dragCompleted(preferred(fromAwtActions(action)));
         }
     }
@@ -470,18 +487,22 @@ final class JavaSENativeDragAndDrop {
             this.canvas = canvas;
         }
 
+        @Override
         public void dragEnter(DropTargetDragEvent e) {
             respond(e, true);
         }
 
+        @Override
         public void dragOver(DropTargetDragEvent e) {
             respond(e, false);
         }
 
+        @Override
         public void dropActionChanged(DropTargetDragEvent e) {
             respond(e, false);
         }
 
+        @Override
         public void dragExit(DropTargetEvent e) {
             try {
                 NativeDragAndDrop.dragExit(canvas.windowId);
@@ -490,6 +511,7 @@ final class JavaSENativeDragAndDrop {
             }
         }
 
+        @Override
         public void drop(DropTargetDropEvent e) {
             try {
                 int allowed = fromAwtActions(e.getSourceActions());

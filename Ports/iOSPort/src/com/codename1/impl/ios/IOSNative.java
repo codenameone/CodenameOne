@@ -396,6 +396,20 @@ public final class IOSNative {
     /// Drops whatever `#prepareNativeDrag(java.lang.String, int, byte[], int, int)` staged,
     /// because the press turned out to be a tap.
     native void cancelNativeDrag();
+
+    /// Attaches the drag interaction, because the application has a component that can be
+    /// dragged out.
+    ///
+    /// UIKit recognizes the drag gesture with a recognizer installed on the surface, and having
+    /// one there changes how every touch is delivered -- with it attached unconditionally a
+    /// plain tap stopped reaching the framework. So it is attached on demand, and an
+    /// application that never drags anything keeps exactly the touch handling it had.
+    /// Idempotent.
+    native void enableNativeDragSource();
+
+    /// Attaches the drop interaction, because the application has a component that accepts
+    /// drops. Withheld until then on the same principle as the drag interaction. Idempotent.
+    native void enableNativeDropTarget();
     
     native void setPinchToZoomEnabled(long peer, boolean e);
     native void setNativeBrowserScrollingEnabled(long peer, boolean e);
