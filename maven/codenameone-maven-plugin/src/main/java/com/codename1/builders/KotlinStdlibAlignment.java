@@ -181,6 +181,12 @@ public class KotlinStdlibAlignment {
         }
         out.append("}\n")
            .append("configurations.all {\n")
+           // Review asked whether selecting a stdlib that is reachable only
+           // THROUGH the shims makes resolution expand until the daemon runs out
+           // of heap. It does not: kotlin-stdlib-jdk8:1.7.0 as the only route to
+           // the stdlib, plus a force to 1.8.0, resolves in seconds under a
+           // 512MB heap on both Gradle 8.5 and 8.14.2 -- and it is a graph this
+           // FIXES, since the baseline there carries the duplicate.
            .append("    resolutionStrategy.capabilitiesResolution {\n");
         for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
             out.append("        withCapability('").append(CAPABILITY_GROUP).append(':')

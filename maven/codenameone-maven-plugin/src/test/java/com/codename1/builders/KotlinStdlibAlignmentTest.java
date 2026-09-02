@@ -178,6 +178,25 @@ class KotlinStdlibAlignmentTest {
                         + "where somebody debugging a build will actually see it");
     }
 
+    @Test
+    void theGateIsNotAboutAndroidX() throws Exception {
+        // The duplicate has nothing to do with AndroidX. Reproduced with
+        // android.useAndroidX=false explicitly set on AGP 8.1.4:
+        // checkDebugDuplicateClasses fails there exactly as it does with
+        // AndroidX on, so gating on it left those builds broken.
+        String src = new String(java.nio.file.Files.readAllBytes(new java.io.File(
+                "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath()), "UTF-8");
+        int at = src.indexOf("String kotlinStdlibAlignment = \"\";");
+        assertTrue(at >= 0, "the builder has the alignment gate");
+        String gate = src.substring(at, src.indexOf("}", src.indexOf("if (", at)));
+        assertTrue(!gate.contains("useAndroidX"),
+                "the gate does not turn on AndroidX: " + gate);
+        assertTrue(gate.contains("gradleVersionInt >= 6"),
+                "it does keep the Gradle floor, which capabilitiesResolution needs");
+        assertTrue(gate.contains("android.kotlinStdlibAlignment"),
+                "and the opt-out hint");
+    }
+
     /**
      * Appended AFTER the dependencies block. Inside it, the
      * {@code configurations.all} half would be a syntax error in the generated

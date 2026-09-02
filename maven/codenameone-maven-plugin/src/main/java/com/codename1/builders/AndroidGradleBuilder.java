@@ -7284,7 +7284,9 @@ public class AndroidGradleBuilder extends Executor {
         // block on the legacy `compile` configuration. Reviewed as an unrelated flag
         // to gate on -- it is not, and the failing case it is meant to protect needs
         // a modern AndroidX dependency in a project that has AndroidX turned off,
-        // which AGP refuses for its own reasons before this could matter.
+        // which AGP refuses for its own reasons before this could matter. That
+        // whole line of reasoning turned out not to matter either: see the
+        // useAndroidX note on the gate below.
         //
         // On Gradle 6 rather than on 4.6 where the constraints
         // DSL first appeared. That is deliberate, and it has been questioned in
@@ -7302,8 +7304,20 @@ public class AndroidGradleBuilder extends Executor {
         // version down, because the alignment RAISED one and could then break a
         // build that resolved. It declares a capability now, which raises
         // nothing, so there is nothing to search for -- see KotlinStdlibAlignment.
+        //
+        // Not gated on useAndroidX any more. It was, on the reasoning above that
+        // a non-AndroidX graph cannot reach a merged kotlin-stdlib -- and that
+        // reasoning is wrong, because the duplicate has nothing to do with
+        // AndroidX. Reproduced with android.useAndroidX=false explicitly set,
+        // AGP 8.1.4, kotlin-stdlib 1.8.10 beside kotlin-stdlib-jdk8 1.6.21:
+        // checkDebugDuplicateClasses fails exactly as it does with AndroidX on,
+        // and passes with this script. The old gate left those builds broken.
+        //
+        // The Gradle 6 floor stays, and for a reason that did survive
+        // measurement: capabilitiesResolution is the mechanism here, and AGP 3.x
+        // on Gradle 4.6 is a different world. Turning it off is the hint.
         String kotlinStdlibAlignment = "";
-        if (useAndroidX && gradleVersionInt >= 6
+        if (gradleVersionInt >= 6
                 && request.getArg("android.kotlinStdlibAlignment", "true").equals("true")) {
             kotlinStdlibAlignment = KotlinStdlibAlignment.alignmentScript();
         }
