@@ -487,6 +487,98 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aDisabledComponentTakesNoWheel() {
+        Form f = new Form("disabled", new BorderLayout());
+        Container page = f.getContentPane();
+        page.setLayout(BoxLayout.y());
+        page.setScrollableY(true);
+        Container inner = new Container(BoxLayout.y());
+        inner.setScrollableY(true);
+        inner.setPreferredH(px(60));
+        WheelHandlingComponent handler = new WheelHandlingComponent();
+        handler.setPreferredH(px(15));
+        inner.add(handler);
+        for (int i = 0; i < 8; i++) {
+            inner.add(filler());
+        }
+        page.add(inner);
+        for (int i = 0; i < 60; i++) {
+            page.add(filler());
+        }
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        // Disabling used to stop the wheel because the gesture it was emulated with went
+        // through Form.pointerDragged, which gates on isEnabled.
+        handler.setEnabled(false);
+        inner.setEnabled(false);
+
+        wheel(handler, 0, -px(30));
+
+        assertEquals(0, handler.wheels(), "a disabled component is offered no wheel");
+        assertEquals(0, inner.getScrollY(), "and a disabled container does not scroll");
+        assertTrue(page.getScrollY() > 0, "the enabled ancestor takes it instead");
+    }
+
+    @FormTest
+    void aListenerThatMovesTheComponentDropsTheCarry() {
+        Form f = new Form("carry vs listener", new BorderLayout());
+        final ExactGridContainer page = new ExactGridContainer();
+        page.setScrollableY(true);
+        for (int i = 0; i < 60; i++) {
+            Label l = new Label("row");
+            l.setPreferredH(px(30));
+            page.add(l);
+        }
+        f.getContentPane().setLayout(BoxLayout.y());
+        f.getContentPane().add(page);
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        page.setSnapToGrid(true);
+        int x = page.getAbsoluteX() + page.getWidth() / 2;
+        int y = page.getAbsoluteY() + page.getHeight() / 2;
+        int pitch = page.getComponentAt(1).getY() - page.getComponentAt(0).getY();
+
+        // Build up an actual carry. Read rather than assumed: whether a notch leaves
+        // something over, and with which sign, depends on where the snap rounded to.
+        for (int i = 0; i < 20 && page.wheelSnapRemainderY == 0; i++) {
+            wheelPrecise(x, y, 0, -(pitch / 4));
+        }
+        assertTrue(page.wheelSnapRemainderY != 0, "there has to be something carried");
+
+        // A listener consumes the next one and moves the component itself. That happens
+        // while a wheel is dispatching, so "is a wheel in flight" cannot tell it from the
+        // framework's own snap -- but it is not this component being moved BY the scroll.
+        final boolean[] moved = new boolean[1];
+        ActionListener consumer = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                if (!moved[0]) {
+                    moved[0] = true;
+                    page.setScrollY(0);
+                }
+                evt.consume();
+            }
+        };
+        page.addMouseWheelListener(consumer);
+        wheelPrecise(x, y, 0, -(pitch / 4));
+        assertTrue(moved[0], "the listener has to have run for this to mean anything");
+        page.removeMouseWheelListener(consumer);
+
+        // The component was moved by something that is not the wheel scrolling it, so what
+        // the wheel was carrying no longer describes anything.
+        assertEquals(0, page.wheelSnapRemainderY,
+                "a listener moving the component itself drops the carry");
+
+        wheelPrecise(x, y, 0, -(pitch / 4));
+
+        assertTrue(page.getScrollY() < pitch,
+                "so the next notch travels a notch, got " + page.getScrollY()
+                        + " with rows " + pitch + " apart");
+    }
+
+    @FormTest
     void aWheelInADesktopWindowScrollsThatWindow() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("scroller", new BorderLayout());

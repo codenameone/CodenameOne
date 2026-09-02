@@ -3653,7 +3653,7 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `scrollX`: the X position of the scrolling
     protected void setScrollX(int scrollX) {
-        if (!Display.getInstance().isScrollWheeling()) {
+        if (Display.getInstance().wheelScrollTarget != this) { //NOPMD CompareObjectsWithEquals
             wheelSnapRemainderX = 0;
         }
         // the setter must always update the value regardless...
@@ -3701,11 +3701,14 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `scrollY`: the Y position of the scrolling
     protected void setScrollY(int scrollY) {
-        if (!Display.getInstance().isScrollWheeling()) {
-            // Anything that is not the wheel invalidates what the wheel was carrying: the
-            // remainder describes a distance from a position this component is no longer
-            // at, so adding it to the next notch would move further than the notch asked
-            // for. A drag, a selection change and a programmatic scroll all land here.
+        if (Display.getInstance().wheelScrollTarget != this) { //NOPMD CompareObjectsWithEquals
+            // Anything that is not the wheel moving THIS component invalidates what it was
+            // carrying: the remainder describes a distance from a position this component
+            // is no longer at, so adding it to the next notch would move further than the
+            // notch asked for. A drag, a selection change and a programmatic scroll all
+            // land here -- including one made by a listener while the wheel is dispatching,
+            // which is why the test is the component being moved rather than whether a
+            // wheel is in flight at all.
             wheelSnapRemainderY = 0;
         }
         int oldAccessibilityScrollY = this.scrollY;
@@ -6770,7 +6773,11 @@ public class Component implements Animation, StyleListener, Editable {
     boolean fireMouseWheelHandlers(com.codename1.ui.events.WheelEvent ev) {
         Component c = this;
         while (c != null) {
-            if (c.mouseWheel(ev) || ev.isConsumed()) {
+            // Disabled components handle nothing, which is what the synthetic drag this
+            // replaced amounted to: Form.pointerDragged gated on isEnabled, so disabling a
+            // viewer or a map stopped the wheel panning it. The walk continues past it so
+            // an enabled ancestor still gets its turn.
+            if (c.isEnabled() && (c.mouseWheel(ev) || ev.isConsumed())) {
                 return true;
             }
             c = c.getParent();

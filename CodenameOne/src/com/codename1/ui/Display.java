@@ -8742,6 +8742,16 @@ public final class Display extends CN1Constants {
         return scrolled;
     }
 
+    /// The component `#applyScroll` is moving right now, and only while it is moving it.
+    ///
+    /// Component#setScrollY reads this to tell the wheel's own two-step -- set the raw
+    /// position, then snap it -- from every other way a scroll position changes, because
+    /// only the former may keep the remainder it is carrying. isScrollWheeling cannot
+    /// answer that: it is true for the whole dispatch, so a listener that consumed the
+    /// wheel and moved a snapping component itself looked like the framework's own snap
+    /// and kept a remainder measured from somewhere else.
+    Component wheelScrollTarget;
+
     private boolean applyScroll(Component target, boolean vertical, int position, int max) {
         int ceiling = max < 0 ? 0 : max;
         int before = vertical ? target.getScrollY() : target.getScrollX();
@@ -8758,9 +8768,11 @@ public final class Display extends CN1Constants {
         if (wanted == wantedBefore) {
             return false;
         }
-        setScrollPosition(target, vertical, wanted);
-        int shown = wanted;
-        if (snapping) {
+        wheelScrollTarget = target;
+        try {
+            setScrollPosition(target, vertical, wanted);
+            int shown = wanted;
+            if (snapping) {
             // Every event lands on the grid, and whether the device is precise no longer
             // enters into it: carrying the remainder is what keeps a trackpad moving, so
             // there is nothing left for a precise flag to decide. Snapping only notched
@@ -8768,16 +8780,19 @@ public final class Display extends CN1Constants {
             // or idle callback to settle it -- and Spinner3D derives its selected index
             // from where the scroll actually is, so resting between rows is a value nobody
             // chose.
-            shown = Math.max(0, Math.min(ceiling,
-                    vertical ? target.getGridPosY() : target.getGridPosX()));
-            if (shown != wanted) {
-                setScrollPosition(target, vertical, shown);
+                shown = Math.max(0, Math.min(ceiling,
+                        vertical ? target.getGridPosY() : target.getGridPosX()));
+                if (shown != wanted) {
+                    setScrollPosition(target, vertical, shown);
+                }
             }
-        }
-        if (vertical) {
-            target.wheelSnapRemainderY = snapping ? wanted - shown : 0;
-        } else {
-            target.wheelSnapRemainderX = snapping ? wanted - shown : 0;
+            if (vertical) {
+                target.wheelSnapRemainderY = snapping ? wanted - shown : 0;
+            } else {
+                target.wheelSnapRemainderX = snapping ? wanted - shown : 0;
+            }
+        } finally {
+            wheelScrollTarget = null;
         }
         target.restoreFadingScrollbar();
         target.repaint();
@@ -8802,7 +8817,10 @@ public final class Display extends CN1Constants {
     private boolean scrollAxisForWheel(Component cmp, boolean vertical, int delta) {
         Component c = cmp;
         while (c != null) {
-            if (vertical ? c.isScrollableY() : c.isScrollableX()) {
+            // A disabled component takes no wheel, exactly as it took no synthetic drag:
+            // Form.pointerDragged gated on isEnabled, so disabling a scroller used to stop
+            // the wheel too. The walk continues, so an enabled ancestor still gets it.
+            if (c.isEnabled() && (vertical ? c.isScrollableY() : c.isScrollableX())) {
                 // Clamped here rather than left to setScrollY: that one only clamps for a
                 // component with tensile drag off, because a finger is allowed to overshoot
                 // and spring back. A wheel notch has nothing to spring back from.
