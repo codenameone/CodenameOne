@@ -26,9 +26,13 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -435,6 +439,59 @@ class ScrollWheelGestureTest extends UITestBase {
         assertEquals(before, page.getScrollY(), "and the form nobody is looking at is not scrolled");
         f.show();
         DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    void aNotchTooSmallToChangeTheRowNeverPublishesAPositionOffTheGrid() {
+        // Spinner3D mirrors this container's scroll into SpinnerNode, which derives its
+        // selected index from the position by rounding down. So every position published
+        // here is a selection, and one that is off the grid is a selection nobody chose:
+        // computing the snap by scrolling to the raw position and coming back fired a
+        // change to the previous row and a second one back, into application listeners and
+        // into the list model, for a notch that moved nothing.
+        Form f = new Form("grid", new BorderLayout());
+        ExactGridContainer page = new ExactGridContainer();
+        page.setScrollableY(true);
+        for (int i = 0; i < 60; i++) {
+            Label l = new Label("row");
+            l.setPreferredH(px(30));
+            page.add(l);
+        }
+        f.getContentPane().setLayout(BoxLayout.y());
+        f.getContentPane().add(page);
+        f.getContentPane().setScrollableY(false);
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        page.setSnapToGrid(true);
+        int x = page.getAbsoluteX() + page.getWidth() / 2;
+        int y = page.getAbsoluteY() + page.getHeight() / 2;
+        int pitch = page.getComponentAt(1).getY() - page.getComponentAt(0).getY();
+        assertTrue(pitch > 4, "the rows have to be tall enough for a quarter of one to be a real delta");
+
+        // Off row zero, on an exact row, carrying nothing. Scrolled there directly rather
+        // than by wheel: a run-up of partial notches leaves a remainder behind, and the
+        // remainder moving the next notch a whole row is correct behaviour that would hide
+        // what this test is about. A scroll that is not the wheel's own drops the carry.
+        int settled = page.getComponentAt(2).getY();
+        page.setScrollY(settled);
+        DisplayTest.flushEdt();
+        assertTrue(settledOnGrid(page), "the setup has to leave it settled on a row");
+        assertEquals(0, page.wheelSnapRemainderY, "and carrying nothing into the notch below");
+
+        final List<Integer> published = new ArrayList<Integer>();
+        page.addScrollListener(new ScrollListener() {
+            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+                published.add(Integer.valueOf(scrollY));
+            }
+        });
+
+        // A quarter of a row back towards the previous one: too little to leave this row.
+        wheelPrecise(x, y, 0, pitch / 4);
+
+        assertEquals(settled, page.getScrollY(), "it stays on the row it was on");
+        assertTrue(published.isEmpty(),
+                "a notch that leaves the row alone has to publish nothing at all, got " + published);
     }
 
     @FormTest

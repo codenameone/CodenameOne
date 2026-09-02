@@ -8788,9 +8788,6 @@ public final class Display extends CN1Constants {
         }
         wheelScrollTarget = target;
         try {
-            setScrollPosition(target, vertical, wanted);
-            int shown = wanted;
-            if (snapping) {
             // Every event lands on the grid, and whether the device is precise no longer
             // enters into it: carrying the remainder is what keeps a trackpad moving, so
             // there is nothing left for a precise flag to decide. Snapping only notched
@@ -8798,12 +8795,15 @@ public final class Display extends CN1Constants {
             // or idle callback to settle it -- and Spinner3D derives its selected index
             // from where the scroll actually is, so resting between rows is a value nobody
             // chose.
-                shown = Math.max(0, Math.min(ceiling,
-                        vertical ? target.getGridPosY() : target.getGridPosX()));
-                if (shown != wanted) {
-                    setScrollPosition(target, vertical, shown);
-                }
+            int shown = wanted;
+            if (snapping) {
+                shown = Math.max(0, Math.min(ceiling, target.gridPositionFor(vertical, wanted)));
             }
+            // One move, straight to where the gesture settles. Going to the raw position
+            // first and snapping back from it published a position off the grid that the
+            // component is never left at, and a listener deriving a value from where the
+            // scroll is -- Spinner3D's selected index -- changed it and changed it back.
+            setScrollPosition(target, vertical, shown);
             if (vertical) {
                 target.wheelSnapRemainderY = snapping ? wanted - shown : 0;
             } else {

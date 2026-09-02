@@ -7572,6 +7572,39 @@ public class Component implements Animation, StyleListener, Editable {
         return getScrollX();
     }
 
+    /// Where this component would settle on its grid if it were scrolled to `position`,
+    /// answered without it ever being at that position.
+    ///
+    /// getGridPosY reads getScrollY, so asking where a wheel notch settles used to mean
+    /// scrolling there and snapping back from it. Everything watching saw both positions,
+    /// and the raw one is off the grid: Spinner3D mirrors the scroll into SpinnerNode,
+    /// which derives its selected index from it by rounding down, so a notch far too small
+    /// to change the selection still fired a selection change to the previous row and a
+    /// second one back to where it started -- twice into application listeners and twice
+    /// into the list model.
+    ///
+    /// The field is set and restored directly rather than through setScrollY, so nothing is
+    /// notified of a position the component is never left at. What getGridPos* reads is the
+    /// scroll position and the children's own coordinates, and those do not move with it.
+    int gridPositionFor(boolean vertical, int position) {
+        if (vertical) {
+            int was = scrollY;
+            scrollY = position;
+            try {
+                return getGridPosY();
+            } finally {
+                scrollY = was;
+            }
+        }
+        int was = scrollX;
+        scrollX = position;
+        try {
+            return getGridPosX();
+        } finally {
+            scrollX = was;
+        }
+    }
+
     boolean isTensileMotionInProgress() {
         return draggedMotionY != null && !draggedMotionY.isFinished();
     }
