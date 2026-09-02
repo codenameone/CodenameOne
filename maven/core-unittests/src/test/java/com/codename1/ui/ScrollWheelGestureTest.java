@@ -58,14 +58,18 @@ class ScrollWheelGestureTest extends UITestBase {
     void aWheelOverAScrollableRowIsNotDeliveredAsATapEither() {
         int[] taps = new int[1];
         Form f = form(taps);
-        // Tall enough to scroll: this is the case where a drag IS activated, and the
-        // release goes to the scrolling container instead of the row. It has to stay
-        // that way -- the container needs its release to settle the momentum.
+        // Tall enough to scroll: this is the case where a drag IS activated, so the release
+        // goes to the scrolling container and never reaches the row. That was already true
+        // before the fix -- this one GUARDS the good case rather than demonstrating the bug,
+        // which only appears when the gesture activates no drag at all, exactly as the
+        // report described it ("there was nothing available to scroll to").
         f.getContentPane().setScrollableY(true);
-        for (int i = 0; i < 40; i++) {
+        for (int i = 0; i < 60; i++) {
             f.getContentPane().add(filler());
         }
         f.revalidate();
+        assertTrue(f.getContentPane().isScrollableY(),
+                "the content has to overflow, or this repeats the case above");
         Component row = f.getContentPane().getComponentAt(0);
 
         wheel(row, -Display.getInstance().convertToPixels(20));
@@ -239,6 +243,63 @@ class ScrollWheelGestureTest extends UITestBase {
         w.dispose();
     }
 
+    @FormTest
+    void aWheelStillScrollsThroughAChildThatForwardsItsDrags() {
+        // The trap the ImageViewer guard has to avoid, and the reason EditorView has none at
+        // all: a component can be the only thing that forwards a drag to the scrollable
+        // ancestor -- ImageViewer does exactly this for a vertical drag -- so declining the
+        // whole gesture there would stop a wheel scrolling the page it sits on.
+        Form f = new Form("forwarding", new BorderLayout());
+        // The scroller has to actually overflow: isScrollableY() reports false for a
+        // container whose content fits, and a child looking for a scrollable ancestor would
+        // find none.
+        Container scroller = f.getContentPane();
+        scroller.setLayout(BoxLayout.y());
+        scroller.setScrollableY(true);
+        ForwardingComponent child = new ForwardingComponent();
+        child.setPreferredH(Display.getInstance().convertToPixels(15));
+        scroller.add(child);
+        for (int i = 0; i < 60; i++) {
+            scroller.add(filler());
+        }
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        assertTrue(scroller.isScrollableY(), "the container has to have something to scroll");
+        assertEquals(0, scroller.getScrollY(), "nothing is scrolled before the wheel");
+
+        wheel(child, -Display.getInstance().convertToPixels(20));
+
+        assertTrue(child.forwarded(), "the child has to have forwarded for this to mean anything");
+        assertTrue(scroller.getScrollY() > 0,
+                "a wheel forwarded by a child still has to scroll the container it names");
+    }
+
+    /// Forwards its drags to the scrollable ancestor instead of handling them, the way
+    /// `ImageViewer` forwards a vertical drag.
+    private static final class ForwardingComponent extends Component {
+        private boolean forwarded;
+
+        boolean forwarded() {
+            return forwarded;
+        }
+
+        @Override
+        public void pointerDragged(int x, int y) {
+            Container p = getParent();
+            while (p != null && !p.isScrollableY()) {
+                p = p.getParent();
+            }
+            if (p != null) {
+                if (!forwarded) {
+                    p.pointerPressed(x, y);
+                }
+                forwarded = true;
+                p.pointerDragged(x, y);
+            }
+        }
+    }
+
     /// Keeps the gesture the way `Spinner` does, and activates a drag on the first move --
     /// which is what tells a settle apart from a tap.
     private static final class StickyDragComponent extends Component {
@@ -311,9 +372,12 @@ class ScrollWheelGestureTest extends UITestBase {
         return f;
     }
 
+    /// Tall enough that a screenful of them overflows. A container whose content fits
+    /// reports isScrollableY() false however it was configured, so a test that means to
+    /// exercise scrolling has to make it actually overflow -- and say so.
     private Component filler() {
         Label l = new Label("filler");
-        l.setPreferredH(Display.getInstance().convertToPixels(10));
+        l.setPreferredH(Display.getInstance().convertToPixels(30));
         return l;
     }
 }

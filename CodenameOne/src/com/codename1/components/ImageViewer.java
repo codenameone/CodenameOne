@@ -579,6 +579,17 @@ public class ImageViewer extends Component {
                 return;
             }
         }
+        // Below the delegation above, and deliberately: a wheel gesture must still reach a
+        // scrollable ancestor through this method, which is the only thing that forwards it
+        // -- guarding the whole handler would stop a wheel scrolling a form that holds an
+        // image viewer. What it must not do is pan or swipe. Those move panPositionX and are
+        // settled by pointerReleased, which animates the partial swipe back or commits the
+        // navigation, and a wheel gets no release: the viewer would be left painted between
+        // two images until something else touched it. A zoomed viewer no longer pans from
+        // the wheel either, which is the same answer every non-scrollable thing gives it.
+        if (Display.getInstance().isScrollWheeling()) {
+            return;
+        }
         // could be a pan
         float distanceX = ((float) pressX - x) / getZoom();
         float distanceY = ((float) pressY - y) / getZoom();
