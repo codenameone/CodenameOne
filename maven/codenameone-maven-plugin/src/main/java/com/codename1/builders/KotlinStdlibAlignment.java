@@ -67,10 +67,15 @@ package com.codename1.builders;
  *       The constraint version this replaced failed both, in the Android build
  *       too: "Could not resolve org.jetbrains.kotlin:kotlin-stdlib-jdk8:
  *       {strictly 1.6.21}". That is the whole reason for the change.</li>
- *   <li>an all-1.7 project -- untouched, because the capability is only
- *       declared from the floor up, so shims that still carry real classes stay.
- *       This is also why a Kotlin compiler older than the floor is not a
- *       problem: nothing raises the stdlib under it.</li>
+ *   <li>an all-1.7 project -- untouched, because the stdlib only supersedes
+ *       from the floor up, so shims that still carry real classes stay. This is
+ *       also why a Kotlin compiler older than the floor is not a problem:
+ *       nothing raises the stdlib under it.</li>
+ *   <li>stdlib 1.8.0 with a NEWER {@code kotlin-stdlib-jdk8:1.9.0} -- resolves
+ *       to 1.9.0 throughout, exactly as the untouched graph does. An earlier
+ *       version of this reused the shims' own capability and evicted that shim,
+ *       taking its requirement on stdlib 1.9.0 with it and silently downgrading
+ *       the base module to 1.8.0.</li>
  *   <li>stdlib 1.9.22, a graph with no Kotlin at all, and this same rule applied
  *       twice -- all inert or clean.</li>
  *   <li>{@code failOnVersionConflict} with an old shim fails identically with
@@ -91,6 +96,28 @@ public class KotlinStdlibAlignment {
         "kotlin-stdlib-jdk8"
     };
 
+    /**
+     * The group of the capability this declares, and the name suffix.
+     *
+     * <p>Ours, deliberately, rather than reusing the shims' own implicit
+     * capability. That one is held by EVERY version of a shim, including the
+     * empty ones at or above the floor -- and a conflict there has no right
+     * answer: dropping the shim loses its requirement on a newer stdlib and
+     * silently downgrades the base module, while dropping the stdlib leaves a
+     * graph of empty shims with no stdlib in it at all. Both were measured.</p>
+     *
+     * <p>A capability only this declares is held by exactly two things: a
+     * {@code kotlin-stdlib} at or above the floor, which supersedes the shims,
+     * and a shim below it, which is superseded. So the conflict exists where the
+     * duplicate exists and nowhere else. It cannot be removed from the shims
+     * instead -- {@code removeCapability} does not remove an implicit one, which
+     * was tried and measured too.</p>
+     */
+    private static final String CAPABILITY_GROUP = "com.codenameone";
+
+    /** @see #CAPABILITY_GROUP */
+    private static final String CAPABILITY_SUFFIX = "-superseded";
+
     private KotlinStdlibAlignment() {
     }
 
@@ -106,54 +133,63 @@ public class KotlinStdlibAlignment {
      * @return the script, newline terminated
      */
     public static String alignmentScript() {
-        String floorMajor = MERGED_STDLIB_FLOOR.substring(
-                0, MERGED_STDLIB_FLOOR.indexOf('.'));
-        String rest = MERGED_STDLIB_FLOOR.substring(
-                MERGED_STDLIB_FLOOR.indexOf('.') + 1);
-        String floorMinor = rest.substring(0, rest.indexOf('.'));
+        String major = MERGED_STDLIB_FLOOR.substring(0, MERGED_STDLIB_FLOOR.indexOf('.'));
+        String rest = MERGED_STDLIB_FLOOR.substring(MERGED_STDLIB_FLOOR.indexOf('.') + 1);
+        String minor = rest.substring(0, rest.indexOf('.'));
+        String atOrAbove = "major > " + major + " || (major == " + major
+                + " && minor >= " + minor + ")";
+        String below = "major < " + major + " || (major == " + major
+                + " && minor < " + minor + ")";
 
         StringBuilder out = new StringBuilder();
         out.append("\n")
            .append("// Codename One: kotlin-stdlib ").append(MERGED_STDLIB_FLOOR)
            .append(" absorbed the kotlin-stdlib-jdk7 and kotlin-stdlib-jdk8\n")
-           .append("// classes and the 1.8.x line ships no Gradle module metadata saying so,\n")
-           .append("// so a graph holding both carries the same classes twice and fails\n")
-           .append("// checkDuplicateClasses. Declaring the overlap as a capability lets\n")
-           .append("// Gradle drop the redundant shim. It raises no version, so it cannot\n")
-           .append("// conflict with a pin, a force, a BOM or the Kotlin compiler in use.\n")
+           .append("// classes and the 1.8.x line ships no Gradle module metadata saying so, so\n")
+           .append("// a graph holding stdlib at or above that and an older shim carries the same\n")
+           .append("// classes twice and fails checkDuplicateClasses. This states the overlap as a\n")
+           .append("// capability and lets Gradle drop the superseded shim. It raises no version,\n")
+           .append("// so it cannot conflict with a pin, a force, a BOM or the Kotlin in use.\n")
            .append("// Turn it off with the build hint android.kotlinStdlibAlignment=false.\n")
            .append("dependencies {\n")
            .append("    components.withModule('org.jetbrains.kotlin:kotlin-stdlib') { details ->\n")
-           .append("        try {\n")
-           .append("            def parts = details.id.version.split('[.-]')\n")
-           .append("            def major = parts[0].toInteger()\n")
-           .append("            def minor = parts[1].toInteger()\n")
-           .append("            if (major > ").append(floorMajor)
-           .append(" || (major == ").append(floorMajor)
-           .append(" && minor >= ").append(floorMinor).append(")) {\n")
-           .append("                allVariants {\n")
-           .append("                    withCapabilities {\n");
+           .append(versionGuard("        ", atOrAbove))
+           .append("            allVariants {\n")
+           .append("                withCapabilities {\n");
         for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
-            out.append("                        addCapability('org.jetbrains.kotlin', '")
-               .append(ALIGNED_ARTIFACTS[i])
+            out.append("                    addCapability('").append(CAPABILITY_GROUP)
+               .append("', '").append(ALIGNED_ARTIFACTS[i]).append(CAPABILITY_SUFFIX)
                .append("', details.id.version)\n");
         }
-        out.append("                    }\n")
-           .append("                }\n")
+        out.append("                }\n")
            .append("            }\n")
-           .append("        } catch (Exception ignored) {\n")
-           .append("            // A version this cannot read is left alone. Doing nothing leaves\n")
-           .append("            // the duplicate the app already had; guessing could drop a shim\n")
-           .append("            // whose classes are still the only copy.\n")
-           .append("        }\n")
-           .append("    }\n")
-           .append("}\n")
+           .append(versionGuardEnd("        "))
+           .append("    }\n");
+        for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
+            out.append("    components.withModule('org.jetbrains.kotlin:")
+               .append(ALIGNED_ARTIFACTS[i]).append("') { details ->\n")
+               .append(versionGuard("        ", below))
+               .append("            allVariants {\n")
+               .append("                withCapabilities {\n")
+               .append("                    addCapability('").append(CAPABILITY_GROUP)
+               .append("', '").append(ALIGNED_ARTIFACTS[i]).append(CAPABILITY_SUFFIX)
+               .append("', details.id.version)\n")
+               .append("                }\n")
+               .append("            }\n")
+               .append(versionGuardEnd("        "))
+               .append("    }\n");
+        }
+        out.append("}\n")
            .append("configurations.all {\n")
            .append("    resolutionStrategy.capabilitiesResolution {\n");
         for (int i = 0; i < ALIGNED_ARTIFACTS.length; i++) {
-            out.append("        withCapability('org.jetbrains.kotlin:")
-               .append(ALIGNED_ARTIFACTS[i]).append("') {\n")
-               .append("            def stdlib = candidates.find { it.id.module == 'kotlin-stdlib' }\n")
+            out.append("        withCapability('").append(CAPABILITY_GROUP).append(':')
+               .append(ALIGNED_ARTIFACTS[i]).append(CAPABILITY_SUFFIX).append("') {\n")
+               .append("            def stdlib = candidates.find {\n")
+               .append("                it.id instanceof org.gradle.api.artifacts.component"
+                       + ".ModuleComponentIdentifier &&\n")
+               .append("                        it.id.module == 'kotlin-stdlib'\n")
+               .append("            }\n")
                .append("            if (stdlib != null) {\n")
                .append("                select(stdlib)\n")
                .append("            }\n")
@@ -162,5 +198,25 @@ public class KotlinStdlibAlignment {
         out.append("    }\n")
            .append("}\n");
         return out.toString();
+    }
+
+    /** Opens a try block that reads the module version and tests {@code test}. */
+    private static String versionGuard(String indent, String test) {
+        return indent + "try {\n"
+                + indent + "    def parts = details.id.version.split('[.-]')\n"
+                + indent + "    def major = parts[0].toInteger()\n"
+                + indent + "    def minor = parts[1].toInteger()\n"
+                + indent + "    if (" + test + ") {\n";
+    }
+
+    /**
+     * Closes it. A version this cannot read is left alone -- doing nothing
+     * leaves the duplicate the app already had, and guessing could drop a shim
+     * whose classes are still the only copy.
+     */
+    private static String versionGuardEnd(String indent) {
+        return indent + "    }\n"
+                + indent + "} catch (Exception ignored) {\n"
+                + indent + "}\n";
     }
 }

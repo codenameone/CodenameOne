@@ -43,9 +43,9 @@ class KotlinStdlibAlignmentTest {
         String s = KotlinStdlibAlignment.alignmentScript();
         assertTrue(s.contains("components.withModule('org.jetbrains.kotlin:kotlin-stdlib')"),
                 "the rule is on kotlin-stdlib, which is what gained the classes");
-        assertTrue(s.contains("addCapability('org.jetbrains.kotlin', 'kotlin-stdlib-jdk7'"),
+        assertTrue(s.contains("addCapability('com.codenameone', 'kotlin-stdlib-jdk7-superseded'"),
                 "jdk7");
-        assertTrue(s.contains("addCapability('org.jetbrains.kotlin', 'kotlin-stdlib-jdk8'"),
+        assertTrue(s.contains("addCapability('com.codenameone', 'kotlin-stdlib-jdk8-superseded'"),
                 "jdk8");
     }
 
@@ -98,13 +98,54 @@ class KotlinStdlibAlignmentTest {
     @Test
     void theConflictResolvesToTheStdlib() {
         String s = KotlinStdlibAlignment.alignmentScript();
-        assertTrue(s.contains("withCapability('org.jetbrains.kotlin:kotlin-stdlib-jdk7')")
-                        && s.contains("withCapability('org.jetbrains.kotlin:kotlin-stdlib-jdk8')"),
+        assertTrue(s.contains("withCapability('com.codenameone:kotlin-stdlib-jdk7-superseded')")
+                        && s.contains("withCapability('com.codenameone:kotlin-stdlib-jdk8-superseded')"),
                 "both capabilities are resolved");
-        assertTrue(s.contains("candidates.find { it.id.module == 'kotlin-stdlib' }"),
+        assertTrue(s.contains("def stdlib = candidates.find {")
+                        && s.contains("it.id.module == 'kotlin-stdlib'"),
                 "the stdlib is the candidate selected");
         assertTrue(s.contains("if (stdlib != null)"),
                 "and it is not selected when it is absent");
+        assertTrue(s.contains("it.id instanceof org.gradle.api.artifacts.component"
+                        + ".ModuleComponentIdentifier"),
+                "a project candidate has no module property; reading one throws "
+                        + "MissingPropertyException and Gradle reports "
+                        + "'Capability resolution rule failed'");
+    }
+
+    @Test
+    void theShimOnlyClaimsToBeSupersededBelowTheFloor() {
+        // The half that keeps a NEWER shim alive. A shim at or above the floor
+        // is empty and duplicates nothing, and its only contribution is a
+        // requirement on a stdlib at its own version. Making it conflict evicts
+        // it and that requirement with it, silently downgrading the base module
+        // -- measured: stdlib 1.8.0 with kotlin-stdlib-jdk8 1.9.0 resolves to
+        // 1.9.0 untouched, and to 1.8.0 when the shim is made to conflict.
+        String s = KotlinStdlibAlignment.alignmentScript();
+        int shimRule = s.indexOf(
+                "components.withModule('org.jetbrains.kotlin:kotlin-stdlib-jdk8')");
+        assertTrue(shimRule >= 0, "the shim carries a rule of its own: " + s);
+        String rule = s.substring(shimRule);
+        rule = rule.substring(0, rule.indexOf("\n    }"));
+        assertTrue(rule.contains("minor < 8"),
+                "and it claims to be superseded only BELOW the floor: " + rule);
+        assertTrue(!rule.contains("minor >= 8"),
+                "never at or above it: " + rule);
+    }
+
+    @Test
+    void theCapabilityIsOursAndNotTheShimsOwn() {
+        // Reusing the shims' implicit capability makes every version of a shim
+        // conflict with the stdlib, including the empty ones, and that conflict
+        // has no right answer: dropping the shim downgrades the base module,
+        // dropping the stdlib leaves empty shims and no stdlib at all. Both were
+        // measured. A capability only this declares is held by exactly the two
+        // modules that actually overlap.
+        String s = KotlinStdlibAlignment.alignmentScript();
+        assertTrue(!s.contains("addCapability('org.jetbrains.kotlin'"),
+                "the shims' own capability is never reused: " + s);
+        assertTrue(s.contains("'com.codenameone'"),
+                "the capability is ours");
     }
 
     /**
