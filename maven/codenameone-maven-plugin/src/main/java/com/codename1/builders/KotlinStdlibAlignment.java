@@ -813,8 +813,39 @@ public class KotlinStdlibAlignment {
             }
             i = end;
         }
-        // No coordinate carries it, so it came from a map entry or a closure.
-        return true;
+        // No coordinate carries it, so it came from a map entry or a closure. A
+        // map has to be DECLARED too: `def catalog = [group: '..', name:
+        // 'kotlin-stdlib', version: '1.7.22!!']` is dependency-shaped data that
+        // is never added to a configuration, and reading it as a strict pin stood
+        // the whole block down for an app that had declared nothing.
+        //
+        // Safe to exclude here where the same exclusion was NOT safe for
+        // enforcedPlatform: a map IS recorded as a definition's value, so
+        // `implementation(catalog)` below carries it and is read there. The
+        // platform's call expression is not recorded, which is why that one is
+        // still honoured wherever it appears.
+        //
+        // An assignment before the map is what says it is stored rather than
+        // declared, which needs no list of the calls that declare.
+        return !isStoredRatherThanDeclared(line);
+    }
+
+    /** Whether an assignment precedes the map this statement carries. */
+    private static boolean isStoredRatherThanDeclared(String line) {
+        for (int i = 0; i < line.length(); i++) {
+            if (isLiteralStart(line, i)) {
+                i = endOfStringLiteral(line, i);
+                continue;
+            }
+            char c = line.charAt(i);
+            if (c == '[' || followedByMapKeyColon(line, i)) {
+                return false;
+            }
+            if (isAssignmentAt(line, i)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether the literal at {@code quoteAt} is an argument of a declaring call. */
@@ -1426,26 +1457,82 @@ public class KotlinStdlibAlignment {
      * one as the app managing the family left a real duplicate unfixed.</p>
      */
     private static boolean namesTheBuildscriptClasspath(String line) {
-        // Outside literals, like every other question about syntax here. A raw
-        // search read the words in a reason -- because 'match configurations
-        // .classpath' -- as the configuration itself and blanked the declaration
-        // carrying them, strict pin and all, before anything could look at it.
-        for (int at = 0; at < line.length(); at++) {
-            if (isLiteralStart(line, at)) {
-                at = endOfStringLiteral(line, at);
+        return "classpath".equals(configurationNamedIn(line));
+    }
+
+    /**
+     * The single configuration this statement names, or null when it names none
+     * or cannot say which.
+     *
+     * <p>Every spelling goes through the same reading, because they are the same
+     * question: {@code configurations.classpath},
+     * {@code configurations['classpath']} and
+     * {@code configurations.getByName('classpath')} all name one configuration,
+     * and only the first was recognised -- so a plugin-classpath force written
+     * either of the other two ways read as the app managing the family and stood
+     * the whole block down.</p>
+     *
+     * <p>Null when a closure decides which configurations are meant:
+     * {@code configurations.all { }}, {@code configureEach}, and
+     * {@code matching { }} may all include the one being constrained, and no
+     * name is available to say. That falls out of the syntax rather than a list
+     * -- a lookup takes a string, a filter takes a closure -- so a selector
+     * nobody anticipated reads as "cannot say", which is the answer that keeps
+     * the constraint out of a graph that would fail on it.</p>
+     */
+    private static String configurationNamedIn(String line) {
+        int at = -1;
+        for (int i = 0; i < line.length(); i++) {
+            if (isLiteralStart(line, i)) {
+                i = endOfStringLiteral(line, i);
                 continue;
             }
-            if (!line.startsWith(BUILDSCRIPT_CLASSPATH, at)) {
-                continue;
-            }
-            boolean startsToken = at == 0 || !isIdentifierChar(line.charAt(at - 1));
-            int after = at + BUILDSCRIPT_CLASSPATH.length();
-            if (startsToken && (after >= line.length()
-                    || !isIdentifierChar(line.charAt(after)))) {
-                return true;
+            int after = i + CONFIGURATIONS.length();
+            if (line.startsWith(CONFIGURATIONS, i)
+                    && (i == 0 || !isIdentifierChar(line.charAt(i - 1)))
+                    && (after >= line.length()
+                            || !isIdentifierChar(line.charAt(after)))) {
+                at = after;
+                break;
             }
         }
-        return false;
+        if (at < 0) {
+            return null;
+        }
+        int next = skipBlanks(line, at);
+        if (next < line.length() && line.charAt(next) == '[') {
+            return literalAfter(line, next + 1);
+        }
+        if (next >= line.length() || line.charAt(next) != '.') {
+            return null;
+        }
+        int start = skipBlanks(line, next + 1);
+        int end = start;
+        while (end < line.length() && isIdentifierChar(line.charAt(end))) {
+            end++;
+        }
+        if (end == start) {
+            return null;
+        }
+        int after = skipBlanks(line, end);
+        if (after < line.length() && line.charAt(after) == '(') {
+            // A lookup carries the name as a string; a filter carries a closure
+            // and says nothing about which configurations it will match.
+            return literalAfter(line, after + 1);
+        }
+        if (after < line.length() && line.charAt(after) == '{') {
+            return null;
+        }
+        return line.substring(start, end);
+    }
+
+    /** The content of the string literal starting at or after {@code from}. */
+    private static String literalAfter(String line, int from) {
+        int at = skipBlanks(line, from);
+        if (at >= line.length() || !isLiteralStart(line, at)) {
+            return null;
+        }
+        return stringLiteralContent(line, at);
     }
 
     private static final String BUILDSCRIPT_CLASSPATH = "configurations.classpath";
@@ -2330,60 +2417,23 @@ public class KotlinStdlibAlignment {
      * Whether a resolution strategy in this statement governs a configuration
      * that receives the emitted constraint.
      *
-     * <p>Asked as the complement of a closed set rather than as a list of the
-     * configurations to ignore, because a project's configurations are open
-     * ended: {@code all} and {@code configureEach} are the only two spellings
-     * that mean every configuration, and the constraint is written on the main
-     * ones. A statement naming any OTHER single configuration -- created,
-     * looked up, or dotted -- governs something this block never reaches.</p>
-     *
-     * <p>A statement that does not go through {@code configurations} at all
-     * cannot be placed, and is assumed to govern: it is a bare
-     * {@code resolutionStrategy} inside a block this cannot see, and being
-     * wrong about it the other way emits a constraint into a graph that fails
-     * the build outright.</p>
+     * <p>It does unless the statement names one particular configuration that
+     * is not among the constrained ones. Anything that leaves the selection to
+     * a closure, and anything that does not go through {@code configurations}
+     * at all, is assumed to reach: being wrong that way costs an app the
+     * duplicate it already had, while being wrong the other way emits a
+     * constraint into a graph whose strategy fails the build on it.</p>
      */
     private static boolean governsTheConstrainedGraph(String line, String configuration) {
-        int at = -1;
-        for (int i = 0; i < line.length(); i++) {
-            if (isLiteralStart(line, i)) {
-                i = endOfStringLiteral(line, i);
-                continue;
-            }
-            if (line.startsWith(CONFIGURATIONS, i)
-                    && (i == 0 || !isIdentifierChar(line.charAt(i - 1)))) {
-                at = i + CONFIGURATIONS.length();
-                break;
-            }
-        }
-        if (at < 0) {
-            return true;
-        }
-        int end = at;
-        while (end < line.length() && isIdentifierChar(line.charAt(end))) {
-            end++;
-        }
-        String named = line.substring(at, end);
-        if ("all".equals(named) || "configureEach".equals(named)) {
-            return true;
-        }
-        if (named.equals(configuration) || isAMainConfiguration(named)) {
-            return true;
-        }
-        // create('implementation'), named('api'), getByName(..): the name is a
-        // string rather than a token, and it is the same question.
-        for (int i = 0; i < line.length(); i++) {
-            if (!isLiteralStart(line, i)) {
-                continue;
-            }
-            int close = endOfStringLiteral(line, i);
-            String held = stringLiteralContent(line, i);
-            if (held.equals(configuration) || isAMainConfiguration(held)) {
-                return true;
-            }
-            i = close;
-        }
-        return false;
+        String named = configurationNamedIn(line);
+        // No single configuration named, so which ones are meant is decided by a
+        // closure this cannot evaluate -- `configurations.all { }`, and equally
+        // `configurations.matching { it.name == 'releaseRuntimeClasspath' }.all`,
+        // which really does select the graph being constrained. Reading a filter
+        // as "some other configuration" put the constraints into a graph whose
+        // strategy fails the build on the version they raise.
+        return named == null || named.equals(configuration)
+                || isAMainConfiguration(named);
     }
 
     /** Whether the name is one of the configurations the constraint is on. */
@@ -2396,7 +2446,8 @@ public class KotlinStdlibAlignment {
         return false;
     }
 
-    private static final String CONFIGURATIONS = "configurations.";
+    /** The container, as a token: what follows it says which configuration. */
+    private static final String CONFIGURATIONS = "configurations";
 
     /** Whether this line declares on {@code configuration}, as a whole token. */
     private static boolean declaresOn(String configuration, String line) {

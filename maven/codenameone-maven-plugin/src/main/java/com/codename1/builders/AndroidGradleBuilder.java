@@ -7338,13 +7338,21 @@ public class AndroidGradleBuilder extends Executor {
                         targetNumber,
                         "android {\ndefaultConfig {\n%s\n}\n}\n".replace("%s", request.getArg("android.xgradle_default_config", "")),
                         "repositories {\n%s\n}\n".replace("%s", injectRepo),
-                        "dependencies {\n%s\n}\n".replace("%s", coreLibraryDesugaringDependency),
-                        "dependencies {\n%s\n}\n".replace("%s", request.getArg("android.supportv4Dep", "")),
-                        "dependencies {\n%s\n}\n".replace("%s", kotlinRuntimeDependency),
-                        "dependencies {\n%s\n}\n".replace("%s", additionalDependencies),
-                        "dependencies {\n%s\n}\n".replace("%s", aiExtraGradleDependencies.toString()),
-                        "dependencies {\n%s\n}\n".replace("%s", request.getArg("android.gradleDep", "")),
-                        "dependencies {\n%s\n}\n".replace("%s", aarDependencies),
+                        // ONE closure around all of them, because the script has
+                        // one: they are concatenated into a single dependencies { }
+                        // below. A closure each made a scope boundary Gradle does
+                        // not have, so a `def` in an earlier fragment was discarded
+                        // before a later one used it -- and the use then named no
+                        // artifact, which loses whatever pin it carried.
+                        "dependencies {\n"
+                                + coreLibraryDesugaringDependency
+                                + request.getArg("android.supportv4Dep", "") + "\n"
+                                + kotlinRuntimeDependency
+                                + additionalDependencies + "\n"
+                                + aiExtraGradleDependencies.toString() + "\n"
+                                + request.getArg("android.gradleDep", "") + "\n"
+                                + aarDependencies
+                                + "\n}\n",
                         request.getArg("android.xgradle", ""));
             } catch (RuntimeException e) {
                 // The alignment reads the app's Gradle text to decide whether the app

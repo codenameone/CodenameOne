@@ -182,13 +182,16 @@ public class KotlinStdlibAlignmentTest {
         // argument deleted. Checked by deleting it, which is the only way that kind of
         // vacuity shows up.
         String[] fragments = {
-            // Each fragment now reaches the call wrapped in the closure that
-            // surrounds it in the generated file, so the argument text ends at the
-            // wrapper's parenthesis rather than at a comma.
-            "additionalDependencies)",
-            "aiExtraGradleDependencies.toString())",
-            "request.getArg(\"android.gradleDep\", \"\")",
-            "request.getArg(\"android.supportv4Dep\", \"\")",
+            // The dependency fragments now reach the call concatenated into ONE
+            // wrapper, because the generated script has one dependencies { } and
+            // a closure each made a scope boundary Gradle does not have. Matched
+            // on the concatenation operator so that deleting an argument fails
+            // this, which matching the bare hint name did not -- the comment
+            // above the list names some of them too.
+            "+ additionalDependencies",
+            "+ aiExtraGradleDependencies.toString()",
+            "+ request.getArg(\"android.gradleDep\", \"\")",
+            "+ request.getArg(\"android.supportv4Dep\", \"\")",
             "request.getArg(\"android.xgradle\", \"\")",
         };
         for (String fragment : fragments) {
@@ -732,6 +735,107 @@ public class KotlinStdlibAlignmentTest {
     private static String rejecting(String rejections) {
         return "    implementation('org.jetbrains.kotlin:kotlin-stdlib-jdk8') {\n"
                 + "        version { require '1.+'; " + rejections + " }\n    }\n";
+    }
+
+    /**
+     * Every spelling of "which configuration" goes through one reading, because
+     * they are the same question. A lookup carries the name as a string, a
+     * filter carries a closure and says nothing -- so a selector nobody
+     * anticipated reads as "cannot say", which keeps the constraint out of a
+     * graph that would fail on it.
+     */
+    @Test
+    public void everySpellingOfAConfigurationIsReadTheSameWay() {
+        String conflict = ".resolutionStrategy.failOnVersionConflict()\n";
+        String[] reaching = {
+            "    configurations.all { resolutionStrategy.failOnVersionConflict() }\n",
+            "    configurations.configureEach { resolutionStrategy"
+                    + ".failOnVersionConflict() }\n",
+            // A filter may select the constrained graph and there is no name to
+            // say otherwise. Reading one as "some other configuration" put the
+            // constraints into a graph whose strategy fails the build on them.
+            "    configurations.matching { it.name == 'releaseRuntimeClasspath' }"
+                    + ".all { resolutionStrategy.failOnVersionConflict() }\n",
+            "    configurations.implementation" + conflict,
+            "    configurations.getByName('implementation')" + conflict,
+            "    configurations['implementation']" + conflict,
+            "    resolutionStrategy.failOnVersionConflict()\n",
+        };
+        for (int i = 0; i < reaching.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    reaching[i]);
+            check("".equals(out), "<<" + reaching[i].trim()
+                    + ">> may reach the constrained graph, got <<" + out + ">>");
+        }
+
+        String[] elsewhere = {
+            "    configurations.create('tooling')" + conflict,
+            "    configurations.tooling" + conflict,
+            "    configurations.getByName('tooling')" + conflict,
+            "    configurations['tooling']" + conflict,
+        };
+        for (int i = 0; i < elsewhere.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            elsewhere[i]).contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + elsewhere[i].trim() + ">> governs another graph");
+        }
+
+        // The plugin classpath is the same question asked of the same reading,
+        // and only its dotted spelling had been recognised.
+        String force = ".resolutionStrategy.force "
+                + "'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'\n";
+        String[] pluginOnly = {
+            "    configurations.classpath" + force,
+            "    configurations['classpath']" + force,
+            "    configurations.getByName('classpath')" + force,
+            "    buildscript.configurations['classpath']" + force,
+        };
+        for (int i = 0; i < pluginOnly.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            pluginOnly[i]).contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + pluginOnly[i].trim() + ">> is the plugin's graph");
+        }
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    configurations.all" + force)),
+                "and a force on the app's own graph still counts");
+    }
+
+    /**
+     * Dependency-shaped data is not a dependency. A map stored in a variable and
+     * never added to a configuration was read as a strict declaration, standing
+     * the block down for an app that had declared nothing.
+     *
+     * <p>Safe to exclude here where the same exclusion was not safe for
+     * enforcedPlatform: a map IS recorded as a definition's value, so a later
+     * {@code implementation(catalog)} carries it and is read there.</p>
+     */
+    @Test
+    public void aStrictMapHasToBeDeclaredToCount() {
+        String map = "[group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib', "
+                + "version: '1.7.22!!']";
+        String[] stored = {
+            "    def catalog = " + map + "\n",
+            "    ext.catalog = " + map + "\n",
+        };
+        for (int i = 0; i < stored.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation", stored[i])
+                            .contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + stored[i].trim() + ">> declares nothing");
+        }
+
+        String[] declared = {
+            "    def catalog = " + map + "\n    implementation(catalog)\n",
+            "    implementation(" + map + ")\n",
+            "    implementation group: 'org.jetbrains.kotlin', "
+                    + "name: 'kotlin-stdlib', version: '1.7.22!!'\n",
+            "    dependencies.add('implementation', " + map + ")\n",
+        };
+        for (int i = 0; i < declared.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    declared[i]);
+            check("".equals(out), "<<" + declared[i].trim()
+                    + ">> is a strict declaration, got <<" + out + ">>");
+        }
     }
 
     /**
@@ -4362,7 +4466,11 @@ public class KotlinStdlibAlignmentTest {
         byte[] bytes = java.nio.file.Files.readAllBytes(new java.io.File(
                 "src/main/java/com/codename1/builders/AndroidGradleBuilder.java").toPath());
         String src = new String(bytes, "UTF-8");
-        int at = src.indexOf("\"dependencies {\\n\"");
+        // The GENERATED block, which is concatenated onto the script with a
+        // leading `+`. The alignment's own argument opens with the same text and
+        // now comes first in the file, so anchoring on the text alone found that
+        // instead and looked for the constraints inside it.
+        int at = src.indexOf("+ \"dependencies {\\n\"");
         assertTrue(at >= 0);
         String block = src.substring(at, src.indexOf("+ \"}\\n\"", at));
         assertTrue(block.contains("+ kotlinStdlibConstraints"));
