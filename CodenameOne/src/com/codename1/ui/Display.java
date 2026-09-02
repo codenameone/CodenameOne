@@ -8681,7 +8681,7 @@ public final class Display extends CN1Constants {
         if (cmp.fireMouseWheelEvent(we)) {
             return true;
         }
-        return scrollForWheel(cmp, scrollX, scrollY);
+        return scrollForWheel(cmp, scrollX, scrollY, precise);
     }
 
     /// Scrolls the nearest scrollable ancestor of `cmp` for a wheel nobody handled.
@@ -8695,21 +8695,22 @@ public final class Display extends CN1Constants {
     ///
     /// A component that wants the wheel for itself takes it before this, by consuming the
     /// event in `Component#mouseWheel` or in a listener.
-    private boolean scrollForWheel(Component cmp, int scrollX, int scrollY) {
+    private boolean scrollForWheel(Component cmp, int scrollX, int scrollY, boolean precise) {
         boolean scrolled = false;
         if (scrollY != 0) {
-            scrolled = scrollAxisForWheel(cmp, true, scrollY);
+            scrolled = scrollAxisForWheel(cmp, true, scrollY, precise);
         }
         if (scrollX != 0) {
-            scrolled = scrollAxisForWheel(cmp, false, scrollX) || scrolled;
+            scrolled = scrollAxisForWheel(cmp, false, scrollX, precise) || scrolled;
         }
         return scrolled;
     }
 
-    private boolean applyScroll(Component target, boolean vertical, int position, int max) {
+    private boolean applyScroll(Component target, boolean vertical, int position, int max, boolean precise) {
         int ceiling = max < 0 ? 0 : max;
+        int before = vertical ? target.getScrollY() : target.getScrollX();
         int next = Math.max(0, Math.min(ceiling, position));
-        if (vertical ? next == target.getScrollY() : next == target.getScrollX()) {
+        if (next == before) {
             return false;
         }
         if (vertical) {
@@ -8722,7 +8723,13 @@ public final class Display extends CN1Constants {
         // it from, and there is no deceleration here. Spinner3D scrolls a snapping container,
         // so a notch that is not an exact multiple of the row height would otherwise leave
         // it stopped between two rows.
-        if (target.isSnapToGrid()) {
+        //
+        // Not for a precise device. A trackpad sends many small deltas, and snapping each
+        // one to the nearest row pulls every one of them back to the row it started on: the
+        // component sticks, and because the wheel was claimed the page underneath cannot
+        // move either. Free scrolling leaves it wherever the gesture ended, which is where
+        // a finger drag leaves it too until something settles it.
+        if (!precise && target.isSnapToGrid()) {
             int snapped = Math.max(0, Math.min(ceiling,
                     vertical ? target.getGridPosY() : target.getGridPosX()));
             if (vertical ? snapped != target.getScrollY() : snapped != target.getScrollX()) {
@@ -8732,6 +8739,12 @@ public final class Display extends CN1Constants {
                     target.setScrollX(snapped);
                 }
             }
+        }
+        // Whether anything actually moved, which a snap can undo: a notch too small to
+        // leave the current row snaps straight back to it, and reporting that as handled
+        // would swallow the wheel instead of letting the page take it.
+        if ((vertical ? target.getScrollY() : target.getScrollX()) == before) {
+            return false;
         }
         target.repaint();
         return true;
@@ -8744,7 +8757,7 @@ public final class Display extends CN1Constants {
     /// the edge it is being pushed against, and the page takes over -- which is what every
     /// other toolkit does with nested scrollers, and what the drag this replaced did by
     /// handing the gesture up.
-    private boolean scrollAxisForWheel(Component cmp, boolean vertical, int delta) {
+    private boolean scrollAxisForWheel(Component cmp, boolean vertical, int delta, boolean precise) {
         Component c = cmp;
         while (c != null) {
             if (vertical ? c.isScrollableY() : c.isScrollableX()) {
@@ -8759,7 +8772,7 @@ public final class Display extends CN1Constants {
                                 + c.getInvisibleAreaUnderVKB()
                         : c.getScrollDimension().getWidth() - c.getWidth();
                 int from = vertical ? c.getScrollY() : c.getScrollX();
-                if (applyScroll(c, vertical, from - delta, max)) {
+                if (applyScroll(c, vertical, from - delta, max, precise)) {
                     return true;
                 }
             }

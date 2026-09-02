@@ -269,6 +269,65 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aTrackpadKeepsMovingASnappingContainer() {
+        Form f = new Form("snapping", new BorderLayout());
+        Container page = snappingRows(f);
+        int x = page.getAbsoluteX() + page.getWidth() / 2;
+        int y = page.getAbsoluteY() + page.getHeight() / 2;
+
+        // Deltas far smaller than a row, the way a trackpad sends them. Snapping each one
+        // to the nearest row pulls every one of them back where it started, and claiming
+        // the wheel while doing it stops the page moving either -- scrolling looks frozen.
+        for (int i = 0; i < 6; i++) {
+            wheelPrecise(x, y, 0, -px(3));
+        }
+
+        assertTrue(page.getScrollY() >= px(3) * 5,
+                "a precise gesture accumulates instead of snapping back every time, got "
+                        + page.getScrollY());
+    }
+
+    @FormTest
+    void aNotchTooSmallToLeaveTheRowPassesTheWheelOn() {
+        Form f = new Form("snapping inside a page", new BorderLayout());
+        Container page = f.getContentPane();
+        page.setLayout(BoxLayout.y());
+        page.setScrollableY(true);
+        Container snapping = new Container(BoxLayout.y());
+        snapping.setScrollableY(true);
+        snapping.setPreferredH(px(60));
+        for (int i = 0; i < 8; i++) {
+            Label l = new Label("row");
+            l.setPreferredH(px(30));
+            snapping.add(l);
+        }
+        page.add(snapping);
+        for (int i = 0; i < 60; i++) {
+            page.add(filler());
+        }
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        snapping.setSnapToGrid(true);
+        assertTrue(snapping.isSnapToGrid(), "the inner container has to actually be snapping");
+
+        int x = snapping.getAbsoluteX() + snapping.getWidth() / 2;
+        int y = snapping.getAbsoluteY() + snapping.getHeight() / 2;
+        // Park it on a row first: at rest it sits at 0 while the first row starts a couple
+        // of pixels in, so even a tiny notch would move it that far and count as movement.
+        wheelAt(x, y, 0, -px(30));
+        int parked = snapping.getScrollY();
+        assertEquals(0, page.getScrollY(), "the inner container takes the wheel while it can move");
+
+        // Bigger than the grid's own tolerance, smaller than a row: the snap puts it back
+        // exactly where it was.
+        wheelAt(x, y, 0, -px(5));
+
+        assertEquals(parked, snapping.getScrollY(), "the snap returned it to the row it was on");
+        assertTrue(page.getScrollY() > 0, "so the page took the wheel instead of it being swallowed");
+    }
+
+    @FormTest
     void aWheelInADesktopWindowScrollsThatWindow() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("scroller", new BorderLayout());
@@ -319,6 +378,31 @@ class ScrollWheelGestureTest extends UITestBase {
     private void wheelAt(int x, int y, int deltaX, int deltaY) {
         Display.impl.pointerWheelMoved(x, y, deltaX, deltaY, false, 0);
         DisplayTest.flushEdt();
+    }
+
+    /// A trackpad's deltas, which arrive small and often and are flagged precise.
+    private void wheelPrecise(int x, int y, int deltaX, int deltaY) {
+        Display.impl.pointerWheelMoved(x, y, deltaX, deltaY, true, 0);
+        DisplayTest.flushEdt();
+    }
+
+    /// A scrollable page of equal rows that snaps to them. Snapping is switched on after
+    /// show, because initialising a component resets it to the look and feel's default.
+    private Container snappingRows(Form f) {
+        Container page = f.getContentPane();
+        page.setLayout(BoxLayout.y());
+        page.setScrollableY(true);
+        for (int i = 0; i < 60; i++) {
+            Label l = new Label("row");
+            l.setPreferredH(px(30));
+            page.add(l);
+        }
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        page.setSnapToGrid(true);
+        assertTrue(page.isSnapToGrid(), "the container has to actually be snapping");
+        return page;
     }
 
     private static int px(int mm) {
