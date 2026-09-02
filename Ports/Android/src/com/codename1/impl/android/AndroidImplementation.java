@@ -10490,9 +10490,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return uri;
     }
 
-    /// A plausible file extension for a MIME type, used only to name the temporary file a
-    /// content URI is served from.
+    /// A file extension for a MIME type, used to name the temporary file a content URI is
+    /// served from.
+    ///
+    /// Android's own table first, because a FileProvider derives the URI's type from the
+    /// extension: a synthesized one it does not recognize makes ContentResolver.getType answer
+    /// application/octet-stream, and the type the clip advertised is then unrecoverable when
+    /// the clip is read back.
     private static String extensionForMime(String mime) {
+        try {
+            String known = android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mime);
+            if (known != null && known.length() > 0) {
+                return known;
+            }
+        } catch (Throwable t) {
+            // Fall through to the synthesized extension below.
+        }
         int slash = mime.indexOf('/');
         String sub = slash < 0 ? mime : mime.substring(slash + 1);
         int plus = sub.indexOf('+');
@@ -10627,6 +10640,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         String plain = null;
         String html = null;
         List<String> fileUris = new ArrayList<String>();
+        // URIs the content resolver could not name. An application defined type has no entry in
+        // Android's table, so a FileProvider serving it reports octet-stream or nothing at all.
+        List<Uri> unnamedUris = new ArrayList<Uri>();
         for (int i = 0; i < clip.getItemCount(); i++) {
             ClipData.Item item = clip.getItemAt(i);
             try {
@@ -10651,8 +10667,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     // because the content it is filtered against a second time no longer had
                     // it. The bytes are promised rather than read: a target that only wants the
                     // path should not pay for a document it never opens.
-                    if (type != null && type.length() > 0 && !content.hasMimeType(type)) {
-                        content.setDataProvider(type.toLowerCase(), uriBytesProvider(uri));
+                    if (type != null && type.length() > 0
+                            && !"application/octet-stream".equals(type.toLowerCase())) {
+                        if (!content.hasMimeType(type)) {
+                            content.setDataProvider(type.toLowerCase(), uriBytesProvider(uri));
+                        }
+                    } else {
+                        unnamedUris.add(uri);
                     }
                     fileUris.add(uri.toString());
                     continue;
@@ -10681,7 +10702,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         content.setData(ClipboardContent.MIME_TEXT, plain == null ? "" : plain);
         if (description != null) {
-            fillAdvertisedTypes(content, description, plain, fileUris);
+            fillAdvertisedTypes(content, description, plain, fileUris, unnamedUris);
         }
         return content;
     }
@@ -10727,8 +10748,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// is, so a type the description names and the clip did not otherwise yield is that text --
     /// `text/uri-list` excepted, which is the list of URIs the clip carried. A type with no
     /// value to give it is left absent rather than advertised empty.
-    private static void fillAdvertisedTypes(ClipboardContent content, ClipDescription description,
-            String plain, List<String> fileUris) {
+    private void fillAdvertisedTypes(ClipboardContent content, ClipDescription description,
+            String plain, List<String> fileUris, List<Uri> unnamedUris) {
+        List<String> unsatisfiedBinary = new ArrayList<String>();
         for (int iter = 0; iter < description.getMimeTypeCount(); iter++) {
             String mime = description.getMimeType(iter);
             if (mime == null) {
@@ -10737,6 +10759,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             mime = mime.toLowerCase();
             if (content.hasMimeType(mime)) {
                 continue;
+            }
+            if (!mime.startsWith("text/") && !"text/uri-list".equals(mime)) {
+                unsatisfiedBinary.add(mime);
             }
             if ("text/uri-list".equals(mime)) {
                 if (!fileUris.isEmpty()) {
@@ -10754,6 +10779,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (mime.startsWith("text/") && plain != null && plain.length() > 0) {
                 content.setData(mime, plain);
             }
+        }
+        if (unsatisfiedBinary.size() == 1 && unnamedUris.size() == 1) {
+            // One type the clip promised and could not produce, and one URI whose type Android
+            // could not name: the pairing cannot be anything else. With more of either it could
+            // be, and inventing an association would tell a target it has something it may not
+            // -- which is the failure this whole path exists to avoid -- so those are left
+            // absent and the target correctly refuses.
+            content.setDataProvider(unsatisfiedBinary.get(0), uriBytesProvider(unnamedUris.get(0)));
         }
     }
 

@@ -24,6 +24,7 @@
 #import "CN1DragAndDrop.h"
 
 #if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+#import <MobileCoreServices/MobileCoreServices.h>
 #if __has_include(<UniformTypeIdentifiers/UniformTypeIdentifiers.h>)
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #endif
@@ -126,6 +127,26 @@ static id cn1DragDelegate = nil;
 
 /// The MIME types the framework names, mapped onto the uniform type identifiers UIKit and
 /// every other application on the system speak.
+/// The uniform type identifier MobileCoreServices knows a MIME type by, or nil.
+///
+/// Deprecated from iOS 15, which is why it is reached only when UTType is unavailable; the
+/// warning is silenced rather than the call avoided, because on those releases it is the only
+/// way to name a type the system will recognize.
+static NSString* cn1LegacyUtiForMime(NSString* mime) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    CFStringRef identifier = UTTypeCreatePreferredIdentifierForTag(kUTTagClassMIMEType,
+                                                                   (CFStringRef) mime, NULL);
+#pragma clang diagnostic pop
+    if (identifier == NULL) {
+        return nil;
+    }
+    NSString* result = [(NSString*) identifier autorelease];
+    // A MIME type it does not know produces a dynamic identifier, which carries no more meaning
+    // to a receiver than the MIME type itself and reads far worse.
+    return [result hasPrefix:@"dyn."] ? nil : result;
+}
+
 static NSString* cn1UtiForMime(NSString* mime) {
     if ([mime isEqualToString:@"text/plain"]) {
         return @"public.utf8-plain-text";
@@ -166,9 +187,15 @@ static NSString* cn1UtiForMime(NSString* mime) {
         if (type != nil && type.identifier.length > 0) {
             return type.identifier;
         }
+        return mime;
     }
 #endif
-    return mime;
+    // Below iOS 14 UTType does not exist, and an application may deploy that far back through
+    // the ios.deployment_target build hint. Without this every type not named above -- including
+    // application/pdf -- was published under its MIME string, which no other application asking
+    // for the standard identifier would ever match.
+    NSString* legacy = cn1LegacyUtiForMime(mime);
+    return legacy != nil ? legacy : mime;
 }
 
 static NSString* cn1MimeForUti(NSString* uti) {
@@ -436,9 +463,9 @@ API_AVAILABLE(ios(11.0))
         NSItemProvider* provider = [[NSItemProvider alloc] init];
         for (NSString* uti in cn1DragData) {
             NSData* payload = [cn1DragData objectForKey:uti];
-#ifndef CN1_USE_ARC
-            [payload retain];
-#endif
+            // No retain of its own. Copying a block retains the objects it captures, which is
+            // what registering the load handler does, so an explicit retain here had nothing to
+            // balance it and every drag leaked its whole payload.
             [provider registerDataRepresentationForTypeIdentifier:uti
                                                        visibility:NSItemProviderRepresentationVisibilityAll
                                                       loadHandler:^NSProgress *(void (^completion)(NSData *, NSError *)) {
