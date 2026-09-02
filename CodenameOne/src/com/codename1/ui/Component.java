@@ -7459,6 +7459,23 @@ public class Component implements Animation, StyleListener, Editable {
         this.dragActivated = dragActivated;
     }
 
+    /// Brings a faded scrollbar back and restarts the fade, for a scroll that did not come
+    /// from a pointer.
+    ///
+    /// pointerPressed and pointerReleased both do this, which is how the wheel used to get
+    /// it: the gesture it was emulated with went through them. Scrolling with a wheel now
+    /// touches neither, so once the scrollbar had faded out the content moved with nothing
+    /// on screen to say where in it the reader was.
+    void restoreFadingScrollbar() {
+        // The opacity and nothing else, which is exactly what pointerPressed and
+        // pointerReleased do. Re-registering the component for animation here as well
+        // looked like "restart the fade", but the fade is already registered by the
+        // initial checkAnimation and stays that way: adding a second registration left
+        // an abandoned form animating for the life of the JVM, and the next test class
+        // to want the event thread timed out waiting for it.
+        scrollOpacity = 0xff;
+    }
+
     void checkAnimation() {
         Image bgImage = getStyle().getBgImage();
         if (bgImage != null && bgImage.isAnimation()) {

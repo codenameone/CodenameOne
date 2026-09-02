@@ -328,6 +328,36 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aWheelBringsAFadedScrollbarBack() {
+        boolean pureTouch = Display.getInstance().isPureTouch();
+        Form f = scrollingForm();
+        Container page = f.getContentPane();
+        boolean fading = page.getUIManager().getLookAndFeel().isFadeScrollBar();
+        try {
+            // The fade is off in this look and feel and selection rendering pins the
+            // opacity, so both are switched on to have something to fade at all.
+            page.getUIManager().getLookAndFeel().setFadeScrollBar(true);
+            Display.getInstance().setPureTouch(true);
+            for (int i = 0; i < 200 && page.getScrollOpacity() > 0; i++) {
+                page.animate();
+            }
+            assertEquals(0, page.getScrollOpacity(), "the scrollbar has to have faded out first");
+
+            wheelAt(page.getAbsoluteX() + page.getWidth() / 2,
+                    page.getAbsoluteY() + page.getHeight() / 2, 0, -px(30));
+
+            // A press or a release restores this, and the wheel used to be both. Without it
+            // the first fade is permanent for anyone using a wheel: the content moves and
+            // nothing says where in it they are.
+            assertEquals(0xff, page.getScrollOpacity(),
+                    "a wheel that moved the content brings its scrollbar back");
+        } finally {
+            page.getUIManager().getLookAndFeel().setFadeScrollBar(fading);
+            Display.getInstance().setPureTouch(pureTouch);
+        }
+    }
+
+    @FormTest
     void aWheelInADesktopWindowScrollsThatWindow() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("scroller", new BorderLayout());

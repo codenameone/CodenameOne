@@ -8746,6 +8746,10 @@ public final class Display extends CN1Constants {
         if ((vertical ? target.getScrollY() : target.getScrollX()) == before) {
             return false;
         }
+        // The scrollbar comes back, exactly as a press or a release would bring it back.
+        // Otherwise the first fade is permanent for anyone using a wheel: the content moves
+        // and nothing on screen says where in it they are.
+        target.restoreFadingScrollbar();
         target.repaint();
         return true;
     }
