@@ -738,6 +738,111 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Two calls one after another are a sequence and the last wins; two in the
+     * arms of a conditional are alternatives, and which one runs is not readable
+     * here. Taking the last of THOSE wrote the shim constraints beside a strict
+     * pre-merge pin that may well be the live branch.
+     */
+    @Test
+    public void aConditionalMakesTheCallsAlternatives() {
+        String jdk8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
+        String[] branched = {
+            "    implementation('" + jdk8 + "') { version { "
+                    + "if (legacy) strictly '1.7.22' else strictly '1.9.22' } }\n",
+            "    implementation('" + jdk8 + "') { version { "
+                    + "if (legacy) strictly '1.9.22' else strictly '1.7.22' } }\n",
+        };
+        for (int i = 0; i < branched.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    branched[i]);
+            check("".equals(out), "either arm may run, got <<" + out + ">>");
+        }
+
+        // A plain sequence still keeps what it was set to last, in both
+        // directions -- that is what makes this about branches and not about
+        // taking the lowest version anywhere.
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation('" + jdk8 + "') { version { "
+                        + "strictly '1.9.22'; strictly '1.7.22' } }\n")),
+                "a sequence ending pre-merge stands the block down");
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation('" + jdk8 + "') { version { "
+                        + "strictly '1.7.22'; strictly '1.9.22' } }\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and one ending merged-era does not");
+    }
+
+    /**
+     * A rich version that is PRESENT but unreadable is not an invitation to read
+     * the coordinate instead. Reported as merged-era, such a declaration had its
+     * own constraint skipped as satisfied while the sibling was raised around it.
+     */
+    @Test
+    public void anUnreadableStrictVersionIsNotTheCoordinate() {
+        String jdk8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation('" + jdk8 + ":1.9.22') { version { "
+                        + "strictly providers.gradleProperty('legacy').get() } }\n")),
+                "an unreadable strictly is not the coordinate's version");
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    configurations.all { resolutionStrategy.eachDependency "
+                        + "{ d ->\n        if (d.requested.name == "
+                        + "'kotlin-stdlib-jdk8') d.useVersion someProperty\n    } }\n")),
+                "and neither is an unreadable useVersion");
+
+        // A readable one still overrides the coordinate, which is the case that
+        // put the rich reading here in the first place.
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation('" + jdk8 + ":1.7.22') { version { "
+                        + "strictly '1.9.22' } }\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a readable strictly is read past the coordinate");
+    }
+
+    /**
+     * The resolvable classpaths EXTEND the constrained configurations and are
+     * where a resolution strategy actually runs, so a conflict check on one
+     * governs the graph these constraints are resolved in.
+     */
+    @Test
+    public void aResolvableClasspathInheritsTheConstraint() {
+        String conflict = ".resolutionStrategy.failOnVersionConflict()\n";
+        String[] inheriting = {
+            "    configurations.releaseRuntimeClasspath" + conflict,
+            "    configurations.runtimeClasspath" + conflict,
+            "    configurations.debugCompileClasspath" + conflict,
+            "    configurations.getByName('releaseRuntimeClasspath')" + conflict,
+        };
+        for (int i = 0; i < inheriting.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    inheriting[i]);
+            check("".equals(out), "<<" + inheriting[i].trim()
+                    + ">> resolves what these constrain, got <<" + out + ">>");
+        }
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    configurations.tooling" + conflict)
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "a configuration that is neither still governs another graph");
+    }
+
+    /**
+     * Groovy's explicit line continuation joins two physical lines into one
+     * statement. Split at the newline, the configuration had no dependency and
+     * the coordinate had no configuration, so neither said anything.
+     */
+    @Test
+    public void anEscapedNewlineContinuesTheStatement() {
+        String jdk8 = "org.jetbrains.kotlin:kotlin-stdlib-jdk8";
+        check("".equals(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation \\\n        '" + jdk8 + ":1.7.22!!'\n")),
+                "the continued statement carries its strict pin");
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        "    implementation \\\n        '" + jdk8 + ":1.9.22'\n")
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "and a merged-era one is read as the declaration it is");
+    }
+
+    /**
      * The dependency handler has three adders and may grow more, and the
      * coordinate one of them is handed may sit inside a provider closure. Only
      * {@code add} with the coordinate as a direct argument was read, so Gradle's

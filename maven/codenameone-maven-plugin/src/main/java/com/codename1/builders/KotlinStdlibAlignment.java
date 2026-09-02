@@ -484,6 +484,16 @@ public class KotlinStdlibAlignment {
         if (rich != null) {
             return rich;
         }
+        // A rich version that is PRESENT but unreadable is not an invitation to
+        // read the coordinate instead. `version { strictly providers
+        // .gradleProperty('legacy').get() }` beside a merged-era coordinate
+        // reported the coordinate, so a strict pin that may well be pre-merge read
+        // as merged-era: its own constraint was skipped as satisfied while the
+        // sibling was raised around it, which is the duplicate again. Unreadable is
+        // the honest answer, and belowTheFloor treats it as below.
+        if (callsStrictly(line) || callsNamed(line, USE_VERSION)) {
+            return null;
+        }
         String fromCoordinate = coordinateVersionOf(line, artifact);
         if (fromCoordinate != null) {
             return fromCoordinate;
@@ -1187,12 +1197,53 @@ public class KotlinStdlibAlignment {
     /** The quoted argument of {@code call}, found outside string literals. */
     private static String versionInCall(String statement, String call) {
         List<String> found = versionsInCall(statement, call);
-        // The LAST of them. Every keyword this is asked about -- strictly, require,
-        // useVersion -- SETS the constraint rather than adding to it, so a closure
-        // that calls one twice keeps what it was set to last. Reading the first
-        // reported 1.9.22 for `strictly '1.9.22'; strictly '1.7.22'` and wrote the
-        // shim constraints beside a pin that was really pre-merge.
-        return found.isEmpty() ? null : found.get(found.size() - 1);
+        if (found.isEmpty()) {
+            return null;
+        }
+        // The LAST of them, when they run one after another. Every keyword this is
+        // asked about -- strictly, require, useVersion -- SETS the constraint
+        // rather than adding to it, so a closure that calls one twice keeps what it
+        // was set to last. Reading the first reported 1.9.22 for
+        // `strictly '1.9.22'; strictly '1.7.22'` and wrote the shim constraints
+        // beside a pin that was really pre-merge.
+        //
+        // But a conditional makes them ALTERNATIVES rather than a sequence:
+        // `if (legacy) strictly '1.7.22' else strictly '1.9.22'` sets one or the
+        // other, and which one is not readable here. The lowest is the answer then,
+        // for the reason every unevaluable branch gets it -- a pre-merge version
+        // that may be the live one has to stand the block down.
+        if (!containsAConditional(statement)) {
+            return found.get(found.size() - 1);
+        }
+        String lowest = null;
+        for (int i = 0; i < found.size(); i++) {
+            lowest = lower(lowest, found.get(i));
+        }
+        return lowest;
+    }
+
+    /** Whether the statement chooses between branches this cannot evaluate. */
+    private static boolean containsAConditional(String statement) {
+        for (int i = 0; i < statement.length(); i++) {
+            if (isLiteralStart(statement, i)) {
+                i = endOfStringLiteral(statement, i);
+                continue;
+            }
+            if (!isIdentifierChar(statement.charAt(i))
+                    || (i > 0 && isIdentifierChar(statement.charAt(i - 1)))) {
+                continue;
+            }
+            int end = i;
+            while (end < statement.length() && isIdentifierChar(statement.charAt(end))) {
+                end++;
+            }
+            String token = statement.substring(i, end);
+            if ("if".equals(token) || "else".equals(token)) {
+                return true;
+            }
+            i = end - 1;
+        }
+        return false;
     }
 
     /**
@@ -2461,7 +2512,19 @@ public class KotlinStdlibAlignment {
                 return true;
             }
         }
-        return false;
+        // And the resolvable classpaths, which EXTEND those and are where a
+        // strategy actually runs: a failOnVersionConflict on
+        // `configurations.releaseRuntimeClasspath` governs the graph these
+        // constraints are resolved in, and reading it as some other configuration
+        // put them into a graph that then failed on the version they raise.
+        //
+        // By suffix rather than by name, because Gradle synthesises one per
+        // variant -- releaseRuntimeClasspath, debugCompileClasspath, and whatever
+        // a flavour adds -- so no list of them can be complete. A configuration
+        // the app named that way and did not wire up costs a suppression, which
+        // is the direction this class takes everywhere.
+        String lower = name.toLowerCase();
+        return lower.endsWith("runtimeclasspath") || lower.endsWith("compileclasspath");
     }
 
     /** The container, as a token: what follows it says which configuration. */
@@ -2715,6 +2778,15 @@ public class KotlinStdlibAlignment {
                 // artifact and any closure in four statements, none of which is a
                 // declaration on its own.
                 if (c == '\n' && endsWithComma(current)) {
+                    current.append(' ');
+                    continue;
+                }
+                // Groovy's explicit line continuation. `implementation \` with the
+                // coordinate on the next line was split into a configuration with
+                // no dependency and a coordinate with no configuration, so neither
+                // said anything and the strict pin between them went unread.
+                if (c == '\n' && endsWithLineContinuation(current)) {
+                    current.setLength(current.length() - 1);
                     current.append(' ');
                     continue;
                 }
@@ -3609,6 +3681,12 @@ public class KotlinStdlibAlignment {
 
     /** The words that introduce a body, braced or not. */
     private static final String UNBRACED_HEADERS = " if else while for ";
+
+    /** Whether the text so far ends with Groovy's line-continuation backslash. */
+    private static boolean endsWithLineContinuation(StringBuilder current) {
+        return current.length() > 0
+                && current.charAt(current.length() - 1) == '\\';
+    }
 
     /** Whether the text so far ends with a comma, ignoring trailing blanks. */
     private static boolean endsWithComma(StringBuilder text) {
