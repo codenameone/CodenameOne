@@ -104,6 +104,20 @@ static int cn1LastDropAction = CN1_DND_ACTION_NONE;
 /// True while this application is the source of the session in progress.
 static BOOL cn1DraggingOut = NO;
 
+/// A drop of this application's own session onto its own surface, still loading.
+///
+/// UIKit asks the source what happened -- dragInteraction:session:didEndWithOperation: -- as
+/// soon as performDrop: returns, which is before the asynchronous loads that drop depends on
+/// have answered. Reporting the operation UIKit proposed at that moment would tell a source
+/// its data had been moved even when the framework went on to refuse the drop, and a source
+/// that deletes on ACTION_MOVE would then delete data nothing ever received. So the completion
+/// waits for the real answer, whichever of the two arrives first.
+///
+/// All three are read and written on the main thread only, by callbacks UIKit serializes.
+static BOOL cn1LocalDropInFlight = NO;
+static BOOL cn1EndDeferred = NO;
+static int cn1LocalDropResult = -1;
+
 /// The surface, remembered so the drag interaction can be attached later, and the delegate that
 /// serves both interactions. The delegate outlives the surface, which lives for the life of the
 /// process, and the interactions hold it weakly.
@@ -392,6 +406,9 @@ API_AVAILABLE(ios(11.0))
     // The authoritative set, which is what a local drop session is told the source allows.
     cn1SessionActions = allowed;
     cn1DraggingOut = YES;
+    cn1LocalDropInFlight = NO;
+    cn1EndDeferred = NO;
+    cn1LocalDropResult = -1;
 
     NSMutableArray<UIDragItem *>* items = [NSMutableArray array];
     // Files first, one item each: a receiver that copies documents expects one item per
@@ -457,8 +474,17 @@ API_AVAILABLE(ios(11.0))
                 session:(id<UIDragSession>)session
     didEndWithOperation:(UIDropOperation)operation {
     cn1DraggingOut = NO;
+    if (cn1LocalDropInFlight) {
+        // The drop landed here and is still assembling. Its answer is the true one, so the
+        // completion goes out when it arrives rather than on UIKit's proposal.
+        cn1EndDeferred = YES;
+        return;
+    }
     int action = CN1_DND_ACTION_NONE;
-    if (operation == UIDropOperationCopy) {
+    if (cn1LocalDropResult >= 0) {
+        action = cn1LocalDropResult;
+        cn1LocalDropResult = -1;
+    } else if (operation == UIDropOperationCopy) {
         action = CN1_DND_ACTION_COPY;
     } else if (operation == UIDropOperationMove) {
         action = CN1_DND_ACTION_MOVE;
@@ -503,6 +529,11 @@ API_AVAILABLE(ios(11.0))
     const int y = (int)(point.y * scaleValue);
     const int action = cn1LastDropAction == CN1_DND_ACTION_NONE
             ? cn1DefaultAction(cn1AllowedActionsFor(session)) : cn1LastDropAction;
+    if (session.localDragSession != nil) {
+        cn1LocalDropInFlight = YES;
+        cn1EndDeferred = NO;
+        cn1LocalDropResult = -1;
+    }
 
     // Every representation is loaded asynchronously and independently, so the framework is only
     // told about the drop once they have all answered. Delivering per representation instead
@@ -562,22 +593,36 @@ API_AVAILABLE(ios(11.0))
     }
 
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
-        NSData* plainData = [collected objectForKey:@"text/plain"];
-        NSData* htmlData = [collected objectForKey:@"text/html"];
-        NSData* rtfData = [collected objectForKey:@"text/rtf"];
-        NSData* imageData = [collected objectForKey:@"image/png"];
-        if (imageData == nil) {
-            imageData = [collected objectForKey:@"image/jpeg"];
+        // Every representation that answered, not a fixed list: a drag offering markdown, a GIF
+        // or an application's own type was accepted while it hovered on the strength of its
+        // advertised types, and materializing fewer of them refused the very target that took
+        // it.
+        CN1NativeDragDeliverDropBegin();
+        for (NSString* mime in collected) {
+            NSData* data = [collected objectForKey:mime];
+            if ([mime hasPrefix:@"text/"]) {
+                NSString* text = [[[NSString alloc] initWithData:data
+                                                        encoding:NSUTF8StringEncoding] autorelease];
+                CN1NativeDragDeliverDropAdd(mime, text, nil);
+            } else {
+                CN1NativeDragDeliverDropAdd(mime, nil, data);
+            }
         }
-        NSString* plain = plainData == nil ? nil
-                : [[[NSString alloc] initWithData:plainData encoding:NSUTF8StringEncoding] autorelease];
-        NSString* html = htmlData == nil ? nil
-                : [[[NSString alloc] initWithData:htmlData encoding:NSUTF8StringEncoding] autorelease];
-        NSString* rtf = rtfData == nil ? nil
-                : [[[NSString alloc] initWithData:rtfData encoding:NSUTF8StringEncoding] autorelease];
-        NSString* fileUris = files.count == 0 ? nil : [files componentsJoinedByString:@"\n"];
-        CN1NativeDragDeliverDrop(x, y, plain, html, rtf, imageData, fileUris, action);
+        if (files.count > 0) {
+            CN1NativeDragDeliverDropAdd(@"application/x-file-list",
+                                        [files componentsJoinedByString:@"\n"], nil);
+        }
+        int accepted = CN1NativeDragDeliverDropCommit(x, y, action);
         cn1LastDropAction = CN1_DND_ACTION_NONE;
+        if (cn1LocalDropInFlight) {
+            cn1LocalDropInFlight = NO;
+            if (cn1EndDeferred) {
+                cn1EndDeferred = NO;
+                CN1NativeDragDeliverCompleted(accepted);
+            } else {
+                cn1LocalDropResult = accepted;
+            }
+        }
 #ifndef CN1_USE_ARC
         [collected release];
         [files release];

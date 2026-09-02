@@ -1134,16 +1134,21 @@ void CN1NativeDragDeliverExit(void) {
     com_codename1_impl_ios_IOSImplementation_nativeDragExitCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
-int CN1NativeDragDeliverDrop(int x, int y, NSString* plain, NSString* html, NSString* rtf,
-                             NSData* image, NSString* fileUris, int action) {
-    return (int)com_codename1_impl_ios_IOSImplementation_nativeDropCallback___int_int_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_java_lang_String_int_R_int(
-            CN1_THREAD_GET_STATE_PASS_ARG x, y,
-            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG plain),
-            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG html),
-            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG rtf),
-            image == nil ? JAVA_NULL : nsDataToByteArr(image),
-            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG fileUris),
-            action);
+void CN1NativeDragDeliverDropBegin(void) {
+    com_codename1_impl_ios_IOSImplementation_nativeDropBeginCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1NativeDragDeliverDropAdd(NSString* mimeType, NSString* text, NSData* binary) {
+    com_codename1_impl_ios_IOSImplementation_nativeDropAddCallback___java_lang_String_java_lang_String_byte_1ARRAY(
+            CN1_THREAD_GET_STATE_PASS_ARG
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG mimeType),
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG text),
+            binary == nil ? JAVA_NULL : nsDataToByteArr(binary));
+}
+
+int CN1NativeDragDeliverDropCommit(int x, int y, int action) {
+    return (int)com_codename1_impl_ios_IOSImplementation_nativeDropCommitCallback___int_int_int_R_int(
+            CN1_THREAD_GET_STATE_PASS_ARG x, y, action);
 }
 
 int CN1NativeDragDeliverSessionStarted(void) {

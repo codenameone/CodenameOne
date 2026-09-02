@@ -285,7 +285,24 @@ final class JavaSENativeDragAndDrop {
         if ("application/x-java-file-list".equals(mime)) {
             return ClipboardContent.MIME_FILE;
         }
+        if (mime.startsWith("application/x-java")) {
+            // AWT's own transport flavors -- serialized objects, local object references, the
+            // text-encoding list. They describe how a payload travels between Java processes,
+            // not what it is, and reading them can hand back arbitrary live objects.
+            return null;
+        }
         if (mime.startsWith("text/") || mime.startsWith("image/")) {
+            return mime;
+        }
+        // Anything else the source offers in a shape this can actually read. RichTransferable
+        // exports arbitrary binary types on the way out, so refusing them on the way in left a
+        // component filtered to, say, application/pdf unable to receive one at all.
+        Class<?> representation = flavor.getRepresentationClass();
+        if (representation != null
+                && (InputStream.class.isAssignableFrom(representation)
+                        || byte[].class.equals(representation)
+                        || String.class.equals(representation)
+                        || java.io.Reader.class.isAssignableFrom(representation))) {
             return mime;
         }
         return null;
@@ -383,6 +400,11 @@ final class JavaSENativeDragAndDrop {
             }
             if (out instanceof byte[]) {
                 return out;
+            }
+            if (!mime.startsWith("text/") && out instanceof InputStream) {
+                // A non-text type read as a stream is bytes, not characters; decoding it as
+                // UTF-8 the way the text path does would corrupt a PDF or an archive.
+                return readBytes((InputStream) out);
             }
             return JavaSEPort.clipboardText(out);
         } catch (Throwable err) {

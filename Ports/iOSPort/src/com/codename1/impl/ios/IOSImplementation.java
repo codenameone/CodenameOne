@@ -9272,24 +9272,43 @@ public class IOSImplementation extends CodenameOneImplementation {
         NativeDragAndDrop.dragExit(0);
     }
 
-    /// Invoked from CN1DragAndDrop.m with a fully loaded drop. Returns the action accepted, or
-    /// zero when nothing under the pointer took it.
-    public static int nativeDropCallback(int x, int y, String plain, String html, String rtf,
-            byte[] image, String fileUris, int action) {
-        ClipboardContent content = new ClipboardContent();
-        if (plain != null) {
-            content.setData(ClipboardContent.MIME_TEXT, plain);
+    /// The drop being assembled by CN1DragAndDrop.m, one representation at a time.
+    ///
+    /// Only ever touched from the three callbacks below, which UIKit runs in order on the main
+    /// thread, so it needs no guarding of its own.
+    private static ClipboardContent pendingDrop;
+
+    /// Invoked from CN1DragAndDrop.m as a drop begins, before its representations arrive.
+    public static void nativeDropBeginCallback() {
+        pendingDrop = new ClipboardContent();
+    }
+
+    /// Invoked from CN1DragAndDrop.m once per representation the drop carries.
+    ///
+    /// Every representation UIKit loaded is delivered here rather than a fixed list of the
+    /// framework's own: forwarding fewer meant a drag carrying markdown or an application's own
+    /// type was accepted while it hovered and then materialized without it, so the target that
+    /// agreed to take the drop was refused it.
+    public static void nativeDropAddCallback(String mimeType, String text, byte[] binary) {
+        if (pendingDrop == null || mimeType == null || mimeType.length() == 0) {
+            return;
         }
-        if (html != null) {
-            content.setData(ClipboardContent.MIME_HTML, html);
+        if (ClipboardContent.MIME_FILE.equals(mimeType)) {
+            pendingDrop.setFiles(split(text));
+            return;
         }
-        if (rtf != null) {
-            content.setData(ClipboardContent.MIME_RTF, rtf);
+        if (binary != null && binary.length > 0) {
+            pendingDrop.setData(mimeType, binary);
+        } else if (text != null && text.length() > 0) {
+            pendingDrop.setData(mimeType, text);
         }
-        if (image != null && image.length > 0) {
-            content.setData(ClipboardContent.MIME_PNG, image);
-        }
-        content.setFiles(split(fileUris));
+    }
+
+    /// Invoked from CN1DragAndDrop.m once every representation has arrived. Returns the action
+    /// accepted, or zero when nothing under the pointer took it.
+    public static int nativeDropCommitCallback(int x, int y, int action) {
+        ClipboardContent content = pendingDrop == null ? new ClipboardContent() : pendingDrop;
+        pendingDrop = null;
         return NativeDragAndDrop.drop(0, x, y, content, action);
     }
 

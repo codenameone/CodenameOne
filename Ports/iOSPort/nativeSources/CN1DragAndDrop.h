@@ -117,9 +117,21 @@ int CN1NativeDragDeliverOver(int x, int y, NSString* mimeTypes, int allowedActio
 /// Reports a drag leaving the surface.
 void CN1NativeDragDeliverExit(void);
 
-/// Delivers a drop and returns the action actually accepted, or 0 when nothing took it.
-int CN1NativeDragDeliverDrop(int x, int y, NSString* plain, NSString* html, NSString* rtf,
-                             NSData* image, NSString* fileUris, int action);
+/// Starts a drop, clearing whatever a previous one left.
+void CN1NativeDragDeliverDropBegin(void);
+
+/// Adds one representation to the drop being assembled. Every representation UIKit loaded goes
+/// through here rather than a fixed list, so a drag carrying markdown, a GIF or an
+/// application's own type is not accepted while it hovers and then found empty at the drop --
+/// which would refuse the very target that agreed to take it.
+///
+/// `text` and `binary` are alternatives; `application/x-file-list` arrives as newline separated
+/// paths in `text`.
+void CN1NativeDragDeliverDropAdd(NSString* mimeType, NSString* text, NSData* binary);
+
+/// Delivers the assembled drop and returns the action actually accepted, or 0 when nothing took
+/// it.
+int CN1NativeDragDeliverDropCommit(int x, int y, int action);
 
 /// Announces that UIKit has started a drag session. Returns the actions the framework's staged
 /// operation allows, or 0 when it has none -- in which case no drag begins. The Java side calls

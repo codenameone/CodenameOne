@@ -272,7 +272,10 @@ final class AndroidNativeDragAndDrop {
                 Log.e(err);
             }
         }
-        ClipboardContent content = impl.contentFromClip(event.getClipData());
+        // With the description, so the types the drag advertised while it hovered survive into
+        // the content the drop is filtered against -- otherwise a target that accepted the
+        // hover on MIME_URI_LIST is refused the drop it was promised.
+        ClipboardContent content = impl.contentFromClip(event.getClipData(), event.getClipDescription());
         int action = lastAction() == NativeDragOperation.ACTION_NONE
                 ? preferred(allowedActions()) : lastAction();
         int accepted = NativeDragAndDrop.drop(0, (int) event.getX(), (int) event.getY(), content, action);

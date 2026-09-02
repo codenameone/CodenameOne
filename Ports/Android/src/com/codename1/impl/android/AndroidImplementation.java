@@ -10275,16 +10275,40 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         List<ClipData.Item> items = new ArrayList<ClipData.Item>();
         String plain = content.getText(ClipboardContent.MIME_TEXT);
         String html = content.getText(ClipboardContent.MIME_HTML);
+        // A clip carries one text payload. Where the content has no text/plain but does have
+        // some other text representation -- markdown, AsciiDoc, a URI list -- that one is the
+        // payload, since publishing an empty clip instead would lose it outright.
+        String primaryTextMime = plain != null ? ClipboardContent.MIME_TEXT : null;
+        // Not when there is HTML: that is already the payload, and an item built with null text
+        // coerces to the HTML's own text, whereas handing it the raw markup as the plain text
+        // would give every receiver the tags as well.
+        if (plain == null && html == null) {
+            String[] advertised = content.getMimeTypes();
+            for (int iter = 0; iter < advertised.length && plain == null; iter++) {
+                if (ClipboardContent.MIME_FILE.equals(advertised[iter])) {
+                    continue;
+                }
+                String value = content.getText(advertised[iter]);
+                if (value != null) {
+                    plain = value;
+                    primaryTextMime = advertised[iter];
+                }
+            }
+        }
         if (sdk >= 16 && html != null) {
             mimeTypes.add(ClipboardContent.MIME_TEXT);
             mimeTypes.add(ClipboardContent.MIME_HTML);
             items.add(new ClipData.Item(plain, html));
         } else if (plain != null) {
             mimeTypes.add(ClipboardContent.MIME_TEXT);
+            if (primaryTextMime != null && !mimeTypes.contains(primaryTextMime)) {
+                mimeTypes.add(primaryTextMime);
+            }
             items.add(new ClipData.Item(plain));
         }
         try {
             addBinaryContent(content, mimeTypes, items);
+            addRemainingRepresentations(content, plain, mimeTypes, items);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
         }
@@ -10357,25 +10381,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             imageExt = "gif";
         }
         if (imageBytes != null) {
-            // AndroidGradleBuilder exposes cache/intent_files through the app's
-            // FileProvider. Keep generated clipboard payloads inside that root so
-            // FileProvider can safely create a content:// URI for paste targets.
-            File imageFile = new File(new File(getContext().getCacheDir(), "intent_files"),
-                    "cn1-clip-image-" + System.currentTimeMillis() + "." + imageExt);
-            imageFile.getParentFile().mkdirs();
-            OutputStream os = new FileOutputStream(imageFile);
-            try {
-                os.write(imageBytes);
-            } finally {
-                os.close();
+            Uri imageUri = writeAsProviderUri(imageBytes, imageExt);
+            if (imageUri != null) {
+                if (!mimeTypes.contains(imageMime)) {
+                    mimeTypes.add(imageMime);
+                }
+                items.add(new ClipData.Item(imageUri));
             }
-            Uri imageUri = FileProvider.getUriForFile(getContext(), authority, imageFile);
-            // Grant broadly so any paste target can read the content:// URI
-            getContext().grantUriPermission("android", imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            if (!mimeTypes.contains(imageMime)) {
-                mimeTypes.add(imageMime);
-            }
-            items.add(new ClipData.Item(imageUri));
         }
 
         // File references: MIME_FILE may be a single String or a String[]
@@ -10408,6 +10420,83 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 items.add(new ClipData.Item(u));
             }
         }
+    }
+
+    /// Adds the representations neither the text nor the binary pass above has taken.
+    ///
+    /// Byte-backed types -- a PDF, an archive, an application's own format -- become typed
+    /// content URIs, which is the only labelled way an Android clip carries bytes. Text types
+    /// are advertised only when their value *is* the text the clip already carries: a clip has
+    /// one text payload, so advertising a second, different reading of it would tell a receiver
+    /// the clip holds something it cannot then produce, and a Codename One target would accept
+    /// the hover and be refused at the drop.
+    private void addRemainingRepresentations(ClipboardContent content, String carriedText,
+            List<String> mimeTypes, List<ClipData.Item> items) throws IOException {
+        String[] advertised = content.getMimeTypes();
+        for (int iter = 0; iter < advertised.length; iter++) {
+            String mime = advertised[iter];
+            if (mimeTypes.contains(mime) || ClipboardContent.MIME_FILE.equals(mime)) {
+                continue;
+            }
+            Object value = content.getData(mime);
+            if (value instanceof String) {
+                if (carriedText != null && carriedText.equals(value)) {
+                    mimeTypes.add(mime);
+                }
+                continue;
+            }
+            if (value instanceof byte[]) {
+                Uri uri = writeAsProviderUri((byte[]) value, extensionForMime(mime));
+                if (uri != null) {
+                    mimeTypes.add(mime);
+                    items.add(new ClipData.Item(uri));
+                }
+            }
+        }
+    }
+
+    /// Writes bytes somewhere the application's file provider can serve them from and returns
+    /// the content URI, which is how an Android clip carries anything that is not text.
+    ///
+    /// AndroidGradleBuilder exposes cache/intent_files through the app's FileProvider, so
+    /// generated payloads stay inside that root and FileProvider can safely name them.
+    private Uri writeAsProviderUri(byte[] bytes, String extension) throws IOException {
+        if (bytes == null || bytes.length == 0) {
+            return null;
+        }
+        File file = new File(new File(getContext().getCacheDir(), "intent_files"),
+                "cn1-clip-" + System.currentTimeMillis() + "-" + bytes.length + "." + extension);
+        file.getParentFile().mkdirs();
+        OutputStream os = new FileOutputStream(file);
+        try {
+            os.write(bytes);
+        } finally {
+            os.close();
+        }
+        Uri uri = FileProvider.getUriForFile(getContext(),
+                getContext().getPackageName() + ".provider", file);
+        // Grant broadly so any paste or drop target can read the content:// URI
+        getContext().grantUriPermission("android", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        return uri;
+    }
+
+    /// A plausible file extension for a MIME type, used only to name the temporary file a
+    /// content URI is served from.
+    private static String extensionForMime(String mime) {
+        int slash = mime.indexOf('/');
+        String sub = slash < 0 ? mime : mime.substring(slash + 1);
+        int plus = sub.indexOf('+');
+        if (plus > 0) {
+            sub = sub.substring(0, plus);
+        }
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < sub.length(); iter++) {
+            char c = sub.charAt(iter);
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+                out.append(c);
+            }
+        }
+        return out.length() == 0 ? "bin" : out.toString();
     }
 
     /**
@@ -10477,6 +10566,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     ///
     /// the content, never null
     ClipboardContent contentFromClip(ClipData clip) {
+        return contentFromClip(clip, null);
+    }
+
+    /// Reads a clip, and where a description is given also honours the MIME types it
+    /// advertises.
+    ///
+    /// A drag is filtered twice: once against the description while it hovers, and again
+    /// against the materialized content when it is dropped. If the second view is narrower than
+    /// the first, a target accepts the hover and is then refused the drop -- which is what
+    /// happened to a component filtering on `ClipboardContent#MIME_URI_LIST`, because a URI
+    /// item materializes as `MIME_FILE` alone. Nothing is invented here: an advertised type is
+    /// only filled from a value the clip actually produced.
+    ///
+    /// Paste passes no description, so it keeps reporting exactly what the clip contained.
+    ///
+    /// #### Parameters
+    ///
+    /// - `clip`: the clip data, which may be null
+    ///
+    /// - `description`: what the source advertised, or null to report only what was read
+    ///
+    /// #### Returns
+    ///
+    /// the content, never null
+    ClipboardContent contentFromClip(ClipData clip, ClipDescription description) {
         ClipboardContent content = new ClipboardContent();
         if (clip == null) {
             content.setData(ClipboardContent.MIME_TEXT, "");
@@ -10531,7 +10645,46 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             content.setFiles(fileUris.toArray(new String[fileUris.size()]));
         }
         content.setData(ClipboardContent.MIME_TEXT, plain == null ? "" : plain);
+        if (description != null) {
+            fillAdvertisedTypes(content, description, plain, fileUris);
+        }
         return content;
+    }
+
+    /// Fills the MIME types the drag advertised but the read did not produce, from what it did.
+    ///
+    /// An Android clip carries a single text payload and the description says what that text
+    /// is, so a type the description names and the clip did not otherwise yield is that text --
+    /// `text/uri-list` excepted, which is the list of URIs the clip carried. A type with no
+    /// value to give it is left absent rather than advertised empty.
+    private static void fillAdvertisedTypes(ClipboardContent content, ClipDescription description,
+            String plain, List<String> fileUris) {
+        for (int iter = 0; iter < description.getMimeTypeCount(); iter++) {
+            String mime = description.getMimeType(iter);
+            if (mime == null) {
+                continue;
+            }
+            mime = mime.toLowerCase();
+            if (content.hasMimeType(mime)) {
+                continue;
+            }
+            if ("text/uri-list".equals(mime)) {
+                if (!fileUris.isEmpty()) {
+                    StringBuilder uris = new StringBuilder();
+                    for (int j = 0; j < fileUris.size(); j++) {
+                        if (j > 0) {
+                            uris.append("\r\n");
+                        }
+                        uris.append(fileUris.get(j));
+                    }
+                    content.setData(ClipboardContent.MIME_URI_LIST, uris.toString());
+                }
+                continue;
+            }
+            if (mime.startsWith("text/") && plain != null && plain.length() > 0) {
+                content.setData(mime, plain);
+            }
+        }
     }
 
     public static MediaException createMediaException(int extra) {
