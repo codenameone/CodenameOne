@@ -1099,6 +1099,49 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * Groovy accepts a redundant parenthesis, and the walk stepped over one.
+     * Looking at the other it found something that is not an identifier, so the
+     * strict pin read as nobody's argument and the constraints went in against
+     * it.
+     */
+    @Test
+    public void aRedundantParenthesisIsStillTheSameArgument() {
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!";
+        String[] declarations = {
+            "    implementation(('" + pin + "'))\n",
+            "    implementation((('" + pin + "')))\n",
+            "    implementation( ( '" + pin + "' ) )\n",
+            "    implementation('" + pin + "')\n",
+            "    implementation '" + pin + "'\n",
+            // A later argument reaches the comma only once the parentheses are
+            // behind it, and the enclosing call is the one with a NAME in front
+            // of it -- a redundant pair has none, so the search goes outward.
+            "    dependencies.add('implementation', ('" + pin + "'))\n",
+            "    dependencies.addProvider('implementation', "
+                    + "providers.provider { ('" + pin + "') })\n",
+        };
+        for (int i = 0; i < declarations.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    declarations[i]);
+            check("".equals(out), "<<" + declarations[i].trim()
+                    + ">> declares a strict pin, got <<" + out + ">>");
+        }
+
+        // Wrapping something in parentheses does not make it a declaration.
+        String[] strangers = {
+            "    (('" + pin + "'))\n",
+            "    logger.lifecycle(('" + pin + "'))\n",
+            "    myList.add('implementation', ('" + pin + "'))\n",
+            "    def all = [('" + pin + "')]\n",
+        };
+        for (int i = 0; i < strangers.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            strangers[i]).contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + strangers[i].trim() + ">> declares nothing");
+        }
+    }
+
+    /**
      * The dependency handler has three adders and may grow more, and the
      * coordinate one of them is handed may sit inside a provider closure. Only
      * {@code add} with the coordinate as a direct argument was read, so Gradle's

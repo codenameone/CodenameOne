@@ -892,6 +892,16 @@ public class KotlinStdlibAlignment {
     /** Whether the literal at {@code quoteAt} is an argument of a declaring call. */
     private static boolean isDeclarationArgument(String line, int quoteAt) {
         int i = skipBlanksBackward(line, quoteAt - 1);
+        // Every parenthesis, not one. Groovy accepts a redundant pair --
+        // `implementation(('g:a:1.7.22!!'))` -- and stepping over a single one
+        // left the walk looking at the other, which is not an identifier, so the
+        // strict pin read as nobody's argument and the constraints went in
+        // against it. Done before the comma and brace are looked for, because a
+        // wrapped LATER argument -- `add('impl', ('g:a:1.7.22!!'))` -- reaches
+        // them only once the parentheses are behind it.
+        while (i >= 0 && line.charAt(i) == '(') {
+            i = skipBlanksBackward(line, i - 1);
+        }
         if (i >= 0 && (line.charAt(i) == ',' || line.charAt(i) == '{')) {
             // Not the first thing the call was handed. A comma is where a
             // coordinate sits in `dependencies.add('implementation', 'g:a:1.7!!')`,
@@ -906,9 +916,6 @@ public class KotlinStdlibAlignment {
             // CONFIGURATION name is read -- true for the shims, and not for the
             // base library, which has a scan of its own that comes through here.
             return isDeclarationCall(line, enclosingCallOf(line, quoteAt));
-        }
-        if (i >= 0 && line.charAt(i) == '(') {
-            i = skipBlanksBackward(line, i - 1);
         }
         if (i < 0 || !isIdentifierChar(line.charAt(i))) {
             // Not an argument of anything -- a bare literal in a list, or an
@@ -940,9 +947,15 @@ public class KotlinStdlibAlignment {
                 opened.remove(opened.size() - 1);
             }
         }
-        if (!opened.isEmpty()) {
-            return skipBlanksBackward(line,
-                    opened.get(opened.size() - 1).intValue() - 1);
+        // Outward until one of them is a CALL's parenthesis. A redundant pair has
+        // no name in front of it, and stopping at the innermost reported the
+        // punctuation before it -- so `add('impl', ('g:a:1.7.22!!'))` found a
+        // comma where the call should be and read the pin as nobody's argument.
+        for (int k = opened.size() - 1; k >= 0; k--) {
+            int before = skipBlanksBackward(line, opened.get(k).intValue() - 1);
+            if (before >= 0 && isIdentifierChar(line.charAt(before))) {
+                return before;
+            }
         }
         // No parentheses anywhere, so this is Groovy's command syntax and the call
         // is the statement's first token -- unless the statement is an assignment,
@@ -2677,7 +2690,8 @@ public class KotlinStdlibAlignment {
      */
     private static boolean isAddCallArgument(String line, int quoteAt) {
         int i = skipBlanksBackward(line, quoteAt - 1);
-        if (i >= 0 && line.charAt(i) == '(') {
+        // Every parenthesis, for the reason isDeclarationArgument gives.
+        while (i >= 0 && line.charAt(i) == '(') {
             i = skipBlanksBackward(line, i - 1);
         }
         if (i < 0 || !isIdentifierChar(line.charAt(i))) {
