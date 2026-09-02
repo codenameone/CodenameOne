@@ -707,6 +707,26 @@ class CertificateWizardModelTest {
         assertTrue(WizardDecisions.pushRequested("true", "remote-notification"));
     }
 
+    @Test
+    void theMacAppIdFollowsTheMacEntitlementRatherThanTheIosHint() {
+        // A Mac build declares the APNs entitlement from macos.entitlements.apsEnvironment,
+        // read the way MacOSBuildHints reads it: false and none suppress it, anything else
+        // selects an environment. A Mac App ID has to grant what the Mac build declares.
+        assertTrue(WizardDecisions.macPushRequested("production"));
+        assertTrue(WizardDecisions.macPushRequested("development"));
+        assertFalse(WizardDecisions.macPushRequested("false"));
+        assertFalse(WizardDecisions.macPushRequested("NONE"));
+        // Absent is where the builder falls back to its class scan, which the wizard has no
+        // classes for -- the same residue the iOS side has, and not a guess.
+        assertFalse(WizardDecisions.macPushRequested(null));
+        assertFalse(WizardDecisions.macPushRequested("  "));
+
+        // And the two questions stay apart: an iOS-only push app must not have the
+        // capability put on its Mac App ID, nor a Mac-only one on its iOS App ID.
+        assertFalse(WizardDecisions.macPushRequested(null));
+        assertFalse(WizardDecisions.pushRequested(null, null));
+    }
+
     private static SigningState stateWithDevices() {
         List<SigningState.Device> devices = new ArrayList<SigningState.Device>();
         devices.add(new SigningState.Device("DEV_1", "iPhone", "UDID_1", "IOS", "ENABLED"));

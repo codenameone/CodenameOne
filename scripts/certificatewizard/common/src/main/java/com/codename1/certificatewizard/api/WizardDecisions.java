@@ -332,6 +332,27 @@ public final class WizardDecisions {
         return hintAbsent && declaresVoipBackgroundMode(backgroundModesHint);
     }
 
+    /// Whether a macOS build will carry the APNs entitlement, from the hint that decides
+    /// it: `macos.entitlements.apsEnvironment` (or the older `macNative.` spelling).
+    ///
+    /// Read exactly as MacOSBuildHints.EntitlementOverrides.push does -- `false` and
+    /// `none` suppress the entitlement and any other value selects an environment -- so
+    /// the Mac App ID grants what the Mac build declares. The two are not the same
+    /// question as the iOS one and are deliberately not shared: `ios.includePush` on an
+    /// iOS-only push app must not put the capability on a Mac App ID, and the entitlement
+    /// here is emitted for a Developer ID build too, not only a store one.
+    ///
+    /// An absent hint is false, where the builder would fall back to its class scan. That
+    /// is the same residue the iOS side has and for the same reason: the wizard has no
+    /// compiled classes to scan and must not guess.
+    public static boolean macPushRequested(String apsEnvironmentHint) {
+        if (apsEnvironmentHint == null || apsEnvironmentHint.trim().isEmpty()) {
+            return false;
+        }
+        String value = apsEnvironmentHint.trim();
+        return !"false".equalsIgnoreCase(value) && !"none".equalsIgnoreCase(value);
+    }
+
     /// Whether `ios.background_modes` lists the VoIP mode.
     ///
     /// Matched as a whole token, the way IPhoneBuilder matches it: "remote-notification"

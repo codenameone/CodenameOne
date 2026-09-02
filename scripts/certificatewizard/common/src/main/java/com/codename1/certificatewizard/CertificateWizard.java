@@ -1094,7 +1094,7 @@ public class CertificateWizard extends Lifecycle {
         // Starts on what the project asks for. This dialog is the deliberate way to turn
         // the capability on, so it follows ios.includePush rather than deciding for
         // itself the way automatic setup used to.
-        push.setSelected(projectWantsPush());
+        push.setSelected(projectWantsPush("IOS"));
         CheckBox appGroups = new CheckBox("Enable App Groups (widgets / live activities)");
         appGroups.setUIID(uiid("CWFieldLabel"));
         d.add(id).add(name).add(push).add(appGroups);
@@ -1527,7 +1527,7 @@ public class CertificateWizard extends Lifecycle {
         SigningState.BundleId existing = findBundleByIdentifier(bundleIdentifier);
         if (existing == null) {
             showPageMessage("Creating Bundle ID " + bundleIdentifier + "...", false);
-            service.createBundleId(bundleIdentifier, appName, projectWantsPush(), r -> {
+            service.createBundleId(bundleIdentifier, appName, projectWantsPush("IOS"), r -> {
                 if (!r.ok) {
                     showPageMessage(r.message, true);
                     return;
@@ -1535,7 +1535,8 @@ public class CertificateWizard extends Lifecycle {
                 refreshForAutoSetup(() -> autoSetupDefaultProfiles(bundleIdentifier, appName));
             });
         } else {
-            ensurePushCapability(bundleIdentifier, () -> autoSetupDefaultProfiles(bundleIdentifier, appName));
+            ensurePushCapability(bundleIdentifier, "IOS",
+                    () -> autoSetupDefaultProfiles(bundleIdentifier, appName));
         }
     }
 
@@ -1562,9 +1563,9 @@ public class CertificateWizard extends Lifecycle {
     /// account's App IDs in no documented order, so on an account holding both records of
     /// one identifier the capability could land on the macOS one while every iOS profile
     /// was issued from the other.
-    private void ensurePushCapability(String bundleIdentifier, Runnable next) {
-        SigningState.BundleId bundle = findBundleByIdentifier(bundleIdentifier, "IOS");
-        if (!projectWantsPush() || bundle == null) {
+    private void ensurePushCapability(String bundleIdentifier, String platform, Runnable next) {
+        SigningState.BundleId bundle = findBundleByIdentifier(bundleIdentifier, platform);
+        if (!projectWantsPush(platform) || bundle == null) {
             next.run();
             return;
         }
@@ -1626,7 +1627,8 @@ public class CertificateWizard extends Lifecycle {
                         "codename1.arg.ios.documentProvider.extension"));
     }
 
-    /// Whether automatic setup should register the App ID with push notifications.
+    /// Whether automatic setup should register the App ID of `platform` with push
+    /// notifications.
     ///
     /// It used to turn push on for every App ID it created, so a project that had never
     /// asked for it got an App ID -- and every profile issued from it -- carrying the
@@ -1639,9 +1641,23 @@ public class CertificateWizard extends Lifecycle {
     /// have. A project that declares the voip background mode says the same thing in the
     /// settings file, and that much is read here -- see
     /// [WizardDecisions#pushRequested(String,String)] for what is left over.
-    private boolean projectWantsPush() {
+    private boolean projectWantsPush(String platform) {
         if (binding == null) {
             return false;
+        }
+        if ("MAC_OS".equals(platform)) {
+            // The Mac build declares the APNs entitlement from its own hint, and a Mac App
+            // ID has to grant what a Mac build declares. Asking the iOS question here
+            // registered a Mac App ID without push for a project whose Mac build carries
+            // the entitlement, and put it on one for a project whose push is iOS only.
+            // MacOSBuildHints reads the older macNative spelling as a fallback, so this
+            // does too.
+            String aps = readSetting(binding.settings(), "codename1.arg.macos.entitlements.apsEnvironment");
+            if (aps == null || aps.trim().isEmpty()) {
+                aps = readSetting(binding.settings(),
+                        "codename1.arg.macNative.entitlements.apsEnvironment");
+            }
+            return WizardDecisions.macPushRequested(aps);
         }
         return WizardDecisions.pushRequested(
                 readSetting(binding.settings(), "codename1.arg.ios.includePush"),
@@ -1802,7 +1818,8 @@ public class CertificateWizard extends Lifecycle {
                 return;
             }
             showPageMessage("Creating Mac Bundle ID " + defaults.bundleId + "...", false);
-            service.createBundleId(defaults.bundleId, defaults.appName, "MAC_OS", projectWantsPush(), r -> {
+            service.createBundleId(defaults.bundleId, defaults.appName, "MAC_OS",
+                    projectWantsPush("MAC_OS"), r -> {
                 if (!r.ok) {
                     showPageMessage(r.message, true);
                     return;
@@ -1811,7 +1828,8 @@ public class CertificateWizard extends Lifecycle {
                         profileType, next));
             });
         } else {
-            autoSetupCertificate(defaults.bundleId, defaults.appName, profileType, next);
+            ensurePushCapability(defaults.bundleId, "MAC_OS",
+                    () -> autoSetupCertificate(defaults.bundleId, defaults.appName, profileType, next));
         }
     }
 

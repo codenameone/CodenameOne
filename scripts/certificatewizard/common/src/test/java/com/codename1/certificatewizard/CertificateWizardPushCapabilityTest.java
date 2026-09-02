@@ -114,6 +114,30 @@ class CertificateWizardPushCapabilityTest {
                 "a declared VoIP project needs the capability, got " + service.pushEnabledOn());
     }
 
+    @Test
+    void aMacPushProjectGetsTheCapabilityOnItsMacAppId() throws Exception {
+        // The mock account holds both records of this identifier, and the run reaches the
+        // Mac half. The Mac build declares the APNs entitlement from its own hint, so the
+        // Mac App ID is the one that has to grant it -- the iOS hint says nothing here.
+        MockSigningService service =
+                runAutoSetup("codename1.arg.macos.entitlements.apsEnvironment=production\n");
+
+        assertTrue(service.pushEnabledOn().contains(MAC_BUNDLE_APPLE_ID),
+                "the Mac App ID needs the capability its own build declares, got "
+                        + service.pushEnabledOn());
+        assertFalse(service.pushEnabledOn().contains(EXISTING_BUNDLE_APPLE_ID),
+                "and the iOS App ID does not, because nothing asked for iOS push");
+    }
+
+    @Test
+    void anIosPushProjectDoesNotTouchTheMacAppId() throws Exception {
+        MockSigningService service = runAutoSetup("codename1.arg.ios.includePush=true\n");
+
+        assertFalse(service.pushEnabledOn().contains(MAC_BUNDLE_APPLE_ID),
+                "an iOS-only push project must not provision push on its Mac App ID, got "
+                        + service.pushEnabledOn());
+    }
+
     /// Runs the wizard's Auto Setup against a project whose settings carry `extraSettings`,
     /// and hands back the service it ran through.
     private MockSigningService runAutoSetup(String extraSettings) throws Exception {
