@@ -35,13 +35,22 @@ ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
 # and validate-guide-snippets.py requires every listing to be [source,LANG] with a
 # bare include:: inside ---- delimiters, so a three-backtick block would fail that
 # gate before reaching this one. Add it here if that convention ever changes.
-# Literal blocks only -- an example (====) or sidebar (****) block contains live
-# markup, so its headings and includes are real. A delimiter may be LONGER than
-# four characters, and closes on one of the same character AND length, so a
-# four-dash line inside a five-dash block is content rather than the close.
-# Matching exactly four left every ----- block's contents live: the guide has 20
-# such lines, all [source] blocks wrapping an include::.
-FENCE_RE = re.compile(r"^(-{4,}|\.{4,}|`{4,}|\+{4,})\s*$")
+# Literal and comment blocks -- an example (====) or sidebar (****) block contains
+# live markup, so its headings and includes are real and must keep counting. A
+# delimiter may be LONGER than four characters, and closes on one of the same
+# character AND length, so a four-dash line inside a five-dash block is content
+# rather than the close. Matching exactly four left every ----- block's contents
+# live: the guide has 20 such lines, all [source] blocks wrapping an include::.
+#
+# //// is here because asciidoctor drops a comment block entirely, so an include
+# inside one does not put its target in the book and prose inside one promises
+# the reader nothing. Note check-guide-links.py deliberately does NOT skip
+# comments: a dead link commented out is still dead debt in the source, and
+# letting the ratchet shrink for it would turn "comment the line out" into a way
+# to silence that gate. Reachability is the opposite case -- treating a
+# commented-out include as reachable states something about the book that is
+# simply untrue.
+FENCE_RE = re.compile(r"^(-{4,}|\.{4,}|`{4,}|\+{4,}|/{4,})\s*$")
 # Lines that end in a colon without promising a listing: headings, attributes,
 # comments, block titles, list markers, table cells and block delimiters.
 NON_PROSE_PREFIX = ("//", "|", "=", ".", ":", "*", "-", "+", "[", "<")
