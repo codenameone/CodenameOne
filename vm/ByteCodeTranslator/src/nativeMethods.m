@@ -1065,13 +1065,15 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
 /* Reports through *mapped which allocator answered, because the caller cannot tell
    from the pointer and the two do not free the same way. */
 static struct elementStruct* cn1AllocThreadStack(int* mapped) {
-    size_t bytes = CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct);
     *mapped = 0;
 #if defined(_WIN32)
     /* VirtualAlloc would be the equivalent; calloc keeps the Windows target on one
        well-trodden path, and it is not the target where thread counts are large. */
     return (struct elementStruct*)calloc(CN1_MAX_OBJECT_STACK_DEPTH, sizeof(struct elementStruct));
 #else
+    /* Declared here rather than above the #if: it is used only on this arm, and on
+       Windows it was an unused local the compiler is entitled to warn about. */
+    size_t bytes = CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct);
     void* p = mmap(NULL, bytes, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if(p == MAP_FAILED) {
@@ -2127,7 +2129,13 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
         // stack through allThreads like everyone else. cn1TlsSelf must keep naming
         // the HOST thread, because the async-signal stop handler runs on the host
         // and needs the host's state.
-        i->gcPthread = 0;
+        // memset rather than `= 0`: pthread_t is a POINTER on Apple and glibc but a
+        // struct {handle, id} in the Windows compat shim, where assigning 0 is not
+        // even a type error the reader would expect -- it is "assigning to
+        // 'pthread_t' from incompatible type 'int'", and it failed only the Windows
+        // and cross-compile legs. Zeroing the bytes is correct for both shapes, and
+        // gcPthreadValid below is what actually gates every read of this field.
+        memset(&i->gcPthread, 0, sizeof(i->gcPthread));
         i->gcPthreadValid = JAVA_FALSE;
     }
 #endif
