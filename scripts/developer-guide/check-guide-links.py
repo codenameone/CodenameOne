@@ -41,7 +41,9 @@ ATTRIBUTE_LINK_RE = re.compile(r"\blink:\{[^}]+\}")
 # it carries no scheme, so URL_RE never sees it -- and check-guide-xrefs.py skips
 # hrefs beginning with "/" because they are not same-page anchors. Between the two
 # gates the route went unchecked, so it is run through the same route model here.
-ROOT_RELATIVE_RE = re.compile(r"""(?:\blink:|\bhref=["'])(/[^\s\[\]"'`>]*)""", re.IGNORECASE)
+ROOT_RELATIVE_RE = re.compile(
+    r"""(?:\blink:|\bxref:|\bhref=["'])(/[^\s\[\]"'`>]*)""", re.IGNORECASE
+)
 # The one tree that genuinely cannot be enumerated from this repository: the
 # Javadoc is produced from the framework sources at build time. Everything else,
 # /developer-guide/ included, is derived below -- whitelisting a prefix silently
@@ -300,10 +302,17 @@ def javadoc_path_exists(target: str) -> bool:
         return False
     if len(parts) == 1:
         return True
-    # javadoc emits a page for a nested type only where one is declared, so the
-    # innermost name has to appear in the outer type's file. Checking the outer
-    # name alone accepted Component.DoesNotExist.html.
-    return declares_nested_type(package, parts[0], parts[-1])
+    # javadoc emits a page for a nested type only where one is declared, and every
+    # level of the chain is declared inside the outermost type's file. Checking the
+    # ends alone let an invented middle through:
+    # CommonProgressAnimations.Fake.CircleProgress.html passed because both
+    # CommonProgressAnimations and CircleProgress are real. Each name is checked
+    # now. What this still does not verify is that they nest in the ORDER given --
+    # that needs brace-depth parsing, and a page naming two real siblings the wrong
+    # way round is a far less likely mistake than naming one that does not exist.
+    return all(
+        declares_nested_type(package, parts[0], nested) for nested in parts[1:]
+    )
 
 
 def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
