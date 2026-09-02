@@ -195,8 +195,7 @@ public final class Navigation {
             return false;
         }
         List<NavigationEntry> rebuilt = new ArrayList<NavigationEntry>();
-        for (int i = 0; i < paths.size(); i++) {
-            String path = paths.get(i);
+        for (String path : paths) {
             if (path == null || path.length() == 0) {
                 continue;
             }

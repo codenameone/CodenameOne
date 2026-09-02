@@ -11721,6 +11721,53 @@ public class IPhoneBuilder extends Executor {
         return "\n<key>NSUserActivityTypes</key><array>" + types + "</array>";
     }
 
+    /// Rewrites a self-closing `NSUserActivityTypes` array into an open/close pair.
+    ///
+    /// `<array/>` is the ordinary XML spelling of an empty array and a plist parser reads it
+    /// exactly as `<array></array>`. `mergeUserActivityTypes` looks for the literal pair, so
+    /// without this an application that declared the key that way took the merge branch and had
+    /// every id silently dropped -- the one outcome worse than a duplicate key, because nothing
+    /// says so until Handoff does not work on a device.
+    ///
+    /// Only this key's array is touched, and only when it is the key's immediate value: another
+    /// key's empty array is none of this method's business.
+    ///
+    /// @param inject the plist fragment the application supplied
+    /// @return the fragment, with this one array expanded when it needed it
+    static String expandEmptyUserActivityArray(String inject) {
+        if (inject == null) {
+            return null;
+        }
+        int key = plistKeyIndex(inject, "NSUserActivityTypes");
+        if (key < 0) {
+            return inject;
+        }
+        int afterKey = inject.indexOf("</key", key);
+        if (afterKey < 0) {
+            return inject;
+        }
+        afterKey = inject.indexOf('>', afterKey);
+        if (afterKey < 0) {
+            return inject;
+        }
+        int at = afterKey + 1;
+        // The key's IMMEDIATE value, so only whitespace may separate them. Scanning forward for
+        // the next "<array" anywhere would find some later key's empty array and rewrite that
+        // instead -- editing an element this method was never asked about.
+        while (at < inject.length() && Character.isWhitespace(inject.charAt(at))) {
+            at++;
+        }
+        if (!inject.startsWith("<array", at)) {
+            return inject;
+        }
+        int close = inject.indexOf('>', at);
+        if (close < 0 || inject.charAt(close - 1) != '/') {
+            // Already an open/close pair, which the merge understands as it is.
+            return inject;
+        }
+        return inject.substring(0, at) + "<array></array>" + inject.substring(close + 1);
+    }
+
     static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents) {
         return mergeUserActivityTypes(inject, intents, null);
     }
@@ -14310,13 +14357,24 @@ public class IPhoneBuilder extends Executor {
             // through ios.plistInject silently lost every intent id -- and lost
             // CoreSpotlightContinuation too, which is a different key entirely, so a Spotlight
             // result could not continue into the app either.
-            if (!inject.contains("NSUserActivityTypes")) {
+            // LIVE elements only, and the array normalized first. A plain contains() answered
+            // yes for a declaration the project had COMMENTED OUT -- the builder then stood
+            // aside, merged the ids into the comment, and shipped an app with no live activity
+            // type at all, which is Handoff and Spotlight silently doing nothing on a device.
+            // The same question is asked of UIBackgroundModes a few hundred lines up, and for
+            // the same reason.
+            if (plistKeyIndex(plistWithoutComments(inject), "NSUserActivityTypes") < 0) {
                 inject += userActivityTypesKey(intentsManifest, continuityActivityType);
             } else {
                 // Merge into the array the application supplied rather than replacing it: its
                 // own activity types have to keep working. Appended just before the closing
                 // </array> of that key, and only ids it does not already list.
-                inject = mergeUserActivityTypes(inject, intentsManifest, continuityActivityType);
+                //
+                // Expanded first: "<array/>" is a valid empty array and the merge looks for a
+                // literal open/close pair, so an app that declared the key that way took the
+                // merge branch and had every id dropped on the floor.
+                inject = mergeUserActivityTypes(expandEmptyUserActivityArray(inject),
+                        intentsManifest, continuityActivityType);
             }
         }
         // CoreSpotlightContinuation is about Spotlight, not about App Intents, and gating it on

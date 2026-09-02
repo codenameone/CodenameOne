@@ -28,7 +28,6 @@ import com.codename1.io.JSONWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -66,7 +65,7 @@ public final class StateCodec {
     public static Map<String, Object> toMap(AppState state) {
         Map<String, Object> m = new HashMap<String, Object>();
         m.put(KEY_ROUTES, new ArrayList<String>(state.getRoutes()));
-        m.put(KEY_PAYLOAD, new HashMap<String, Object>(state.getPayload()));
+        m.put(KEY_PAYLOAD, encode(state.getPayload()));
         m.put(KEY_DEVICE, state.getDeviceId());
         if (state.getTitle() != null) {
             m.put(KEY_TITLE, state.getTitle());
@@ -99,8 +98,7 @@ public final class StateCodec {
         Object routes = m.get(KEY_ROUTES);
         if (routes instanceof List) {
             List<String> paths = new ArrayList<String>();
-            for (Iterator<?> i = ((List<?>) routes).iterator(); i.hasNext();) {
-                Object path = i.next();
+            for (Object path : (List<?>) routes) {
                 if (path instanceof String) {
                     paths.add((String) path);
                 }
@@ -111,11 +109,9 @@ public final class StateCodec {
         if (payload instanceof Map) {
             Map<String, Object> copy = new HashMap<String, Object>();
             Map<?, ?> read = (Map<?, ?>) payload;
-            for (Iterator<? extends Map.Entry<?, ?>> i = read.entrySet().iterator();
-                    i.hasNext();) {
-                Map.Entry<?, ?> entry = i.next();
+            for (Map.Entry<?, ?> entry : read.entrySet()) {
                 if (entry.getKey() instanceof String) {
-                    copy.put((String) entry.getKey(), entry.getValue());
+                    copy.put((String) entry.getKey(), decode(entry.getValue()));
                 }
             }
             // Not validated on the way in. This map came from another device, and refusing it
@@ -187,9 +183,7 @@ public final class StateCodec {
         if (payload == null) {
             return;
         }
-        for (Iterator<Map.Entry<String, Object>> i = payload.entrySet().iterator();
-                i.hasNext();) {
-            Map.Entry<String, Object> entry = i.next();
+        for (Map.Entry<String, Object> entry : payload.entrySet()) {
             if (entry.getKey() == null) {
                 throw new IllegalArgumentException("A continuity payload cannot have a null key.");
             }
@@ -211,6 +205,131 @@ public final class StateCodec {
         return toJson(state).length();
     }
 
+    /// Renders a payload value so its Java type survives every transport.
+    ///
+    /// Neither destination format preserves the types this payload admits. `JSONParser` reads
+    /// every JSON number back as a `Double` -- so an `Integer` returns as `3.0`, and a `Long`
+    /// past 2^53 comes back a different number -- and it reads `true` back as the *string*
+    /// `"true"`. A property list is kinder but not identical. The result was an application
+    /// casting a value to the type it stored and getting a `ClassCastException` on Android and
+    /// the desktop, and on iOS something worse: ParparVM does not throw for a failed cast, so
+    /// the wrong object is handed to the next instruction.
+    ///
+    /// So every scalar crosses as a tagged string and is put back together on arrival. Strings
+    /// are tagged too, which is what stops an application's own `"i:5"` from being read as an
+    /// integer. Lists and maps stay themselves -- both formats carry those natively -- and their
+    /// contents are encoded element by element.
+    private static Object encodeValue(Object value) {
+        if (value instanceof String) {
+            return "s:" + value;
+        }
+        if (value instanceof Integer) {
+            return "i:" + value;
+        }
+        if (value instanceof Long) {
+            return "l:" + value;
+        }
+        if (value instanceof Double) {
+            return "d:" + value;
+        }
+        if (value instanceof Boolean) {
+            return "b:" + value;
+        }
+        if (value instanceof List) {
+            List<?> in = (List<?>) value;
+            List<Object> out = new ArrayList<Object>();
+            for (Object element : in) {
+                out.add(encodeValue(element));
+            }
+            return out;
+        }
+        if (value instanceof Map) {
+            return encode(castToStringKeyed((Map<?, ?>) value));
+        }
+        // Unreachable for a payload that went through requireRepresentable, which is every
+        // payload this framework produces. A hand-built map handed straight to toMap reaches
+        // here, and its own toString is a better answer than dropping the entry.
+        return "s:" + String.valueOf(value);
+    }
+
+    private static Map<String, Object> encode(Map<String, Object> payload) {
+        Map<String, Object> out = new HashMap<String, Object>();
+        if (payload == null) {
+            return out;
+        }
+        for (Map.Entry<String, Object> e : payload.entrySet()) {
+            out.put(e.getKey(), encodeValue(e.getValue()));
+        }
+        return out;
+    }
+
+    /// Rebuilds a value `encodeValue` wrote.
+    ///
+    /// An untagged value is passed through as-is rather than refused: it is what a hand-written
+    /// endpoint, or a device running a build older than the tagging, produces -- and a payload
+    /// that is merely untyped is more useful than no payload at all.
+    private static Object decode(Object value) {
+        if (value instanceof List) {
+            List<?> in = (List<?>) value;
+            List<Object> out = new ArrayList<Object>();
+            for (Object element : in) {
+                out.add(decode(element));
+            }
+            return out;
+        }
+        if (value instanceof Map) {
+            Map<?, ?> in = (Map<?, ?>) value;
+            Map<String, Object> out = new HashMap<String, Object>();
+            for (Map.Entry<?, ?> e : in.entrySet()) {
+                if (e.getKey() instanceof String) {
+                    out.put((String) e.getKey(), decode(e.getValue()));
+                }
+            }
+            return out;
+        }
+        if (!(value instanceof String)) {
+            return value;
+        }
+        String text = (String) value;
+        if (text.length() < 2 || text.charAt(1) != ':') {
+            return text;
+        }
+        String body = text.substring(2);
+        char tag = text.charAt(0);
+        try {
+            if (tag == 's') {
+                return body;
+            }
+            if (tag == 'i') {
+                return Integer.valueOf(body);
+            }
+            if (tag == 'l') {
+                return Long.valueOf(body);
+            }
+            if (tag == 'd') {
+                return Double.valueOf(body);
+            }
+            if (tag == 'b') {
+                return Boolean.valueOf(body);
+            }
+        } catch (NumberFormatException malformed) {
+            // A tag whose body will not parse came from somewhere this build does not control.
+            // The text is the honest answer; throwing would lose the whole state over one key.
+            return text;
+        }
+        return text;
+    }
+
+    private static Map<String, Object> castToStringKeyed(Map<?, ?> in) {
+        Map<String, Object> out = new HashMap<String, Object>();
+        for (Map.Entry<?, ?> e : in.entrySet()) {
+            if (e.getKey() instanceof String) {
+                out.put((String) e.getKey(), e.getValue());
+            }
+        }
+        return out;
+    }
+
     private static void check(Object value, String path, int depth) {
         if (depth > 16) {
             // A payload cannot legitimately be this deep, and a cycle looks exactly like a very
@@ -219,22 +338,33 @@ public final class StateCodec {
                     + "\" nests more than 16 levels deep, or contains a cycle. Neither a property "
                     + "list nor JSON can represent a cycle.");
         }
-        if (value == null || value instanceof String || value instanceof Integer
+        if (value instanceof String || value instanceof Integer
                 || value instanceof Long || value instanceof Double || value instanceof Boolean) {
             return;
         }
+        if (value == null) {
+            // Refused rather than carried. A property list has no null: the iOS sanitizer drops a
+            // null-valued entry and drops a null LIST ELEMENT, which shifts every index after it,
+            // so the payload that arrives on the other device is a different shape from the one
+            // that was sent. Saying so here, where the key is known, beats a list that is quietly
+            // one shorter on an iPad.
+            throw new IllegalArgumentException("The continuity payload at \"" + path + "\" is "
+                    + "null. A property list cannot carry one, and dropping it would change the "
+                    + "shape of what arrives on another device -- a null list element would shift "
+                    + "every index after it. Leave the key out instead.");
+        }
         if (value instanceof List) {
             List<?> list = (List<?>) value;
-            for (int i = 0; i < list.size(); i++) {
-                check(list.get(i), path + "[" + i + "]", depth + 1);
+            int index = 0;
+            for (Object element : list) {
+                check(element, path + "[" + index + "]", depth + 1);
+                index++;
             }
             return;
         }
         if (value instanceof Map) {
             Map<?, ?> map = (Map<?, ?>) value;
-            for (Iterator<? extends Map.Entry<?, ?>> i = map.entrySet().iterator();
-                    i.hasNext();) {
-                Map.Entry<?, ?> entry = i.next();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
                 Object key = entry.getKey();
                 if (!(key instanceof String)) {
                     throw new IllegalArgumentException("The continuity payload at \"" + path

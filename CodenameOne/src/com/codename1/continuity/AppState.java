@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -72,12 +71,6 @@ public final class AppState implements Externalizable {
     private long sequence;
     private long timestamp;
 
-    /// Creates an empty state. Applications normally obtain one from
-    /// `Continuity.getRestorableState()` or receive one through a `ContinuityListener`; this is
-    /// public so tests and relays can build one.
-    public AppState() {
-    }
-
     /// The navigation stack as route paths, oldest first. Never null, possibly empty.
     ///
     /// #### Returns
@@ -99,8 +92,7 @@ public final class AppState implements Externalizable {
     public AppState setRoutes(List<String> r) {
         routes = new ArrayList<String>();
         if (r != null) {
-            for (Iterator<String> i = r.iterator(); i.hasNext();) {
-                String path = i.next();
+            for (String path : r) {
                 if (path != null && path.length() > 0) {
                     routes.add(path);
                 }
@@ -133,10 +125,7 @@ public final class AppState implements Externalizable {
     /// - `IllegalArgumentException`: when a value cannot cross to another device
     public AppState setPayload(Map<String, Object> p) {
         StateCodec.requireRepresentable(p);
-        payload = new HashMap<String, Object>();
-        if (p != null) {
-            payload.putAll(p);
-        }
+        payload = deepCopy(p);
         return this;
     }
 
@@ -149,10 +138,51 @@ public final class AppState implements Externalizable {
     ///
     /// - `p`: the payload; null is treated as empty
     void setPayloadUnchecked(Map<String, Object> p) {
-        payload = new HashMap<String, Object>();
-        if (p != null) {
-            payload.putAll(p);
+        payload = deepCopy(p);
+    }
+
+    /// Copies a payload all the way down, not just its outer map.
+    ///
+    /// A shallow copy left the snapshot sharing the application's own lists and maps. That is a
+    /// race with a silent result, because a state outlives the call that produced it: the relay
+    /// serializes it later on a background thread, so an edit the application makes in between
+    /// could publish newer contents under an older sequence number, or throw a
+    /// ConcurrentModificationException in the middle of a checkpoint. A snapshot has to be a
+    /// snapshot.
+    ///
+    /// Only the container types are rebuilt. Everything else a payload may hold -- String,
+    /// Integer, Long, Double, Boolean -- is immutable, so copying it would buy nothing.
+    private static Map<String, Object> deepCopy(Map<String, Object> p) {
+        Map<String, Object> out = new HashMap<String, Object>();
+        if (p == null) {
+            return out;
         }
+        for (Map.Entry<String, Object> e : p.entrySet()) {
+            out.put(e.getKey(), copyValue(e.getValue()));
+        }
+        return out;
+    }
+
+    private static Object copyValue(Object value) {
+        if (value instanceof List) {
+            List<?> in = (List<?>) value;
+            List<Object> out = new ArrayList<Object>();
+            for (Object element : in) {
+                out.add(copyValue(element));
+            }
+            return out;
+        }
+        if (value instanceof Map) {
+            Map<?, ?> in = (Map<?, ?>) value;
+            Map<String, Object> out = new HashMap<String, Object>();
+            for (Map.Entry<?, ?> e : in.entrySet()) {
+                if (e.getKey() instanceof String) {
+                    out.put((String) e.getKey(), copyValue(e.getValue()));
+                }
+            }
+            return out;
+        }
+        return value;
     }
 
     /// The device this state was produced on. Used to drop a state's own echo when it comes back
@@ -291,8 +321,8 @@ public final class AppState implements Externalizable {
         out.writeLong(sequence);
         out.writeLong(timestamp);
         out.writeInt(routes.size());
-        for (Iterator<String> i = routes.iterator(); i.hasNext();) {
-            Util.writeUTF(i.next(), out);
+        for (String path : routes) {
+            Util.writeUTF(path, out);
         }
         // The payload goes through the framework's own object writer rather than a hand-rolled
         // encoding: it already knows every type requireRepresentable admits, including nested
@@ -321,9 +351,7 @@ public final class AppState implements Externalizable {
         payload = new HashMap<String, Object>();
         if (p instanceof Map) {
             Map<?, ?> read = (Map<?, ?>) p;
-            for (Iterator<? extends Map.Entry<?, ?>> i = read.entrySet().iterator();
-                    i.hasNext();) {
-                Map.Entry<?, ?> entry = i.next();
+            for (Map.Entry<?, ?> entry : read.entrySet()) {
                 if (entry.getKey() instanceof String) {
                     payload.put((String) entry.getKey(), entry.getValue());
                 }

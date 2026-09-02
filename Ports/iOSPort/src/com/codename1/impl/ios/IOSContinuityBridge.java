@@ -66,14 +66,17 @@ class IOSContinuityBridge implements ContinuityBridge {
         supported = s;
     }
 
+    @Override
     public void setCallback(ContinuityCallback callback) {
         IOSContinuityCallbacks.setCallback(callback);
     }
 
+    @Override
     public boolean isContinuationSupported() {
         return supported;
     }
 
+    @Override
     public void publishContinuation(String activityType, String title,
             Map<String, Object> userInfo) {
         if (!supported) {
@@ -87,6 +90,7 @@ class IOSContinuityBridge implements ContinuityBridge {
         }
     }
 
+    @Override
     public void clearContinuation() {
         if (!supported) {
             return;
@@ -98,6 +102,7 @@ class IOSContinuityBridge implements ContinuityBridge {
         }
     }
 
+    @Override
     public boolean isSyncedStoreSupported() {
         if (!supported) {
             return false;
@@ -110,6 +115,7 @@ class IOSContinuityBridge implements ContinuityBridge {
         }
     }
 
+    @Override
     public void syncedStorePut(String key, String value) {
         if (!isSyncedStoreSupported()) {
             return;
@@ -121,6 +127,7 @@ class IOSContinuityBridge implements ContinuityBridge {
         }
     }
 
+    @Override
     public String syncedStoreGet(String key) {
         if (!isSyncedStoreSupported()) {
             return null;
@@ -133,6 +140,7 @@ class IOSContinuityBridge implements ContinuityBridge {
         }
     }
 
+    @Override
     public void syncedStoreRemove(String key) {
         if (!isSyncedStoreSupported()) {
             return;
@@ -144,6 +152,7 @@ class IOSContinuityBridge implements ContinuityBridge {
         }
     }
 
+    @Override
     public String[] syncedStoreKeys() {
         if (!isSyncedStoreSupported()) {
             return new String[0];

@@ -256,16 +256,10 @@ exactly as it would on Android.
 [options="header"]
 |===
 | Hint | Default | What it does
-| `ios.continuity.enabled` | `false` | Declares that this project hands work between devices. The build works this out from bytecode on its own; this exists because the Certificate Wizard and the signing preflight can't read bytecode and need to know whether an iCloud capability will be wanted.
-| `ios.continuity.sync` | `true` | Set `false` to skip the iCloud key-value store entitlement.
+| `ios.continuity.sync` | unset | Whether this project wants the iCloud key-value store. Left unset the build decides from the bytecode. Set `false` to drop the entitlement; set `true` to declare it, which is what lets the signing preflight check your profile before the build is sent.
 |===
 
-[source,properties]
-----
-include::../demos/common/src/main/snippets/developer-guide/state-restoration-and-continuity.properties[tag=state-restoration-and-continuity-properties-001,indent=0]
-----
-
-Everything else is automatic. Referencing `com.codename1.continuity` compiles the
+Everything is automatic by default. Referencing `com.codename1.continuity` compiles the
 `NSUserActivity` handling into the iOS build and declares this app's activity
 type in `NSUserActivityTypes`, which is what lets another device be offered the
 work -- iOS continues an activity only when the app declared its type, so an app

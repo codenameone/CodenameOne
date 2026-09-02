@@ -183,6 +183,91 @@ class IPhoneBuilderContinuityPlistTest {
         assertEquals(1, occurrences(merged, "NSUserActivityTypes"), merged);
     }
 
+    // ------------------------------------------------------------------
+    // The shapes a hand-written ios.plistInject really carries
+    // ------------------------------------------------------------------
+
+    /**
+     * {@code <array/>} is the ordinary XML spelling of an empty array and a plist parser reads it
+     * as {@code <array></array>}. The merge looks for the literal pair, so without expansion an
+     * app that declared the key that way took the merge branch and had every id dropped -- worse
+     * than a duplicate key, because nothing says so until Handoff does not work on a device.
+     */
+    @Test
+    void aSelfClosingArrayIsExpandedSoTheMergeCanSeeIt() {
+        String inject = "<key>NSUserActivityTypes</key><array/>";
+
+        String expanded = IPhoneBuilder.expandEmptyUserActivityArray(inject);
+        String merged = IPhoneBuilder.mergeUserActivityTypes(expanded, noIntents(), CONTINUITY_TYPE);
+
+        assertTrue(merged.contains("<string>" + CONTINUITY_TYPE + "</string>"), merged);
+        assertEquals(1, occurrences(merged, "NSUserActivityTypes"), merged);
+    }
+
+    @Test
+    void aSelfClosingArrayWithWhitespaceAndASpacedTagIsStillExpanded() {
+        String inject = "<key>NSUserActivityTypes</key>\n   <array />";
+
+        String merged = IPhoneBuilder.mergeUserActivityTypes(
+                IPhoneBuilder.expandEmptyUserActivityArray(inject), intents("logWorkout"),
+                CONTINUITY_TYPE);
+
+        assertTrue(merged.contains("<string>logWorkout</string>"), merged);
+        assertTrue(merged.contains("<string>" + CONTINUITY_TYPE + "</string>"), merged);
+    }
+
+    /** An array that is already a pair is left exactly as it was. */
+    @Test
+    void anOpenClosePairIsNotRewritten() {
+        String inject = "<key>NSUserActivityTypes</key><array><string>a</string></array>";
+
+        assertEquals(inject, IPhoneBuilder.expandEmptyUserActivityArray(inject));
+    }
+
+    /** Another key's empty array is none of this method's business. */
+    @Test
+    void anUnrelatedEmptyArrayIsNotRewritten() {
+        String inject = "<key>NSUserActivityTypes</key><array><string>a</string></array>"
+                + "<key>SomethingElse</key><array/>";
+
+        String out = IPhoneBuilder.expandEmptyUserActivityArray(inject);
+
+        assertTrue(out.contains("<key>SomethingElse</key><array/>"), out);
+    }
+
+    @Test
+    void aFragmentWithoutTheKeyIsLeftAlone() {
+        String inject = "<key>SomethingElse</key><array/>";
+
+        assertEquals(inject, IPhoneBuilder.expandEmptyUserActivityArray(inject));
+    }
+
+    /**
+     * The decision has to be made on LIVE elements. A commented-out declaration answered a plain
+     * contains() yes, so the builder stood aside, merged into the comment, and shipped an app
+     * with no live activity type at all.
+     */
+    @Test
+    void aCommentedOutDeclarationDoesNotCountAsSupplied() {
+        String inject = "<!-- <key>NSUserActivityTypes</key><array>"
+                + "<string>com.example.app.old</string></array> -->";
+
+        assertTrue(IPhoneBuilder.plistKeyIndex(
+                IPhoneBuilder.plistWithoutComments(inject), "NSUserActivityTypes") < 0,
+                "a commented-out key must read as absent, which is what makes the builder "
+                        + "emit a live one of its own");
+    }
+
+    /** A live declaration beside a commented-out one still reads as supplied. */
+    @Test
+    void aLiveDeclarationBesideACommentedOneCountsAsSupplied() {
+        String inject = "<!-- <key>NSUserActivityTypes</key><array/> -->"
+                + "<key>NSUserActivityTypes</key><array><string>a</string></array>";
+
+        assertTrue(IPhoneBuilder.plistKeyIndex(
+                IPhoneBuilder.plistWithoutComments(inject), "NSUserActivityTypes") >= 0);
+    }
+
     @Test
     void nothingToAddLeavesTheFragmentAlone() {
         String inject = "<key>NSUserActivityTypes</key><array>"

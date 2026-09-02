@@ -391,6 +391,121 @@ public class LocalContinuityTest extends UITestBase {
         assertEquals("later", waiting.getPayload().get("note"));
     }
 
+    /**
+     * A relay hands back whatever it still holds, which can be days old. Auto-restoring an
+     * expired checkout or booking hold is the exact harm setMaxAge exists to prevent, and the
+     * stored-state check alone never saw this path.
+     */
+    @EdtTest
+    public void anExpiredStateArrivingFromElsewhereIsIgnored() {
+        Continuity.setStateProvider(new RecordingProvider());
+        RecordingListener listener = new RecordingListener();
+        Continuity.addContinuationListener(listener);
+        Continuity.setMaxAge(60000L);
+
+        deliverFromElsewhereAged("stale", 1L, System.currentTimeMillis() - 300000L);
+
+        assertEquals(0, listener.calls);
+    }
+
+    /** The same delivery inside the window still arrives, so the check is not simply off. */
+    @EdtTest
+    public void aFreshStateArrivingFromElsewhereStillArrivesWithMaxAgeSet() {
+        Continuity.setStateProvider(new RecordingProvider());
+        RecordingListener listener = new RecordingListener();
+        Continuity.addContinuationListener(listener);
+        Continuity.setMaxAge(60000L);
+
+        deliverFromElsewhereAged("fresh", 2L, System.currentTimeMillis());
+
+        assertEquals(1, listener.calls);
+    }
+
+    /**
+     * Dropping an expired state must not consume its sequence, or a fresher state from the same
+     * device would be mistaken for one already seen.
+     */
+    @EdtTest
+    public void anExpiredStateDoesNotConsumeTheSequenceOfAFresherOne() {
+        Continuity.setStateProvider(new RecordingProvider());
+        RecordingListener listener = new RecordingListener();
+        Continuity.addContinuationListener(listener);
+        Continuity.setMaxAge(60000L);
+
+        deliverFromElsewhereAged("stale", 5L, System.currentTimeMillis() - 300000L);
+        deliverFromElsewhereAged("fresh", 5L, System.currentTimeMillis());
+
+        assertEquals(1, listener.calls);
+        assertEquals("fresh", listener.seen.getPayload().get("note"));
+    }
+
+    /**
+     * A publish REPLACES what the relay holds, so two checkpoints racing to the endpoint could
+     * land in reverse order and leave the user's other device fetching work they had moved past.
+     * Nothing failed and nothing was logged, which is what made it worth pinning.
+     */
+    @EdtTest
+    public void relayPublishesArriveInCheckpointOrder() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        OrderRecordingRelay r = new OrderRecordingRelay();
+        Continuity.setRelay(r);
+
+        for (int i = 1; i <= 6; i++) {
+            provider.saved.put("n", Integer.valueOf(i));
+            Continuity.checkpoint();
+        }
+        long newest = Continuity.getRestorableState().getSequence();
+        r.awaitQuiet();
+
+        assertFalse(r.published.isEmpty(), "the relay saw nothing at all");
+        // Coalescing is allowed and expected -- what is not allowed is going backwards.
+        for (int i = 1; i < r.published.size(); i++) {
+            assertTrue(r.published.get(i).longValue() > r.published.get(i - 1).longValue(),
+                    "relay saw " + r.published + ", which goes backwards");
+        }
+        assertEquals(Long.valueOf(newest), r.published.get(r.published.size() - 1),
+                "the newest checkpoint has to be the relay's final value");
+    }
+
+    /** Records the sequence of everything the relay is handed, slowly enough to overlap. */
+    static class OrderRecordingRelay implements StateRelay {
+        final List<Long> published =
+                java.util.Collections.synchronizedList(new ArrayList<Long>());
+        private volatile long lastFinished;
+
+        public void publish(AppState state) {
+            try {
+                Thread.sleep(15);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            published.add(Long.valueOf(state.getSequence()));
+            lastFinished = System.currentTimeMillis();
+        }
+
+        public AppState fetch() {
+            return null;
+        }
+
+        /// Waits until the relay has been quiet for a moment, so the assertions read a settled
+        /// list rather than a race of their own.
+        void awaitQuiet() {
+            long deadline = System.currentTimeMillis() + 5000L;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (!published.isEmpty() && System.currentTimeMillis() - lastFinished > 300L) {
+                    return;
+                }
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // The synced store
     // ------------------------------------------------------------------
@@ -445,6 +560,18 @@ public class LocalContinuityTest extends UITestBase {
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    private void deliverFromElsewhereAged(String note, long sequence, long timestamp) {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("note", note);
+        AppState state = new AppState()
+                .setPayload(payload)
+                .setDeviceId("some-other-device")
+                .setSequence(sequence)
+                .setTimestamp(timestamp);
+        bridge.simulateArrival(Continuity.getActivityType(), StateCodec.toMap(state));
+        flushSerialCalls();
+    }
 
     private void deliverFromElsewhere(String note, long sequence) {
         Map<String, Object> payload = new HashMap<String, Object>();

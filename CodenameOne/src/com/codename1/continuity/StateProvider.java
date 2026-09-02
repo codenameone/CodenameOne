@@ -50,8 +50,24 @@ public interface StateProvider {
     /// Applies a payload this provider previously produced, on this device or another one.
     ///
     /// Called before the restored screens are shown, so a form built by the route table can read
-    /// what was put here during its own construction. When the app has no routes, this is the
-    /// whole of restoration and the provider is responsible for showing a form.
+    /// what was put here during its own construction.
+    ///
+    /// #### Do not show a form from here
+    ///
+    /// Put the values where your screens will read them and return. `Continuity.restore()` answers
+    /// false for a payload-only state precisely so that the caller still shows its own screen:
+    ///
+    /// ```java
+    /// if (!Continuity.restore()) {
+    ///     showDraftForm();   // reads what restoreState put in place
+    /// }
+    /// ```
+    ///
+    /// A review read the false as a defect -- the caller "shows its initial form over the one the
+    /// provider restored" -- which is only true of a provider that shows one. Returning true
+    /// instead would be the worse trade: an application whose provider only populates fields, the
+    /// shape recommended here, would then show nothing at all and come back to a blank screen.
+    /// False is the answer that is safe whichever the provider does.
     ///
     /// #### Parameters
     ///

@@ -30,6 +30,7 @@ import com.codename1.continuity.spi.ContinuityCallback;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.LifecycleListener;
 import com.codename1.io.Log;
+import com.codename1.ui.Display;
 
 import java.util.Map;
 
@@ -56,6 +57,13 @@ import java.util.Map;
 /// capability table has a column per platform rather than a single "supported" claim.
 public class AndroidContinuityBridge implements ContinuityBridge {
 
+    /// How long the suspend flush may hold Android's main thread waiting for the event thread.
+    ///
+    /// Bounded because the alternative is an ANR: if the event thread is wedged, waiting forever
+    /// turns a missed checkpoint into a killed application. The state written by the last
+    /// navigation is still on disk when this gives up.
+    private static final int CHECKPOINT_TIMEOUT_MILLIS = 1500;
+
     /// Registers the flush hook. Called once, when the port builds the bridge.
     public AndroidContinuityBridge() {
         try {
@@ -65,40 +73,64 @@ public class AndroidContinuityBridge implements ContinuityBridge {
         }
     }
 
+    @Override
     public void setCallback(ContinuityCallback callback) {
         // Nothing to deliver: neither capability below exists on this platform, so the framework's
         // inbound seam is never reached from here. States still arrive on Android -- through a
         // StateRelay, which the framework drives itself and which needs no port support.
     }
 
+    @Override
     public boolean isContinuationSupported() {
         return false;
     }
 
+    @Override
     public void publishContinuation(String activityType, String title,
             Map<String, Object> userInfo) {
     }
 
+    @Override
     public void clearContinuation() {
     }
 
+    @Override
     public boolean isSyncedStoreSupported() {
         return false;
     }
 
+    @Override
     public void syncedStorePut(String key, String value) {
     }
 
+    @Override
     public String syncedStoreGet(String key) {
         return null;
     }
 
+    @Override
     public void syncedStoreRemove(String key) {
     }
 
+    @Override
     public String[] syncedStoreKeys() {
         return new String[0];
     }
+
+    /// The checkpoint, as a constant rather than an anonymous class per callback.
+    ///
+    /// It captures nothing -- everything it touches is static -- so an inner class would hold the
+    /// listener alive for no reason and allocate on a path that runs at every suspend.
+    private static final Runnable CHECKPOINT = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                Continuity.checkpoint();
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
+    };
 
     /// Flushes the checkpoint when the platform says the process may be killed.
     ///
@@ -140,7 +172,24 @@ public class AndroidContinuityBridge implements ContinuityBridge {
         @Override
         public void onSaveInstanceState(Bundle b) {
             try {
-                Continuity.checkpoint();
+                if (!Continuity.isCheckpointPending()) {
+                    // The ordinary case, and the reason this is asked first. The framework writes
+                    // through as the user navigates, so by the time Android says it may kill the
+                    // process there is usually nothing owed -- and answering that here costs no
+                    // thread hop at all.
+                    return;
+                }
+                // Onto the Codename One event thread, and waited for. This callback runs on
+                // Android's own main thread, which is not the EDT: StateProvider.saveState is
+                // application code documented to run on the EDT, and the route stack it is
+                // captured beside is an EDT-owned list. Reading both from here raced the running
+                // application and could capture a half-changed screen -- or throw, and lose the
+                // payload with nothing said.
+                //
+                // Waiting blocks Android's main thread, which is why it is behind the check
+                // above: it is paid only when there is genuinely something to save, not on every
+                // suspend.
+                Display.getInstance().callSeriallyAndWait(CHECKPOINT, CHECKPOINT_TIMEOUT_MILLIS);
             } catch (Throwable t) {
                 // Never allowed to escape. This runs on Android's main thread inside a platform
                 // callback, and an exception here takes down the activity as it is being saved --

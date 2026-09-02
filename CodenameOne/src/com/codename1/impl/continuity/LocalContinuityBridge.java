@@ -29,7 +29,6 @@ import com.codename1.io.Preferences;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -58,14 +57,17 @@ public class LocalContinuityBridge implements ContinuityBridge {
     private String publishedTitle;
     private Map<String, Object> publishedInfo;
 
+    @Override
     public void setCallback(ContinuityCallback c) {
         callback = c;
     }
 
+    @Override
     public boolean isContinuationSupported() {
         return true;
     }
 
+    @Override
     public void publishContinuation(String activityType, String title,
             Map<String, Object> userInfo) {
         publishedType = activityType;
@@ -73,6 +75,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
         publishedInfo = userInfo == null ? null : new HashMap<String, Object>(userInfo);
     }
 
+    @Override
     public void clearContinuation() {
         publishedType = null;
         publishedTitle = null;
@@ -152,10 +155,12 @@ public class LocalContinuityBridge implements ContinuityBridge {
     // Synced store
     // ------------------------------------------------------------------
 
+    @Override
     public boolean isSyncedStoreSupported() {
         return true;
     }
 
+    @Override
     public void syncedStorePut(String key, String value) {
         Preferences.set(PREFIX + key, value);
         List<String> keys = indexKeys();
@@ -165,10 +170,12 @@ public class LocalContinuityBridge implements ContinuityBridge {
         }
     }
 
+    @Override
     public String syncedStoreGet(String key) {
         return Preferences.get(PREFIX + key, null);
     }
 
+    @Override
     public void syncedStoreRemove(String key) {
         Preferences.delete(PREFIX + key);
         List<String> keys = indexKeys();
@@ -177,6 +184,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
         }
     }
 
+    @Override
     public String[] syncedStoreKeys() {
         List<String> keys = indexKeys();
         return keys.toArray(new String[keys.size()]);
@@ -222,11 +230,11 @@ public class LocalContinuityBridge implements ContinuityBridge {
 
     private void writeIndex(List<String> keys) {
         StringBuilder sb = new StringBuilder();
-        for (Iterator<String> i = keys.iterator(); i.hasNext();) {
+        for (String key : keys) {
             if (sb.length() > 0) {
                 sb.append('\n');
             }
-            sb.append(i.next());
+            sb.append(key);
         }
         Preferences.set(INDEX, sb.toString());
     }

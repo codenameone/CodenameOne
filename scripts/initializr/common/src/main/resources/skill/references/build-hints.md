@@ -140,8 +140,8 @@ The framework already knows the `@Route` navigation stack and restores it with n
 
 | Hint (`codename1.arg.` prefix) | Effect |
 | --- | --- |
-| `ios.continuity.enabled=true` | Declares the feature. Redundant for the build, which detects the API reference itself, but it is how the Certificate Wizard and the signing preflight know an iCloud capability will be wanted. |
 | `ios.continuity.sync=false` | Skip the iCloud key-value store entitlement a reference to `com.codename1.continuity.sync` earns, leaving `SyncedStore` unsupported at runtime. |
+| `ios.continuity.sync=true` | Declare the store explicitly, which is what lets the signing preflight check the provisioning profile before the build is sent. Left unset, the build decides from the bytecode. |
 
 Three things to get right. A payload admits only `String`, `Integer`, `Long`, `Double`, `Boolean` and `List`/`Map` of those, because it has to survive reaching another device -- anything else is refused where you produced it. `com.codename1.continuity.sync` is a separate package because it is the only half that costs an entitlement, which must be granted on the App ID or the build fails at codesigning. And Codename One runs no relay server: carrying state to a non-Apple device means implementing `StateRelay` (or subclassing `RestStateRelay`) against your own endpoint, because deciding which states belong to the same person is your account system's job.
 

@@ -739,10 +739,13 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
 }
 #endif
 
-// Compiled for universal links OR intents: without the second condition a Spotlight tap on a
-// legacy-lifecycle build (ios.uiscene=false) would silently do nothing, since the scene delegate
-// is what routes this on a default build.
-#if defined(CN1_HANDLE_UNIVERSAL_LINKS) || defined(CN1_USE_INTENTS)
+// Compiled for universal links OR intents OR continuity: without the second and third conditions
+// a Spotlight tap, or a handoff from the user's other device, on a legacy-lifecycle build
+// (ios.uiscene=false) would silently do nothing, since the scene delegate is what routes this on
+// a default build. Continuity was added here for exactly the reason intents was: the branch it
+// needs inside cn1ContinueUserActivity: is compiled, and on a legacy build nothing ever calls it.
+#if defined(CN1_HANDLE_UNIVERSAL_LINKS) || defined(CN1_USE_INTENTS) \
+        || defined(CN1_USE_CONTINUITY)
 // https://developer.apple.com/documentation/uikit/core_app/allowing_apps_and_websites_to_link_to_your_content?language=objc
 // https://github.com/codenameone/CodenameOne/issues/2677
 - (BOOL)application:(UIApplication *)application

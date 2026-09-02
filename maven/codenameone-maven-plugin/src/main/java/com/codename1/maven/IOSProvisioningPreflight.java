@@ -233,6 +233,9 @@ final class IOSProvisioningPreflight {
     /**
      * Whether the profile can sign an app that asks for the iCloud key-value store.
      *
+     * <p>Asked only of a project that set {@code ios.continuity.sync=true}, which is how a
+     * project says it wants the store without this check having to read bytecode.</p>
+     *
      * <p>A reference to {@code com.codename1.continuity.sync} makes the build declare
      * {@code com.apple.developer.ubiquity-kvstore-identifier}, and Apple grants that entitlement
      * only through an App ID with the iCloud capability enabled. A profile issued before that was
@@ -245,27 +248,27 @@ final class IOSProvisioningPreflight {
      * the app working with {@code SyncedStore.isSupported()} reporting false, so a warning that
      * names the two ways out is more useful than a refusal.</p>
      *
-     * @return one problem when the profile demonstrably lacks the entitlement, none when it has
-     * it, the sync half is switched off, or nothing readable says either way
+     * @return one problem when the profile demonstrably lacks the entitlement, none when the
+     * project did not declare the synced store or nothing readable says either way
      */
     static List<Problem> checkContinuitySync(Properties settings, boolean release) {
         List<Problem> problems = new ArrayList<Problem>();
         if (settings == null) {
             return problems;
         }
+        // Keyed on the SYNC declaration alone. An earlier version keyed on a separate
+        // "continuity is in use" hint and warned the wrong projects: the builder asks for the
+        // entitlement only when it sees com.codename1.continuity.sync in the bytecode, so a
+        // project using continuity WITHOUT the synced store was told its profile could not sign
+        // an entitlement its build was never going to request. That hint had no other reader and
+        // is gone; this is the only declaration the question needs.
+        //
+        // An explicit true rather than a default, because this check has to be read as "the
+        // project says it wants a synced store". Absent means "the bytecode decides", which is
+        // exactly the thing nothing here can read; false means the entitlement is dropped. Only
+        // an explicit yes is a claim this can act on.
         if (!"true".equals(trimmed(settings.getProperty(
-                "codename1.arg.ios.continuity.enabled")))) {
-            // The project has not said it wants a synced store. The builder decides this from
-            // bytecode, which this check cannot read -- so an app that uses the API without
-            // setting the hint is simply not checked here, and finds out at codesign as it does
-            // today. Guessing from anything else would warn projects that use no continuity at
-            // all.
-            return problems;
-        }
-        if ("false".equals(trimmed(settings.getProperty(
                 "codename1.arg.ios.continuity.sync")))) {
-            // Explicitly opted out: the build declares no entitlement, so there is nothing the
-            // profile has to grant.
             return problems;
         }
         String override = trimmed(settings.getProperty("codename1.arg.ios.entitlements.com.apple"

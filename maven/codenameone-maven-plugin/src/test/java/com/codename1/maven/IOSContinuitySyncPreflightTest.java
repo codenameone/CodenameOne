@@ -98,7 +98,7 @@ public class IOSContinuitySyncPreflightTest {
         p.setProperty("codename1.packageName", "com.example.app");
         p.setProperty(IOSProvisioningPreflight.provisioningProfileSettingKey(true),
                 appProfile.getAbsolutePath());
-        p.setProperty("codename1.arg.ios.continuity.enabled", "true");
+        p.setProperty("codename1.arg.ios.continuity.sync", "true");
         return p;
     }
 
@@ -133,14 +133,28 @@ public class IOSContinuitySyncPreflightTest {
     }
 
     /**
-     * A project that has not said it uses continuity is not checked. The builder decides that
-     * from bytecode, which this cannot read -- and guessing from anything else would warn
-     * projects that use none of it.
+     * A project that has not declared the synced store is not checked. The builder decides that
+     * from bytecode, which this cannot read.
      */
     @Test
-    public void aProjectThatDeclaresNoContinuityIsNotChecked() throws Exception {
+    public void aProjectThatDeclaresNoSyncedStoreIsNotChecked() throws Exception {
         Properties p = settings(profile("NoCloud", false));
-        p.remove("codename1.arg.ios.continuity.enabled");
+        p.remove("codename1.arg.ios.continuity.sync");
+
+        assertTrue(check(p).isEmpty());
+    }
+
+    /**
+     * The false warning this check used to produce. A project that uses continuity but NOT the
+     * synced store gets no entitlement from the builder, so warning that its profile cannot sign
+     * one told it to enable an iCloud capability it does not need.
+     */
+    @Test
+    public void aContinuityOnlyProjectIsNotWarnedAboutICloud() throws Exception {
+        Properties p = new Properties();
+        p.setProperty("codename1.packageName", "com.example.app");
+        p.setProperty(IOSProvisioningPreflight.provisioningProfileSettingKey(true),
+                profile("NoCloud", false).getAbsolutePath());
 
         assertTrue(check(p).isEmpty());
     }
@@ -163,7 +177,7 @@ public class IOSContinuitySyncPreflightTest {
     public void anUnreadableProfileIsLeftToTheOtherChecks() throws Exception {
         Properties p = new Properties();
         p.setProperty("codename1.packageName", "com.example.app");
-        p.setProperty("codename1.arg.ios.continuity.enabled", "true");
+        p.setProperty("codename1.arg.ios.continuity.sync", "true");
         p.setProperty(IOSProvisioningPreflight.provisioningProfileSettingKey(true),
                 "/nowhere/missing.mobileprovision");
 

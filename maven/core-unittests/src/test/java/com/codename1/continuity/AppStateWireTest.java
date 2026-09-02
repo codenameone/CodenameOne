@@ -109,6 +109,141 @@ public class AppStateWireTest {
         assertEquals(1700000000123L, back.getTimestamp());
     }
 
+    /**
+     * The reason every scalar crosses as a tagged string.
+     *
+     * <p>{@code JSONParser} reads every JSON number back as a {@code Double} and reads
+     * {@code true} back as the <em>string</em> {@code "true"}. Without tagging, an application
+     * that stored an {@code Integer} and cast it back got a {@code ClassCastException} on Android
+     * and the desktop -- and on iOS something worse, because ParparVM does not throw for a failed
+     * cast and hands the wrong object to the next instruction.</p>
+     */
+    @Test
+    public void everyAdmittedScalarKeepsItsTypeThroughJson() throws Exception {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("i", Integer.valueOf(3));
+        payload.put("l", Long.valueOf(9007199254740993L));
+        payload.put("d", Double.valueOf(1.5));
+        payload.put("b", Boolean.TRUE);
+        payload.put("s", "text");
+
+        Map<String, Object> back = StateCodec.fromJson(
+                StateCodec.toJson(new AppState().setPayload(payload))).getPayload();
+
+        assertEquals(Integer.valueOf(3), back.get("i"));
+        assertEquals(Long.valueOf(9007199254740993L), back.get("l"),
+                "a long past 2^53 is a different number once it has been a double");
+        assertEquals(Double.valueOf(1.5), back.get("d"));
+        assertEquals(Boolean.TRUE, back.get("b"));
+        assertEquals("text", back.get("s"));
+    }
+
+    /** The same guarantee on the map form, which is what an Apple continuation carries. */
+    @Test
+    public void everyAdmittedScalarKeepsItsTypeThroughTheMapForm() {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("i", Integer.valueOf(42));
+        payload.put("b", Boolean.FALSE);
+        payload.put("l", Long.valueOf(-9007199254740993L));
+
+        Map<String, Object> back = StateCodec.fromMap(
+                StateCodec.toMap(new AppState().setPayload(payload))).getPayload();
+
+        assertEquals(Integer.valueOf(42), back.get("i"));
+        assertEquals(Boolean.FALSE, back.get("b"));
+        assertEquals(Long.valueOf(-9007199254740993L), back.get("l"));
+    }
+
+    /** Types survive inside a list and inside a nested map too. */
+    @Test
+    public void typesSurviveInsideListsAndNestedMaps() throws Exception {
+        Map<String, Object> inner = new HashMap<String, Object>();
+        inner.put("count", Integer.valueOf(9));
+        List<Object> list = new ArrayList<Object>();
+        list.add(Integer.valueOf(7));
+        list.add(Boolean.TRUE);
+        list.add("nine");
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("inner", inner);
+        payload.put("list", list);
+
+        Map<String, Object> back = StateCodec.fromJson(
+                StateCodec.toJson(new AppState().setPayload(payload))).getPayload();
+
+        assertEquals(Integer.valueOf(9), ((Map<?, ?>) back.get("inner")).get("count"));
+        List<?> readList = (List<?>) back.get("list");
+        assertEquals(Integer.valueOf(7), readList.get(0));
+        assertEquals(Boolean.TRUE, readList.get(1));
+        assertEquals("nine", readList.get(2));
+    }
+
+    /** An application's own tag-shaped string is not mistaken for a tagged value. */
+    @Test
+    public void aStringThatLooksLikeATagIsStillAString() throws Exception {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("looksLikeAnInt", "i:5");
+        payload.put("looksLikeABool", "b:true");
+
+        Map<String, Object> back = StateCodec.fromJson(
+                StateCodec.toJson(new AppState().setPayload(payload))).getPayload();
+
+        assertEquals("i:5", back.get("looksLikeAnInt"));
+        assertEquals("b:true", back.get("looksLikeABool"));
+    }
+
+    /**
+     * An untagged payload -- a hand-written endpoint, or a device on an older build -- is passed
+     * through rather than refused. Untyped beats absent.
+     */
+    @Test
+    public void anUntaggedValueFromElsewhereIsPassedThrough() throws Exception {
+        AppState back = StateCodec.fromJson(
+                "{\"device\":\"other\",\"payload\":{\"note\":\"plain\"}}");
+
+        assertEquals("plain", back.getPayload().get("note"));
+    }
+
+    /**
+     * Null is refused where the application can act on it.
+     *
+     * <p>A property list cannot carry one: the iOS sanitizer drops a null-valued entry, and drops
+     * a null LIST ELEMENT, which shifts every index after it -- so the payload arriving on the
+     * other device is a different shape from the one that was sent.
+     */
+    @Test
+    public void aNullPayloadValueIsRefusedWithItsKey() {
+        final Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("draft", null);
+
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setPayload(payload);
+                    }
+                });
+
+        assertTrue(err.getMessage().contains("draft"), err.getMessage());
+        assertTrue(err.getMessage().contains("null"), err.getMessage());
+    }
+
+    @Test
+    public void aNullInsideAListIsRefusedWithItsIndex() {
+        List<Object> list = new ArrayList<Object>();
+        list.add("fine");
+        list.add(null);
+        final Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("items", list);
+
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setPayload(payload);
+                    }
+                });
+
+        assertTrue(err.getMessage().contains("items[1]"), err.getMessage());
+    }
+
     @Test
     public void aNestedPayloadSurvivesTheMapForm() {
         Map<String, Object> inner = new HashMap<String, Object>();

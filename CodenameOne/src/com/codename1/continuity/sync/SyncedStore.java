@@ -222,16 +222,16 @@ public final class SyncedStore {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 // Copied before iterating: a listener that reacts to a change by unregistering
                 // itself is ordinary, and would otherwise mutate the list being walked.
                 List<SyncedStoreListener> snapshot =
                         new ArrayList<SyncedStoreListener>(listeners);
-                for (int i = 0; i < snapshot.size(); i++) {
-                    // Read before the try, not inside it: the compiler inserts a checked cast for
-                    // the generic element type, and a failed cast does not throw on the iOS
-                    // virtual machine -- so a handler wrapped around one cannot run there.
-                    SyncedStoreListener l = snapshot.get(i);
+                // The element cast the compiler inserts sits in the loop header, outside the
+                // handler -- a failed cast does not throw on the iOS virtual machine, so a
+                // handler wrapped around one could not run there anyway.
+                for (SyncedStoreListener l : snapshot) {
                     try {
                         l.storeChanged();
                     } catch (Throwable t) {

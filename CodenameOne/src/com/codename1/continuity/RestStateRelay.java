@@ -109,6 +109,7 @@ public class RestStateRelay implements StateRelay {
         return null;
     }
 
+    @Override
     public void publish(AppState state) throws IOException {
         Response<String> response = auth(Rest.post(url).jsonContent()
                 .body(StateCodec.toJson(state))).getAsString();
@@ -120,6 +121,7 @@ public class RestStateRelay implements StateRelay {
         }
     }
 
+    @Override
     public AppState fetch() throws IOException {
         Response<String> response = auth(Rest.get(url).jsonContent()).getAsString();
         int code = response.getResponseCode();

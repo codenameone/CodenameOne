@@ -792,29 +792,20 @@ final class BuildHintsIos {
                         + "group, no plist keys -- leaving com.codename1.documents an inert no-op "
                         + "at runtime."));
 
-        h.add(new Hint("ios.continuity.enabled")
-                .group(HintGroup.IOS)
-                .type(HintType.BOOLEAN)
-                .def("false")
-                .platform("ios")
-                .doc("Declares that this project hands the user's work between their devices. "
-                        + "The build detects a reference to com.codename1.continuity on its own, "
-                        + "so this is redundant for the build itself; it exists because the "
-                        + "Certificate Wizard and the signing preflight work without reading "
-                        + "bytecode and need to know whether an iCloud capability will be "
-                        + "wanted."));
-
         h.add(new Hint("ios.continuity.sync")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)
                 .def("true")
                 .platform("ios")
-                .doc("Set false to skip the iCloud key-value store entitlement that a reference "
-                        + "to com.codename1.continuity.sync would otherwise earn. Use it when the "
-                        + "App ID has no iCloud capability and the app can live without a synced "
-                        + "store: SyncedStore then reports itself unsupported at runtime instead "
-                        + "of the build failing to sign. Handing work to a nearby device is "
-                        + "unaffected -- that half needs no entitlement."));
+                .doc("Whether this project wants the iCloud key-value store behind "
+                        + "com.codename1.continuity.sync. Left unset the build decides from the "
+                        + "bytecode, which is usually what you want. Set false when the App ID "
+                        + "has no iCloud capability and the app can live without a synced store: "
+                        + "the entitlement is dropped and SyncedStore reports itself unsupported "
+                        + "at runtime rather than the build failing to sign. Set true to say so "
+                        + "explicitly, which is what lets the signing preflight check the profile "
+                        + "before the build is sent. Handing work to a nearby device is "
+                        + "unaffected either way -- that half needs no entitlement."));
 
         h.add(new Hint("ios.superfastBuild")
                 .group(HintGroup.IOS)
