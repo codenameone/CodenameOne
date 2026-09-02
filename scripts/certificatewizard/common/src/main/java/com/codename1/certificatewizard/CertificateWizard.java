@@ -1866,9 +1866,36 @@ public class CertificateWizard extends Lifecycle {
 
     private void autoSetupMacProject(String profileType) {
         autoSetupWarnings.clear();
-        ensurePushCapabilities(projectDefaults().bundleId,
-                () -> autoSetupMacProject(profileType,
-                        () -> finishAutoSetup("Mac signing setup completed.")));
+        final ProjectDefaults defaults = projectDefaults();
+        // The Mac capability only: this button is scoped to Mac signing, and asserting the
+        // iOS one here would change an App ID this run has no intention of reissuing
+        // profiles from. The full run asserts both, because it reissues both.
+        ensurePushCapability(defaults.bundleId, "MAC_OS", () -> {
+            // And it reissues one profile type, while a capability change invalidates every
+            // profile the App ID ever issued -- both Mac types, and on a UNIVERSAL
+            // registration the iOS ones too, since that is one App ID serving both. What
+            // this button does not cover, it says, and points at the run that does.
+            if (projectWantsPush("MAC_OS") && hasOtherProfiles(defaults.bundleId, profileType)) {
+                warnDuringAutoSetup("Only the " + profileTypeName(profileType)
+                        + " profile was reissued here. If asserting the push capability changed it,"
+                        + " Apple invalidated the other profiles issued from " + defaults.bundleId
+                        + " -- automatic setup reissues them.");
+            }
+            autoSetupMacProject(profileType, () -> finishAutoSetup("Mac signing setup completed."));
+        });
+    }
+
+    /// Whether the account holds a profile for this identifier that this run is not going
+    /// to reissue. Read from the profiles rather than assumed, so the caveat above appears
+    /// for an account that has something to lose and stays quiet for one that does not.
+    private boolean hasOtherProfiles(String bundleIdentifier, String profileType) {
+        for (SigningState.Profile p : state.profiles) {
+            if (bundleIdentifier != null && bundleIdentifier.equals(p.bundleId())
+                    && !profileType.equals(p.profileType())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void autoSetupMacProject(String profileType, Runnable next) {

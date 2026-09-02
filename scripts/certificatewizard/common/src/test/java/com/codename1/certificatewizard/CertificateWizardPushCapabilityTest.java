@@ -172,6 +172,37 @@ class CertificateWizardPushCapabilityTest {
     }
 
     @Test
+    void standaloneMacSetupSaysWhatItDidNotReissue() throws Exception {
+        // One App ID for both platforms, profiles already issued from it, and a button that
+        // reissues one Mac profile type. Asserting the capability invalidates everything
+        // else that App ID ever issued, and this run is not going to fix those.
+        final MockSigningService service = new MockSigningService();
+        final CertificateWizard[] app = launchBound(service, "com.example.universal",
+                "codename1.arg.macos.entitlements.apsEnvironment=production\n");
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "btn.autoSetup");
+            }
+        });
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "nav.mac");
+            }
+        });
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "btn.macAppStore");
+            }
+        });
+
+        Component banner = find(app[0].getForm(), "page.message");
+        assertNotNull(banner, "the outcome has to be on screen");
+        String text = ((SpanLabel) banner).getText();
+        assertTrue(text.contains("automatic setup reissues them"),
+                "the profiles this button did not reissue have to be named: " + text);
+    }
+
+    @Test
     void thePushCapabilityCanBeTurnedOnFromTheBundleIdsPage() throws Exception {
         // What a project whose push the builders DETECT rather than read from a hint is
         // left with: neither inference is reproducible in the wizard, so the remedy for a
