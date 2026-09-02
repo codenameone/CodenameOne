@@ -848,6 +848,46 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * A component-selection block holds a rule per {@code all { }}, and the
+     * predicate that names this family has to be in the SAME rule as the
+     * rejection. Accumulated across the block, a rule that merely mentions
+     * Kotlin paired up with a sibling that rejects something else, so the block
+     * stood down for a rejection that could not touch it -- which leaves the
+     * duplicate exactly where it was.
+     */
+    @Test
+    public void aRejectionCountsOnlyInTheRuleThatNamesTheFamily() {
+        String open = "    configurations.all {\n        resolutionStrategy {\n"
+                + "            componentSelection {\n";
+        String close = "            }\n        }\n    }\n";
+        String logsKotlin = "                all { s ->\n                    if "
+                + "(s.candidate.module == 'kotlin-stdlib') "
+                + "{ logger.info(s.candidate.version) }\n                }\n";
+        String rejectsOther = "                all { s ->\n                    if "
+                + "(s.candidate.module == 'okhttp') "
+                + "{ s.reject('unsupported') }\n                }\n";
+        String rejectsOurs = "                all { s ->\n                    if "
+                + "(s.candidate.module == 'kotlin-stdlib-jdk8') "
+                + "{ s.reject('unsupported') }\n                }\n";
+
+        check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                        open + logsKotlin + rejectsOther + close)
+                        .contains("kotlin-stdlib-jdk7:1.8.0"),
+                "neither rule can reject the floor");
+
+        String[] rejecting = {
+            open + rejectsOther + rejectsOurs + close,
+            open + rejectsOurs + close,
+        };
+        for (int i = 0; i < rejecting.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    rejecting[i]);
+            check("".equals(out), "a rule that names and rejects stands the block "
+                    + "down, got <<" + out + ">>");
+        }
+    }
+
+    /**
      * A component-selection rule is normally written over several lines, and
      * then its opener, its predicate and its reject are three statements. The
      * one-statement reading saw none of them together, so a rule that removes

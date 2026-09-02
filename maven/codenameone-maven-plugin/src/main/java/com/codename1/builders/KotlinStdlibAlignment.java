@@ -552,18 +552,31 @@ public class KotlinStdlibAlignment {
                 namesKotlin = namesKotlin || namesOneOfTheFamily(active[i])
                         || holdsLiteral(active[i], KOTLIN_GROUP);
             }
+            int before = depth;
             depth += braceBalance(active[i]);
             if (depth < 0) {
                 depth = 0;
             }
-            if (openedAt >= 0 && depth <= openedAt) {
-                if (rejects && namesKotlin && governs) {
-                    return true;
-                }
+            if (openedAt < 0) {
+                continue;
+            }
+            if (rejects && namesKotlin && governs) {
+                return true;
+            }
+            if (depth <= openedAt) {
                 openedAt = -1;
+            } else if (depth == openedAt + 1 && before > openedAt + 1) {
+                // One rule of several just closed. A block holds a rule per
+                // `all { }` or `withModule { }`, and accumulating across all of
+                // them let a rule that merely MENTIONS this family pair up with
+                // a sibling that rejects something else -- so the block stood
+                // down for a rejection that could not touch it, which leaves the
+                // duplicate exactly where it was.
+                rejects = false;
+                namesKotlin = false;
             }
         }
-        return openedAt >= 0 && rejects && namesKotlin && governs;
+        return false;
     }
 
     /**
