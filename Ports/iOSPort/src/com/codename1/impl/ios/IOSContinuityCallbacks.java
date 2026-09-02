@@ -102,6 +102,19 @@ final class IOSContinuityCallbacks {
             // not: an app using both frameworks would otherwise have its own continuation offered
             // to the wrong one, which would correctly decline it, and the launch would land on the
             // home screen.
+            //
+            // But only when it is OURS. The native side matches on the ".continuity" suffix,
+            // which an App Intent id may also end in -- and claiming one of those here skipped
+            // the intents branch for an activity this framework then discarded on delivery.
+            //
+            // Declined only on a POSITIVE mismatch. Asking for the expected type can fail this
+            // early, before the stub has published package_name, and treating "cannot tell" as
+            // "not ours" would decline the framework's own cold launch -- the one case the whole
+            // feature exists for, and a worse outcome than the bug being fixed.
+            String expected = expectedTypeOrNull();
+            if (expected != null && !expected.equals(activityType)) {
+                return false;
+            }
             pendingType = activityType;
             pendingJson = userInfoJson;
             return true;
@@ -127,6 +140,23 @@ final class IOSContinuityCallbacks {
             c.syncedStoreChanged();
         } catch (Throwable t) {
             Log.e(t);
+        }
+    }
+
+    /// This app's continuity activity type, or null when it cannot be determined yet.
+    ///
+    /// Null rather than a guess: `Continuity.getActivityType()` substitutes a placeholder package
+    /// when the property is missing, and a placeholder compared against a real activity type is a
+    /// mismatch that reads as certainty.
+    private static String expectedTypeOrNull() {
+        try {
+            String pkg = com.codename1.ui.Display.getInstance().getProperty("package_name", null);
+            if (pkg == null || pkg.length() == 0) {
+                return null;
+            }
+            return pkg + ".continuity";
+        } catch (Throwable t) {
+            return null;
         }
     }
 

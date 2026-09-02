@@ -11750,6 +11750,47 @@ public class IPhoneBuilder extends Executor {
         return close < 0 || close > at;
     }
 
+    /// The index of the element that is the key's IMMEDIATE value, or -1.
+    ///
+    /// Whitespace and live comments are stepped over, because
+    /// `<key>NSUserActivityTypes</key><!-- why --><array/>` is a fragment a person writes and a
+    /// plist parser reads the array as the key's value regardless. Anything else stops the walk:
+    /// scanning onwards for the next element of the shape we want is what let a merge reach past
+    /// a NON-array value and insert into some later key's array instead, corrupting a property
+    /// this code was never asked about.
+    ///
+    /// @param plist the fragment
+    /// @param keyIndex the index of the `<key>` element
+    /// @return the index of the value element, or -1
+    static int immediateValueIndex(String plist, int keyIndex) {
+        if (plist == null || keyIndex < 0) {
+            return -1;
+        }
+        int afterKey = plist.indexOf("</key", keyIndex);
+        if (afterKey < 0) {
+            return -1;
+        }
+        afterKey = plist.indexOf('>', afterKey);
+        if (afterKey < 0) {
+            return -1;
+        }
+        int at = afterKey + 1;
+        for (;;) {
+            while (at < plist.length() && Character.isWhitespace(plist.charAt(at))) {
+                at++;
+            }
+            if (plist.startsWith("<!--", at)) {
+                int end = plist.indexOf("-->", at + 4);
+                if (end < 0) {
+                    return -1;
+                }
+                at = end + 3;
+                continue;
+            }
+            return at < plist.length() ? at : -1;
+        }
+    }
+
     /// Rewrites a self-closing `NSUserActivityTypes` array into an open/close pair.
     ///
     /// `<array/>` is the ordinary XML spelling of an empty array and a plist parser reads it
@@ -11771,22 +11812,8 @@ public class IPhoneBuilder extends Executor {
         if (key < 0) {
             return inject;
         }
-        int afterKey = inject.indexOf("</key", key);
-        if (afterKey < 0) {
-            return inject;
-        }
-        afterKey = inject.indexOf('>', afterKey);
-        if (afterKey < 0) {
-            return inject;
-        }
-        int at = afterKey + 1;
-        // The key's IMMEDIATE value, so only whitespace may separate them. Scanning forward for
-        // the next "<array" anywhere would find some later key's empty array and rewrite that
-        // instead -- editing an element this method was never asked about.
-        while (at < inject.length() && Character.isWhitespace(inject.charAt(at))) {
-            at++;
-        }
-        if (!inject.startsWith("<array", at)) {
+        int at = immediateValueIndex(inject, key);
+        if (at < 0 || !inject.startsWith("<array", at)) {
             return inject;
         }
         int close = inject.indexOf('>', at);
@@ -11820,11 +11847,15 @@ public class IPhoneBuilder extends Executor {
         // shipped had no continuity type in the array iOS actually reads, so Handoff was never
         // advertised and nothing anywhere said so.
         int key = firstLiveIndex(inject, "NSUserActivityTypes");
-        int open = key < 0 ? -1 : plistElementIndex(inject, "array", key);
-        while (open >= 0 && insideComment(inject, open)) {
-            open = plistElementIndex(inject, "array", open + 1);
+        // The key's OWN value, not the next array anywhere after it. An unbounded search reached
+        // past a NSUserActivityTypes whose value was not an array and inserted the ids into some
+        // later key's array -- corrupting a property this method was never asked about, while the
+        // documented behaviour for "no array here" is to return the fragment untouched.
+        int open = immediateValueIndex(inject, key);
+        if (open < 0 || !inject.startsWith("<array", open)) {
+            return inject;
         }
-        int close = open < 0 ? -1 : plistCloseElementIndex(inject, "array", open);
+        int close = plistCloseElementIndex(inject, "array", open);
         if (close < 0) {
             return inject;
         }

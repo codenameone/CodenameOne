@@ -318,6 +318,61 @@ class IPhoneBuilderContinuityPlistTest {
         assertTrue(IPhoneBuilder.insideComment(s, 7));
     }
 
+    /**
+     * A comment between the key and its array is a fragment a person writes, and a plist parser
+     * reads the array as the key's value regardless. Skipping only whitespace left the array
+     * self-closing, and the merge then found no closing tag and added nothing.
+     */
+    @Test
+    void aCommentBetweenTheKeyAndItsArrayIsSteppedOver() {
+        String inject = "<key>NSUserActivityTypes</key><!-- why we declare this --><array/>";
+
+        String merged = IPhoneBuilder.mergeUserActivityTypes(
+                IPhoneBuilder.expandEmptyUserActivityArray(inject), noIntents(), CONTINUITY_TYPE);
+
+        assertTrue(merged.contains("<string>" + CONTINUITY_TYPE + "</string>"), merged);
+        assertEquals(1, occurrences(merged, "NSUserActivityTypes"), merged);
+    }
+
+    /**
+     * The documented behaviour when this key's value is not an array is to return the fragment
+     * untouched. An unbounded search instead reached past it and inserted the ids into a LATER
+     * key's array, corrupting a property this code was never asked about.
+     */
+    @Test
+    void aNonArrayValueDoesNotBorrowALaterKeysArray() {
+        String inject = "<key>NSUserActivityTypes</key><string>not an array</string>"
+                + "<key>SomethingElse</key><array><string>keep</string></array>";
+
+        String merged = IPhoneBuilder.mergeUserActivityTypes(inject, intents("logWorkout"),
+                CONTINUITY_TYPE);
+
+        assertEquals(inject, merged, "an unrelated array was edited");
+    }
+
+    @Test
+    void aNonArrayValueIsNotExpandedEither() {
+        String inject = "<key>NSUserActivityTypes</key><dict/>"
+                + "<key>SomethingElse</key><array/>";
+
+        assertEquals(inject, IPhoneBuilder.expandEmptyUserActivityArray(inject));
+    }
+
+    @Test
+    void immediateValueIndexStepsOverWhitespaceAndComments() {
+        String plist = "<key>K</key>  <!-- a --> <!-- b --> <array/>";
+        int at = IPhoneBuilder.immediateValueIndex(plist, 0);
+
+        assertTrue(at > 0, "no value found");
+        assertTrue(plist.startsWith("<array", at), plist.substring(at));
+    }
+
+    /** An unterminated comment has no value after it, which is what a parser would conclude. */
+    @Test
+    void anUnterminatedCommentYieldsNoImmediateValue() {
+        assertEquals(-1, IPhoneBuilder.immediateValueIndex("<key>K</key><!-- oops", 0));
+    }
+
     @Test
     void nothingToAddLeavesTheFragmentAlone() {
         String inject = "<key>NSUserActivityTypes</key><array>"

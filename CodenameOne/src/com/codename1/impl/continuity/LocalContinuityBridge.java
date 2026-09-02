@@ -213,16 +213,17 @@ public class LocalContinuityBridge implements ContinuityBridge {
         if (raw == null || raw.length() == 0) {
             return keys;
         }
-        // Newline separated because a synced store key is an application-chosen string and the
-        // separators one might reach for first -- comma, semicolon, space -- are all plausible
-        // inside one. A newline is not, and put() is the only writer.
+        // Newline separated AND escaped. The separator alone was not enough: a key containing a
+        // newline is one this API accepts -- the platform store imposes no such rule, so neither
+        // does the simulation -- and it came back from here as two phantom keys that nothing
+        // could then remove.
         int start = 0;
         while (start <= raw.length()) {
             int end = raw.indexOf('\n', start);
             if (end < 0) {
                 end = raw.length();
             }
-            String key = raw.substring(start, end);
+            String key = unescapeIndexEntry(raw.substring(start, end));
             if (key.length() > 0 && !keys.contains(key)) {
                 keys.add(key);
             }
@@ -231,13 +232,52 @@ public class LocalContinuityBridge implements ContinuityBridge {
         return keys;
     }
 
+    /// Escapes a key for the newline-separated index: backslash first, then the separator.
+    private static String escapeIndexEntry(String key) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < key.length(); i++) {
+            char c = key.charAt(i);
+            if (c == '\\') {
+                sb.append("\\\\");
+            } else if (c == '\n') {
+                sb.append("\\n");
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /// Reverses `escapeIndexEntry`.
+    private static String unescapeIndexEntry(String entry) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < entry.length(); i++) {
+            char c = entry.charAt(i);
+            if (c == '\\' && i + 1 < entry.length()) {
+                char next = entry.charAt(i + 1);
+                if (next == 'n') {
+                    sb.append('\n');
+                    i++;
+                    continue;
+                }
+                if (next == '\\') {
+                    sb.append('\\');
+                    i++;
+                    continue;
+                }
+            }
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
     private void writeIndex(List<String> keys) {
         StringBuilder sb = new StringBuilder();
         for (String key : keys) {
             if (sb.length() > 0) {
                 sb.append('\n');
             }
-            sb.append(key);
+            sb.append(escapeIndexEntry(key));
         }
         Preferences.set(INDEX, sb.toString());
     }

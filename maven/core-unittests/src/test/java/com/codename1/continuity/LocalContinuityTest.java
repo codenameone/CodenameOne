@@ -701,6 +701,34 @@ public class LocalContinuityTest extends UITestBase {
         }
     }
 
+    /**
+     * A key containing a newline is one this API accepts -- the platform store imposes no such
+     * rule, so the simulation must not either. The newline-delimited index used to read it back
+     * as two phantom keys, and nothing could then remove the value that was actually stored.
+     */
+    @EdtTest
+    public void aKeyContainingANewlineSurvivesTheSimulatedIndex() {
+        assertTrue(SyncedStore.put("multi\nline", "value"));
+
+        List<String> keys = new ArrayList<String>(Arrays.asList(SyncedStore.keys()));
+        assertTrue(keys.contains("multi\nline"), "the key came back as " + keys);
+        assertFalse(keys.contains("multi"), "a phantom key appeared: " + keys);
+        assertEquals("value", SyncedStore.get("multi\nline", "missing"));
+
+        SyncedStore.remove("multi\nline");
+        assertFalse(new ArrayList<String>(Arrays.asList(SyncedStore.keys()))
+                .contains("multi\nline"), "the key could not be removed");
+    }
+
+    /** A backslash in a key is the other half of the escaping, and round-trips too. */
+    @EdtTest
+    public void aKeyContainingABackslashSurvivesTheSimulatedIndex() {
+        assertTrue(SyncedStore.put("back\\slash", "v"));
+
+        List<String> keys = new ArrayList<String>(Arrays.asList(SyncedStore.keys()));
+        assertTrue(keys.contains("back\\slash"), "the key came back as " + keys);
+    }
+
     @EdtTest
     public void aChangeMadeElsewhereReachesTheListener() {
         CountingStoreListener listener = new CountingStoreListener();

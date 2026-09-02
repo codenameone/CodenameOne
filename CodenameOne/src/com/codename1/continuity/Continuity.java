@@ -702,7 +702,14 @@ public final class Continuity {
             pendingPublish = null;
             accountEra++;
         }
-        lastSeen.clear();
+        synchronized (lastSeen) {
+            // Under the same monitor deliver() and isStillNewest() use. A bare clear() on a
+            // HashMap that another thread is reading is a data race, not merely a stale read --
+            // and the benign-looking version of it let a pre-logout high-water mark survive long
+            // enough for a queued delivery to pass isStillNewest and dispatch the previous
+            // account's state after the user signed out.
+            lastSeen.clear();
+        }
         clearContinuation();
         try {
             if (Display.isInitialized() && Storage.getInstance().exists(STORAGE_KEY)) {
