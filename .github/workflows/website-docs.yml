@@ -20,6 +20,10 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
+      # The other root build_javadocs.sh generates from, and the other one
+      # check-guide-links.py indexes. Without it, deleting a linked CLDC type
+      # merges unvalidated and the next scheduled build is where it surfaces.
+      - 'Ports/CLDC11/src/**'
       # The developer guide this site renders includes a build hint table that is
       # generated rather than committed, so a change to the catalog or to the
       # renderer changes the published page without touching docs/. The
@@ -46,6 +50,10 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
+      # The other root build_javadocs.sh generates from, and the other one
+      # check-guide-links.py indexes. Without it, deleting a linked CLDC type
+      # merges unvalidated and the next scheduled build is where it surfaces.
+      - 'Ports/CLDC11/src/**'
       # As above: the build hint table is generated, not committed.
       - 'maven/build-hint-catalog/**'
       - 'maven/build-hint-tools/**'

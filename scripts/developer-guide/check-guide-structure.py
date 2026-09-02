@@ -511,8 +511,19 @@ def main() -> int:
         key = normalize(heading[1])
         # A direct entry must appear at CHAPTER level. A nested fragment sits at
         # whatever depth its parent puts it, so it is only counted at all.
+        #
+        # Counted once per INCLUSION, not once per file. A fragment two parents
+        # both include renders twice, and expecting one title let a swallowed
+        # occurrence hide behind the surviving one -- the check only ever asks
+        # whether a title appears at least as often as expected.
+        occurrences = sum(
+            count
+            for (_, included), count in walker.include_edges.items()
+            if included == path
+        ) or 1
         target = expected_chapters if path in walker.direct else expected
-        target.setdefault(key, []).append(path.name)
+        for _ in range(occurrences):
+            target.setdefault(key, []).append(path.name)
 
     for title, sources in sorted(expected_chapters.items()):
         found = rendered_chapters.get(title, 0)
