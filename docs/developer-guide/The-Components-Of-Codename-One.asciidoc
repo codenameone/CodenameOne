@@ -1755,7 +1755,7 @@ NOTE: The JavaScript Bridge is implemented on top of the `BrowserNavigationCallb
 TIP: The JavaScript bridge is sometimes confused with the JavaScript Port. The JavaScript bridge allows you to communicate with JavaScript from Java (and vice versa). The JavaScript port allows you to compile the Codename One application into a JavaScript application that runs in a standard web browser without code changes (think GWT without source changes and with thread support).+
 You discuss the JavaScript port further later in the guide.
 
-Use the `BrowserComponent` API to interact with JavaScript. It replaces the deprecated https://www.codenameone.com/javadoc/com/codename1/JavaScript/package-summary.html[com.codename1.JavaScript package].
+Use the `BrowserComponent` API to interact with JavaScript. It replaces the deprecated https://www.codenameone.com/javadoc/com/codename1/javascript/package-summary.html[`com.codename1.javascript` package].
 
 ===== What was wrong with the old API
 
@@ -1859,7 +1859,7 @@ Coupled with `shouldNavigate` you can effectively do everything which is what th
 
 While it's possible to build everything on top of `execute` and `shouldNavigate`, both of these methods have their limits. That's why Codename One introduced the JavaScript package, it allows you to communicate with JavaScript using intuitive code/syntax.
 
-The https://www.codenameone.com/javadoc/com/codename1/JavaScript/JavascriptContext.html[JavascriptContext] class lays the foundation by enabling you to call JavaScript code directly from Java. It provides automatic type conversion between Java and JavaScript types as follows:
+The https://www.codenameone.com/javadoc/com/codename1/javascript/JavascriptContext.html[JavascriptContext] class lays the foundation by enabling you to call JavaScript code directly from Java. It provides automatic type conversion between Java and JavaScript types as follows:
 
 .Java to JavaScript
 [cols="2*",options="header"]
@@ -1888,7 +1888,7 @@ The https://www.codenameone.com/javadoc/com/codename1/JavaScript/JavascriptConte
 | `undefined` | `null`
 |====
 
-NOTE: This conversion table is more verbose than necessary, since JavaScript functions and arrays are, in fact Objects themselves, so those rows are redundant. All JavaScript objects are converted to https://www.codenameone.com/javadoc/com/codename1/JavaScript/JSObject.html[JSObject].
+NOTE: This conversion table is more verbose than necessary, since JavaScript functions and arrays are, in fact Objects themselves, so those rows are redundant. All JavaScript objects are converted to https://www.codenameone.com/javadoc/com/codename1/javascript/JSObject.html[JSObject].
 
 You can access JavaScript variables from the context by using code like this:
 

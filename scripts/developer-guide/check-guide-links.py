@@ -23,7 +23,7 @@ import collections
 import datetime
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
 
 ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
@@ -37,11 +37,17 @@ URL_RE = re.compile(r"\bhttps?://[^\s\[\]<>\"'`)]+")
 # So both spellings are refused instead, which keeps the gap from opening quietly.
 ATTRIBUTE_URL_DECL_RE = re.compile(r"^:[A-Za-z0-9_-]+:\s*https?://")
 ATTRIBUTE_LINK_RE = re.compile(r"\blink:\{[^}]+\}")
+# A root-relative target names a website route just as an absolute URL does, but
+# it carries no scheme, so URL_RE never sees it -- and check-guide-xrefs.py skips
+# hrefs beginning with "/" because they are not same-page anchors. Between the two
+# gates the route went unchecked, so it is run through the same route model here.
+ROOT_RELATIVE_RE = re.compile(r"""(?:\blink:|\bhref=["'])(/[^\s\[\]"'`>]*)""")
 # The one tree that genuinely cannot be enumerated from this repository: the
 # Javadoc is produced from the framework sources at build time. Everything else,
 # /developer-guide/ included, is derived below -- whitelisting a prefix silently
 # exempts every path under it from the check.
 GENERATED_PREFIXES = ("/javadoc/",)
+_JAVADOC_ROOT: Path | None = None
 # http:// is correct for these: RFC 3161 timestamping servers reject TLS, and
 # example.com URLs are illustrative rather than fetched.
 TLS_EXEMPT_HOSTS = {"timestamp.digicert.com", "example.com", "www.example.com"}
@@ -154,6 +160,77 @@ def redirect_pattern(source: str) -> tuple[re.Pattern[str], list[str]] | None:
     return re.compile("^" + pattern + "/?$"), names
 
 
+# build_javadocs.sh generates the API docs from these two roots, so the published
+# tree is derivable from the repository without building it.
+JAVADOC_SOURCE_ROOTS = ("CodenameOne/src", "Ports/CLDC11/src")
+# Pages javadoc emits for a package rather than for a type.
+JAVADOC_PACKAGE_PAGES = {
+    "package-summary.html",
+    "package-frame.html",
+    "package-use.html",
+    "package-tree.html",
+}
+_javadoc_index: tuple[set[str], set[str]] | None = None
+
+
+def javadoc_index(repo_root: Path) -> tuple[set[str], set[str]]:
+    """Package directories and class names the generated Javadoc will contain."""
+    global _javadoc_index
+    if _javadoc_index is not None:
+        return _javadoc_index
+    packages: set[str] = set()
+    classes: set[str] = set()
+    for root_name in JAVADOC_SOURCE_ROOTS:
+        root = repo_root / root_name
+        if not root.exists():
+            continue
+        for source in root.rglob("*.java"):
+            relative = source.relative_to(root)
+            package = relative.parent.as_posix()
+            packages.add(package)
+            classes.add(f"{package}/{relative.stem}")
+    _javadoc_index = (packages, classes)
+    return _javadoc_index
+
+
+def javadoc_path_exists(target: str) -> bool:
+    """Whether a /javadoc/ path names something the generated tree will hold.
+
+    The prefix used to be accepted wholesale, on the grounds that the tree is
+    generated at build time and cannot be enumerated here. It can: the generator
+    runs over two fixed source roots, so a package is a directory and a class page
+    is a .java file. That distinction matters -- the guide linked three times to
+    /javadoc/com/codename1/JavaScript/, and the package is lowercase, so a
+    case-sensitive host served 404s while this reported success.
+
+    Anything that is not a recognisable package or class page is still accepted:
+    javadoc emits index pages, class-use trees and frames this does not model, and
+    reporting those would be a false alarm rather than a finding.
+    """
+    if _JAVADOC_ROOT is None:
+        return True
+    path = target[len("/javadoc/"):] if target.startswith("/javadoc/") else target
+    if not path.endswith(".html"):
+        return True  # a directory or an asset, not a documented type
+    packages, classes = javadoc_index(_JAVADOC_ROOT)
+    package = str(PurePosixPath(path).parent)
+    page = PurePosixPath(path).name
+    if package == ".":
+        return True  # a top-level index or overview page, outside the model
+    # class-use/ holds one page per type, alongside the package it belongs to.
+    if package.endswith("/class-use"):
+        package = package[: -len("/class-use")]
+    if package not in packages:
+        # The package itself will not exist in the generated tree. This is the
+        # case that mattered: com/codename1/JavaScript is spelt lowercase in the
+        # sources, so the published path 404s on a case-sensitive host.
+        return False
+    if page in JAVADOC_PACKAGE_PAGES:
+        return True
+    # A nested type is documented as Outer.Inner.html, generated from Outer.java.
+    return f"{package}/{page[:-5].split('.')[0]}" in classes
+
+
 def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
     """Whether a path is served, following wildcard redirects to their destination.
 
@@ -167,8 +244,10 @@ def resolves(target: str, known: set[str], rules: list, depth: int = 0) -> bool:
         return True
     if target.startswith(GENERATED_PREFIXES) or target + "/" in GENERATED_PREFIXES:
         # Reachable both directly and by following a redirect into it, so the
-        # test belongs here rather than only at the call site.
-        return True
+        # test belongs here rather than only at the call site. The javadoc tree is
+        # not accepted wholesale -- javadoc_path_exists() checks the package and
+        # class against the sources it is generated from.
+        return javadoc_path_exists(target)
     if depth > 4:  # a redirect loop in the table should not hang the check
         return False
     for compiled, names, destination in rules:
@@ -391,6 +470,11 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
             out.append((line.strip().split()[0], "an attribute holding a URL: any link built from it is unchecked, because this does not expand attributes"))
         if ATTRIBUTE_LINK_RE.search(line):
             out.append((ATTRIBUTE_LINK_RE.search(line).group(0), "a link target built from an attribute, which this cannot expand or check"))
+        for target in ROOT_RELATIVE_RE.findall(line):
+            path = target.split("#", 1)[0].split("?", 1)[0]
+            normalized = normalize_path(path)
+            if not resolves(normalized, known, patterns):
+                out.append((target, "the website serves no such path (checked _redirects and the content tree)"))
         for url in URL_RE.findall(line):
             url = url.rstrip(".,;:")
             split = urlsplit(url)
@@ -497,6 +581,8 @@ def main() -> int:
     args = parser.parse_args()
 
     guide_dir = args.guide_dir.resolve()
+    global _JAVADOC_ROOT
+    _JAVADOC_ROOT = args.repo_root.resolve()
     known, patterns, declared = site_paths(args.repo_root.resolve())
     if not known:
         raise SystemExit("could not derive any site paths; is --repo-root correct?")
