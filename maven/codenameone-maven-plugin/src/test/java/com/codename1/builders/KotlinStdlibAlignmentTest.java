@@ -178,17 +178,20 @@ class KotlinStdlibAlignmentTest {
 
     /**
      * Every fragment the app controls has to reach the scan. A hint that is
-     * added to the generated script and not passed here is a pin this cannot
-     * see, which is the one way to get the dangerous answer.
+     * added to the generated script and not collected here is a pin this cannot
+     * see, which is the one way to get the dangerous answer. The same list has
+     * to feed both questions, too -- asking "does the app pin this" over one set
+     * of fragments and then aligning over another is the same defect wearing a
+     * different shape.
      */
     @Test
     void theBuilderPassesEveryAppControlledFragment() throws Exception {
         String src = new String(java.nio.file.Files.readAllBytes(new java.io.File(
                 "src/main/java/com/codename1/builders/AndroidGradleBuilder.java")
                 .toPath()), "UTF-8");
-        int at = src.indexOf("KotlinStdlibAlignment.constraintsBlock(");
-        assertTrue(at >= 0, "the builder calls the alignment");
-        String call = src.substring(at, src.indexOf(";", at));
+        int at = src.indexOf("String[] appGradle = {");
+        assertTrue(at >= 0, "the builder collects the app's Gradle fragments");
+        String list = src.substring(at, src.indexOf("};", at));
         String[] hints = {
             "android.gradlePlugin", "android.gradle.androidx",
             "android.xgradle_default_config", "android.supportv4Dep",
@@ -197,7 +200,7 @@ class KotlinStdlibAlignmentTest {
         for (String hint : hints) {
             // With the quotes. One hint name is a prefix of another, so a bare
             // contains() stayed true after the argument was deleted.
-            assertTrue(call.contains("\"" + hint + "\""),
+            assertTrue(list.contains("\"" + hint + "\""),
                     "the alignment is not told about the " + hint
                             + " hint, which reaches the generated script");
         }
@@ -205,14 +208,20 @@ class KotlinStdlibAlignmentTest {
             "kotlinRuntimeDependency", "additionalDependencies",
             "aiExtraGradleDependencies", "aarDependencies", "injectRepo",
             "gradleDependency",
+            // This builder has desugaring; the daemon twin does not.
+            "coreLibraryDesugaringDependency",
         };
         for (String local : locals) {
-            assertTrue(call.contains(local),
+            assertTrue(list.contains(local),
                     "the alignment is not told about " + local
                             + ", which reaches the generated script");
         }
+        String uses = src.substring(src.indexOf("};", at));
+        assertTrue(uses.contains("appPinsTheStdlibFamily(appGradle)"),
+                "the stand-down question is asked over that same list");
+        assertTrue(uses.contains("constraintsBlock(compile, appGradle)"),
+                "and so is the alignment");
     }
-
     /**
      * The alignment is an optimisation over a build that already worked apart
      * from one duplicate class, and it runs on every AndroidX build -- so its

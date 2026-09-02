@@ -7300,40 +7300,50 @@ public class AndroidGradleBuilder extends Executor {
         String kotlinStdlibConstraints = "";
         if (useAndroidX && gradleVersionInt >= 6
                 && request.getArg("android.kotlinStdlibAlignment", "true").equals("true")) {
+            // Every fragment the APP controls, as one piece of text. Order and
+            // nesting do not matter to a whole-text check, so nothing here wraps
+            // or sequences them -- that was the parser's requirement, not this
+            // one. Built once because it answers two questions: whether the app
+            // already holds this family, and what to hand the alignment.
+            String[] appGradle = {
+                request.getArg("android.gradlePlugin", ""),
+                request.getArg("android.gradle.androidx", ""),
+                request.getArg("android.xgradle_default_config", ""),
+                request.getArg("android.supportv4Dep", ""),
+                request.getArg("android.gradleDep", ""),
+                request.getArg("android.xgradle", ""),
+                coreLibraryDesugaringDependency,
+                kotlinRuntimeDependency,
+                additionalDependencies,
+                aiExtraGradleDependencies.toString(),
+                aarDependencies,
+                injectRepo,
+                gradleDependency
+            };
             try {
-                kotlinStdlibConstraints = KotlinStdlibAlignment.constraintsBlock(
-                        compile,
-                        // Every fragment the APP controls, as one piece of
-                        // text. Order and nesting do not matter to a whole-text
-                        // check, so nothing here wraps or sequences them --
-                        // that was the parser's requirement, not this one.
-                        request.getArg("android.gradlePlugin", ""),
-                        request.getArg("android.gradle.androidx", ""),
-                        request.getArg("android.xgradle_default_config", ""),
-                        request.getArg("android.supportv4Dep", ""),
-                        request.getArg("android.gradleDep", ""),
-                        request.getArg("android.xgradle", ""),
-                        coreLibraryDesugaringDependency,
-                        kotlinRuntimeDependency,
-                        additionalDependencies,
-                        aiExtraGradleDependencies.toString(),
-                        aarDependencies,
-                        injectRepo,
-                        gradleDependency);
+                if (KotlinStdlibAlignment.appPinsTheStdlibFamily(appGradle)) {
+                    // Said out loud. An alignment that silently does not happen
+                    // is the one support cannot account for later, when the
+                    // duplicate class it exists to prevent comes back.
+                    log("NOTICE: not aligning the Kotlin stdlib, the project's "
+                            + "own Gradle text holds that family itself");
+                } else {
+                    kotlinStdlibConstraints =
+                            KotlinStdlibAlignment.constraintsBlock(compile, appGradle);
+                }
             } catch (RuntimeException e) {
-                // The alignment reads the app's Gradle text to decide whether the app
-                // already manages the stdlib family, and that reading is a scanner
-                // over arbitrary developer-authored Groovy. It runs on EVERY AndroidX
-                // build, so an index defect anywhere in it would not break one app,
-                // it would break all of them -- and the whole block is an optimisation
-                // over a build that already worked apart from one duplicate class.
-                // So its worst case is made "emit nothing", which is exactly the
-                // behaviour before this feature existed, and never a failed build.
-                // Logged rather than swallowed, because a silent catch here would
+                // The alignment is string work with no indexing in it, so this
+                // should not be reachable. It is here anyway because the whole
+                // block is an optimisation over a build that already worked
+                // apart from one duplicate class, and it runs on EVERY AndroidX
+                // build -- so a defect here would not break one app, it would
+                // break all of them. Three lines buy the difference between
+                // believing it cannot fail a build and knowing it cannot.
+                // Logged rather than swallowed, because a silent catch would
                 // hide the defect for as long as nobody reported the duplicate.
                 kotlinStdlibConstraints = "";
-                log("NOTICE: skipping the Kotlin stdlib alignment, its read of the "
-                        + "project's Gradle text failed: " + e);
+                log("NOTICE: skipping the Kotlin stdlib alignment, it failed "
+                        + "unexpectedly: " + e);
             }
         }
 
