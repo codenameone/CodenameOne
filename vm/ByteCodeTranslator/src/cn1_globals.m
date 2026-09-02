@@ -11032,17 +11032,164 @@ JAVA_OBJECT alloc4DArray(CODENAME_ONE_THREAD_STATE, int length4, int length3, in
  * Creates a java.lang.String object from an array of integers, this is useful
  * for the constant pool
  */
-JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]) {
-    enteringNativeAllocations();
-    JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, length, &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
-    memcpy((*dat).data, data, length * sizeof(JAVA_ARRAY_CHAR));
-    JAVA_OBJECT o = __NEW_java_lang_String(threadStateData);
+/*
+ * Builds a java.lang.String from decoded UTF-16 code units.
+ *
+ * The representation is not a free choice: the VM stores a string whose units all
+ * fit in a byte as a COMPACT byte[], and as a char[] otherwise, and String.charAt
+ * reads whichever it finds. Handing it the wrong one does not fail loudly -- it
+ * reads 8-bit units out of 16-bit data, so "caf..." comes back as c,NUL,a,NUL,f.
+ *
+ * Used by newString and newStringFromUtf8. newStringFromCString deliberately keeps
+ * its own copy of this tail: it tracks the Latin-1 flag DURING decoding, and it runs
+ * for every generated string literal at startup, so routing it through here would
+ * add a second pass over every literal in the program to save a dozen duplicated
+ * lines. If that tail changes, change this one with it.
+ */
+static JAVA_OBJECT cn1StringFromUnits(CODENAME_ONE_THREAD_STATE, const JAVA_ARRAY_CHAR* units, int count) {
+    JAVA_ARRAY dat;
+    JAVA_BOOLEAN latin1 = JAVA_TRUE;
+    int i;
+    JAVA_OBJECT o;
+    struct obj__java_lang_String* ss;
+    for(i = 0 ; i < count ; i++) {
+        if(units[i] > 0xff) { latin1 = JAVA_FALSE; break; }
+    }
+    if(latin1) {
+        JAVA_ARRAY_BYTE* b;
+        dat = (JAVA_ARRAY)allocArray(threadStateData, count, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+        b = (JAVA_ARRAY_BYTE*) (*dat).data;
+        for(i = 0 ; i < count ; i++) { b[i] = (JAVA_ARRAY_BYTE)units[i]; }
+    } else {
+        JAVA_ARRAY_CHAR* a;
+        dat = (JAVA_ARRAY)allocArray(threadStateData, count, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
+        a = (JAVA_ARRAY_CHAR*) (*dat).data;
+        for(i = 0 ; i < count ; i++) { a[i] = units[i]; }
+    }
+    o = __NEW_java_lang_String(threadStateData);
     java_lang_String___INIT____(threadStateData, o);
-    struct obj__java_lang_String* str = (struct obj__java_lang_String*)o;
-    str->java_lang_String_value = (JAVA_OBJECT)dat;
-    str->java_lang_String_count = length;
+    ss = (struct obj__java_lang_String*)o;
+    ss->java_lang_String_value = (JAVA_OBJECT)dat;
+    ss->java_lang_String_count = count;
+    return o;
+}
+
+JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]) {
+    /* JAVA_CHAR is an INT and JAVA_ARRAY_CHAR is an unsigned short, so the old
+       body was wrong twice: it sized the allocation with sizeof(JAVA_CHAR) (4 bytes
+       per element, for an array whose readers use 2) and then memcpy'd
+       length * sizeof(JAVA_ARRAY_CHAR) bytes straight out of a 4-byte-element
+       array, which copies half the input at the wrong stride. It went unnoticed
+       because nothing in C called this until now. Narrow element by element. */
+    JAVA_OBJECT o;
+    JAVA_ARRAY_CHAR stackUnits[256];
+    JAVA_ARRAY_CHAR* units = length <= 256 ? stackUnits
+            : (JAVA_ARRAY_CHAR*)malloc((size_t)length * sizeof(JAVA_ARRAY_CHAR));
+    int i;
+    if(units == 0) {
+        return JAVA_NULL;
+    }
+    enteringNativeAllocations();
+    for(i = 0 ; i < length ; i++) {
+        units[i] = (JAVA_ARRAY_CHAR)data[i];
+    }
+    o = cn1StringFromUnits(threadStateData, units, length);
+    if(units != stackUnits) {
+        free(units);
+    }
     finishedNativeAllocations();
     return o;
+}
+
+/**
+ * Creates a java.lang.String by DECODING UTF-8, rather than widening bytes.
+ *
+ * newStringFromCString below widens each byte to a char independently -- its own
+ * comment says so, and that is correct for the generated string literals it exists
+ * to serve, which are ASCII plus ~~uXXXX escapes. It is wrong for any text that
+ * arrives from outside the program: a UTF-8 "e-acute" is two bytes, and widening
+ * them yields two garbage chars instead of one correct one.
+ *
+ * Invalid input decodes to U+FFFD rather than failing, which is what
+ * java.lang.String's own UTF-8 decoder does: a program should not die because one
+ * environment variable holds a stray byte.
+ *
+ * NOTE the Windows gap this does not close: argv and the environment arrive in the
+ * ACTIVE CODE PAGE there, not UTF-8, so they need the wide entry points
+ * (GetCommandLineW / _wgetenv) before any decoding is meaningful. That is the same
+ * unfixed issue recorded against the file layer in nativeMethods.m, and the same
+ * remedy.
+ */
+JAVA_OBJECT newStringFromUtf8(CODENAME_ONE_THREAD_STATE, const char* str) {
+    int length;
+    int in = 0;
+    int out = 0;
+    /* JAVA_ARRAY_CHAR, not JAVA_CHAR: these are UTF-16 code UNITS destined for a
+       string's backing array, and the two types are different widths. */
+    JAVA_ARRAY_CHAR stackBuf[256];
+    JAVA_ARRAY_CHAR* buf;
+    JAVA_OBJECT result;
+    if(str == 0) {
+        return JAVA_NULL;
+    }
+    length = (int)strlen(str);
+    /* One UTF-16 unit per input BYTE is always enough: a 1-byte sequence yields 1,
+       and the only multi-unit case (a 4-byte sequence yielding a surrogate pair)
+       yields 2 units from 4 bytes. An invalid byte yields exactly one U+FFFD. */
+    buf = length <= 256 ? stackBuf : (JAVA_ARRAY_CHAR*)malloc((size_t)length * sizeof(JAVA_ARRAY_CHAR));
+    if(buf == 0) {
+        return JAVA_NULL;
+    }
+    while(in < length) {
+        unsigned char b0 = (unsigned char)str[in];
+        unsigned int cp;
+        int extra;
+        if(b0 < 0x80) {
+            buf[out++] = (JAVA_ARRAY_CHAR)b0;
+            in++;
+            continue;
+        } else if((b0 & 0xE0) == 0xC0) { cp = b0 & 0x1FU; extra = 1; }
+        else if((b0 & 0xF0) == 0xE0) { cp = b0 & 0x0FU; extra = 2; }
+        else if((b0 & 0xF8) == 0xF0) { cp = b0 & 0x07U; extra = 3; }
+        else { buf[out++] = 0xFFFD; in++; continue; }
+
+        if(in + extra >= length + 0) {
+            /* Truncated at the end of the input. */
+            if(in + extra > length - 1) { buf[out++] = 0xFFFD; in++; continue; }
+        }
+        {
+            int k;
+            int ok = 1;
+            for(k = 1 ; k <= extra ; k++) {
+                unsigned char bn = (unsigned char)str[in + k];
+                if((bn & 0xC0) != 0x80) { ok = 0; break; }
+                cp = (cp << 6) | (bn & 0x3FU);
+            }
+            if(!ok) { buf[out++] = 0xFFFD; in++; continue; }
+        }
+        in += extra + 1;
+        /* Overlong forms, surrogates encoded as UTF-8, and out-of-range code points
+           are all rejected the way a conforming decoder must. */
+        if((extra == 1 && cp < 0x80) || (extra == 2 && cp < 0x800) || (extra == 3 && cp < 0x10000)
+                || (cp >= 0xD800 && cp <= 0xDFFF) || cp > 0x10FFFF) {
+            buf[out++] = 0xFFFD;
+            continue;
+        }
+        if(cp >= 0x10000) {
+            cp -= 0x10000;
+            buf[out++] = (JAVA_ARRAY_CHAR)(0xD800 + (cp >> 10));
+            buf[out++] = (JAVA_ARRAY_CHAR)(0xDC00 + (cp & 0x3FF));
+        } else {
+            buf[out++] = (JAVA_ARRAY_CHAR)cp;
+        }
+    }
+    enteringNativeAllocations();
+    result = cn1StringFromUnits(threadStateData, buf, out);
+    finishedNativeAllocations();
+    if(buf != stackBuf) {
+        free(buf);
+    }
+    return result;
 }
 
 /**
@@ -11928,7 +12075,10 @@ JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]) {
     JAVA_OBJECT arrObj = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     JAVA_ARRAY_OBJECT* dest = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)arrObj)->data;
     for(int iter = 0 ; iter < count ; iter++) {
-        JAVA_OBJECT str = newStringFromCString(threadStateData, argv[iter + 1]);
+        /* Decoded, not widened: an argument is outside text. A UTF-8 "e-acute" is
+           two bytes, and widening them hands main(String[]) two garbage chars --
+           enough to corrupt a path or an option value before the program starts. */
+        JAVA_OBJECT str = newStringFromUtf8(threadStateData, argv[iter + 1]);
         CN1_WRITE_BARRIER(arrObj, str);
         dest[iter] = str;
     }

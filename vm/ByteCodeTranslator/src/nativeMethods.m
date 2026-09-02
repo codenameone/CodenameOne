@@ -1104,8 +1104,14 @@ static void cn1FreeThreadStack(struct elementStruct* stack, int mapped) {
 // getenv returns a pointer into the process environment, which is owned by the
 // C runtime and must not be freed. stringToUTF8 hands back the calling thread's
 // scratch buffer, so the lookup must finish with it before anything else on this
-// thread converts another string -- newStringFromCString copies, so building the
+// thread converts another string -- newStringFromUtf8 copies, so building the
 // result here is safe.
+//
+// DECODED, not widened. An environment value is outside text: newStringFromCString
+// turns each byte into its own char, so a UTF-8 value comes back as one garbage
+// char per byte. (On Windows the value is in the ACTIVE CODE PAGE rather than
+// UTF-8, so it needs _wgetenv before any decoding is meaningful -- the same unfixed
+// issue recorded against the file layer below, and the same remedy.)
 JAVA_OBJECT java_lang_System_getenv___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
     if(name == JAVA_NULL) {
         return JAVA_NULL;
@@ -1118,7 +1124,7 @@ JAVA_OBJECT java_lang_System_getenv___java_lang_String_R_java_lang_String(CODENA
     if(value == NULL) {
         return JAVA_NULL;
     }
-    return newStringFromCString(threadStateData, value);
+    return newStringFromUtf8(threadStateData, value);
 }
 
 // ---------------------------------------------------------------------------

@@ -2569,6 +2569,12 @@ extern struct clazz class_array2__JAVA_DOUBLE;
 extern struct clazz class_array3__JAVA_DOUBLE;
 
 extern JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]);
+/**
+ * Like newStringFromCString but DECODES UTF-8 instead of widening bytes. Use it for
+ * text that came from outside the program (argv, the environment); the widening one
+ * is right only for generated literals, which are ASCII plus ~~uXXXX escapes.
+ */
+extern JAVA_OBJECT newStringFromUtf8(CODENAME_ONE_THREAD_STATE, const char* str);
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str);
 extern JAVA_OBJECT newStringFromAsciiLen(CODENAME_ONE_THREAD_STATE, const char *src, int len);
 // Single-allocation fused compact-String builder (see cn1_globals.m). Returns a valid empty
