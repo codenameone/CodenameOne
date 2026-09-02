@@ -9272,6 +9272,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         NativeDragAndDrop.dragExit(0);
     }
 
+    /// The operation whose representations the item providers may still be asked for.
+    ///
+    /// Deliberately not the active drag: an item provider's load handler is asynchronous by
+    /// design, and a receiving application is free to defer reading a representation until
+    /// after the session has ended -- by which point the active drag has been cleared and the
+    /// lookup would answer with nothing at all. Held until the next drag replaces it, which is
+    /// one payload and the price of letting a receiver read late.
+    private static NativeDragOperation exportedDrag;
+
     /// The drop being assembled by CN1DragAndDrop.m, one representation at a time.
     ///
     /// Only ever touched from the three callbacks below, which UIKit runs in order on the main
@@ -9367,6 +9376,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (op == null) {
             return 0;
         }
+        exportedDrag = op;
         ClipboardContent content = op.getContent();
         nativeInstance.beginNativeDragPayload();
         // Names, not values. Reading a representation here would build every promised file and
@@ -9401,7 +9411,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     ///
     /// its bytes, or null when the operation cannot supply it
     public static byte[] nativeDragResolveCallback(String mimeType) {
-        NativeDragOperation op = NativeDragAndDrop.getActiveDrag();
+        // exportedDrag, not the active drag: see the field. A receiver that reads a
+        // representation after the session has ended still gets it.
+        NativeDragOperation op = exportedDrag;
         if (op == null || mimeType == null || mimeType.length() == 0) {
             return null;
         }

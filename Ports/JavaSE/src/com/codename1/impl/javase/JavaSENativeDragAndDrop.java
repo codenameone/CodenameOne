@@ -270,6 +270,15 @@ final class JavaSENativeDragAndDrop {
         if (DataFlavor.imageFlavor.equals(flavor)) {
             return ClipboardContent.MIME_PNG;
         }
+        if (flavor.getRepresentationClass() != null
+                && java.awt.Image.class.isAssignableFrom(flavor.getRepresentationClass())) {
+            // A decoded image, whatever the flavor calls itself. All this can produce from one
+            // is a PNG, so PNG is what it advertises -- filing PNG bytes under image/jpeg or
+            // image/webp because the flavor said so handed a target bytes it could not decode
+            // by the type it had asked for. A source offering the real encoded bytes offers
+            // them through a stream flavor as well, and that one keeps its own type.
+            return ClipboardContent.MIME_PNG;
+        }
         if (DataFlavor.stringFlavor.equals(flavor)) {
             return ClipboardContent.MIME_TEXT;
         }

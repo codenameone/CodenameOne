@@ -525,9 +525,23 @@ public final class NativeDragAndDrop {
                 overDispatchPending = false;
                 currentAction = target == null ? NativeDragOperation.ACTION_NONE
                         : preferredAction(allowedActions & target.getAcceptedDropActions());
-            } else if (target != null && !overDispatchPending) {
-                overDispatchPending = true;
-                dispatchOver = true;
+            } else if (target != null) {
+                if (currentAction != NativeDragOperation.ACTION_NONE
+                        && (currentAction & allowedActions) == 0) {
+                    // The permitted set changed while the pointer stayed put, which is what the
+                    // desktop modifier does. An action agreed under the old set is no longer on
+                    // offer, so keeping it told the platform something it had just withdrawn.
+                    //
+                    // ACTION_NONE is excluded deliberately: it is a decision, not a stale value.
+                    // Recomputing it here turned a target's refusal back into the default and
+                    // handed it the drop -- the same defect the enter callback's own rejection
+                    // suffered, arriving by a different route.
+                    currentAction = preferredAction(allowedActions & target.getAcceptedDropActions());
+                }
+                if (!overDispatchPending) {
+                    overDispatchPending = true;
+                    dispatchOver = true;
+                }
             }
             answer = target == null ? NativeDragOperation.ACTION_NONE : currentAction;
         }
@@ -754,11 +768,9 @@ public final class NativeDragAndDrop {
             return;
         }
         final boolean local;
-        final int startingAction;
         final int generation;
         synchronized (LOCK) {
             local = active != null;
-            startingAction = currentAction;
             generation = targetGeneration;
         }
         Display.getInstance().callSerially(new Runnable() {
@@ -767,6 +779,16 @@ public final class NativeDragAndDrop {
                 try {
                     NativeDropEvent ev = new NativeDropEvent(target, type, content, x, y, allowedActions, local);
                     if (type == ActionEvent.Type.NativeDragOver || type == ActionEvent.Type.NativeDragEnter) {
+                        // Read as this runs, not when it was queued. A drag event can arrive
+                        // before the enter callback ahead of it in the queue has run, and
+                        // capturing the answer at queueing time meant this event then restored
+                        // the default over a decision that callback had since made -- so a
+                        // target rejecting only in nativeDragEnter had its rejection undone by
+                        // the very next no-op nativeDragOver, and was handed the drop.
+                        int startingAction;
+                        synchronized (LOCK) {
+                            startingAction = currentAction;
+                        }
                         // The target starts from what the framework already agreed to, so a
                         // target that does not care keeps the answer stable instead of
                         // resetting it to the default on every event.

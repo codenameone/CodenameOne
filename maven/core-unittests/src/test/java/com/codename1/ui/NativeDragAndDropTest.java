@@ -290,6 +290,50 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aRejectionInEnterSurvivesAnAlreadyQueuedOver() {
+        Form form = Display.getInstance().getCurrent();
+        final List<String> seen = new ArrayList<String>();
+        // Decides in nativeDragEnter and nowhere else, which is the case the queued over event
+        // used to undo.
+        Container target = new Container() {
+            @Override
+            protected void nativeDragEnter(NativeDropEvent ev) {
+                seen.add("enter");
+                ev.reject();
+            }
+
+            @Override
+            protected void nativeDrop(NativeDropEvent ev) {
+                seen.add("drop");
+            }
+        };
+        target.setNativeDropTarget(true);
+        form.setLayout(new BorderLayout());
+        form.add(BorderLayout.CENTER, target);
+        form.revalidate();
+
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        // A second motion event before the queue drains, so its callback is queued behind the
+        // enter that has not run yet.
+        NativeDragAndDrop.dragOver(0, x + 1, y + 1, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertEquals(NativeDragOperation.ACTION_NONE,
+                NativeDragAndDrop.dragOver(0, x + 2, y + 2, textContent("hi"),
+                        NativeDragOperation.ACTION_COPY),
+                "the refusal made in nativeDragEnter must not be undone by an over event that "
+                        + "was queued before it ran");
+        assertEquals(NativeDragOperation.ACTION_NONE,
+                NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY));
+        flushSerialCalls();
+        assertFalse(seen.contains("drop"));
+        NativeDragAndDrop.dragExit(0);
+        flushSerialCalls();
+    }
+
+    @FormTest
     void aRejectionMadeWhileHoveringSurvivesTheDrop() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder target = addTarget(form);
