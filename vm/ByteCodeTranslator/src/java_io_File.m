@@ -329,6 +329,8 @@ JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_Str
 /* Shared, not per-arm: cn1NameList below uses malloc/realloc/free on BOTH, and it
    sits outside the platform blocks. */
 #include <stdlib.h>
+/* O_CREAT/O_EXCL for the atomic create, needed on both arms. */
+#include <fcntl.h>
 #ifdef _WIN32
 /* clang-cl ships no <unistd.h> and no <dirent.h>. Only two things in this file
    actually need them -- access() and the directory walk -- and the MSVC CRT
@@ -380,11 +382,19 @@ JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_Str
 #define X_OK 0
 #endif
 #define CN1_FILE_ACCESS(p, m) _access((p), (m))
+/* Exclusive create, so File.createNewFile can be the single atomic operation it is
+   specified to be. _O_BINARY keeps a zero-length file out of text mode, and
+   _S_IREAD|_S_IWRITE is the permission argument the CRT wants. */
+#define CN1_FILE_OPEN_EXCL(p) _open((p), _O_CREAT | _O_EXCL | _O_WRONLY | _O_BINARY, _S_IREAD | _S_IWRITE)
+#define CN1_FILE_CLOSE_FD(fd)  _close(fd)
 #else
 #include <unistd.h>
 #include <dirent.h>
 #define CN1_FILE_ACCESS(p, m) access((p), (m))
 #define CN1_FILE_SEP '/'
+/* 0666 before umask, which is what fopen(p, "w") produced. */
+#define CN1_FILE_OPEN_EXCL(p) open((p), O_CREAT | O_EXCL | O_WRONLY, 0666)
+#define CN1_FILE_CLOSE_FD(fd)  close(fd)
 #endif
 
 /*
@@ -554,13 +564,21 @@ JAVA_LONG java_io_File_lengthImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_
 JAVA_BOOLEAN java_io_File_createNewFileImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_FALSE;
     const char* p = stringToUTF8(threadStateData, path);
-    if (CN1_FILE_ACCESS(p, F_OK) != -1) return JAVA_FALSE;
-    FILE* f = fopen(p, "w");
-    if (f) {
-        fclose(f);
+    /* ONE call, because File.createNewFile is specified to be atomic. The previous
+       shape -- access() and then fopen(p, "w") -- loses the race twice over: another
+       process creating the file in between gets its content TRUNCATED by the "w",
+       and this returns true as though it had created it. That is precisely what
+       breaks the lock-file and single-instance patterns the method exists for.
+       O_EXCL makes the kernel decide, and EEXIST is a false return rather than an
+       error. */
+    {
+        int fd = CN1_FILE_OPEN_EXCL(p);
+        if (fd < 0) {
+            return JAVA_FALSE;
+        }
+        CN1_FILE_CLOSE_FD(fd);
         return JAVA_TRUE;
     }
-    return JAVA_FALSE;
 }
 
 JAVA_BOOLEAN java_io_File_deleteImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
@@ -724,6 +742,24 @@ JAVA_OBJECT java_io_File_getAbsolutePathImpl___java_lang_String_R_java_lang_Stri
         char buf[PATH_MAX];
         char joined[PATH_MAX];
 #ifdef _WIN32
+        /* "C:foo" is DRIVE-RELATIVE: relative to the working directory OF DRIVE C,
+           which is not the process working directory and may be on another drive
+           entirely. Joining it to _getcwd() produces "D:\cwd\C:foo", which names
+           nothing. _getdcwd asks the right drive; 1 is A. Everything else falls
+           through to the process working directory below. */
+        if (p[0] != '\0' && p[1] == ':' && p[2] != '\\' && p[2] != '/') {
+            int drive = p[0];
+            if (drive >= 'a' && drive <= 'z') { drive = drive - 'a' + 1; }
+            else if (drive >= 'A' && drive <= 'Z') { drive = drive - 'A' + 1; }
+            else { drive = 0; }
+            if (drive != 0 && _getdcwd(drive, buf, (int)sizeof(buf)) != NULL) {
+                /* p + 2 skips the drive letter and colon. */
+                if (snprintf(joined, sizeof(joined), "%s%c%s", buf, CN1_FILE_SEP, p + 2) < (int)sizeof(joined)) {
+                    return newStringFromCString(threadStateData, joined);
+                }
+            }
+            return path;
+        }
         if (_getcwd(buf, (int)sizeof(buf)) != NULL) {
 #else
         if (getcwd(buf, sizeof(buf)) != NULL) {

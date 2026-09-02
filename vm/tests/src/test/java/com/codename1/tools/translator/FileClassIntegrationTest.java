@@ -165,6 +165,30 @@ public class FileClassIntegrationTest {
                "            }\n" +
                "            if (!sawA || !sawB) throw new RuntimeException(\"missing entry\");\n" +
                "            fa.delete(); fb.delete(); dir.delete();\n" +
+               // A REGRESSION GUARD, not a proof of atomicity -- stated plainly
+               // because the difference is easy to misread. This checks the
+               // uncontended path: createNewFile on an existing file returns false
+               // and leaves it intact. The check-then-act version it replaced passes
+               // this too, since access() succeeds and it returns before ever
+               // reaching the fopen that would truncate. Verified by running it
+               // against the old code: 5/5 green.
+               //
+               // The actual defect needs a file to appear BETWEEN the check and the
+               // open, which one thread cannot produce, so no single-threaded test
+               // can demonstrate it. The correctness argument is structural instead:
+               // one O_EXCL syscall where there were two operations, with the kernel
+               // deciding who wins. What this guards is that the rewrite did not
+               // break the ordinary path.
+               "            char[] exChars = new char[]{'e','x','c','l','.','t','x','t'};\n" +
+               "            File ex = new File(new String(exChars));\n" +
+               "            if (ex.exists()) ex.delete();\n" +
+               "            if (!ex.createNewFile()) throw new RuntimeException(\"first create\");\n" +
+               "            java.io.FileOutputStream os = new java.io.FileOutputStream(ex);\n" +
+               "            os.write(new byte[]{1,2,3,4});\n" +
+               "            os.close();\n" +
+               "            if (ex.createNewFile()) throw new RuntimeException(\"second create returned true\");\n" +
+               "            if (ex.length() != 4) throw new RuntimeException(\"existing file was truncated\");\n" +
+               "            ex.delete();\n" +
                "        } catch (Exception e) {\n" +
                "            // e.printStackTrace(); // Can't print stack trace without constants\n" +
                "            System.exit(1);\n" +
