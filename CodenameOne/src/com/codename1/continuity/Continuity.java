@@ -849,8 +849,17 @@ public final class Continuity {
         if (state == null) {
             return false;
         }
-        setParked(null);
-        return restore(state);
+        // Cleared only AFTER the restore has actually happened. Clearing first threw away the
+        // only copy: an off-EDT caller whose marshalled restore timed out got false back, and the
+        // state was gone -- and because dispatch had already written the sender's durable mark, a
+        // relay retry was rejected after the next launch too. A state that was never restored
+        // then could not be restored at all, which is the one outcome this feature exists to
+        // prevent.
+        boolean shown = restore(state);
+        if (shown) {
+            setParked(null);
+        }
+        return shown;
     }
 
     /// Restores a specific state: hands its payload to the provider, then replays its route stack.

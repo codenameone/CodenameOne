@@ -63,6 +63,13 @@ public class LocalContinuityBridge implements ContinuityBridge {
     /// holding it.
     private final Object lock = new Object();
 
+    /// Serializes the read-modify-write of the simulated store's key index.
+    ///
+    /// Static, because the index lives in Preferences rather than in this object: two bridges --
+    /// the simulator swaps them -- write the same underlying list, so an instance lock would not
+    /// actually serialize anything.
+    private static final Object INDEX_LOCK = new Object();
+
     private ContinuityCallback callback;
     private String publishedType;
     private String publishedTitle;
@@ -203,10 +210,16 @@ public class LocalContinuityBridge implements ContinuityBridge {
     @Override
     public boolean syncedStorePut(String key, String value) {
         Preferences.set(PREFIX + key, value);
-        List<String> keys = indexKeys();
-        if (!keys.contains(key)) {
-            keys.add(key);
-            writeIndex(keys);
+        synchronized (INDEX_LOCK) {
+            // Read, modify and write the key index under ONE hold. Two concurrent put()s each
+            // read the same index, each added their own key, and the second write erased the
+            // first: both values stayed readable directly, while keys() omitted one of them for
+            // good -- so enumeration and clearTheSyncedStore() disagreed with the store itself.
+            List<String> keys = indexKeys();
+            if (!keys.contains(key)) {
+                keys.add(key);
+                writeIndex(keys);
+            }
         }
         // Read back rather than assume, so the simulation answers the same question the device
         // does: is the value there now?
@@ -221,16 +234,22 @@ public class LocalContinuityBridge implements ContinuityBridge {
     @Override
     public void syncedStoreRemove(String key) {
         Preferences.delete(PREFIX + key);
-        List<String> keys = indexKeys();
-        if (keys.remove(key)) {
-            writeIndex(keys);
+        synchronized (INDEX_LOCK) {
+            List<String> keys = indexKeys();
+            if (keys.remove(key)) {
+                writeIndex(keys);
+            }
         }
     }
 
     @Override
     public String[] syncedStoreKeys() {
-        List<String> keys = indexKeys();
-        return keys.toArray(new String[keys.size()]);
+        synchronized (INDEX_LOCK) {
+            // Under the same hold the writers take, so an enumeration cannot read the index
+            // halfway through somebody's update.
+            List<String> keys = indexKeys();
+            return keys.toArray(new String[keys.size()]);
+        }
     }
 
     /// Reports a change made "on another device", which the Simulate menu uses to exercise an
