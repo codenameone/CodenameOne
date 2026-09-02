@@ -851,15 +851,19 @@ public class KotlinStdlibAlignment {
     /** Whether the literal at {@code quoteAt} is an argument of a declaring call. */
     private static boolean isDeclarationArgument(String line, int quoteAt) {
         int i = skipBlanksBackward(line, quoteAt - 1);
-        if (i >= 0 && line.charAt(i) == ',') {
-            // A LATER argument, which is where a coordinate sits in
-            // `dependencies.add('implementation', 'g:a:1.7.22!!')`. Walking back one
-            // token found the comma and stopped, so the strict pin the app really
-            // had went unread and the constraints went in against it. This was
-            // removed once as an exception that constrained nothing, on the
-            // reasoning that such a call is recognised where the CONFIGURATION name
-            // is read -- true for the shims, and not for the base library, which
-            // has a scan of its own that comes through here.
+        if (i >= 0 && (line.charAt(i) == ',' || line.charAt(i) == '{')) {
+            // Not the first thing the call was handed. A comma is where a
+            // coordinate sits in `dependencies.add('implementation', 'g:a:1.7!!')`,
+            // and a brace is where it sits inside a provider:
+            // `dependencies.addProvider('implementation', providers.provider {
+            // 'g:a:1.7!!' })`. Walking back one token found the punctuation and
+            // stopped, so the strict pin the app really had went unread and the
+            // constraints went in against it.
+            //
+            // The comma half was removed once as an exception that constrains
+            // nothing, on the reasoning that such a call is recognised where the
+            // CONFIGURATION name is read -- true for the shims, and not for the
+            // base library, which has a scan of its own that comes through here.
             return isDeclarationCall(line, enclosingCallOf(line, quoteAt));
         }
         if (i >= 0 && line.charAt(i) == '(') {
@@ -898,6 +902,20 @@ public class KotlinStdlibAlignment {
         if (!opened.isEmpty()) {
             return skipBlanksBackward(line,
                     opened.get(opened.size() - 1).intValue() - 1);
+        }
+        // No parentheses anywhere, so this is Groovy's command syntax and the call
+        // is the statement's first token -- unless the statement is an assignment,
+        // in which case there is no call at all and the literal is just a value.
+        // Without that, `def all = ['g:a:1.7.22!!']` read its own `def` as the
+        // declaring call.
+        for (int i = 0; i < at && i < line.length(); i++) {
+            if (isLiteralStart(line, i)) {
+                i = endOfStringLiteral(line, i);
+                continue;
+            }
+            if (isAssignmentAt(line, i)) {
+                return -1;
+            }
         }
         int first = skipBlanks(line, 0);
         int end = first;
@@ -2501,24 +2519,26 @@ public class KotlinStdlibAlignment {
         if (i >= 0 && line.charAt(i) == '(') {
             i = skipBlanksBackward(line, i - 1);
         }
-        if (i < 2 || !"add".equals(line.substring(i - 2, i + 1))
-                || (i - 3 >= 0 && isIdentifierChar(line.charAt(i - 3)))) {
+        if (i < 0 || !isIdentifierChar(line.charAt(i))) {
             return false;
         }
-        // And the receiver has to BE a dependency handler. `add` is an ordinary
-        // method name -- `catalog.add('implementation', '...')` adds to a version
-        // catalog and declares nothing -- so reading one as a declaration skipped
-        // the constraint for an artifact the app had never put in its graph, and
-        // an old transitive shim beside a merged stdlib stayed unaligned.
-        //
-        // A bare `add` is the shorthand inside a dependencies closure and has no
-        // receiver to check; only a qualified one does.
-        if (i - 3 < 0) {
-            return true;
+        int nameEnd = i;
+        while (i >= 0 && isIdentifierChar(line.charAt(i))) {
+            i--;
         }
-        int dot = skipBlanksBackward(line, i - 3);
+        String method = line.substring(i + 1, nameEnd + 1);
+        // The receiver decides when there is one, and the name when there is not.
+        //
+        // `add` was the only name accepted, so Gradle's provider form --
+        // `dependencies.addProvider('implementation', ..)` -- was not read as a
+        // declaration at all. The handler has three adders and may grow more, so
+        // a call ON the handler is taken whatever it is called; an unqualified
+        // one, which is the shorthand inside a dependencies closure, still has to
+        // look like an adder, because `catalog.add(..)` adds to a version catalog
+        // and `myList.add(..)` to a list, and neither declares anything.
+        int dot = skipBlanksBackward(line, i);
         if (dot < 0 || line.charAt(dot) != '.') {
-            return true;
+            return method.startsWith("add");
         }
         int end = skipBlanksBackward(line, dot - 1);
         if (end < 0) {

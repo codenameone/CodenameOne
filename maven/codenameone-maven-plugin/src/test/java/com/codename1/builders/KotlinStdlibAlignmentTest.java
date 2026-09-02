@@ -738,6 +738,61 @@ public class KotlinStdlibAlignmentTest {
     }
 
     /**
+     * The dependency handler has three adders and may grow more, and the
+     * coordinate one of them is handed may sit inside a provider closure. Only
+     * {@code add} with the coordinate as a direct argument was read, so Gradle's
+     * provider form declared nothing as far as this was concerned.
+     */
+    @Test
+    public void theDependencyHandlerHasMoreThanOneAdder() {
+        String pin = "org.jetbrains.kotlin:kotlin-stdlib:1.7.22!!";
+        String[] declarations = {
+            "    dependencies.addProvider('implementation', "
+                    + "providers.provider { '" + pin + "' })\n",
+            "    dependencies.addProvider('implementation', '" + pin + "')\n",
+            "    dependencies.addProviderBundle('implementation', '" + pin + "')\n",
+            "    dependencies {\n        addProvider 'implementation', '"
+                    + pin + "'\n    }\n",
+            "    dependencies.add('implementation', '" + pin + "')\n",
+            "    dependencies {\n        add 'implementation', '" + pin + "'\n    }\n",
+            "    implementation(providers.provider { '" + pin + "' })\n",
+        };
+        for (int i = 0; i < declarations.length; i++) {
+            String out = KotlinStdlibAlignment.constraintsBlock("implementation",
+                    declarations[i]);
+            check("".equals(out), "<<" + declarations[i].trim()
+                    + ">> declares a strict pin, got <<" + out + ">>");
+        }
+
+        // The name matters where there is no receiver to check, which is the
+        // shorthand inside a dependencies closure: read as a declaration, the
+        // artifact it names is left to the app and only its sibling is raised.
+        String merged = KotlinStdlibAlignment.constraintsBlock("implementation",
+                "    dependencies {\n        addProvider 'implementation', "
+                + "'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22'\n    }\n");
+        check(merged.contains("kotlin-stdlib-jdk7:1.8.0")
+                        && !merged.contains("kotlin-stdlib-jdk8:1.8.0"),
+                "a bare addProvider declares its artifact, got <<" + merged + ">>");
+
+        // The receiver still decides for a qualified call, and an unqualified one
+        // still has to look like an adder. Neither a list nor a version catalog
+        // declares anything, and a literal that is nobody's argument declares
+        // nothing either.
+        String[] strangers = {
+            "    myList.add('implementation', '" + pin + "')\n",
+            "    catalog.add('implementation', '" + pin + "')\n",
+            "    logger.lifecycle('" + pin + "')\n",
+            "    def all = ['" + pin + "']\n",
+            "    def make = { '" + pin + "' }\n",
+        };
+        for (int i = 0; i < strangers.length; i++) {
+            check(KotlinStdlibAlignment.constraintsBlock("implementation",
+                            strangers[i]).contains("kotlin-stdlib-jdk7:1.8.0"),
+                    "<<" + strangers[i].trim() + ">> declares nothing");
+        }
+    }
+
+    /**
      * Every spelling of "which configuration" goes through one reading, because
      * they are the same question. A lookup carries the name as a string, a
      * filter carries a closure and says nothing -- so a selector nobody
