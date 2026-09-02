@@ -34,6 +34,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -64,6 +65,10 @@ public final class PreAdvancedThemingScreenshots {
     private static final int WHITE = 0xffffff;
     private static final Font TITLE_FONT = screenshotFont(35);
     private static final Font BLOCK_FONT = screenshotFont(24);
+    /// Sized to match the height the theme's own default font had (13px), so
+    /// pinning the face on components the block styling does not touch keeps
+    /// their layout exactly where it was.
+    private static final Font FIELD_FONT = screenshotFont(11);
 
     /// Loads a figure font from the port's bundled Roboto rather than from the host.
     ///
@@ -369,6 +374,22 @@ public final class PreAdvancedThemingScreenshots {
     private static void applyBlockStyleToContent(Container container) {
         for (int i = 0; i < container.getComponentCount(); i++) {
             Component component = container.getComponentAt(i);
+            // Pin the font on EVERY component rather than on the types that also
+            // get block colours. Anything left on the theme's default font
+            // resolves through the host, and that is what made
+            // guibuilder-2-insets-3.png -- the only figure containing a
+            // TextField -- differ between a Mac and CI while the other 23
+            // matched byte for byte. Enumerating the types that carry text
+            // would leave the next one to be added broken in the same way.
+            component.getAllStyles().setFont(FIELD_FONT);
+            if (component instanceof TextArea) {
+                // The hint is painted by a Label that is not in the component
+                // tree, so the walk above never reaches it.
+                Label hint = ((TextArea) component).getHintLabel();
+                if (hint != null) {
+                    hint.getAllStyles().setFont(FIELD_FONT);
+                }
+            }
             if (component instanceof Label || component instanceof Button) {
                 styleBlock(component);
             }
