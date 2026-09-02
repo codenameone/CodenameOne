@@ -273,12 +273,6 @@ final class IOSProvisioningPreflight {
         }
         String override = trimmed(settings.getProperty("codename1.arg.ios.entitlements.com.apple"
                 + ".developer.ubiquity-kvstore-identifier"));
-        if (override != null && !override.isEmpty()) {
-            // The project named a container of its own, which is the shape of an app sharing a
-            // store with a sibling. Whether the profile grants that particular one is a question
-            // this cannot answer from the key alone, and warning on it would be noise.
-            return problems;
-        }
         Profile appProfile = appProfile(settings, release);
         if (appProfile == null || appProfile.applicationIdentifier == null) {
             // No readable profile: check() reports that, and it is not something to warn about
@@ -286,8 +280,19 @@ final class IOSProvisioningPreflight {
             return problems;
         }
         if (appProfile.ubiquityKeyValueStore) {
+            // Granted. WHICH container it grants is not something this can answer from the key
+            // alone, so a project naming its own -- the shape of an app sharing a store with a
+            // sibling -- is where the check stops rather than warning on what it cannot check.
             return problems;
         }
+        // Not granted AT ALL, and an explicit container does not rescue that: the builder puts the
+        // entitlement into the app either way and codesigning rejects it. Returning early on the
+        // override, as this did, suppressed the one answer the preflight can give definitively --
+        // the unanswerable question is which container, and that is not the question here.
+        String named = override == null || override.isEmpty() ? ""
+                : "\nThe project names its own container (" + override + "). That does not change "
+                        + "this: the profile grants no key-value store at all, so there is no "
+                        + "container for it to share.";
         problems.add(new Problem("This app uses com.codename1.continuity.sync, so the build asks "
                 + "for the iCloud key-value store entitlement "
                 + "(com.apple.developer.ubiquity-kvstore-identifier) -- and the provisioning "
@@ -298,7 +303,7 @@ final class IOSProvisioningPreflight {
                 + "profile, or set codename1.arg.ios.continuity.sync=false -- which drops the "
                 + "entitlement and leaves SyncedStore reporting itself unsupported at runtime. "
                 + "Handing work to a nearby device is unaffected either way; that half needs no "
-                + "entitlement.", false));
+                + "entitlement." + named, false));
         return problems;
     }
 

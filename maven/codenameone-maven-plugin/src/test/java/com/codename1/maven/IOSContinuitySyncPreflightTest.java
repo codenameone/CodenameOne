@@ -160,16 +160,37 @@ public class IOSContinuitySyncPreflightTest {
     }
 
     /**
-     * An app sharing a store with a sibling names that sibling's container. Whether the profile
-     * grants that particular one is not a question this can answer from the key alone.
+     * An app sharing a store with a sibling names that sibling's container. WHICH container a
+     * profile grants is not a question this can answer from the key alone, so a profile that
+     * grants the capability is left alone.
      */
     @Test
-    public void anExplicitContainerIsLeftAlone() throws Exception {
-        Properties p = settings(profile("NoCloud", false));
+    public void anExplicitContainerOnAGrantingProfileIsLeftAlone() throws Exception {
+        Properties p = settings(profile("WithCloud", true));
         p.setProperty("codename1.arg.ios.entitlements.com.apple.developer"
                 + ".ubiquity-kvstore-identifier", "ABCD1234.com.example.shared");
 
         assertTrue(check(p).isEmpty());
+    }
+
+    /**
+     * But a profile that grants NO key-value store at all is answerable, and naming a container
+     * does not rescue it: the builder puts the entitlement in either way and codesigning rejects
+     * it. This returned early on the override and suppressed the one warning it can give for
+     * certain -- the unanswerable question is which container, not whether there is one.
+     */
+    @Test
+    public void anExplicitContainerStillWarnsWhenTheProfileGrantsNothing() throws Exception {
+        Properties p = settings(profile("NoCloud", false));
+        p.setProperty("codename1.arg.ios.entitlements.com.apple.developer"
+                + ".ubiquity-kvstore-identifier", "ABCD1234.com.example.shared");
+
+        List<IOSProvisioningPreflight.Problem> problems = check(p);
+
+        assertEquals(String.valueOf(problems), 1, problems.size());
+        assertTrue("the warning does not name the container the project asked for: "
+                        + problems.get(0).message,
+                problems.get(0).message.contains("ABCD1234.com.example.shared"));
     }
 
     /** No readable profile is reported by check(), and is not something to warn about twice. */

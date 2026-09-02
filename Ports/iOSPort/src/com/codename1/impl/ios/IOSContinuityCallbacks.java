@@ -42,7 +42,22 @@ import java.util.Map;
 /// The call must be unconditional. Wrapping it in an `if` the optimizer can prove false folds the
 /// whole thing away and reintroduces the bug.
 final class IOSContinuityCallbacks {
+    /// Guards `callback` and the pending arrival below.
+    ///
+    /// The platform hands a continuation over on a thread of its own -- on a cold launch from
+    /// `willConnectToSession`, before the EDT has run the application's init() -- while
+    /// setCallback runs on the EDT. Every field it protects is therefore written by one thread and
+    /// read by the other, and without it there was no happens-before between them at all: the
+    /// arrival a cold launch parked was not guaranteed to be visible to the thread that installs
+    /// the callback, and the take-and-clear in setCallback was not atomic with the store in
+    /// nativeContinuation. Either one silently drops the continuation, which is the single failure
+    /// this class exists to prevent. Nothing calls out to the framework while holding it.
+    private static final Object LOCK = new Object();
+
     private static ContinuityCallback callback;
+
+    /// Written once by the class initializer, which every thread's first touch of this class
+    /// happens after, so it needs no lock of its own.
     private static boolean dceGuard;
 
     /// A continuation that arrived before the framework was enabled, and the type it arrived
@@ -63,11 +78,18 @@ final class IOSContinuityCallbacks {
     }
 
     static void setCallback(ContinuityCallback c) {
-        callback = c;
-        String type = pendingType;
-        String json = pendingJson;
-        pendingType = null;
-        pendingJson = null;
+        String type;
+        String json;
+        synchronized (LOCK) {
+            // Installed and drained under one hold. A continuation landing between the two halves
+            // was written into a slot this method had already read and was about to clear, so it
+            // was dropped by the very call that exists to deliver it.
+            callback = c;
+            type = pendingType;
+            json = pendingJson;
+            pendingType = null;
+            pendingJson = null;
+        }
         if (c != null && type != null) {
             // A continuation that cold-launched the app can reach this class before the
             // application's init() has called Continuity.enable(), which is what installs the
@@ -91,7 +113,10 @@ final class IOSContinuityCallbacks {
         if (dceGuard) {
             return false;
         }
-        ContinuityCallback c = callback;
+        ContinuityCallback c;
+        synchronized (LOCK) {
+            c = callback;
+        }
         if (c == null) {
             // The framework has not been enabled yet. That is the ordinary cold-launch ordering
             // rather than a mistake, so the activity is held for setCallback to deliver instead
@@ -111,13 +136,24 @@ final class IOSContinuityCallbacks {
             // early, before the stub has published package_name, and treating "cannot tell" as
             // "not ours" would decline the framework's own cold launch -- the one case the whole
             // feature exists for, and a worse outcome than the bug being fixed.
+            // Asked OUTSIDE the lock: it reads the app's package name through the framework, and
+            // nothing slow or re-entrant may run under a lock the platform thread also takes.
             String expected = expectedTypeOrNull();
             if (expected != null && !expected.equals(activityType)) {
                 return false;
             }
-            pendingType = activityType;
-            pendingJson = userInfoJson;
-            return true;
+            synchronized (LOCK) {
+                // Re-read, because the framework may have been enabled while the question above
+                // was being answered. Parking an arrival for a setCallback that has already been
+                // and gone strands it until the next one -- and on a cold launch there is no next
+                // one. Delivering it directly is what this re-check buys.
+                c = callback;
+                if (c == null) {
+                    pendingType = activityType;
+                    pendingJson = userInfoJson;
+                    return true;
+                }
+            }
         }
         try {
             return c.continuationReceived(activityType, parse(userInfoJson));
@@ -132,7 +168,10 @@ final class IOSContinuityCallbacks {
         if (dceGuard) {
             return;
         }
-        ContinuityCallback c = callback;
+        ContinuityCallback c;
+        synchronized (LOCK) {
+            c = callback;
+        }
         if (c == null) {
             return;
         }

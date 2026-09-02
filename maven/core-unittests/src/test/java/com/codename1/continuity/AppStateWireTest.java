@@ -464,4 +464,38 @@ public class AppStateWireTest {
                     }
                 });
     }
+
+    /**
+     * Every string this class writes goes through Util.writeUTF, not just the payload. A route
+     * carrying a long query value, or a long title, made externalize() throw -- which
+     * Continuity.persist() logs and carries on from, so the checkpoint reached the other device
+     * and was silently absent from local storage.
+     */
+    @Test
+    void everyStringSurfaceIsLengthChecked() {
+        StringBuilder huge = new StringBuilder();
+        for (int i = 0; i < 70000; i++) {
+            huge.append('x');
+        }
+        final String big = huge.toString();
+
+        assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setRoutes(java.util.Arrays.asList("/ok", "/x?q=" + big));
+                    }
+                });
+        assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setTitle(big);
+                    }
+                });
+        assertThrows(IllegalArgumentException.class,
+                new org.junit.jupiter.api.function.Executable() {
+                    public void execute() {
+                        new AppState().setDeviceId(big);
+                    }
+                });
+    }
 }

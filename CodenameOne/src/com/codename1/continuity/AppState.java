@@ -92,10 +92,19 @@ public final class AppState implements Externalizable {
     public AppState setRoutes(List<String> r) {
         routes = new ArrayList<String>();
         if (r != null) {
+            int index = 0;
             for (String path : r) {
                 if (path != null && path.length() > 0) {
+                    // Every string this class writes goes through Util.writeUTF, and a route is
+                    // not obviously short: a deep link carrying a query value reaches the limit
+                    // as easily as a payload does. Validating only the payload left externalize()
+                    // able to throw on a route, which persist() logs and carries on from -- so
+                    // the checkpoint was published to the other device and silently absent from
+                    // local storage, and restoration after process death did nothing.
+                    StateCodec.requireWritable(path, "route[" + index + "]");
                     routes.add(path);
                 }
+                index++;
             }
         }
         return this;
@@ -205,6 +214,11 @@ public final class AppState implements Externalizable {
     ///
     /// this state, for chaining
     public AppState setDeviceId(String id) {
+        if (id != null) {
+            // Framework-generated in every path we own, and validated anyway: a port supplying its
+            // own id writes it through the same writeUTF as everything else here.
+            StateCodec.requireWritable(id, "deviceId");
+        }
         deviceId = id == null ? "" : id;
         return this;
     }
@@ -229,6 +243,10 @@ public final class AppState implements Externalizable {
     ///
     /// this state, for chaining
     public AppState setTitle(String t) {
+        if (t != null) {
+            // Application-supplied, so this is the one of the three most likely to be long.
+            StateCodec.requireWritable(t, "title");
+        }
         title = t;
         return this;
     }

@@ -138,6 +138,39 @@ class IPhoneBuilderContinuityPlistTest {
     }
 
     /**
+     * A commented-out entry is not a declaration. Treating one as already-present added nothing,
+     * so the array iOS actually reads never carried the continuity type and Handoff was silently
+     * not advertised -- the same failure the commented-out KEY case has one level up.
+     */
+    @Test
+    void aCommentedOutEntryDoesNotSuppressTheType() {
+        String inject = "<key>NSUserActivityTypes</key><array>"
+                + "<!-- <string>" + CONTINUITY_TYPE + "</string> -->"
+                + "<string>com.example.app.other</string></array>";
+
+        String merged = IPhoneBuilder.mergeUserActivityTypes(inject, noIntents(), CONTINUITY_TYPE);
+
+        assertTrue(merged.contains("<string>" + CONTINUITY_TYPE + "</string>"), merged);
+        // Twice in the TEXT -- once dead in the comment, once live -- which is the point.
+        assertEquals(2, occurrences(merged, CONTINUITY_TYPE), merged);
+    }
+
+    /**
+     * A processing instruction between a key and its value is markup a plist parser steps over.
+     * Stopping on it made immediateValueIndex answer with the "&lt;?", so both the expansion and
+     * the merge decided the value was not an array and dropped every activity type.
+     */
+    @Test
+    void aProcessingInstructionBetweenKeyAndArrayIsSteppedOver() {
+        String inject = "<key>NSUserActivityTypes</key><?note valid?><array/>";
+
+        String merged = IPhoneBuilder.mergeUserActivityTypes(
+                IPhoneBuilder.expandEmptyUserActivityArray(inject), noIntents(), CONTINUITY_TYPE);
+
+        assertTrue(merged.contains("<string>" + CONTINUITY_TYPE + "</string>"), merged);
+    }
+
+    /**
      * A CDATA section is character data, not markup. "&lt;dict&gt;" written inside one is text an
      * application chose to store, and counting it as structure classified a following ROOT
      * NSUserActivityTypes as nested -- so the builder appended a second one and shipped a plist

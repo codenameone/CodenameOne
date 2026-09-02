@@ -11880,15 +11880,24 @@ public class IPhoneBuilder extends Executor {
             while (at < plist.length() && Character.isWhitespace(plist.charAt(at))) {
                 at++;
             }
-            if (plist.startsWith("<!--", at)) {
-                int end = plist.indexOf("-->", at + 4);
-                if (end < 0) {
-                    return -1;
-                }
-                at = end + 3;
+            if (at >= plist.length()) {
+                return -1;
+            }
+            // The SHARED scanner, not a local comment test. A processing instruction, a
+            // declaration and a CDATA section are every bit as invisible to a plist parser as a
+            // comment is, and it steps over all of them on its way to the key's value. Stopping
+            // on one made immediateValueIndex answer with the "<?", so both the expansion and the
+            // merge decided the value was not an array and dropped every activity type without a
+            // word. An unterminated construct still yields -1: nothing after it can be read.
+            int skipped = WatchNativeBuilder.skipMarkupBefore(plist, at, at);
+            if (skipped < 0) {
+                return -1;
+            }
+            if (skipped != at) {
+                at = skipped;
                 continue;
             }
-            return at < plist.length() ? at : -1;
+            return at;
         }
     }
 
@@ -11923,6 +11932,15 @@ public class IPhoneBuilder extends Executor {
             return inject;
         }
         return inject.substring(0, at) + "<array></array>" + inject.substring(close + 1);
+    }
+
+    /// Whether an array's text already lists `value` as a LIVE entry.
+    ///
+    /// Through the shared live scanner, so an entry the project commented out does not count as
+    /// declared. It is the array iOS reads that has to carry the type, and a disabled line looks
+    /// identical to a raw text search.
+    static boolean listsLiveString(String arrayText, String value) {
+        return plistIndexOfLive(arrayText, "<string>" + value + "</string>", 0) >= 0;
     }
 
     static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents) {
@@ -11961,6 +11979,10 @@ public class IPhoneBuilder extends Executor {
             return inject;
         }
         String existing = inject.substring(open, close);
+        // Compared against LIVE entries below. A raw contains() answered yes for
+        // "<!-- <string>com.example.app.continuity</string> -->", so the builder added nothing and
+        // the array iOS actually reads never carried the type -- Handoff silently not advertised,
+        // which is the same failure the commented-out KEY case already had one level up.
         StringBuilder add = new StringBuilder();
         for (Map<String, Object> intent : intents) {
             Object id = intent.get("id");
@@ -11968,12 +11990,12 @@ public class IPhoneBuilder extends Executor {
             // business in the app's own array either. See publishesUserActivity.
             if (id instanceof String
                     && IOSAppIntentsBuilder.publishesUserActivity(intent)
-                    && !existing.contains("<string>" + (String) id + "</string>")) {
+                    && !listsLiveString(existing, (String) id)) {
                 add.append("<string>").append((String) id).append("</string>");
             }
         }
         if (continuityType != null && continuityType.length() > 0
-                && !existing.contains("<string>" + continuityType + "</string>")) {
+                && !listsLiveString(existing, continuityType)) {
             add.append("<string>").append(continuityType).append("</string>");
         }
         if (add.length() == 0) {

@@ -52,6 +52,17 @@ public class LocalContinuityBridge implements ContinuityBridge {
     /// The list of keys, kept beside them because `Preferences` cannot be enumerated.
     private static final String INDEX = "CN1$SyncedStoreKeys";
 
+    /// Guards the four fields below.
+    ///
+    /// They are written on the Codename One EDT -- setCallback from enable(), the published
+    /// activity from a checkpoint -- and read on the AWT event thread, because the simulator's
+    /// "Simulate ->" menu calls simulateArrival() and simulateStoreChange() from there. Without
+    /// this there is no happens-before between the two, so the menu could read a half-published
+    /// activity or miss the callback entirely, and the item would report "nothing to deliver" for
+    /// a state the application had just checkpointed. Nothing calls out to application code while
+    /// holding it.
+    private final Object lock = new Object();
+
     private ContinuityCallback callback;
     private String publishedType;
     private String publishedTitle;
@@ -59,7 +70,9 @@ public class LocalContinuityBridge implements ContinuityBridge {
 
     @Override
     public void setCallback(ContinuityCallback c) {
-        callback = c;
+        synchronized (lock) {
+            callback = c;
+        }
     }
 
     @Override
@@ -70,16 +83,24 @@ public class LocalContinuityBridge implements ContinuityBridge {
     @Override
     public void publishContinuation(String activityType, String title,
             Map<String, Object> userInfo) {
-        publishedType = activityType;
-        publishedTitle = title;
-        publishedInfo = userInfo == null ? null : new HashMap<String, Object>(userInfo);
+        Map<String, Object> copy = userInfo == null
+                ? null : new HashMap<String, Object>(userInfo);
+        synchronized (lock) {
+            // All three together: the menu reads the type and the payload as a pair, and setting
+            // them separately let it see a new type beside the previous payload.
+            publishedType = activityType;
+            publishedTitle = title;
+            publishedInfo = copy;
+        }
     }
 
     @Override
     public void clearContinuation() {
-        publishedType = null;
-        publishedTitle = null;
-        publishedInfo = null;
+        synchronized (lock) {
+            publishedType = null;
+            publishedTitle = null;
+            publishedInfo = null;
+        }
     }
 
     /// The activity type currently advertised, or null when nothing is.
@@ -88,7 +109,9 @@ public class LocalContinuityBridge implements ContinuityBridge {
     ///
     /// the type
     public String getPublishedType() {
-        return publishedType;
+        synchronized (lock) {
+            return publishedType;
+        }
     }
 
     /// The label currently advertised, or null.
@@ -97,7 +120,9 @@ public class LocalContinuityBridge implements ContinuityBridge {
     ///
     /// the label
     public String getPublishedTitle() {
-        return publishedTitle;
+        synchronized (lock) {
+            return publishedTitle;
+        }
     }
 
     /// The payload currently advertised, or null when nothing is.
@@ -120,12 +145,19 @@ public class LocalContinuityBridge implements ContinuityBridge {
     ///
     /// true when there was an activity to deliver and the app claimed it
     public boolean simulateArrival() {
-        if (publishedType == null || publishedInfo == null) {
-            return false;
+        String type;
+        Map<String, Object> copy;
+        synchronized (lock) {
+            if (publishedType == null || publishedInfo == null) {
+                return false;
+            }
+            // Read as a pair and copied under the lock, so a checkpoint landing mid-read cannot
+            // hand the menu one activity's type with another's payload.
+            type = publishedType;
+            copy = new HashMap<String, Object>(publishedInfo);
         }
-        Map<String, Object> copy = new HashMap<String, Object>(publishedInfo);
         copy.put("device", "simulated-device");
-        return simulateArrival(publishedType, copy);
+        return simulateArrival(type, copy);
     }
 
     /// Delivers an arbitrary activity, for tests that build their own.
@@ -139,7 +171,10 @@ public class LocalContinuityBridge implements ContinuityBridge {
     ///
     /// true when the app claimed it
     public boolean simulateArrival(String activityType, Map<String, Object> userInfo) {
-        ContinuityCallback c = callback;
+        ContinuityCallback c;
+        synchronized (lock) {
+            c = callback;
+        }
         if (c == null) {
             return false;
         }
@@ -196,7 +231,10 @@ public class LocalContinuityBridge implements ContinuityBridge {
     /// Reports a change made "on another device", which the Simulate menu uses to exercise an
     /// app's `SyncedStoreListener` without a second machine.
     public void simulateStoreChange() {
-        ContinuityCallback c = callback;
+        ContinuityCallback c;
+        synchronized (lock) {
+            c = callback;
+        }
         if (c == null) {
             return;
         }
