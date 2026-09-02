@@ -133,7 +133,13 @@ class Walker:
         """
         depth = 0
         for line in lines[:index]:
-            if re.match(r"^(ifdef|ifndef|ifeval)::.*\[\s*\]\s*$", line):
+            # ifdef/ifndef open a block only with EMPTY brackets -- with content
+            # they are the single-line form and guard just that line. ifeval has
+            # no single-line form and always carries its expression in the
+            # brackets, so requiring them empty meant this could never match one.
+            if re.match(r"^(ifdef|ifndef)::[^\[]*\[\s*\]\s*$", line) or re.match(
+                r"^ifeval::\[", line
+            ):
                 depth += 1
             elif re.match(r"^endif::", line):
                 depth = max(0, depth - 1)
