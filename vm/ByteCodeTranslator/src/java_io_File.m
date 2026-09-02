@@ -328,7 +328,31 @@ JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_Str
    reached java.io.File. */
 #include <io.h>
 #include <direct.h>
+#include <stdlib.h>
+/* WIN32_LEAN_AND_MEAN keeps <winsock.h> out of <windows.h>. Without it winsock's
+   own `struct timeval` collides with the one cn1_win_compat.h defines, and the
+   file fails on "redefinition of 'timeval'" rather than on anything it does. */
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
+/* The MSVC CRT has the st_mode BITS but not the POSIX macros that test them. */
+#ifndef S_ISDIR
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#endif
+#ifndef S_ISREG
+#define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
+#endif
+/* PATH_MAX is POSIX; MAX_PATH is the Win32 spelling. realpath's counterpart is
+   _fullpath, which takes (destination, source) -- the REVERSE of realpath's
+   (source, destination) -- so the macro swaps them; getting that backwards
+   compiles and silently canonicalizes the wrong string. Both return NULL on
+   failure. _fullpath also resolves a path that does not exist rather than
+   failing, which is the more useful answer for getCanonicalPath. */
+#ifndef PATH_MAX
+#define PATH_MAX MAX_PATH
+#endif
+#define realpath(path, resolved) _fullpath((resolved), (path), MAX_PATH)
 #ifndef F_OK
 #define F_OK 0
 #endif
