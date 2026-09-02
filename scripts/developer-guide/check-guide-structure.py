@@ -73,6 +73,9 @@ class Walker:
         self.guide_dir = guide_dir
         self.reachable: dict[Path, str] = {}
         self.direct: set[Path] = set()
+        # Direct entries that sit inside an ifdef/ifndef region. Only one branch
+        # renders, so the outcome check cannot demand every branch's title.
+        self.conditional: set[Path] = set()
         # Counted at the EDGE, not per visited file: _visit returns early on a
         # revisit, so a document included twice would otherwise leave no trace.
         # Only direct manifest entries are counted. A nested fragment may be
@@ -114,7 +117,9 @@ class Walker:
                 # appears twice in the source and once in the output.
                 self.direct.add(target)
                 self._check_manifest_spacing(index, lines, target_raw)
-                if not self._inside_conditional(lines, index):
+                if self._inside_conditional(lines, index):
+                    self.conditional.add(target)
+                else:
                     self.direct_include_count[target] += 1
             self._visit(target, attrs)
 
@@ -284,7 +289,10 @@ def main() -> int:
     rendered = rendered_titles(render(root))
     expected: dict[str, list[str]] = {}
     for path in sorted(walker.reachable):
-        if path == root:
+        if path == root or path in walker.conditional:
+            # A conditional entry renders in one branch only, so requiring its
+            # title in this render would report a chapter that is deliberately
+            # absent. Its level and spacing are still checked above.
             continue
         heading = first_heading(path)
         if heading:

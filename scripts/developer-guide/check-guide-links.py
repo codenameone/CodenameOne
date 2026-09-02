@@ -62,8 +62,13 @@ def front_matter(page: Path) -> dict[str, object]:
             break
         if in_aliases:
             stripped = line.strip()
-            if stripped.startswith("-"):
-                aliases.append(stripped.lstrip("- ").strip().strip("\"'"))
+            if stripped in {"]", "],"}:
+                in_aliases = False
+                continue
+            # YAML block sequence ("- /x") and TOML/flow array ("\"/x\",") both
+            # appear in this tree, so accept either continuation shape.
+            if stripped.startswith("-") or stripped.startswith(("\"", "'")):
+                aliases.append(stripped.lstrip("- ").strip().rstrip(",").strip("\"'"))
                 continue
             in_aliases = False
         match = re.match(r'^(url|slug|aliases|draft|date)\s*[:=]\s*(.*)$', line)
@@ -71,8 +76,8 @@ def front_matter(page: Path) -> dict[str, object]:
             continue
         key, raw = match.group(1), match.group(2).strip()
         if key == "aliases":
-            if raw in {"", "["}:
-                in_aliases = True
+            if raw in {"", "[", "[]"}:
+                in_aliases = raw != "[]"
             else:
                 aliases.extend(v.strip().strip("\"'") for v in raw.strip("[]").split(",") if v.strip())
             continue
