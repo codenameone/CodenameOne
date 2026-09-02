@@ -29,6 +29,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -172,6 +173,31 @@ class CertificateWizardPushCapabilityTest {
     }
 
     @Test
+    void aMacPushFailureNamesTheMacHint() throws Exception {
+        // The two platforms declare push through different settings. A Mac-only project
+        // told to look at ios.includePush is being pointed at something it never set, while
+        // the profiles it just got cannot satisfy the build it did ask for.
+        final MockSigningService service = new MockSigningService();
+        service.failPushCapability("Apple rejected the request.");
+        final CertificateWizard[] app = launchBound(service, "com.example.universal",
+                "codename1.arg.macos.entitlements.apsEnvironment=production\n");
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "btn.autoSetup");
+            }
+        });
+
+        settle();
+        Component banner = find(app[0].getForm(), "page.message");
+        assertNotNull(banner, "a failed capability change has to be reported");
+        String text = ((SpanLabel) banner).getText();
+        assertTrue(text.contains("macos.entitlements.apsEnvironment"),
+                "the hint that asked for push is the one to name: " + text);
+        assertTrue(text.indexOf("ios.includePush") < 0,
+                "and not the one this project never set: " + text);
+    }
+
+    @Test
     void standaloneMacSetupSaysWhatItDidNotReissue() throws Exception {
         // One App ID for both platforms, profiles already issued from it, and a button that
         // reissues one Mac profile type. Asserting the capability invalidates everything
@@ -195,6 +221,7 @@ class CertificateWizardPushCapabilityTest {
             }
         });
 
+        settle();
         Component banner = find(app[0].getForm(), "page.message");
         assertNotNull(banner, "the outcome has to be on screen");
         String text = ((SpanLabel) banner).getText();
@@ -228,6 +255,7 @@ class CertificateWizardPushCapabilityTest {
         // issued before a capability change, so stopping at "enabled" would leave the
         // project installed against profiles that no longer sign -- the App ID fixed and
         // the same codesign failure on screen.
+        settle();
         Component banner = find(app[0].getForm(), "page.message");
         assertNotNull(banner, "the follow-up has to be on screen");
         assertTrue(((SpanLabel) banner).getText().contains("reissued"),
@@ -295,6 +323,34 @@ class CertificateWizardPushCapabilityTest {
             CertificateWizard.setServiceForTesting(null);
         }
         return app;
+    }
+
+    /// Waits until the event thread has nothing animating, because container mutations are
+    /// QUEUED while the animation manager is busy: a page rebuilt under a toast reads back
+    /// as though the rebuild never happened. Bounded, so a test that never settles fails on
+    /// its own assertion rather than hanging.
+    private static void settle() throws Exception {
+        for (int i = 0; i < 60; i++) {
+            final boolean[] busy = new boolean[1];
+            onEdt(new Runnable() {
+                public void run() {
+                    Form current = Display.getInstance().getCurrent();
+                    busy[0] = current != null && current.getAnimationManager().isAnimating();
+                }
+            });
+            if (!busy[0]) {
+                // A few more turns, so anything the last animated frame queued has been
+                // applied before the tree is read.
+                for (int t = 0; t < 3; t++) {
+                    onEdt(new Runnable() {
+                        public void run() {
+                        }
+                    });
+                }
+                return;
+            }
+            Thread.sleep(100);
+        }
     }
 
     private static void onEdt(Runnable r) {

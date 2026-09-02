@@ -41,6 +41,7 @@ public final class MockSigningService implements SigningService {
     private final Map<String, List<String>> appGroupAssociations = new LinkedHashMap<String, List<String>>();
     private final List<String> pushEnabledOn = new ArrayList<String>();
     private final List<String> callLog = new ArrayList<String>();
+    private String pushCapabilityFailure;
     private long seq = 100;
 
     public MockSigningService() {
@@ -154,8 +155,12 @@ public final class MockSigningService implements SigningService {
     }
 
     public void enablePushCapability(String bundleIdAppleId, OnComplete<Result<Void>> callback) {
-        pushEnabledOn.add(bundleIdAppleId);
         callLog.add("enablePush:" + bundleIdAppleId);
+        if (pushCapabilityFailure != null) {
+            callback.completed(Result.<Void>fail(pushCapabilityFailure));
+            return;
+        }
+        pushEnabledOn.add(bundleIdAppleId);
         for (int i = 0; i < bundles.size(); i++) {
             SigningState.BundleId b = bundles.get(i);
             if (b.id() != null && b.id().equals(bundleIdAppleId)) {
@@ -170,6 +175,12 @@ public final class MockSigningService implements SigningService {
     /// "the App ID happened to have it already".
     public List<String> pushEnabledOn() {
         return new ArrayList<String>(pushEnabledOn);
+    }
+
+    /// Makes every push capability call fail with `message`, so a test can read the
+    /// diagnostic the wizard puts up rather than only the happy path.
+    public void failPushCapability(String message) {
+        pushCapabilityFailure = message;
     }
 
     /// Every call that changed something, in the order it arrived. A profile is a snapshot

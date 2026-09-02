@@ -1610,9 +1610,13 @@ public class CertificateWizard extends Lifecycle {
         showPageMessage("Enabling push notifications on " + bundle.identifier() + "...", false);
         service.enablePushCapability(bundle.id(), r -> {
             if (!r.ok) {
+                // Naming the hint that actually asked for it. The two platforms declare push
+                // through different settings, and a Mac-only project sent to ios.includePush
+                // is being pointed at something it never set.
                 warnDuringAutoSetup("Push notifications could not be enabled on " + bundle.identifier()
-                        + ": " + r.message + " The build stamps a push entitlement because"
-                        + " ios.includePush is on, and signing fails until the App ID grants it.");
+                        + ": " + r.message + " The " + ("MAC_OS".equals(platform) ? "Mac " : "")
+                        + "build stamps a push entitlement because " + pushHintName(platform)
+                        + " asks for it, and signing fails until the App ID grants it.");
                 next.run();
                 return;
             }
@@ -1757,6 +1761,12 @@ public class CertificateWizard extends Lifecycle {
             return;
         }
         showPageMessage(message + " Recreate them from the profiles page.", true);
+    }
+
+    /// The build hint that turns push on for this platform, as a developer would search
+    /// for it in their settings file.
+    private String pushHintName(String platform) {
+        return "MAC_OS".equals(platform) ? "macos.entitlements.apsEnvironment" : "ios.includePush";
     }
 
     /// Apple's BundleIdPlatform as a person reads it.

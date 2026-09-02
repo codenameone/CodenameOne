@@ -71,6 +71,7 @@ class CertificateWizardPageMessageTest {
             }
         });
 
+        settle();
         String banner = bannerText(app.getForm());
         assertTrue(banner.contains("Mac signing was skipped"),
                 "the run has to end saying what it could not do, got: " + banner);
@@ -92,6 +93,7 @@ class CertificateWizardPageMessageTest {
             }
         });
 
+        settle();
         String banner = bannerText(app.getForm());
         assertTrue(banner.contains("iOS signing was skipped"),
                 "the run has to say what it could not do, got: " + banner);
@@ -132,6 +134,7 @@ class CertificateWizardPageMessageTest {
             }
         });
 
+        settle();
         Component banner = find(app.getForm(), "page.message");
         assertTrue(banner == null || ((SpanLabel) banner).getText().length() == 0,
                 "a successful install has to clear the failure before it, got: "
@@ -163,6 +166,34 @@ class CertificateWizardPageMessageTest {
             CertificateWizard.setServiceForTesting(null);
         }
         return app[0];
+    }
+
+    /// Waits until the event thread has nothing animating, because container mutations are
+    /// QUEUED while the animation manager is busy: a page rebuilt under a toast reads back
+    /// as though the rebuild never happened. Bounded, so a test that never settles fails on
+    /// its own assertion rather than hanging.
+    private static void settle() throws Exception {
+        for (int i = 0; i < 60; i++) {
+            final boolean[] busy = new boolean[1];
+            onEdt(new Runnable() {
+                public void run() {
+                    Form current = Display.getInstance().getCurrent();
+                    busy[0] = current != null && current.getAnimationManager().isAnimating();
+                }
+            });
+            if (!busy[0]) {
+                // A few more turns, so anything the last animated frame queued has been
+                // applied before the tree is read.
+                for (int t = 0; t < 3; t++) {
+                    onEdt(new Runnable() {
+                        public void run() {
+                        }
+                    });
+                }
+                return;
+            }
+            Thread.sleep(100);
+        }
     }
 
     private static void onEdt(Runnable r) {
