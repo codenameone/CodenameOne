@@ -296,7 +296,7 @@ def javadoc_index(repo_root: Path) -> tuple[set[str], set[str]]:
 
 
 JAVA_TOKEN_RE = re.compile(
-    r"(?P<decl>\b(?:class|interface|enum|record)\s+(?P<name>[A-Za-z_$][\w$]*))"
+    r"(?P<decl>\b(?P<kind>class|interface|enum|record)\s+(?P<name>[A-Za-z_$][\w$]*))"
     r"|(?P<open>\{)|(?P<close>\})"
 )
 
@@ -358,8 +358,8 @@ def documented_type_chains(source: Path) -> set[str]:
     text = blank_java_noise(source.read_text(encoding="utf-8", errors="ignore"))
 
     chains: set[str] = set()
-    stack: list[tuple[str, bool, int]] = []
-    pending: tuple[str, bool] | None = None
+    stack: list[tuple[str, bool, int, str]] = []
+    pending: tuple[str, bool, str] | None = None
     depth = 0
     for match in JAVA_TOKEN_RE.finditer(text):
         if match.group("decl"):
@@ -371,12 +371,18 @@ def documented_type_chains(source: Path) -> set[str]:
             )
             modifiers = text[boundary + 1 : match.start()]
             documented = re.search(r"\b(?:public|protected)\b", modifiers) is not None
-            pending = (match.group("name"), documented)
+            # A member of an interface or annotation type is implicitly public, so
+            # javadoc documents it whether or not the modifier is written. Route.Routes
+            # is declared as a bare `@interface Routes` inside `public @interface Route`
+            # and was being rejected.
+            if not documented and stack and stack[-1][3] == "interface":
+                documented = True
+            pending = (match.group("name"), documented, match.group("kind"))
         elif match.group("open"):
             depth += 1
             if pending is not None:
-                name, documented = pending
-                stack.append((name, documented, depth))
+                name, documented, kind = pending
+                stack.append((name, documented, depth, kind))
                 if all(level[1] for level in stack):
                     chains.add(".".join(level[0] for level in stack))
                 pending = None

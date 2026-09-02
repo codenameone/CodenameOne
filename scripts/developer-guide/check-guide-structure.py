@@ -170,6 +170,19 @@ class Walker:
             if not match:
                 continue
             target_raw, attrs = match.group(1), match.group(2)
+            if "{" in target_raw:
+                # An attribute-built target resolves to a literal "{name}" here, which
+                # has no .adoc suffix and was therefore filed as a snippet and ignored.
+                # asciidoctor expands it and includes the chapter, so a second copy
+                # rendered with no edge counted and no extra title expected. Expanding
+                # attributes means reimplementing asciidoctor's resolution, inheritance
+                # through includes included; the guide uses none, so refuse instead.
+                self.errors.append(
+                    f"{path.name}:{index + 1}: include target {target_raw} is built from "
+                    f"an attribute. This does not expand attributes, so the target "
+                    f"cannot be identified or counted; write the path literally."
+                )
+                continue
             target = (path.parent / target_raw).resolve()
             if target.suffix not in ASCIIDOC_EXTENSIONS:
                 continue  # a snippet include, validated by validate-guide-snippets.py
