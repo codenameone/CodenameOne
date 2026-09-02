@@ -357,7 +357,12 @@ def findings_for(path: Path, known: set[str], patterns: list, declared: set[str]
         for url in URL_RE.findall(line):
             url = url.rstrip(".,;:")
             split = urlsplit(url)
-            host = split.hostname or ""
+            # urlsplit lowercases the host but keeps the root label's trailing dot,
+            # so the fully qualified spelling "www.codenameone.com." misses
+            # SITE_HOSTS and skips route validation entirely -- the same path that
+            # is rejected without the dot sails through with it. DNS treats the two
+            # as the same name, so strip it before classifying.
+            host = (split.hostname or "").rstrip(".")
             # hostname strips the port whether or not it is a number, so a typo in
             # the authority hides behind an otherwise correct host and every check
             # below passes on a URL no browser can open. Reading .port is what
