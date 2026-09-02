@@ -355,7 +355,16 @@ public class VideoCaptureConstraints {
     /// - #getPreferredMaxLength()
     public boolean isMaxLengthSupported() {
         build();
-        return maxLength == 0 || maxLength == preferredMaxLength;
+        // Guard on the PREFERRED value, the way isQualitySupported() and
+        // isMaxFileSizeSupported() do: it is "the caller asked for no limit"
+        // that makes any resolved value acceptable. Guarding on the RESOLVED
+        // value instead inverted the answer in the one case a caller asks this
+        // question about -- a platform that expresses "no duration limit" by
+        // resolving maxLength to 0 (every platform with no compiler, Java SE
+        // included) reported a five-second preference as honored. That also
+        // contradicted getMaxLength()'s documented "equal to
+        // getPreferredMaxLength() iff isMaxLengthSupported()".
+        return preferredMaxLength == 0 || maxLength == preferredMaxLength;
     }
 
     /// Gets the width constraint that is supported by the platform, and is nearest to the specified
