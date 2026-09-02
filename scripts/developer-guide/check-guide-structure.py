@@ -175,16 +175,25 @@ def render(root: Path) -> str:
         return out.read_text(encoding="utf-8")
 
 
-def rendered_titles(markup: str) -> dict[str, int]:
-    """Count every rendered heading, normalized and stripped of its number."""
+def rendered_titles(markup: str) -> tuple[dict[str, int], dict[str, int]]:
+    """Count rendered headings: all levels, and chapter level (h2) separately.
+
+    Counting every level lets an unrelated subsection stand in for a chapter that
+    was swallowed -- "Analytics" is a chapter and also a subsection of Commerce,
+    and "Getting started" collides the same way. A chapter renders as h2, so
+    holding manifest entries to that count removes the substitution.
+    """
     body = markup.split('id="content"', 1)[-1]
     counts: dict[str, int] = {}
+    chapters: dict[str, int] = {}
     for match in re.finditer(r"<h([1-6])[^>]*>(.*?)</h\1>", body, re.S):
         text = re.sub(r"<[^>]+>", "", match.group(2))
         text = re.sub(r"^(Appendix [A-Z]:|(\d+|[A-Z])(\.\d+)*\.)\s*", "", html.unescape(text).strip())
         key = normalize(text)
         counts[key] = counts.get(key, 0) + 1
-    return counts
+        if match.group(1) == "2":
+            chapters[key] = chapters.get(key, 0) + 1
+    return counts, chapters
 
 
 def main() -> int:
@@ -286,8 +295,9 @@ def main() -> int:
             )
 
     # 3. Outcome check: every included chapter's title survives into the book.
-    rendered = rendered_titles(render(root))
+    rendered, rendered_chapters = rendered_titles(render(root))
     expected: dict[str, list[str]] = {}
+    expected_chapters: dict[str, list[str]] = {}
     for path in sorted(walker.reachable):
         if path == root or path in walker.conditional:
             # A conditional entry renders in one branch only, so requiring its
@@ -295,16 +305,28 @@ def main() -> int:
             # absent. Its level and spacing are still checked above.
             continue
         heading = first_heading(path)
-        if heading:
-            expected.setdefault(normalize(heading[1]), []).append(path.name)
+        if not heading:
+            continue
+        key = normalize(heading[1])
+        # A direct entry must appear at CHAPTER level. A nested fragment sits at
+        # whatever depth its parent puts it, so it is only counted at all.
+        target = expected_chapters if path in walker.direct else expected
+        target.setdefault(key, []).append(path.name)
+
+    for title, sources in sorted(expected_chapters.items()):
+        found = rendered_chapters.get(title, 0)
+        if found < len(sources):
+            errors.append(
+                f"{', '.join(sources)}: the title '{title}' appears {found} time(s) as a "
+                f"chapter in the rendered book but {len(sources)} manifest entr(ies) "
+                f"declare it. A chapter was swallowed by whatever precedes it."
+            )
     for title, sources in sorted(expected.items()):
-        # Compare counts, not membership: a chapter sharing its title with another
-        # heading would otherwise hide the fact that it was swallowed.
         if rendered.get(title, 0) < len(sources):
             errors.append(
                 f"{', '.join(sources)}: the title '{title}' appears "
                 f"{rendered.get(title, 0)} time(s) in the rendered book but "
-                f"{len(sources)} document(s) declare it. A chapter was swallowed by "
+                f"{len(sources)} document(s) declare it. A fragment was swallowed by "
                 f"whatever precedes it."
             )
 

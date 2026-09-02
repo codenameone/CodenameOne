@@ -30,6 +30,11 @@ ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
 # passthrough. The container delimiters -- ==== example, **** sidebar, ____ quote
 # -- hold ordinary prose, and skipping them hid six real holes in basics.asciidoc
 # alone, among them the setSameWidth example this check was written to find.
+#
+# Markdown's three-backtick fence is deliberately absent. The guide contains none,
+# and validate-guide-snippets.py requires every listing to be [source,LANG] with a
+# bare include:: inside ---- delimiters, so a three-backtick block would fail that
+# gate before reaching this one. Add it here if that convention ever changes.
 FENCE_RE = re.compile(r"^(----|\.\.\.\.|````|\+\+\+\+)\s*$")
 # Lines that end in a colon without promising a listing: headings, attributes,
 # comments, block titles, list markers, table cells and block delimiters.
