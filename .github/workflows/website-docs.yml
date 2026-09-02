@@ -277,6 +277,17 @@ jobs:
             --root-dir public
             public/**/*.html
 
+      # The developer guide links into this site, so a page renamed, deleted or
+      # re-slugged here breaks the guide. The check lives in THIS workflow rather
+      # than in developer-guide-docs.yml because it is the route data that
+      # changed: widening that workflow's paths to docs/website/** would run the
+      # full guide build -- maven install, demo build, screenshot generation --
+      # on every blog post the daily publisher pushes, to run one Python script.
+      # This job already triggers on docs/website/**, and the check needs nothing
+      # but a checkout.
+      - name: Check developer guide links against the routes this site serves
+        run: python3 scripts/developer-guide/check-guide-links.py
+
       - name: Reject absolute codenameone.com links
         run: |
           set -euo pipefail
