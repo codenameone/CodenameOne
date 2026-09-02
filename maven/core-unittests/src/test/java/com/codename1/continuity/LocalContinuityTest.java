@@ -631,6 +631,20 @@ public class LocalContinuityTest extends UITestBase {
         AppState fromB = foreign("device-b", 9);
         bridge.simulateArrival(Continuity.getActivityType(), StateCodec.toMap(fromA));
         bridge.simulateArrival(Continuity.getActivityType(), StateCodec.toMap(fromB));
+        // Drained, because the durable mark is written when a state is ACTED ON and not when it
+        // is admitted -- a process killed between the two would otherwise leave a mark on disk for
+        // a state nothing had handled. Both arrivals dispatch through callSerially and this test
+        // body is the EDT, so without this the states were never acted on and "survives a restart"
+        // would be asserting about something that never happened.
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
         // This device then navigates, so the stored checkpoint is OUR state and carries neither id.
         Continuity.checkpoint();
 

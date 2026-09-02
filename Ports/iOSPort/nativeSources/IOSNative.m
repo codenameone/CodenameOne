@@ -20645,11 +20645,13 @@ static id cn1ContinuitySanitize(id value) {
 /// symptom of that is a setting that silently fails to follow the user.
 static NSUbiquitousKeyValueStore *cn1ContinuityStore(void) {
     static NSUbiquitousKeyValueStore *store = nil;
-    static BOOL resolved = NO;
-    if (resolved) {
-        return store;
-    }
-    resolved = YES;
+    static dispatch_once_t cn1ContinuityStoreOnce;
+    // dispatch_once, not a resolved flag. The flag was set BEFORE the store was assigned, so a
+    // second thread arriving in that gap saw "resolved" and got nil back from a store that was
+    // perfectly available -- and two threads passing the check together installed the
+    // external-change observer twice, which delivers every remote change to the listener twice.
+    // A one-time initializer is exactly what this is, so it says so.
+    dispatch_once(&cn1ContinuityStoreOnce, ^{
     @try {
         NSUbiquitousKeyValueStore *s = [NSUbiquitousKeyValueStore defaultStore];
         if (s != nil && [s synchronize]) {
@@ -20666,6 +20668,7 @@ static NSUbiquitousKeyValueStore *cn1ContinuityStore(void) {
     } @catch (NSException *e) {
         store = nil;
     }
+    });
     return store;
 }
 

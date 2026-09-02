@@ -148,6 +148,14 @@ public final class Continuity {
     /// STATE_LOCK, which the other half of the same decision already holds.
     private static long deliveryEra;
 
+    /// Which run of enable()/disable() the framework is in. Guarded by STATE_LOCK.
+    ///
+    /// enable() does slow work -- Preferences, the stored marks -- before it can publish
+    /// `enabled`, and a disable() arriving during that window has nothing to switch off yet. The
+    /// generation lets the initializing thread notice it lost and stand down, instead of turning
+    /// the framework on after the caller was told it was off.
+    private static long lifecycleEra;
+
     // Configured by the application while it starts, then read from the EDT, the relay worker
     // and the thread a port delivers a continuation on. All guarded by STATE_LOCK -- volatile is
     // forbidden by the project's PMD gate, and would not have been enough anyway for the ones
@@ -218,10 +226,12 @@ public final class Continuity {
     /// Nothing before this call has any effect, which is what keeps an app that does not use this
     /// API behaving exactly as it always did.
     public static void enable() {
+        final long generation;
         synchronized (STATE_LOCK) {
             if (enabled) {
                 return;
             }
+            generation = lifecycleEra;
         }
         // Registered once, and only from here, so that a build which merely links this class --
         // because something else in the framework mentions it -- never installs a callback or
@@ -246,9 +256,11 @@ public final class Continuity {
         // queued. The duplicate this whole mechanism exists to stop, in the window that creates it.
         Map<String, Long> restored = readSeen();
         synchronized (STATE_LOCK) {
-            if (enabled) {
-                // Lost the race while loading. The winner's values stand, and installing a second
-                // callback over theirs is the duplicate the first check already existed to stop.
+            if (enabled || generation != lifecycleEra) {
+                // Lost the race while loading. Either another enable() won -- its values stand,
+                // and a second callback over theirs is the duplicate the first check exists to
+                // stop -- or a disable() arrived while this was initializing, and the caller of
+                // THAT has already been told the framework is off.
                 return;
             }
             deviceId = id;
@@ -276,22 +288,31 @@ public final class Continuity {
     /// arriving states are ignored. What is already in storage is left alone -- use `clear()` to
     /// remove it.
     public static void disable() {
-        synchronized (STATE_LOCK) {
-            if (!enabled) {
-                return;
+        // COMMIT_LOCK, like clear(). Without it a checkpoint already past its era check could
+        // publish the continuation and the relay state AFTER this returned, leaving Handoff
+        // advertising work while isEnabled() answers false.
+        synchronized (COMMIT_LOCK) {
+            synchronized (STATE_LOCK) {
+                // Bumped even when already disabled, so an enable() that is midway through its
+                // slow initialization -- loading preferences, before it publishes `enabled` --
+                // sees the generation move and stands down. It used to observe false here and
+                // return, and the initializing thread then switched the framework ON after its
+                // caller had been told disabling was done.
+                lifecycleEra++;
+                if (!enabled) {
+                    return;
+                }
+                enabled = false;
+                // Everything already on the event queue belongs to the run that just ended.
+                // Bumping the era rather than testing `enabled` at dispatch is what makes
+                // disable-then-enable safe: a re-enabled framework would otherwise accept an
+                // arrival from before it was turned off.
+                deliveryEra++;
+                dirty = false;
             }
-            enabled = false;
-            // Everything already on the event queue belongs to the run that just ended. Bumping
-            // the era rather than testing `enabled` at dispatch is what makes disable-then-enable
-            // safe: a re-enabled framework would otherwise accept an arrival from before it was
-            // turned off.
-            deliveryEra++;
+            setParked(null);
+            clearContinuation();
         }
-        setParked(null);
-        synchronized (STATE_LOCK) {
-            dirty = false;
-        }
-        clearContinuation();
     }
 
     /// Whether the framework is on.
@@ -598,11 +619,38 @@ public final class Continuity {
     /// the desktop port the EDT itself blocks on the AWT thread while painting, so an application
     /// calling a checkpoint from an AWT callback could otherwise deadlock the two against each
     /// other. A checkpoint that misses its window is a lost checkpoint; a deadlock is a hung app.
-    private static void runOnEdt(Runnable r) {
+    private static boolean runOnEdt(final Runnable r) {
+        // [0] cancelled, [1] completed. The wait is bounded, and a bounded wait that gives up
+        // leaves the runnable QUEUED: restore() then returned false to a caller that went on to
+        // show its initial screen, and the restore ran afterwards and replaced it -- while
+        // capture() returned null and still consumed a sequence when the EDT got round to it.
+        // A caller told the operation did not happen has to be right about that.
+        final boolean[] flags = new boolean[2];
+        Runnable guarded = new Runnable() {
+            @Override
+            public void run() {
+                synchronized (flags) {
+                    if (flags[0]) {
+                        return;
+                    }
+                }
+                r.run();
+                synchronized (flags) {
+                    flags[1] = true;
+                }
+            }
+        };
         try {
-            Display.getInstance().callSeriallyAndWait(r, EDT_WAIT_MILLIS);
+            Display.getInstance().callSeriallyAndWait(guarded, EDT_WAIT_MILLIS);
         } catch (Throwable t) {
             Log.e(t);
+        }
+        synchronized (flags) {
+            if (!flags[1]) {
+                flags[0] = true;
+                return false;
+            }
+            return true;
         }
     }
 
@@ -627,7 +675,10 @@ public final class Continuity {
         // publish went out under the NEXT account's credentials.
         synchronized (COMMIT_LOCK) {
             synchronized (STATE_LOCK) {
-                if (era != accountEra) {
+                if (era != accountEra || !enabled) {
+                    // `enabled` as well as the era: disable() takes COMMIT_LOCK, so a checkpoint
+                    // either commits entirely before it gets in or sees the framework switched
+                    // off here -- rather than advertising work after isEnabled() went false.
                     return;
                 }
             }
@@ -1414,8 +1465,7 @@ public final class Continuity {
             lastSeen.put(state.getDeviceId(), Long.valueOf(state.getSequence()));
             era = deliveryEra;
         }
-        // Durable, so the mark survives the relaunch. Outside the lock: it touches Preferences.
-        rememberSeen();
+
         if (!Display.isInitialized()) {
             if (stillDeliverable(state, era)) {
                 setParked(state);
@@ -1499,6 +1549,12 @@ public final class Continuity {
         } else {
             setParked(state);
         }
+        // Durable only NOW. Writing it when the state was admitted meant a process killed before
+        // this runnable ran left a high-water mark on disk for a state nothing had acted on and
+        // nothing had stored -- so the next launch rejected the relay's repeat as already seen and
+        // the continuation was lost for good. The in-memory mark still goes in at admission,
+        // which is what dedups within the session; only the durable copy waits for the act.
+        rememberSeen();
     }
 
     private static void park(final AppState state) {
