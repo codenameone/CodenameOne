@@ -58,19 +58,7 @@ import java.util.Vector;
 /// @author Chen Fishbein
 public class UIManager {
 
-    /// Volatile because getInstance() reads it twice around a lock (a plain field
-    /// makes that double-checked lock unsafe) and because the constructor publishes
-    /// this instance before it has finished running: without it, another thread can
-    /// see the reference while the fields written below it are still unset. Ordering
-    /// the constructor's assignments is not enough on its own -- with no
-    /// happens-before edge, a thread that sees the reference is still allowed to see
-    /// the fields as unwritten, which is the null look and feel this fixes.
-    ///
-    /// AvoidUsingVolatile is suppressed rather than worked around: it is a blanket
-    /// style rule, and a double-checked lock is the case the modifier exists for.
-    /// The alternative that needs no modifier is publishing after the constructor
-    /// finishes, and the comment on the constructor says why that is not safe here.
-    static volatile UIManager instance; //NOPMD AvoidUsingVolatile
+    static UIManager instance;
     /// This member is used by the resource editor
     static boolean accessible = true;
     /// This member is used by the resource editor
@@ -121,13 +109,15 @@ public class UIManager {
         // from other projects that may be out of sync.  E.g. the Designer project
         // uses the "instance" property directly.  This should guarantee that
         // instance will be set
-        // current is assigned BEFORE this instance is published, not after. getInstance()
-        // hands out `instance`, so any thread reaching it while this constructor is still
-        // running gets an object whose getLookAndFeel() is null, and the first component
-        // built on that thread dies in Component.initLaf. Ordering it this way is safe:
-        // the LookAndFeel constructor only stores the manager it is handed, so it cannot
-        // reach back through the static. resetThemeProps() can, which is why it stays
-        // after the publish the comment above describes.
+        // current is assigned BEFORE this instance is published, not after. The publish
+        // above is what makes getInstance() hand this object out, and resetThemeProps()
+        // below reaches Font, Display and CN -- so anything down there that comes back
+        // through getInstance() would get an object whose getLookAndFeel() is null and
+        // die in Component.initLaf. One statement earlier and there is nothing to see.
+        //
+        // Not a locking question and deliberately unsynchronized: this is all on the EDT.
+        // Ordering it this way is free, and safe because the LookAndFeel constructor only
+        // stores the manager it is handed and cannot reach back through the static.
         current = new DefaultLookAndFeel(this);
         if (instance == null) {
             instance = this;
