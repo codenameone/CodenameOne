@@ -462,10 +462,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 .Captured recordings in the demo
 image::img/capture-audio.png[Captured recordings in the demo,scaledwidth=20%]
 
-Or, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder` APIs to capture audio, as a more customizable approach than using the Capture API:
-
-
-image::img/media-audio-recording-example.png[Example of recording and playback audio using Media API]
+You can also record audio through the `Media`, `MediaManager` and
+`MediaRecorderBuilder` APIs, which give you more control over the recording than
+the `Capture` API does -- the recorder is built with an explicit path, MIME type,
+sample rate and bit rate rather than handed to the platform's own capture UI.
 
 ==== Capture asynchronous API
 

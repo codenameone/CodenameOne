@@ -118,7 +118,6 @@ Miscellaneous-Features.asciidoc	For example: you can copy the `Image` to `Storag
 Miscellaneous-Features.asciidoc	However, it gets better, say you want to return a value:
 Miscellaneous-Features.asciidoc	If you need to apply the scale manually for custom fonts or layout calculations, read the values directly:
 Miscellaneous-Features.asciidoc	It allows formatting numbers/dates & time based on platform locale. It also provides a great deal of the information you need such as the language/locale information you need to pick the proper resource bundle:
-Miscellaneous-Features.asciidoc	Or, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder` APIs to capture audio, as a more customizable approach than using the Capture API:
 Miscellaneous-Features.asciidoc	The `Capture` API also includes a callback based API that uses the `ActionListener` interface to implement capture. For example: you can adapt the previous sample to use this API as such:
 Miscellaneous-Features.asciidoc	The following code demonstrates usage of the GeoFence API:
 Miscellaneous-Features.asciidoc	The list of available languages in the resource bundle could be retrieved like this. Notice that this a list that was set by you and doesn't need to confirm to the ISO language code standards:
