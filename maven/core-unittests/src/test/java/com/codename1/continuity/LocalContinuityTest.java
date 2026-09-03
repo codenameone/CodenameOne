@@ -1440,6 +1440,71 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A checkpoint whose write failed is still owed. `dirty` is cleared on the way in, so leaving
+     * it clear told the next suspend there was nothing to save -- a checkpoint lost to a full
+     * disk was never retried and the app came back to the last write that had succeeded.
+     */
+    @EdtTest
+    public void aFailedCheckpointWriteLeavesTheStateOwed() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+
+        Storage original = Storage.getInstance();
+        Storage.setStorageInstance(new RefusingStorage());
+        try {
+            Continuity.routeStackChanged();
+            Continuity.checkpoint();
+            assertTrue(Continuity.isCheckpointPending(),
+                    "a checkpoint whose write failed was reported as saved");
+        } finally {
+            Storage.setStorageInstance(original);
+        }
+    }
+
+    /**
+     * And a restore whose write failed must not acknowledge the state. noteActedOn() is durable
+     * and stops the relay ever offering it again, so doing it on top of a failed write loses the
+     * state in both directions at once -- nothing stored here, nothing left to fetch.
+     */
+    @EdtTest
+    public void aFailedRestoreWriteDoesNotAcknowledgeTheState() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+
+        AppState arrival = fromElsewhere("unstorable", 21L);
+        Storage original = Storage.getInstance();
+        Storage.setStorageInstance(new RefusingStorage());
+        try {
+            Continuity.restore(arrival);
+        } finally {
+            Storage.setStorageInstance(original);
+        }
+
+        // The relay would offer it again. It has to be accepted, not refused as already handled.
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+        Continuity.deliver(arrival);
+        flushSerialCalls();
+
+        assertEquals(1, seen[0],
+                "a state whose write failed was marked handled, so it can never be recovered");
+    }
+
+    /** Storage whose writes always fail, which is what a full disk looks like. */
+    static class RefusingStorage extends Storage {
+        @Override
+        public boolean writeObject(String name, Object o) {
+            return false;
+        }
+    }
+
+    /**
      * An applied state has to reach local storage, and a payload-only one is the case that proves
      * it. noteActedOn() is durable -- once it runs the relay's copy is refused for good -- so a
      * state that was acknowledged and never written is lost outright if the process dies before

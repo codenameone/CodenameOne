@@ -97,8 +97,14 @@ public class ContinuitySnippets {
                 if (Dialog.show("Continue?", "Pick up \"" + state.getTitle()
                         + "\" from your other device?", "Continue", "Stay here")) {
                     Continuity.restore(held);
+                } else {
+                    // Declining is a decision, and it has to be recorded. Returning false alone
+                    // only suppresses the state for THIS run -- false also means "keep it, I will
+                    // prompt again later" -- so without this the relay's unchanged document asks
+                    // the same question after every relaunch.
+                    Continuity.acknowledge(state);
                 }
-                // Consumed either way: the decision has been made here.
+                // Consumed either way: the decision has been made here, and recorded either way.
                 return false;
             }
         });

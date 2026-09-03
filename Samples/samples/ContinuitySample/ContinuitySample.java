@@ -37,6 +37,7 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
@@ -110,6 +111,12 @@ public class ContinuitySample {
                 if (Dialog.show("Continue?", "Pick up \"" + label + "\"?", "Continue", "Stay")) {
                     Continuity.restore(state);
                     showDraftForm();
+                } else {
+                    // Declining is recorded, not just acted on. Returning false alone suppresses
+                    // the state for this run only -- false also means "hold it, I will ask again"
+                    // -- so without this the relay's unchanged document re-prompts after every
+                    // relaunch.
+                    Continuity.acknowledge(state);
                 }
                 // Consumed either way: the decision has been made here, so no other listener is
                 // asked and nothing is restored behind this one's back.
@@ -150,8 +157,19 @@ public class ContinuitySample {
         Form form = new Form("Continuity", BoxLayout.y());
 
         field = new TextArea(draft, 5, 40);
-        field.addActionListener(new ActionListener<ActionEvent>() {
-            public void actionPerformed(ActionEvent evt) {
+        // A DATA CHANGE listener, not an action listener. TextArea.addActionListener fires when
+        // editing ENDS -- its own javadoc warns it "might never fire an action event if it is
+        // edited in place and the user never leaves the text field" -- so a draft that is still
+        // being typed was never captured, and the sample lost precisely the half-finished draft
+        // it exists to preserve: killed mid-sentence, or picked up on another device, the state
+        // held whatever was there the last time focus left the field.
+        //
+        // Checkpointing per keystroke is the point rather than an oversight. This feature is
+        // write-through by design -- there is no reliable "save on exit" callback to hang it on,
+        // which the chapter says outright -- and an app whose whole state is one text field has
+        // nothing else that would ever checkpoint.
+        field.addDataChangeListener(new DataChangedListener() {
+            public void dataChanged(int type, int index) {
                 capture();
             }
         });

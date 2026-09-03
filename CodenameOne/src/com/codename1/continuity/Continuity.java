@@ -503,7 +503,14 @@ public final class Continuity {
         if (state == null) {
             return;
         }
-        persist(state);
+        if (!persist(state)) {
+            // Still owed. `dirty` was cleared on the way in, and leaving it clear told the next
+            // suspend there was nothing to write -- so a checkpoint that failed on a full disk
+            // was never retried, and the app came back to whatever the last successful write
+            // held. The other channels still run: a continuation and a relay copy that reached
+            // the user's other devices are worth having even when this one could not be stored.
+            dirty = true;
+        }
         publishContinuation(state);
         publishToRelay(state);
     }
@@ -726,8 +733,14 @@ public final class Continuity {
         // hit it, because an app that does not use @Route has nothing else that checkpoints. The
         // reverse order costs at worst one re-delivery of a state that is already applied, which
         // restoring again handles.
-        persist(state);
-        noteActedOn(state);
+        if (persist(state)) {
+            // Acknowledged only when the write succeeded, for the reason it happens before the
+            // acknowledgement at all: noteActedOn() is durable and makes the relay refuse this
+            // state for good. Doing that on top of a failed write is the same loss the ordering
+            // exists to prevent, one step further along -- nothing stored here, and nothing left
+            // to fetch. Left unacknowledged, the relay offers it again, which is recoverable.
+            noteActedOn(state);
+        }
         List<String> routes = state.getRoutes();
         if (routes.isEmpty()) {
             // Payload-only restoration, which is what an app that does not use @Route gets. The
@@ -915,11 +928,23 @@ public final class Continuity {
         return paths;
     }
 
-    private static void persist(AppState state) {
+    /// Writes the checkpoint, and says whether it got there.
+    ///
+    /// The answer is used, not logged. Storage.writeObject returns false on a failed write -- a
+    /// full disk is the ordinary cause -- and every piece of bookkeeping around this call assumes
+    /// the state is now durable: checkpoint() clears `dirty`, and restore() marks the sender's
+    /// sequence so the relay stops offering its copy. Doing either after a failed write is how a
+    /// state is lost in both directions at once, with nothing anywhere saying so.
+    ///
+    /// #### Returns
+    ///
+    /// true when the state is in storage
+    private static boolean persist(AppState state) {
         try {
-            Storage.getInstance().writeObject(STORAGE_KEY, state);
+            return Storage.getInstance().writeObject(STORAGE_KEY, state);
         } catch (Throwable t) {
             Log.e(t);
+            return false;
         }
     }
 
