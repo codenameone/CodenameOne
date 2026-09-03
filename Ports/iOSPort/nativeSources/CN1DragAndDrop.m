@@ -84,6 +84,27 @@ void CN1CancelNativeDrag(void) {
 /// points and the framework works in pixels, exactly as the touch path does.
 extern float scaleValue;
 
+/// The uniform type identifier under which this provider carries an actual document, or nil
+/// when it carries none.
+///
+/// A provider built from a URL registers the document under its content type and a
+/// public.file-url beside it. That URL is not the document: loadFileRepresentation writes a copy
+/// of the data of the type it is given, and the data of type public.file-url is the URL itself,
+/// so asking for a file of *that* yields a temporary file containing a URL string. The content
+/// type is the one that yields the document, and a provider with nothing but the URL has no
+/// document to offer at all.
+static NSString* cn1DocumentUtiOf(NSItemProvider* provider) {
+    if (![provider hasItemConformingToTypeIdentifier:@"public.file-url"]) {
+        return nil;
+    }
+    for (NSString* uti in provider.registeredTypeIdentifiers) {
+        if (![uti isEqualToString:@"public.file-url"]) {
+            return uti;
+        }
+    }
+    return nil;
+}
+
 /// What the press staged: the representations the drag could offer, what a receiver may do
 /// with them, and the preview. Named but not built -- see CN1DragAndDrop.h.
 static NSArray* cn1PreparedMimes = nil;
@@ -93,6 +114,15 @@ static NSArray* cn1PreparedMimes = nil;
 /// the source allows. UIKit carries no action information for a session that arrived from
 /// another application, so those are told copy -- see cn1AllowedActionsFor.
 static int cn1SessionActions = CN1_DND_ACTION_NONE;
+
+/// The drag session this source started, retained for as long as it runs and released when
+/// UIKit reports it finished -- which it always does for a session it started here.
+///
+/// Every drag begun anywhere in this application has a non-nil localDragSession, so "local"
+/// alone said yes to a drag some other interaction started -- and cn1SessionActions, which
+/// nothing cleared, then handed that unrelated drag the last Codename One drag's mask. A
+/// move-only one would have proposed a move to a source that never offered it.
+static id cn1OutgoingSession = nil;
 static UIImage* cn1PreparedPreview = nil;
 static CGPoint cn1PreparedTouch;
 
@@ -309,7 +339,12 @@ static NSString* cn1MimeForUti(NSString* uti) {
 /// safe one, since proposing a move the source never offered would have it delete data on the
 /// strength of our guess.
 static int cn1AllowedActionsFor(id<UIDropSession> session) {
-    if (session.localDragSession != nil && cn1SessionActions != CN1_DND_ACTION_NONE) {
+    // The session this source started, not merely one that started somewhere in this
+    // application: another interaction's drag is as foreign to this framework as one from
+    // another application, and is told the same thing.
+    if (session.localDragSession != nil && cn1OutgoingSession != nil
+            && session.localDragSession == cn1OutgoingSession
+            && cn1SessionActions != CN1_DND_ACTION_NONE) {
         return cn1SessionActions;
     }
     return CN1_DND_ACTION_COPY;
@@ -362,7 +397,11 @@ static NSString* cn1MimesForSession(id<UIDropSession> session) {
         // spellings of that, as the other two ports publish them: a component filtered to
         // MIME_URI_LIST refused an ordinary drag out of Files while the same component took
         // it from the Finder and from a file manager on Android.
-        if ([item.itemProvider hasItemConformingToTypeIdentifier:@"public.file-url"]) {
+        //
+        // A provider offering nothing *but* a URL is not one of them: there is no document
+        // behind it to copy, and the drop says the same -- which is the agreement between the
+        // hover and the drop that everything here is built on.
+        if (cn1DocumentUtiOf(item.itemProvider) != nil) {
             if (![mimes containsObject:@"application/x-file-list"]) {
                 [mimes addObject:@"application/x-file-list"];
             }
@@ -610,8 +649,16 @@ API_AVAILABLE(ios(11.0))
         // begins; the framework side has already tidied up whatever it had.
         return @[];
     }
-    // The authoritative set, which is what a local drop session is told the source allows.
+    // The authoritative set, which is what a local drop session is told the source allows --
+    // and the session it belongs to, so no other drag in this application can inherit it.
     cn1SessionActions = allowed;
+#ifndef CN1_USE_ARC
+    [cn1OutgoingSession release];
+#endif
+    cn1OutgoingSession = session;
+#ifndef CN1_USE_ARC
+    [cn1OutgoingSession retain];
+#endif
     cn1DraggingOut = YES;
     cn1LocalDropInFlight = NO;
     cn1EndDeferred = NO;
@@ -740,6 +787,13 @@ API_AVAILABLE(ios(11.0))
                 session:(id<UIDragSession>)session
     didEndWithOperation:(UIDropOperation)operation {
     cn1DraggingOut = NO;
+    if (cn1OutgoingSession == session) {
+#ifndef CN1_USE_ARC
+        [cn1OutgoingSession release];
+#endif
+        cn1OutgoingSession = nil;
+        cn1SessionActions = CN1_DND_ACTION_NONE;
+    }
     if (cn1LocalDropInFlight) {
         // The drop landed here and is still assembling. Its answer is the true one, so the
         // completion goes out when it arrives rather than on UIKit's proposal.
@@ -853,14 +907,24 @@ API_AVAILABLE(ios(11.0))
 
     for (UIDragItem* item in session.items) {
         NSItemProvider* provider = item.itemProvider;
-        BOOL vendsFile = [provider hasItemConformingToTypeIdentifier:@"public.file-url"];
+        // The document's own type, which is what has to be asked for. loadFileRepresentation
+        // writes a copy of the provider's data *of the type named*, and the data of type
+        // public.file-url is the URL -- so asking for a file of that produced a temporary file
+        // containing a URL string, and MIME_FILE pointed at that pointer instead of at the
+        // document. A provider built from a URL registers the document under its content type
+        // and the URL beside it; the content type is the one that yields the document.
+        NSString* documentUti = cn1DocumentUtiOf(provider);
+        // A provider offering nothing but a URL has no document to copy, so it is read the
+        // ordinary way below rather than treated as a file drag.
+        BOOL vendsFile = documentUti != nil;
         if (vendsFile) {
             // A document provider commonly offers both a file URL and the document's own
             // content type. Taking only the file made cn1MimesForSession advertise a type the
             // drop could not then produce, so a target filtered to it accepted the hover and
             // was refused the drop.
+            NSString* documentMime = cn1MimeForUti(documentUti);
             dispatch_group_enter(group);
-            [provider loadFileRepresentationForTypeIdentifier:@"public.file-url"
+            [provider loadFileRepresentationForTypeIdentifier:documentUti
                                            completionHandler:^(NSURL* url, NSError* error) {
                 // The URL is only valid inside this handler, so the file is copied out before
                 // it is named to the application. A path handed over without copying is
@@ -879,13 +943,24 @@ API_AVAILABLE(ios(11.0))
                     @synchronized (files) {
                         [files addObject:target];
                     }
+                    if (documentMime != nil) {
+                        // The document is that type as well as being a file, and this is the
+                        // copy of it -- so the loop below has nothing left to do for its own
+                        // identifier and skips it.
+                        NSString* charset = cn1CharsetNameForUti(documentUti);
+                        @synchronized (fileBacked) {
+                            [fileBacked addObject:@[documentMime, target,
+                                                    charset == nil ? @"" : charset]];
+                        }
+                    }
                 }
                 {
                     {
                         // Issued from in here, rather than beside the file load, so that the
                         // comparison above is possible at all.
                         for (NSString* uti in provider.registeredTypeIdentifiers) {
-                            if ([uti isEqualToString:@"public.file-url"]) {
+                            if ([uti isEqualToString:@"public.file-url"]
+                                    || [uti isEqualToString:documentUti]) {
                                 continue;
                             }
                             NSString* mime = cn1MimeForUti(uti);
