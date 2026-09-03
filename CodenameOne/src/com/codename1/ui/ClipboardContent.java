@@ -219,6 +219,24 @@ public class ClipboardContent {
         }
         int semicolon = mimeType.indexOf(';');
         String value = semicolon < 0 ? mimeType : mimeType.substring(0, semicolon);
-        return value.trim().toLowerCase();
+        return asciiLower(value.trim());
+    }
+
+    /// Lowercases ASCII letters only, so the result never depends on the device locale.
+    ///
+    /// String.toLowerCase() is locale sensitive, and a Turkish or Azerbaijani default turns
+    /// I into a dotless i: IMAGE/PNG normalized under one of those locales stopped being
+    /// equal to image/png, so every check against the framework's own constants failed and
+    /// a port no longer recognized the representation at all. MIME types, schemes and file
+    /// extensions are ASCII by definition, which is what makes folding only ASCII correct
+    /// rather than merely safe. Codename One has no java.util.Locale to ask for the root
+    /// locale instead.
+    private static String asciiLower(String s) {
+        StringBuilder out = new StringBuilder(s.length());
+        for (int iter = 0; iter < s.length(); iter++) {
+            char c = s.charAt(iter);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+        }
+        return out.toString();
     }
 }

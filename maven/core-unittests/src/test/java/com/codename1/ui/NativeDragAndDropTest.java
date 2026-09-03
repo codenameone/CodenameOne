@@ -159,6 +159,28 @@ class NativeDragAndDropTest extends UITestBase {
                 "a source that offered a move learns here, and only here, that it must delete its copy");
     }
 
+    @Test
+    void aMimeTypeIsNormalizedWithoutAskingTheLocale() {
+        // Turkish and Azerbaijani fold I to a dotless i, so String.toLowerCase() turned IMAGE/PNG
+        // into something that is not equal to image/png -- and every check against the
+        // framework's own constants then failed, on the device's locale alone.
+        java.util.Locale saved = java.util.Locale.getDefault();
+        try {
+            java.util.Locale.setDefault(new java.util.Locale("tr", "TR"));
+            ClipboardContent content = new ClipboardContent()
+                    .setData("IMAGE/PNG", new byte[]{1, 2, 3})
+                    .setData("TEXT/URI-LIST", "https://codenameone.com");
+            assertTrue(content.hasMimeType(ClipboardContent.MIME_PNG),
+                    "a case-insensitive spelling of a MIME type is the same type in every locale");
+            assertNotNull(content.getBytes(ClipboardContent.MIME_PNG));
+            assertEquals("https://codenameone.com",
+                    content.getText(ClipboardContent.MIME_URI_LIST));
+            assertEquals(ClipboardContent.MIME_PNG, content.getMimeTypes()[0]);
+        } finally {
+            java.util.Locale.setDefault(saved);
+        }
+    }
+
     // ------------------------------------------------------------------------------------
     // Resolving the target and answering the operating system
     // ------------------------------------------------------------------------------------

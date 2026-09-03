@@ -10808,7 +10808,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             out.append((char) ((hi << 4) | lo));
         }
-        return out.toString().toLowerCase();
+        return asciiLower(out.toString());
     }
 
     /// A file extension for a MIME type, used to name the temporary file a content URI is
@@ -10851,7 +10851,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// believed the label, and invisible to a target filtering on the type the drag advertised,
     /// so the hover was accepted and the drop refused.
     private static String imageMimeFor(String type) {
-        String lower = type.toLowerCase();
+        String lower = asciiLower(type);
         if (lower.startsWith(ClipboardContent.MIME_PNG)
                 || lower.startsWith(ClipboardContent.MIME_JPEG)
                 || lower.startsWith(ClipboardContent.MIME_GIF)) {
@@ -11263,8 +11263,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // A bare path, which is a local file by construction.
             return true;
         }
-        scheme = scheme.toLowerCase();
-        return "content".equals(scheme) || "file".equals(scheme);
+        // equalsIgnoreCase rather than a fold: it compares character by character and is
+        // locale independent, which String.toLowerCase() is not.
+        return "content".equalsIgnoreCase(scheme) || "file".equalsIgnoreCase(scheme);
+    }
+
+    /// Lowercases ASCII letters only, so the result never depends on the device locale.
+    ///
+    /// String.toLowerCase() is locale sensitive, and a Turkish or Azerbaijani default turns
+    /// I into a dotless i: IMAGE/PNG normalized under one of those locales stopped being
+    /// equal to image/png, so every check against the framework's own constants failed and
+    /// a port no longer recognized the representation at all. MIME types, schemes and file
+    /// extensions are ASCII by definition, which is what makes folding only ASCII correct
+    /// rather than merely safe. Codename One has no java.util.Locale to ask for the root
+    /// locale instead.
+    static String asciiLower(String s) {
+        StringBuilder out = new StringBuilder(s.length());
+        for (int iter = 0; iter < s.length(); iter++) {
+            char c = s.charAt(iter);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+        }
+        return out.toString();
     }
 
     /// A MIME type without its parameters, lower case, or null when there is none.
@@ -11273,7 +11292,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return null;
         }
         int semicolon = type.indexOf(';');
-        String bare = (semicolon < 0 ? type : type.substring(0, semicolon)).trim().toLowerCase();
+        String bare = asciiLower((semicolon < 0 ? type : type.substring(0, semicolon)).trim());
         return bare.length() == 0 ? null : bare;
     }
 
@@ -11340,7 +11359,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (mime == null) {
                 continue;
             }
-            mime = mime.toLowerCase();
+            mime = asciiLower(mime);
             if (content.hasMimeType(mime)) {
                 continue;
             }
@@ -11426,7 +11445,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (dot < 0 || dot == name.length() - 1) {
             return null;
         }
-        String extension = name.substring(dot + 1).toLowerCase();
+        String extension = asciiLower(name.substring(dot + 1));
         String match = null;
         for (int pass = 0; pass < 2; pass++) {
             List<String> candidates = pass == 0 ? binary : text;

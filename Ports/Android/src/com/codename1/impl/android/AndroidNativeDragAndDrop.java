@@ -371,7 +371,9 @@ final class AndroidNativeDragAndDrop {
             if (mime == null) {
                 continue;
             }
-            mime = mime.toLowerCase();
+            // Locale independent: see AndroidImplementation.asciiLower for what a Turkish
+            // default does to String.toLowerCase() and to a MIME type run through it.
+            mime = AndroidImplementation.asciiLower(mime);
             if ("text/uri-list".equals(mime)) {
                 // Android carries a dragged file as a URI, which is what the framework calls a
                 // file list; advertise both so either kind of target matches.

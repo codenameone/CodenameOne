@@ -216,6 +216,33 @@ scripts/check-cast-semantics.sh
 scripts/check-cast-semantics.sh --write-baseline   # after fixing a method
 ```
 
+### Never case-fold a protocol token with `toLowerCase()`
+
+`String.toLowerCase()` and `toUpperCase()` are **locale sensitive**, and Codename
+One has no `java.util.Locale` to ask for the root locale instead -- the overload
+that takes one does not exist in `vm/JavaAPI` or `Ports/CLDC11`. On a device set to
+Turkish or Azerbaijani, the `I` of `"IMAGE/PNG".toLowerCase()` folds to a dotless
+i, so the result is not equal to `image/png` and every comparison against a
+constant fails. Nothing throws; the feature is simply inert for those users.
+
+Anything that is ASCII by specification -- a MIME type, a URI scheme, a file
+extension, an HTTP header name, a hex digit -- must therefore be folded by hand or
+compared without folding at all:
+
+- **Comparing two strings?** `equalsIgnoreCase`, or `regionMatches(true, ...)` for
+  a prefix. Both compare character by character and are locale independent, and
+  neither allocates.
+- **Storing or keying a canonical form?** A private ASCII fold. There are several
+  in the tree already -- `ClipboardContent.asciiLower`,
+  `AndroidImplementation.asciiLower`, `WebSocketImpl.asciiLower`,
+  `DefaultCalendarHttpTransport.asciiLowerCase` -- all the same six lines. Copy one
+  rather than widening a class's API to share it.
+
+There is no gate for this yet, and the tree still has ~160 unswept
+`toLowerCase()`/`toUpperCase()` calls across the ports (cookie parsing, crypto
+transformation names, font matching, `url.toLowerCase().startsWith("http")`).
+Sweeping them is worth doing on its own; do not fold it into an unrelated change.
+
 ### Never write a control character into source
 
 A raw control byte -- NUL, US, SOH, DEL -- typed straight into a file instead of

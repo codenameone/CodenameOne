@@ -315,7 +315,9 @@ final class JavaSENativeDragAndDrop {
         if (primary == null || sub == null) {
             return null;
         }
-        String mime = (primary + "/" + sub).toLowerCase();
+        // Locale independent: a Turkish default folds the I of IMAGE to a dotless i, and
+        // the result stops being equal to the framework's own constants.
+        String mime = asciiLower(primary + "/" + sub);
         if ("application/rtf".equals(mime)) {
             return ClipboardContent.MIME_RTF;
         }
@@ -343,6 +345,19 @@ final class JavaSENativeDragAndDrop {
             return mime;
         }
         return null;
+    }
+
+    /// Lowercases ASCII letters only, so the result never depends on the JVM's locale.
+    ///
+    /// MIME types are ASCII by definition, and Codename One has no java.util.Locale to ask
+    /// for the root locale instead -- so this is what the ports use to canonicalize one.
+    static String asciiLower(String s) {
+        StringBuilder out = new StringBuilder(s.length());
+        for (int iter = 0; iter < s.length(); iter++) {
+            char c = s.charAt(iter);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+        }
+        return out.toString();
     }
 
     /// The provider a hover installs: the representation is named, and has no value here.

@@ -9664,7 +9664,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// receiver imported the document twice. Only the key is normalized; what is published stays
     /// the spelling the source used.
     private static String clipboardUrlKey(String url) {
-        if(url.length() <= 5 || !url.substring(0, 5).toLowerCase().equals("file:")) {
+        // regionMatches(true, ...) rather than a lowercased substring: it compares
+        // character by character and is locale independent, which String.toLowerCase() is
+        // not -- a Turkish default folds the I of FILE: to a dotless i.
+        if(url.length() <= 5 || !url.regionMatches(true, 0, "file:", 0, 5)) {
             return url;
         }
         String key = url.substring(5);
@@ -9703,7 +9706,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             // No scheme: a relative path, possibly one whose own name contains a colon.
             return true;
         }
-        return "file".equals(url.substring(0, colon).toLowerCase());
+        return colon == 4 && url.regionMatches(true, 0, "file", 0, 4);
     }
 
     private static String[] splitClipboardFileUris(String joined) {

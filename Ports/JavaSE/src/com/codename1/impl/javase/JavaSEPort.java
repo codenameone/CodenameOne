@@ -2190,7 +2190,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 throw new UnsupportedFlavorException(flavor);
             }
-            String mime = (flavor.getPrimaryType() + "/" + flavor.getSubType()).toLowerCase();
+            // Locale independent; see JavaSENativeDragAndDrop.asciiLower.
+            String mime = JavaSENativeDragAndDrop.asciiLower(
+                    flavor.getPrimaryType() + "/" + flavor.getSubType());
             if (ClipboardContent.MIME_URI_LIST.equals(mime) && !data.hasMimeType(ClipboardContent.MIME_URI_LIST)) {
                 // Synthesized from the file list rather than stored, so a source only has to
                 // name its files once.
