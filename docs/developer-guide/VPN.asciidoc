@@ -11,9 +11,10 @@ developer account can switch on, and is what almost every app that says
 what this chapter is mostly about.
 
 The second is *shipping a tunnel of your own* that receives raw IP packets and
-decides what to do with them. That's `com.codename1.vpn.tunnel`, and it runs
-on Android only; the section below covers why, and what to write so the loop
-you wrote is still the loop that runs if that changes.
+decides what to do with them. That's `com.codename1.vpn.tunnel`. It runs on
+Android with no configuration at all, and on iOS behind a build hint and an
+entitlement Apple grants case by case; the section below covers both, and what
+to write so the loop you wrote is the loop that runs on either.
 
 [options="header"]
 |===
@@ -22,7 +23,7 @@ you wrote is still the loop that runs if that changes.
 | IPsec with a pre-shared key | yes | -- | simulated | --
 | Connect, disconnect, observe status | yes | yes (Android 11 and later) | simulated | --
 | Always-on / on-demand | yes | yes | simulated | --
-| A tunnel your app implements | -- | yes | simulated | --
+| A tunnel your app implements | yes (see below) | yes | simulated | --
 | Detect that some VPN is active | yes | yes | yes | --
 |===
 
@@ -111,9 +112,11 @@ If your VPN speaks a protocol the platforms don't implement -- anything that
 isn't IKEv2 or IPsec -- you write the packet loop yourself, in Java, once.
 Extend `VpnTunnel` and hand it to `Tunnels.start`.
 
-`Tunnels.isSupported()` answers true on Android and false everywhere else.
-Ask it, and keep a path for the answer being no -- `Tunnels.start` refuses
-with `NOT_SUPPORTED` rather than pretending.
+`Tunnels.isSupported()` answers true on Android, true on an iOS build that
+generated the extension, and false everywhere else -- including an iOS build
+that did not ask for one, which is every iOS build by default. Ask it, and
+keep a path for the answer being no: `Tunnels.start` refuses with
+`NOT_SUPPORTED` rather than pretending.
 
 The addresses in a `TunnelSetup` are read before the platform is asked. An
 address, a route or a DNS server that isn't an IP literal fails the start
@@ -126,19 +129,37 @@ On Android the tunnel runs inside a `VpnService` in your app's own process.
 The instance you passed to `Tunnels.start` is the instance that runs, and
 everything it closed over is still there.
 
-On iOS it would run inside a *Network Extension*: a separate process with its
-own bundle identifier, its own provisioning profile and a hard memory limit.
-**That half isn't built.** The extension has to carry a virtual machine to
-run your Java, and the translation that would give it one without the
-application shell -- which uses UIKit APIs an extension may not call -- has
-not been written. `ios.vpn.tunnel` fails the build rather than producing an
-extension too broken to compile, and `Tunnels.isSupported()` answers false on
-iOS.
+On iOS it runs inside a *Network Extension*: a separate process with its own
+bundle identifier, its own provisioning profile and a hard memory limit. The
+build generates that extension for you -- a target of its own, carrying a
+virtual machine, running the class you name in `ios.vpn.tunnel.class`.
 
-Write the tunnel as though it ran over there anyway. It costs an Android
-tunnel nothing, and it's the difference between a packet loop and a packet
-loop wired to this process: no statics you set, no `Display`, no open
-connections, and the tunnel constructed fresh with none of them.
+The extension is *its own translation*, rooted at your tunnel rather than at
+your app. That is what makes it possible at all: an app extension compiles
+with `APPLICATION_EXTENSION_API_ONLY`, and the iOS port's own natives call
+`UIApplicationMain` and `[UIApplication sharedApplication]`, which an
+extension may not touch -- so a target carrying the application's translation
+could not be built. Rooted at the tunnel it carries what the tunnel reaches,
+and the application shell is simply not in it.
+
+Which turns the advice below into a build error rather than a disappointment.
+Write the tunnel as though it ran in a process of its own, because it does:
+no statics you set, no `Display`, no open connections, and the tunnel
+constructed fresh with none of them. A tunnel that reaches for your app's
+other classes drags them into this translation, and the ones backed by the
+port's UIKit natives fail the extension's *link*, naming the symbol they
+wanted.
+
+Two things are yours to arrange, and neither is something a build can do for
+you. Apple grants
+`com.apple.developer.networking.networkextension` case by case rather than
+from the developer portal, so setting `ios.vpn.tunnel=true` is you saying you
+hold it -- an App ID that doesn't fails codesigning with an error naming the
+entitlement and not the reason it appeared. And the extension signs under its
+own App ID, `<packageName>.vpntunnel`, so a device archive needs a
+provisioning profile for that identifier passed as
+`ios.appext.CN1VpnTunnel.provisioningData` or `.provisioningURL`, exactly as
+the Call Directory extension does.
 
 `TunnelSetup.data` exists for that reason, and the rule worth taking away
 follows from it:
@@ -185,18 +206,22 @@ Every item is also callable from a test with `CN.execute("vpn:itemN")`.
 |===
 | Hint | Default | What it does
 | `ios.entitlements.com.apple.developer.networking.vpn.api` | injected as `allow-vpn` | The Personal VPN capability. Enable it on the App ID or the app won't sign.
-| `ios.vpn.tunnel` | `false` | Reserved for the packet tunnel extension. Setting it fails the build today; see above.
-| `ios.vpn.tunnel.class` | none | Which `VpnTunnel` subclass the extension will run, fully qualified. Reserved with the hint above.
+| `ios.vpn.tunnel` | `false` | Generates the packet tunnel extension. Also your assertion that the App ID holds the Network Extension grant; see above.
+| `ios.vpn.tunnel.class` | none | Which `VpnTunnel` subclass the extension runs, fully qualified. Required when the hint above is true, and checked against the compiled classes.
+| `ios.appext.CN1VpnTunnel.provisioningData` | none | The extension's own provisioning profile, base64, for a device archive. `.provisioningURL` is the hosted alternative.
+| `ios.vpn.tunnel.buildSettings.<KEY>` | none | Overrides a build setting on the generated target, as the other extensions' equivalents do.
 |===
 
 Referencing `com.codename1.vpn.profile` links `NetworkExtension.framework` and
 injects the Personal VPN entitlement with no hint at all.
 
 Codename One never injects `com.apple.developer.networking.networkextension`
-from a class reference. Apple grants it case by case rather than self-serve,
-and an entitlement an App ID doesn't carry fails codesigning with an error
-naming the entitlement and not the reason it appeared. Hence the tunnel
-hints exist at all rather than the package alone turning the extension on.
+into your app from a class reference. Apple grants it case by case rather
+than self-serve, and an entitlement an App ID doesn't carry fails codesigning
+with an error naming the entitlement and not the reason it appeared. That is
+why the hint exists at all rather than the package alone turning the
+extension on -- and why the entitlement is written into the *extension's* own
+entitlements file, where it belongs, rather than into the host app's.
 
 Android needs no hints. Referencing the package adds the `VpnService`, its
 `BIND_VPN_SERVICE` declaration and the foreground-service permissions the

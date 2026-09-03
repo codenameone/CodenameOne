@@ -26,49 +26,68 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * NOTHING CALLS THIS, and that is the current state rather than an oversight.
+ * Generates the iOS packet-tunnel app extension behind
+ * {@code com.codename1.vpn.tunnel}.
  *
- * <p>IPhoneBuilder refuses {@code ios.vpn.tunnel=true} and never enables
- * {@code CN1_VPN_TUNNEL}, so {@code vpnTunnelSupported()} compiles to false
- * in every build and no target is generated. The class is kept, and kept
- * under test, because the piece that is missing is a ByteCodeTranslator
- * translation rooted at the tunnel -- not any of this -- and throwing the
- * generator away would mean writing it again from nothing when that lands.
+ * <p>Called by {@code VpnTunnelNativeBuilder} for a project that sets
+ * {@code ios.vpn.tunnel=true} and names its tunnel class in
+ * {@code ios.vpn.tunnel.class}. Nothing else reaches it, and that gate is
+ * deliberate: the entitlement this extension carries is one Apple grants
+ * case by case, so the hint is also the project asserting it holds the
+ * grant.</p>
  *
- * <p>It has been read as evidence that the iOS tunnel works, twice. It is
- * not: a generator with no caller and a {@code #if} whose macro nothing
- * defines produce no code at all. The guide says the iOS half is unbuilt
- * because the iOS half is unbuilt.
+ * <p>This file used to open by saying NOTHING CALLS THIS, and for two rounds
+ * that was true -- the generator was written and left without a caller,
+ * because the piece believed to be missing was "a ByteCodeTranslator
+ * translation rooted at the tunnel". That translation already existed and
+ * had shipped: the watch slice is translated by a SECOND translator pass
+ * rooted at its own entry point, and {@code VpnTunnelNativeBuilder} does the
+ * same thing rooted at a generated tunnel stub. Rooting it there is what
+ * makes an app-extension target possible at all -- the extension carries
+ * what the tunnel reaches, so the port's UIKit natives, whose
+ * {@code UIApplicationMain} and {@code [UIApplication sharedApplication]}
+ * an {@code APPLICATION_EXTENSION_API_ONLY} target may not compile, are not
+ * in it.</p>
  *
- * <p>One consequence worth stating plainly: no build in this repository
- * compiles what this writes. The output was checked by generating it and
- * running clang against the real iOS SDK by hand, which is how a
- * forward-declaration break that would have failed the target's first build
- * was found sitting here. Treat a change to this file as unverified until
- * that is done again.
+ * <p><b>Nothing in CI compiles what this writes</b>, here or in the
+ * CodenameOne repository -- neither runs an Objective-C compiler. The output
+ * is checked instead by generating it and running clang against the real iOS
+ * SDK with {@code -fapplication-extension}, which is what
+ * {@code .github/scripts/check-vpn-tunnel-extension-compiles.sh} does on a
+ * machine that has Xcode; it skips where there is none. Run it after
+ * changing this file: a forward-declaration break that would have failed the
+ * generated target's first build was found sitting here exactly that way.</p>
  *
  * <hr>
  *
- * <p>What it WOULD generate, when there is something to call it: the iOS
- * packet-tunnel app extension behind {@code com.codename1.vpn.tunnel}.</p>
+ * <p>The iOS packet-tunnel app extension behind
+ * {@code com.codename1.vpn.tunnel}.</p>
  *
  * <p>This one differs from every other extension this builder generates:
  * <b>it hosts a virtual machine</b>. The others are small Objective-C
  * handlers that answer the system and exit. A packet tunnel runs the
  * application's own {@code VpnTunnel} subclass, which is Java, so the
- * extension target is translated exactly as the app target is and the
- * generated provider below boots the VM before handing packets to it.</p>
+ * extension target is translated the way the app target is -- by the same
+ * translator, from its own root -- and the generated provider below boots
+ * the VM before handing packets to it.</p>
  *
  * <p>An earlier version of this framework recorded that this could not be
  * done -- that a Network Extension is "a separate process with no ParparVM
- * in it". That premise is half right, and the half that matters is the
- * reason nothing calls this yet: the extension WOULD be a target this build
- * produces, so what is in it would be this build's decision -- but the
- * translation that would put a VM in it without the application shell, whose
- * natives call UIKit an extension may not touch, has not been written. What
- * IS true either way is that it shares nothing with the app: no statics, no
- * {@code Display}, no open connections. Everything the tunnel needs travels
- * in {@code TunnelSetup.data} and arrives as the provider configuration.</p>
+ * in it". The premise is half right, and the half that matters is the half
+ * it got wrong: the extension is a target THIS BUILD produces, so what is in
+ * it is this build's decision. {@code VpnTunnelNativeBuilder} runs a second
+ * translator pass rooted at a stub that reaches the tunnel and nothing else,
+ * so the VM in the extension is carried WITHOUT the application shell whose
+ * natives call UIKit an extension may not touch.</p>
+ *
+ * <p>What IS true either way is that it shares nothing with the app: no
+ * statics, no {@code Display}, no open connections. Everything the tunnel
+ * needs travels in {@code TunnelSetup.data} and arrives as the provider
+ * configuration. That is not a style rule -- a tunnel that reaches for the
+ * application's own classes drags them into the rooted translation, and the
+ * ones backed by the port's UIKit natives cannot be compiled into an app
+ * extension at all, so it fails the extension's link rather than misbehaving
+ * at run time.</p>
  *
  * <p><b>The entitlement is not injected.</b>
  * {@code com.apple.developer.networking.networkextension} is granted by Apple
