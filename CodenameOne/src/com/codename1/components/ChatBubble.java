@@ -55,6 +55,10 @@ public class ChatBubble extends Container {
         this.message = message;
         setUIID(defaultUiidFor(message.getRole()));
         this.body = new TextArea(message.getText());
+        // The bubble starts out showing the message's text, so that text is
+        // already conversation. Leaving this empty would make the first append
+        // record only the delta and drop everything the message came with.
+        this.conversation = message.getText() == null ? "" : message.getText();
         body.setEditable(false);
         body.setUIID("ChatBubbleText");
         body.setGrowByContent(true);

@@ -74,6 +74,18 @@ class ChatViewTest extends UITestBase {
     }
 
     @FormTest
+    void appendingToANonEmptyBubbleKeepsWhatItStartedWith() {
+        // A bubble created from a message already shows that text, so the first
+        // append must extend it rather than replace the stored message with just
+        // the delta.
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.addMessage(ChatMessage.assistant("Hello"));
+        bubble.appendText(" world");
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("Hello world", history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
     void textAppendedAfterAnAnnotationDoesNotDragItIntoHistory() {
         // The annotation stays in the bubble, so deriving the conversation from
         // the rendered body folds it in on the very next delta -- excluding it

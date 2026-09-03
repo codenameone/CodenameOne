@@ -100,7 +100,9 @@ class AiAndSpeechJava018Snippet {
                 });
 
         ChatRequest req = ChatRequest.builder()
-                .model("gpt-4o-mini")
+                // No model named: the client's default applies, which the
+                // simulator's Ollama redirect sets for you. Naming a cloud model
+                // asks a local server for one it does not have.
                 .addMessage(ChatMessage.user("What is the weather in Tel Aviv?"))
                 .tools(Collections.singletonList(weather))
                 .toolChoice(ToolChoice.AUTO)
@@ -121,7 +123,6 @@ class AiAndSpeechJava018Snippet {
             // of them, and a follow-up carrying only some is rejected as an
             // incomplete tool-call sequence.
             ChatRequest.Builder followUp = ChatRequest.builder()
-                    .model("gpt-4o-mini")
                     .addMessage(ChatMessage.user("What is the weather in Tel Aviv?"))
                     .addMessage(resp.getAssistantMessage());
             for (ToolCall call : resp.getToolCalls()) {
