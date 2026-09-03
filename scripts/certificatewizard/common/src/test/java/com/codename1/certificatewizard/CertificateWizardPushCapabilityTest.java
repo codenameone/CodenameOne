@@ -26,10 +26,12 @@ import com.codename1.certificatewizard.api.MockSigningService;
 import com.codename1.certificatewizard.project.ProjectIO;
 import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.TextField;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -329,6 +331,89 @@ class CertificateWizardPushCapabilityTest {
     }
 
     /// A wizard bound to a project carrying `extraSettings`, running against `service`.
+    @Test
+    void anAccountHoldingOnlyIosIdentifiersStillOffersToRegisterAMacOne() throws Exception {
+        // The account has App IDs, just none a Mac profile can use, and this project's
+        // identifier is not one of them. Deciding the remedy on whether the account holds
+        // ANY bundle IDs left this case with an explanation and nothing to act on: the Mac
+        // profile could not be created, and no screen in the wizard registered a Mac App ID.
+        final MockSigningService service = new MockSigningService();
+        service.removeBundlesForPlatform("MAC_OS");
+        service.removeBundlesForPlatform("UNIVERSAL");
+        final CertificateWizard[] app = launchBound(service, "com.example.brandnew", "");
+
+        openMacProfileDialog(app);
+
+        assertNotNull(find(app[0].getForm(), "btn.profileNeedsBundle"),
+                "an unregistered identifier has to be offered for registration");
+    }
+
+    @Test
+    void appGroupsOnAMacRegistrationLookTheBundleUpOnItsOwnPlatform() throws Exception {
+        // Registering from the Mac profile flow creates a MAC_OS App ID, and the App Groups
+        // follow-up then looked the identifier back up as IOS. It found nothing and told the
+        // user the bundle it had just created could not be found.
+        final MockSigningService service = new MockSigningService();
+        service.removeBundlesForPlatform("MAC_OS");
+        service.removeBundlesForPlatform("UNIVERSAL");
+        final CertificateWizard[] app = launchBound(service, "com.example.brandnew", "");
+
+        openMacProfileDialog(app);
+        // Checked from here rather than inside the event thread: fire() asserts on a
+        // missing component, and an assertion thrown in there is handled as an application
+        // error instead of failing the test -- the run hangs rather than saying what is
+        // wrong.
+        assertNotNull(find(app[0].getForm(), "btn.profileNeedsBundle"),
+                "the registration action has to be offered before this can test it");
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "btn.profileNeedsBundle");
+            }
+        });
+        onEdt(new Runnable() {
+            public void run() {
+                Component id = find(app[0].getForm(), "modal.bundle.identifier");
+                assertNotNull(id, "the registration dialog has to be on screen");
+                ((TextField) id).setText("com.example.brandnew");
+                Component groups = find(app[0].getForm(), "modal.bundle.appGroups");
+                assertNotNull(groups, "with the App Groups option on it");
+                ((CheckBox) groups).setSelected(true);
+                fire(app[0].getForm(), "modal.bundle.submit");
+            }
+        });
+        settle();
+
+        Component banner = find(app[0].getForm(), "page.message");
+        String text = banner == null ? "" : ((SpanLabel) banner).getText();
+        assertTrue(text.indexOf("could not be found after refresh") < 0,
+                "the bundle it just registered has to be found again: " + text);
+    }
+
+    /// Opens the new-profile dialog and switches it to a Mac profile type, which is what
+    /// narrows the bundle list to the App IDs macOS can use.
+    private void openMacProfileDialog(final CertificateWizard[] app) throws Exception {
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "nav.profiles");
+            }
+        });
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "btn.newProfile");
+            }
+        });
+        // Settled before touching the dialog: its show animation queues container
+        // mutations, so the type buttons are not reachable while it is still running and
+        // the type silently stays on iOS.
+        settle();
+        onEdt(new Runnable() {
+            public void run() {
+                fire(app[0].getForm(), "pick.type.mac_app_store");
+            }
+        });
+        settle();
+    }
+
     private CertificateWizard[] launchBound(final MockSigningService service, String extraSettings)
             throws Exception {
         return launchBound(service, EXISTING_BUNDLE, extraSettings);

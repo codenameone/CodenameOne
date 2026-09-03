@@ -238,6 +238,17 @@ public final class MockSigningService implements SigningService {
         }
     }
 
+    /// Drops every App ID registered for `platform`, so a test can build the account shape
+    /// where the identifiers on file are all for the other one.
+    public void removeBundlesForPlatform(String platform) {
+        for (int i = bundles.size() - 1; i >= 0; i--) {
+            String p = bundles.get(i).platform();
+            if (p != null && p.equals(platform)) {
+                bundles.remove(i);
+            }
+        }
+    }
+
     public List<String> appGroupAssociation(String bundleIdAppleId) {
         List<String> assoc = appGroupAssociations.get(bundleIdAppleId);
         return assoc == null ? new ArrayList<String>() : new ArrayList<String>(assoc);

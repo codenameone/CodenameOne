@@ -1092,6 +1092,7 @@ public class CertificateWizard extends Lifecycle {
                 ? "Register bundle ID"
                 : "Register " + bundlePlatformName(platform) + " bundle ID");
         TextField id = field("Identifier", "com.example.app");
+        id.setName("modal.bundle.identifier");
         TextField name = field("Name", "My App");
         if (initialIdentifier != null) {
             id.setText(initialIdentifier);
@@ -1107,6 +1108,7 @@ public class CertificateWizard extends Lifecycle {
         push.setSelected(projectWantsPush(platform));
         CheckBox appGroups = new CheckBox("Enable App Groups (widgets / live activities)");
         appGroups.setUIID(uiid("CWFieldLabel"));
+        appGroups.setName("modal.bundle.appGroups");
         d.add(id).add(name).add(push).add(appGroups);
         Button save = primary("Register", "modal.bundle.submit");
         save.addActionListener(e -> {
@@ -1119,7 +1121,7 @@ public class CertificateWizard extends Lifecycle {
                     return;
                 }
                 if (withGroups) {
-                    enableAppGroupsForBundle(bundleIdentifier);
+                    enableAppGroupsForBundle(bundleIdentifier, platform);
                 } else {
                     afterMutation(r, "Bundle ID registered");
                 }
@@ -1304,7 +1306,12 @@ public class CertificateWizard extends Lifecycle {
                 c.add(toggle);
             }
             if (usableBundles.isEmpty()) {
-                if (state.bundleIds.isEmpty()) {
+                // Whether THIS identifier is already registered decides the remedy, not
+                // whether the account holds any bundle IDs at all. An account full of other
+                // apps' iOS App IDs says nothing about whether this one can be registered
+                // for macOS, and testing the account left that case with an explanation and
+                // no way to act on it -- a Mac profile could not be reached from anywhere.
+                if (findBundleByIdentifier(projectDefaults().bundleId) == null) {
                     Button createBundle = outline("Register bundle ID first", "btn.profileNeedsBundle");
                     createBundle.addActionListener(e -> { d.dispose(); bundleDialog(null, null, bundlePlatform); });
                     c.add(createBundle);
@@ -1975,13 +1982,17 @@ public class CertificateWizard extends Lifecycle {
         }
     }
 
-    private void enableAppGroupsForBundle(String bundleIdentifier) {
+    /// `platform` is the one the App ID was registered for, and it has to be carried here:
+    /// this looks the bundle back up after a refresh, and looking for the iOS record of an
+    /// identifier registered only for macOS finds nothing -- the group would be created and
+    /// then reported as a bundle that cannot be found.
+    private void enableAppGroupsForBundle(String bundleIdentifier, String platform) {
         ProjectDefaults defaults = projectDefaults();
         String groupId = resolveAppGroupIdentifier(defaults);
         String groupName = defaults.appName + " Shared";
         showPageMessage("Enabling App Groups for " + bundleIdentifier + "...", false);
         findOrCreateAppGroup(groupId, groupName, group -> refreshForAutoSetup(() -> {
-            SigningState.BundleId bundle = findBundleByIdentifier(bundleIdentifier, "IOS");
+            SigningState.BundleId bundle = findBundleByIdentifier(bundleIdentifier, platform);
             if (bundle == null) {
                 showPageMessage("Bundle ID was created but could not be found after refresh.", true);
                 return;
