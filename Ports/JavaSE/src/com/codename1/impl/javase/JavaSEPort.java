@@ -16886,6 +16886,26 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return (Contact) contacts.get(id);
     }
+
+    @Override
+    public boolean isContactPickerSupported() {
+        return true;
+    }
+
+    @Override
+    public void pickContacts(int requestedFields, boolean multiSelect,
+            int selectionLimit, boolean requireAllRequestedFields,
+            com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent> response) {
+        // No checkForPermission and no checkContactsUsageDescription: a
+        // picker is the way an app reads contacts *without* asking for
+        // either, and simulating a permission prompt here would teach the
+        // developer the opposite of what ships.
+        if (contacts == null) {
+            contacts = createSimulatedContacts();
+        }
+        ContactPickerSimulation.pick(contacts, requestedFields, multiSelect,
+                selectionLimit, requireAllRequestedFields, response);
+    }
     
     @Override
     public Contact getContactById(String id, boolean includesFullName, boolean includesPicture,
@@ -19015,8 +19035,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         return skin;
     }
     
+    /**
+     * The simulated address book, as seen through the broad contacts API.
+     *
+     * <p>Reading the whole book is what needs {@code NSContactsUsageDescription}
+     * on the device, so the build hint is nagged for here rather than in
+     * {@link #createSimulatedContacts()}. The contact picker shares the same
+     * data and deliberately does not come through this door: its iOS
+     * counterpart runs out of process and needs no usage description, and
+     * adding the hint behind the developer's back would misrepresent what the
+     * app asks for.</p>
+     */
     private Hashtable initContacts() {
         checkContactsUsageDescription();
+        return createSimulatedContacts();
+    }
+
+    private Hashtable createSimulatedContacts() {
         Hashtable retVal = new Hashtable();
         
         Image img = null;

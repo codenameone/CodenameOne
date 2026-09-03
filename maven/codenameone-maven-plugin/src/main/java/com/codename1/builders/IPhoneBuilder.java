@@ -1409,6 +1409,15 @@ public class IPhoneBuilder extends Executor {
     private boolean usesWifiHotspotConfig;
     private boolean usesBonjour;
     private boolean usesCalendarApi;
+    /**
+     * Whether the application shows the system contact picker.
+     *
+     * <p>Keyed on {@code ContactPicker} alone rather than on the contacts
+     * package, because the point of the picker is that it is the one member
+     * of that package which needs neither the address book nor a usage
+     * description.</p>
+     */
+    private boolean usesContactPicker;
     private boolean usesCalendarEventApi;
     private boolean usesCalendarTaskApi;
     private String firstBonjourType;
@@ -2420,6 +2429,10 @@ public class IPhoneBuilder extends Executor {
                     aiAcc.consume(cls);
                     if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0) {
                         usesCalendarApi = true;
+                    }
+                    if (!usesContactPicker
+                            && "com/codename1/contacts/ContactPicker".equals(cls)) {
+                        usesContactPicker = true;
                     }
                     if (!usesLocalNotifications && cls.indexOf("com/codename1/notifications/LocalNotification") == 0) {
                         usesLocalNotifications = true;
@@ -4269,6 +4282,27 @@ public class IPhoneBuilder extends Executor {
                 } else if (!addLibs.toLowerCase().contains("eventkit")) {
                     addLibs = addLibs + ";EventKit.framework";
                 }
+            }
+
+            // CNContactPickerViewController, behind
+            // com.codename1.contacts.ContactPicker. The define and the two
+            // frameworks travel together: the native sources only reference
+            // ContactsUI inside CN1_USE_CONTACT_PICKER, and turning the define
+            // on without linking would fail at link rather than at compile.
+            //
+            // Contacts.framework comes with it because the picker hands back
+            // CNContact objects the native code then reads.
+            if (usesContactPicker) {
+                try {
+                    replaceInFile(new File(buildinRes, "IOSNative.m"),
+                            "//#define CN1_USE_CONTACT_PICKER",
+                            "#define CN1_USE_CONTACT_PICKER");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_USE_CONTACT_PICKER", ex);
+                }
+                addLibs = appendFrameworks(addLibs, "ContactsUI.framework",
+                        "Contacts.framework");
             }
 
             // DeviceCheck.framework backs App Attest (com.codename1.security.

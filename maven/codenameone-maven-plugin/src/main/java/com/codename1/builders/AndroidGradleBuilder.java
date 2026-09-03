@@ -472,6 +472,15 @@ public class AndroidGradleBuilder extends Executor {
     private boolean calendarReadPermission;
     private boolean calendarWritePermission;
     private boolean contactsWritePermission;
+    /**
+     * Which of the two contacts permissions the application actually needs.
+     *
+     * <p>Its own class because "referenced a class under
+     * com.codename1.contacts" stopped being the answer once the contact
+     * picker, which needs no permission at all, started returning
+     * {@code Contact} objects from that same package.</p>
+     */
+    private final ContactsPermissionScan contactsScan = new ContactsPermissionScan();
     private boolean addRemoteControlService;
     /**
      * @deprecated for use to build 1.1 version
@@ -2032,9 +2041,7 @@ public class AndroidGradleBuilder extends Executor {
                             foregroundServicePermission = true;
                         }
                     }
-                    if (cls.indexOf("com/codename1/contacts") > -1) {
-                        contactsReadPermission = true;
-                    }
+                    contactsScan.usesClass(cls);
                     if (cls.indexOf("com/codename1/payment") > -1) {
                         purchasePermissions = true;
                     }
@@ -2537,9 +2544,7 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("getMsisdn") > -1) {
                         phonePermission = true;
                     }
-                    if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("getAllContacts") > -1) {
-                        contactsReadPermission = true;
-                    }
+                    contactsScan.usesClassMethod(cls, method);
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("lockScreen") > -1) {
                         wakeLock = true;
                     }
@@ -2556,18 +2561,7 @@ public class AndroidGradleBuilder extends Executor {
                     // usesClassMethodWithDescriptor: which overload was
                     // called decides whether any shared media is read,
                     // and the name alone cannot say.
-                    if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("createContact") > -1) {
-                        contactsWritePermission = true;
-                    }
-                    if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("deleteContact") > -1) {
-                        contactsWritePermission = true;
-                    }
-                    if (cls.indexOf("com/codename1/contacts/ContactsManager") == 0 && method.indexOf("createContact") > -1) {
-                        contactsWritePermission = true;
-                    }
-                    if (cls.indexOf("com/codename1/contacts/ContactsManager") == 0 && method.indexOf("deleteContact") > -1) {
-                        contactsWritePermission = true;
-                    }
+
                     // WiFi scan implies management. We detect the method
                     // rather than just the class so that apps that only read
                     // SSID/BSSID (no scan) do not pick up CHANGE_WIFI_STATE.
@@ -2590,6 +2584,8 @@ public class AndroidGradleBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("An error occurred while trying to scan the classes for API usage.", ex);
         }
+        contactsReadPermission = contactsScan.readPermissionRequired();
+        contactsWritePermission = contactsScan.writePermissionRequired();
 
         // The libraries as well as the loose class tree.
         //

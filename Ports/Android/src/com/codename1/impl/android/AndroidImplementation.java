@@ -9663,6 +9663,60 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
+    @Override
+    public boolean isContactPickerSupported() {
+        // Both paths behind AndroidContactPicker exist on every version this
+        // port runs on: the system picker from Android 17, ACTION_PICK
+        // against the contacts provider before that. A device with no
+        // contacts app answers with ActivityNotFoundException, which the
+        // picker reports as an empty selection -- the same thing a cancelled
+        // pick reports, so callers need no separate case for it.
+        return getActivity() != null;
+    }
+
+    @Override
+    public void pickContacts(int requestedFields, boolean multiSelect,
+                             int selectionLimit, boolean requireAllRequestedFields,
+                             ActionListener<ActionEvent> response) {
+        if (getActivity() == null) {
+            fireContactPickerResult(response, new Contact[0]);
+            return;
+        }
+        if (editInProgress()) {
+            stopEditing(true);
+        }
+        // Deliberately no checkForPermission call. The whole point of the
+        // picker is that neither path needs READ_CONTACTS, and asking for it
+        // here would put the permission back into the manifest and in front
+        // of the user for a flow that does not need it.
+        AndroidContactPicker.pick(getContext(), requestedFields, multiSelect,
+                selectionLimit, requireAllRequestedFields,
+                new ContactPickerResult(response));
+    }
+
+    /**
+     * Hands a picker selection back to the listener that asked for it.
+     *
+     * <p>A named class rather than the anonymous one this obviously wants to
+     * be. scripts/check-cast-semantics.sh holds its baseline against
+     * synthetic names like {@code AndroidImplementation$48}, which javac
+     * hands out in source order, so an anonymous class added here renumbers
+     * every one below it and fails a gate that has nothing to do with this
+     * change.</p>
+     */
+    private final class ContactPickerResult implements AndroidContactPicker.Result {
+        private final ActionListener<ActionEvent> response;
+
+        ContactPickerResult(ActionListener<ActionEvent> response) {
+            this.response = response;
+        }
+
+        @Override
+        public void picked(Contact[] picked) {
+            fireContactPickerResult(response, picked);
+        }
+    }
+
     public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
         if(!checkForPermission(Manifest.permission.WRITE_CONTACTS, "This is required to create a contact")){
             return null;

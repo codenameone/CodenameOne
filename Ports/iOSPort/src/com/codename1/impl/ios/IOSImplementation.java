@@ -9957,6 +9957,108 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return getContactById(id, true, true, true, true, true);
     }
+
+    /// The listener waiting for the contact picker, and the fields it asked
+    /// for.
+    ///
+    /// One slot rather than a queue, like the capture callback beside it:
+    /// `CNContactPickerViewController` is modal, so a second pick cannot
+    /// start while the first is on screen.
+    private static EventDispatcher contactPickerCallback;
+
+    private static int contactPickerFields;
+
+    @Override
+    public boolean isContactPickerSupported() {
+        return nativeInstance.isContactPickerSupported();
+    }
+
+    @Override
+    public void pickContacts(int requestedFields, boolean multiSelect,
+                             int selectionLimit, boolean requireAllRequestedFields,
+                             ActionListener<ActionEvent> response) {
+        if (!nativeInstance.isContactPickerSupported()) {
+            fireContactPickerResult(response, new Contact[0]);
+            return;
+        }
+        // Deliberately no checkContactsUsage. The picker is a separate
+        // process that hands back only what the user tapped, so it needs no
+        // NSContactsUsageDescription -- demanding the build hint here would
+        // make the privacy-preserving path harder to adopt than the broad
+        // one it replaces.
+        contactPickerFields = requestedFields;
+        contactPickerCallback = new EventDispatcher();
+        contactPickerCallback.addListener(response);
+        // requireAllRequestedFields reaches the picker as its enabling
+        // predicate, which is built natively from the same field bits.
+        nativeInstance.openContactPicker(
+                requireAllRequestedFields ? requestedFields | CONTACT_PICKER_REQUIRE_ALL
+                        : requestedFields,
+                multiSelect, selectionLimit);
+    }
+
+    /// Marks `#pickContacts` as wanting every requested field present.
+    ///
+    /// Rides the field bit set rather than a separate argument so the native
+    /// signature stays one int; it is well above every
+    /// `com.codename1.contacts.ContactPicker` constant.
+    static final int CONTACT_PICKER_REQUIRE_ALL = 0x40000000;
+
+    /// Invoked from the Objective-C picker delegate once the user is done.
+    ///
+    /// The picked contacts are still held natively when this runs; each one
+    /// is copied across and then the native array is dropped. Public and
+    /// static because the C side calls it by its mangled symbol, which is
+    /// also the only thing keeping it out of the dead-code pass.
+    ///
+    /// #### Parameters
+    ///
+    /// - `count`: how many contacts the user picked, zero when cancelled
+    public static void contactPickerResult(final int count) {
+        final EventDispatcher target = contactPickerCallback;
+        contactPickerCallback = null;
+        final int fields = contactPickerFields;
+        Contact[] picked = new Contact[Math.max(0, count)];
+        try {
+            for (int iter = 0; iter < picked.length; iter++) {
+                Contact c = new Contact();
+                // The native side fills these rather than creating them, the
+                // same way updatePersonWithRecordID does.
+                c.setAddresses(new Hashtable());
+                c.setEmails(new Hashtable());
+                c.setPhoneNumbers(new Hashtable());
+                if (System.currentTimeMillis() == 0) {
+                    // Keeps Address and its setters out of the dead-code pass;
+                    // only the native side ever calls them. Same hack, and
+                    // same reason, as getContactById above.
+                    Address tmp = new Address();
+                    tmp.setCountry("");
+                    tmp.setLocality("");
+                    tmp.setRegion("");
+                    tmp.setPostalCode("");
+                    tmp.setStreetAddress("");
+                    c.getAddresses().put("", tmp);
+                }
+                instance.nativeInstance.updatePickedContact(iter, c, fields);
+                picked[iter] = c;
+            }
+        } finally {
+            instance.nativeInstance.releasePickedContacts();
+        }
+        final Contact[] result = picked;
+        if (target == null) {
+            return;
+        }
+        if (deliverPickerResultOnEdt(new Runnable() {
+            @Override
+            public void run() {
+                target.fireActionEvent(new ActionEvent(result));
+            }
+        })) {
+            return;
+        }
+        target.fireActionEvent(new ActionEvent(result));
+    }
     
     @Override
     public void dial(String phoneNumber) {        

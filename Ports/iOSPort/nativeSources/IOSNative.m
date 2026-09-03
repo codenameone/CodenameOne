@@ -119,6 +119,20 @@ static id<NSObject> cn1MacIdleActivity = nil;
 #import <EventKit/EventKit.h>
 #endif
 #endif
+// The contact picker (com.codename1.contacts.ContactPicker). ContactsUI is
+// absent on watchOS and tvOS, and macOS has a different picker class, so the
+// implementation is iOS and Mac Catalyst only; every other slice compiles the
+// natives as no-ops that report the picker unsupported. Turned on by
+// IPhoneBuilder when the application references the API, which is also what
+// links ContactsUI.framework -- the two have to move together or the build
+// fails to link.
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+//#define CN1_USE_CONTACT_PICKER
+#if defined(CN1_USE_CONTACT_PICKER) && TARGET_OS_IOS
+#import <Contacts/Contacts.h>
+#import <ContactsUI/ContactsUI.h>
+#endif
+#endif
 #import <CoreText/CoreText.h>
 #include <ifaddrs.h>
 #include <net/if.h>
@@ -9799,6 +9813,430 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
     }
     
     POOL_END();
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// Contact picker -- com.codename1.contacts.ContactPicker
+//
+// Nothing here touches the address book. CNContactPickerViewController runs
+// out of process and hands back copies of only the contacts the user tapped,
+// which is why this path deliberately does not sit behind
+// INCLUDE_CONTACTS_USAGE the way everything above it does: a picker needs no
+// NSContactsUsageDescription, and requiring the build hint would make the
+// privacy-preserving path harder to adopt than the broad one it replaces.
+//
+// The functions exist unconditionally even when CN1_USE_CONTACT_PICKER is off.
+// A native method is kept alive by its symbol appearing in the native sources,
+// so compiling the symbol away would let the dead-code pass drop the Java
+// method and the failure would be a silently inert feature rather than a link
+// error.
+// ---------------------------------------------------------------------------
+
+// Mirrors the field constants on com.codename1.contacts.ContactPicker. Both
+// sides of one bit set, and nothing checks that they agree, so they are named
+// here rather than passed as seven booleans.
+#define CN1_CONTACT_FIELD_NAME 1
+#define CN1_CONTACT_FIELD_PHONE 2
+#define CN1_CONTACT_FIELD_EMAIL 4
+#define CN1_CONTACT_FIELD_ADDRESS 8
+#define CN1_CONTACT_FIELD_PHOTO 16
+#define CN1_CONTACT_FIELD_BIRTHDAY 32
+#define CN1_CONTACT_FIELD_WEBSITE 64
+// IOSImplementation.CONTACT_PICKER_REQUIRE_ALL, which rides the same int.
+#define CN1_CONTACT_REQUIRE_ALL 0x40000000
+
+#if defined(CN1_USE_CONTACT_PICKER) && TARGET_OS_IOS
+
+// The contacts the user picked, held only between the callback into Java and
+// releasePickedContacts. CNContactPickerViewController is modal, so one slot
+// is enough: a second pick cannot begin while the first is on screen.
+static NSArray* cn1PickedContacts = nil;
+
+// The picker's delegate is a weak property, so something has to own the
+// delegate for the life of the presentation. This does.
+static id cn1ContactPickerDelegate = nil;
+
+static int cn1ContactPickerLimit = 0;
+
+/// Publishes the selection and wakes the Java side.
+static void cn1ContactPickerFinished(NSArray* contacts) {
+#ifndef CN1_USE_ARC
+    [cn1PickedContacts release];
+#endif
+    cn1PickedContacts = nil;
+    if (contacts != nil && cn1ContactPickerLimit > 0
+            && (int)[contacts count] > cn1ContactPickerLimit) {
+        // The platform picker has no selection limit of its own, so the
+        // caller's limit is applied here. Dropping the tail rather than
+        // reporting nothing keeps a user who over-selected with something
+        // rather than an unexplained empty result.
+        contacts = [contacts subarrayWithRange:NSMakeRange(0, cn1ContactPickerLimit)];
+    }
+#ifndef CN1_USE_ARC
+    cn1PickedContacts = [contacts retain];
+    // autorelease, not release: this runs from inside the delegate's own
+    // method, and releasing the last reference would free it under its own
+    // stack frame.
+    [cn1ContactPickerDelegate autorelease];
+#else
+    cn1PickedContacts = contacts;
+#endif
+    cn1ContactPickerDelegate = nil;
+    int count = cn1PickedContacts == nil ? 0 : (int)[cn1PickedContacts count];
+    com_codename1_impl_ios_IOSImplementation_contactPickerResult___int(
+            CN1_THREAD_GET_STATE_PASS_ARG count);
+}
+
+/// Single selection.
+///
+/// Two delegate classes rather than one with a flag: CNContactPickerViewController
+/// picks its selection mode by asking whether the delegate implements
+/// contactPicker:didSelectContacts:, so a class carrying both methods is
+/// always multi-select.
+@interface CN1ContactPickerSingleDelegate : NSObject <CNContactPickerDelegate>
+@end
+
+@implementation CN1ContactPickerSingleDelegate
+- (void)contactPicker:(CNContactPickerViewController*)picker
+     didSelectContact:(CNContact*)contact {
+    cn1ContactPickerFinished(contact == nil ? nil : [NSArray arrayWithObject:contact]);
+}
+
+- (void)contactPickerDidCancel:(CNContactPickerViewController*)picker {
+    cn1ContactPickerFinished(nil);
+}
+@end
+
+/// Multiple selection. @see CN1ContactPickerSingleDelegate
+@interface CN1ContactPickerMultiDelegate : NSObject <CNContactPickerDelegate>
+@end
+
+@implementation CN1ContactPickerMultiDelegate
+- (void)contactPicker:(CNContactPickerViewController*)picker
+    didSelectContacts:(NSArray<CNContact*>*)contacts {
+    cn1ContactPickerFinished(contacts);
+}
+
+- (void)contactPickerDidCancel:(CNContactPickerViewController*)picker {
+    cn1ContactPickerFinished(nil);
+}
+@end
+
+/// The contact keys a field request needs fetched.
+static NSArray* cn1ContactPickerKeys(int fields) {
+    NSMutableArray* keys = [NSMutableArray array];
+    if ((fields & CN1_CONTACT_FIELD_NAME) != 0) {
+        [keys addObject:CNContactGivenNameKey];
+        [keys addObject:CNContactFamilyNameKey];
+        [keys addObject:CNContactOrganizationNameKey];
+    }
+    if ((fields & CN1_CONTACT_FIELD_PHONE) != 0) {
+        [keys addObject:CNContactPhoneNumbersKey];
+    }
+    if ((fields & CN1_CONTACT_FIELD_EMAIL) != 0) {
+        [keys addObject:CNContactEmailAddressesKey];
+    }
+    if ((fields & CN1_CONTACT_FIELD_ADDRESS) != 0) {
+        [keys addObject:CNContactPostalAddressesKey];
+    }
+    if ((fields & CN1_CONTACT_FIELD_PHOTO) != 0) {
+        [keys addObject:CNContactThumbnailImageDataKey];
+    }
+    if ((fields & CN1_CONTACT_FIELD_BIRTHDAY) != 0) {
+        [keys addObject:CNContactBirthdayKey];
+    }
+    if ((fields & CN1_CONTACT_FIELD_WEBSITE) != 0) {
+        [keys addObject:CNContactUrlAddressesKey];
+    }
+    return keys;
+}
+
+/// The predicate that decides which contacts the picker offers.
+///
+/// Matches what Android's picker does with the same request. Requiring every
+/// field is an AND over the multi-value kinds; requiring any of them is an OR,
+/// and only when a name was not among them -- every contact has a name, so a
+/// request that includes one is satisfied by everybody and must not be
+/// narrowed by the other clauses.
+static NSPredicate* cn1ContactPickerPredicate(int fields, BOOL requireAll) {
+    NSMutableArray* clauses = [NSMutableArray array];
+    if ((fields & CN1_CONTACT_FIELD_PHONE) != 0) {
+        [clauses addObject:@"phoneNumbers.@count > 0"];
+    }
+    if ((fields & CN1_CONTACT_FIELD_EMAIL) != 0) {
+        [clauses addObject:@"emailAddresses.@count > 0"];
+    }
+    if ((fields & CN1_CONTACT_FIELD_ADDRESS) != 0) {
+        [clauses addObject:@"postalAddresses.@count > 0"];
+    }
+    if ([clauses count] == 0) {
+        return nil;
+    }
+    if (!requireAll && (fields & CN1_CONTACT_FIELD_NAME) != 0) {
+        return nil;
+    }
+    NSString* joined = [clauses componentsJoinedByString:(requireAll ? @" AND " : @" OR ")];
+    return [NSPredicate predicateWithFormat:joined];
+}
+
+/// Maps a Contacts label to the key AndroidContactsManager and the iOS
+/// address-book path already use, so an application that moved a lookup over
+/// to the picker keeps reading the same hashtable keys.
+static NSString* cn1ContactPickerLabel(NSString* label) {
+    if (label == nil) {
+        return @"other";
+    }
+    if ([label isEqualToString:CNLabelHome]) {
+        return @"home";
+    }
+    if ([label isEqualToString:CNLabelWork]) {
+        return @"work";
+    }
+    if ([label isEqualToString:CNLabelPhoneNumberMobile]
+            || [label isEqualToString:CNLabelPhoneNumberiPhone]) {
+        return @"mobile";
+    }
+    if ([label isEqualToString:CNLabelPhoneNumberHomeFax]
+            || [label isEqualToString:CNLabelPhoneNumberWorkFax]) {
+        return @"fax";
+    }
+    return @"other";
+}
+#endif
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isContactPickerSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if defined(CN1_USE_CONTACT_PICKER) && TARGET_OS_IOS
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_openContactPicker___int_boolean_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT requestedFields, JAVA_BOOLEAN multiSelect, JAVA_INT selectionLimit) {
+#if defined(CN1_USE_CONTACT_PICKER) && TARGET_OS_IOS
+    const BOOL requireAll = (requestedFields & CN1_CONTACT_REQUIRE_ALL) != 0;
+    const int fields = requestedFields & ~CN1_CONTACT_REQUIRE_ALL;
+    const BOOL multi = multiSelect != JAVA_FALSE;
+    const int limit = multi ? (int)selectionLimit : 1;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        cn1ContactPickerLimit = limit;
+        CNContactPickerViewController* picker =
+                [[CNContactPickerViewController alloc] init];
+        picker.displayedPropertyKeys = cn1ContactPickerKeys(fields);
+        NSPredicate* enabling = cn1ContactPickerPredicate(fields, requireAll);
+        if (enabling != nil) {
+            picker.predicateForEnablingContact = enabling;
+        }
+        id delegate = multi
+                ? (id)[[CN1ContactPickerMultiDelegate alloc] init]
+                : (id)[[CN1ContactPickerSingleDelegate alloc] init];
+        cn1ContactPickerDelegate = delegate;
+        picker.delegate = delegate;
+        [cn1PresentingController() presentViewController:picker animated:YES completion:nil];
+#ifndef CN1_USE_ARC
+        [picker release];
+#endif
+        POOL_END();
+    });
+#else
+    // No picker on this slice, which the Java side already checked -- reported
+    // rather than ignored so a caller that reached here still gets its
+    // listener called exactly once.
+    com_codename1_impl_ios_IOSImplementation_contactPickerResult___int(
+            CN1_THREAD_STATE_PASS_ARG 0);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_updatePickedContact___int_com_codename1_contacts_Contact_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT index, JAVA_OBJECT cnt, JAVA_INT requestedFields) {
+#if defined(CN1_USE_CONTACT_PICKER) && TARGET_OS_IOS
+    if (cn1PickedContacts == nil || index < 0
+            || index >= (JAVA_INT)[cn1PickedContacts count]) {
+        return;
+    }
+    POOL_BEGIN();
+    const int fields = requestedFields & ~CN1_CONTACT_REQUIRE_ALL;
+    CNContact* contact = [cn1PickedContacts objectAtIndex:index];
+    com_codename1_contacts_Contact_setId___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt,
+            fromNSString(CN1_THREAD_STATE_PASS_ARG contact.identifier));
+
+    // Every read is guarded by isKeyAvailable. CNContact THROWS on a property
+    // the fetch did not include, and the picker decides its own key set from
+    // displayedPropertyKeys -- so an unguarded read of a field the user's
+    // contact happens not to carry would take down the app rather than return
+    // nothing.
+    NSString* given = nil;
+    NSString* family = nil;
+    if ((fields & CN1_CONTACT_FIELD_NAME) != 0) {
+        if ([contact isKeyAvailable:CNContactGivenNameKey]) {
+            given = contact.givenName;
+            if ([given length] > 0) {
+                com_codename1_contacts_Contact_setFirstName___java_lang_String(
+                        CN1_THREAD_STATE_PASS_ARG cnt,
+                        fromNSString(CN1_THREAD_STATE_PASS_ARG given));
+            }
+        }
+        if ([contact isKeyAvailable:CNContactFamilyNameKey]) {
+            family = contact.familyName;
+            if ([family length] > 0) {
+                com_codename1_contacts_Contact_setFamilyName___java_lang_String(
+                        CN1_THREAD_STATE_PASS_ARG cnt,
+                        fromNSString(CN1_THREAD_STATE_PASS_ARG family));
+            }
+        }
+        NSString* display = nil;
+        if ([given length] > 0 && [family length] > 0) {
+            display = [NSString stringWithFormat:@"%@ %@", given, family];
+        } else if ([given length] > 0) {
+            display = given;
+        } else if ([family length] > 0) {
+            display = family;
+        } else if ([contact isKeyAvailable:CNContactOrganizationNameKey]
+                && [contact.organizationName length] > 0) {
+            display = contact.organizationName;
+        }
+        if (display != nil) {
+            com_codename1_contacts_Contact_setDisplayName___java_lang_String(
+                    CN1_THREAD_STATE_PASS_ARG cnt,
+                    fromNSString(CN1_THREAD_STATE_PASS_ARG display));
+        }
+    }
+
+    if ((fields & CN1_CONTACT_FIELD_PHONE) != 0
+            && [contact isKeyAvailable:CNContactPhoneNumbersKey]) {
+        JAVA_OBJECT hash = com_codename1_contacts_Contact_getPhoneNumbers___R_java_util_Hashtable(
+                CN1_THREAD_STATE_PASS_ARG cnt);
+        BOOL first = YES;
+        for (CNLabeledValue<CNPhoneNumber*>* entry in contact.phoneNumbers) {
+            NSString* number = [entry.value stringValue];
+            if ([number length] == 0) {
+                continue;
+            }
+            if (first) {
+                com_codename1_contacts_Contact_setPrimaryPhoneNumber___java_lang_String(
+                        CN1_THREAD_STATE_PASS_ARG cnt,
+                        fromNSString(CN1_THREAD_STATE_PASS_ARG number));
+                first = NO;
+            }
+            java_util_Hashtable_put___java_lang_Object_java_lang_Object_R_java_lang_Object(
+                    CN1_THREAD_STATE_PASS_ARG hash,
+                    fromNSString(CN1_THREAD_STATE_PASS_ARG cn1ContactPickerLabel(entry.label)),
+                    fromNSString(CN1_THREAD_STATE_PASS_ARG number));
+        }
+    }
+
+    if ((fields & CN1_CONTACT_FIELD_EMAIL) != 0
+            && [contact isKeyAvailable:CNContactEmailAddressesKey]) {
+        JAVA_OBJECT hash = com_codename1_contacts_Contact_getEmails___R_java_util_Hashtable(
+                CN1_THREAD_STATE_PASS_ARG cnt);
+        BOOL first = YES;
+        for (CNLabeledValue<NSString*>* entry in contact.emailAddresses) {
+            NSString* address = (NSString*)entry.value;
+            if ([address length] == 0) {
+                continue;
+            }
+            if (first) {
+                com_codename1_contacts_Contact_setPrimaryEmail___java_lang_String(
+                        CN1_THREAD_STATE_PASS_ARG cnt,
+                        fromNSString(CN1_THREAD_STATE_PASS_ARG address));
+                first = NO;
+            }
+            java_util_Hashtable_put___java_lang_Object_java_lang_Object_R_java_lang_Object(
+                    CN1_THREAD_STATE_PASS_ARG hash,
+                    fromNSString(CN1_THREAD_STATE_PASS_ARG cn1ContactPickerLabel(entry.label)),
+                    fromNSString(CN1_THREAD_STATE_PASS_ARG address));
+        }
+    }
+
+    if ((fields & CN1_CONTACT_FIELD_ADDRESS) != 0
+            && [contact isKeyAvailable:CNContactPostalAddressesKey]) {
+        JAVA_OBJECT hash = com_codename1_contacts_Contact_getAddresses___R_java_util_Hashtable(
+                CN1_THREAD_STATE_PASS_ARG cnt);
+        for (CNLabeledValue<CNPostalAddress*>* entry in contact.postalAddresses) {
+            CNPostalAddress* postal = entry.value;
+            JAVA_OBJECT addr = __NEW_com_codename1_contacts_Address(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            com_codename1_contacts_Address___INIT____(CN1_THREAD_STATE_PASS_ARG addr);
+            com_codename1_contacts_Address_setStreetAddress___java_lang_String(
+                    CN1_THREAD_STATE_PASS_ARG addr,
+                    fromNSString(CN1_THREAD_STATE_PASS_ARG postal.street));
+            com_codename1_contacts_Address_setLocality___java_lang_String(
+                    CN1_THREAD_STATE_PASS_ARG addr,
+                    fromNSString(CN1_THREAD_STATE_PASS_ARG postal.city));
+            com_codename1_contacts_Address_setRegion___java_lang_String(
+                    CN1_THREAD_STATE_PASS_ARG addr,
+                    fromNSString(CN1_THREAD_STATE_PASS_ARG postal.state));
+            com_codename1_contacts_Address_setPostalCode___java_lang_String(
+                    CN1_THREAD_STATE_PASS_ARG addr,
+                    fromNSString(CN1_THREAD_STATE_PASS_ARG postal.postalCode));
+            com_codename1_contacts_Address_setCountry___java_lang_String(
+                    CN1_THREAD_STATE_PASS_ARG addr,
+                    fromNSString(CN1_THREAD_STATE_PASS_ARG postal.country));
+            java_util_Hashtable_put___java_lang_Object_java_lang_Object_R_java_lang_Object(
+                    CN1_THREAD_STATE_PASS_ARG hash,
+                    fromNSString(CN1_THREAD_STATE_PASS_ARG cn1ContactPickerLabel(entry.label)),
+                    addr);
+        }
+    }
+
+    if ((fields & CN1_CONTACT_FIELD_BIRTHDAY) != 0
+            && [contact isKeyAvailable:CNContactBirthdayKey]) {
+        NSDateComponents* birthday = contact.birthday;
+        NSDate* date = birthday == nil ? nil : [birthday date];
+        if (date != nil) {
+            com_codename1_contacts_Contact_setBirthday___long(CN1_THREAD_STATE_PASS_ARG cnt,
+                    (JAVA_LONG)([date timeIntervalSince1970] * 1000));
+        }
+    }
+
+    if ((fields & CN1_CONTACT_FIELD_WEBSITE) != 0
+            && [contact isKeyAvailable:CNContactUrlAddressesKey]) {
+        NSArray* urls = contact.urlAddresses;
+        if ([urls count] > 0) {
+            JAVA_OBJECT array = __NEW_ARRAY_java_lang_String(CN1_THREAD_STATE_PASS_ARG
+                    (JAVA_INT)[urls count]);
+            JAVA_ARRAY_OBJECT* entries = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)array)->data;
+            int pos = 0;
+            for (CNLabeledValue<NSString*>* entry in urls) {
+                NSString* url = (NSString*)entry.value;
+                entries[pos++] = fromNSString(CN1_THREAD_STATE_PASS_ARG
+                        (url == nil ? @"" : url));
+            }
+            com_codename1_contacts_Contact_setUrls___java_lang_String_1ARRAY(
+                    CN1_THREAD_STATE_PASS_ARG cnt, array);
+        }
+    }
+
+    if ((fields & CN1_CONTACT_FIELD_PHOTO) != 0
+            && [contact isKeyAvailable:CNContactThumbnailImageDataKey]
+            && contact.thumbnailImageData != nil) {
+        CN1Image* img = [CN1Image imageWithData:contact.thumbnailImageData];
+        if (img != nil) {
+            GLUIImage* g = [[GLUIImage alloc] initWithImage:img];
+            enteringNativeAllocations();
+            struct obj__com_codename1_impl_ios_IOSImplementation_NativeImage* nativeImage =
+                    (struct obj__com_codename1_impl_ios_IOSImplementation_NativeImage*)
+                    __NEW_com_codename1_impl_ios_IOSImplementation_NativeImage(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+            (*nativeImage).com_codename1_impl_ios_IOSImplementation_NativeImage_peer = (JAVA_LONG)g;
+            (*nativeImage).com_codename1_impl_ios_IOSImplementation_NativeImage_width = (int)[g getImage].size.width;
+            (*nativeImage).com_codename1_impl_ios_IOSImplementation_NativeImage_height = (int)[g getImage].size.height;
+            JAVA_OBJECT image = com_codename1_ui_Image_createImage___java_lang_Object_R_com_codename1_ui_Image(
+                    CN1_THREAD_STATE_PASS_ARG (JAVA_OBJECT)nativeImage);
+            com_codename1_contacts_Contact_setPhoto___com_codename1_ui_Image(
+                    CN1_THREAD_STATE_PASS_ARG cnt, image);
+            finishedNativeAllocations();
+        }
+    }
+    POOL_END();
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_releasePickedContacts__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if defined(CN1_USE_CONTACT_PICKER) && TARGET_OS_IOS
+#ifndef CN1_USE_ARC
+    [cn1PickedContacts release];
+#endif
+    cn1PickedContacts = nil;
 #endif
 }
 

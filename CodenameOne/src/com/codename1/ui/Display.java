@@ -6727,6 +6727,42 @@ public final class Display extends CN1Constants {
         return impl.isContactsPermissionGranted();
     }
 
+    /// Returns true when the platform has a contact picker, see
+    /// `com.codename1.contacts.ContactPicker`.
+    ///
+    /// #### Returns
+    ///
+    /// true if `#pickContacts(int, boolean, int, boolean, com.codename1.ui.events.ActionListener)`
+    /// will show a picker
+    public boolean isContactPickerSupported() {
+        return impl.isContactPickerSupported();
+    }
+
+    /// Shows the platform's contact picker, see
+    /// `com.codename1.contacts.ContactPicker` for the API applications should
+    /// use and for what the arguments mean.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestedFields`: bit set of the field constants on
+    /// `com.codename1.contacts.ContactPicker`
+    ///
+    /// - `multiSelect`: true to let the user pick more than one contact
+    ///
+    /// - `selectionLimit`: the largest number of contacts the user may pick
+    ///
+    /// - `requireAllRequestedFields`: true to offer only contacts holding
+    /// every requested field
+    ///
+    /// - `response`: invoked with a `com.codename1.contacts.Contact` array
+    /// source once the user is done
+    public void pickContacts(int requestedFields, boolean multiSelect,
+                             int selectionLimit, boolean requireAllRequestedFields,
+                             ActionListener<ActionEvent> response) {
+        impl.pickContacts(requestedFields, multiSelect, selectionLimit,
+                requireAllRequestedFields, response);
+    }
+
     /// Create a contact to the device contacts book
     ///
     /// #### Parameters

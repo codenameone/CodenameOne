@@ -85,7 +85,9 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -108,6 +110,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final Map<String, Contact> contacts = new ConcurrentHashMap<String, Contact>();
     private final List<ScheduledNotification> scheduledNotifications = new CopyOnWriteArrayList<ScheduledNotification>();
     private final AtomicInteger contactIdCounter = new AtomicInteger(1);
+    private final AtomicReference<Contact[]> contactPickerSelection =
+            new AtomicReference<Contact[]>(new Contact[0]);
+    private final AtomicBoolean contactPickerSupported = new AtomicBoolean();
+    private final List<ContactPickerRequest> contactPickerRequests =
+            new CopyOnWriteArrayList<ContactPickerRequest>();
     private boolean getAllContactsFast;
     private boolean databaseCustomPathSupported;
     private String[] lastSentMessageRecipients;
@@ -3779,6 +3786,81 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void clearContacts() {
         contacts.clear();
+        contactPickerSelection.set(new Contact[0]);
+        contactPickerSupported.set(false);
+        contactPickerRequests.clear();
+    }
+
+    /** What a mocked picker reports the user chose. */
+    public void setContactPickerSelection(Contact... selection) {
+        contactPickerSelection.set(selection == null ? new Contact[0] : selection);
+    }
+
+    /** Whether the mocked platform claims to have a picker. */
+    public void setContactPickerSupported(boolean supported) {
+        contactPickerSupported.set(supported);
+    }
+
+    /** Every picker request made so far, oldest first. */
+    public List<ContactPickerRequest> getContactPickerRequests() {
+        return new ArrayList<ContactPickerRequest>(contactPickerRequests);
+    }
+
+    @Override
+    public boolean isContactPickerSupported() {
+        return contactPickerSupported.get();
+    }
+
+    @Override
+    public void pickContacts(int requestedFields, boolean multiSelect,
+            int selectionLimit, boolean requireAllRequestedFields,
+            ActionListener<ActionEvent> response) {
+        contactPickerRequests.add(new ContactPickerRequest(requestedFields,
+                multiSelect, selectionLimit, requireAllRequestedFields));
+        // Through the real base-class hop rather than straight to the
+        // listener, so a test sees the same "answers later, on the EDT"
+        // shape the device does.
+        fireContactPickerResult(response, contactPickerSelection.get());
+    }
+
+    /** The arguments one {@code pickContacts} call was made with. */
+    public static final class ContactPickerRequest {
+        private final int requestedFields;
+        private final boolean multiSelect;
+        private final int selectionLimit;
+        private final boolean requireAllRequestedFields;
+
+        ContactPickerRequest(int requestedFields, boolean multiSelect,
+                int selectionLimit, boolean requireAllRequestedFields) {
+            this.requestedFields = requestedFields;
+            this.multiSelect = multiSelect;
+            this.selectionLimit = selectionLimit;
+            this.requireAllRequestedFields = requireAllRequestedFields;
+        }
+
+        public int getRequestedFields() {
+            return requestedFields;
+        }
+
+        public boolean isMultiSelect() {
+            return multiSelect;
+        }
+
+        public int getSelectionLimit() {
+            return selectionLimit;
+        }
+
+        public boolean isRequireAllRequestedFields() {
+            return requireAllRequestedFields;
+        }
+
+        @Override
+        public String toString() {
+            return "ContactPickerRequest{fields=" + requestedFields
+                    + ", multiSelect=" + multiSelect
+                    + ", selectionLimit=" + selectionLimit
+                    + ", requireAll=" + requireAllRequestedFields + '}';
+        }
     }
 
     public void setGetAllContactsFast(boolean getAllContactsFast) {

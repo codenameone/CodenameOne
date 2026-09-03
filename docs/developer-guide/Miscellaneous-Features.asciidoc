@@ -145,6 +145,26 @@ TIP: Notice that the code above uses `callSerially` & `scheduleBackgroundTask` i
 
 You can use `createContact(String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email)` to add a new contact and deleteContact(String id) to delete a contact.
 
+==== Contact picker
+
+The API above reads the whole address book, so it needs the broad contacts permission. If all you need is a contact the user chose, use
+https://www.codenameone.com/javadoc/com/codename1/contacts/ContactPicker.html[ContactPicker] instead. It shows the platform's own picker, and the app only ever sees the contacts the user tapped and only the fields it asked for.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MiscellaneousFeaturesJava040Snippet.java[tag=miscellaneous-features-java-040,indent=0]
+----
+
+IMPORTANT: From 2027-01-27 Google Play requires an app that targets Android 17 (API level 37) or later and requests `READ_CONTACTS` to pass a Play Console declaration explaining why the picker isn't enough. An app that only picks never requests that permission, so it never files that declaration. The build only adds `READ_CONTACTS` for the broad API, so mixing the two in one app puts the permission back.
+
+Ask for as little as you can. On Android the requested fields also decide which contacts the picker offers, and the platform returns nothing you didn't ask for. `setMultiSelect(boolean)` lets the user pick several contacts, `setSelectionLimit(int)` caps how many, and `setRequireAllRequestedFields(boolean)` hides contacts that are missing one of them.
+
+The contacts you get back are snapshots. There's no continuing access behind them, so anything you need later has to be copied out of the `Contact` and stored by your app.
+
+`ContactPicker.isSupported()` tells you whether the platform has a picker at all. Android, iOS and the simulator do; where a platform doesn't, `pick` reports an empty selection rather than falling back to reading the address book, because that fallback would need the permission you were avoiding. A cancelled pick reports the same empty selection, so `getPickedContacts` is the only thing your listener has to check.
+
+TIP: Android 17 and newer show the system picker. Older releases fall back to the contacts app's own single-row picker, which needs no permission either but returns one contact carrying one kind of data. On those releases a multiple selection comes back with a single contact, and the field ranking is phone, then email, then postal address.
+
 
 === Localization & internationalization (L10N & I18N)
 
