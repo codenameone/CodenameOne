@@ -90,7 +90,7 @@ class ThreeDGraphicsJava006Snippet {
             // Size the atlas to what this device can actually hold rather than
             // assuming a figure: the limit is as low as 2048 on older hardware.
             int edge = Math.min(2048, caps.getMaxTextureSize());
-            Texture atlas = device.createTexture(edge, edge, null);
+            Log.p("atlas edge " + edge);
 
             if (caps.isIntIndicesSupported()) {
                 // 32-bit indices are available, so a mesh may exceed 65535 vertices
