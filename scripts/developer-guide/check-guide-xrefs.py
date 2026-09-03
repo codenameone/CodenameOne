@@ -58,6 +58,19 @@ ANCHOR_SOURCE_RE = re.compile(r"<<([^>,]+)")
 # legitimately test either, so the surrogate defines both. Missing the second one
 # meant ifdef::basebackend-pdf[] content vanished from the render that was meant
 # to be inspecting it.
+
+# A rendered listing is markup, not links. Rouge wraps each token in a span, so a
+# Java string literal such as "location.href=" reaches the HTML as text that ends
+# in `href="`, and scanning the whole page for hrefs then reports the rest of the
+# highlighted line as a relative URL. Strip listings before looking for links --
+# nothing inside one is a cross-reference, and no anchor id is emitted there.
+LISTING_RE = re.compile(r"<pre\b[^>]*>.*?</pre>", re.S)
+
+
+def without_listings(markup: str) -> str:
+    return LISTING_RE.sub("", markup)
+
+
 BACKENDS = (("html", ()), ("pdf", ("backend-pdf", "basebackend-pdf")))
 # The surrogate has one blind spot, and it cannot be closed from the command line.
 # Setting backend-pdf makes `ifndef::backend-pdf[]` content disappear and
@@ -184,8 +197,9 @@ def main() -> int:
     anchor_total = 0
 
     for name, attributes in BACKENDS:
-        markup = render(root, attributes)
-        ids = set(ID_RE.findall(markup))
+        rendered = render(root, attributes)
+        ids = set(ID_RE.findall(rendered))
+        markup = without_listings(rendered)
         anchor_total = max(anchor_total, len(ids))
         for target in HREF_RE.findall(markup):
             if target not in ids:

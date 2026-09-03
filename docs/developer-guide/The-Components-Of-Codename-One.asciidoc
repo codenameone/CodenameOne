@@ -52,6 +52,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 A form is a container with a title, a content area, and an optional menu or menu-bar area. When you call methods such as `add` or `remove` on a form, you're invoking something that maps to this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava143Snippet.java[tag=the-components-of-codename-one-java-143,indent=0]
+----
 
 `Form` is effectively a https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container] with a border layout. The north section holds the title area, the south section holds the optional menu bar, and the center stretches as the content pane. Place all components in the content pane.
 
@@ -246,6 +250,10 @@ image::img/components-dialog-blur-no-tint.png[The blur effect is more pronounced
 
 A popup dialog is a common mobile paradigm showing a `Dialog` that points at a specific component. It's a standard `Dialog` that's shown in a unique way:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava144Snippet.java[tag=the-components-of-codename-one-java-144,indent=0]
+----
 
 .Popup Dialog
 image::img/components-dialog-popup.png[Popup Dialog,scaledwidth=20%]
@@ -275,6 +283,10 @@ The block image of the dialog should have empty pixels in the sides to reserve s
 
 You will need to define the following theme constants for the arrow to work:
 
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/the-components-of-codename-one.properties[tag=the-components-of-codename-one-properties-001,indent=0]
+----
 
 Then style the `PopupDialog` UIID with the image for the `Dialog` itself.
 
@@ -321,6 +333,10 @@ https://www.codenameone.com/javadoc/com/codename1/ui/Label.html[Label] represent
 
 `Label` text can be positioned in one of 4 locations as such:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava146Snippet.java[tag=the-components-of-codename-one-java-146,indent=0]
+----
 
 .Label positions
 image::img/components-label-text-position.png[Label positions,scaledwidth=20%]
@@ -399,9 +415,17 @@ A common use case when working with text components is the ability to "mask" inp
 
 Masking allows you to accept partial input in one field and implicitly move to the next, this can be used to all types of complex input thanks to the text component API. E.g with the code above you can mask the credit card input so the cursor jumps to the next field implicitly using this code:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava147Snippet.java[tag=the-components-of-codename-one-java-147,indent=0]
+----
 
 Then implement the method `automoveToNext` as:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava148Snippet.java[tag=the-components-of-codename-one-java-148,indent=0]
+----
 
 Notice you can invoke `stopEditing(Runnable)` where you receive a callback as editing is stopped.
 
@@ -421,6 +445,10 @@ TIP: When working with a virtual keyboard it's important that the parent `Contai
 By default, the virtual keyboard on Android has a "Done" button, you can customize it to be a search icon, a send icon,
 or a go icon using a hint such as this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava149Snippet.java[tag=the-components-of-codename-one-java-149,indent=0]
+----
 
 This will adapt the icon for the action on the keys.
 
@@ -440,6 +468,10 @@ NOTE: This works with 3rd party keyboards too...
 
 For example, this behavior might not be desired so to block that you can do:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava150Snippet.java[tag=the-components-of-codename-one-java-150,indent=0]
+----
 
 This will hide the toolbar for that given field.
 
@@ -451,9 +483,17 @@ iOS has a convention where an X can be placed after the text field to clear it. 
 
 You can wrap a `TextField` with a clearable wrapper to get this effect on all platforms. For example: replace this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava151Snippet.java[tag=the-components-of-codename-one-java-151,indent=0]
+----
 
 With this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava152Snippet.java[tag=the-components-of-codename-one-java-152,indent=0]
+----
 
 You can also specify the size of the clear icon if you wish. This is technically a `Container` with the text field style and a button to clear the text at the edge.
 
@@ -493,6 +533,10 @@ The validator class supports text component and it should "work." But the cool t
 
 If you add to the sample above a `Validator`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava153Snippet.java[tag=the-components-of-codename-one-java-153,indent=0]
+----
 
 You would see something that looks like this on Android:
 
@@ -519,6 +563,10 @@ To keep the code common and generic you use the `InputComponent` abstract base c
 
 A picker can work with your existing sample using code like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava154Snippet.java[tag=the-components-of-codename-one-java-154,indent=0]
+----
 
 This produces the following which looks pretty standard:
 
@@ -641,6 +689,10 @@ The `CheckBox` can be added to a `Container` like any other `Component` but the 
 
 Notice in the sample below that you associate all the radio buttons with a group but don't do anything with the group as the radio buttons keep the reference internally. You also show the opposite side functionality and icon behavior:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava155Snippet.java[tag=the-components-of-codename-one-java-155,indent=0]
+----
 
 .RadioButton & CheckBox usage
 image::img/components-radiobutton-checkbox.png[RadioButton & CheckBox usage,scaledwidth=20%]
@@ -657,6 +709,10 @@ IMPORTANT: Invoking `setToggle(true)` implicitly converts the `UIID` to `ToggleB
 
 You can convert the sample above to use toggle buttons as such:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava156Snippet.java[tag=the-components-of-codename-one-java-156,indent=0]
+----
 
 .Toggle button converted sample
 image::img/components-toggle-buttons.png[Toggle button converted sample,scaledwidth=20%]
@@ -665,6 +721,10 @@ That's half the story though: to get the full effect of some cool toggle button 
 
 For example, to enclose the `CheckBox` components in a vertical `ComponentGroup` and the `RadioButton's` in a horizontal group, change the last line of the code above as such:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava157Snippet.java[tag=the-components-of-codename-one-java-157,indent=0]
+----
 
 .Toggle button converted sample wrapped in ComponentGroup
 image::img/components-toggle-buttons-component-group.png[Toggle button converted sample wrapped in ComponentGroup,scaledwidth=20%]
@@ -716,6 +776,10 @@ NOTE: The `MultiButton` was inspired by the aesthetics of the `UITableView` iOS 
 
 A common source of confusion in the `MultiButton` is the difference between the icon and the emblem, since both may have an icon image associated with them. The icon is an image representing the entry while the emblem is an optional visual representation of the action that will be undertaken when the element is pressed. Both may be used simultaneously or individually of one another:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava158Snippet.java[tag=the-components-of-codename-one-java-158,indent=0]
+----
 
 .Multiple usage scenarios for the MultiButton
 image::img/components-multibutton.png[Multiple usage scenarios for the MultiButton,scaledwidth=20%]
@@ -737,6 +801,10 @@ https://www.codenameone.com/javadoc/com/codename1/components/SpanButton.html[Spa
 
 Unlike the `MultiButton` it uses the `TextArea` internally to break lines seamlessly. The `SpanButton` is far simpler than the `MultiButton` and as a result isn't as configurable:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava159Snippet.java[tag=the-components-of-codename-one-java-159,indent=0]
+----
 
 .The SpanButton Component
 image::img/components-spanbutton.png[The SpanButton Component,scaledwidth=20%]
@@ -752,6 +820,10 @@ https://www.codenameone.com/javadoc/com/codename1/components/SpanLabel.html[Span
 
 One of the features of label that moved into `SpanLabel` to some extent is the ability to position the icon. For example, unlike a `Label` the icon position is determined by the layout manager of the composite so `setIconPosition` accepts a `BorderLayout` constraint:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava160Snippet.java[tag=the-components-of-codename-one-java-160,indent=0]
+----
 
 .The SpanLabel Component
 image::img/components-spanlabel.png[The SpanLabel Component,scaledwidth=20%]
@@ -789,6 +861,10 @@ constraints such as https://www.codenameone.com/javadoc/com/codename1/ui/validat
 
 This sample below continues from the place where the <<text-component-sample-code,TextField sample above>> stopped by adding validation to that code:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava161Snippet.java[tag=the-components-of-codename-one-java-161,indent=0]
+----
 
 .Validation & Regular Expressions
 image::img/validation-regex-masking-1.png[Validation and Regular Expressions,scaledwidth=20%]
@@ -809,6 +885,10 @@ TIP: This style of animation is often nicknamed "washing machine" as it spins en
 
 `InfiniteProgress` can be used in one of two ways either by embedding the component into the UI through something like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava162Snippet.java[tag=the-components-of-codename-one-java-162,indent=0]
+----
 
 `InfiniteProgress` can also appear over the entire screen, thus blocking all input. This tints the background while the infinite progress rotates:
 
@@ -841,6 +921,10 @@ image::img/components-infinitescrolladapter.png[InfiniteScrollAdapter demo code 
 
 The first step is creating the webservice call, you won't go into too much detail here as webservices & IO are discussed later in the guide:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava163Snippet.java[tag=the-components-of-codename-one-java-163,indent=0]
+----
 
 IMPORTANT: The demo code here doesn't do any error handling! This is a bad practice and it's taken here to keep the code short and readable. Proper error handling is used in the Property Cross demo.
 
@@ -848,6 +932,22 @@ The `fetchPropertyData` is a simplistic tool that fetches the next page of listi
 
 Now that you have a webservice lets proceed to create the UI. Check out the code annotations below:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava164Snippet.java[tag=the-components-of-codename-one-java-164,indent=0]
+----
+
+<1> Placeholder is essential for the https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.html[URLImage] class which this guide covers at a different place.
+
+<2> The `InfiniteScrollAdapter` accepts a runnable which is invoked every time you reach the edge of the scrolling. You used a closure instead of the typical run() method override.
+
+<3> This is a blocking call, after the method completes you will have all the data you need. Notice that this method doesn't block the EDT illegally.
+
+<4> If there is no more data you call the `addMoreComponents` method with a false argument. This indicates that there is no more data to fetch.
+
+<5> Here you add the actual components to the end of the form. Notice that you *must not* invoke the `add`/`remove` method of `Container`. Those might conflict with the work of the `InfiniteScrollAdapter`.
+
+<6> You pass true to show that the data isn't "prefilled" so the method should be invoked when the `Form` is first shown
 
 IMPORTANT: Don't violate the EDT in the callback. It's invoked on the event dispatch thread and it's crucial
 
@@ -861,6 +961,10 @@ Converting the code above to an `InfiniteContainer` is pretty simple you moved a
 
 Unlike the `InfiniteScrollAdapter` you can't use the `ContentPane` directly so you've to use a `BorderLayout` and place the `InfiniteContainer` there:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava165Snippet.java[tag=the-components-of-codename-one-java-165,indent=0]
+----
 
 === List, MultiList, renderers & models
 
@@ -943,6 +1047,10 @@ When working with lists, you want the list to handle the scrolling (otherwise it
 
 It's also recommended to place the list in the `CENTER` location of a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] to produce the most effective results. For example:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava166Snippet.java[tag=the-components-of-codename-one-java-166,indent=0]
+----
 
 ==== MultiList & DefaultListModel
 
@@ -954,6 +1062,10 @@ The full power of the `ListModel` is still available and allows you to create a 
 
 Here is a simple example of a `MultiList` containing a highly popular subject matter:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava167Snippet.java[tag=the-components-of-codename-one-java-167,indent=0]
+----
 
 .Basic usage of the MultiList & DefaultListModel]
 image::img/components-multilist.png[Basic usage of the MultiList and DefaultListModel,scaledwidth=20%]
@@ -985,9 +1097,17 @@ You will fake it a bit but notice that 1M components won't be created even if yo
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] interface can be implemented by anyone in this case you did a stupid simple implementation:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava168Snippet.java[tag=the-components-of-codename-one-java-168,indent=0]
+----
 
 You can now replace the existing model by removing all the model related logic and changing the constructor call as such:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava169Snippet.java[tag=the-components-of-codename-one-java-169,indent=0]
+----
 
 .It took ages to scroll this far... This goes to a million...
 image::img/components-millionbooks.png[It took ages to scroll this far... This goes to a million...,scaledwidth=20%]
@@ -997,14 +1117,26 @@ image::img/components-millionbooks.png[It took ages to scroll this far... This g
 
 The Renderer is a simple interface with 2 methods:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava170Snippet.java[tag=the-components-of-codename-one-java-170,indent=0]
+----
 
 The most simple/naive implementation may choose to implement the renderer as follows:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava171Snippet.java[tag=the-components-of-codename-one-java-171,indent=0]
+----
 
 This will compile and work, but won't give you much, notice that you won't see the `List` selection move on the List, this is because the renderer returns a https://www.codenameone.com/javadoc/com/codename1/ui/Label.html[Label] with the same style regardless if it's selected or not.
 
 Now make it a bit more useful:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava172Snippet.java[tag=the-components-of-codename-one-java-172,indent=0]
+----
 
 In this renderer you set the `Label.setFocus(true)` if it's selected, calling to this method doesn't give the focus to the Label, it renders the label as selected.
 
@@ -1014,9 +1146,17 @@ That's still not efficient because you create a new `Label` each time the method
 
 To make the code tighter, keep a reference to the `Component` or extend it as https://www.codenameone.com/javadoc/com/codename1/ui/list/DefaultListCellRenderer.html[DefaultListCellRenderer] does:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava173Snippet.java[tag=the-components-of-codename-one-java-173,indent=0]
+----
 
 Now look at a more advanced Renderer:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava174Snippet.java[tag=the-components-of-codename-one-java-174,indent=0]
+----
 
 In this renderer you want to render a `Contact` object to the Screen, you build the `Component` in the constructor and in the getListCellRendererComponent you update the Labels' texts according to the `Contact` object.
 
@@ -1024,6 +1164,10 @@ Notice that in this renderer you return a focus `Label` with semi transparency, 
 
 For example, you can change the focus `Component` to have an icon:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava175Snippet.java[tag=the-components-of-codename-one-java-175,indent=0]
+----
 
 ==== Generic list cell renderer
 
@@ -1083,13 +1227,25 @@ This can be achieved with a custom renderer, but that's a pretty difficult task.
 
 Normally, to build the model for a renderer of this type, you use something like:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava176Snippet.java[tag=the-components-of-codename-one-java-176,indent=0]
+----
 
 What if you want componentName to be red? Just use:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava177Snippet.java[tag=the-components-of-codename-one-java-177,indent=0]
+----
 
 This will apply the UIID "red" to the component, which you can then style in the theme. Notice that once you start
 doing this, you need to define this entry for all entries, for example:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava178Snippet.java[tag=the-components-of-codename-one-java-178,indent=0]
+----
 
 Otherwise the component will stay red for the next entry (since the renderer acts like a rubber stamp).
 
@@ -1101,6 +1257,10 @@ As you might guess this triggers a performance penalty that's paid with every re
 
 `setRenderingPrototype` accepts a "fake" value that represents a reasonably large amount of data and it will be used to calculate the preferred size. For example: for a multiList that should render 2 lines of text with 20 characters and a 5mm square icon you can do something like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava179Snippet.java[tag=the-components-of-codename-one-java-179,indent=0]
+----
 
 ==== ComboBox
 
@@ -1133,6 +1293,10 @@ Since a `ComboBox` is a `List` you can use everything you learned about a `List`
 
 For example: the demo below uses the GRRM demo data from above to build a `ComboBox`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava180Snippet.java[tag=the-components-of-codename-one-java-180,indent=0]
+----
 
 .GRRM ComboBox
 image::img/components-combobox.png[GRRM ComboBox,scaledwidth=25%]
@@ -1149,6 +1313,10 @@ The interesting part about the slider is that it has two separate style `UIID’
 
 `Slider` is highly customizable for example: a slider can be used to replicate a 5-star rating widget as such. Notice that this slider will work when its given its preferred size otherwise more stars will appear. That's why you place it within a `FlowLayout`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava181Snippet.java[tag=the-components-of-codename-one-java-181,indent=0]
+----
 
 The slider itself is initialized in the code below. Notice that you can achieve almost the same result using a theme by setting the `Slider` & `SliderFull` UIID's (both in selected & unselected states).
 
@@ -1247,6 +1415,10 @@ Like the `Table` it works in consort with a model to construct its user interfac
 
 The data of the `Tree` arrives from a model for example: this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava182Snippet.java[tag=the-components-of-codename-one-java-182,indent=0]
+----
 
 Will result in this:
 
@@ -1257,6 +1429,10 @@ NOTE: Since `Tree` is hierarchy based you can't have a simple model like you've 
 
 A more practical "real world" example would be working with XML data. You can use something like this to show an XML `Tree`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava183Snippet.java[tag=the-components-of-codename-one-java-183,indent=0]
+----
 
 NOTE: The `try(Stream)` syntax is a try with resources clogic that implicitly closes the stream.
 
@@ -1265,6 +1441,10 @@ image::img/components-tree-xml.png[XML Tree,scaledwidth=20%]
 
 The model for the XML hierarchy is implemented as such:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava184Snippet.java[tag=the-components-of-codename-one-java-184,indent=0]
+----
 
 [[sharebutton-section]]
 === ShareButton
@@ -1310,6 +1490,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 If you call `Display` directly instead of using `ShareButton`, pass the listener as the final argument to the new overload:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava185Snippet.java[tag=the-components-of-codename-one-java-185,indent=0]
+----
 
 When the share is dispatched through the non-native fallback dialog (platforms without `isNativeShareSupported`), the listener still fires: it reports `DISMISSED` when the user picks the Cancel button, and the underlying `ShareService` implementations report `SHARED_TO` once they call `ShareService.finish()`. Custom `ShareService` subclasses can call `deliverResult(ShareResult.failed("..."))` from inside `share(...)` to publish a failure explicitly; otherwise `finish()` falls back to a default `SHARED_TO(commandName)`.
 
@@ -1467,6 +1651,10 @@ IMPORTANT: The `ImageViewer` is a complex rich component designed for user inter
 
 You can use the `ImageViewer` as a tool to view a single image which allows you to zoom in/out to that image as such:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava187Snippet.java[tag=the-components-of-codename-one-java-187,indent=0]
+----
 
 TIP: You can simulate pinch to zoom on the simulator by dragging the right button away from the top left corner to zoom in and towards the top left corner to zoom out. On Mac touchpads you can drag two fingers to achieve that.
 
@@ -1491,6 +1679,10 @@ Notice that you use a https://www.codenameone.com/javadoc/com/codename1/ui/list/
 
 `ImageViewer` also supports optional side arrows (material font icons) and an optional thumbnail strip for direct image navigation:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava188Snippet.java[tag=the-components-of-codename-one-java-188,indent=0]
+----
 
 When arrows are enabled, tapping near the left/right edge will move to the previous/next image.
 When thumbnails are enabled, tapping a thumbnail jumps directly to that image.
@@ -1505,6 +1697,10 @@ TIP: `EncodedImage's` aren't always fully loaded and so when you swipe if the im
 
 You can dynamically download images directly into the `ImageViewer` with a custom list model like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava189Snippet.java[tag=the-components-of-codename-one-java-189,indent=0]
+----
 
 .Dynamically fetching an image URL from the internet footnote:[Image was fetched from http://awoiaf.westeros.org/index.php/Portal:Books]
 image::img/components-imageviewer-dynamic.png[Dynamically fetching an image URL from the internet,scaledwidth=20%]
@@ -1522,6 +1718,10 @@ You can use `ScaleImageLabel`/`ScaleImageButton` interchangeably. The major diff
 
 Here is a simple example that also shows the difference between the `scale to fill` and `scale to fit` modes:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava190Snippet.java[tag=the-components-of-codename-one-java-190,indent=0]
+----
 
 .ScaleImageLabel/Button, the top row includes scale to fit versions (the default) whereas the bottom row includes the scale to fill versions
 image::img/components-scaleimage.png[ScaleImageLabel/Button the top row includes scale to fit versions (the default) whereas the bottom row includes the scale to fill versions,scaledwidth=25%]
@@ -1551,6 +1751,10 @@ The basic functionality of the `Toolbar` includes the ability to add a command t
 
 The code below provides a brief overview of these options:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava191Snippet.java[tag=the-components-of-codename-one-java-191,indent=0]
+----
 
 .The Toolbar
 image::img/components-toolbar.png[The Toolbar,scaledwidth=25%]
@@ -1603,6 +1807,10 @@ You can customize the appearance of the search bar by using the UIID's: `Toolbar
 
 In the sample below you fetch all the contacts from the device and enable search through them, notice it expects and image called `duke.png` which is the default Codename One icon renamed and placed in the src folder:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava192Snippet.java[tag=the-components-of-codename-one-java-192,indent=0]
+----
 
 ==== South Component
 
@@ -1610,6 +1818,10 @@ A common feature in side menu bar is the ability to add a component to the "sout
 
 Notice that this feature works with the on-top and permanent versions of the side menu and not with the legacy versions:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava193Snippet.java[tag=the-components-of-codename-one-java-193,indent=0]
+----
 
 This places the component below the side menu bar. Notice that this component controls its entire UIID & is separate from the `SideNavigationPanel` UIID so if you set that component you might want to place it within a container that has the `SideNavigationPanel` UIID so it will blend with the rest of the UI.
 
@@ -1761,6 +1973,10 @@ Use the `BrowserComponent` API to interact with JavaScript. It replaces the depr
 
 The old API provided a synchronous wrapper around an inherently asynchronous process, and made extensive use of `invokeAndBlock()` underneath the covers. This resulted in a nice API with high-level abstractions that played with a synchronous programming model, but it came with a price-tag in performance, complexity, and predictability. Let’s take a simple example, getting a reference to the "window" object:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava194Snippet.java[tag=the-components-of-codename-one-java-194,indent=0]
+----
 
 This code looks harmless enough, but this is actually expensive. It issues a command to the `BrowserComponent`, and uses `invokeAndBlock()` to wait for the command to go through and send back a response. `invokeAndBlock()` is a magical tool that allows you to "block" without blocking the EDT, but it has its costs, and shouldn’t be overused. Most of the Codename One APIs that use `invokeAndBlock()` show this in their name. For example: `Component.animateLayoutAndWait()`. This provides you the expectation that this call could take some time, and helps to alert you to the underlying cost.
 
@@ -1772,6 +1988,10 @@ The new API fully embraces the asynchronous nature of JavaScript. It uses callba
 
 NOTE: In all the sample code below, you can assume that variables named `bc` represent an instance of https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html[BrowserComponent]:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava195Snippet.java[tag=the-components-of-codename-one-java-195,indent=0]
+----
 
 This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute(java.lang.String,com.codename1.util.SuccessCallback)[execute()] method is:
 
@@ -1788,6 +2008,10 @@ As mentioned before, the new API also provides an `executeAndWait()` wrapper for
 
 For example:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava196Snippet.java[tag=the-components-of-codename-one-java-196,indent=0]
+----
 
 Prints `The result was 7`.
 
@@ -1797,6 +2021,10 @@ IMPORTANT: When using the `andWait()` variant, it's critical that your JavaScrip
 
 The callbacks you pass to `execute()` and `executeAndWait()` are single-use callbacks. You can’t, for example, store the `callback` variable on the JavaScript side for later use (for example: to respond to a button click event). If you need a "multi-use" callback, you should use the `addJSCallback()` method instead. Its usage looks identical to `execute()`, the difference is that the callback will live on after its first use. For example: Consider the following code:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava197Snippet.java[tag=the-components-of-codename-one-java-197,indent=0]
+----
 
 The above example, assumes that jQuery is loaded in the webpage that you're interacting with, and you're adding a click handler to a button with ID "somebutton." The click handler calls your callback.
 
@@ -1804,6 +2032,10 @@ If you run this example, the first time the button is clicked, you’ll see "But
 
 You need to change this code to use the `addJSCallback()` method as follows:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava198Snippet.java[tag=the-components-of-codename-one-java-198,indent=0]
+----
 
 Now it will work no matter how many times the button is clicked.
 
@@ -1813,6 +2045,10 @@ Often, the JavaScript expressions that you execute will include parameters from 
 
 For example, suppose you want to pass a string with text to set in a textarea within the webpage. You can do something like:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava199Snippet.java[tag=the-components-of-codename-one-java-199,indent=0]
+----
 
 The gist is that you embed placeholders in the JavaScript expression that are replaced by the corresponding entry in an array of parameters. The `${0}` placeholder is replaced by the first item in the parameters array, the `${1}` placeholder is replaced by the 2nd, etc.
 
@@ -1822,18 +2058,38 @@ The new API also includes a https://www.codenameone.com/javadoc/com/codename1/ui
 
 For example: You might want to create a proxy for the https://developer.mozilla.org/en-You/docs/Web/API/Window/location[window.location] object so that you can access its properties more from Java:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava200Snippet.java[tag=the-components-of-codename-one-java-200,indent=0]
+----
 
 Then you can retrieve its properties using the `get()` method:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava201Snippet.java[tag=the-components-of-codename-one-java-201,indent=0]
+----
 
 Or synchronously:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava202Snippet.java[tag=the-components-of-codename-one-java-202,indent=0]
+----
 
 You can also set its properties:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava203Snippet.java[tag=the-components-of-codename-one-java-203,indent=0]
+----
 
 And call its methods:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava204Snippet.java[tag=the-components-of-codename-one-java-204,indent=0]
+----
 
 ===== Legacy JSObject support
 
@@ -1892,15 +2148,27 @@ NOTE: This conversion table is more verbose than necessary, since JavaScript fun
 
 You can access JavaScript variables from the context by using code like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava205Snippet.java[tag=the-components-of-codename-one-java-205,indent=0]
+----
 
 .The contents were copied from the DOM and placed in the south position of the form
 image::img/components-browsercomponent-context.png[The contents were copied from the DOM and placed in the south position of the form,scaledwidth=20%]
 
 Notice that when you work with numeric values or anything related to the types mentioned above your code must be aware of the typing. For example: in this case the type is `Double` and not `String`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava206Snippet.java[tag=the-components-of-codename-one-java-206,indent=0]
+----
 
 You can also query the context for objects and change their value for example:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava207Snippet.java[tag=the-components-of-codename-one-java-207,indent=0]
+----
 
 This code effectively navigates to the Codename One home page by fetching the DOM's window object and setting its `location` property to https://www.codenameone.com/[https://www.codenameone.com/].
 
@@ -1947,6 +2215,10 @@ image::img/components-autocomplete.png[Autocomplete Text Field,scaledwidth=30%]
 
 For example, if you wish to query a database or a web service you will need to derive the class and perform more advanced filtering by overriding the `filter` method:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava208Snippet.java[tag=the-components-of-codename-one-java-208,indent=0]
+----
 
 .Autocomplete Text Field with a webservice
 image::img/dynamic-autocomplete.png[Autocomplete Text Field with a webservice,scaledwidth=20%]
@@ -2037,6 +2309,10 @@ A common use case is to format date values based on a specific appearance and `P
 
 When using lightweight picker mode (`setUseLightweightPopup(true)`), you can add custom quick-action buttons to the popup. This is useful for actions like setting the date to "Today" or "+7 Days" without scrolling the wheels manually:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava209Snippet.java[tag=the-components-of-codename-one-java-209,indent=0]
+----
 
 Button placement options are:
 
@@ -2051,9 +2327,22 @@ that can be exposed by swiping the component to the side.
 
 This swipe gesture is commonly used in touch interfaces to expose features such as delete, edit etc. It's trivial to use this component by determining the components placed on top and bottom (the revealed component):
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava210Snippet.java[tag=the-components-of-codename-one-java-210,indent=0]
+----
 
 You can combine some demos above including the <<slider-stars-demo,Slider stars demo>> to rank GRRM's books in an interactive way:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava211Snippet.java[tag=the-components-of-codename-one-java-211,indent=0]
+----
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava211Snippet.java[tag=the-components-of-codename-one-java-211-helper,indent=0]
+----
 
 .SwipableContainer showing a common use case of ranking on swipe
 image::img/components-swipablecontainer.png[SwipableContainer showing a common use case of ranking on swipe,scaledwidth=20%]
@@ -2087,6 +2376,10 @@ image::img/mapcomponent.png[Map Component,scaledwidth=30%]
 
 The screenshot above was produced using the following code:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava212Snippet.java[tag=the-components-of-codename-one-java-212,indent=0]
+----
 
 The example below shows how to integrate the https://www.codenameone.com/javadoc/com/codename1/maps/MapComponent.html[MapComponent] with the Google https://www.codenameone.com/javadoc/com/codename1/location/Location.html[Location] API.
 Make sure to get your secret API key from the Google https://www.codenameone.com/javadoc/com/codename1/location/Location.html[Location] data API at:
@@ -2181,6 +2474,10 @@ For example: the colors, fonts, styles, to use.
 You can check out the https://github.com/codenameone/codenameone-demos/tree/master/ChartsDemo[ChartsDemo]
 app for specific examples, but here is a high-level view of some code that creates a Pie Chart:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava213Snippet.java[tag=the-components-of-codename-one-java-213,indent=0]
+----
 
 === Calendar
 
@@ -2190,6 +2487,10 @@ NOTE: You recommend developers use the <<picker-section,Picker UI>> rather than 
 
 Simple usage of the `Calendar` class looks something like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava214Snippet.java[tag=the-components-of-codename-one-java-214,indent=0]
+----
 
 .The Calendar component
 image::img/components-calendar.png[The Calendar component,scaledwidth=20%]
@@ -2200,21 +2501,37 @@ The https://www.codenameone.com/javadoc/com/codename1/components/ToastBar.html[T
 
 Simple usage of the `ToastBar` class looks something like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava215Snippet.java[tag=the-components-of-codename-one-java-215,indent=0]
+----
 
 .ToastBar with message
 image::img/components-statusbar-message.png[ToastBar with message,scaledwidth=20%]
 
 You can show a progress indicator in the ToastBar like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava216Snippet.java[tag=the-components-of-codename-one-java-216,indent=0]
+----
 
 .Status Message with Progress Bar
 image::img/components-statusbar.png[Status Message with Progress Bar,scaledwidth=20%]
 
 You can automatically clear a status message/progress after a timeout using the `setExpires` method as such:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava217Snippet.java[tag=the-components-of-codename-one-java-217,indent=0]
+----
 
 You can also delay the showing of the status message using `showDelayed` as such:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava218Snippet.java[tag=the-components-of-codename-one-java-218,indent=0]
+----
 
 .ToastBar with a multiline message
 image::img/components-statusbar-multiline.png[ToastBar with a multiline message,scaledwidth=20%]
@@ -2319,6 +2636,10 @@ image::img/badge-floating-button.png[Badge floating button in action,scaledwidth
 
 The split pane component is a bit desktop specific but works reasonably well on devices. To get the image below you changed `SalesDemo.java` in the kitchen sink by changing this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava219Snippet.java[tag=the-components-of-codename-one-java-219,indent=0]
+----
 
 To:
 
