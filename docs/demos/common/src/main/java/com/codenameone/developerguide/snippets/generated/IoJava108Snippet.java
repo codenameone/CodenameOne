@@ -111,7 +111,9 @@ class IoJava108Snippet {
             protected void handleErrorResponseCode(int code, String message) {
                 if(code == 444) {
                     // do something
+                    return;
                 }
+                super.handleErrorResponseCode(code, message);
             }
             protected void readResponse(InputStream input) {
                 // just read from the response input stream

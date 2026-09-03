@@ -120,7 +120,7 @@ class IoJava096Snippet {
                 Cursor cur = null;
                 try {
                     db = Display.getInstance().openOrCreate("MyDB.db");
-                    if(query.getText().startsWith("select")) {
+                    if(query.getText().trim().toLowerCase().startsWith("select")) {
                         cur = db.executeQuery(query.getText());
                         int columns = cur.getColumnCount();
                         hi.removeAll();

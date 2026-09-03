@@ -107,13 +107,15 @@ class IoJava137Snippet {
     
     void snippet() throws Exception {
         // tag::io-java-137[]
-        if(result.getResponseData() != null) {
-            String error = (String)result.getResponseData().get("error_message");
-            if(error != null) {
-                ToastBar.showErrorMessage(error);
+        if(result.getResponseCode() < 200 || result.getResponseCode() > 299) {
+            String error = null;
+            if(result.getResponseData() != null) {
+                error = (String)result.getResponseData().get("error_message");
             }
-        } else {
-            ToastBar.showErrorMessage("Error sending SMS: " + result.getResponseCode());
+            if(error == null) {
+                error = "Error sending SMS: " + result.getResponseCode();
+            }
+            ToastBar.showErrorMessage(error);
         }
         // end::io-java-137[]
     }

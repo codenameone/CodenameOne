@@ -188,17 +188,12 @@ class IoJava149Snippet {
                 try {
                     byte[] buffer = new byte[8192];
                     while(isConnected()) {
-                        int pending = is.available();
-                        if(pending > 0) {
-                            int size = is.read(buffer, 0, 8192);
-                            if(size == -1) {
-                                return;
-                            }
-                            if(size > 0) {
-                                updateLabel(new String(buffer, 0, size));
-                            }
-                        } else {
-                            Thread.sleep(50);
+                        int size = is.read(buffer, 0, 8192);
+                        if(size == -1) {
+                            return;
+                        }
+                        if(size > 0) {
+                            updateLabel(new String(buffer, 0, size));
                         }
                     }
                 } catch(Exception err) {

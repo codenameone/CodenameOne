@@ -107,7 +107,7 @@ class IoJava122Snippet {
     
     void snippet() throws Exception {
         // tag::io-java-122[]
-        String first2[] = result.getAsStringArray("//player[position() < 3]/firstname");
+        String first2[] = result.getAsStringArray("//player[position() < 2]/firstname");
 
         String secondLast = result.getAsString("//player[last() - 1]/firstname");
         // end::io-java-122[]
