@@ -83,7 +83,7 @@ class GraphicsJava050Snippet {
     void snippet() throws Exception {
         // tag::graphics-java-050[]
         LinearGradientPaint gradient = new LinearGradientPaint(
-                0, 0, getWidth(), 0,  // horizontal gradient
+                getX(), getY(), getX() + getWidth(), getY(),  // horizontal gradient
                 new float[] {0f, 0.5f, 1f},
                 new int[] {0xff4285f4, 0xff34a853, 0xfffbbc05},
                 MultipleGradientPaint.CycleMethod.NO_CYCLE,
