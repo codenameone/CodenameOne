@@ -10557,6 +10557,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// receiver sees. Not through writeAsProviderUri: that names and records what it mints as
     /// transport for a representation's bytes, and this is a file the source published.
     private static final long MAX_STAGED_SHARE_BYTES = 8L * 1024 * 1024;
+    private static final String SHARED_COPY_PREFIX = "cn1-shared-";
 
     private Uri shareableUriFor(File file, String authority) throws IOException {
         try {
@@ -10581,7 +10582,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         dir.mkdirs();
         // Its own directory, so the copy keeps the original name without colliding with
         // another file of the same name in the same drag.
-        File holder = File.createTempFile("cn1-shared-", "", dir);
+        File holder = File.createTempFile(SHARED_COPY_PREFIX, "", dir);
         if (!holder.delete() || !holder.mkdirs()) {
             throw new IOException("could not stage " + file + " for sharing");
         }
@@ -10604,6 +10605,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Uri staged = FileProvider.getUriForFile(getContext(), authority, copy);
         getContext().grantUriPermission("android", staged,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        // Remembered so it is cleaned up, but not as transport: this is a file the source
+        // published, and it has to read back as one.
+        rememberStagedClipFile(staged, copy, false);
         return staged;
     }
 
@@ -10642,7 +10646,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 getContext().getPackageName() + ".provider", file);
         // Grant broadly so any paste or drop target can read the content:// URI
         getContext().grantUriPermission("android", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        rememberGeneratedClipUri(uri);
+        rememberStagedClipFile(uri, file, true);
         return uri;
     }
 
@@ -11006,19 +11010,57 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// Bounded: a clip that has been replaced on the clipboard can no longer be pasted, so the
     /// oldest entries are of no further use. A clip that outlives the process falls back to
     /// being read as a file, which is what it was read as before any of this existed.
+    /// It also names the file, because every one of these is a file this application wrote
+    /// into its own cache and nothing else will ever come back for it. A clip that has been
+    /// replaced cannot be pasted, so when an entry falls off the end its file goes with it --
+    /// otherwise copying documents or images repeatedly leaves every one of them on disk for
+    /// the life of the installation.
     private static final int GENERATED_CLIP_URI_MEMORY = 64;
-    private static final java.util.LinkedHashSet<String> GENERATED_CLIP_URIS =
-            new java.util.LinkedHashSet<String>();
+    private static final java.util.LinkedHashMap<String, StagedClipFile> STAGED_CLIP_FILES =
+            new java.util.LinkedHashMap<String, StagedClipFile>();
 
-    private static void rememberGeneratedClipUri(Uri uri) {
-        synchronized (GENERATED_CLIP_URIS) {
-            GENERATED_CLIP_URIS.remove(uri.toString());
-            GENERATED_CLIP_URIS.add(uri.toString());
-            java.util.Iterator<String> oldest = GENERATED_CLIP_URIS.iterator();
-            while (GENERATED_CLIP_URIS.size() > GENERATED_CLIP_URI_MEMORY && oldest.hasNext()) {
-                oldest.next();
+    /// One file staged for a clip: where it is, and whether it carries a representation's
+    /// bytes rather than being a file the source published.
+    private static final class StagedClipFile {
+        private final String path;
+        private final boolean transport;
+
+        StagedClipFile(String path, boolean transport) {
+            this.path = path;
+            this.transport = transport;
+        }
+    }
+
+    private static void rememberStagedClipFile(Uri uri, File file, boolean transport) {
+        synchronized (STAGED_CLIP_FILES) {
+            STAGED_CLIP_FILES.remove(uri.toString());
+            STAGED_CLIP_FILES.put(uri.toString(),
+                    new StagedClipFile(file.getAbsolutePath(), transport));
+            java.util.Iterator<java.util.Map.Entry<String, StagedClipFile>> oldest =
+                    STAGED_CLIP_FILES.entrySet().iterator();
+            while (STAGED_CLIP_FILES.size() > GENERATED_CLIP_URI_MEMORY && oldest.hasNext()) {
+                StagedClipFile evicted = oldest.next().getValue();
                 oldest.remove();
+                deleteStagedClipFile(evicted);
             }
+        }
+    }
+
+    /// Removes a staged file, and the directory it was given to itself when it had one.
+    ///
+    /// Best effort by design: a file that will not delete is one the cache directory will
+    /// eventually reclaim, which is what a cache directory is for -- and is also what bounds
+    /// the files left behind by a process that ended before it could let go of them.
+    private static void deleteStagedClipFile(StagedClipFile staged) {
+        try {
+            File file = new File(staged.path);
+            File holder = file.getParentFile();
+            if (file.delete() && holder != null
+                    && holder.getName().startsWith(SHARED_COPY_PREFIX)) {
+                holder.delete();
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
         }
     }
 
@@ -11026,8 +11068,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// java.lang.String)` minted to carry a representation's bytes, rather than a file the
     /// source published.
     private static boolean isGeneratedClipFile(Uri uri) {
-        synchronized (GENERATED_CLIP_URIS) {
-            return GENERATED_CLIP_URIS.contains(uri.toString());
+        synchronized (STAGED_CLIP_FILES) {
+            StagedClipFile staged = STAGED_CLIP_FILES.get(uri.toString());
+            return staged != null && staged.transport;
         }
     }
 

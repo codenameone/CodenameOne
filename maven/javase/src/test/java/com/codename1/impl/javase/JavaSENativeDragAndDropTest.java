@@ -192,6 +192,27 @@ class JavaSENativeDragAndDropTest {
     }
 
     @Test
+    void aFailingImageProviderDoesNotTakeTheOtherEncodingsWithIt() throws Exception {
+        java.io.ByteArrayOutputStream jpeg = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(
+                new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB),
+                "jpeg", jpeg);
+        ClipboardContent content = new ClipboardContent()
+                .setDataProvider(ClipboardContent.MIME_PNG, new ClipboardDataProvider() {
+                    @Override
+                    public Object getClipboardData(String mimeType) {
+                        throw new IllegalStateException("this one cannot be produced");
+                    }
+                })
+                .setData(ClipboardContent.MIME_JPEG, jpeg.toByteArray());
+        Transferable t = new JavaSEPort.RichTransferable(content);
+
+        assertTrue(t.getTransferData(DataFlavor.imageFlavor) instanceof java.awt.Image,
+                "a provider is allowed to fail, and one failing on the PNG must not take a "
+                        + "perfectly good JPEG with it");
+    }
+
+    @Test
     void aDecodableImageStillClaimsTheStandardImageFlavor() throws Exception {
         ClipboardContent content = new ClipboardContent()
                 .setData(ClipboardContent.MIME_PNG, onePixelPng());

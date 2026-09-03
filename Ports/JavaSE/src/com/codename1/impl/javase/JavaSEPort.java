@@ -2077,15 +2077,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private static java.awt.Image decodeImage(ClipboardContent data, String mime) {
-            byte[] bytes = data.getBytes(mime);
-            if (bytes == null) {
-                return null;
-            }
             try {
+                // Resolving the representation is inside this, not before it. A provider is
+                // allowed to fail, and one throwing on the PNG used to escape the whole
+                // flavor -- so a payload whose JPEG was perfectly good answered the standard
+                // image flavor with an exception instead of the JPEG.
+                byte[] bytes = data.getBytes(mime);
+                if (bytes == null) {
+                    return null;
+                }
                 return ImageIO.read(new ByteArrayInputStream(bytes));
             } catch (Throwable err) {
-                // A representation that does not decode is not the image flavor's answer; the
-                // next one, or the byte stream flavor, still is.
+                // A representation that will not resolve, or does not decode, is not the
+                // image flavor's answer; the next one, or the byte stream flavor, still is.
                 return null;
             }
         }

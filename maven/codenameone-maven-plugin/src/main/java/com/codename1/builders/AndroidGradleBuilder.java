@@ -5438,7 +5438,7 @@ public class AndroidGradleBuilder extends Executor {
                     //
                     // Only the default. An application that sets the hint still says exactly
                     // what it wants and gets nothing it did not ask for.
-                    request.getArg("android.file_paths", "    <files-path name=\"app_files\" path=\".\" />\n    <external-files-path name=\"app_external_files\" path=\".\" />\n    <external-cache-path name=\"app_external_cache\" path=\".\" />\n    <external-path name=\"external\" path=\".\" />\n") +
+                    request.getArg("android.file_paths", "    <files-path name=\"app_files\" path=\".\" /><external-files-path name=\"app_external_files\" path=\".\" /><external-cache-path name=\"app_external_cache\" path=\".\" /><external-path name=\"external\" path=\".\" />") +
                     "</paths>";
 
             try {
