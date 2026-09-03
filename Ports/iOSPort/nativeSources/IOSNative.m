@@ -9867,10 +9867,26 @@ static void cn1ContactPickerFinished(NSArray* contacts) {
     cn1PickedContacts = nil;
     if (contacts != nil && cn1ContactPickerLimit > 0
             && (int)[contacts count] > cn1ContactPickerLimit) {
-        // The platform picker has no selection limit of its own, so the
-        // caller's limit is applied here. Dropping the tail rather than
-        // reporting nothing keeps a user who over-selected with something
-        // rather than an unexplained empty result.
+        // CNContactPickerViewController has no selection-limit property and
+        // no per-selection delegate callback to veto one with -- the only
+        // multi-select hook fires once, after the user has confirmed. So a
+        // cap above one cannot be enforced in its UI, and the choice is what
+        // to do with a confirmation that exceeded it.
+        //
+        // Review asked for the confirmation to be rejected instead of
+        // truncated. Under this API that is strictly worse: a rejection can
+        // only be reported as an empty selection, which is the same thing a
+        // cancelled pick reports, so neither the user nor the application
+        // would be able to tell an over-selection from a cancel -- and the
+        // application would have nothing to show for a pick the user did
+        // make. Truncating keeps the user's first N choices, which is what
+        // the caller asked for, and leaves the count consistent with Android,
+        // whose picker enforces the same cap in its own UI.
+        //
+        // Logged rather than silent, so the developer who set the cap sees
+        // this happen while they are testing the flow.
+        CN1Log(@"Contact picker: user selected %d contacts, capped at %d",
+               (int)[contacts count], cn1ContactPickerLimit);
         contacts = [contacts subarrayWithRange:NSMakeRange(0, cn1ContactPickerLimit)];
     }
 #ifndef CN1_USE_ARC

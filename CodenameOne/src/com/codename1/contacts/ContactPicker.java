@@ -260,6 +260,15 @@ public class ContactPicker {
     /// Sets the largest number of contacts the user may pick, which only has
     /// an effect together with `#setMultiSelect(boolean)`.
     ///
+    /// The selection handed to the listener never exceeds it. Whether the
+    /// user is stopped at the cap or merely has the surplus dropped depends
+    /// on the platform: Android and the simulator stop accepting the tick
+    /// that would exceed it, and so does iOS for a limit of one, which it
+    /// serves with its single-select picker. iOS cannot cap a larger multiple
+    /// selection -- its picker has no such setting -- so a user who confirms
+    /// more than the cap has the extras dropped, keeping the ones they chose
+    /// first.
+    ///
     /// #### Parameters
     ///
     /// - `selectionLimit`: a count between 1 and
