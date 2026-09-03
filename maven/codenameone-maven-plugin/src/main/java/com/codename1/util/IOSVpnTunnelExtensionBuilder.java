@@ -227,9 +227,19 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("// here, so a name looked up at run time would not be\n");
         sb.append("// there -- which is the same reason Class.forName is\n");
         sb.append("// banned in the framework itself.\n");
-        sb.append("extern JAVA_OBJECT __NEW_").append(mangled).append("();\n");
-        sb.append("extern void ").append(mangled)
-                .append("_ctor__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);\n");
+        sb.append("// THE ABI ParparVM actually emits, which these two\n");
+        sb.append("// declarations got wrong twice over. __NEW_X takes the\n");
+        sb.append("// thread state -- it uses it for class initialisation and\n");
+        sb.append("// for the GC allocation -- and an empty parameter list is\n");
+        sb.append("// an old-style declaration that compiles and then leaves\n");
+        sb.append("// the argument register unset on arm64. And the\n");
+        sb.append("// no-argument constructor is X___INIT____, not X_ctor__,\n");
+        sb.append("// which is a symbol the translation never defines: the\n");
+        sb.append("// extension would not have linked.\n");
+        sb.append("extern JAVA_OBJECT __NEW_").append(mangled)
+                .append("(CODENAME_ONE_THREAD_STATE);\n");
+        sb.append("extern JAVA_VOID ").append(mangled)
+                .append("___INIT____(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);\n");
         sb.append("\n");
         sb.append("static CN1VpnTunnelProvider *cn1tnProvider = nil;\n");
         sb.append("\n");
@@ -336,9 +346,10 @@ public final class IOSVpnTunnelExtensionBuilder {
         sb.append("        // nothing to say so.\n");
         sb.append("        com_codename1_impl_ios_IOSExtensionTunnel_install__(\n");
         sb.append("                threadStateData);\n");
-        sb.append("        JAVA_OBJECT tunnel = __NEW_").append(mangled).append("();\n");
+        sb.append("        JAVA_OBJECT tunnel = __NEW_").append(mangled)
+                .append("(threadStateData);\n");
         sb.append("        ").append(mangled)
-                .append("_ctor__(threadStateData, tunnel);\n");
+                .append("___INIT____(threadStateData, tunnel);\n");
         sb.append("        com_codename1_impl_vpn_ExtensionTunnelHost_begin___java_lang_Object_java_lang_String(\n");
         sb.append("                threadStateData, tunnel,\n");
         sb.append("                fromNSString(threadStateData, wire));\n");

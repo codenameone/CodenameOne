@@ -3854,6 +3854,10 @@ public class IPhoneBuilder extends Executor {
         // Read here rather than beside the other VPN hints further down
         // because the stub has to exist before javac runs, and that is a
         // thousand lines earlier than the block that enables the defines.
+        // No standaloneWatchProduct() gate here, unlike the cloud builder's
+        // copy. That method exists only there, along with the watch-only
+        // archive it describes; this builder hands the project to a local
+        // Xcode and has no such product.
         vpnTunnelBuilder.parseHints(request, usesCustomTunnel);
         if (vpnTunnelBuilder.isEnabled()) {
             vpnTunnelBuilder.verifyTunnelClass(classesDir, buildinRes);
@@ -5539,14 +5543,40 @@ public class IPhoneBuilder extends Executor {
                 // appeared, which is why referencing com.codename1.vpn.tunnel
                 // alone still writes nothing.
                 //
-                // A project that set the hint itself is left alone: the key
-                // is in the renderer's array-valued set, so its value is
-                // emitted as an <array> whatever it holds.
-                if (request.getArg("ios.entitlements.com.apple.developer"
-                        + ".networking.networkextension", null) == null) {
+                // A project may write the key itself -- to ask for
+                // app-proxy-provider alongside the tunnel, say -- and its
+                // value is emitted as an <array> because the key is in the
+                // renderer's array-valued set. What it may NOT do is leave
+                // out the value this feature is: a blank hint counts as
+                // absent, and a non-blank one that omits
+                // packet-tunnel-provider is refused rather than quietly
+                // replaced, exactly as the Personal VPN hint above is.
+                //
+                // The ios.entitlementsInject door is checked in the
+                // BuildDaemon twin and deliberately not here, for the reason
+                // the Personal VPN block gives: nothing in this file reads
+                // that hint.
+                String tunnelEntitlement = request.getArg(
+                        "ios.entitlements.com.apple.developer"
+                        + ".networking.networkextension", null);
+                if (tunnelEntitlement == null
+                        || tunnelEntitlement.trim().length() == 0) {
                     request.putArgument("ios.entitlements.com.apple.developer"
                             + ".networking.networkextension",
                             "packet-tunnel-provider");
+                } else if (!entitlementArrayDeclares(tunnelEntitlement,
+                        "packet-tunnel-provider")) {
+                    throw new BuildException("ios.vpn.tunnel=true, so this app"
+                            + " has to be signed with"
+                            + " com.apple.developer.networking.networkextension"
+                            + " including 'packet-tunnel-provider' -- that is"
+                            + " the value that lets it start the provider."
+                            + " The build hint"
+                            + " ios.entitlements.com.apple.developer.networking"
+                            + ".networkextension sets it to '"
+                            + tunnelEntitlement.trim() + "', which does not"
+                            + " include it. Add it on its own line, or remove"
+                            + " the hint and let the build supply the value.");
                 }
                 log("[vpnTunnel] Packet-tunnel extension enabled; the"
                         + " extension will run " + vpnTunnelBuilder.getTunnelClass());
@@ -11409,6 +11439,26 @@ public class IPhoneBuilder extends Executor {
      * compiles.sh} on a machine with Xcode; the target around it is not.
      * Treat a change here as unverified until an opt-in build has run.</p>
      */
+    /**
+     * Whether an array-valued entitlement hint declares {@code value}.
+     *
+     * <p>The renderer splits these on newlines and trims, so a project
+     * asking for two provider kinds writes them on two lines. Read the same
+     * way here, or a legitimate multi-value hint would be refused for not
+     * being the single string this feature needs.</p>
+     */
+    static boolean entitlementArrayDeclares(String hint, String value) {
+        if (hint == null) {
+            return false;
+        }
+        for (String entry : hint.split("\n")) {
+            if (value.equals(entry.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void appendVpnTunnelExtensionTarget(StringBuilder sb,
             BuildRequest request, File tmpFile, File distDir)
             throws IOException, BuildException {

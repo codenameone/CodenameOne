@@ -163,8 +163,8 @@ error naming the entitlement and not the reason it appeared.
 entitlement because it *is* the provider; the app carries it because
 `NETunnelProviderManager` -- what `Tunnels.start` uses to save the
 configuration and start the tunnel -- is Network Extension API too. Signing
-only the `.appex` produces an app whose every start fails with a permission
-error. The build writes the entitlement into both, and refuses before the
+only the `.appex` leaves the app unable to start its own tunnel: every
+attempt fails with a permission error. The build writes the entitlement into both, and refuses before the
 archive if either profile doesn't grant it.
 
 And the extension signs under its own App ID, `<packageName>.vpntunnel`, so a

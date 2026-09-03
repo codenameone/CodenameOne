@@ -128,10 +128,32 @@ class VpnTunnelExtensionTest {
         // defines, so the extension failed at link.
         String src = IOSVpnTunnelExtensionBuilder.providerSource(
                 "com.example.Outer$Tunnel");
-        assertTrue(src.contains("__NEW_com_example_Outer_Tunnel()"));
-        assertTrue(src.contains("com_example_Outer_Tunnel_ctor__"));
+        assertTrue(src.contains("__NEW_com_example_Outer_Tunnel("));
+        assertTrue(src.contains("com_example_Outer_Tunnel___INIT____"));
         assertFalse(src.contains("Outer$Tunnel"),
                 "no '$' can survive into a C symbol");
+    }
+
+    @Test
+    void theTunnelIsAllocatedThroughTheAbiParparvmEmits() {
+        String src = provider();
+        // __NEW_X takes the thread state -- it uses it for class
+        // initialisation and for the GC allocation -- and an EMPTY parameter
+        // list is an old-style declaration that compiles and then leaves the
+        // argument register unset on arm64.
+        assertTrue(src.contains("extern JAVA_OBJECT __NEW_com_example_MyTunnel("
+                + "CODENAME_ONE_THREAD_STATE);"),
+                "the allocator has to be declared with the thread state");
+        assertTrue(src.contains("__NEW_com_example_MyTunnel(threadStateData)"),
+                "...and called with it");
+        // The no-argument constructor is X___INIT____. X_ctor__ is a symbol
+        // the translation never defines, so the extension did not link.
+        assertTrue(src.contains(
+                "com_example_MyTunnel___INIT____(threadStateData, tunnel)"));
+        // No CALL or declaration of it. The generated file names the old
+        // spelling once, in the comment that explains why it is not used.
+        assertFalse(src.contains("_ctor__("),
+                "_ctor__ is not a symbol ParparVM emits");
     }
 
     @Test

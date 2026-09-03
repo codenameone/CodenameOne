@@ -310,10 +310,12 @@ class VpnTunnelNativeBuilder {
      * Whether {@code entry} is in any archive or loose class file under
      * {@code dir}.
      *
-     * <p>The same shapes {@code LibraryClassPrefixScan} walks -- jar, aar,
-     * zip and loose {@code .class} -- because that is what a submitted
-     * library arrives as, and the two have to agree about what "in a
-     * library" means.</p>
+     * <p>jar, zip and loose {@code .class} -- the shapes
+     * {@code LibraryClassPrefixScan} walks, minus {@code .aar}. That one is
+     * deliberate: an Android archive is not something javac can put on a
+     * classpath, so accepting a tunnel found inside one would pass this
+     * check and then fail the generated stub's compile, which is the exact
+     * error this method exists to turn into a sentence about the hint.</p>
      */
     private static boolean containsClass(File dir, String entry) {
         if (dir == null || !dir.isDirectory()) {
@@ -331,8 +333,7 @@ class VpnTunnelNativeBuilder {
                 continue;
             }
             String name = child.getName().toLowerCase(java.util.Locale.ROOT);
-            if (name.endsWith(".jar") || name.endsWith(".aar")
-                    || name.endsWith(".zip")) {
+            if (name.endsWith(".jar") || name.endsWith(".zip")) {
                 java.util.zip.ZipFile zip = null;
                 try {
                     zip = new java.util.zip.ZipFile(child);

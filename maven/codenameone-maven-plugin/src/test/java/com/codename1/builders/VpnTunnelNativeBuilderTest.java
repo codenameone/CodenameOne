@@ -257,6 +257,28 @@ class VpnTunnelNativeBuilderTest {
     }
 
     @Test
+    void theHostEntitlementHasToCarryTheTunnelValue() {
+        // The renderer splits an array-valued hint on newlines and trims, so
+        // a project asking for two provider kinds writes two lines and must
+        // still be accepted. What is refused is a hint that leaves out the
+        // value this feature IS.
+        assertTrue(IPhoneBuilder.entitlementArrayDeclares(
+                "packet-tunnel-provider", "packet-tunnel-provider"));
+        assertTrue(IPhoneBuilder.entitlementArrayDeclares(
+                "app-proxy-provider\npacket-tunnel-provider",
+                "packet-tunnel-provider"));
+        assertTrue(IPhoneBuilder.entitlementArrayDeclares(
+                " packet-tunnel-provider \n", "packet-tunnel-provider"));
+        assertFalse(IPhoneBuilder.entitlementArrayDeclares(
+                "app-proxy-provider", "packet-tunnel-provider"));
+        assertFalse(IPhoneBuilder.entitlementArrayDeclares(
+                "packet-tunnel-provider-x", "packet-tunnel-provider"),
+                "a value that merely contains ours is not ours");
+        assertFalse(IPhoneBuilder.entitlementArrayDeclares(
+                null, "packet-tunnel-provider"));
+    }
+
+    @Test
     void theTargetIsBuiltAsAnAppExtension() {
         VpnTunnelNativeBuilder builder = new VpnTunnelNativeBuilder(null);
         BuildRequest request = request("true", "com.example.app.MyTunnel");
