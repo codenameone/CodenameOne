@@ -23,6 +23,10 @@
 package com.codename1.components;
 
 import com.codename1.ai.ChatMessage;
+import java.util.Arrays;
+import com.codename1.ai.ToolCall;
+import com.codename1.ai.TextPart;
+import com.codename1.ai.MessagePart;
 import com.codename1.ai.Role;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
@@ -40,6 +44,168 @@ import static org.junit.jupiter.api.Assertions.*;
  * embedded {@link ChatInput}.
  */
 class ChatViewTest extends UITestBase {
+
+    @FormTest
+    void streamedTextReachesTheStoredMessage() {
+        // A streamed reply only ever reached the bubble: the ChatMessage stored
+        // when beginAssistantStream() created it stayed empty, so anything
+        // building a request from getHistory() -- LlmChatBinding included --
+        // sent a blank assistant turn for every completed reply.
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("Hello");
+        bubble.appendText(", world");
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("Hello, world", history.get(history.size() - 1).getText());
+        assertEquals(Role.ASSISTANT, history.get(history.size() - 1).getRole());
+    }
+
+    @FormTest
+    void annotationsAreShownButStayOutOfHistory() {
+        // LlmChatBinding appends "[error: ...]" to the bubble when a stream
+        // fails. That is for the reader, not for the model: replaying it would
+        // send a network failure back as if the assistant had written it.
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("partial answer");
+        bubble.appendAnnotation("\n\n[error: connection reset]");
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("partial answer", history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
+    void appendingToANonEmptyBubbleKeepsWhatItStartedWith() {
+        // A bubble created from a message already shows that text, so the first
+        // append must extend it rather than replace the stored message with just
+        // the delta.
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.addMessage(ChatMessage.assistant("Hello"));
+        bubble.appendText(" world");
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("Hello world", history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
+    void theBubblesOwnMessageTracksItsText() {
+        // getMessage() and getHistory() are two ways of asking the same
+        // question, so a streamed reply has to reach both.
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("Hello");
+        assertEquals("Hello", bubble.getMessage().getText());
+        assertEquals("Hello", v.getHistory().get(v.getHistory().size() - 1).getText());
+
+        bubble.appendAnnotation(" [note]");
+        assertEquals("Hello", bubble.getMessage().getText(),
+                "an annotation is not part of the message either");
+    }
+
+    @FormTest
+    void textAppendedAfterAnAnnotationDoesNotDragItIntoHistory() {
+        // The annotation stays in the bubble, so deriving the conversation from
+        // the rendered body folds it in on the very next delta -- excluding it
+        // for exactly one append and no longer.
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("the answer so far");
+        bubble.appendAnnotation(" [reconnecting]");
+        bubble.appendText(" and the rest");
+
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("the answer so far and the rest",
+                history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
+    void setTextReplacesTheConversationOutright() {
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("draft");
+        bubble.appendAnnotation(" [stale]");
+        bubble.setText("final answer");
+        bubble.appendText(" plus more");
+
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("final answer plus more",
+                history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
+    void annotationsStayOutOfHistoryWhenAppendedOffTheEdt() throws Exception {
+        // The exclusion has to survive the hop to the EDT. appendText only
+        // queues the update when it is called from another thread, so an
+        // exclusion held in a field is already cleared by the time the queued
+        // work runs -- and the error annotation lands in history after all.
+        // LlmChatBinding's error callback is exactly this case.
+        ChatView v = new ChatView();
+        final ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("partial answer");
+
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                bubble.appendAnnotation("\n\n[error: connection reset]");
+            }
+        });
+        t.start();
+        t.join();
+        flushSerialCalls();
+
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("partial answer", history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
+    void streamedTextOffTheEdtStillReachesHistory() {
+        // The other half of the same dispatch: a queued conversational append
+        // must still be recorded.
+        ChatView v = new ChatView();
+        final ChatBubble bubble = v.beginAssistantStream();
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                bubble.appendText("from a worker");
+            }
+        });
+        t.start();
+        try {
+            t.join();
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+        }
+        flushSerialCalls();
+
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("from a worker", history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
+    void replacingTheTextKeepsToolCallMetadata() {
+        // A message can be a single text part and still carry tool calls. The
+        // following tool result refers to their ids, so losing them makes the
+        // replay an incomplete sequence that a provider rejects.
+        ToolCall call = new ToolCall("call-1", "get_weather", "{}");
+        ChatMessage withCall = new ChatMessage(Role.ASSISTANT,
+                Arrays.<MessagePart>asList(new TextPart("")),
+                Arrays.asList(call), "assistant-1", null);
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.addMessage(withCall);
+        bubble.appendText("checking the weather");
+        ChatMessage stored = v.getHistory().get(v.getHistory().size() - 1);
+        assertEquals("checking the weather", stored.getText());
+        assertEquals(1, stored.getToolCalls().size());
+        assertEquals("call-1", stored.getToolCalls().get(0).getId());
+        assertEquals("assistant-1", stored.getName());
+    }
+
+    @FormTest
+    void appendToLastMessageAlsoUpdatesHistory() {
+        ChatView v = new ChatView();
+        v.beginAssistantStream();
+        v.appendToLastMessage("streamed");
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("streamed", history.get(history.size() - 1).getText());
+    }
 
     @FormTest
     void freshViewHasEmptyHistoryAndAnInput() {

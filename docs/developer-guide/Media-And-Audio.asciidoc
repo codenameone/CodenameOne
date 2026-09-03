@@ -50,6 +50,10 @@ When you need to combine PCM clips before writing or playing them, use `AudioMix
 The mixed buffer is clipped to the normalized PCM range `[-1, 1]`, so it can be passed directly to `WAVWriter`. The mixer doesn't resample or convert channel layouts; downsample or otherwise convert source buffers before adding them if they're not already on the target clock.
 
 `AudioEffects` provides small platform-neutral PCM transforms that compose with the mixer:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MediaAndAudioJava003Snippet.java[tag=media-and-audio-java-003,indent=0]
+----
 
 
 `equalize(...)` is a simple three-band tone shaper for lightweight cleanup and demos. `removeCenter(...)`, `isolateCenter(...)`, and `midSide(...)` use classic stereo mid/side processing. They can reduce, isolate, or enhance centered dialog only when the source is stereo and the voice is actually centered. These methods aren't source-separation, speech-isolation, or noise-reduction APIs.
