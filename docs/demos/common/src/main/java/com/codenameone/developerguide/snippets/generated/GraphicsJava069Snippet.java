@@ -81,7 +81,7 @@ class GraphicsJava069Snippet {
     
     void snippet() throws Exception {
         // tag::graphics-java-069[]
-        Image i = URLImage.createToStorage(placeholder, "fileNameInStorage", "http://xxx/myurl.jpg", URLImage.RESIZE_SCALE);
+        Image i = URLImage.createToStorage(placeholder, "fileNameInStorage", "https://xxx/myurl.jpg", URLImage.RESIZE_SCALE);
         // end::graphics-java-069[]
     }
 

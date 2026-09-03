@@ -89,13 +89,13 @@ class GraphicsJava075Snippet {
 
         ArrayList<Map<String, Object>> data = new ArrayList<>();
 
-        data.add(createListEntry("A Game of Thrones", "1996", "http://www.georgerrmartin.com/wp-content/uploads/2013/03/GOTMTI2.jpg"));
-        data.add(createListEntry("A Clash Of Kings", "1998", "http://www.georgerrmartin.com/wp-content/uploads/2012/08/clashofkings.jpg"));
-        data.add(createListEntry("A Storm Of Swords", "2000", "http://www.georgerrmartin.com/wp-content/uploads/2013/03/stormswordsMTI.jpg"));
-        data.add(createListEntry("A Feast For Crows", "2005", "http://www.georgerrmartin.com/wp-content/uploads/2012/08/feastforcrows.jpg"));
-        data.add(createListEntry("A Dance With Dragons", "2011", "http://georgerrmartin.com/gallery/art/dragons05.jpg"));
-        data.add(createListEntry("The Winds of Winter", "2016 (please, please, please)", "http://www.georgerrmartin.com/wp-content/uploads/2013/03/GOTMTI2.jpg"));
-        data.add(createListEntry("A Dream of Spring", "Ugh", "http://www.georgerrmartin.com/wp-content/uploads/2013/03/GOTMTI2.jpg"));
+        data.add(createListEntry("A Game of Thrones", "1996", "https://www.georgerrmartin.com/wp-content/uploads/2013/03/GOTMTI2.jpg"));
+        data.add(createListEntry("A Clash Of Kings", "1998", "https://www.georgerrmartin.com/wp-content/uploads/2012/08/clashofkings.jpg"));
+        data.add(createListEntry("A Storm Of Swords", "2000", "https://www.georgerrmartin.com/wp-content/uploads/2013/03/stormswordsMTI.jpg"));
+        data.add(createListEntry("A Feast For Crows", "2005", "https://www.georgerrmartin.com/wp-content/uploads/2012/08/feastforcrows.jpg"));
+        data.add(createListEntry("A Dance With Dragons", "2011", "https://georgerrmartin.com/gallery/art/dragons05.jpg"));
+        data.add(createListEntry("The Winds of Winter", "2016 (please, please, please)", "https://www.georgerrmartin.com/wp-content/uploads/2013/03/GOTMTI2.jpg"));
+        data.add(createListEntry("A Dream of Spring", "Ugh", "https://www.georgerrmartin.com/wp-content/uploads/2013/03/GOTMTI2.jpg"));
 
         DefaultListModel<Map<String, Object>> model = new DefaultListModel<>(data);
         MultiList ml = new MultiList(model);

@@ -87,7 +87,7 @@ class GraphicsJava073Snippet {
         gr.fillArc(0, 0, placeholder.getWidth(), placeholder.getHeight(), 0, 360);
 
         URLImage.ImageAdapter ada = URLImage.createMaskAdapter(roundMask);
-        Image i = URLImage.createToStorage(placeholder, "fileNameInStorage", "http://xxx/myurl.jpg", ada);
+        Image i = URLImage.createToStorage(placeholder, "fileNameInStorage", "https://xxx/myurl.jpg", ada);
         // end::graphics-java-073[]
     }
 
