@@ -9501,6 +9501,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void copyToClipboard(Object obj) {
         if(obj instanceof com.codename1.ui.ClipboardContent) {
             com.codename1.ui.ClipboardContent content = (com.codename1.ui.ClipboardContent)obj;
+            // Every representation, now, including any registered as a provider. The pasteboard
+            // is a system store that outlives this process, so what goes on it has to be the
+            // data and not a promise this application has to still be running to keep -- a lazily
+            // registered item pastes as nothing once the application is gone. The drag path is
+            // where the laziness pays off, and it keeps it; see ClipboardDataProvider.
             nativeInstance.setClipboardContent(
                     content.getText(com.codename1.ui.ClipboardContent.MIME_TEXT),
                     content.getText(com.codename1.ui.ClipboardContent.MIME_HTML),

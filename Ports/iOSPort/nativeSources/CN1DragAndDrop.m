@@ -492,10 +492,19 @@ void CN1AddNativeDragFiles(NSString* paths) {
         }
         // ClipboardContent's file representation permits a raw local path as well as a file:
         // URI, and URLWithString: turns a path into a scheme-less relative URL that no receiver
-        // can open.
-        NSURL* url = ([entry hasPrefix:@"/"] || [entry hasPrefix:@"~"])
-                ? [NSURL fileURLWithPath:[entry stringByExpandingTildeInPath]]
-                : [NSURL URLWithString:entry];
+        // can open. An absolute path is obvious; a relative one -- exports/report.pdf -- looks
+        // enough like a URL to be parsed as one, and was then quietly dropped from the drag
+        // because an item provider cannot vend it. Anything that does not come back with a
+        // scheme is a path.
+        NSURL* url;
+        if ([entry hasPrefix:@"/"] || [entry hasPrefix:@"~"]) {
+            url = [NSURL fileURLWithPath:[entry stringByExpandingTildeInPath]];
+        } else {
+            url = [NSURL URLWithString:entry];
+            if (url == nil || url.scheme == nil) {
+                url = [NSURL fileURLWithPath:entry];
+            }
+        }
         if (url != nil) {
             [cn1DragFileUrls addObject:url];
         }
