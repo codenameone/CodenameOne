@@ -99,7 +99,12 @@ class GameBuilderJava002Snippet extends GameSceneView {
         // forward loop would step over the next sprite.
         for (int i = scene.size() - 1; i >= 0; i--) {
             Sprite s = scene.get(i);
-            GameElement el = (GameElement) s.getUserData();
+            // Tile sprites carry a Layer in their user data, not a GameElement, so
+            // a plain cast fails on the first frame of any scene with painted
+            // tiles. elementOf() answers null for those. It also matters that this
+            // is not a cast: ParparVM does not check them, so on iOS a bad cast
+            // reads the wrong object's fields instead of throwing.
+            GameElement el = elementOf(s);
             if (el == null) continue;
             switch (el.getAssetId()) {
                 case "player" -> {

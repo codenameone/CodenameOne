@@ -61,26 +61,6 @@ Device-Input-And-Form-Factors.asciidoc	React to fold changes with a posture list
 Device-Input-And-Form-Factors.asciidoc	handles desktop and touch:
 Device-Input-And-Form-Factors.asciidoc	https://www.codenameone.com/javadoc/com/codename1/ui/DevicePosture.html[`DevicePosture`]:
 Device-Input-And-Form-Factors.asciidoc	pointer is a stylus or eraser:
-Game-Assets.asciidoc	is registered as solid. Applications add their own without changing the level format:
-Game-Builder.asciidoc	Loading and playing a level at runtime is three lines:
-Game-Builder.asciidoc	`start()` it:
-Game-Builder.asciidoc	the editor:
-Game-Development.asciidoc	as 2:1 diamonds -- columns step right-and-down, rows step left-and-down:
-Game-Development.asciidoc	build the frames yourself, which is what `ScrollerGameSample`'s runner does:
-Game-Development.asciidoc	come from one piece of geometry:
-Game-Development.asciidoc	each card's bounding box:
-Game-Development.asciidoc	engine can report completion, so guard with `isVoiceCompletionSupported()`:
-Game-Development.asciidoc	handle:
-Game-Development.asciidoc	layers the sprites within a cell:
-Game-Development.asciidoc	never recompute coordinates:
-Game-Development.asciidoc	objects, and step it once per frame from your `update`:
-Game-Development.asciidoc	rendered positions between physics states:
-Game-Development.asciidoc	required:
-Game-Development.asciidoc	rotation automatically (in pixels, screen space) -- and the scene draws it there:
-Game-Development.asciidoc	runs once before the first frame:
-Game-Development.asciidoc	that always faces the camera, so your existing 2D art keeps working in 3D:
-Game-Development.asciidoc	the thin point reads exactly the same to the eye:
-Game-Development.asciidoc	uploading it with `com.codename1.gpu.GraphicsDevice#createTexture(com.codename1.ui.Image)`:
 In-Car-Experiences.asciidoc	Head units enforce a hard cap on the number of rows/items they display (driver-distraction rules). Query it and trim accordingly:
 In-Car-Experiences.asciidoc	Register a single `CarApplication` from your app's `init()` -- before a head unit connects -- and return a root `CarScreen` that builds a template:
 In-Car-Experiences.asciidoc	`CarContext` manages a back stack, mirroring `androidx.car.app`'s `ScreenManager` and CarPlay's `CPInterfaceController`:

@@ -93,6 +93,11 @@ class GameBuilderJava003Snippet {
         // is not on an application's classpath.
         AssetCatalog catalog = AssetCatalog.load(
                 Display.getInstance().getResourceAsStream(Level1.class, "/my-packs.json"));
+
+        // load() only parses the definitions. Nothing else loads the images,
+        // sprite sheets and meshes they name, so without this the scene renders
+        // placeholders and the sheets never animate.
+        catalog.resolveArt();
         Level1 scene = new Level1(catalog);
         game.add(BorderLayout.CENTER, scene);
         game.show();
