@@ -43,9 +43,6 @@ public class ChatBubble extends Container {
     /// this is bookkeeping between ChatView and its bubbles, not API.
     ChatView owner;
 
-    /// True while an annotation is being appended, so it stays out of history.
-    private boolean annotating;
-
     private final TextArea body;
     private final ChatMessage message;
 
@@ -79,12 +76,28 @@ public class ChatBubble extends Container {
     }
 
     private void applyText(String text) {
+        applyText(text, true);
+    }
+
+    /// Sets the body text, and tells the owning view about it when the text is
+    /// part of the conversation.
+    ///
+    /// `sync` travels with the work rather than living in a field: appendText
+    /// hops to the EDT when called from another thread, and a field cleared by
+    /// the caller as soon as it returns is already back to its old value by the
+    /// time the queued update runs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the new body text
+    /// - `sync`: true to record it in the view's history
+    private void applyText(String text, boolean sync) {
         body.setText(text == null ? "" : text);
         // Keep the view's history in step with what the bubble shows. A streamed
         // reply is otherwise only ever painted: the ChatMessage the view stored
         // when this bubble was created stays empty, and anything building a
         // request from getHistory() sends a blank assistant turn.
-        if (owner != null && !annotating) {
+        if (sync && owner != null) {
             owner.bubbleTextChanged(this, body.getText());
         }
         revalidateLater();
@@ -100,31 +113,27 @@ public class ChatBubble extends Container {
     ///
     /// - `note`: the annotation to show
     public void appendAnnotation(final String note) {
-        if (note == null || note.length() == 0) {
-            return;
-        }
-        annotating = true;
-        try {
-            appendText(note);
-        } finally {
-            annotating = false;
-        }
+        append(note, false);
     }
 
     /// Append a token-sized delta to the bubble's body. Used by
     /// [ChatView#appendToLastMessage] during LLM streaming.
     public void appendText(final String delta) {
+        append(delta, true);
+    }
+
+    private void append(final String delta, final boolean sync) {
         if (delta == null || delta.length() == 0) {
             return;
         }
         if (Display.getInstance().isEdt()) {
-            applyText(body.getText() + delta);
+            applyText(body.getText() + delta, sync);
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                applyText(body.getText() + delta);
+                applyText(body.getText() + delta, sync);
             }
         });
     }

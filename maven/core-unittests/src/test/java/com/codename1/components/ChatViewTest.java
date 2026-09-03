@@ -74,6 +74,55 @@ class ChatViewTest extends UITestBase {
     }
 
     @FormTest
+    void annotationsStayOutOfHistoryWhenAppendedOffTheEdt() throws Exception {
+        // The exclusion has to survive the hop to the EDT. appendText only
+        // queues the update when it is called from another thread, so an
+        // exclusion held in a field is already cleared by the time the queued
+        // work runs -- and the error annotation lands in history after all.
+        // LlmChatBinding's error callback is exactly this case.
+        ChatView v = new ChatView();
+        final ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("partial answer");
+
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                bubble.appendAnnotation("\n\n[error: connection reset]");
+            }
+        });
+        t.start();
+        t.join();
+        flushSerialCalls();
+
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("partial answer", history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
+    void streamedTextOffTheEdtStillReachesHistory() {
+        // The other half of the same dispatch: a queued conversational append
+        // must still be recorded.
+        ChatView v = new ChatView();
+        final ChatBubble bubble = v.beginAssistantStream();
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                bubble.appendText("from a worker");
+            }
+        });
+        t.start();
+        try {
+            t.join();
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+        }
+        flushSerialCalls();
+
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("from a worker", history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
     void replacingTheTextKeepsToolCallMetadata() {
         // A message can be a single text part and still carry tool calls. The
         // following tool result refers to their ids, so losing them makes the
