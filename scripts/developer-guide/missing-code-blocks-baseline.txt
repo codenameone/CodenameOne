@@ -284,91 +284,11 @@ graphics.asciidoc	name of icon to `icon_URLImage` then using this in the data:
 graphics.asciidoc	show this, try to place five of these components on a form inside a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] and see how it looks:
 graphics.asciidoc	straight lines rather than curves might look like this:
 graphics.asciidoc	to draw each individual tick:
-io.asciidoc	A more advanced usage of the `FileSystemStorage` API can be a `FileSystemStorage` `Tree`:
-io.asciidoc	A simpler implementation could do something like this:
-io.asciidoc	Above, if you want to select the IDs of all players that are ranked in the top 2, you can use an expression like:
-io.asciidoc	Above, you globally find a lastname element with a value of ‘Hewitt’, then grab the parent node of lastname which happens to be the player node, then grab the ID attribute from the player node. Or, you could get the same result from the following simpler statement:
-io.asciidoc	Above, you selected the IDs of all ranked players. Conversely, you can select the non-ranked players like this:
-io.asciidoc	After you do that once you can write/read contacts from storage if you so want:
-io.asciidoc	An `Externalizable` object *must* have a *default public constructor* and must implement the following 4 methods:
-io.asciidoc	And delete an entry using:
-io.asciidoc	And vice versa:
-io.asciidoc	Another approach is to use the `setFailSilently(true)` method on the `ConnectionRequest`. This will prevent the `ConnectionRequest` from displaying any errors to the user. It's a powerful strategy if you use the synchronous version of the APIs for example:
-io.asciidoc	As part of the premium cloud features it's possible to invoke Log.sendLog() to email a log directly to the developer account. Codename One can do that seamlessly based on changes printed into the log or based on exceptions that are uncaught or logged for example:
-io.asciidoc	Assuming you added a new date field to the object you can do the following. Notice that a `Date` is a `long` value in Java that can be null. For completeness the full class is presented below:
-io.asciidoc	Binding makes this all seamless. For example: the code above can be written as:
-io.asciidoc	By default `GZConnectionRequest` doesn't request gzipped data ( unzips it when its received) but its pretty easy to do so add the HTTP header `Accept-Encoding: gzip` for example:
-io.asciidoc	Codename One provides many tools to simplify the path between networking/IO & GUI. A common task of showing a wait dialog or progress sign while fetching network data can be simplified by using the https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgress.html[InfiniteProgress] class for example:
-io.asciidoc	Developers need to write the data of the object in the externalize method using the methods in the data output stream and read the data of the object in the internalize method for example:
-io.asciidoc	For a lot of REST requests this will fail because you need to add an HTTP header indicating that you accept JSON results. You have a special case support for that:
-io.asciidoc	For endpoints that return a list of DTOs, use `fetchAsMappedList`:
-io.asciidoc	For example, if you wish to have finer grained control over the submission process for example: for making a `HEAD` request you can do this with code like:
-io.asciidoc	For example: to block all network errors from showing anything to the user you could do something like this:
-io.asciidoc	For example: you can do something like this in your `init(Object)` method:
-io.asciidoc	For starters all the common methods of `Object` can be implemented with almost no code:
-io.asciidoc	If a document is ordered, you might want to select nodes by their position, for example:
-io.asciidoc	If you continue the example from above to show persistence to the SQL database you can do something like this:
-io.asciidoc	If you continue your example from above you can do something like this:
-io.asciidoc	Implementing the `Externalizable` interface is important when you want to store a proprietary object. In this case you must register the object with the `com.codename1.io.Util` class so the externalization algorithm will be able to recognize it by name by invoking:
 io.asciidoc	In the above code you do the following:
-io.asciidoc	It's also possible to nest expressions, for example:
-io.asciidoc	It's also possible to select parent nodes, by using the `..` expression. For example:
-io.asciidoc	Listing the entries is more interesting:
-io.asciidoc	Moving on, to select a node based on the existence of an attribute:
-io.asciidoc	Notice that you can also implement the same thing and much more by avoiding the response listener code and instead overriding the methods of the `ConnectionRequest` class which offers many points to override for example:
-io.asciidoc	One of the bigger features of properties are their ability to bind UI to a property. For example: if you continue the sample above with the `Contact` class, say you have a text field on the form and you want the property (which you mapped to the database) to have the value of the text field. You could do something like this:
-io.asciidoc	POST requests use the same builder pattern:
-io.asciidoc	Server returned headers are a bit trickier to read. You need to subclass the connection request and override the `readHeaders` method for example:
-io.asciidoc	Since strings might be null sometimes you also included convenience methods to implement such externalization. This effectively writes a boolean before writing the UTF to show whether the string is null:
 io.asciidoc	Since you assume most developers reading this will be familiar with Java here is the way to implement the multipart upload in the servlet API:
-io.asciidoc	Some headers are built-in as direct APIs for example: content type is directly exposed within the API since it's a pretty common use case. You can set the content kind of post request using:
-io.asciidoc	Some objects make sense as global objects, you can use the `Preferences` API to store that data directly but then you don't have the type safety that property objects bring to the table. That's where the binding of property objects to preferences makes sense. For example: say you have a global `Settings` property object you can bind it to preferences using:
 io.asciidoc	That's what the new method of `URLImage` does:
-io.asciidoc	The JSON ("JavaScript Object Notation") format is popular on the web for passing values to/from webservices since it works so well with JavaScript. Parsing JSON is as easy but has two different variations. You can use the https://www.codenameone.com/javadoc/com/codename1/io/JSONParser.html[JSONParser] class to build a tree of the JSON data as such:
-io.asciidoc	The XML processor handles global selections by using a double slash anywhere within the expression, for example:
-io.asciidoc	The `CachedDataService` will fetch data if it isn't cached locally and cache it. When you "refresh" it will send a special HTTP request that will send back the data if it has been updated since the last refresh:
-io.asciidoc	The `Rest` API makes it easy to invoke a RESTful webservice without many of the nuances of `ConnectionRequest`. You can use it to define the HTTP method and start building based on that. To get a parsed JSON result from a URL you could do:
-io.asciidoc	The cool thing is that this works with many component types and property types almost magically. Binding works by using an adapter class to convert the data to/from the component. The adapter itself works with a generic converter for example: this code:
-io.asciidoc	The sample code below demonstrates listing storage content, adding and viewing entries, and deleting entries:
-io.asciidoc	The simplest usage of `XMLParser` looks a bit like this:
 io.asciidoc	There are many methods of interest to keep an eye for:
-io.asciidoc	This can be tedious to do if you want all requests from your app to use this header. For this use case you can use:
-io.asciidoc	This means that this code won't compile:
-io.asciidoc	This should display an error message to the user if there was a problem sending the SMS:
-io.asciidoc	This simple example allows you to create a server and a client assuming the device supports both:
-io.asciidoc	This still carries most of the flexibilities of the regular binding for example: you can still get a binding object using:
-io.asciidoc	To parse a CSV use the https://www.codenameone.com/javadoc/com/codename1/io/CSVParser.html[CSVParser] class as such:
-io.asciidoc	Up until now this was pretty cool but if you looked at the UI construction code above you would see that it's pretty full of boilerplate code. The thing about boilerplate is that it shows where automation can be applied, that's the exact idea behind the magical "InstantUI" class. This means that the UI above can be generated using this code:
-io.asciidoc	When you used a POJO you did this:
-io.asciidoc	With properties you do this:
-io.asciidoc	Without this feature the code would look like this:
-io.asciidoc	Working with a database is pretty trivial, the application logic below can send arbitrary queries to the database and present the results in a `Table`. You can probably integrate this code into your app as a debugging tool:
-io.asciidoc	You added a new syntax:
-io.asciidoc	You can also add any arbitrary header type you want, for example: a common use case is basic authorization where the authorization header includes the Base64 encoded user/password combination as such:
-io.asciidoc	You can also override the error callbacks of the various types in the request for example: for a server error code you can do:
-io.asciidoc	You can always submit data in the `buildRequestBody` but this is flaky and has some limitations in devices/size allowed. HTTP standardized file upload capabilities through the multipart request protocol, this is implemented by countless servers and is well documented. Codename One supports this out of the box:
-io.asciidoc	You can build a UI that would allow you to edit the `Contact` property in memory:
-io.asciidoc	You can do some more elaborate bindings such as:
-io.asciidoc	You can now send hello world as an SMS to the end user. Once this is in place sending an SMS through REST is a matter of using the `Rest` API:
-io.asciidoc	You can pick either one of these approaches based on your personal preferences. Here you show both uses with the server API:
-io.asciidoc	You can send a get request to a URL using something like:
-io.asciidoc	You can then add entries to the contact table using:
-io.asciidoc	You can update an entry using:
-io.asciidoc	You might not have noticed this but in the previous verbose code you had lines like:
-io.asciidoc	You want to extract some data above into simpler string results. You can do this using:
-io.asciidoc	You've some special case defaults for some common property names, so if your property is named email it will use an email constraint by default. If it's named url or password etc. It will do the "right thing" unless you explicitly state otherwise. You can customize the constraint for a specific property using something like:
-io.asciidoc	`NetworkManager` also supports synchronous requests which work in a similar way to `Dialog` through the `invokeAndBlock` call and thus don't block the EDT footnote:[Event Dispatch Thread] illegally. For example: you can do something like this:
-io.asciidoc	`Storage` also offers a simple API in the form of the https://www.codenameone.com/javadoc/com/codename1/io/Preferences.html[Preferences] class. The `Preferences` class lets developers store simple variables, strings, numbers, booleans, and similar values without writing storage code. This is a common use case in applications. For example, you might need to store a server token:
-io.asciidoc	`com.codename1.io.JSONWriter` class is the complement of `JSONParser`:
 io.asciidoc	database by name:
-io.asciidoc	directly:
-io.asciidoc	download a `ConnectionRequest` to `Storage` using code like this:
-io.asciidoc	out any change made to the property:
-io.asciidoc	than a `Map` literal:
-io.asciidoc	that prevents setting the property to null and defaults it to an empty string:
-io.asciidoc	the array directly:
-io.asciidoc	values from parsed JSON:
-io.asciidoc	you will notice the `final` keyword:
 performance.asciidoc	All you need to do now is update the `lastScroll` variable whenever user interaction is in place. This works for user touches:
 performance.asciidoc	For example, Codename One annotates:
 performance.asciidoc	In the new Contacts demo you have a share button for each contact, the code for constructing a `ShareButton` looks like this:

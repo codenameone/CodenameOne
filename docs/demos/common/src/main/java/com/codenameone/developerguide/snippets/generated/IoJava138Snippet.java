@@ -50,13 +50,24 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.rest.*;
+import com.codename1.xml.*;
+import com.codename1.ui.tree.*;
+import com.codename1.ui.table.*;
+import com.codename1.db.*;
+import com.codename1.io.gzip.*;
+import com.codename1.util.*;
+import com.codename1.system.*;
+import com.codename1.annotations.*;
+import com.codename1.io.services.*;
 import java.util.*;
 
 
-class IoJava037Snippet {
+class IoJava138Snippet {
+
 
     Object context;
-    Object url;
+    String url = "https://example.com";
     Object value;
     Object body;
     Object event;
@@ -77,46 +88,36 @@ class IoJava037Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    void snippet() throws Exception {
-        // tag::io-java-037[]
-        Form hi = new Form("Location", new BoxLayout(BoxLayout.Y_AXIS));
-        hi.add("Pinpointing Location");
-        Display.getInstance().callSerially(() -> {
-            Location l = Display.getInstance().getLocationManager().getCurrentLocationSync();
-            ConnectionRequest request = new ConnectionRequest("https://maps.googleapis.com/maps/api/geocode/json", false) {
-                private String country;
-                private String region;
-                private String city;
-                private String json;
-
-                @Override
-                protected void readResponse(InputStream input) throws IOException {
-                        Result result = Result.fromContent(input, Result.JSON);
-                        country = result.getAsString("/results/address_components[types='country']/long_name");
-                        region = result.getAsString("/results/address_components[types='administrative_area_level_1']/long_name");
-                        city = result.getAsString("/results/address_components[types='locality']/long_name");
-                        json = result.toString();
-                }
-
-                @Override
-                protected void postResponse() {
-                    hi.removeAll();
-                    hi.add(country);
-                    hi.add(region);
-                    hi.add(city);
-                    hi.add(new SpanLabel(json));
-                    hi.revalidate();
-                }
+    String myUrl = "https://example.com";
+    String baseUrl = "https://example.com";
+    String token = "token";
+    String myToken = "token";
+    String password = "password";
+    String user = "user";
+    String email = "user@example.com";
+    String fullPathToFile = "/path/to/file.txt";
+    String bodyValueAsString = "{}";
+    String petId = "1";
+    Result result;
+    ConnectionRequest request;
+    java.io.Reader reader;
+    java.io.Writer writer;
+    java.io.InputStream input;
+    java.io.OutputStream outputStream;
+    
+    // tag::io-java-138[]
+    public class GameOfThronesServiceServer {
+        public static String[] getBookNames() {
+            return new String[] {
+                "A Game of Thrones", "A Clash Of Kings", "A Storm Of Swords", "A Feast For Crows",
+                "A Dance With Dragons", "The Winds of Winter", "A Dream of Spring"
             };
-            request.setContentType("application/json");
-            request.addRequestHeader("Accept", "application/json");
-            request.addArgument("sensor", "true");
-            request.addArgument("latlng", l.getLatitude() + "," + l.getLongitude());
+        }
 
-            NetworkManager.getInstance().addToQueue(request);
-        });
-        hi.show();
-        /* omitted */
-        // end::io-java-037[]
+        public static String[] getBookPovCharacters(String bookName) {
+            // your code goes here...
+            return null;
+        }
     }
+    // end::io-java-138[]
 }

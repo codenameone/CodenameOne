@@ -50,13 +50,24 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.rest.*;
+import com.codename1.xml.*;
+import com.codename1.ui.tree.*;
+import com.codename1.ui.table.*;
+import com.codename1.db.*;
+import com.codename1.io.gzip.*;
+import com.codename1.util.*;
+import com.codename1.system.*;
+import com.codename1.annotations.*;
+import com.codename1.io.services.*;
 import java.util.*;
 
 
-class IoJava037Snippet {
+class IoJava119Snippet {
+
 
     Object context;
-    Object url;
+    String url = "https://example.com";
     Object value;
     Object body;
     Object event;
@@ -77,8 +88,25 @@ class IoJava037Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
+    String myUrl = "https://example.com";
+    String baseUrl = "https://example.com";
+    String token = "token";
+    String myToken = "token";
+    String password = "password";
+    String user = "user";
+    String email = "user@example.com";
+    String fullPathToFile = "/path/to/file.txt";
+    String bodyValueAsString = "{}";
+    String petId = "1";
+    Result result;
+    ConnectionRequest request;
+    java.io.Reader reader;
+    java.io.Writer writer;
+    java.io.InputStream input;
+    java.io.OutputStream outputStream;
+    
     void snippet() throws Exception {
-        // tag::io-java-037[]
+        // tag::io-java-119[]
         Form hi = new Form("Location", new BoxLayout(BoxLayout.Y_AXIS));
         hi.add("Pinpointing Location");
         Display.getInstance().callSerially(() -> {
@@ -116,7 +144,6 @@ class IoJava037Snippet {
             NetworkManager.getInstance().addToQueue(request);
         });
         hi.show();
-        /* omitted */
-        // end::io-java-037[]
+        // end::io-java-119[]
     }
 }
