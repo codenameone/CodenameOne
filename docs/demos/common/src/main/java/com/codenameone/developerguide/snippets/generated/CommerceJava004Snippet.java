@@ -105,7 +105,14 @@ class CommerceJava004Snippet {
                 // Back to the EDT to read the entitlement and touch the UI:
                 // Codename One UI calls are only legal there.
                 CN.callSerially(() -> {
-                    if (cm.isEntitled("pro")) {
+                    // Same rule as the entitlement sample earlier in the chapter:
+                    // the store-direct check is for when the cloud had no answer,
+                    // not an override of one it gave.
+                    boolean pro = cm.isEntitled("pro");
+                    if (!pro && (!cm.isCloudEnabled() || cm.isDegraded())) {
+                        pro = Purchase.getInAppPurchase().isSubscribed("pro_monthly");
+                    }
+                    if (pro) {
                         // unlock the paid features here
                     }
                 });

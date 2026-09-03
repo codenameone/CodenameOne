@@ -103,6 +103,7 @@ class AdvertisingJava006Snippet {
 
         ad.setAdListener(new AdListener() {
             public void onLoaded() {
+                retryDelay = 1000;
                 // A rewarded ad is an opt-in format, so a loaded ad only enables
                 // the offer. Showing it here would put a full screen ad in front
                 // of a user who never asked for one.
@@ -121,6 +122,14 @@ class AdvertisingJava006Snippet {
                 // leaving it disabled for the rest of the screen.
                 ad.load();
             }
+
+            public void onFailedToLoad(AdError error) {
+                // Transient provider and network errors are normal here. Without
+                // a retry the offer stays disabled for the life of the screen, so
+                // back off and try again rather than dropping it silently.
+                retryDelay = Math.min(retryDelay * 2, 60000);
+                UITimer.timer(retryDelay, false, form, () -> ad.load());
+            }
         });
         ad.load();
         // end::advertising-java-006[]
@@ -130,5 +139,8 @@ class AdvertisingJava006Snippet {
     void showRewardPending(int coins) { }
     Button watchForCoins = new Button("Watch for coins");
     String userId = "42";
+
+
+    int retryDelay = 1000;
 
 }
