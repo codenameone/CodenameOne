@@ -218,6 +218,29 @@ final class BuildHintsAndroid {
                 .def("2.0.1")
                 .platform("android"));
 
+
+        h.add(new Hint("android.locationButton.version")
+                .group(HintGroup.ANDROID)
+                .type(HintType.VERSION)
+                .def("1.0.0-alpha01")
+                .platform("android")
+                .doc("Version of `androidx.core.locationbutton:locationbutton`, added only when the app "
+                        + "references `com.codename1.location.LocationButton`. The library is an "
+                        + "experimental Jetpack artifact, so pin it here when a release changes under you."));
+
+        h.add(new Hint("android.locationButton.exclusive")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("android")
+                .doc("Whether precise location is reachable through the location button and nothing else, "
+                        + "which declares `ACCESS_FINE_LOCATION` with "
+                        + "`usesPermissionFlags=\"onlyForLocationButton\"`. Set it when every use of precise "
+                        + "location in the app is transactional; that's what removes the Play Console "
+                        + "declaration Google requires for persistent access from 2027-01-27. Leave it off for "
+                        + "an app that navigates, tracks or geofences -- those calls would be refused the "
+                        + "grant they need, and the build rejects the combination rather than shipping it."));
+
         h.add(new Hint("android.ar.required")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)
@@ -493,6 +516,22 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .doc("Device key used to mark a specific Android device as a test device for Google Play ads "
                         + "defaults to C6783E2486F0931D9D09FABC65094FDF"));
+
+        h.add(new Hint("android.blockLocationPermission")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("android")
+                .doc("Whether to keep the location permissions the build adds FOR LOCATION FEATURES out "
+                        + "of the manifest. It overrides the autodetection behind `android.gpsPermission`, "
+                        + "it suppresses background location, and it overrides the location button: an app "
+                        + "that sets this gets no location permission through a `LocationButton` a library "
+                        + "of its own happens to use, and no toolchain requirement from one either. It does "
+                        + "doesn't strip a location permission another feature needs to work -- Bluetooth "
+                        + "scanning declares `ACCESS_FINE_LOCATION` because BLE scan results require a "
+                        + "location grant up to API 30, and removing it would leave the app scanning and "
+                        + "finding nothing. An app that must declare no location permission at all "
+                        + "shouldn't also ask to scan for beacons."));
 
         h.add(new Hint("android.gpsPermission")
                 .group(HintGroup.ANDROID)

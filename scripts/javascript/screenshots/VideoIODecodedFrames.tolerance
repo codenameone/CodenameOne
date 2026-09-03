@@ -1,0 +1,15 @@
+# Decoded video frames, whose exact pixel values depend on the browser's own
+# decoder. The frame itself is deterministic -- the harness seeks to a fixed
+# time -- but the colour conversion is not identical between runs, so nearly
+# every pixel moves by a little and none of it is a rendering change.
+#
+# Measured against this reference on a failing CI run: worst channel delta 20,
+# 2.61% of pixels past delta 4, 0.27% past delta 8, and NOTHING past delta 16.
+# 24 leaves headroom over that without being loose -- a wrong or blank frame
+# moves whole regions by far more and still fails.
+#
+# Android and iOS have carried a sidecar for this same test from the start
+# (android is maxChannelDelta=72, maxMismatchPercent=18.0); the JavaScript port
+# was the one port missing it, which is why it was the one port failing.
+maxChannelDelta=24
+maxMismatchPercent=2.0

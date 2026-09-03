@@ -110,6 +110,11 @@ public final class CallAction {
                 // avoid, undone by the field no longer naming it.
                 return;
             }
+            // NOT named, though a named thread would say which subsystem left
+            // one running. java.util.Timer(String) exists in vm/JavaAPI and not
+            // in Ports/CLDC11, and core may only call what BOTH define -- the
+            // maven build compiles against a full JDK and accepted it, the ant
+            // build that uses the real bootclasspath did not.
             safety = new Timer();
             safetyTask = new SafetyNet(this);
             try {

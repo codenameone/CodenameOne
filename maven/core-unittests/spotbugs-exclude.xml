@@ -409,4 +409,27 @@
         <Class name="~com\.codename1\.ui\.editor\..*" />
         <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
     </Match>
+
+    <!--
+    LocationButton's stale-request wake-up is a single static Timer reference,
+    read and written only on the EDT: scheduleStaleWake and cancelStaleWake are
+    reached from callSerially bodies, and the TimerTask itself does nothing to
+    the field except inside another callSerially. LI_LAZY_INIT_STATIC reports
+    the check-then-assign shape as an unsafe lazy initialisation, which is a
+    statement about two threads racing, and Codename One's UI state has one
+    thread by construction. Adding a lock or a volatile to satisfy the pattern
+    would put synchronisation into core to describe a race that cannot occur.
+    Scoped to the two methods rather than the class, so anything else here is
+    still analysed. (No double hyphens in this comment: XML forbids them, and a
+    malformed filter file is not rejected loudly, it silently stops excluding
+    ANYTHING, which surfaces as unrelated findings elsewhere in the tree.)
+    -->
+    <Match>
+        <Class name="com.codename1.location.LocationButton" />
+        <Or>
+            <Method name="scheduleStaleWake" />
+            <Method name="cancelStaleWake" />
+        </Or>
+        <Bug pattern="LI_LAZY_INIT_STATIC" />
+    </Match>
 </FindBugsFilter>
