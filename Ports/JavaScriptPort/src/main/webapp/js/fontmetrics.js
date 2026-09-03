@@ -2773,9 +2773,10 @@ window.virtualKeyboardDetector = ( function( window, undefined ) {
                 // NOTE: this guard never passes. MediaTrackSupportedConstraints has no
                 // audioChannels member -- the standard key is channelCount, which is what
                 // the line below correctly uses for the constraint itself. So the channel
-                // count is never submitted to getUserMedia, the stream keeps the browser's
-                // own layout, and onAudioProcess still reports the configured audioChannels
-                // value, which AudioBuffer.getNumChannels() then echoes back to the app.
+                // count is never submitted to getUserMedia and the capture keeps whatever
+                // layout the device offers. interleave() above still shapes the delivered
+                // buffer to audioChannels, so the count reported to the app matches the PCM
+                // it receives; what is lost is the ability to ask the device for two.
                 if (supportedConstraints.audioChannels) {	
                     audioConstraints.channelCount = {ideal: audioChannels};
                 }

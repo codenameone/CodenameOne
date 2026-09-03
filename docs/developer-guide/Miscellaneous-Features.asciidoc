@@ -492,11 +492,12 @@ Treat the builder's numbers as preferences rather than guarantees. An
 fills that in from the rate the audio actually arrived at, or from the rate it
 resampled the audio to, so the figure describes the samples in your hands.
 
-`getNumChannels()` is weaker. On the JavaScript port it repeats the channel count
-you asked for rather than the one the browser delivered, and the buffer itself
-can't settle the question: a run of samples is equally consistent with mono frames
-or with half as many stereo ones. Record in mono on the web when your processing
-depends on knowing the layout.
+`getNumChannels()` reports the layout the recorder built, and on the JavaScript
+port that much is exact: it emits channel 0 alone for a mono request and
+interleaves left and right for a stereo one, so the count always matches the PCM
+you hold and you can split the channels by it. It says nothing about the capture,
+though -- the port never submits a channel count to the browser, so a stereo
+request depends on the input device already providing two channels.
 
 ==== Capture asynchronous API
 
