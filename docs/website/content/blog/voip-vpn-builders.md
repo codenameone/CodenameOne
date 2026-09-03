@@ -11,11 +11,17 @@ series: ["release-2026-09-04"]
 
 ![A phone, secure tunnel, and native build pipeline](/blog/voip-vpn-builders.jpg)
 
-Adding a Java method called `reportIncoming()` is easy. Making that call appear on the lock screen before iOS terminates the process is not. The same distinction applies to VPN. Describing an IKEv2 profile is ordinary application code. Shipping the right frameworks, entitlements, services, background modes, provisioning, and native targets is the feature.
+In 2019, a reader asked whether our WhatsApp clone included VoIP. [I said no](/blog/whatsapp-clone-ga/#comment-24081). It would require native integration, and the setup was too much for that project. For years, that was the line.
 
-[PR #5604](https://github.com/codenameone/CodenameOne/pull/5604) adds first-class call management, VoIP push handling, and VPN management. The API matters, but the more interesting part is what happens after Maven sees that the application uses it. Codename One's builders inspect the referenced packages and assemble a different native product around the same Java application. Code that never imports the feature does not inherit its permissions or binary weight.
+VPN sat behind the same line. These features do not live neatly inside the application process. On iOS, a VoIP push can arrive before the application installs a Java listener, yet CallKit expects the incoming call to reach the lock screen on its deadline. A Call Directory integration is a separate extension executable with its own lifecycle and signing identity. Managed VPN adds Network Extension entitlements and profile rules. Android solves the same jobs through `ConnectionService`, `VpnManager`, `VpnService`, manifest declarations, and foreground-service rules.
 
-That build layer is Codename One's quiet advantage. It lets us reach platform APIs that do not fit inside a lowest-common-denominator runtime while keeping one application codebase and one UI architecture.
+Wrapping those APIs in Java is the small part. A cross-platform runtime cannot add a service before installation, answer a native callback before the application is ready, or create and sign another executable inside the application bundle. Once every team must maintain those pieces in Xcode and Android Studio, the shared abstraction has stopped at the hardest part.
+
+Codename One has a secret weapon for that problem: builders.
+
+Builders already assemble the native product, so they can change its shape based on the Java packages the application actually uses. They link frameworks, inject permissions and background modes, generate native delegates and services, and create extension targets when needed. Leave a package out and its native machinery stays out too.
+
+[PR #5604](https://github.com/codenameone/CodenameOne/pull/5604) is where we crossed that old line. It adds first-class call management, VoIP push handling, managed VPN, and raw packet tunneling on Android. The Java API is the visible result. The bigger change is that builders assemble the system integration around it without turning every application team into the maintainer of two native build projects.
 
 ## TL;DR
 
@@ -131,7 +137,7 @@ That is an inconvenient sentence for a launch post, which is precisely why it be
 
 A browser application cannot register CallKit, a self-managed Android connection service, or an Apple Network Extension. Flutter, React Native, and .NET MAUI can reach those APIs through native plugins and platform projects. The difficult work then lives in target membership, manifests, entitlements, background modes, native delegates, and signing.
 
-Codename One's builders are the secret weapon here. The build server already owns the native product graph. It can see which Java packages survive into the application and generate the platform pieces that match them:
+Builders change where that difficult work lives. The build server already owns the native product graph. It can see which Java packages survive into the application and generate the platform pieces that match them:
 
 {{< mermaid >}}
 flowchart LR
