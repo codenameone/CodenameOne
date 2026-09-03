@@ -2304,46 +2304,38 @@ To force an update check, run `mvn cn1:update` from the project root.
 
 ==== How does it work
 
-// vale-skip: Microsoft.Contractions: "of it is simple" parses as the prepositional phrase "of it" plus the predicate "is simple"; collapsing it to "of it's" would read as a possessive ("of its simple") and lose the meaning.
-You can see the full code https://github.com/codenameone/UpdateCodenameOne[here] the gist of it is simple. You create a jar called `UpdateCodenameOne.jar` under `~/.codenameone` (`~` represents the users home directory).
+`mvn cn1:update` does two separate things.
 
-An update happens by running this tool with a path to a Codename One project for example:
+First it makes sure `~/.codenameone/UpdateCodenameOne.jar` is there -- installed
+from a resource bundled in the plugin, or downloaded if that resource is missing
+-- and runs it. That's what keeps the shared tooling and the device skins under
+`~/.codenameone` current, and it's why the download happens once per machine
+rather than once per project. It no longer runs against your project directory,
+which is why a Maven project has no jars of its own to update: the plugin hands it
+a synthetic directory under `common/target/codenameone/update-dummy`, seeded with
+the project's `codenameone_settings.properties`. It's under `common` because that
+module holds `codenameone_settings.properties` and is therefore the one the plugin
+treats as the Codename One project; run from the root, the aggregator skips itself
+and `common` does the work.
 
-[source,bash]
-----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.sh[tag=advanced-topics-under-the-hood-bash-002,indent=0]
-----
+Then it reads the plugin's Maven metadata, resolves the newest published release
+and rewrites the `cn1.version` and `cn1.plugin.version` properties in the pom.
 
-For example:
+Which metadata it reads depends on the project. Releases are published to
+https://repo.codenameone.com/maven2[the Codename One repository], and the mojo
+uses it only when the project declares that host in BOTH `<repositories>` and
+`<pluginRepositories>`. A project that declares it in one section only, or in
+neither, is offered what Maven Central holds instead -- and Central keeps every
+version published before the cutover but receives no new ones, so such a project
+is told it's up-to-date at the last pre-cutover release however long it waits. The build log says so
+when it happens. Adding the repository to both sections is the fix. The framework and plugin artifacts for that version then
+resolve on the next build like any other dependency. The Resource Editor doesn't:
+it's a separate artifact of around 43MB that's fetched when you run
+`mvn cn1:designer`.
 
-----
-java -jar ~/.codenameone/UpdateCodenameOne.jar ~/dev/AccordionDemo
-Checking: JavaSE.jar
-Checking: CodeNameOneBuildClient.jar
-Checking: CLDC11.jar
-Checking: CodenameOne.jar
-Checking: CodenameOne_SRC.jar
-Checking: designer_1.jar
-Checking: guibuilder_1.jar
-Updating the file: /Users/shai/dev/AccordionDemo/JavaSE.jar
-Updating the file: /Users/shai/dev/AccordionDemo/CodeNameOneBuildClient.jar
-Updating the file: /Users/shai/dev/AccordionDemo/lib/CLDC11.jar
-Updating the file: /Users/shai/dev/AccordionDemo/lib/CodenameOne.jar
-Updated project files
-----
-
-Notice that no download happened since the files were up-to-date. You can also force a check against the server by adding the force argument as such:
-
-[source,bash]
-----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.sh[tag=advanced-topics-under-the-hood-bash-003,indent=0]
-----
-
-The way this works under the hood is thought a `Versions.properties` within your directory that lists the versions of local files. That way you know what should be updated.
-
-TIP: Exclude `Versions.properties` from Git
-
-Under the `~/.codenameone` directory you have a more detailed `UpdateStatus.properties` file that includes versions of the locally downloaded files. Notice you can delete this file and it will be recreated as all the jars get downloaded over again.
+A project pinned to a `-SNAPSHOT` keeps its version, because a snapshot already
+tracks the newest build. To move to a particular release rather than the newest
+one, name it: `mvn cn1:update -DnewVersion=X.Y.Z`.
 
 ==== What isn't covered
 
