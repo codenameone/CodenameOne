@@ -107,7 +107,7 @@ class IoJava153Snippet {
     
     public class Meeting implements PropertyBusinessObject {
     // tag::io-java-153[]
-    public final Property<String,Meeting> subject = new Property<>("subject", "") {
+    public final Property<String,Meeting> subject = new Property<String, Meeting>("subject", "") {
          public Meeting set(String value) {
              if(value == null) {
                 return Meeting.this;
