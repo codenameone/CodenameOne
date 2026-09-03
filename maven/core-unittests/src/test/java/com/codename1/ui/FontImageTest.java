@@ -85,6 +85,45 @@ class FontImageTest extends UITestBase {
         assertEquals("e", getPrivateString(button.getDisabledIcon(), "text"));
     }
 
+    @FormTest
+    void testMaterialIconsOfTheSameSizeShareOneDerivedFont() {
+        Style s = new Style();
+        FontImage a = FontImage.createMaterial(FontImage.MATERIAL_ADD, s, 4f);
+        FontImage b = FontImage.createMaterial(FontImage.MATERIAL_CLOSE, s, 4f);
+        assertSame(a.getFont(), b.getFont(),
+                "icons of the same size must share one derived font: deriving per icon "
+                + "builds a native font per icon");
+    }
+
+    @FormTest
+    void testMaterialFontCacheIsDroppedWhenTheBaseFontChanges() throws Exception {
+        Style s = new Style();
+        Font first = FontImage.createMaterial(FontImage.MATERIAL_ADD, s, 4f).getFont();
+        // A DIFFERENT icon font, not merely a re-created one: clearing the field
+        // and letting it rebuild hands back the same cached instance, and the
+        // sizes derived from it are then still correct.
+        Field field = FontImage.class.getDeclaredField("materialDesignFont");
+        field.setAccessible(true);
+        field.set(null, Font.createTrueTypeFont("OtherIcons", "other.ttf"));
+        Font second = FontImage.createMaterial(FontImage.MATERIAL_ADD, s, 4f).getFont();
+        assertNotSame(first, second,
+                "a different icon font must invalidate every size derived from the old one");
+    }
+
+    @FormTest
+    void testMaterialFontSurvivesTheSoftReferenceBeingCleared() throws Exception {
+        Style s = new Style();
+        Font first = FontImage.createMaterial(FontImage.MATERIAL_ADD, s, 4f).getFont();
+        // What a low-memory device does to the cache. The next call must rebuild
+        // it rather than hand back null.
+        Field field = FontImage.class.getDeclaredField("materialByPixels");
+        field.setAccessible(true);
+        field.set(null, null);
+        Font second = FontImage.createMaterial(FontImage.MATERIAL_ADD, s, 4f).getFont();
+        assertNotNull(second);
+        assertEquals(first.getPixelSize(), second.getPixelSize(), 0.001f);
+    }
+
     private int getPrivateInt(Object target, String name) {
         try {
             Field field = FontImage.class.getDeclaredField(name);
