@@ -616,6 +616,43 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aReusedOperationAsksItsProvidersAgainForEachDrag() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            final int[] calls = {0};
+            ClipboardContent content = new ClipboardContent()
+                    .setDataProvider(ClipboardContent.MIME_FILE, new ClipboardDataProvider() {
+                        public Object getClipboardData(String mimeType) {
+                            calls[0]++;
+                            return "/tmp/drag-" + calls[0] + ".pdf";
+                        }
+                    });
+            // The instance a component installs once and is dragged with again and again.
+            NativeDragOperation op = new NativeDragOperation(content);
+
+            assertTrue(NativeDragAndDrop.startDrag(null, op));
+            assertEquals("/tmp/drag-1.pdf", op.getContent().getFiles()[0]);
+            assertEquals("/tmp/drag-1.pdf", op.getContent().getFiles()[0],
+                    "within one drag the provider is asked once: a drop queries and then reads, "
+                            + "and the promised file must not be written twice");
+            assertEquals(1, calls[0]);
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
+            flushSerialCalls();
+
+            assertTrue(NativeDragAndDrop.startDrag(null, op));
+            assertEquals("/tmp/drag-2.pdf", op.getContent().getFiles()[0],
+                    "and the next drag gets its own: the file the first one wrote may have been "
+                            + "cleaned up by now, and publishing that path again publishes nothing");
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aSecondDragIsRefusedWhileOneIsStillRunning() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

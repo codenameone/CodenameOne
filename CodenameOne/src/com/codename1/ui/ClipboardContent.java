@@ -118,9 +118,29 @@ public class ClipboardContent {
         return value;
     }
 
-    /// A provider plus the value it produced. The value is resolved once and remembered, so a
-    /// target that asks twice -- as a drop does when it queries and then reads -- does not run
-    /// the provider twice and does not, for instance, write the promised file twice.
+    /// Forgets every value a provider has produced, so the next transfer asks for it again.
+    ///
+    /// Resolving once is right *within* a transfer -- a drop queries and then reads, and the
+    /// promised file must not be written twice -- but not beyond one. A component may install
+    /// a single `NativeDragOperation` and be dragged again and again, and a provider that
+    /// generates a temporary file would then have published, on the second drag, a path from
+    /// the first: stale, or by then cleaned up and gone.
+    ///
+    /// Called where an operation is armed for a new session; see
+    /// `NativeDragOperation#resetProvidedValues()`.
+    void resetProvidedValues() {
+        for (int iter = 0; iter < values.size(); iter++) {
+            Object value = values.get(iter);
+            if (value instanceof LazyValue) {
+                ((LazyValue) value).forget();
+            }
+        }
+    }
+
+    /// A provider plus the value it produced. The value is resolved once per transfer and
+    /// remembered, so a target that asks twice -- as a drop does when it queries and then
+    /// reads -- does not run the provider twice and does not, for instance, write the
+    /// promised file twice. `#resetProvidedValues()` is what ends a transfer's memory.
     private static final class LazyValue {
         private final ClipboardDataProvider provider;
         private Object resolved;
@@ -136,6 +156,11 @@ public class ClipboardContent {
                 resolved = provider.getClipboardData(mimeType);
             }
             return resolved;
+        }
+
+        synchronized void forget() {
+            done = false;
+            resolved = null;
         }
     }
 

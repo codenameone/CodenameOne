@@ -319,6 +319,21 @@ public class NativeDragOperation {
         performedAction = ACTION_NONE;
     }
 
+    /// Forgets the values this operation's providers produced for the drag before.
+    ///
+    /// The same instance is offered for every drag of the component that owns it, and a
+    /// provider is asked once per transfer -- so without this the second drag published
+    /// whatever the first one produced, which for a provider that writes a temporary file is
+    /// a path that has since been cleaned up.
+    ///
+    /// Separate from `#resetPerformedAction()` because the two are wanted at different
+    /// moments: a port that begins the session itself reads the payload the instant it is
+    /// told the drag started, so the values have to be forgotten before that, while the
+    /// outcome must not be cleared until the previous drag's completion has gone out.
+    void resetProvidedValues() {
+        content.resetProvidedValues();
+    }
+
     /// Records the outcome and notifies the completion listeners. Invoked by the port, on the
     /// event dispatch thread, when the native drag session ends.
     ///

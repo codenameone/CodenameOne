@@ -216,6 +216,8 @@ public final class NativeDragAndDrop {
         // belongs, so its listeners hear the drag that ended before the one beginning.
         deliverCompletion(op);
         op.resetPerformedAction();
+        // Before the port is asked to start, which is when it reads the payload.
+        op.resetProvidedValues();
         if (renderPreview && needsGeneratedImage(op) && source != null) {
             try {
                 // The same snapshot the gesture path renders, because this method documents the
@@ -320,6 +322,13 @@ public final class NativeDragAndDrop {
             targetGeneration++;
             currentAction = NativeDragOperation.ACTION_NONE;
         }
+        // Now, not queued: this runs on the platform's own thread and the port reads the
+        // payload the moment this returns -- through nativeDragSessionStartedCallback on
+        // iOS -- so anything the previous drag's providers produced has to be forgotten
+        // before that read, not after it. Forgetting it afterwards would be worse than not
+        // forgetting at all: a receiver reading a representation later in this same session
+        // would run the provider a second time and get a second file for one drag.
+        op.resetProvidedValues();
         // Queued rather than run here: this is the platform's own thread, and a completion
         // belongs to the event dispatch thread. Behind the callback dragCompleted queued for the
         // previous session, which is what puts that session's outcome before the reset arming
