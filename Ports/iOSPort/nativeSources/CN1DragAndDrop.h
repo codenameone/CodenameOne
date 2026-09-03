@@ -155,7 +155,10 @@ void CN1NativeDragDeliverDropAddFile(NSString* mimeType, NSString* path, NSStrin
 ///
 /// `local` is whether the drag being dropped is one this application started, taken when the
 /// drop began rather than when its loads finished -- by then the drag running may be another.
-int CN1NativeDragDeliverDropCommit(int x, int y, int action, BOOL local);
+/// `allowedActions` is the mask this session offered and `local` whether the drag is one this
+/// application started -- both taken when the drop began rather than when its loads finished,
+/// because by then the drag the framework remembers may be another one.
+int CN1NativeDragDeliverDropCommit(int x, int y, int action, int allowedActions, BOOL local);
 
 /// Produces one representation of a drag on demand. Returns nil when the operation that
 /// session belongs to can no longer supply it.

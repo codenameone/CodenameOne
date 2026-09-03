@@ -9387,13 +9387,14 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// Invoked from CN1DragAndDrop.m once every representation has arrived. Returns the action
     /// accepted, or zero when nothing under the pointer took it.
-    public static int nativeDropCommitCallback(int x, int y, int action, boolean local) {
+    public static int nativeDropCommitCallback(int x, int y, int action, int allowedActions,
+            boolean local) {
         ClipboardContent content = pendingDrop == null ? new ClipboardContent() : pendingDrop;
         pendingDrop = null;
-        // Whether *this* drop came from a drag this application started, which the native side
-        // knew when the drop began. Asking now would ask about whichever drag is running by the
-        // time a slow item provider finished loading, and that can be a different one.
-        return NativeDragAndDrop.drop(0, x, y, content, action, local);
+        // What *this* drop was offering and where it came from, both taken by the native side
+        // when the drop began. Asking now would ask about whichever drag is running by the time
+        // a slow item provider finished loading, and that can be a different one.
+        return NativeDragAndDrop.drop(0, x, y, content, action, allowedActions, local);
     }
 
     /// Invoked from CN1DragAndDrop.m when UIKit starts a drag session. Hands the payload down

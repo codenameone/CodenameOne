@@ -315,6 +315,21 @@ class JavaSENativeDragAndDropTest {
     }
 
     @Test
+    void hoveringDoesNotConsumeAStreamedUriList() throws Exception {
+        DataFlavor uriStream = new DataFlavor("text/uri-list;class=java.io.InputStream");
+        FakeTransferable t = new FakeTransferable()
+                .add(uriStream, new ByteArrayInputStream(
+                        (new File("/tmp/a.txt").toURI() + "\r\n").getBytes("UTF-8")));
+
+        JavaSENativeDragAndDrop.contentFor(t, t.getTransferDataFlavors(), false);
+        JavaSENativeDragAndDrop.contentFor(t, t.getTransferDataFlavors(), false);
+        assertEquals(0, t.reads,
+                "the description is rebuilt for every drag event, so reading a one-shot source "
+                        + "to classify it spends it on the first hover and leaves the drop with "
+                        + "nothing");
+    }
+
+    @Test
     void aFileUriListIsStillAFileDragWhileItHovers() throws Exception {
         DataFlavor uriList = new DataFlavor("text/uri-list;class=java.lang.String");
         FakeTransferable t = new FakeTransferable()

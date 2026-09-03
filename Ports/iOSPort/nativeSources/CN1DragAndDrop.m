@@ -825,6 +825,9 @@ API_AVAILABLE(ios(11.0))
     // the external drop's action. Two local drops cannot overlap -- the framework runs one drag
     // at a time and a local drop's completion is what ends it -- so this is the whole of it.
     const BOOL localAssembly = (session.localDragSession != nil);
+    // The mask this session offers, taken now. By the time a slow provider has finished the
+    // framework's own memory of it belongs to whatever drag is running then.
+    const int sessionActions = cn1AllowedActionsFor(session);
     if (localAssembly) {
         cn1LocalDropInFlight = YES;
         cn1EndDeferred = NO;
@@ -933,11 +936,23 @@ API_AVAILABLE(ios(11.0))
                                             completionHandler:^(NSData* data, NSError* error) {
                 if (data != nil) {
                     @synchronized (collected) {
-                        if ([collected objectForKey:mime] == nil) {
+                        NSArray* existing = [collected objectForKey:mime];
+                        if (existing == nil) {
                             // The identifier is kept beside the bytes because it is what says
                             // how to read them: several standard text UTIs map to the same MIME
                             // type and disagree about the encoding.
                             [collected setObject:@[data, uti] forKey:mime];
+                        } else if ([mime isEqualToString:@"text/uri-list"]) {
+                            // A URI list is a list. Several public.url items all arrive under
+                            // this one type, and keeping whichever asynchronous load happened to
+                            // finish first threw away every URL the user dragged but one. RFC
+                            // 2483 separates them with CRLF, which is what everything else here
+                            // writes and reads.
+                            NSMutableData* joined =
+                                    [NSMutableData dataWithData:[existing objectAtIndex:0]];
+                            [joined appendBytes:"\r\n" length:2];
+                            [joined appendData:data];
+                            [collected setObject:@[joined, [existing objectAtIndex:1]] forKey:mime];
                         }
                     }
                 }
@@ -984,7 +999,7 @@ API_AVAILABLE(ios(11.0))
         // begun since -- the newer target is sent an exit and its next update re-enters it, a
         // flicker that repairs itself. Withholding the commit instead would lose a drop the
         // user actually performed, and unperformed work is worse than a repaired frame.
-        int accepted = CN1NativeDragDeliverDropCommit(x, y, action, localAssembly);
+        int accepted = CN1NativeDragDeliverDropCommit(x, y, action, sessionActions, localAssembly);
         cn1LastDropAction = CN1_DND_ACTION_NONE;
         // This assembly's commit cleared the hover state itself, so its own end -- which went
         // past long ago -- can stop holding off. Only this one: another drop still loading is

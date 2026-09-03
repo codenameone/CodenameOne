@@ -499,7 +499,12 @@ final class JavaSENativeDragAndDrop {
         }
         for (int iter = 0; iter < flavors.length; iter++) {
             DataFlavor flavor = flavors[iter];
-            if (!ClipboardContent.MIME_URI_LIST.equals(mimeFor(flavor))) {
+            if (!ClipboardContent.MIME_URI_LIST.equals(mimeFor(flavor))
+                    || !String.class.equals(flavor.getRepresentationClass())) {
+                // Only the spelling that can be read twice. This runs on every drag event --
+                // the description is rebuilt for each one -- so consuming a stream here would
+                // spend a one-shot source on the first hover and leave the drop with nothing.
+                // A String flavor hands back the same string however often it is asked.
                 continue;
             }
             Object value = readValue(transferable, flavor, ClipboardContent.MIME_URI_LIST);

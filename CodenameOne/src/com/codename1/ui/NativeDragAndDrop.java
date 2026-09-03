@@ -713,10 +713,12 @@ public final class NativeDragAndDrop {
     /// the pointer took the drop and the port should report the transfer as failed
     public static int drop(int windowId, int x, int y, ClipboardContent content, int action) {
         boolean local;
+        int advertised;
         synchronized (LOCK) {
             local = active != null;
+            advertised = advertisedActions;
         }
-        return drop(windowId, x, y, content, action, local);
+        return drop(windowId, x, y, content, action, advertised, local);
     }
 
     /// Delivers a native drop whose origin the port knows.
@@ -730,23 +732,35 @@ public final class NativeDragAndDrop {
     ///
     /// #### Parameters
     ///
+    /// - `advertisedActions`: the mask *this* drag offered, or `NativeDragOperation#ACTION_NONE`
+    ///   to use whatever the last drag event advertised. Carried for the same reason as the
+    ///   locality beside it: a newer drag has since overwritten what the framework remembers,
+    ///   and giving this drop that newer mask made its event report an action the source never
+    ///   offered -- or, when the newer drag is narrower, report nothing accepted at all while
+    ///   the platform had been told the drop succeeded.
+    ///
     /// - `local`: true when the drag being dropped is one this application started
     ///
     /// #### Returns
     ///
     /// the action actually accepted, or `NativeDragOperation#ACTION_NONE`
     public static int drop(int windowId, int x, int y, ClipboardContent content, int action,
-            boolean local) {
+            int advertisedActions, boolean local) {
         Component target = findTarget(windowId, x, y, content, action);
         int accepted;
         Component previous;
         int advertised;
         synchronized (LOCK) {
-            // What the drag has been advertising all along. A drop arriving with no drag
-            // event before it -- which no real port does -- has only the port's one action
-            // to report.
-            advertised = advertisedActions == NativeDragOperation.ACTION_NONE
-                    ? action : advertisedActions;
+            // What this drag advertised: the caller's answer where it has one, otherwise what
+            // the last drag event said. A drop arriving with neither -- which no real port
+            // does -- has only the port's one action to report.
+            advertised = advertisedActions;
+            if (advertised == NativeDragOperation.ACTION_NONE) {
+                advertised = NativeDragAndDrop.advertisedActions;
+            }
+            if (advertised == NativeDragOperation.ACTION_NONE) {
+                advertised = action;
+            }
             previous = currentTarget;
             if (target != null && target == currentTarget) { // NOPMD CompareObjectsWithEquals
                 // The target's own latest word, not a recomputation from the action the port

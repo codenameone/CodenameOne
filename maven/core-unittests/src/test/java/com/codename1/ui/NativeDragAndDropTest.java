@@ -878,6 +878,57 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDropAssembledLateReportsItsOwnActionsRatherThanTheNewDragS() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            DropRecorder hovered = new DropRecorder();
+            DropRecorder target = new DropRecorder();
+            hovered.setNativeDropTarget(true);
+            target.setNativeDropTarget(true);
+            hovered.setPreferredSize(new com.codename1.ui.geom.Dimension(40, 40));
+            target.setPreferredSize(new com.codename1.ui.geom.Dimension(40, 40));
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.NORTH, hovered);
+            form.add(BorderLayout.SOUTH, target);
+            form.revalidate();
+            final NativeDropEvent[] seen = { null };
+            target.addNativeDropListener(new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(ActionEvent ev) {
+                    if (ev.getEventType() == ActionEvent.Type.NativeDrop) {
+                        seen[0] = (NativeDropEvent) ev;
+                    }
+                }
+            });
+
+            // A move-only drag of our own is hovering elsewhere by the time a copy-only drop
+            // that arrived from another application finishes loading. It has overwritten what
+            // the framework remembers of the earlier one.
+            NativeDragAndDrop.dragEnter(0, hovered.getAbsoluteX() + 5, hovered.getAbsoluteY() + 5,
+                    textContent("ours"), NativeDragOperation.ACTION_MOVE);
+            flushSerialCalls();
+            NativeDragAndDrop.drop(0, target.getAbsoluteX() + 5, target.getAbsoluteY() + 5,
+                    textContent("theirs"), NativeDragOperation.ACTION_COPY,
+                    NativeDragOperation.ACTION_COPY, false);
+            flushSerialCalls();
+
+            assertNotNull(seen[0]);
+            assertEquals(NativeDragOperation.ACTION_COPY, seen[0].getAllowedActions(),
+                    "the drop reports what its own drag offered, not what the drag that has "
+                            + "since started offers");
+            assertEquals(NativeDragOperation.ACTION_COPY, seen[0].getAcceptedAction(),
+                    "and the copy it is performing is accepted rather than measured against a "
+                            + "move-only mask and refused outright");
+        } finally {
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aDropAssembledLateIsNotLocalJustBecauseADragIsRunning() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);
@@ -900,7 +951,7 @@ class NativeDragAndDropTest extends UITestBase {
             assertTrue(NativeDragAndDrop.startDrag(null,
                     new NativeDragOperation("ours, and still going")));
             NativeDragAndDrop.drop(0, x, y, textContent("theirs"),
-                    NativeDragOperation.ACTION_COPY, false);
+                    NativeDragOperation.ACTION_COPY, NativeDragOperation.ACTION_COPY, false);
             flushSerialCalls();
 
             assertEquals(Boolean.FALSE, seen[0],
