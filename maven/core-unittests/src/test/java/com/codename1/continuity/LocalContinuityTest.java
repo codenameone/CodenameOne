@@ -1733,6 +1733,31 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * The continuation label is the previous user's, and clear() is the logout path. Withdrawing
+     * the advertised activity is not enough: the label is a field that outlives it, so the first
+     * checkpoint afterwards -- a login screen, or the next account's opening route -- published
+     * it again to every device around them.
+     */
+    @EdtTest
+    public void logoutForgetsTheContinuationLabel() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setTitle("Invoice 2031 for Dana");
+        Continuity.routeStackChanged();
+        Continuity.checkpoint();
+
+        Continuity.clear();
+
+        assertNull(Continuity.getTitle(), "the previous account's label survived the logout");
+
+        // And the next account's first checkpoint must not carry it either.
+        Continuity.routeStackChanged();
+        Continuity.checkpoint();
+        assertNull(bridge.getPublishedTitle(),
+                "the first checkpoint after logout re-advertised the previous user's label");
+    }
+
+    /**
      * A checkpoint whose write failed is still owed. `dirty` is cleared on the way in, so leaving
      * it clear told the next suspend there was nothing to save -- a checkpoint lost to a full
      * disk was never retried and the app came back to the last write that had succeeded.

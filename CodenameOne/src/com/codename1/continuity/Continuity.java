@@ -892,6 +892,17 @@ public final class Continuity {
     public static void clear() {
         parked = null;
         dirty = false;
+        // The label goes with the work it describes. It is CONTENT, not configuration -- "Draft
+        // to Dana", "Invoice 2031", read at every checkpoint -- so leaving it behind meant the
+        // first checkpoint after a logout, a login screen or the next account's opening route,
+        // re-advertised the previous user's label to every device around them. Withdrawing the
+        // current activity below is not enough on its own: the field outlives it and the next
+        // publish puts it straight back.
+        //
+        // The configuration is deliberately left alone: the provider, the relay, autoRestore,
+        // maxAge and this device's id are how the application is wired, not what the last user
+        // was doing, and an app would have to install them all again after every logout.
+        title = null;
         // Anything queued for the relay belonged to the account that just signed out, and a relay
         // reads its credentials when the request runs rather than when it was queued -- so a state
         // left here would have gone out under the NEXT account's token. The session is ended too,
