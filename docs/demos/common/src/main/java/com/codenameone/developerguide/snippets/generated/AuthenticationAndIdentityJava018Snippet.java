@@ -87,7 +87,12 @@ class AuthenticationAndIdentityJava018Snippet {
         // tag::authentication-and-identity-java-018[]
         FacebookConnect.getInstance().signIn(
             "FB_APP_ID",
-            "com.example.app:/oauth2redirect",
+            // This flow is for the simulator and the web port, where the
+            // response comes back through the browser, so the redirect is an
+            // https URL registered with Facebook. A native Android or iOS build
+            // registers a custom scheme instead, as the OidcClient samples above
+            // do -- match the redirect to the target you are building.
+            "https://example.com/oauth2redirect",
             "public_profile", "email"
         ).ready(new SuccessCallback<OidcTokens>() {
             public void onSucess(OidcTokens t) {
