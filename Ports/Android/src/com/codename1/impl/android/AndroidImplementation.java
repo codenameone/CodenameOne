@@ -5737,9 +5737,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (keycode == AndroidImplementation.DROID_IMPL_KEY_BACK) {
                 switch (event.getAction()) {
                     case KeyEvent.ACTION_DOWN:
+                        // Claim the gesture so the activity's
+                        // OnBackInvokedCallback stands down; on Android 16 the
+                        // platform can deliver both for one press. See
+                        // PredictiveBackBridge.
+                        PredictiveBackBridge.keyEventBackStarted();
                         Display.getInstance().keyPressed(keycode);
                         break;
                     case KeyEvent.ACTION_UP:
+                        PredictiveBackBridge.keyEventBackFinished();
                         Display.getInstance().keyReleased(keycode);
                         break;
                 }
@@ -5899,11 +5905,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 if (keycode == AndroidImplementation.DROID_IMPL_KEY_BACK || 
                                     (keycode == KeyEvent.KEYCODE_MENU && 
                                         Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE)) {
+                                    boolean backKey =
+                                            keycode == AndroidImplementation.DROID_IMPL_KEY_BACK;
                                     switch (event.getAction()) {
                                         case KeyEvent.ACTION_DOWN:
+                                            // Claim the gesture so the
+                                            // activity's OnBackInvokedCallback
+                                            // stands down; on Android 16 the
+                                            // platform can deliver both for one
+                                            // press. See PredictiveBackBridge.
+                                            if (backKey) {
+                                                PredictiveBackBridge.keyEventBackStarted();
+                                            }
                                             Display.getInstance().keyPressed(keycode);
                                             break;
                                         case KeyEvent.ACTION_UP:
+                                            if (backKey) {
+                                                PredictiveBackBridge.keyEventBackFinished();
+                                            }
                                             Display.getInstance().keyReleased(keycode);
                                             break;
                                     }
@@ -11849,6 +11868,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             int keycode = event.getKeyCode();
             keycode = CodenameOneView.internalKeyCodeTranslate(keycode);
             if (keycode == AndroidImplementation.DROID_IMPL_KEY_BACK) {
+                // Claim the gesture so the activity's OnBackInvokedCallback
+                // stands down; on Android 16 the platform can deliver both for
+                // one press. See PredictiveBackBridge. The claim brackets the
+                // DOWN and the UP even though this path answers each of them
+                // with a whole press/release pair of its own.
+                switch (event.getAction()) {
+                    case KeyEvent.ACTION_DOWN:
+                        PredictiveBackBridge.keyEventBackStarted();
+                        break;
+                    case KeyEvent.ACTION_UP:
+                        PredictiveBackBridge.keyEventBackFinished();
+                        break;
+                    default:
+                        break;
+                }
                 Display.getInstance().keyPressed(keycode);
                 Display.getInstance().keyReleased(keycode);
                 return true;

@@ -200,6 +200,15 @@
       ]
     },
     {
+      "id": "system-back-navigation",
+      "category": "Input and lifecycle",
+      "name": "System back navigation",
+      "description": "Checks that the platform's system back action reaches the current form's back command.",
+      "tests": [
+        "SystemBackNavigationTest"
+      ]
+    },
+    {
       "id": "status-bar-events",
       "category": "Input and lifecycle",
       "name": "Status-bar tap events",
@@ -800,6 +809,9 @@
     }
   ],
   "test_scopes": {
+    "SystemBackNavigationTest": [
+      "android"
+    ],
     "WindowLayoutTest": [
       "linux-x64",
       "linux-arm64",

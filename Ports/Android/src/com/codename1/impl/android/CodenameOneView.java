@@ -586,6 +586,16 @@ public class CodenameOneView {
                     && Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE) {
                 return false;
             }
+            if (keyCode == AndroidImplementation.DROID_IMPL_KEY_BACK) {
+                // Claim the gesture so the activity's OnBackInvokedCallback
+                // stands down; on Android 16 the platform can deliver both for
+                // one press. See PredictiveBackBridge.
+                if (down) {
+                    PredictiveBackBridge.keyEventBackStarted();
+                } else {
+                    PredictiveBackBridge.keyEventBackFinished();
+                }
+            }
             if (down) {
                 Display.getInstance().keyPressed(keyCode);
             } else {

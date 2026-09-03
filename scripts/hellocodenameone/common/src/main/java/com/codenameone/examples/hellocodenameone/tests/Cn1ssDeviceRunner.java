@@ -234,6 +234,18 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     // every test ends up in the jar without platform-dependent initialization.
     private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
             new MainScreenScreenshotTest(),
+            // Second, and deliberately near the front: it is the only test
+            // whose input comes from OUTSIDE the app process. The
+            // instrumentation harness watches the log for the probe's
+            // announcement and injects one system back for it, and its own wait
+            // is capped well below the length of a full suite -- a back test at
+            // the end of the list would be reached after that cap had expired,
+            // and the assertion would never run at all. Failing here is also
+            // the loudest place to fail: an unmigrated port leaves the app on a
+            // back press, so nothing after this point produces any output.
+            // Takes no screenshot; every port but Android skips it for want of
+            // a system back action.
+            new SystemBackNavigationTest(),
             // Advertising API: renders a banner + native-ad feed via the
             // deterministic MockAdProvider (cn1-ads-mock) for a pixel-stable shot.
             new AdsScreenshotTest(),
