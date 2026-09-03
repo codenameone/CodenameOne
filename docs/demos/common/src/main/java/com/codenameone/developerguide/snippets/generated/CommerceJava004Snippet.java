@@ -85,17 +85,24 @@ class CommerceJava004Snippet {
     
     void snippet() throws Exception {
         // tag::commerce-java-004[]
-        new Thread(() -> {
-            cm.refresh();
-            // refresh() returns on the worker thread. Reading the entitlement
-            // and unlocking the UI has to hop back to the event dispatch
-            // thread, because Codename One UI calls are only legal there.
-            CN.callSerially(() -> {
-                if (cm.isEntitled("pro")) {
-                    // unlock the paid features here
-                }
-            });
-        }).start();
+        // Purchase submits a new receipt to the receipt store asynchronously,
+        // and refresh() only validates the receipts already stored. Called
+        // straight after a purchase it would not see the new one, and nothing
+        // retries it later, so chain it off the synchronization instead.
+        Purchase.getInAppPurchase().synchronizeReceipts(0, synced -> {
+            // This callback arrives on the EDT and refresh() blocks on the
+            // network, so it needs a thread of its own.
+            new Thread(() -> {
+                cm.refresh();
+                // Back to the EDT to read the entitlement and touch the UI:
+                // Codename One UI calls are only legal there.
+                CN.callSerially(() -> {
+                    if (cm.isEntitled("pro")) {
+                        // unlock the paid features here
+                    }
+                });
+            }).start();
+        });
         // end::commerce-java-004[]
     }
 

@@ -85,6 +85,11 @@ class CommerceJava001Snippet {
     
     void snippet() throws Exception {
         // tag::commerce-java-001[]
+        // With no cloud answer -- a build without commerce, an offline start, a
+        // degraded account -- isEntitled falls back to asking the store for a
+        // subscription with this same id. Give at least one granting product a
+        // SKU equal to the entitlement id if that offline path has to unlock,
+        // because the cloud's entitlement-to-SKU mapping is not on the device.
         if (CommerceManager.getInstance().isEntitled("pro")) {
             // unlock pro features
         }

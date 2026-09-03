@@ -92,9 +92,14 @@ class MonetizationJava036Snippet {
      Storage s = Storage.getInstance();
      boolean stored;
      synchronized(RECEIPTS_KEY) {
+     // Same guard as fetchReceipts(): readObject() answers null when the
+     // entry cannot be read or deserialized, and this runs inside
+     // synchronizeReceipts(), so throwing here would leave synchronization
+     // marked in progress for the rest of the session.
      List<Receipt> receipts;
-     if (s.exists(RECEIPTS_KEY)) {
-     receipts = (List<Receipt>)s.readObject(RECEIPTS_KEY);
+     Object raw = s.exists(RECEIPTS_KEY) ? s.readObject(RECEIPTS_KEY) : null;
+     if (raw instanceof List) {
+     receipts = (List<Receipt>)raw;
      } else {
      receipts = new ArrayList<Receipt>();
      }
