@@ -18,9 +18,14 @@ Once enabled your `theme.res` file will regenerate from a CSS file that resides 
 
 Compiling CSS in a Maven project rewrites the build's `theme.res` in place. The
 compiler reads `src/main/css`, merges in whatever CSS the project's dependencies
-contribute, and writes the result as the theme the app loads. There's no second
-resource and nothing left underneath it, so a property you don't set in CSS is
-absent rather than inherited from something older.
+contribute, and writes the result as the theme the app loads. What it doesn't do
+is keep an older Designer resource underneath: there's no second file and no
+overlay involved.
+
+Something does sit beneath the compiled styles, though. The `theme.css` a new
+project starts with sets `includeNativeBool: true`, and `UIManager` installs the
+platform's native theme before it applies the compiled one, so a property you
+leave out of CSS can still arrive from there.
 
 Layering is a separate mechanism that you ask for explicitly. A theme constant
 named `OverlayThemes` holds a comma-separated list of resource names, each
