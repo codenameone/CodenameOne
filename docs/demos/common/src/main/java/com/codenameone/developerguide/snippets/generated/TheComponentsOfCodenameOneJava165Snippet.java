@@ -100,6 +100,10 @@ class TheComponentsOfCodenameOneJava165Snippet {
         InfiniteContainer ic = new InfiniteContainer() {
             @Override
             public Component[] fetchComponents(int index, int amount) {
+                if(index == 0) {
+                    // a pull to refresh asks for the start of the list again
+                    pageNumber = 1;
+                }
                 java.util.List<Map<String, Object>> data = fetchPropertyData("Leeds");
             if(data == null) { // the fetch failed, so there is nothing more to add
                 return null;
@@ -125,5 +129,8 @@ class TheComponentsOfCodenameOneJava165Snippet {
     }
 
     java.util.List<Map<String, Object>> fetchPropertyData(String t) { return new ArrayList<>(); }
+
+
+    int pageNumber = 1;
 
 }

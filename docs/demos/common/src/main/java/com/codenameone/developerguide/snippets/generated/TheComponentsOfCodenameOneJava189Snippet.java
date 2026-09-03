@@ -99,6 +99,7 @@ class TheComponentsOfCodenameOneJava189Snippet {
 
         class ImageList implements ListModel<Image> {
             private int selection;
+            private final java.util.List<SelectionListener> selectionListeners = new ArrayList<>();
             private String[] imageURLs = {
                 "http://awoiaf.westeros.org/images/thumb/9/93/AGameOfThrones.jpg/300px-AGameOfThrones.jpg",
                 "http://awoiaf.westeros.org/images/thumb/3/39/AClashOfKings.jpg/300px-AClashOfKings.jpg",
@@ -137,7 +138,12 @@ class TheComponentsOfCodenameOneJava189Snippet {
             }
 
             public void setSelectedIndex(int index) {
+                int old = selection;
                 selection = index;
+                // ImageViewer swaps the displayed image from this event
+                for(SelectionListener l : selectionListeners) {
+                    l.selectionChanged(old, index);
+                }
             }
 
             public void addDataChangedListener(DataChangedListener l) {
@@ -149,9 +155,11 @@ class TheComponentsOfCodenameOneJava189Snippet {
             }
 
             public void addSelectionListener(SelectionListener l) {
+                selectionListeners.add(l);
             }
 
             public void removeSelectionListener(SelectionListener l) {
+                selectionListeners.remove(l);
             }
 
             public void addItem(Image item) {
