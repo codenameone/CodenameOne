@@ -1185,21 +1185,20 @@ void CN1NativeDragDeliverCompleted(int action) {
             CN1_THREAD_GET_STATE_PASS_ARG action);
 }
 
-#if TARGET_OS_OSX
-/// The pasteboard type the bytes actually are, by magic number, or nil when
+/// The uniform type identifier the bytes actually are, by magic number, or nil when
 /// they are none of the three the Java side can hand us.
 ///
 /// IOSImplementation.clipboardImageBytes() takes ClipboardContent's MIME_PNG
 /// representation if it has one, else MIME_JPEG, else MIME_GIF -- so the bytes
 /// arriving here are frequently not PNG, and declaring them PNG makes every
 /// other application decode JPEG or GIF data as PNG.
-static NSString* cn1MacPasteboardImageType(NSData* data) {
+static NSString* cn1PasteboardImageUti(NSData* data) {
     if (data.length < 4) {
         return nil;
     }
     const unsigned char* b = (const unsigned char*)data.bytes;
     if (b[0] == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
-        return NSPasteboardTypePNG;
+        return @"public.png";
     }
     if (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) {
         return @"public.jpeg";
@@ -1208,6 +1207,35 @@ static NSString* cn1MacPasteboardImageType(NSData* data) {
         return @"com.compuserve.gif";
     }
     return nil;
+}
+
+/// The URL a MIME_FILE entry names, whichever way it was spelled.
+///
+/// ClipboardContent's file representation explicitly permits a raw local path, and
+/// URLWithString: turns one into a scheme-less relative URL whose isFileURL is NO. A
+/// receiver then gets no usable file reference, and neither UIPasteboard.URLs nor the
+/// Finder can see what was just published. An absolute path is obvious; a relative one --
+/// exports/report.pdf -- looks enough like a URL to be parsed as one, so anything that does
+/// not come back with a scheme is a path too.
+static NSURL* cn1PasteboardUrlFor(NSString* entry) {
+    if (entry.length == 0) {
+        return nil;
+    }
+    if ([entry hasPrefix:@"/"] || [entry hasPrefix:@"~"]) {
+        return [NSURL fileURLWithPath:[entry stringByExpandingTildeInPath]];
+    }
+    NSURL* url = [NSURL URLWithString:entry];
+    if (url == nil || url.scheme == nil) {
+        return [NSURL fileURLWithPath:entry];
+    }
+    return url;
+}
+
+#if TARGET_OS_OSX
+/// The same, as the pasteboard type name AppKit declares for it.
+static NSString* cn1MacPasteboardImageType(NSData* data) {
+    NSString* uti = cn1PasteboardImageUti(data);
+    return uti != nil && [uti isEqualToString:@"public.png"] ? NSPasteboardTypePNG : uti;
 }
 #endif
 
@@ -1262,20 +1290,10 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
             // means changing the bridge for both platforms rather than making
             // macOS disagree with iOS about what the separator means.
             //
-            // ClipboardContent.MIME_FILE's contract explicitly permits a raw
-            // local path, and URLWithString: turns one into a scheme-less
-            // relative URL whose isFileURL is NO. The Finder then gets no
-            // usable file reference, and getClipboardFileUris() -- which asks
-            // for file URLs only -- cannot read back what this just wrote.
-            NSURL* url;
-            if ([u hasPrefix:@"/"] || [u hasPrefix:@"~"]) {
-                url = [NSURL fileURLWithPath:[u stringByExpandingTildeInPath]];
-            } else {
-                url = [NSURL URLWithString:u];
-                if (url != nil && url.scheme == nil) {
-                    url = [NSURL fileURLWithPath:u];
-                }
-            }
+            // A raw local path is read as one rather than as a relative URL; see
+            // cn1PasteboardUrlFor, which is also what getClipboardFileUris() has to be
+            // able to read back, since it asks for file URLs only.
+            NSURL* url = cn1PasteboardUrlFor(u);
             if (url != nil) [urls addObject:url];
         }
         // Written as objects rather than as a type, which is what makes the
@@ -1299,18 +1317,44 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
     }
     if (image != JAVA_NULL) {
         NSData* imgData = arrayToData(image);
-        if (imgData != nil && imgData.length > 0) [item setObject:imgData forKey:@"public.png"];
+        if (imgData != nil && imgData.length > 0) {
+            // Under the type the bytes actually are. The Java side sends whichever of PNG,
+            // JPEG or GIF the content offered, and calling a JPEG public.png had every
+            // receiver -- this port's own reader included -- decode it as something it is
+            // not. Unrecognized bytes keep the old label, which is no worse than before.
+            NSString* imageUti = cn1PasteboardImageUti(imgData);
+            [item setObject:imgData forKey:imageUti == nil ? @"public.png" : imageUti];
+        }
     }
     NSMutableArray* items = [NSMutableArray array];
-    if ([item count] > 0) [items addObject:item];
     if (fileUris != JAVA_NULL) {
         NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG fileUris);
         for (NSString* u in [joined componentsSeparatedByString:@"\n"]) {
-            if (u.length == 0) continue;
-            NSData* urlData = [u dataUsingEncoding:NSUTF8StringEncoding];
-            if (urlData != nil) [items addObject:[NSDictionary dictionaryWithObject:urlData forKey:@"public.url"]];
+            // As an NSURL, not as the bytes of a string: a raw path is not a URL
+            // representation at all, and UIPasteboard.URLs and every other URL reader look
+            // for the object. See cn1PasteboardUrlFor.
+            NSURL* url = cn1PasteboardUrlFor(u);
+            if (url == nil) {
+                continue;
+            }
+            NSMutableDictionary* urlItem =
+                    [NSMutableDictionary dictionaryWithObject:url forKey:@"public.url"];
+            if ([item count] > 0) {
+                // The text, markup and image ride on the first URL rather than becoming an
+                // item of their own. An item is a copied *object*, so a document beside its
+                // text fallback as two items is two things on the pasteboard, and a receiver
+                // importing everything took the document *and* a stray piece of text instead
+                // of choosing the best form of one thing. The drag path has always done it
+                // this way; see registerDeclared in CN1DragAndDrop.m.
+                [urlItem addEntriesFromDictionary:item];
+                [item removeAllObjects];
+            }
+            [items addObject:urlItem];
         }
     }
+    // Whatever the alternatives were not able to ride on, which is the whole payload when
+    // the content named no files at all.
+    if ([item count] > 0) [items addObject:item];
     [UIPasteboard generalPasteboard].items = items;
     POOL_END();
 #endif
