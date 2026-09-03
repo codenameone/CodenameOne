@@ -90,6 +90,7 @@ class MonetizationJava036Snippet {
     @Override
     public void submitReceipt(Receipt receipt, SuccessCallback<Boolean> callback) {
      Storage s = Storage.getInstance();
+     boolean stored;
      synchronized(RECEIPTS_KEY) {
      List<Receipt> receipts;
      if (s.exists(RECEIPTS_KEY)) {
@@ -140,19 +141,31 @@ class MonetizationJava036Snippet {
 
      receipt.setExpiryDate(newExpiry);
      receipts.add(receipt);
-     s.writeObject(RECEIPTS_KEY, receipts);
+     stored = s.writeObject(RECEIPTS_KEY, receipts);
 
      }
-     // Make sure this is outside the synchronized block
-     callback.onSucess(Boolean.TRUE);
+     // Make sure this is outside the synchronized block. Report what the
+     // write actually did: on a failure Purchase would otherwise record the
+     // transaction as processed and drop it from the pending queue, losing a
+     // receipt the user paid for.
+     callback.onSucess(stored);
     }
 
-    // Two receipts are the same purchase when their transaction ids match. A
-    // null transaction id is not an identity, though: two distinct receipts
-    // can both carry one, so treating them as equal would silently drop the
-    // second purchase. Fall back to the fields that together identify a
-    // purchase -- the same comparison `Purchase.receiptsMatch()` makes.
+    // Two receipts are the same purchase when they come from the same store
+    // and carry the same transaction id. The store code is part of that
+    // identity because a transaction id is only unique within its own store,
+    // as Receipt#getTransactionId() says. A null transaction id is not an
+    // identity either: two distinct receipts can both carry one, so fall back
+    // to the fields that together identify a purchase.
+    //
+    // Purchase.receiptsMatch() compares one device's pending queue, where
+    // every receipt comes from the same store, so it can lean on the
+    // transaction id alone. A ReceiptStore holds receipts from every store
+    // and cannot.
     private static boolean sameReceipt(Receipt a, Receipt b) {
+     if (!Objects.equals(a.getStoreCode(), b.getStoreCode())) {
+     return false;
+     }
      String aTx = a.getTransactionId();
      String bTx = b.getTransactionId();
      if (aTx != null && bTx != null) {
@@ -162,7 +175,6 @@ class MonetizationJava036Snippet {
      return false;
      }
      return Objects.equals(a.getSku(), b.getSku())
-     && Objects.equals(a.getStoreCode(), b.getStoreCode())
      && Objects.equals(a.getPurchaseDate(), b.getPurchaseDate())
      && Objects.equals(a.getOrderData(), b.getOrderData());
     }

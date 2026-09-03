@@ -87,10 +87,18 @@ class AdvertisingJava004Snippet {
         // tag::advertising-java-004[]
         InterstitialAd ad = new InterstitialAd("ca-app-pub-xxx/yyy");
         ad.setAdListener(new AdListener() {
-            public void onLoaded() { ad.show(); }
+            // Do not show from onLoaded(): onDismissed() loads the next ad,
+            // which would then show itself the moment it arrives, and the user
+            // never escapes the sequence.
             public void onDismissed() { ad.load(); } // preload the next
         });
         ad.load();
+
+        // Show it where an ad belongs -- a natural break such as the end of a
+        // level -- and only if one is actually ready.
+        if (ad.isLoaded()) {
+            ad.show();
+        }
         // end::advertising-java-004[]
     }
 }
