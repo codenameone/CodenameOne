@@ -140,11 +140,13 @@ class IoJava095Snippet {
             @Override
             protected String childToDisplayLabel(Object child) {
                 String n = (String)child;
-                int pos = n.lastIndexOf("/");
+                // the paths above are built with the platform separator, which is
+                // a backslash on Windows
+                int pos = n.lastIndexOf(FileSystemStorage.getInstance().getFileSystemSeparator());
                 if(pos < 0) {
                     return n;
                 }
-                return n.substring(pos);
+                return n.substring(pos + 1);
             }
         };
         hi.add(BorderLayout.CENTER, t);
