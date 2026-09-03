@@ -90,7 +90,13 @@ class GameBuilderJava001Snippet {
                 // "/games/Level1.game", which resolves to null there. This is the
                 // path the editor's generated companion uses.
                 Display.getInstance().getResourceAsStream(MyScene.class, "/Level1.game"));
-        GameSceneView view = new GameSceneView(level, AssetCatalog.load(packsJson));
+        // load() only parses the pack definitions. resolveArt() is what loads the
+        // images, sheets and meshes they name, and the 2D constructor realizes
+        // sprites immediately -- so resolve before constructing, or the scene is
+        // built from placeholders and stays that way.
+        AssetCatalog catalog = AssetCatalog.load(packsJson);
+        catalog.resolveArt();
+        GameSceneView view = new GameSceneView(level, catalog);
         form.add(BorderLayout.CENTER, view);
         form.show();
         view.start();

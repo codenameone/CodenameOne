@@ -87,6 +87,14 @@ class GameDevelopmentJava004Snippet {
         // tag::game-development-java-004[]
         // in the card's per-frame animation; flip runs 0 -> 1 over ~0.4s
         flip += dt * 5;
+        if (flip >= 1) {
+            // Finish the animation: snap back to full width and stop. Without
+            // this, abs(1 - 2 * flip) keeps climbing past 1 and the card grows
+            // wider on every later frame instead of settling.
+            sprite.setImage(face);
+            sprite.setScale(1f, 1f);
+            return;
+        }
         float sx = Math.abs(1f - 2f * (float) flip);   // 1 -> 0 -> 1
         if (flip >= 0.5 && !showingFace) {
             showingFace = true;

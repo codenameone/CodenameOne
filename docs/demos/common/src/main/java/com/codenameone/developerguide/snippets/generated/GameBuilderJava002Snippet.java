@@ -95,6 +95,10 @@ class GameBuilderJava002Snippet extends GameSceneView {
         // the slime stalls.
         GameInput in = getInput();
         Scene scene = getScene();
+        // The editor names a stamped object after the asset's display name, so
+        // the generated companion has a field like duke1 rather than "player".
+        // Look the sprite up by asset id instead of assuming a field name.
+        Sprite player = findByAsset("player");
         // Backwards, because collecting a coin removes it from the scene and a
         // forward loop would step over the next sprite.
         for (int i = scene.size() - 1; i >= 0; i--) {
@@ -125,6 +129,5 @@ class GameBuilderJava002Snippet extends GameSceneView {
     }
     // end::game-builder-java-002[]
 
-    Sprite player;
 
 }
