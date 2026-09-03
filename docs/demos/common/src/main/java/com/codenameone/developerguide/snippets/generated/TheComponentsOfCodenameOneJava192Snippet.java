@@ -135,6 +135,10 @@ class TheComponentsOfCodenameOneJava192Snippet {
             } else {
                 text = text.toLowerCase();
                 for(Component cmp : hi.getContentPane()) {
+                    if(!(cmp instanceof MultiButton)) {
+                        // the loading indicator is still there until the contacts arrive
+                        continue;
+                    }
                     MultiButton mb = (MultiButton)cmp;
                     String line1 = mb.getTextLine1();
                     String line2 = mb.getTextLine2();
