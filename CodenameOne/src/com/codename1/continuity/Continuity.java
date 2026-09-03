@@ -601,20 +601,39 @@ public final class Continuity {
     ///
     /// The state itself is not stored -- only `checkpoint()` does that -- but the sequence counter
     /// it allocates is remembered, so states keep a rising order across a relaunch even for an
-    /// application that never checkpoints.
+    /// application that never checkpoints. When that counter cannot be written this returns null,
+    /// because a state carrying a number this device will hand out again is unsafe to send.
     ///
     /// #### Returns
     ///
-    /// the current state, or null when the framework is not enabled
+    /// the current state, or null when the framework is not enabled or the sequence counter
+    /// could not be stored -- see below for why the second one is refused rather than returned
     ///
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: when the provider returned an unrepresentable payload
     public static AppState capture() {
-        // Best effort, which is what this method has always been: an application calling it to
-        // feed its own transport wants whatever can be gathered. checkpoint() asks the private
-        // form instead, because for the DURABLE path a provider failure is not "no payload".
-        return capture(new boolean[1], new boolean[1]);
+        boolean[] payloadFailed = new boolean[1];
+        boolean[] sequenceFailed = new boolean[1];
+        AppState state = capture(payloadFailed, sequenceFailed);
+        if (sequenceFailed[0]) {
+            // Refused rather than returned. The one documented use of this method is to hand the
+            // state to a transport of the application's own, and that is exactly the act a
+            // non-durable sequence makes harmful: the receiver records the number against its
+            // durable high-water mark, this device reloads a LOWER counter after a restart and
+            // issues the same number again, and every state it sends from then on is discarded
+            // as already seen -- silently, on both sides, until the counter climbs past it.
+            //
+            // checkpoint() answers the same failure by storing locally and staying pending, and
+            // this is the same rule for the path where the caller IS the publisher: it cannot
+            // make that judgement, because nothing on the state says the number is safe.
+            //
+            // Best effort still holds for the PAYLOAD -- a provider that threw leaves real routes
+            // worth sending, which is why the two failures cannot share a flag. rememberSequence()
+            // has already logged the storage failure, so the null is not the only trace.
+            return null;
+        }
+        return state;
     }
 
     /// As above, reporting the two ways a capture can come up short -- SEPARATELY, because the

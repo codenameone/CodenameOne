@@ -2109,6 +2109,42 @@ public class LocalContinuityTest extends UITestBase {
                 "the checkpoint was reported as done even though the counter is not durable");
     }
 
+    /**
+     * The public capture() is documented for feeding the application's own transport, so it is a
+     * publisher too -- and a state whose sequence never reached storage is exactly what must not
+     * be published. The caller cannot tell: nothing on AppState says whether its number is one
+     * this device will issue again after a restart.
+     *
+     * <p>The control half matters more than the failing half here. Returning null unconditionally
+     * would satisfy the assertion below while breaking the method, so the same call is made with
+     * working storage first and required to produce a state.</p>
+     */
+    @EdtTest
+    public void aCaptureWhoseSequenceCannotBeStoredIsRefused() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+
+        AppState healthy = Continuity.capture();
+        assertNotNull(healthy,
+                "capture() returned nothing with storage working, so the refusal below proves "
+                        + "nothing about the sequence");
+
+        Storage original = Storage.getInstance();
+        Storage.setStorageInstance(new RefusingOneStorage(original, Continuity.PREF_SEQUENCE));
+        AppState refused;
+        try {
+            refused = Continuity.capture();
+        } finally {
+            Storage.setStorageInstance(original);
+        }
+
+        assertNull(refused,
+                "capture() handed out a state whose sequence never reached storage, and the "
+                        + "caller publishes it -- so the receiver's durable mark outlives the "
+                        + "counter that produced it and later states are silently ignored");
+    }
+
     /** Storage that refuses ONE name and passes everything else through. */
     static class RefusingOneStorage extends Storage {
         private final Storage delegate;
