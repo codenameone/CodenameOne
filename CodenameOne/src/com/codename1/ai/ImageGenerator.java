@@ -71,12 +71,20 @@ public abstract class ImageGenerator {
     /// key and proxying the call, so the device carries nothing more than a
     /// short-lived token of yours.
     ///
-    /// @param baseUrl endpoint root, for example `https://api.example.com/ai/v1`
+    /// @param baseUrl endpoint root, for example `https://api.example.com/ai/v1`;
+    ///   required, because falling back to the public endpoint would send your
+    ///   proxy's token and your user's prompt to a third party
     /// @param apiKey credential for that endpoint, or empty when it needs none
     /// @return configured generator
+    /// @throws IllegalArgumentException when `baseUrl` is null or empty
     public static ImageGenerator openAiCompatible(String baseUrl, String apiKey) {
-        return new OpenAiImageGenerator(apiKey,
-                baseUrl == null || baseUrl.length() == 0 ? OPENAI_ROOT : baseUrl);
+        if (baseUrl == null || baseUrl.length() == 0) {
+            // Never quietly substitute the public endpoint: a caller reaching
+            // this factory asked for their own server, and an unconfigured URL
+            // is a deployment mistake, not a request to use OpenAI.
+            throw new IllegalArgumentException("baseUrl is required");
+        }
+        return new OpenAiImageGenerator(apiKey, baseUrl);
     }
 
     /// Replicate runs a wide catalog of third-party image models

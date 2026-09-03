@@ -195,6 +195,17 @@ class ImageGeneratorTest extends UITestBase {
     }
 
     @Test
+    void openAiCompatibleRefusesAMissingUrl() {
+        // Falling back to the public endpoint would send the proxy's token and
+        // the user's prompt to a third party -- the opposite of why this factory
+        // exists. A missing URL is a deployment mistake, so say so.
+        assertThrows(IllegalArgumentException.class,
+                () -> ImageGenerator.openAiCompatible(null, "token"));
+        assertThrows(IllegalArgumentException.class,
+                () -> ImageGenerator.openAiCompatible("", "token"));
+    }
+
+    @Test
     void openaiStillPostsToOpenAi() {
         mock(200, "{\"model\":\"dall-e-3\"}");
         await(ImageGenerator.openai("k").generate(new GenerateImageRequest("a cat")));
