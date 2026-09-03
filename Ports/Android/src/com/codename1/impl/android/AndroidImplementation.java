@@ -10243,12 +10243,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 int sdk = android.os.Build.VERSION.SDK_INT;
                 if (sdk < 11) {
                     android.text.ClipboardManager clipboard = (android.text.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
+                    clipboardHolds(0);
                     clipboard.setText(obj.toString());
                 } else {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
                     android.content.ClipData clip;
                     if (obj instanceof ClipboardContent) {
                         clip = clipDataFor((ClipboardContent) obj);
+                        clipboardHolds(lastAssembledClip());
                         if (clip == null) {
                             // A copy of nothing is an empty clipboard, which is a thing the user
                             // asked for and can paste. A *drag* of nothing is not: there the null
@@ -10257,6 +10259,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             clip = ClipData.newPlainText("Codename One", "");
                         }
                     } else {
+                        // Nothing of ours is staged for a plain text clip, and it replaces
+                        // whatever was there: the clip the clipboard held is no longer the
+                        // clipboard's, so it stops being pinned.
+                        clipboardHolds(0);
                         clip = ClipData.newPlainText("Codename One", obj.toString());
                     }
                     clipboard.setPrimaryClip(clip);
@@ -11119,9 +11125,48 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// is recognisable as belonging together.
     private static long stagingClip;
 
+    /// The clip the system clipboard is holding, and the clip a running drag is carrying.
+    ///
+    /// Neither is superseded by anything newer, which is what a window of recent clips would
+    /// otherwise assume. A clipboard holds its clip until something replaces it, and every
+    /// drag in between advances the count -- so nine drags after a copy deleted the files the
+    /// clipboard was still pointing at, and the paste the user eventually made produced a
+    /// content URI nothing could read.
+    private static long clipboardClip;
+    private static long draggingClip;
+
     private static long beginStagingClip() {
         synchronized (STAGED_CLIP_FILES) {
             return ++stagingClip;
+        }
+    }
+
+    /// The clip `#clipDataFor(com.codename1.ui.ClipboardContent)` assembled last.
+    ///
+    /// Read straight after the call that built it: one clip is assembled at a time, on the
+    /// thread that asked for it.
+    static long lastAssembledClip() {
+        synchronized (STAGED_CLIP_FILES) {
+            return stagingClip;
+        }
+    }
+
+    /// Records which clip the system clipboard now holds, or zero for a clip with nothing
+    /// staged for it.
+    ///
+    /// Called for every clip put on the clipboard, plain text included: what matters as much
+    /// is that the clip it held *before* is not the clipboard's any more, so its files may go
+    /// when they age out.
+    static void clipboardHolds(long clip) {
+        synchronized (STAGED_CLIP_FILES) {
+            clipboardClip = clip;
+        }
+    }
+
+    /// Records the clip a drag is carrying, or zero once it has ended.
+    static void dragHolds(long clip) {
+        synchronized (STAGED_CLIP_FILES) {
+            draggingClip = clip;
         }
     }
 
@@ -11138,7 +11183,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     STAGED_CLIP_FILES.entrySet().iterator();
             while (entries.hasNext()) {
                 StagedClipFile staged = entries.next().getValue();
-                if (staged.clip <= forgetBefore) {
+                if (staged.clip <= forgetBefore && staged.clip != clipboardClip
+                        && staged.clip != draggingClip) {
                     entries.remove();
                     deleteStagedClipFile(staged);
                 }

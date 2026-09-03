@@ -285,6 +285,32 @@ class JavaSENativeDragAndDropTest {
                 "the files could not be produced; the text was never in question");
     }
 
+    @Test
+    void aFailingProviderIsRefusedEvenBeforeAnImplementationExists() throws Exception {
+        // With none installed, which is the state AWT can read a Transferable in -- it does so
+        // whenever it likes, including before anything has started the framework. Log.e reaches
+        // through Util.getImplementation() and NullPointerExceptions there, so the report of the
+        // failure used to become a second, worse failure thrown at whoever asked for the clip.
+        // Every other test here runs after something has installed one, which is exactly why
+        // this passed locally and failed in CI, where the order differs.
+        // Read reflectively only because the getter is package private; the setter is not, and
+        // leaving the framework without an implementation would break every test after this one.
+        java.lang.reflect.Method reader =
+                com.codename1.io.Util.class.getDeclaredMethod("getImplementation");
+        reader.setAccessible(true);
+        Object installed = reader.invoke(null);
+        com.codename1.io.Util.setImplementation(null);
+        try {
+            final Transferable t = new JavaSEPort.RichTransferable(
+                    new ClipboardContent().setDataProvider(ClipboardContent.MIME_TEXT, failing()));
+            assertThrows(UnsupportedFlavorException.class,
+                    () -> t.getTransferData(DataFlavor.stringFlavor));
+        } finally {
+            com.codename1.io.Util.setImplementation(
+                    (com.codename1.impl.CodenameOneImplementation) installed);
+        }
+    }
+
     /// A provider that fails, which ClipboardDataProvider explicitly permits.
     private static ClipboardDataProvider failing() {
         return new ClipboardDataProvider() {

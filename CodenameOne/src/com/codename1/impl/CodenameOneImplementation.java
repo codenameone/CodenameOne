@@ -5765,7 +5765,18 @@ public abstract class CodenameOneImplementation {
         } catch (Throwable err) {
             // Logged rather than swallowed: a provider that fails is an application bug
             // worth seeing, it is simply not this copy's or this drag's bug.
-            Log.e(err);
+            //
+            // And the logging is itself guarded, because Log.e reaches through
+            // Util.getImplementation() and Display.getInstance(), and neither is
+            // necessarily there: AWT reads a Transferable whenever it likes, including
+            // before anything has installed an implementation. Reporting the failure must
+            // never be what turns a recoverable one into a NullPointerException thrown at
+            // whoever asked for the clip.
+            try {
+                Log.e(err);
+            } catch (Throwable unloggable) {
+                err.printStackTrace();
+            }
             return null;
         }
     }

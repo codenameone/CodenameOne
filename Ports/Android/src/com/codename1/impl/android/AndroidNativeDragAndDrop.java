@@ -169,6 +169,9 @@ final class AndroidNativeDragAndDrop {
         if (clip == null) {
             return false;
         }
+        // The drag holds this clip until it ends, and copies made while it runs must not age
+        // its files out from under the receiver.
+        AndroidImplementation.dragHolds(AndroidImplementation.lastAssembledClip());
         setExporting(op);
         setLastAction(UNDECIDED);
         setLocalDropAction(NativeDragOperation.ACTION_NONE);
@@ -188,6 +191,7 @@ final class AndroidNativeDragAndDrop {
                     Log.e(err);
                 }
                 if (!started) {
+                    AndroidImplementation.dragHolds(0);
                     setExporting(null);
                     NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
                 }
@@ -242,6 +246,10 @@ final class AndroidNativeDragAndDrop {
                         setExporting(null);
                         NativeDragAndDrop.dragCompleted(completed);
                     }
+                    // The drag is over, so its clip goes back to ageing out with the rest.
+                    // Not deleted here: a receiver that kept a URI may still read it, and the
+                    // window of recent clips is what covers that.
+                    AndroidImplementation.dragHolds(0);
                     setLastAction(UNDECIDED);
                     setLocalDropAction(NativeDragOperation.ACTION_NONE);
                     return true;
