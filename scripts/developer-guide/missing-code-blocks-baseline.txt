@@ -1,9 +1,6 @@
 # Prose that promises a code block where none follows.
 # A ratchet: entries may be removed as holes are filled, never added.
 # Regenerate with check-missing-code-blocks.py --write-baseline.
-3D-Graphics.asciidoc	ARGB pixels:
-3D-Graphics.asciidoc	Querying capabilities at runtime:
-3D-Graphics.asciidoc	own material, so a textured model renders with no extra setup:
 Advanced-Topics-Under-The-Hood.asciidoc	For the release build, you will also need to inject some proguard configuration so that important classes don't get stripped out at build time. The FreshDesk SDK instructions state:
 Advanced-Topics-Under-The-Hood.asciidoc	You can override these methods in the draggable components:
 Advertising.asciidoc	(for example "Sponsored"):
@@ -64,9 +61,6 @@ Device-Input-And-Form-Factors.asciidoc	React to fold changes with a posture list
 Device-Input-And-Form-Factors.asciidoc	handles desktop and touch:
 Device-Input-And-Form-Factors.asciidoc	https://www.codenameone.com/javadoc/com/codename1/ui/DevicePosture.html[`DevicePosture`]:
 Device-Input-And-Form-Factors.asciidoc	pointer is a stylus or eraser:
-Events.asciidoc	The pointer events (touch events) can be intercepted by overriding one or more of these methods in `Component` or `Form`. Notice that unless you want to block functionality you should probably invoke `super` when overriding:
-Events.asciidoc	Then when you need to broadcast the event use:
-Events.asciidoc	https://www.codenameone.com/javadoc/com/codename1/ui/events/StyleListener.html[StyleListener] allows components to track changes to the style objects. For example, if the developer does something like:
 Game-Assets.asciidoc	is registered as solid. Applications add their own without changing the level format:
 Game-Builder.asciidoc	Loading and playing a level at runtime is three lines:
 Game-Builder.asciidoc	`start()` it:
@@ -154,18 +148,6 @@ SVG-Transcoder.asciidoc	the generated class directly:
 The-Components-Of-Codename-One.asciidoc	Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
 The-Components-Of-Codename-One.asciidoc	Let start by exploring how you can achieve this UI that fetches data from a webservice:
 The-Components-Of-Codename-One.asciidoc	This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute(java.lang.String,com.codename1.util.SuccessCallback)[execute()] method is:
-The-EDT---Event-Dispatch-Thread.asciidoc	A simplistic approach is to do something like this:
-The-EDT---Event-Dispatch-Thread.asciidoc	For example, instead of using operation names lets use a more "real world" example:
-The-EDT---Event-Dispatch-Thread.asciidoc	However, `updateUIWithContentOfFile` should be executed on the EDT and not on a random thread. The right way to do this would therefore be something like this:
-The-EDT---Event-Dispatch-Thread.asciidoc	IMPORTANT: The Runnable passed to the `callSerially` and `callSeriallyAndWait` methods isn't a `Thread`. Use the `Runnable` interface as a convenient callback interface:
-The-EDT---Event-Dispatch-Thread.asciidoc	Invoke and block solves this in a unique way you can get almost the exact same behavior by using this:
-The-EDT---Event-Dispatch-Thread.asciidoc	Or this with Java 8 syntax:
-The-EDT---Event-Dispatch-Thread.asciidoc	TIP: You can write this code more concisely using Java 8 lambda code as such:
-The-EDT---Event-Dispatch-Thread.asciidoc	The `callSeriallyAndWait(Runnable)` method blocks the current thread until the method completes, this is useful for cases such as user notification e.g.:
-The-EDT---Event-Dispatch-Thread.asciidoc	This is best explained by an example. Typical Java code reads as a single sequence as such:
-The-EDT---Event-Dispatch-Thread.asciidoc	To explain how invokeAndBlock works you can return to the sample above of how the EDT works:
-The-EDT---Event-Dispatch-Thread.asciidoc	You can visualize the EDT as a loop such as this:
-The-EDT---Event-Dispatch-Thread.asciidoc	`invokeAndBlock()` works in a similar way to this pseudo-code:
 Working-With-iOS.asciidoc	Repeating notifications will continue until they're canceled by the app. You can cancel a single notification by calling:
 appendix_goal_generate_graphql.adoc	The `@GraphQLClient` interface looks like:
 appendix_goal_generate_graphql.adoc	an `OnComplete<GraphQLResponse<T>>`:

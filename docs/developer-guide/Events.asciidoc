@@ -80,8 +80,6 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 This will work great but you will still get the default error message from the EDT over that exception. To prevent the event from proceeding to the default error handling you can do this:
-
-
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava004Snippet.java[tag=events-java-004,indent=0]
@@ -168,6 +166,10 @@ The https://www.codenameone.com/javadoc/com/codename1/ui/events/SelectionListene
 ==== StyleListener
 
 https://www.codenameone.com/javadoc/com/codename1/ui/events/StyleListener.html[StyleListener] allows components to track changes to the style objects. For example, if the developer does something like:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava016Snippet.java[tag=events-java-016,indent=0]
+----
 
 
 This will trigger a style event that will eventually lead to the component being repainted. This is quite important
@@ -189,6 +191,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 Then when you need to broadcast the event use:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava017Snippet.java[tag=events-java-017,indent=0]
+----
 
 
 
@@ -239,6 +245,10 @@ There are two basic types of low-level events: Key and Pointer.
 IMPORTANT: Key events are relevant to physical keys and won't trigger on virtual keyboard keys, to track those use a https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html[TextField] with a `DataChangeListener` as mentioned above.
 
 The pointer events (touch events) can be intercepted by overriding one or more of these methods in `Component` or `Form`. Notice that unless you want to block functionality you should probably invoke `super` when overriding:
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/events.txt[tag=events-text-001,indent=0]
+----
 
 
 Notice that most pointer events have a version that accepts an array as an argument, this allows for multi-touch event handling by sending all the touched coordinates. Desktop and pen-enabled devices can also trigger hover events without a press. To respond to those you can override the `pointerHover*` callbacks on `Form` or `Component`, which are invoked before a button receives focus or a drag begins on those platforms.
