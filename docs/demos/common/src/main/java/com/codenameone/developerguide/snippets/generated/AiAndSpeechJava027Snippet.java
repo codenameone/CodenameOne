@@ -83,7 +83,10 @@ class AiAndSpeechJava027Snippet {
     void snippet() throws Exception {
         // tag::ai-and-speech-java-027[]
         LlmChatBinding.bind(view,
-                LlmClient.openai(apiKey),
+                // The proxy client from the credentials section, not
+                // LlmClient.openai(apiKey): a shipped build must not carry the
+                // provider key on the device.
+                client,
                 // The template's messages are sent ahead of the conversation on
                 // every request, so this is where a system prompt belongs.
                 // build() also rejects an empty message list.
@@ -94,5 +97,9 @@ class AiAndSpeechJava027Snippet {
     }
 
     ChatView view = new ChatView();
+
+
+    LlmClient client = LlmClient.localOpenAiCompatible(
+            "https://api.example.com/ai/v1", "session-token", "your-model");
 
 }

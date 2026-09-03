@@ -124,7 +124,10 @@ class AiAndSpeechJava026Snippet {
                     .build();
 
             ChatBubble streaming = view.beginAssistantStream();
-            LlmClient.openai(apiKey).chatStream(req, new StreamingListener.Adapter() {
+            // The proxy client from the credentials section: on a device
+            // LlmClient.openai(apiKey) would need the billable provider key to
+            // be present there, which that section says not to do.
+            client.chatStream(req, new StreamingListener.Adapter() {
                 @Override public void onContentDelta(String d) {
                     // Append to the bubble this send opened, not to whichever is
                     // newest: a second send while this one is still streaming
@@ -148,4 +151,8 @@ class AiAndSpeechJava026Snippet {
         chat.show();
         // end::ai-and-speech-java-026[]
     }
+
+    LlmClient client = LlmClient.localOpenAiCompatible(
+            "https://api.example.com/ai/v1", "session-token", "your-model");
+
 }

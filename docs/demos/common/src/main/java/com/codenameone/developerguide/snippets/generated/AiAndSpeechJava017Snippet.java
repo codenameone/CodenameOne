@@ -112,7 +112,7 @@ class AiAndSpeechJava017Snippet {
 
     LlmClient openai = LlmClient.openai(apiKey);
     ChatView chatView = new ChatView();
-    ChatRequest req = ChatRequest.builder().model("gpt-4o-mini")
+    ChatRequest req = ChatRequest.builder()
             .addMessage(ChatMessage.user("hi")).build();
 
 }

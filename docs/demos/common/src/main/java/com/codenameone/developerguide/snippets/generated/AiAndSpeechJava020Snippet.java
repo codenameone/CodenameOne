@@ -88,8 +88,11 @@ class AiAndSpeechJava020Snippet {
 
         ChatRequest req = ChatRequest.builder()
                 // No model named: the client's default applies, and the
-                // simulator's Ollama redirect sets that for you. Naming a
-                // cloud model asks a local server for one it lacks.
+                // simulator's Ollama redirect sets that for you. This request
+                // carries an image, so whichever default is in play has to
+                // accept one -- the redirect's own default is text-only, so
+                // point cn1.ai.ollamaModel at a vision-capable model to run
+                // this locally.
                 .addMessage(msg)
                 .build();
         // end::ai-and-speech-java-020[]
