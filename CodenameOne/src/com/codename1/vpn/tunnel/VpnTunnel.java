@@ -35,13 +35,25 @@ package com.codename1.vpn.tunnel;
 /// #### Where this runs
 ///
 /// On Android, in the app's own process, inside the port's `VpnService`.
-/// Nowhere else: [Tunnels#isSupported] is false on iOS, where a packet
-/// tunnel would have to run in a Network Extension and the translation that
-/// would give that process a virtual machine has not been written.
+/// On iOS, in a Network Extension: a separate process, with a virtual
+/// machine of its own, which the build generates for a project that sets
+/// `ios.vpn.tunnel`.
 ///
-/// Write the tunnel as though it ran somewhere else anyway. Everything it
-/// needs travels in [TunnelConfiguration#getData]; a static the app set
-/// happens to be there on Android and is not a thing to rely on.
+/// Write the tunnel as though it ran somewhere else, because on one of the
+/// two platforms it does. Everything it needs travels in
+/// [TunnelConfiguration#getData]; a static the app set happens to be there
+/// on Android and is not a thing to rely on -- on iOS it is not there at
+/// all, and reaching for the app's own classes drags them into the
+/// extension's translation, where the ones backed by UIKit fail its link.
+///
+/// #### Constructing it
+///
+/// On Android the app constructs the tunnel and hands it to
+/// [Tunnels#start]. On iOS the EXTENSION constructs it, because
+/// [Tunnels#start] ran in another process that has since gone away -- so an
+/// iOS tunnel needs an accessible no-argument constructor, and the class
+/// named by `ios.vpn.tunnel.class` is the one it calls. A tunnel with only a
+/// parameterised constructor fails the build rather than the device.
 ///
 /// #### What is expensive
 ///

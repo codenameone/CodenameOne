@@ -114,7 +114,7 @@ Extend `VpnTunnel` and hand it to `Tunnels.start`.
 
 `Tunnels.isSupported()` answers true on Android, true on an iOS build that
 generated the extension, and false everywhere else -- including an iOS build
-that did not ask for one, which is every iOS build by default. Ask it, and
+that didn't ask for one, which is every iOS build by default. Ask it, and
 keep a path for the answer being no: `Tunnels.start` refuses with
 `NOT_SUPPORTED` rather than pretending.
 
@@ -135,26 +135,29 @@ build generates that extension for you -- a target of its own, carrying a
 virtual machine, running the class you name in `ios.vpn.tunnel.class`.
 
 The extension is *its own translation*, rooted at your tunnel rather than at
-your app. That is what makes it possible at all: an app extension compiles
+your app. That's what makes it possible at all: an app extension compiles
 with `APPLICATION_EXTENSION_API_ONLY`, and the iOS port's own natives call
 `UIApplicationMain` and `[UIApplication sharedApplication]`, which an
 extension may not touch -- so a target carrying the application's translation
-could not be built. Rooted at the tunnel it carries what the tunnel reaches,
+couldn't be built. Rooted at the tunnel it carries what the tunnel reaches,
 and the application shell is simply not in it.
 
 Which turns the advice below into a build error rather than a disappointment.
 Write the tunnel as though it ran in a process of its own, because it does:
 no statics you set, no `Display`, no open connections, and the tunnel
-constructed fresh with none of them. A tunnel that reaches for your app's
-other classes drags them into this translation, and the ones backed by the
-port's UIKit natives fail the extension's *link*, naming the symbol they
-wanted.
+constructed fresh with none of them -- iOS constructs it, so it needs an
+accessible no-argument constructor. A tunnel that reaches for your app's
+other classes drags them into this translation, and the ones backed by
+native code fail the extension's *link*, naming the symbol they wanted. That
+includes a `NativeInterface` from a cn1lib: the extension carries the
+translated program and the virtual machine, and nothing the port or a
+library hand-wrote.
 
 Two things are yours to arrange, and neither is something a build can do for
 you. Apple grants
 `com.apple.developer.networking.networkextension` case by case rather than
 from the developer portal, so setting `ios.vpn.tunnel=true` is you saying you
-hold it -- an App ID that doesn't fails codesigning with an error naming the
+hold it -- an App ID without it fails codesigning with an error naming the
 entitlement and not the reason it appeared. And the extension signs under its
 own App ID, `<packageName>.vpntunnel`, so a device archive needs a
 provisioning profile for that identifier passed as
@@ -218,7 +221,7 @@ injects the Personal VPN entitlement with no hint at all.
 Codename One never injects `com.apple.developer.networking.networkextension`
 into your app from a class reference. Apple grants it case by case rather
 than self-serve, and an entitlement an App ID doesn't carry fails codesigning
-with an error naming the entitlement and not the reason it appeared. That is
+with an error naming the entitlement and not the reason it appeared. That's
 why the hint exists at all rather than the package alone turning the
 extension on -- and why the entitlement is written into the *extension's* own
 entitlements file, where it belongs, rather than into the host app's.

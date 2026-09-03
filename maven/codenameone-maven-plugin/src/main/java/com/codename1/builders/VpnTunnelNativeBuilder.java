@@ -90,7 +90,14 @@ class VpnTunnelNativeBuilder {
 
     /// The application's VpnTunnel subclass, in source form
     /// (com.example.MyTunnel), from ios.vpn.tunnel.class.
-    private String tunnelClass;
+    ///
+    /// Initialised rather than left null. Every caller reaches it behind
+    /// isEnabled(), which is only true once parseHints has set this -- but
+    /// "only reached behind another field" is an invariant a reader has to
+    /// go and check, and SpotBugs reads it as a field dereferenced before
+    /// any constructor set it (UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR).
+    /// Empty means the same thing here as null did and costs nothing.
+    private String tunnelClass = "";
 
     VpnTunnelNativeBuilder(IPhoneBuilder owner) {
         this.owner = owner;
@@ -138,50 +145,71 @@ class VpnTunnelNativeBuilder {
     static final String SRC_DIR = "vpn-tunnel-src";
 
     /**
-     * Sources the extension target must not compile.
+     * The iOS port's hand-written native sources, which the extension target
+     * must not compile.
      *
-     * <p>A mechanical list, not a policy one. Each entry was found by
-     * scanning the iOS port's native sources for {@code UIApplicationMain}
-     * and {@code [UIApplication sharedApplication]} -- the two
-     * {@code NS_EXTENSION_UNAVAILABLE_IOS} spellings that an
-     * {@code APPLICATION_EXTENSION_API_ONLY} target rejects -- plus the five
-     * the watch target excludes for a different reason: a {@code .metal}
-     * shader is compiled by the Metal compiler and a {@code .xib} is
-     * Interface Builder data, so neither has a preprocessor to guard.</p>
+     * <p>Recorded from the directory the port was unzipped into rather than
+     * listed here, because a list is wrong in both directions. This started
+     * as one -- the sources that call {@code UIApplicationMain} or
+     * {@code [UIApplication sharedApplication]}, which an
+     * {@code APPLICATION_EXTENSION_API_ONLY} target rejects -- and that list
+     * excluded {@code IOSNative.m} while still compiling fifteen port
+     * sources that reference symbols {@code IOSNative.m} defines:
+     * {@code toNSString}, {@code nsDataToByteArr}, {@code scaleValue},
+     * {@code displayWidth}, {@code repaintUI}. The target would have failed
+     * to LINK, and nothing here or in CI compiles it, so the first thing to
+     * notice would have been a customer's device build.</p>
      *
-     * <p>They are excluded rather than guarded because the tunnel's
-     * translation should not be reaching them in the first place. A guard
-     * would let a tunnel that DOES reach one link against a stub and fail at
-     * run time, in a process with no log and no UI to fail in; excluding
-     * makes the same mistake an undefined symbol at build time, naming the
-     * native it wanted.</p>
+     * <p>The rule that is actually true: <b>the extension compiles the
+     * translated program and the ParparVM runtime, and none of the port.</b>
+     * It can, because the tree is rooted at the tunnel -- the only
+     * {@code com.codename1.impl.ios} class in it is
+     * {@code IOSExtensionTunnel}, whose one native the generated provider
+     * implements itself. The runtime ({@code cn1_globals.m},
+     * {@code nativeMethods.m}, {@code java_io_File.m} and the allocators)
+     * comes from the translator, not from the port, so it is never in this
+     * set and is never excluded.</p>
      *
-     * <p>TO ADD AN ENTRY, scan rather than guess:</p>
-     * <pre>
-     * grep -l 'sharedApplication\\|UIApplicationMain' Ports/iOSPort/nativeSources/*.m
-     * </pre>
+     * <p>A native belonging to a submitted library sits in the same
+     * directory and is excluded with the rest. That is the documented
+     * bargain rather than a gap: a tunnel gets nothing from the application
+     * process, and one that calls a library's native fails the extension's
+     * link naming the symbol -- which is the same report as reaching for any
+     * other app-side class, and better than a tunnel that builds and finds
+     * nothing there.</p>
      */
-    static final String[] EXCLUDED_EXTENSION_SOURCES = {
-        // The application shell and the natives that reach UIApplication.
-        "IOSNative.m",
-        "CodenameOne_GLAppDelegate.m",
-        "CodenameOne_GLSceneDelegate.m",
-        "CodenameOne_GLViewController.m",
-        "UIWebViewEventDelegate.m",
-        "AudioPlayer.m",
-        "NetworkConnectionImpl.m",
-        "cn1_debugger.m",
-        "CN1AppleSignIn.m",
-        "CN1OidcBrowser.m",
-        "CN1WebAuthn.m",
-        "CN1SmartHome.m",
-        "GoogleConnectImpl.m",
-        "CN1MacWindows.m",
-        // No preprocessor to run; see above.
-        "CN1MetalShaders.metal",
-        "CodenameOne_GLViewController.xib", "MainWindow.xib",
-        "CodenameOne_METALViewController.xib", "MainWindowMETAL.xib"
-    };
+    private final java.util.Set<String> portNatives =
+            new java.util.HashSet<String>();
+
+    /**
+     * Records what the port contributed, so {@link #stageTranslation} can
+     * leave it out.
+     *
+     * <p>Called once the port has been unzipped and before the translation
+     * is staged. Cheap, and only for a build that generates the
+     * extension.</p>
+     *
+     * @param portNativeDir the directory the iOS port's natives were
+     *                      unzipped into
+     */
+    void recordPortNatives(File portNativeDir) {
+        File[] files = portNativeDir.listFiles();
+        if (files == null) {
+            // Refused rather than carried on with an empty set: an empty set
+            // means "exclude nothing", which is exactly the broken target
+            // this exists to prevent, and it would fail at link on a machine
+            // none of our tests run on.
+            throw new BuildException("Could not read the iOS port's native"
+                    + " sources at " + portNativeDir + ", so the packet"
+                    + " tunnel extension cannot know which sources belong to"
+                    + " the application rather than to it.");
+        }
+        for (File f : files) {
+            if (f.isFile()) {
+                portNatives.add(f.getName());
+            }
+        }
+    }
 
     /**
      * Reads the hints and decides whether the extension is generated.
@@ -229,7 +257,7 @@ class VpnTunnelNativeBuilder {
         return enabled;
     }
 
-    /** The application's VpnTunnel subclass, or null when disabled. */
+    /** The application's VpnTunnel subclass, or empty when disabled. */
     String getTunnelClass() {
         return tunnelClass;
     }
@@ -241,6 +269,15 @@ class VpnTunnelNativeBuilder {
      * generated stub's javac. Both refuse, but this one can say which hint
      * was wrong; javac would report an unresolvable symbol inside a source
      * file the developer never wrote.</p>
+     *
+     * <p>EXISTENCE only. Whether the class is a {@code VpnTunnel} and
+     * whether it has a no-argument constructor are left to javac on the
+     * generated stub, which reads them off the real class rather than
+     * guessing at its bytes -- and the stub carries a comment saying so, so
+     * the error names the hint even though the file naming it is generated.
+     * Parsing the constructor out of the {@code .class} here would be a
+     * second, worse implementation of a check the compiler already does
+     * exactly.</p>
      *
      * @param classesDir the compiled application classes
      */
@@ -289,6 +326,15 @@ class VpnTunnelNativeBuilder {
                 + " * CN1VpnTunnelProvider calls these methods directly;"
                 + " main() exists so the\n"
                 + " * translator keeps them.</p>\n"
+                + " *\n"
+                + " * <p>If javac fails HERE rather than in your own code,"
+                + " it is almost always\n"
+                + " * the constructor: the extension builds the tunnel"
+                + " itself, in a process\n"
+                + " * where Tunnels.start() never ran, so "
+                + HINT_CLASS + " has to name a\n"
+                + " * VpnTunnel subclass with an accessible no-argument"
+                + " constructor.</p>\n"
                 + " */\n"
                 + "public class " + stubClass + " {\n"
                 + "    public static void main(String[] argv) {\n"
@@ -459,14 +505,16 @@ class VpnTunnelNativeBuilder {
         return translationRoot(mainClass) + "-Prefix.pch";
     }
 
-    /** Whether a translated source is one the extension target must not compile. */
-    static boolean isExcluded(String name) {
-        for (String excluded : EXCLUDED_EXTENSION_SOURCES) {
-            if (excluded.equals(name)) {
-                return true;
-            }
-        }
-        return false;
+    /**
+     * Whether a staged source belongs to the port rather than to the
+     * translated program.
+     *
+     * <p>Answers false for everything until {@link #recordPortNatives} has
+     * run, which is why that is not optional: an unrecorded build would
+     * compile the whole port into the extension and fail at link.</p>
+     */
+    boolean isExcluded(String name) {
+        return portNatives.contains(name);
     }
 
     /**

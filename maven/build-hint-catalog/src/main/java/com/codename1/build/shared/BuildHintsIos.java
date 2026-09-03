@@ -151,7 +151,7 @@ final class BuildHintsIos {
                         + "skips it, and an app may have several subclasses while an extension "
                         + "runs exactly one. A wrong guess would build the wrong tunnel into the "
                         + "extension and fail at link on a symbol nobody wrote. The build checks the "
-                        + "name against the compiled classes and refuses one it cannot find, rather "
+                        + "name against the compiled classes and refuses one it can't find, rather "
                         + "than letting the generated entry point fail javac on a source file the "
                         + "developer never wrote."));
 

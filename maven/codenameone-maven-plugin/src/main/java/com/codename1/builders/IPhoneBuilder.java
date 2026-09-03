@@ -3850,6 +3850,12 @@ public class IPhoneBuilder extends Executor {
         vpnTunnelBuilder.parseHints(request, usesCustomTunnel);
         if (vpnTunnelBuilder.isEnabled()) {
             vpnTunnelBuilder.verifyTunnelClass(classesDir);
+            // What the PORT contributed, recorded before the translation
+            // exists so the extension target can compile the translated
+            // program and leave the port out. See recordPortNatives: a
+            // hand-written list of "the sources that touch UIApplication"
+            // was not the same set, and the difference was a link error.
+            vpnTunnelBuilder.recordPortNatives(buildinRes);
             try {
                 vpnTunnelBuilder.writeStubSource(request, stubSource);
             } catch (IOException ex) {
