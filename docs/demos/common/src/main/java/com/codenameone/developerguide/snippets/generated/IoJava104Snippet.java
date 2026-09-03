@@ -109,7 +109,7 @@ class IoJava104Snippet {
     void snippet() throws Exception {
         // tag::io-java-104[]
         String authCode = user + ":" + password;
-        String authHeader = "Basic " + Base64.encode(authCode.getBytes());
+        String authHeader = "Basic " + Base64.encodeNoNewline(authCode.getBytes());
         request.addRequestHeader("Authorization", authHeader);
         // end::io-java-104[]
     }

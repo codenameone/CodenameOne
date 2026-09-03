@@ -121,9 +121,13 @@ class IoJava096Snippet {
                 try {
                     db = Display.getInstance().openOrCreate("MyDB.db");
                     String sql = query.getText().trim().toLowerCase();
-                    boolean returnsRows = sql.startsWith("select") || sql.startsWith("with") ||
-                            sql.startsWith("pragma") || sql.startsWith("explain") ||
-                            sql.startsWith("values");
+                    boolean writeCte = sql.startsWith("with") &&
+                            (sql.indexOf("insert") > -1 || sql.indexOf("update") > -1 ||
+                             sql.indexOf("delete") > -1);
+                    boolean returnsRows = !writeCte &&
+                            (sql.startsWith("select") || sql.startsWith("with") ||
+                             sql.startsWith("pragma") || sql.startsWith("explain") ||
+                             sql.startsWith("values"));
                     if(returnsRows) {
                         cur = db.executeQuery(query.getText());
                         int columns = cur.getColumnCount();
