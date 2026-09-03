@@ -135,6 +135,26 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void anEmptyRouteListProducesNoRoutes() {
+        String src = provider();
+        // componentsSeparatedByString returns ONE empty item for @"", and a
+        // setup with no routes of a family is ordinary -- a v6-only tunnel
+        // passes @"" to the v4 helper. Without the skip that helper built an
+        // NEIPv4Route whose destination was the empty string, and iOS
+        // refused the whole settings object: a valid setup that would not
+        // start. The v6 helper never showed it, because its own family test
+        // skips an empty entry for having no colon in it.
+        int helpers = 0;
+        int at = src.indexOf("[[items objectAtIndex:i] length] == 0");
+        while (at >= 0) {
+            helpers++;
+            at = src.indexOf("[[items objectAtIndex:i] length] == 0", at + 1);
+        }
+        assertEquals(2, helpers,
+                "both route helpers have to skip an empty entry");
+    }
+
+    @Test
     void theTunnelIsAllocatedThroughTheAbiParparvmEmits() {
         String src = provider();
         // __NEW_X takes the thread state -- it uses it for class

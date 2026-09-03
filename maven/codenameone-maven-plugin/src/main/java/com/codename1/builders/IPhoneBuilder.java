@@ -11590,7 +11590,11 @@ public class IPhoneBuilder extends Executor {
         sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
                 + "main_app_target.add_dependency(vpn_target)\n"
                 + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('"
-                + productName + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                // ESCAPED into the single-quoted literal.
+                // effectiveExtensionProductName accepts any name without a
+                // '$' in it, and "Acme's VPN" is a legal PRODUCT_NAME that
+                // closes the string and fails the script on a syntax error.
+                + escapeRuby(productName) + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
                 + "embed_phase = main_app_target.copy_files_build_phases.find{|p| "
                 + "p.name=='Embed App Extensions'} || "
                 + "main_app_target.new_copy_files_build_phase('Embed App Extensions')\n"
@@ -11611,8 +11615,15 @@ public class IPhoneBuilder extends Executor {
         }
         sb.append("vpn_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
+            // The KEY goes into a single-quoted literal and the VALUE into
+            // a double-quoted one, so they need different escaping. A build
+            // setting value is developer input and an ordinary one carries a
+            // quote -- OTHER_SWIFT_FLAGS=$(inherited) -DNAME="foo" -- which
+            // escapeRuby does not touch: it would close the literal, and a
+            // '#' would start an interpolation.
             sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
-                    + escapeRuby(buildSettingsMap.get(buildSettingKey)) + "\"\n");
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey))
+                    + "\"\n");
         }
         sb.append("}\nend\n");
     }
