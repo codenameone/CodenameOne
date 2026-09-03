@@ -682,6 +682,43 @@ static NSString* cn1CopyDroppedFile(NSURL* url) {
     return target;
 }
 
+/// How many drops' copies are kept before the oldest are reclaimed.
+#define CN1_DROP_COPY_MEMORY 8
+
+/// The files copied out of recent drops, oldest first, one array of paths per drop.
+///
+/// Nothing else ever comes back for a copy: the path is handed to the application and the
+/// application is free to keep it, read it later, or ignore it. So a long-running application
+/// that accepts documents repeatedly kept every one of them -- the system purges the temporary
+/// directory only while the application is not running, which for a drop-heavy session may be
+/// a very long time, and a few large documents are enough to matter.
+///
+/// The last few drops are kept and older ones are reclaimed as new ones arrive -- the same
+/// shape, and the same bound, as the exporter's staged clips. By drop rather than by file,
+/// because one drop's files belong together, and never the drop just delivered, which is the
+/// one the application is working with.
+static NSMutableArray* cn1DroppedFileCopies = nil;
+
+/// Records the copies one drop made, and reclaims the oldest beyond the bound.
+static void cn1RememberDroppedFiles(NSArray* paths) {
+    if (paths.count == 0) {
+        return;
+    }
+    if (cn1DroppedFileCopies == nil) {
+        cn1DroppedFileCopies = [[NSMutableArray alloc] init];
+    }
+    [cn1DroppedFileCopies addObject:paths];
+    while (cn1DroppedFileCopies.count > CN1_DROP_COPY_MEMORY) {
+        NSArray* oldest = [cn1DroppedFileCopies objectAtIndex:0];
+        for (NSString* path in oldest) {
+            // Best effort by design: a file that will not delete is one the system reclaims
+            // when it next purges the directory, which is what the directory is for.
+            [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+        }
+        [cn1DroppedFileCopies removeObjectAtIndex:0];
+    }
+}
+
 API_AVAILABLE(ios(11.0))
 @interface CN1DragAndDropDelegate : NSObject <UIDragInteractionDelegate, UIDropInteractionDelegate>
 @end
@@ -1220,7 +1257,20 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
         // begun since -- the newer target is sent an exit and its next update re-enters it, a
         // flicker that repairs itself. Withholding the commit instead would lose a drop the
         // user actually performed, and unperformed work is worse than a repaired frame.
+        // Everything this drop copied out, remembered as one so the oldest drops can be
+        // reclaimed later. After the commit: the paths are handed over by it, and this only
+        // ever deletes the copies of drops well before this one.
+        NSMutableArray* copied = [NSMutableArray arrayWithArray:ordered];
+        for (NSArray* named in fileBacked) {
+            NSString* path = [named objectAtIndex:1];
+            if (path != nil && ![copied containsObject:path]) {
+                // A representation that is another name for the document shares its copy;
+                // one of its own has a copy of its own, and both are this drop's to reclaim.
+                [copied addObject:path];
+            }
+        }
         int accepted = CN1NativeDragDeliverDropCommit(x, y, action, sessionActions, localAssembly);
+        cn1RememberDroppedFiles(copied);
         // This session's own agreement, and only it: another drop hovering while this one
         // finished loading is still entitled to the action its target chose.
         cn1ForgetDropAction(session);
