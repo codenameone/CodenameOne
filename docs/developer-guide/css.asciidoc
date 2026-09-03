@@ -13,6 +13,17 @@ New Maven projects enable CSS by default with `codename1.cssTheme=true` in `comm
 
 Once enabled your `theme.res` file will regenerate from a CSS file that resides under the `css` directory. Changes you make to the CSS file will instantly update the simulator as you save. But, there are some limits to this live update so sometimes a simulator restart would be necessary.
 
+[[OverlayThemes]]
+=== How the compiled CSS reaches your theme
+
+The CSS compiler doesn't replace your `theme.res`. It compiles the stylesheet into a second resource file and then layers that one on top, so the styles you write in CSS win over the ones already in the theme.
+
+The layering is a theme constant, `@OverlayThemes`. Its value is a comma-separated list of resource names that live beside the theme, without the `.res` extension. When `UIManager` builds a theme it reads that constant, opens each name in turn and applies its properties over the ones already loaded, so a later overlay beats an earlier one and every overlay beats the base theme.
+
+You don't normally set it. Installing CSS support writes the constant for you, pointing it at the compiled stylesheet, which is why a CSS project works without anyone touching the theme's constants. It's worth knowing the constant exists for two reasons: it explains why a value you set in the Designer appears to be ignored when the CSS file sets the same one, and it's the mechanism to reach for when you want a second resource file to override a theme you don't own -- a theme shipped inside a cn1lib, for instance.
+
+WARNING: An overlay is loaded by name from the same directory as the theme that names it. A name the build doesn't produce is skipped with a message on the error stream and the app carries on with the base theme, so a typo here shows up as styling that never applies rather than as a build failure.
+
 === Supported CSS selectors
 
 Since Codename One stylesheets are meant to be used with Codename One component hierarchies instead of XML/HTML documents, selectors work a little differently.
