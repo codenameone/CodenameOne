@@ -51,6 +51,7 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import java.util.List;
 import java.util.*;
 import com.codename1.ai.*;
 
@@ -86,21 +87,28 @@ class AiAndSpeechJava026Snippet {
         ChatView view = new ChatView();
         chat.add(BorderLayout.CENTER, view);
 
-        view.addMessage(ChatMessage.assistant("How can I help?"));
+        // The view's history is what it displays. A streaming reply is a bubble
+        // there, not a message -- appendText changes the bubble's text and never
+        // the immutable ChatMessage the view stored -- so every completed reply
+        // would go back to the model as a blank assistant turn. Keep the
+        // conversation the request is built from separately.
+        List<ChatMessage> history = new ArrayList<ChatMessage>();
+
+        ChatMessage greeting = ChatMessage.assistant("How can I help?");
+        view.addMessage(greeting);
+        history.add(greeting);
 
         view.setOnSend(e -> {
             String text = view.getInput().getText();
             view.getInput().clear();
-            view.addMessage(ChatMessage.user(text));
+            ChatMessage sent = ChatMessage.user(text);
+            view.addMessage(sent);
+            history.add(sent);
             view.setTypingIndicatorVisible(true);
 
-            // Snapshot the history before opening the assistant bubble.
-            // beginAssistantStream() appends an empty assistant message, and
-            // sending that back replays a blank turn to the model on every
-            // subsequent request.
             ChatRequest req = ChatRequest.builder()
                     .model("gpt-4o-mini")
-                    .messages(new ArrayList<ChatMessage>(view.getHistory()))
+                    .messages(new ArrayList<ChatMessage>(history))
                     .build();
 
             ChatBubble streaming = view.beginAssistantStream();
@@ -111,12 +119,16 @@ class AiAndSpeechJava026Snippet {
                     // would otherwise divert this response into that bubble.
                     streaming.appendText(d);
                 }
-            }).ready(resp -> view.setTypingIndicatorVisible(false))
-              .except(err -> {
-                  // Without this the indicator stays up for good on a failure.
-                  view.setTypingIndicatorVisible(false);
-                  Log.e(err);
-              });
+            }).ready(resp -> {
+                view.setTypingIndicatorVisible(false);
+                // Record what the assistant actually said, so the next turn
+                // carries it rather than an empty placeholder.
+                history.add(resp.getAssistantMessage());
+            }).except(err -> {
+                // Without this the indicator stays up for good on a failure.
+                view.setTypingIndicatorVisible(false);
+                Log.e(err);
+            });
         });
         chat.show();
         // end::ai-and-speech-java-026[]

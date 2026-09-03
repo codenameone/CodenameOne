@@ -83,12 +83,22 @@ class AiAndSpeechJava028Snippet {
     void snippet() throws Exception {
         // tag::ai-and-speech-java-028[]
         Capture.capturePhoto(evt -> {
+            // A cancelled capture arrives as a null event or a null source
+            // depending on the port, and reading either would fail rather than
+            // simply returning the user to the app.
+            if (evt == null || !(evt.getSource() instanceof String)) {
+                return;
+            }
             String path = (String) evt.getSource();
             byte[] bytes = readAllBytes(path);
             ImagePart img = new ImagePart(bytes, "image/jpeg");
 
             ChatRequest req = ChatRequest.builder()
-                    .model("gpt-4o")
+                    // Whatever model you name has to exist wherever the client
+                    // points. With the simulator's Ollama redirect that is your
+                    // local install, so name a vision-capable model you pulled
+                    // there rather than assuming an OpenAI one resolves.
+                    .model(visionModel)
                     .addMessage(ChatMessage.userWithImage(
                         "Describe the photo in one sentence.", img))
                     .build();
@@ -100,7 +110,9 @@ class AiAndSpeechJava028Snippet {
             LlmClient.openai(apiKey).chatStream(req, new StreamingListener.Adapter() {
                 @Override public void onContentDelta(String d) {
                     full.append(d);
-                    chatView.appendToLastMessage(d);
+                    // Append to the bubble this capture opened: a second photo
+                    // started mid-stream would otherwise take this text.
+                    streaming.appendText(d);
                 }
             }).ready(resp -> {
                 TextToSpeech.speak(full.toString());
@@ -111,5 +123,8 @@ class AiAndSpeechJava028Snippet {
 
     ChatView chatView = new ChatView();
     byte[] readAllBytes(String path) { return new byte[0]; }
+
+
+    String visionModel = "gpt-4o";
 
 }

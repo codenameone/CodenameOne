@@ -84,7 +84,11 @@ class AiAndSpeechJava027Snippet {
         // tag::ai-and-speech-java-027[]
         LlmChatBinding.bind(view,
                 LlmClient.openai(apiKey),
-                ChatRequest.builder().model("gpt-4o-mini").build());
+                // build() rejects an empty message list, so the template that
+                // seeds the binding needs at least one turn.
+                ChatRequest.builder().model("gpt-4o-mini")
+                        .addMessage(ChatMessage.system("You are a helpful assistant."))
+                        .build());
         // end::ai-and-speech-java-027[]
     }
 
