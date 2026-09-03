@@ -8492,6 +8492,11 @@ public abstract class CodenameOneImplementation {
     /// empty selection rather than reading the address book, because falling
     /// back to a broad read is exactly what the caller was avoiding.
     ///
+    /// **An override must call `response` exactly once**, whether the user
+    /// picked, cancelled or the platform refused. `Display` counts on that to
+    /// know when a pick has finished, and a port that answers twice or not at
+    /// all breaks the next pick rather than only its own.
+    ///
     /// #### Parameters
     ///
     /// - `requestedFields`: bit set of the field constants on

@@ -186,12 +186,23 @@ class AndroidContactPicker {
      * on Android before 17.
      *
      * <p>The data URI decides what the user is choosing and what the returned
-     * row holds. Picking a phone number returns the number and the owner's
-     * display name under one grant; picking a contact returns the contact
-     * row, whose data rows would need {@code READ_CONTACTS} to read. So the
-     * most specific requested field wins, and a request naming several of
-     * them gets whichever one this ranking puts first rather than a
-     * permission prompt.</p>
+     * row holds. Picking a phone number returns that number under one grant,
+     * which is why the most specific requested field wins: a request naming
+     * several of them gets whichever one this ranking puts first rather than
+     * a permission prompt.</p>
+     *
+     * <p>A request for a photo, a birthday or a web site has no content URI
+     * of its own -- {@code ACTION_PICK} offers none -- so it falls through to
+     * the contact, and those fields are read afterwards through the directory
+     * hanging off the granted contact URI. See
+     * {@code applyContactEntity}.</p>
+     *
+     * <p>{@code requireAllRequestedFields} has no effect here. The pre-17
+     * picker takes no predicate, so every contact is offered and the caller
+     * has to cope with one that turned out to be missing a field -- which is
+     * what its own documentation says a platform may do. Narrowing it any
+     * further would mean reading the address book to decide, which is the
+     * thing this path exists to avoid.</p>
      *
      * @param requestedFields bit set of {@link ContactPicker} constants
      * @return the intent to launch
@@ -271,6 +282,7 @@ class AndroidContactPicker {
             return new Contact[0];
         }
         Cursor cursor = null;
+        Uri picked = data.getData();
         try {
             ContentResolver resolver = context.getContentResolver();
             // A null projection rather than a chosen one. The session
@@ -279,13 +291,13 @@ class AndroidContactPicker {
             // different content URIs whose columns differ; asking for
             // whatever each has and tolerating a missing column is the only
             // shape that works for both.
-            cursor = resolver.query(data.getData(), null, null, null, null);
+            cursor = resolver.query(picked, null, null, null, null);
             if (cursor == null) {
                 return new Contact[0];
             }
             return session
                     ? readSession(cursor, requestedFields)
-                    : readLegacyRow(cursor, requestedFields);
+                    : readLegacyRow(cursor, resolver, picked, requestedFields);
         } catch (SecurityException err) {
             // The temporary grant is gone, which is what happens when the
             // result is handled after the process was rebuilt.
@@ -333,9 +345,16 @@ class AndroidContactPicker {
             if (contact == null) {
                 contact = new Contact();
                 contact.setId(key);
-                String display = column(cursor, nameColumn);
-                if (display != null) {
-                    contact.setDisplayName(display);
+                // Gated on NAME. The session cursor joins the owner's display
+                // name onto every row, so a phone-only request would come
+                // back carrying the name as well -- which is data the caller
+                // deliberately did not ask for and which this API promises
+                // not to hand over.
+                if ((requestedFields & ContactPicker.NAME) != 0) {
+                    String display = column(cursor, nameColumn);
+                    if (display != null) {
+                        contact.setDisplayName(display);
+                    }
                 }
                 byPerson.put(key, contact);
             }
@@ -357,7 +376,8 @@ class AndroidContactPicker {
      * @param requestedFields bit set of {@link ContactPicker} constants
      * @return the single picked contact, or an empty array
      */
-    private static Contact[] readLegacyRow(Cursor cursor, int requestedFields) {
+    private static Contact[] readLegacyRow(Cursor cursor, ContentResolver resolver,
+            Uri picked, int requestedFields) {
         if (!cursor.moveToFirst()) {
             return new Contact[0];
         }
@@ -371,25 +391,91 @@ class AndroidContactPicker {
             id = column(cursor, cursor.getColumnIndex(ContactsContract.Contacts._ID));
         }
         contact.setId(id);
-        String display = column(cursor,
-                cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
-        if (display != null) {
-            contact.setDisplayName(display);
+        // Gated on NAME for the same reason as the session path: a data row
+        // carries the owner's display name as a joined column, so an
+        // ungated read would hand a phone-only caller the name too.
+        if ((requestedFields & ContactPicker.NAME) != 0) {
+            String display = column(cursor,
+                    cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
+            if (display != null) {
+                contact.setDisplayName(display);
+            }
         }
-        String mime = column(cursor,
-                cursor.getColumnIndex(ContactsContract.Data.MIMETYPE));
+        int mimeColumn = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE);
+        String mime = column(cursor, mimeColumn);
+        if (mimeColumn < 0) {
+            // No MIMETYPE column at all, so this is the contact row rather
+            // than a data row -- what the ranking picks when the request
+            // wants something no ACTION_PICK content URI offers. The row
+            // itself holds only the name, so the data rows are read through
+            // the directory hanging off the same granted URI.
+            applyContactEntity(contact, resolver, picked, requestedFields);
+            return new Contact[]{contact};
+        }
         if (mime == null) {
-            // A row with no MIMETYPE is either the contact row -- which is
-            // what a name-only request picks and which carries nothing else
-            // to read -- or a contacts app that answered from an older view
-            // of the same table. Reading it as the kind the request asked
-            // for costs a few null column lookups and is the difference
-            // between returning the number the user picked and returning
-            // only their name.
+            // The column exists but this row left it empty, which is a
+            // contacts app answering from an older view of the same table.
+            // Reading it as the kind the request asked for costs a few null
+            // column lookups and is the difference between returning the
+            // number the user picked and returning only their name.
             mime = legacyMimeType(requestedFields);
         }
         applyRow(contact, cursor, mime, requestedFields);
         return new Contact[]{contact};
+    }
+
+    /**
+     * Reads the picked contact's data rows through the directory that hangs
+     * off the granted contact URI.
+     *
+     * <p>This is the only way the pre-17 path can answer a request for a
+     * photo, a birthday or a web site: no {@code ACTION_PICK} content URI
+     * offers those kinds, so the ranking falls through to the contact itself,
+     * and the contact row carries nothing but the name.</p>
+     *
+     * <p>Whether the URI grant reaches the directory is a property of the
+     * device's contacts provider rather than something the API can promise,
+     * so a refusal is caught and the caller simply gets the fields that were
+     * readable. That is the same outcome as before this existed -- it can
+     * only add fields, never lose one -- and it never falls back to asking
+     * for {@code READ_CONTACTS}, which is the whole point of the picker.</p>
+     *
+     * @param contact         the contact being assembled
+     * @param resolver        used to query the directory
+     * @param contactUri      the URI the contacts app returned and granted
+     * @param requestedFields bit set of {@link ContactPicker} constants
+     */
+    private static void applyContactEntity(Contact contact, ContentResolver resolver,
+            Uri contactUri, int requestedFields) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
+            // ContactsContract.Contacts.Entity arrived in API 11, and merely
+            // naming it on an older device is a NoClassDefFoundError rather
+            // than something the catch below could see.
+            return;
+        }
+        Cursor rows = null;
+        try {
+            rows = resolver.query(Uri.withAppendedPath(contactUri,
+                    ContactsContract.Contacts.Entity.CONTENT_DIRECTORY),
+                    null, null, null, null);
+            if (rows == null) {
+                return;
+            }
+            int mimeColumn = rows.getColumnIndex(
+                    ContactsContract.Contacts.Entity.MIMETYPE);
+            while (rows.moveToNext()) {
+                applyRow(contact, rows, column(rows, mimeColumn), requestedFields);
+            }
+        } catch (SecurityException err) {
+            Log.p("Contact picker: the grant does not reach this contact's "
+                    + "data rows, returning the fields that were readable");
+        } catch (RuntimeException err) {
+            Log.e(err);
+        } finally {
+            if (rows != null) {
+                rows.close();
+            }
+        }
     }
 
     /**

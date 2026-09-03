@@ -213,6 +213,65 @@ class ContactPickerTest extends UITestBase {
         });
     }
 
+    /**
+     * A second pick while the first is still outstanding is refused.
+     *
+     * <p>Without this the ports' single result slot decodes the first pick
+     * with the second request's fields and hands it to the second listener,
+     * and the first listener is never called at all. A double tap is enough
+     * to produce it, and no platform can show two pickers at once anyway.</p>
+     */
+    @FormTest
+    void aSecondPickWhileOneIsOutstandingReportsEmpty() {
+        implementation.clearContacts();
+        implementation.setContactPickerSupported(true);
+        implementation.setContactPickerSelection(contact("a", "Alice", "111"));
+
+        final CountDownLatch first = new CountDownLatch(1);
+        final AtomicReference<Contact[]> firstResult = new AtomicReference<Contact[]>();
+        new ContactPicker().pick(new ActionListener<ActionEvent>() {
+            @Override
+            public void actionPerformed(ActionEvent ev) {
+                firstResult.set(ContactPicker.getPickedContacts(ev));
+                first.countDown();
+            }
+        });
+
+        // Still in flight: this test body IS the EDT, so the first listener
+        // has not run yet.
+        final CountDownLatch second = new CountDownLatch(1);
+        final AtomicReference<Contact[]> secondResult = new AtomicReference<Contact[]>();
+        new ContactPicker().pick(new ActionListener<ActionEvent>() {
+            @Override
+            public void actionPerformed(ActionEvent ev) {
+                secondResult.set(ContactPicker.getPickedContacts(ev));
+                second.countDown();
+            }
+        });
+
+        waitFor(first, 5000);
+        waitFor(second, 5000);
+        assertEquals(1, firstResult.get().length,
+                "the pick that was already running must still report its selection");
+        assertEquals("Alice", firstResult.get()[0].getDisplayName());
+        assertEquals(0, secondResult.get().length,
+                "the refused pick must report an empty selection, not the other one's");
+        assertEquals(1, implementation.getContactPickerRequests().size(),
+                "the refused pick must never reach the port");
+    }
+
+    /** And the picker works again once the outstanding one has answered. */
+    @FormTest
+    void aPickAfterTheLastOneFinishedIsAccepted() {
+        implementation.clearContacts();
+        implementation.setContactPickerSupported(true);
+        implementation.setContactPickerSelection(contact("a", "Alice", "111"));
+
+        assertEquals(1, pickAndWait(new ContactPicker()).length);
+        assertEquals(1, pickAndWait(new ContactPicker()).length,
+                "the guard must not wedge the picker after a completed pick");
+    }
+
     /** isSupported reports what the platform said, not a guess. */
     @FormTest
     void supportIsReportedFromThePlatform() {

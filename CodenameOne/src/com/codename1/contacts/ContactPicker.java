@@ -257,9 +257,10 @@ public class ContactPicker {
     /// instance an invitation flow that needs both a name and an email
     /// address. Leave it off when any one of the requested fields will do.
     ///
-    /// A platform applies it as far as its own picker can. Android enforces
-    /// it exactly; iOS enforces it over phone numbers, email addresses and
-    /// postal addresses, and cannot filter on the remaining fields. So the
+    /// A platform applies it as far as its own picker can. Android 17 and
+    /// later enforce it exactly; iOS enforces it over phone numbers, email
+    /// addresses and postal addresses and cannot filter on the rest; Android
+    /// before 17 has no picker predicate at all and ignores it. So the
     /// listener still has to cope with a contact that turned out to be
     /// missing one.
     ///

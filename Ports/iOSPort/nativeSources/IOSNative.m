@@ -10021,6 +10021,19 @@ void com_codename1_impl_ios_IOSNative_openContactPicker___int_boolean_int(CN1_TH
     const int limit = multi ? (int)selectionLimit : 1;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+        if (cn1ContactPickerDelegate != nil) {
+            // A picker is already on screen. UIKit would refuse the second
+            // presentation anyway, and overwriting the delegate slot would
+            // release the object the first picker still holds a WEAK
+            // reference to -- a dangling pointer rather than a missed
+            // callback. Display rejects a second pick before it reaches
+            // here; this is the same answer for anything that calls the
+            // native directly.
+            POOL_END();
+            com_codename1_impl_ios_IOSImplementation_contactPickerResult___int(
+                    CN1_THREAD_GET_STATE_PASS_ARG 0);
+            return;
+        }
         cn1ContactPickerLimit = limit;
         CNContactPickerViewController* picker =
                 [[CNContactPickerViewController alloc] init];

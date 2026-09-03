@@ -6759,8 +6759,74 @@ public final class Display extends CN1Constants {
     public void pickContacts(int requestedFields, boolean multiSelect,
                              int selectionLimit, boolean requireAllRequestedFields,
                              ActionListener<ActionEvent> response) {
+        if (contactPickInProgress) {
+            // A second pick while the first is still on screen, which a
+            // double tap is enough to produce. The platforms cannot honour it
+            // either -- UIKit refuses to present a second modal controller,
+            // and the Android picker activity is already on top -- and the
+            // single result slot each port keeps would then decode the first
+            // pick with the second request's fields and hand it to the second
+            // listener, leaving the first listener with nothing. Reporting an
+            // empty selection is what a cancelled pick reports, so the caller
+            // needs no separate case for it.
+            deliverEmptyContactPick(response);
+            return;
+        }
+        contactPickInProgress = true;
         impl.pickContacts(requestedFields, multiSelect, selectionLimit,
-                requireAllRequestedFields, response);
+                requireAllRequestedFields, new ContactPickCompletion(response));
+    }
+
+    /// True between a contact pick starting and its listener being called.
+    ///
+    /// Read and written on the EDT only: the call in comes from application
+    /// code and every port answers through `Display#callSerially(Runnable)`.
+    private boolean contactPickInProgress;
+
+    private void deliverEmptyContactPick(ActionListener<ActionEvent> response) {
+        if (response == null) {
+            return;
+        }
+        callSerially(new EmptyContactPick(response));
+    }
+
+    /// Tells one listener that its pick produced nothing.
+    ///
+    /// A named static class rather than the anonymous one this obviously
+    /// wants to be: an anonymous one would capture the Display for no reason,
+    /// which is a SpotBugs finding, and that gate is zero-findings.
+    private static final class EmptyContactPick implements Runnable {
+        private final ActionListener<ActionEvent> response;
+
+        EmptyContactPick(ActionListener<ActionEvent> response) {
+            this.response = response;
+        }
+
+        @Override
+        public void run() {
+            response.actionPerformed(new ActionEvent(new Contact[0]));
+        }
+    }
+
+    /// Clears the in-progress flag and passes the selection on.
+    ///
+    /// Wrapping the application's listener rather than trusting the port to
+    /// report back is what makes the flag above reliable for every port at
+    /// once, including one whose picker answers without an EDT hop.
+    private class ContactPickCompletion implements ActionListener<ActionEvent> {
+        private final ActionListener<ActionEvent> response;
+
+        ContactPickCompletion(ActionListener<ActionEvent> response) {
+            this.response = response;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent ev) {
+            contactPickInProgress = false;
+            if (response != null) {
+                response.actionPerformed(ev);
+            }
+        }
     }
 
     /// Create a contact to the device contacts book

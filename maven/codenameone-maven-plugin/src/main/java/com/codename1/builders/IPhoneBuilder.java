@@ -2430,6 +2430,18 @@ public class IPhoneBuilder extends Executor {
                     if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0) {
                         usesCalendarApi = true;
                     }
+                    // classesDir only, and deliberately so. Reviewers read the
+                    // database scan beside this one -- which passes buildinRes
+                    // as well -- and conclude a cn1lib's reference would be
+                    // invisible here. It would not: CN1BuildMojo.mergeJars
+                    // merges EVERY compile-classpath element except
+                    // codenameone-core and java-runtime into the
+                    // -jar-with-dependencies.jar that becomes dist.jar, so a
+                    // library's classes arrive already merged with the
+                    // application's own and are walked as loose classes. What
+                    // reaches buildinRes is native input -- framework zips,
+                    // static archives, the port's own sources -- none of which
+                    // references a Java class.
                     if (!usesContactPicker
                             && "com/codename1/contacts/ContactPicker".equals(cls)) {
                         usesContactPicker = true;
@@ -2752,6 +2764,19 @@ public class IPhoneBuilder extends Executor {
                     // entries for every feature, health included, and is
                     // indifferent to what follows.
                     aiAcc.consumeMethod(cls, method);
+                    // Display carries the contact picker too, and an app is
+                    // free to call it there instead of through ContactPicker.
+                    // The class reference cannot say so -- every app
+                    // references Display -- so the two entry points are named.
+                    // Missing one ships an iOS build with the picker compiled
+                    // out and every pick answering empty, while the same app
+                    // works on Android and in the simulator.
+                    if (!usesContactPicker
+                            && "com/codename1/ui/Display".equals(cls)
+                            && (method.indexOf("pickContacts") > -1
+                                || method.indexOf("isContactPickerSupported") > -1)) {
+                        usesContactPicker = true;
+                    }
                     // Health.getStore()/getWorkouts() mean a real platform
                     // store; Health.getSensors() means BLE only. The class
                     // reference alone cannot tell them apart, so the facade
