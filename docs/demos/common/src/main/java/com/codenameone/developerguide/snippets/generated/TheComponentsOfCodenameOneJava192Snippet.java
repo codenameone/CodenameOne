@@ -91,11 +91,12 @@ class TheComponentsOfCodenameOneJava192Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-192[]
-        Image duke = null;
+        Image duke;
         try {
             duke = Image.createImage("/duke.png");
         } catch(IOException err) {
             Log.e(err);
+            return; // without the icon there is nothing to show
         }
         int fiveMM = Display.getInstance().convertToPixels(5);
         final Image finalDuke = duke.scaledWidth(fiveMM);

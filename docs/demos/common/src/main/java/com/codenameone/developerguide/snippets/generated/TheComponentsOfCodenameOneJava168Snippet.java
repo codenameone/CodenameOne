@@ -92,6 +92,9 @@ class TheComponentsOfCodenameOneJava168Snippet {
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-168[]
         class GRMMModel implements ListModel<Map<String,Object>> {
+            private int selection;
+            private final java.util.List<SelectionListener> selectionListeners = new ArrayList<>();
+
             @Override
             public Map<String, Object> getItemAt(int index) {
                 int idx = index % 7;
@@ -120,11 +123,16 @@ class TheComponentsOfCodenameOneJava168Snippet {
 
             @Override
             public int getSelectedIndex() {
-                return 0;
+                return selection;
             }
 
             @Override
             public void setSelectedIndex(int index) {
+                int old = selection;
+                selection = index;
+                for(SelectionListener l : selectionListeners) {
+                    l.selectionChanged(old, index);
+                }
             }
 
             @Override
@@ -137,10 +145,12 @@ class TheComponentsOfCodenameOneJava168Snippet {
 
             @Override
             public void addSelectionListener(SelectionListener l) {
+                selectionListeners.add(l);
             }
 
             @Override
             public void removeSelectionListener(SelectionListener l) {
+                selectionListeners.remove(l);
             }
 
             @Override

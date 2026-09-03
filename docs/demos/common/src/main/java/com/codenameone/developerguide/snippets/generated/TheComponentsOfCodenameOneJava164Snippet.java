@@ -116,7 +116,7 @@ class TheComponentsOfCodenameOneJava164Snippet {
                 cmps[iter] = new MultiButton(summary);
                 cmps[iter].setIcon(URLImage.createToStorage(placeholder, guid, thumb_url));
             }
-            InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), cmps, true); // <5>
+            InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), cmps, !data.isEmpty()); // <5>
         }, true); // <6>
         hi.show();
         // end::the-components-of-codename-one-java-164[]

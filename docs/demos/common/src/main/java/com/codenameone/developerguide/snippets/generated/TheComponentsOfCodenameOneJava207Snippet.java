@@ -102,12 +102,17 @@ class TheComponentsOfCodenameOneJava207Snippet {
                     "    </body>\n" +
                     "</html>", null);
         hi.add(BorderLayout.CENTER, bc);
-        bc.addWebEventListener("onLoad", (e) -> {
-            // Create a JavaScript context for this BrowserComponent
-            JavascriptContext ctx = new JavascriptContext(bc);
+        bc.addWebEventListener("onLoad", new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                // the destination fires onLoad too, so stop listening before navigating
+                bc.removeWebEventListener("onLoad", this);
 
-            JSObject jo = (JSObject)ctx.get("window");
-            jo.set("location", "https://www.codenameone.com/");
+                // Create a JavaScript context for this BrowserComponent
+                JavascriptContext ctx = new JavascriptContext(bc);
+
+                JSObject jo = (JSObject)ctx.get("window");
+                jo.set("location", "https://www.codenameone.com/");
+            }
         });
         hi.show();
         // end::the-components-of-codename-one-java-207[]
