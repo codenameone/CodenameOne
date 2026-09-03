@@ -2304,46 +2304,17 @@ To force an update check, run `mvn cn1:update` from the project root.
 
 ==== How does it work
 
-// vale-skip: Microsoft.Contractions: "of it is simple" parses as the prepositional phrase "of it" plus the predicate "is simple"; collapsing it to "of it's" would read as a possessive ("of its simple") and lose the meaning.
-You can see the full code https://github.com/codenameone/UpdateCodenameOne[here] the gist of it is simple. You create a jar called `UpdateCodenameOne.jar` under `~/.codenameone` (`~` represents the users home directory).
+`mvn cn1:update` reads the Maven metadata for the Codename One plugin from
+https://repo.codenameone.com/maven2[the Codename One repository], resolves the
+newest published release and rewrites the `cn1.version` and `cn1.plugin.version`
+properties in the project's pom. The rest is ordinary Maven: the new
+framework, plugin and designer artifacts resolve on the next build and land in the
+local repository, so a second project on the same machine reuses that download
+rather than fetching its own copy.
 
-An update happens by running this tool with a path to a Codename One project for example:
-
-[source,bash]
-----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.sh[tag=advanced-topics-under-the-hood-bash-002,indent=0]
-----
-
-For example:
-
-----
-java -jar ~/.codenameone/UpdateCodenameOne.jar ~/dev/AccordionDemo
-Checking: JavaSE.jar
-Checking: CodeNameOneBuildClient.jar
-Checking: CLDC11.jar
-Checking: CodenameOne.jar
-Checking: CodenameOne_SRC.jar
-Checking: designer_1.jar
-Checking: guibuilder_1.jar
-Updating the file: /Users/shai/dev/AccordionDemo/JavaSE.jar
-Updating the file: /Users/shai/dev/AccordionDemo/CodeNameOneBuildClient.jar
-Updating the file: /Users/shai/dev/AccordionDemo/lib/CLDC11.jar
-Updating the file: /Users/shai/dev/AccordionDemo/lib/CodenameOne.jar
-Updated project files
-----
-
-Notice that no download happened since the files were up-to-date. You can also force a check against the server by adding the force argument as such:
-
-[source,bash]
-----
-include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.sh[tag=advanced-topics-under-the-hood-bash-003,indent=0]
-----
-
-The way this works under the hood is thought a `Versions.properties` within your directory that lists the versions of local files. That way you know what should be updated.
-
-TIP: Exclude `Versions.properties` from Git
-
-Under the `~/.codenameone` directory you have a more detailed `UpdateStatus.properties` file that includes versions of the locally downloaded files. Notice you can delete this file and it will be recreated as all the jars get downloaded over again.
+A project pinned to a `-SNAPSHOT` is left alone, because a snapshot already tracks
+the newest build. To move a project to a particular release rather than to the
+newest one, name it: `mvn cn1:update -DnewVersion=X.Y.Z`.
 
 ==== What isn't covered
 
