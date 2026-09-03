@@ -57,6 +57,17 @@ REQUIRED_ALIGNMENT = 0x4000
 # ELF, whatever it is called, is found.
 ZIP_MAGIC = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
 
+# Content decides what gets *scanned*; these names decide what gets
+# *challenged*. They are not the old allow-list returning -- nothing is found
+# by being on them, and a container with a name nobody anticipated is still
+# picked up by its magic. They encode a second rule: a file whose name
+# declares a format must actually be that format. Without it, a zeroed or
+# truncated `libfoo.so` matches no magic, is classified as an ordinary file,
+# and is skipped in silence -- the exact "could not look reads as clean" hole
+# this gate exists to avoid, reachable by corrupting a library rather than
+# misaligning it.
+ARCHIVE_NAME_SUFFIXES = (".aar", ".apk", ".aab", ".jar", ".zip", ".cn1lib")
+
 # An archive inside an archive is legitimate and, as the QRScanner cn1lib
 # shows, three deep happens in practice. Bounded so a malformed or hostile
 # ZIP cannot spin this gate forever, but with headroom: exceeding the limit
@@ -171,11 +182,34 @@ def read_load_alignments(data):
     return ei_class == ELFCLASS64, alignments
 
 
-def classify(head):
-    """Return "zip", "elf" or None for the first bytes of a file."""
+def looks_like_shared_library(name):
+    """True for `libfoo.so` and for a versioned `libfoo.so.1`."""
+    base = os.path.basename(name).lower()
+    return base.endswith(".so") or ".so." in base
+
+
+def looks_like_archive(name):
+    return os.path.basename(name).lower().endswith(ARCHIVE_NAME_SUFFIXES)
+
+
+def classify(name, head):
+    """Return "elf", "zip" or None for one file, from its name and content.
+
+    A name claiming to be a shared library always routes to the ELF reader,
+    whatever the bytes turn out to be, so a corrupted library is reported
+    rather than quietly reclassified as something the rule does not cover.
+    Otherwise content decides, which is what finds a container or a library
+    under any name at all. An unreadable file whose name claims a container
+    format falls through to the archive reader for the same reason as the
+    first rule: it is reported, not skipped.
+    """
+    if looks_like_shared_library(name):
+        return "elf"
     if head[:4] == ELF_MAGIC:
         return "elf"
     if head[:4] in ZIP_MAGIC:
+        return "zip"
+    if looks_like_archive(name):
         return "zip"
     return None
 
@@ -243,7 +277,7 @@ class Scanner(object):
                         "%s!%s: cannot read entry (%s)"
                         % (label, entry.filename, error))
                     continue
-                kind = classify(head)
+                kind = classify(entry.filename, head)
                 if kind is None:
                     continue
                 nested = "%s!%s" % (label, entry.filename)
@@ -255,7 +289,7 @@ class Scanner(object):
     def scan_path(self, path):
         with open(path, "rb") as handle:
             head = handle.read(MAGIC_LENGTH)
-        kind = classify(head)
+        kind = classify(path, head)
         if kind is None:
             return
         with open(path, "rb") as handle:
