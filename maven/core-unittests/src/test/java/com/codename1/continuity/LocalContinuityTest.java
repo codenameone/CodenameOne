@@ -1232,8 +1232,16 @@ public class LocalContinuityTest extends UITestBase {
                 new java.util.concurrent.atomic.AtomicInteger();
         private final java.util.concurrent.atomic.AtomicInteger count =
                 new java.util.concurrent.atomic.AtomicInteger();
+        private final java.util.concurrent.atomic.AtomicInteger posts =
+                new java.util.concurrent.atomic.AtomicInteger();
 
         public void publish(AppState state) {
+            posts.incrementAndGet();
+        }
+
+        /** How many states actually reached the endpoint. */
+        int published() {
+            return posts.get();
         }
 
         public AppState fetch() {
@@ -1365,6 +1373,95 @@ public class LocalContinuityTest extends UITestBase {
         flushSerialCalls();
 
         assertEquals(0, listener.calls, "a delivery from before disable() still dispatched");
+    }
+
+    /**
+     * disable() documents that checkpoints stop. A publish deferred behind a relay fetch used to
+     * go out anyway: the state sat in the pending slot, disable() left it there, and the fetch
+     * landing afterwards started a publisher that POSTed it -- after disable() had returned.
+     *
+     * <p>The EDT model is what makes this the only shape worth testing. Nothing can interleave
+     * within a turn, so the sole way work outlives the decision is a relay round trip, and this
+     * is that path.</p>
+     */
+    @EdtTest
+    public void aPublishDeferredBehindAFetchIsNotSentAfterDisable() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        final BlockingFetchRelay r = new BlockingFetchRelay();
+        Continuity.setRelay(r);
+        // setRelay polls, so the fetch is in flight and any checkpoint defers behind it.
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitInFlight();
+            }
+        });
+
+        Continuity.checkpoint();
+        Continuity.disable();
+        r.release();
+        pause(500L);
+
+        assertEquals(0, r.published(),
+                "a state queued before disable() was published after it");
+    }
+
+    /**
+     * A payload-only continuation -- what an app that does not use @Route gets -- is APPLIED even
+     * though no form appears, so it must be marked acted-on. The route-less return skipped the
+     * acknowledgement, so the relay's unchanged document was accepted again after a restart and
+     * the listener repeated its side effects.
+     */
+    @EdtTest
+    public void aPayloadOnlyRestoreIsStillMarkedActedOn() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+
+        AppState payloadOnly = fromElsewhere("payload only", 5L);
+        payloadOnly.setRoutes(new ArrayList<String>());
+
+        assertFalse(Continuity.restore(payloadOnly),
+                "a route-less state shows no form, so restore must report false");
+
+        // Re-delivered exactly as a relay would after a restart. The mark has to reject it.
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+        Continuity.deliver(payloadOnly);
+        flushSerialCalls();
+
+        assertEquals(0, seen[0],
+                "a payload-only state that was already applied was delivered a second time");
+    }
+
+    /**
+     * And the parked slot is released on application, not on a form appearing. Gating it on the
+     * return value kept a payload-only arrival parked for ever, so every restore() re-applied it.
+     */
+    @EdtTest
+    public void aPayloadOnlyParkedStateIsNotOfferedTwice() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+
+        AppState payloadOnly = fromElsewhere("parked payload", 9L);
+        payloadOnly.setRoutes(new ArrayList<String>());
+        Continuity.deliver(payloadOnly);
+        flushSerialCalls();
+
+        assertFalse(Continuity.restore(), "a route-less state shows no form");
+        AppState left = Continuity.getRestorableState();
+        assertFalse(left != null && isSame(left, payloadOnly),
+                "the parked state was applied and must not still be offered");
+    }
+
+    private static boolean isSame(AppState a, AppState b) {
+        return a.getDeviceId().equals(b.getDeviceId()) && a.getSequence() == b.getSequence();
     }
 
     /**

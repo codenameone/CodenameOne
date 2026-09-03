@@ -243,6 +243,13 @@ public final class Continuity {
         enabled = false;
         dirty = false;
         parked = null;
+        // The relay session ends too. A checkpoint whose publish was deferred behind a fetch is
+        // still sitting in the slot, and pollFinished() starts a publisher when that fetch lands
+        // -- so without this a state queued before disable() went out on the wire after it had
+        // returned, which is exactly what "checkpoints stop" is supposed to mean. clear() has
+        // always done this; disable() is a weaker promise about the same machinery, not a
+        // different one.
+        endRelaySession();
         clearContinuation();
     }
 
@@ -636,7 +643,10 @@ public final class Continuity {
         // retry was rejected after the next launch too -- a state that was never restored then
         // could not be restored at all, which is the one outcome this feature exists to prevent.
         boolean shown = restore(state);
-        if (shown && isSameState(parked, state)) {
+        // Released because the state was APPLIED, not because a form appeared. Gating this on
+        // `shown` kept a payload-only arrival parked for ever: restore(state) hands the payload
+        // to the provider and returns false, so every later call re-applied the same state.
+        if (isSameState(parked, state)) {
             parked = null;
         }
         return shown;
@@ -698,6 +708,16 @@ public final class Continuity {
                 Log.e(t);
             }
         }
+        // Acknowledged HERE, before the branch below, because the state has now been APPLIED --
+        // which is not the same question as whether a form appeared.
+        //
+        // The comment that used to sit at the bottom of this method said exactly that and was
+        // wrong about where it happened: the route-less return below skipped it, so the one case
+        // it named -- a payload-only continuation, what an app that does not use @Route gets --
+        // was the case that never got marked. The relay offered the unchanged document again
+        // after every restart, and with automatic restore off the no-argument wrapper re-applied
+        // it on every call.
+        noteActedOn(state);
         List<String> routes = state.getRoutes();
         if (routes.isEmpty()) {
             // Payload-only restoration, which is what an app that does not use @Route gets. The
@@ -733,15 +753,6 @@ public final class Continuity {
             // back to the position that preceded the restore.
             persist(state);
         }
-        // Acknowledged whenever the state was APPLIED, which is not the same question as whether
-        // a form appeared. A route-less continuation is applied by handing its payload to the
-        // provider -- the documented shape for an app that does not use @Route -- and
-        // restoreStack() then returns false, so tying the acknowledgement to the return value
-        // left that state unmarked: the relay offered it again after every restart, and with
-        // automatic restore off the no-argument wrapper re-applied it on every call. Calling
-        // restore() IS the acceptance; what it returns only says whether the caller still needs
-        // to show a screen.
-        noteActedOn(state);
         return shown;
     }
 
@@ -1013,7 +1024,11 @@ public final class Continuity {
     /// one: a state retained after a failed send is sent by whatever finishes next -- a poll, or
     /// the following checkpoint -- rather than sitting in the slot forever.
     private static void startPublisher() {
-        if (!Display.isInitialized() || relay == null) {
+        if (!Display.isInitialized() || relay == null || !enabled) {
+            // `enabled` as the general invariant, beside the specific drop in disable(). Nothing
+            // may reach the relay while the framework is off, and this is the one funnel every
+            // publication passes through -- including the ones started by a worker completing
+            // after the application turned it off.
             return;
         }
         if (publishing) {
