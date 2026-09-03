@@ -103,6 +103,12 @@ class TheComponentsOfCodenameOneJava192Snippet {
             Contact[] cnts = Display.getInstance().getAllContacts(true, true, true, true, false, false);
             Display.getInstance().callSerially(() -> {
                 hi.removeAll();
+                if(cnts == null) {
+                    // the platform has no contacts API, or access was refused
+                    hi.add(new Label("Contacts are unavailable"));
+                    hi.revalidate();
+                    return;
+                }
                 for(Contact c : cnts) {
                     MultiButton m = new MultiButton();
                     m.setTextLine1(c.getDisplayName());
