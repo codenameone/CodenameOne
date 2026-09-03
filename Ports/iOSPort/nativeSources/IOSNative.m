@@ -9845,6 +9845,11 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
 #define CN1_CONTACT_FIELD_WEBSITE 64
 // IOSImplementation.CONTACT_PICKER_REQUIRE_ALL, which rides the same int.
 #define CN1_CONTACT_REQUIRE_ALL 0x40000000
+// The fields CNContactPickerViewController's enabling predicate cannot test.
+// Every contact has a name, and the other three are not predicate key paths.
+#define CN1_CONTACT_UNFILTERABLE (CN1_CONTACT_FIELD_NAME \
+        | CN1_CONTACT_FIELD_PHOTO | CN1_CONTACT_FIELD_BIRTHDAY \
+        | CN1_CONTACT_FIELD_WEBSITE)
 
 #if defined(CN1_USE_CONTACT_PICKER) && TARGET_OS_IOS
 
@@ -9989,7 +9994,13 @@ static NSPredicate* cn1ContactPickerPredicate(int fields, BOOL requireAll) {
     if ([clauses count] == 0) {
         return nil;
     }
-    if (!requireAll && (fields & CN1_CONTACT_FIELD_NAME) != 0) {
+    // An "any of these" request that names a field with no clause cannot be
+    // narrowed at all. Every contact has a name, and a contact with only a
+    // photo, a birthday or a web site satisfies the request just as well as
+    // one with a phone number -- so ORing the clauses that DO exist would
+    // hide it. Only NAME was exempted here at first, which left
+    // PHONE|PHOTO behaving as phone-only.
+    if (!requireAll && (fields & CN1_CONTACT_UNFILTERABLE) != 0) {
         return nil;
     }
     NSString* joined = [clauses componentsJoinedByString:(requireAll ? @" AND " : @" OR ")];

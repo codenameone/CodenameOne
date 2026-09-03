@@ -72,6 +72,24 @@ final class ContactsPermissionScan {
         "ContactPicker",
     };
 
+    // Exempting Contact is safe even when the code that READ it lives in a
+    // submitted library, which review has asked about three times. A cn1lib is
+    // entirely client-side: CN1BuildMojo.mergeJars merges every
+    // compile-classpath element except codenameone-core and java-runtime into
+    // the -jar-with-dependencies.jar that becomes the dist.jar the client
+    // uploads, so the library's own ContactsManager and Display references
+    // are walked by the same scan of loose classes that sees the
+    // application's.
+    //
+    // Measured rather than argued, on a real built artifact: the sample app's
+    // dist.jar carries com/codename1/ads/mock/*.class -- classes belonging to
+    // its cn1-ads-mock DEPENDENCY -- as loose entries stamped with that
+    // library's own build date, and contains no nested jar or aar at all.
+    // Nothing routed to the libraries directory holds Java classes, so
+    // folding that tree in would add no signal and would risk the opposite
+    // failure: a scanner over a directory that also receives framework
+    // payloads reports usage for every application ever built.
+
     private static final String DISPLAY = "com/codename1/ui/Display";
 
     private static final String CONTACTS_MANAGER =

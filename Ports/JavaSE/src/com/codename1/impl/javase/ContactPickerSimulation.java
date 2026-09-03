@@ -134,8 +134,36 @@ final class ContactPickerSimulation {
         }
     }
 
+    /**
+     * The contact's own name, or null when it has none.
+     *
+     * <p>Deliberately never {@link Contact#getDisplayName()}. That getter
+     * SYNTHESIZES a display name from the primary phone, the primary email or
+     * the id when the contact has none -- and caches the result back into the
+     * contact. Asking it whether a contact has a name therefore always
+     * answers yes, which would let a nameless contact satisfy
+     * {@code requireAllRequestedFields} and would hand the caller a phone
+     * number as a display name. Worse, the caching would rewrite the
+     * simulated address book permanently, so the second pick would see a
+     * contact the first pick invented.</p>
+     *
+     * @param contact the simulated contact
+     * @return the declared name, or null
+     */
+    static String declaredName(Contact contact) {
+        String first = contact.getFirstName();
+        String family = contact.getFamilyName();
+        if (first != null && family != null) {
+            return first + " " + family;
+        }
+        if (first != null) {
+            return first;
+        }
+        return family;
+    }
+
     private static String name(Contact contact) {
-        String display = contact.getDisplayName();
+        String display = declaredName(contact);
         if (display != null) {
             return display;
         }
@@ -172,9 +200,7 @@ final class ContactPickerSimulation {
     private static boolean has(Contact contact, int field) {
         switch (field) {
             case ContactPicker.NAME:
-                return contact.getDisplayName() != null
-                        || contact.getFirstName() != null
-                        || contact.getFamilyName() != null;
+                return declaredName(contact) != null;
             case ContactPicker.PHONE:
                 return notEmpty(contact.getPhoneNumbers());
             case ContactPicker.EMAIL:
@@ -212,7 +238,11 @@ final class ContactPickerSimulation {
         Contact out = new Contact();
         out.setId(source.getId());
         if ((fields & ContactPicker.NAME) != 0) {
-            out.setDisplayName(source.getDisplayName());
+            // declaredName, not getDisplayName: see the note there. A contact
+            // with no name of its own comes back with a null display name,
+            // which is what Android does when the picker returns no
+            // structured-name row.
+            out.setDisplayName(declaredName(source));
             out.setFirstName(source.getFirstName());
             out.setFamilyName(source.getFamilyName());
         }
@@ -236,7 +266,17 @@ final class ContactPickerSimulation {
             out.setBirthday(source.getBirthday());
         }
         if ((fields & ContactPicker.WEBSITE) != 0) {
-            out.setUrls(source.getUrls());
+            // Cloned, like every other field here. Handing the array over
+            // would let the caller's edits reach back into the simulated
+            // address book and into every later pick -- a picked contact is
+            // documented as a snapshot, and Android and iOS both build a
+            // fresh array.
+            String[] urls = source.getUrls();
+            if (urls != null) {
+                String[] copy = new String[urls.length];
+                System.arraycopy(urls, 0, copy, 0, urls.length);
+                out.setUrls(copy);
+            }
         }
         return out;
     }
