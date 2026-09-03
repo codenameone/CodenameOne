@@ -121,13 +121,14 @@ class IoJava096Snippet {
                 try {
                     db = Display.getInstance().openOrCreate("MyDB.db");
                     String sql = query.getText().trim().toLowerCase();
-                    boolean writeCte = sql.startsWith("with") &&
-                            (sql.indexOf("insert") > -1 || sql.indexOf("update") > -1 ||
-                             sql.indexOf("delete") > -1);
-                    boolean returnsRows = !writeCte &&
-                            (sql.startsWith("select") || sql.startsWith("with") ||
-                             sql.startsWith("pragma") || sql.startsWith("explain") ||
-                             sql.startsWith("values"));
+                    // Deciding this properly means parsing the statement, which is a
+                    // long way outside a sample about Database and Cursor. These four
+                    // prefixes always return rows; a CTE can do either, so it goes to
+                    // execute() and a WITH that ends in a SELECT will report success
+                    // without a table.
+                    boolean returnsRows = sql.startsWith("select") ||
+                            sql.startsWith("pragma") || sql.startsWith("explain") ||
+                            sql.startsWith("values");
                     if(returnsRows) {
                         cur = db.executeQuery(query.getText());
                         int columns = cur.getColumnCount();
