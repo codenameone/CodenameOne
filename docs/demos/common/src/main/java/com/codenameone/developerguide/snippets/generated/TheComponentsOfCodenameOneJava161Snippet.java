@@ -95,6 +95,7 @@ class TheComponentsOfCodenameOneJava161Snippet {
         TextField url = new TextField("", "URL", 20, TextField.URL);
         TextField email = new TextField("", "E-Mail", 20, TextField.EMAILADDR);
         TextField phone = new TextField("", "Phone", 20, TextField.PHONENUMBER);
+        String phoneRegex = "[0-9\\-\\+ ]+";
             TextField num1 = new TextField("", "", 5, TextField.NUMERIC);
         TextField num2 = new TextField("", "", 5, TextField.NUMERIC);
         TextField num3 = new TextField("", "", 5, TextField.NUMERIC);
@@ -123,6 +124,5 @@ class TheComponentsOfCodenameOneJava161Snippet {
 
 
 
-    String phoneRegex = "[0-9-]+";
 
 }

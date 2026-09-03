@@ -99,8 +99,13 @@ class TheComponentsOfCodenameOneJava148Snippet {
             if(val.length() > 4) {
                 current.stopEditing();
                 current.setText(val.substring(0, 4));
-                next.setText(val.substring(4));
-                next.startEditingAsync();
+                String rest = val.substring(4);
+                next.setText(rest);
+                if(rest.length() <= 4) {
+                    // a longer remainder means the next field's listener is still
+                    // splitting; let the last one in the chain take the focus
+                    next.startEditingAsync();
+                }
             }
         });
     }
