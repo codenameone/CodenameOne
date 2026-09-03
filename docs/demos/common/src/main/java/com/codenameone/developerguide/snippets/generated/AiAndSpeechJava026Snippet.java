@@ -87,16 +87,7 @@ class AiAndSpeechJava026Snippet {
         ChatView view = new ChatView();
         chat.add(BorderLayout.CENTER, view);
 
-        // The view's history is what it displays. A streaming reply is a bubble
-        // there, not a message -- appendText changes the bubble's text and never
-        // the immutable ChatMessage the view stored -- so every completed reply
-        // would go back to the model as a blank assistant turn. Keep the
-        // conversation the request is built from separately.
-        List<ChatMessage> history = new ArrayList<ChatMessage>();
-
-        ChatMessage greeting = ChatMessage.assistant("How can I help?");
-        view.addMessage(greeting);
-        history.add(greeting);
+        view.addMessage(ChatMessage.assistant("How can I help?"));
 
         // One request at a time. A second send while the first is still
         // streaming builds its request without the first reply, and the two
@@ -111,16 +102,18 @@ class AiAndSpeechJava026Snippet {
             sending[0] = true;
             String text = view.getInput().getText();
             view.getInput().clear();
-            ChatMessage sent = ChatMessage.user(text);
-            view.addMessage(sent);
-            history.add(sent);
+            view.addMessage(ChatMessage.user(text));
             view.setTypingIndicatorVisible(true);
 
+            // Snapshot the history before opening the assistant bubble. The view
+            // records streamed text as it arrives, so completed replies are
+            // already in there; the one thing to leave out is the empty
+            // placeholder that beginAssistantStream() is about to append.
+            //
+            // No model named: the client's default applies, and the simulator's
+            // Ollama redirect sets that for you.
             ChatRequest req = ChatRequest.builder()
-                    // No model named: the client's default applies, and the
-                    // simulator's Ollama redirect sets that for you. Naming a
-                    // cloud model asks a local server for one it lacks.
-                    .messages(new ArrayList<ChatMessage>(history))
+                    .messages(new ArrayList<ChatMessage>(view.getHistory()))
                     .build();
 
             ChatBubble streaming = view.beginAssistantStream();
@@ -137,9 +130,6 @@ class AiAndSpeechJava026Snippet {
             }).ready(resp -> {
                 sending[0] = false;
                 view.setTypingIndicatorVisible(false);
-                // Record what the assistant actually said, so the next turn
-                // carries it rather than an empty placeholder.
-                history.add(resp.getAssistantMessage());
             }).except(err -> {
                 // Without this the indicator stays up for good on a failure, and
                 // the guard above would block every later send.

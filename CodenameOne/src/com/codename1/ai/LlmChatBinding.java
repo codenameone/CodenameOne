@@ -59,6 +59,12 @@ import java.util.List;
 /// // ...add view to a Form and that's it.
 /// ```
 ///
+/// The base request's messages are a **fixed prefix**: they lead every request,
+/// ahead of the conversation held by the view. That is what makes it the place
+/// for a system prompt, and it means anything else put there -- a seed user or
+/// assistant turn -- is repeated on every turn too, so put those in the view
+/// instead.
+///
 /// The view's accumulated history is replayed on every turn so the
 /// model has full conversation context. The original `baseRequest`
 /// is treated as a template -- its model, tools, temperature, etc.
@@ -130,14 +136,11 @@ public final class LlmChatBinding {
         return mergeOutgoing(view.getHistory(), baseRequest);
     }
 
-    /// Combines the base request's messages with the conversation so far.
-    ///
-    /// The base request carries the application's own framing -- typically a
-    /// system prompt -- and the view carries the conversation. Returning only
-    /// the history dropped that framing from every request, not merely from
-    /// later ones: `bind` appends the user message and the assistant
-    /// placeholder to the view before this runs, so the history is never empty
-    /// by the time it is asked.
+    /// Combines the base request's messages with the conversation so far, base
+    /// first. The base is a fixed prefix, sent on every request rather than
+    /// only on the first: it carries the application's framing -- typically a
+    /// system prompt -- and dropping it after the opening turn would change the
+    /// model's instructions midway through a conversation.
     ///
     /// Package private so it can be tested without a `ChatView`.
     static List<ChatMessage> mergeOutgoing(List<ChatMessage> history, ChatRequest baseRequest) {
