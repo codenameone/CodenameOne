@@ -943,8 +943,13 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
     // materialize: one cloud-backed document among local ones was enough to hand the
     // application a different order from the one the user dragged.
     NSMutableArray* files = [[NSMutableArray alloc] init];
+    // And the URI list for the same reason: several public.url items all carry that one
+    // type, so joining them as they arrived ordered the user's links by load time. Kept
+    // apart from `collected`, which holds one value per type and has no notion of order.
+    NSMutableArray* uriSlots = [[NSMutableArray alloc] init];
     for (NSUInteger slot = 0; slot < session.items.count; slot++) {
         [files addObject:[NSNull null]];
+        [uriSlots addObject:[NSNull null]];
     }
     // The representations a file-vending provider also advertises, each named against a file on
     // disk rather than read into memory: {MIME type, path, charset}. One that is another name
@@ -1052,24 +1057,22 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
             [provider loadDataRepresentationForTypeIdentifier:uti
                                             completionHandler:^(NSData* data, NSError* error) {
                 if (data != nil) {
-                    @synchronized (collected) {
-                        NSArray* existing = [collected objectForKey:mime];
-                        if (existing == nil) {
-                            // The identifier is kept beside the bytes because it is what says
-                            // how to read them: several standard text UTIs map to the same MIME
-                            // type and disagree about the encoding.
-                            [collected setObject:@[data, uti] forKey:mime];
-                        } else if ([mime isEqualToString:@"text/uri-list"]) {
-                            // A URI list is a list. Several public.url items all arrive under
-                            // this one type, and keeping whichever asynchronous load happened to
-                            // finish first threw away every URL the user dragged but one. RFC
-                            // 2483 separates them with CRLF, which is what everything else here
-                            // writes and reads.
-                            NSMutableData* joined =
-                                    [NSMutableData dataWithData:[existing objectAtIndex:0]];
-                            [joined appendBytes:"\r\n" length:2];
-                            [joined appendData:data];
-                            [collected setObject:@[joined, [existing objectAtIndex:1]] forKey:mime];
+                    if ([mime isEqualToString:@"text/uri-list"]) {
+                        // A URI list is a list, and its order is the user's. Each item fills
+                        // its own slot and they are joined below in the order they were
+                        // dragged; keeping only the first to arrive threw away every URL but
+                        // one, and appending them as they arrived reordered what was left.
+                        @synchronized (uriSlots) {
+                            [uriSlots replaceObjectAtIndex:slot withObject:@[data, uti]];
+                        }
+                    } else {
+                        @synchronized (collected) {
+                            if ([collected objectForKey:mime] == nil) {
+                                // The identifier is kept beside the bytes because it is what
+                                // says how to read them: several standard text UTIs map to the
+                                // same MIME type and disagree about the encoding.
+                                [collected setObject:@[data, uti] forKey:mime];
+                            }
                         }
                     }
                 }
@@ -1097,6 +1100,28 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
             NSString* charset = [named objectAtIndex:2];
             CN1NativeDragDeliverDropAddFile([named objectAtIndex:0], [named objectAtIndex:1],
                                             charset.length == 0 ? nil : charset);
+        }
+        // The dragged URLs, in the order they were dragged. RFC 2483 separates them with
+        // CRLF, which is what every other port here writes and reads.
+        NSMutableData* uriList = nil;
+        NSString* uriListUti = nil;
+        @synchronized (uriSlots) {
+            for (id entry in uriSlots) {
+                if (entry == [NSNull null]) {
+                    continue;
+                }
+                if (uriList == nil) {
+                    uriList = [NSMutableData dataWithData:[entry objectAtIndex:0]];
+                    uriListUti = [entry objectAtIndex:1];
+                } else {
+                    [uriList appendBytes:"\r\n" length:2];
+                    [uriList appendData:[entry objectAtIndex:0]];
+                }
+            }
+        }
+        if (uriList != nil) {
+            CN1NativeDragDeliverDropAdd(@"text/uri-list", cn1TextFromData(uriList, uriListUti),
+                                        nil);
         }
         // In the order the items were dragged, with the slots nothing filled left out: an
         // item that vends no file, or one whose file would not materialize, is not a gap in
@@ -1145,6 +1170,7 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
 #ifndef CN1_USE_ARC
         [collected release];
         [files release];
+        [uriSlots release];
         [fileBacked release];
 #endif
     });

@@ -10249,8 +10249,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
                     android.content.ClipData clip;
                     if (obj instanceof ClipboardContent) {
-                        clip = clipDataFor((ClipboardContent) obj);
-                        clipboardHolds(lastAssembledClip());
+                        AssembledClip assembled = clipDataFor((ClipboardContent) obj);
+                        clip = assembled.getData();
+                        clipboardHolds(assembled.getClip());
                         if (clip == null) {
                             // A copy of nothing is an empty clipboard, which is a thing the user
                             // asked for and can paste. A *drag* of nothing is not: there the null
@@ -10283,8 +10284,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// #### Returns
     ///
     /// the clip, or null when the content produced no representation at all
-    ClipData clipDataFor(ClipboardContent content) {
-        beginStagingClip();
+    AssembledClip clipDataFor(ClipboardContent content) {
+        // Held here and handed down, never read back off the field. A clipboard copy runs
+        // on the Android UI thread and a drag on the Codename One event dispatch thread, so
+        // two assemblies can overlap -- and one reading the field mid-way filed its
+        // remaining files under the other's id, which split one clip across two and left
+        // the half nobody pinned free to be deleted while the clip still referenced it.
+        final long clip = beginStagingClip();
         int sdk = android.os.Build.VERSION.SDK_INT;
         List<String> mimeTypes = new ArrayList<String>();
         List<ClipData.Item> items = new ArrayList<ClipData.Item>();
@@ -10329,7 +10335,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // the two after it as well, so a clip whose image could not be written went out
         // without the document and the typed representations it also had.
         try {
-            addBinaryContent(content, mimeTypes, items);
+            addBinaryContent(content, mimeTypes, items, clip);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
         }
@@ -10339,7 +10345,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             com.codename1.io.Log.e(t);
         }
         try {
-            addRemainingRepresentations(content, plain, mimeTypes, items);
+            addRemainingRepresentations(content, plain, mimeTypes, items, clip);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
         }
@@ -10352,18 +10358,42 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // is no clip, and the callers decide what that means. Answering with empty text
             // instead replaced the payload with a different one: a drag offering only
             // application/pdf reported success and let another application accept blank text.
-            return null;
+            return new AssembledClip(null, clip);
         }
         // Built from the union of the types, not by appending to a text clip. ClipData.addItem
         // does not add the item's type to the description, so a clip assembled that way
         // describes itself as text only -- and both a Codename One drop target filtering on
         // MIME_FILE and an external receiver choosing a representation read the description.
-        ClipData clip = new ClipData("Codename One",
+        ClipData data = new ClipData("Codename One",
                 mimeTypes.toArray(new String[mimeTypes.size()]), items.get(0));
         for (int iter = 1; iter < items.size(); iter++) {
-            clip.addItem(items.get(iter));
+            data.addItem(items.get(iter));
         }
-        return clip;
+        return new AssembledClip(data, clip);
+    }
+
+    /// A clip and the assembly that built it.
+    ///
+    /// The id travels with the clip because that is the only way its caller can say which
+    /// assembly the clipboard or the drag now holds: a field read afterwards answers about
+    /// whichever assembly began most recently, and two of them can be in flight at once.
+    static final class AssembledClip {
+        /// The clip, or null when the content produced nothing that could be published.
+        private final ClipData data;
+        private final long clip;
+
+        AssembledClip(ClipData data, long clip) {
+            this.data = data;
+            this.clip = clip;
+        }
+
+        ClipData getData() {
+            return data;
+        }
+
+        long getClip() {
+            return clip;
+        }
     }
 
     // ------------------------------------------------------------------------------------
@@ -10399,7 +10429,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * ClipData.addItem cannot widen a description that already exists.
      */
     private void addBinaryContent(ClipboardContent content, List<String> mimeTypes,
-            List<ClipData.Item> items) throws IOException {
+            List<ClipData.Item> items, long clip) throws IOException {
         String authority = getContext().getPackageName() + ".provider";
 
         // The files first, then the byte-backed representations. Android's ClipData.Item holds
@@ -10440,7 +10470,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         File file = pathOrUri.startsWith("file:")
                                 ? new File(Uri.parse(pathOrUri).getPath())
                                 : new File(pathOrUri);
-                        u = shareableUriFor(file, authority);
+                        u = shareableUriFor(file, authority, clip);
                     }
                     if (!mimeTypes.contains("text/uri-list")) {
                         mimeTypes.add("text/uri-list");
@@ -10477,7 +10507,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if (imageBytes != null) {
             try {
-                Uri imageUri = writeAsProviderUri(imageBytes, imageExt, imageMime);
+                Uri imageUri = writeAsProviderUri(imageBytes, imageExt, imageMime, clip);
                 if (imageUri != null) {
                     if (!mimeTypes.contains(imageMime)) {
                         mimeTypes.add(imageMime);
@@ -10573,7 +10603,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// the clip holds something it cannot then produce, and a Codename One target would accept
     /// the hover and be refused at the drop.
     private void addRemainingRepresentations(ClipboardContent content, String carriedText,
-            List<String> mimeTypes, List<ClipData.Item> items) throws IOException {
+            List<String> mimeTypes, List<ClipData.Item> items, long clip) throws IOException {
         String[] advertised = content.getMimeTypes();
         for (int iter = 0; iter < advertised.length; iter++) {
             String mime = advertised[iter];
@@ -10606,7 +10636,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             if (bytes != null) {
                 try {
-                    Uri uri = writeAsProviderUri(bytes, extensionForMime(mime), mime);
+                    Uri uri = writeAsProviderUri(bytes, extensionForMime(mime), mime, clip);
                     if (uri != null) {
                         mimeTypes.add(mime);
                         items.add(new ClipData.Item(uri));
@@ -10632,7 +10662,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static final long MAX_STAGED_SHARE_BYTES = 8L * 1024 * 1024;
     private static final String SHARED_COPY_PREFIX = "cn1-shared-";
 
-    private Uri shareableUriFor(File file, String authority) throws IOException {
+    private Uri shareableUriFor(File file, String authority, long clip) throws IOException {
         try {
             Uri direct = FileProvider.getUriForFile(getContext(), authority, file);
             getContext().grantUriPermission("android", direct,
@@ -10680,7 +10710,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 Intent.FLAG_GRANT_READ_URI_PERMISSION);
         // Remembered so it is cleaned up, but not as transport: this is a file the source
         // published, and it has to read back as one.
-        rememberStagedClipFile(staged, copy, false);
+        rememberStagedClipFile(staged, copy, false, clip);
         return staged;
     }
 
@@ -10692,7 +10722,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     ///
     /// The name carries `mime` so the read back is an answer rather than a guess -- see
     /// `#decodeMimeFromFileName(java.lang.String)`.
-    private Uri writeAsProviderUri(byte[] bytes, String extension, String mime) throws IOException {
+    private Uri writeAsProviderUri(byte[] bytes, String extension, String mime, long clip)
+            throws IOException {
         if (bytes == null) {
             return null;
         }
@@ -10719,7 +10750,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 getContext().getPackageName() + ".provider", file);
         // Grant broadly so any paste or drop target can read the content:// URI
         getContext().grantUriPermission("android", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        rememberStagedClipFile(uri, file, true);
+        rememberStagedClipFile(uri, file, true, clip);
         return uri;
     }
 
@@ -11141,16 +11172,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
-    /// The clip `#clipDataFor(com.codename1.ui.ClipboardContent)` assembled last.
-    ///
-    /// Read straight after the call that built it: one clip is assembled at a time, on the
-    /// thread that asked for it.
-    static long lastAssembledClip() {
-        synchronized (STAGED_CLIP_FILES) {
-            return stagingClip;
-        }
-    }
-
     /// Records which clip the system clipboard now holds, or zero for a clip with nothing
     /// staged for it.
     ///
@@ -11170,9 +11191,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
-    private static void rememberStagedClipFile(Uri uri, File file, boolean transport) {
+    private static void rememberStagedClipFile(Uri uri, File file, boolean transport,
+            long clip) {
         synchronized (STAGED_CLIP_FILES) {
-            long clip = stagingClip;
             STAGED_CLIP_FILES.remove(uri.toString());
             STAGED_CLIP_FILES.put(uri.toString(),
                     new StagedClipFile(file.getAbsolutePath(), transport, clip));
