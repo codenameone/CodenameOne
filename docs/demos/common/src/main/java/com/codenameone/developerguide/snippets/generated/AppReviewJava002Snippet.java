@@ -1,0 +1,124 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codenameone.developerguide.snippets.generated;
+
+import com.codename1.gpu.*;
+import com.codename1.ui.*;
+import com.codename1.ui.animations.*;
+import com.codename1.ui.events.*;
+import com.codename1.ui.geom.*;
+import com.codename1.ui.layouts.*;
+import com.codename1.ui.list.*;
+import com.codename1.ui.plaf.*;
+import com.codename1.ui.util.*;
+import com.codename1.components.*;
+import com.codename1.charts.models.*;
+import com.codename1.charts.renderers.*;
+import com.codename1.charts.views.*;
+import com.codename1.capture.*;
+import com.codename1.io.*;
+import com.codename1.l10n.*;
+import com.codename1.location.*;
+import com.codename1.maps.*;
+import com.codename1.media.*;
+import com.codename1.messaging.*;
+import com.codename1.payment.*;
+import com.codename1.processing.*;
+import com.codename1.properties.*;
+import com.codename1.push.*;
+import com.codename1.security.*;
+import com.codename1.social.*;
+import com.codename1.ui.spinner.*;
+import java.io.*;
+import com.codename1.analytics.*;
+import com.codename1.appreview.*;
+import com.codename1.ads.*;
+import com.codename1.util.*;
+import java.util.*;
+
+
+class AppReviewJava002Snippet {
+
+
+    Object context;
+    Object url;
+    Object value;
+    Object body;
+    Object event;
+    String apiKey = "test-key";
+    String myHttpsURL = "https://example.com";
+    java.util.List<String> validKeysList = new java.util.ArrayList<>();
+    Image myImage;
+    Graphics graphics;
+    Graphics g;
+    GraphicsDevice device;
+    Form form;
+    Form hi;
+    Container cnt;
+    Container myForm;
+    Component component;
+    Button button;
+    MultiButton myMultiButton;
+    Label label;
+    BrowserComponent browserComponent;
+    Resources theme;
+    
+    void snippet() throws Exception {
+        // tag::app-review-java-002[]
+        // When no native review prompt is available the dialog falls back to
+        // opening this URL, and that happens on the simulator, the desktop and
+        // the web target as well as on a device, so every target needs an answer
+        // rather than everything-except-Android getting the Apple listing.
+        String storeUrl;
+        if ("ios".equals(CN.getPlatformName())) {
+            storeUrl = "https://apps.apple.com/app/id0000000000";
+        } else if ("and".equals(CN.getPlatformName())) {
+            storeUrl = "https://play.google.com/store/apps/details?id=com.example.app";
+        } else {
+            storeUrl = "https://example.com/app";   // no store listing to send them to
+        }
+
+        AppReview.getInstance()
+                .setMinimumLaunches(5)          // at least 5 launches
+                .setMinimumDaysInstalled(3)     // and installed at least 3 days
+                .setDaysBetweenPrompts(30)      // never nag more than monthly
+                .setStoreUrl(storeUrl)
+                .setSupportEmail("support@example.com");
+
+        // registerSession() prompts as soon as the thresholds are met, and the
+        // fallback dialog is a Sheet, which throws when no form is current. That
+        // is exactly the state during init, so configure there and record the
+        // session once a form is up.
+        form.addShowListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                // Once per launch. registerSession() increments the launch
+                // counter, and a show listener fires again every time the user
+                // navigates back here -- which would reach the thresholds after
+                // a few screens rather than after the launches you configured.
+                form.removeShowListener(this);
+                AppReview.getInstance().registerSession();
+            }
+        });
+        // end::app-review-java-002[]
+    }
+}

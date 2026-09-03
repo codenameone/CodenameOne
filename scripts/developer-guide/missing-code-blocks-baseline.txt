@@ -3,14 +3,8 @@
 # Regenerate with check-missing-code-blocks.py --write-baseline.
 Advanced-Topics-Under-The-Hood.asciidoc	For the release build, you will also need to inject some proguard configuration so that important classes don't get stripped out at build time. The FreshDesk SDK instructions state:
 Advanced-Topics-Under-The-Hood.asciidoc	You can override these methods in the draggable components:
-Advertising.asciidoc	(for example "Sponsored"):
-Advertising.asciidoc	anchored at the top or bottom) and call `load()`:
 Advertising.asciidoc	identifier. The recommended order is to initialize, gather consent, then load:
-Advertising.asciidoc	manager and provider handle the foreground hook and freshness window for you:
 Advertising.asciidoc	method that registers its provider with `AdManager`:
-Advertising.asciidoc	next one when the current ad is dismissed:
-Advertising.asciidoc	rewards, verify server side rather than trusting the client:
-Advertising.asciidoc	transitions, no more often than a given interval:
 Ai-And-Speech.asciidoc	`ChatMessage` values to JSON under a named key:
 Ai-And-Speech.asciidoc	`SecureStorage` overloads:
 Ai-And-Speech.asciidoc	`chatStream(...)` can mutate the view directly:
@@ -24,15 +18,6 @@ Ai-And-Speech.asciidoc	one user message:
 Ai-And-Speech.asciidoc	returns a string the runtime can hand to `JSONParser`:
 Ai-And-Speech.asciidoc	safe to log:
 Ai-And-Speech.asciidoc	you need a custom send pipeline:
-Analytics.asciidoc	Consent is broken down by category, so you can honor granular choices -- for example allowing crash reporting while declining behavioral analytics:
-Analytics.asciidoc	Each device is identified by a pseudonymous client id. It's generated on first use and stored locally -- it isn't derived from any hardware identifier. To honor an erasure request ("right to be forgotten"), reset it:
-Analytics.asciidoc	If you would rather not gate at all, switch the default so collection is active unless the user withdraws it. This places the compliance responsibility on you as the integrator:
-Analytics.asciidoc	If your application has already obtained consent through its own mechanism -- a custom prompt, a third-party consent-management platform, an enterprise device-management policy, or a jurisdiction where you have determined consent isn't required -- record it once at startup so reporting flows without a second prompt:
-Analytics.asciidoc	Once at least one provider is registered, report usage from anywhere in your app:
-Analytics.asciidoc	You can also seed every category and then revoke just one with the builder, for example to allow analytics but not ad storage:
-Analytics.asciidoc	`FirebaseAnalyticsProvider` forwards to the native Firebase Analytics SDK on Android and iOS. Register it like any other provider:
-Analytics.asciidoc	`GoogleAnalyticsProvider` uses the GA4 Measurement Protocol. Create it with a measurement id (`G-XXXXXXXX`) and a Measurement Protocol API secret from the GA4 admin console:
-Analytics.asciidoc	`MatomoAnalyticsProvider` targets Matomo (formerly Piwik) through its HTTP tracking API. Matomo can be self-hosted and supports IP anonymization, which makes it a good fit for privacy-sensitive deployments:
 Animations.asciidoc	That one command will enable swiping back from `currentForm`. https://www.codenameone.com/javadoc/com/codename1/util/LazyValue.html[LazyValue] allows you to pass a value lazily:
 Animations.asciidoc	builder:
 Annotation-Component-Binding.asciidoc	ASM and inserts the equivalent of:
@@ -40,15 +25,8 @@ Annotation-Component-Binding.asciidoc	After binding, drive validation through th
 Annotation-JSON-XML-Mapping.asciidoc	Hand-write a `Mapper<T>` and register it at startup:
 Annotation-JSON-XML-Mapping.asciidoc	mutation:
 Annotation-SQLite-ORM.asciidoc	dao surface isn't enough. Transactions:
-App-Review.asciidoc	By default the low-rating feedback is collected through an e-mail to the address passed to `setSupportEmail(String)`. To deliver feedback through your own backend, register a `FeedbackListener`:
-App-Review.asciidoc	Rather than picking the moment yourself, you can let `AppReview` decide based on simple engagement heuristics: how many times the app was launched, how long ago it was installed, and how long since it last asked. Configure it once (for example in your app's `init` or `start` method) and call `registerSession()` on every launch:
-App-Review.asciidoc	The simplest usage is a single call at a moment that makes sense in your app -- typically right after the user completed something rewarding (finished a level, saved a document, completed an order):
 Apple-Wallet-Extension.asciidoc	In Java, publish the user's cards whenever they change (typically after login) and keep a fresh token published so Wallet can skip the login screen:
 Authentication-And-Identity.asciidoc	Firebase Auth isn't an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
-Commerce.asciidoc	After a purchase, or on app start, validate the device's receipts with the cloud and refresh the entitlement cache. `refresh()` makes a blocking network call, so run it off the EDT:
-Commerce.asciidoc	Drive purchases through the manager (these delegate to the `Purchase` API):
-Commerce.asciidoc	In your `Lifecycle.init` (or wherever you set up purchases):
-Commerce.asciidoc	The core idea is the *entitlement*: an abstract access right such as `pro` or `remove_ads`. You map one or more store products to an entitlement, and your code only ever checks the entitlement:
 Crash-Protection.asciidoc	In your `Lifecycle.init`:
 Deep-Links-Routing.asciidoc	Or annotate a static factory method:
 Deep-Links-Routing.asciidoc	`AssetLinksBuilder` produces the payload:
@@ -113,23 +91,12 @@ Miscellaneous-Features.asciidoc	You can add more than one attachment by putting 
 Miscellaneous-Features.asciidoc	You can install the bundle using code like this:
 Miscellaneous-Features.asciidoc	You can send a task to the thread using:
 Monetization.asciidoc	And you also provide a button to allow the user to manually synchronize the receipts:
-Monetization.asciidoc	And your `itemPurchased()` callback will need to add a world:
-Monetization.asciidoc	At the end of the `start()` method:
-Monetization.asciidoc	At this point, the app can track the sale of the world. To make it more useful, add `ToastBar` feedback for purchase completion:
 Monetization.asciidoc	In the hello world app you'll use this information in a few different places. On your main form you'll include a label to show the current expiry date, and you allow the user to press a button to synchronize receipts manually if they think the value is out of date:
-Monetization.asciidoc	In the main form, you want two buttons to subscribe to the `World`, for one month and one year respectively. They look like:
-Monetization.asciidoc	Now in the `start()` method, add a button that lets the user buy the world:
-Monetization.asciidoc	Now you'll change your buy code as follows:
 Monetization.asciidoc	On the server-side, your REST controller is a standard JAX-RS REST interface. The Netbeans web service wizard generated it and then it was modified to suit the purposes here. The methods of the `ReceiptsFacadeREST` class for the REST API are shown here:
-Monetization.asciidoc	Once implemented, your `fetchReceipts()` method will look like:
 Monetization.asciidoc	The `createRESTClient()` method shown there creates a `RESTfulWebServiceClient` and configuring it to use basic authentication with a username and password. The idea is that your user would have logged into your app at some point, and you would have a username and password on hand to pass back to the web service with the receipt data so that you can connect the subscription to a user account. The source of that method is listed here:
-Monetization.asciidoc	The `submitReceipt()` method is a little more complex, as it needs to calculate the new expiry date for your subscription:
-Monetization.asciidoc	The buy callbacks are like the ones implemented in the regular in-app purchase examples:
 Monetization.asciidoc	The general usage is as follows:
 Monetization.asciidoc	The source for your ReceiptStore is as follows:
-Monetization.asciidoc	To build the signed discount payload required by Apple you can use the `ApplePromotionalOffer` helper:
 Monetization.asciidoc	You are now ready to see the full magic of the `validateAndSaveReceipt()` method in all its glory:
-Monetization.asciidoc	You'll register it in your app's init() method so that it's always available:
 Monetization.asciidoc	You'll set these in your constants:
 Motion-Sensors.asciidoc	Callbacks arrive on the EDT, so the listener can update the UI directly. Sampling is reference counted: the hardware sensor draws power only while at least one listener is registered. Remove the listener once the screen is no longer visible, typically from the form's `removeNotify`, so the sensor powers down:
 Motion-Sensors.asciidoc	Register a `GestureListener` for one of the `GestureEvent.TYPE_*` gestures. The accelerometer powers on for the duration that a gesture listener stays registered:
