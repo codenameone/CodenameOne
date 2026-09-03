@@ -6756,9 +6756,23 @@ public final class Display extends CN1Constants {
     ///
     /// - `response`: invoked with a `com.codename1.contacts.Contact` array
     /// source once the user is done
-    public void pickContacts(int requestedFields, boolean multiSelect,
-                             int selectionLimit, boolean requireAllRequestedFields,
-                             ActionListener<ActionEvent> response) {
+    public void pickContacts(final int requestedFields, final boolean multiSelect,
+                             final int selectionLimit,
+                             final boolean requireAllRequestedFields,
+                             final ActionListener<ActionEvent> response) {
+        if (!isEdt()) {
+            // The guard below is a plain field read and written without a
+            // lock, because Codename One is single threaded and core carries
+            // no synchronization. Nothing stops an application calling this
+            // from a background thread, though, and two that did would both
+            // see the flag clear and both start a pick -- which is the state
+            // the flag exists to prevent. Moving the whole check-and-start
+            // onto the EDT serializes it without a lock, and costs a caller
+            // that was already on the EDT nothing.
+            callSerially(new DeferredContactPick(requestedFields, multiSelect,
+                    selectionLimit, requireAllRequestedFields, response));
+            return;
+        }
         if (contactPickInProgress) {
             // A second pick while the first is still on screen, which a
             // double tap is enough to produce. The platforms cannot honour it
@@ -6788,6 +6802,31 @@ public final class Display extends CN1Constants {
             return;
         }
         callSerially(new EmptyContactPick(response));
+    }
+
+    /// Re-enters `#pickContacts` on the EDT for an off-EDT caller.
+    private class DeferredContactPick implements Runnable {
+        private final int requestedFields;
+        private final boolean multiSelect;
+        private final int selectionLimit;
+        private final boolean requireAllRequestedFields;
+        private final ActionListener<ActionEvent> response;
+
+        DeferredContactPick(int requestedFields, boolean multiSelect,
+                int selectionLimit, boolean requireAllRequestedFields,
+                ActionListener<ActionEvent> response) {
+            this.requestedFields = requestedFields;
+            this.multiSelect = multiSelect;
+            this.selectionLimit = selectionLimit;
+            this.requireAllRequestedFields = requireAllRequestedFields;
+            this.response = response;
+        }
+
+        @Override
+        public void run() {
+            pickContacts(requestedFields, multiSelect, selectionLimit,
+                    requireAllRequestedFields, response);
+        }
     }
 
     /// Tells one listener that its pick produced nothing.

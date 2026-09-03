@@ -9671,6 +9671,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // contacts app answers with ActivityNotFoundException, which the
         // picker reports as an empty selection -- the same thing a cancelled
         // pick reports, so callers need no separate case for it.
+        //
+        // Deliberately NOT PackageManager.resolveActivity. Review asked for
+        // it, to catch the kiosk device that has no contacts app at all, and
+        // it would answer the wrong question on every ordinary one: from
+        // Android 11 a resolve query is filtered by package visibility, so an
+        // app without a matching <queries> entry is told nothing handles the
+        // intent even where the picker works perfectly. LAUNCHING an implicit
+        // intent is not filtered, which is why the picker itself needs no
+        // <queries> and works regardless. Trading a false yes on a stripped
+        // device -- whose cost is a pick that reports empty, exactly as a
+        // cancelled one does -- for a false no on every modern device, whose
+        // cost is a working feature hidden with no way to find out why, is a
+        // bad trade.
         return getActivity() != null;
     }
 

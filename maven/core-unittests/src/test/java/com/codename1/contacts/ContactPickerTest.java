@@ -260,6 +260,49 @@ class ContactPickerTest extends UITestBase {
                 "the refused pick must never reach the port");
     }
 
+    /**
+     * A pick started off the EDT reaches the port on the EDT.
+     *
+     * <p>The in-progress guard is a plain field, read and written without a
+     * lock, because Codename One is single threaded and core carries no
+     * synchronization. Two background threads would therefore both see it
+     * clear and both start a pick -- the state it exists to prevent. Moving
+     * the whole check-and-start onto the EDT serializes it without a lock,
+     * and this is the deterministic half of that: a real interleaving cannot
+     * be staged here, but "the port was entered on the EDT" is exactly the
+     * property that makes the interleaving impossible.</p>
+     */
+    @FormTest
+    void aPickStartedOffTheEdtReachesThePortOnTheEdt() throws Exception {
+        implementation.clearContacts();
+        implementation.setContactPickerSupported(true);
+        implementation.setContactPickerSelection(contact("a", "Alice", "111"));
+
+        final CountDownLatch answered = new CountDownLatch(1);
+        final AtomicReference<Contact[]> result = new AtomicReference<Contact[]>();
+        Thread worker = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                new ContactPicker().pick(new ActionListener<ActionEvent>() {
+                    @Override
+                    public void actionPerformed(ActionEvent ev) {
+                        result.set(ContactPicker.getPickedContacts(ev));
+                        answered.countDown();
+                    }
+                });
+            }
+        });
+        worker.start();
+        waitFor(answered, 5000);
+
+        List<ContactPickerRequest> requests =
+                implementation.getContactPickerRequests();
+        assertEquals(1, requests.size());
+        assertTrue(requests.get(0).isOnEdt(),
+                "an off-EDT pick must be marshalled before it touches the guard");
+        assertEquals(1, result.get().length);
+    }
+
     /** And the picker works again once the outstanding one has answered. */
     @FormTest
     void aPickAfterTheLastOneFinishedIsAccepted() {

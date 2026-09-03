@@ -128,6 +128,12 @@ public class ContactPicker {
 
     /// Requests the contact's birthday, which populates
     /// `Contact#getBirthday()`.
+    ///
+    /// The one field a picker cannot filter on exactly. Android groups
+    /// birthdays with anniversaries and custom dates, so
+    /// `#setRequireAllRequestedFields(boolean)` may still offer a contact
+    /// that turns out to have an anniversary and no birthday; the contact
+    /// comes back with a zero birthday rather than being withheld.
     public static final int BIRTHDAY = 32;
 
     /// Requests the contact's web sites, which populates
@@ -153,12 +159,22 @@ public class ContactPicker {
 
     private boolean requireAllRequestedFields;
 
-    /// Returns true when the platform can show a contact picker.
+    /// Returns true when the platform provides a contact picker.
+    ///
+    /// It answers for the platform rather than for the device. Android says
+    /// yes wherever the application is running normally, because deciding
+    /// otherwise would mean asking the package manager what handles the
+    /// picker intent, and from Android 11 that question is filtered by
+    /// package visibility -- it would report no picker on ordinary devices
+    /// where the picker works. A device that really has no contacts
+    /// application reports an empty selection from `#pick(ActionListener)`,
+    /// which is what a cancelled pick reports, so a listener that checks the
+    /// selection handles it already.
     ///
     /// #### Returns
     ///
-    /// true if `#pick(ActionListener)` will show a picker, false if it will
-    /// report an empty selection without showing anything
+    /// true if the platform has a picker, false if `#pick(ActionListener)`
+    /// will report an empty selection without showing anything
     public static boolean isSupported() {
         return Display.getInstance().isContactPickerSupported();
     }

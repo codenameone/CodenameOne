@@ -3816,7 +3816,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             int selectionLimit, boolean requireAllRequestedFields,
             ActionListener<ActionEvent> response) {
         contactPickerRequests.add(new ContactPickerRequest(requestedFields,
-                multiSelect, selectionLimit, requireAllRequestedFields));
+                multiSelect, selectionLimit, requireAllRequestedFields,
+                Display.getInstance().isEdt()));
         // Through the real base-class hop rather than straight to the
         // listener, so a test sees the same "answers later, on the EDT"
         // shape the device does.
@@ -3829,13 +3830,21 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         private final boolean multiSelect;
         private final int selectionLimit;
         private final boolean requireAllRequestedFields;
+        private final boolean onEdt;
 
         ContactPickerRequest(int requestedFields, boolean multiSelect,
-                int selectionLimit, boolean requireAllRequestedFields) {
+                int selectionLimit, boolean requireAllRequestedFields,
+                boolean onEdt) {
             this.requestedFields = requestedFields;
             this.multiSelect = multiSelect;
             this.selectionLimit = selectionLimit;
             this.requireAllRequestedFields = requireAllRequestedFields;
+            this.onEdt = onEdt;
+        }
+
+        /** Whether the port was entered on the EDT. */
+        public boolean isOnEdt() {
+            return onEdt;
         }
 
         public int getRequestedFields() {
@@ -3859,7 +3868,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             return "ContactPickerRequest{fields=" + requestedFields
                     + ", multiSelect=" + multiSelect
                     + ", selectionLimit=" + selectionLimit
-                    + ", requireAll=" + requireAllRequestedFields + '}';
+                    + ", requireAll=" + requireAllRequestedFields
+                    + ", onEdt=" + onEdt + '}';
         }
     }
 

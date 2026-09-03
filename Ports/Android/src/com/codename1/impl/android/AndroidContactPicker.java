@@ -142,6 +142,22 @@ class AndroidContactPicker {
             types.add(ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE);
         }
         if ((requestedFields & ContactPicker.BIRTHDAY) != 0) {
+            // Coarser than every other entry here, and the picker offers no
+            // finer one: Event covers anniversaries and custom dates as well
+            // as birthdays, and its filtering is by MIME type rather than by
+            // the row's TYPE. So requireAllRequestedFields will offer a
+            // contact whose only event is an anniversary, and applyBirthday
+            // then declines to store it -- the contact comes back with a null
+            // birthday.
+            //
+            // Review asked for those contacts to be dropped from the result
+            // instead. That is worse for the caller: the user picks somebody
+            // and gets an empty selection with nothing to explain it, where
+            // today the application has a named contact and a null birthday
+            // and can say so. requireAllRequestedFields is documented as
+            // best-effort filtering of what the picker OFFERS, never a
+            // promise about what comes back, precisely because of cases like
+            // this one.
             types.add(ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE);
         }
         if ((requestedFields & ContactPicker.WEBSITE) != 0) {
