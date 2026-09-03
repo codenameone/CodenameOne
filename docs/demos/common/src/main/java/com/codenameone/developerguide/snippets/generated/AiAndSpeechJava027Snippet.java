@@ -87,7 +87,7 @@ class AiAndSpeechJava027Snippet {
                 // The template's messages are sent ahead of the conversation on
                 // every request, so this is where a system prompt belongs.
                 // build() also rejects an empty message list.
-                ChatRequest.builder().model("gpt-4o-mini")
+                ChatRequest.builder()
                         .addMessage(ChatMessage.system("You are a helpful assistant."))
                         .build());
         // end::ai-and-speech-java-027[]

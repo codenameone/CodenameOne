@@ -117,7 +117,9 @@ class AiAndSpeechJava026Snippet {
             view.setTypingIndicatorVisible(true);
 
             ChatRequest req = ChatRequest.builder()
-                    .model("gpt-4o-mini")
+                    // No model named: the client's default applies, and the
+                    // simulator's Ollama redirect sets that for you. Naming a
+                    // cloud model asks a local server for one it lacks.
                     .messages(new ArrayList<ChatMessage>(history))
                     .build();
 

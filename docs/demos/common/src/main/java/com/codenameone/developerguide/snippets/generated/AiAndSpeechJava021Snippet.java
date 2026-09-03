@@ -83,6 +83,9 @@ class AiAndSpeechJava021Snippet {
     void snippet() throws Exception {
         // tag::ai-and-speech-java-021[]
         EmbeddingRequest req = EmbeddingRequest.builder()
+                // Embeddings need an embedding model, and the client carries a
+                // single default that is normally a chat one -- so name it here.
+                // Against a local Ollama, name an embedding model you pulled.
                 .model("text-embedding-3-small")
                 .addInput("a cat sat on the mat")
                 .addInput("a feline rested on the rug")

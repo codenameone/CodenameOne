@@ -83,7 +83,9 @@ class AiAndSpeechJava019Snippet {
     void snippet() throws Exception {
         // tag::ai-and-speech-java-019[]
         ChatRequest req = ChatRequest.builder()
-                .model("gpt-4o-mini")
+                // No model named: the client's default applies, and the
+                // simulator's Ollama redirect sets that for you. Naming a
+                // cloud model asks a local server for one it lacks.
                 .responseFormat(ResponseFormat.JSON_OBJECT)
                 .addMessage(ChatMessage.system(
                     "Return a JSON object with keys city and population."))

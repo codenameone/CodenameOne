@@ -88,7 +88,7 @@ class AiAndSpeechJava023Snippet {
 
         history.add(ChatMessage.user("Hello"));
         ChatResponse resp = openai.chat(
-                ChatRequest.builder().model("gpt-4o-mini").messages(history).build())
+                ChatRequest.builder().messages(history).build())
             .get();                                       // blocking helper, EDT-safe
         history.add(resp.getAssistantMessage());
         store.save(history);

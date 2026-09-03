@@ -87,7 +87,9 @@ class AiAndSpeechJava020Snippet {
                 "Extract the line items from this receipt.", photo);
 
         ChatRequest req = ChatRequest.builder()
-                .model("gpt-4o")
+                // No model named: the client's default applies, and the
+                // simulator's Ollama redirect sets that for you. Naming a
+                // cloud model asks a local server for one it lacks.
                 .addMessage(msg)
                 .build();
         // end::ai-and-speech-java-020[]
