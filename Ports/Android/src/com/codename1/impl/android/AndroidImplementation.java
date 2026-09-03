@@ -10421,9 +10421,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         File file = pathOrUri.startsWith("file:")
                                 ? new File(Uri.parse(pathOrUri).getPath())
                                 : new File(pathOrUri);
-                        u = FileProvider.getUriForFile(getContext(), authority, file);
-                        getContext().grantUriPermission("android", u,
-                                Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        u = shareableUriFor(file, authority);
                     }
                     if (!mimeTypes.contains("text/uri-list")) {
                         mimeTypes.add("text/uri-list");
@@ -10545,6 +10543,56 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
         }
+    }
+
+    /// A content URI another application can read for this file.
+    ///
+    /// The file provider is configured with a fixed set of roots -- the application's files
+    /// directory and cache/intent_files -- and getUriForFile throws for anything outside them.
+    /// Plenty of perfectly good paths are outside them: FileSystemStorage lists external
+    /// storage roots, and a file there used to throw, be logged, and be left out of the clip
+    /// entirely -- taking the whole drag with it when it was the only thing being dragged.
+    ///
+    /// So it is copied where the provider can reach, under its own name, which is what a
+    /// receiver sees. Not through writeAsProviderUri: that names and records what it mints as
+    /// transport for a representation's bytes, and this is a file the source published.
+    private Uri shareableUriFor(File file, String authority) throws IOException {
+        try {
+            Uri direct = FileProvider.getUriForFile(getContext(), authority, file);
+            getContext().grantUriPermission("android", direct,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            return direct;
+        } catch (Throwable outsideTheRoots) {
+            com.codename1.io.Log.e(outsideTheRoots);
+        }
+        File dir = new File(getContext().getCacheDir(), "intent_files");
+        dir.mkdirs();
+        // Its own directory, so the copy keeps the original name without colliding with
+        // another file of the same name in the same drag.
+        File holder = File.createTempFile("cn1-shared-", "", dir);
+        if (!holder.delete() || !holder.mkdirs()) {
+            throw new IOException("could not stage " + file + " for sharing");
+        }
+        File copy = new File(holder, file.getName());
+        InputStream in = new FileInputStream(file);
+        try {
+            OutputStream os = new FileOutputStream(copy);
+            try {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = in.read(buffer)) > 0) {
+                    os.write(buffer, 0, read);
+                }
+            } finally {
+                os.close();
+            }
+        } finally {
+            in.close();
+        }
+        Uri staged = FileProvider.getUriForFile(getContext(), authority, copy);
+        getContext().grantUriPermission("android", staged,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        return staged;
     }
 
     /// Writes bytes somewhere the application's file provider can serve them from and returns

@@ -834,8 +834,15 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
     // Never more than the source allowed. The refusal above is what should keep a move from
     // being performed at all; this is the second half of it, because the cost of being wrong
     // here is a source deleting data on the strength of an action it never offered.
+    //
+    // With one reading rather than a refusal. UIKit has no link operation, so a receiver
+    // that takes a link-only drag is reported as having copied it -- and clamping that to
+    // nothing told the source its drag had been cancelled when it had in fact been
+    // accepted. Only when link is the whole of what was offered, where there is nothing
+    // else the copy could have meant.
     if (allowed != CN1_DND_ACTION_NONE && (action & allowed) != action) {
-        action = CN1_DND_ACTION_NONE;
+        action = (action == CN1_DND_ACTION_COPY && allowed == CN1_DND_ACTION_LINK)
+                ? CN1_DND_ACTION_LINK : CN1_DND_ACTION_NONE;
     }
     CN1NativeDragDeliverCompleted(action);
 }
