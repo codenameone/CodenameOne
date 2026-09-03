@@ -95,6 +95,9 @@ class TheComponentsOfCodenameOneJava147Snippet {
         TextField num2 = new TextField("", "", 5, TextField.NUMERIC);
         TextField num3 = new TextField("", "", 5, TextField.NUMERIC);
         TextField num4 = new TextField("", "", 5, TextField.NUMERIC);
+        // the first three are trimmed to four by automoveToNext when the fifth
+        // digit arrives; the last one has no successor, so it needs a limit
+        num4.setMaxSize(4);
         automoveToNext(num1, num2);
         automoveToNext(num2, num3);
         automoveToNext(num3, num4);
