@@ -785,6 +785,96 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A platform continuation carries no generation of its own -- the OS has no notion of our
+     * eras -- so both era predicates are skipped for it. What it can still be held to is that
+     * nothing changed while delivery was being decided, and without that a clear() landing
+     * between the two locked checks admitted the arrival and stamped it with the NEW generation.
+     */
+    @EdtTest
+    public void aPlatformArrivalIsStillRejectedWhenTheGenerationMoves() {
+        Continuity.enable();
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+
+        // A state whose maxAge check will run while we move the generation underneath it: the
+        // isTooOld() and getDeviceId() calls in deliver() both take and release the lock.
+        AppState arrival = foreign("device-platform", 11);
+        Continuity.disable();
+        Continuity.enable();
+
+        // NO_ERA on both, which is exactly how a platform continuation is delivered.
+        Continuity.deliver(arrival);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(250);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+        // It IS admitted here -- nothing moved during the decision -- which is the correct
+        // behaviour and what makes the guard a guard rather than a blanket refusal.
+        assertEquals(1, seen[0], "a platform arrival with a settled generation must be delivered");
+    }
+
+    /**
+     * An off-EDT capture() must report an unrepresentable payload the same way the on-EDT path
+     * does. Marshalled to the EDT, the IllegalArgumentException died in the runnable: the caller
+     * waited out the timeout and got null, so the programming error the exception exists to name
+     * became a silent nothing -- and only when called off the EDT.
+     */
+    @EdtTest
+    public void anInvalidPayloadFailsTheSameWayFromAnyThread() {
+        Continuity.enable();
+        Continuity.setStateProvider(new StateProvider() {
+            public Map<String, Object> saveState() {
+                Map<String, Object> bad = new HashMap<String, Object>();
+                bad.put("unsupported", new StringBuilder("not a representable type"));
+                return bad;
+            }
+
+            public void restoreState(Map<String, Object> state) {
+            }
+        });
+
+        // On the EDT, where this test body runs: the refusal is immediate. This half was never
+        // broken, and asserting only it is what made the first version of this test vacuous --
+        // it passed with the exception swallowed, because it never reached the marshalled path.
+        boolean threwOnEdt = false;
+        try {
+            Continuity.capture();
+        } catch (IllegalArgumentException expected) {
+            threwOnEdt = true;
+        }
+        assertTrue(threwOnEdt, "capture() must refuse an unrepresentable payload");
+
+        // And OFF the EDT, which is the path that swallowed it. invokeAndBlock runs this on a
+        // separate thread and releases the EDT to process what capture() marshals to it, so
+        // offEdt() is true here and the call really does go through runOnEdt.
+        final Throwable[] caught = new Throwable[1];
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                try {
+                    Continuity.capture();
+                } catch (Throwable t) {
+                    caught[0] = t;
+                }
+            }
+        });
+
+        assertTrue(caught[0] instanceof IllegalArgumentException,
+                "an off-EDT capture() reported " + caught[0] + " instead of the "
+                        + "IllegalArgumentException the on-EDT path raises for the same payload");
+    }
+
+    /**
      * An app that only registers a store listener keeps continuity OFF by design -- a key/value
      * store is not consent to broadcast a route stack. refreshBridge() tested `enabled` alone, so
      * the simulator's capability menu, which swaps the bridge and calls it, left the replacement

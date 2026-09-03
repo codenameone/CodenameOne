@@ -644,6 +644,7 @@ public final class Continuity {
         // A caller told the operation did not happen has to be right about that.
         // [0] cancelled, [1] completed, [2] started.
         final boolean[] flags = new boolean[3];
+        final Throwable[] failure = new Throwable[1];
         Runnable guarded = new Runnable() {
             @Override
             public void run() {
@@ -653,9 +654,24 @@ public final class Continuity {
                     }
                     flags[2] = true;
                 }
-                r.run();
-                synchronized (flags) {
-                    flags[1] = true;
+                try {
+                    r.run();
+                } catch (Throwable t) {
+                    // Kept for the waiting thread. capture() refuses an unrepresentable payload
+                    // by throwing, deliberately and with the key named -- and marshalled to the
+                    // EDT that throw died here, so an off-EDT caller waited out the full timeout
+                    // and got null. The programming error the exception exists to surface became
+                    // a silent nothing, and only when called off the EDT.
+                    synchronized (flags) {
+                        failure[0] = t;
+                    }
+                } finally {
+                    // ALWAYS. Marking completion only on the success path made a throwing
+                    // operation look like one that never started, so the caller then waited out
+                    // the whole started-work cap for something already finished.
+                    synchronized (flags) {
+                        flags[1] = true;
+                    }
                 }
             }
         };
@@ -666,6 +682,7 @@ public final class Continuity {
         }
         synchronized (flags) {
             if (flags[1]) {
+                rethrow(failure[0]);
                 return true;
             }
             if (!flags[2]) {
@@ -695,8 +712,27 @@ public final class Continuity {
             }
         }
         synchronized (flags) {
+            rethrow(failure[0]);
             return flags[1];
         }
+    }
+
+    /// Re-throws on the waiting thread what the EDT threw, preserving its type.
+    ///
+    /// An unchecked failure has to reach the caller as itself: StateCodec refuses an
+    /// unrepresentable payload with an IllegalArgumentException naming the key, and an
+    /// application debugging that must see the same exception whichever thread it called from.
+    private static void rethrow(Throwable t) {
+        if (t == null) {
+            return;
+        }
+        if (t instanceof RuntimeException) {
+            throw (RuntimeException) t;
+        }
+        if (t instanceof Error) {
+            throw (Error) t;
+        }
+        throw new RuntimeException(t);
     }
 
     private static void checkpointOnEdt() {
@@ -1617,6 +1653,8 @@ public final class Continuity {
         if (state == null) {
             return;
         }
+        final long observedAccount;
+        final long observedDelivery;
         synchronized (STATE_LOCK) {
             if (!enabled) {
                 return;
@@ -1625,6 +1663,15 @@ public final class Continuity {
                     || (pollDelivery != NO_ERA && pollDelivery != deliveryEra)) {
                 return;
             }
+            // OBSERVED here, required unchanged below. A caller that supplies no generation -- a
+            // platform continuation arrives that way, since the OS has no notion of our eras --
+            // skipped both predicates entirely, so a clear() or disable() landing between these
+            // two locked blocks let the arrival through and stamped it with the NEW deliveryEra.
+            // The previous account's state then reached the listeners and the screen after
+            // logout. What every caller can be held to, era or not, is that nothing changed while
+            // this was deciding.
+            observedAccount = accountEra;
+            observedDelivery = deliveryEra;
         }
         if (getDeviceId().equals(state.getDeviceId())) {
             // This device's own echo, which a relay returns as a matter of course.
@@ -1640,11 +1687,12 @@ public final class Continuity {
         }
         final long era;
         synchronized (STATE_LOCK) {
-            // Re-asked under the SAME hold that records the mark, so a logout -- or a disable and
-            // re-enable -- between the check above and this one cannot slip an old state past
-            // both.
-            if ((pollEra != NO_ERA && pollEra != accountEra)
-                    || (pollDelivery != NO_ERA && pollDelivery != deliveryEra)) {
+            // Re-asked under the SAME hold that records the mark, so a logout -- or a disable
+            // and re-enable -- between the check above and this one cannot slip an old state past
+            // both. Against the OBSERVED generation, so this holds for a platform arrival that
+            // carried no era of its own; getDeviceId() and isTooOld() above each take the lock
+            // and release it, so the gap is real time.
+            if (observedAccount != accountEra || observedDelivery != deliveryEra) {
                 return;
             }
             Long seen = lastSeen.get(state.getDeviceId());
