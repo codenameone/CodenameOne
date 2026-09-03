@@ -698,48 +698,24 @@ public final class Continuity {
         if (state == null) {
             return false;
         }
-        // NOT serialized against clear(), and nothing here needs to be. A review asked twice for
-        // a lock around the provider and navigation work below, on the reading that a worker can
-        // call clear() midway through and have this recreate the checkpoint it just deleted.
-        // There is no such worker: clear() is event-thread API like every other method on this
-        // class, so it runs either entirely before this or entirely after it. The lock that
-        // question asks for is the one that made this class need a lock-ordering rule to be
-        // safe from itself. See the threading note on the class.
+        // Whether any part of this state actually reached the application. Nothing is written
+        // or acknowledged until something has: a route-only state naming routes this build no
+        // longer registers applies nothing at all, and replacing the stored checkpoint with it
+        // destroyed the user's own restorable position -- while acknowledging it stopped the
+        // relay offering it again, so the next launch found only the unusable state where a good
+        // checkpoint had been. Left alone, the old checkpoint still restores and the relay may
+        // offer this one to a build that understands it.
+        boolean applied = false;
         StateProvider p = provider;
         if (p != null) {
             try {
-                // Before the routes, so a form the route table is about to build can read what
-                // the provider stashed while it is being constructed.
                 p.restoreState(state.getPayload());
+                // An empty payload is not an application. It is what a route-only state carries,
+                // and counting it would make the question above answer yes for every state.
+                applied = !state.getPayload().isEmpty();
             } catch (Throwable t) {
                 Log.e(t);
             }
-        }
-        // Acknowledged HERE, before the branch below, because the state has now been APPLIED --
-        // which is not the same question as whether a form appeared.
-        //
-        // The comment that used to sit at the bottom of this method said exactly that and was
-        // wrong about where it happened: the route-less return below skipped it, so the one case
-        // it named -- a payload-only continuation, what an app that does not use @Route gets --
-        // was the case that never got marked. The relay offered the unchanged document again
-        // after every restart, and with automatic restore off the no-argument wrapper re-applied
-        // it on every call.
-        // Written to storage BEFORE it is acknowledged, and for both shapes of state.
-        //
-        // The order matters and this is the safe one. noteActedOn() is durable: once it has run,
-        // the relay's copy is refused for good. Acknowledging first and dying before the write
-        // lost the state entirely -- the payload was applied in memory, never stored, and never
-        // offered again -- and a payload-only continuation is exactly the shape most likely to
-        // hit it, because an app that does not use @Route has nothing else that checkpoints. The
-        // reverse order costs at worst one re-delivery of a state that is already applied, which
-        // restoring again handles.
-        if (persist(state)) {
-            // Acknowledged only when the write succeeded, for the reason it happens before the
-            // acknowledgement at all: noteActedOn() is durable and makes the relay refuse this
-            // state for good. Doing that on top of a failed write is the same loss the ordering
-            // exists to prevent, one step further along -- nothing stored here, and nothing left
-            // to fetch. Left unacknowledged, the relay offers it again, which is recoverable.
-            noteActedOn(state);
         }
         List<String> routes = state.getRoutes();
         if (routes.isEmpty()) {
@@ -752,6 +728,9 @@ public final class Continuity {
             // that way, and StateProvider.restoreState tells providers not to be. True would be
             // the worse failure of the two: a provider that only populates fields -- the
             // documented shape -- would leave the application on no screen at all.
+            if (applied) {
+                commit(state);
+            }
             return false;
         }
         // Applying a state is not the user navigating, and the difference is not cosmetic. The
@@ -770,6 +749,9 @@ public final class Continuity {
         } finally {
             applyingRestore = false;
         }
+        if (shown || applied) {
+            commit(state);
+        }
         return shown;
     }
 
@@ -780,6 +762,16 @@ public final class Continuity {
     /// device on its own, but a relay is only read when something asks it to be.
     public static void pollRelay() {
         if (relay == null || !enabled || !Display.isInitialized()) {
+            return;
+        }
+        if (publishing) {
+            // Deferred behind the POST, which is the other half of the rule startPublisher()
+            // already follows. The relay holds ONE document per user, so a publish in flight can
+            // replace the other device's state before a GET started now has read it -- and that
+            // GET then returns this device's own echo, which admit() drops as an echo should be
+            // dropped. The remote update is gone from the relay and was never seen. Read before
+            // write, in BOTH directions, is what makes that impossible.
+            pollAgain = true;
             return;
         }
         if (polling) {
@@ -926,6 +918,18 @@ public final class Continuity {
             paths.add(entry.getPath());
         }
         return paths;
+    }
+
+    /// Makes an applied state the local checkpoint, and records that it was acted on.
+    ///
+    /// The two belong together and in this order. noteActedOn() is durable and stops the relay
+    /// ever offering this state again, so it may only follow a write that actually succeeded --
+    /// otherwise the state is lost in both directions at once, nothing stored here and nothing
+    /// left to fetch. An unacknowledged state is offered again, which is recoverable.
+    private static void commit(AppState state) {
+        if (persist(state)) {
+            noteActedOn(state);
+        }
     }
 
     /// Writes the checkpoint, and says whether it got there.
@@ -1120,11 +1124,20 @@ public final class Continuity {
             // network went away never reached the other device at all. Put back only when nothing
             // newer is queued, since a newer state supersedes it entirely.
             pendingPublish = sent;
-            if (!publishRequested) {
-                // Stood down rather than retried: one attempt per change, not a spin against an
-                // endpoint that is down. The next checkpoint or poll starts the next one.
-                return;
-            }
+        }
+        if (pollAgain) {
+            // A poll asked for while this was on the wire, and it goes FIRST: read before write
+            // is the ordering a single-document relay needs, and pollFinished() starts a
+            // publisher for whatever is still queued when it lands.
+            pollAgain = false;
+            publishRequested = false;
+            startPoll();
+            return;
+        }
+        if (!ok && !publishRequested) {
+            // Stood down rather than retried: one attempt per change, not a spin against an
+            // endpoint that is down. The next checkpoint or poll starts the next one.
+            return;
         }
         // Somebody asked for a publisher while this attempt was in flight -- an application
         // calling pollRelay() on reconnect is the ordinary case. Consumed rather than looped on,

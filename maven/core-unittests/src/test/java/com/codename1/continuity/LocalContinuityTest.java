@@ -1440,6 +1440,89 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A relay holds ONE document per user, so a GET started while a POST is on the wire can lose
+     * the other device's state outright: the POST replaces it, and the GET then reads back this
+     * device's own echo, which admit() correctly drops. startPublisher() already defers behind an
+     * active fetch for this reason; the poll had no matching guard, so the rule held in one
+     * direction only.
+     */
+    @EdtTest
+    public void aPollDoesNotOverlapAPublishInFlight() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        final GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+
+        // A checkpoint puts a POST on the wire and the relay holds it there.
+        Continuity.checkpoint();
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+
+        // A DELTA, not an absolute count: setRelay() polls on installation, so a fetch has
+        // already been and gone by the time the publish is on the wire. What must not happen is
+        // another one starting now.
+        final int before = r.fetches();
+
+        // The application reconnects and polls while that POST is still in flight.
+        Continuity.pollRelay();
+        // Given time to happen before it is declared absent. startPoll() spawns a worker, so
+        // reading the count on the very next line races it: the assertion passed whether or not a
+        // fetch had been wrongly started, which is no assertion at all. The positive signal below
+        // is what makes this absence mean something.
+        pause(400L);
+        assertEquals(before, r.fetches(),
+                "a fetch was started while a publish was on the wire, so the POST can overwrite "
+                        + "the other device's state before the GET reads it");
+
+        // Released, the deferred poll runs.
+        r.release();
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitFetched(before + 1);
+            }
+        });
+        assertTrue(r.fetches() > before,
+                "the deferred poll was dropped rather than run afterwards");
+    }
+
+    /**
+     * A route-only state whose routes this build no longer registers applies nothing. Writing it
+     * over the stored checkpoint destroyed the user's own restorable position, and acknowledging
+     * it stopped the relay offering it again -- so the next launch found only the unusable state.
+     */
+    @EdtTest
+    public void anUnrestorableStateDoesNotReplaceTheCheckpoint() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+
+        // The user's own checkpoint, which must survive.
+        Continuity.routeStackChanged();
+        Continuity.checkpoint();
+        long mine = Continuity.getRestorableState().getSequence();
+
+        // A foreign state naming a route this build does not have, and carrying no payload.
+        AppState foreignState = new AppState()
+                .setDeviceId("some-other-device")
+                .setSequence(77L)
+                .setTimestamp(System.currentTimeMillis());
+        List<String> unknown = new ArrayList<String>();
+        unknown.add("/a-route-this-build-does-not-register");
+        foreignState.setRoutes(unknown);
+
+        assertFalse(Continuity.restore(foreignState), "an unknown route cannot show a form");
+
+        AppState stored = Continuity.getRestorableState();
+        assertNotNull(stored, "the local checkpoint was destroyed by a state that applied nothing");
+        assertEquals(mine, stored.getSequence(),
+                "the unusable foreign state replaced the user's own checkpoint");
+    }
+
+    /**
      * A checkpoint whose write failed is still owed. `dirty` is cleared on the way in, so leaving
      * it clear told the next suspend there was nothing to save -- a checkpoint lost to a full
      * disk was never retried and the app came back to the last write that had succeeded.
@@ -1622,8 +1705,25 @@ public class LocalContinuityTest extends UITestBase {
             sent.add(Long.valueOf(state.getSequence()));
         }
 
+        private final java.util.concurrent.atomic.AtomicInteger fetched =
+                new java.util.concurrent.atomic.AtomicInteger();
+
         public AppState fetch() {
+            fetched.incrementAndGet();
             return null;
+        }
+
+        /** How many GETs have actually reached the endpoint. */
+        int fetches() {
+            return fetched.get();
+        }
+
+        /** Waits until at least `count` GETs have run, so a deferred poll can be seen to land. */
+        void awaitFetched(int count) {
+            long deadline = System.currentTimeMillis() + 5000L;
+            while (System.currentTimeMillis() < deadline && fetched.get() < count) {
+                sleepBriefly();
+            }
         }
 
         void awaitEntered() {
