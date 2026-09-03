@@ -55,13 +55,13 @@ ELF32_HEADER = 52
 ELF32_PHENTSIZE = 32
 
 
-def elf64(p_align, machine=0xB7):
+def elf64(p_align, machine=0xB7, e_type=3):
     """A minimal little-endian 64-bit ELF with one PT_LOAD segment."""
     total = ELF64_HEADER + ELF64_PHENTSIZE
     header = struct.pack(
         "<4sBBBB8xHHIQQQIHHHHHH",
         b"\x7fELF", 2, 1, 1, 0,          # magic, ELFCLASS64, LSB, version
-        3, machine, 1,                   # ET_DYN, machine, version
+        e_type, machine, 1,              # e_type, machine, version
         0, ELF64_HEADER, 0, 0,           # entry, phoff, shoff, flags
         ELF64_HEADER, ELF64_PHENTSIZE, 1, 0, 0, 0)
     phdr = struct.pack(
@@ -72,13 +72,13 @@ def elf64(p_align, machine=0xB7):
     return header + phdr
 
 
-def elf32(p_align, machine=0x28):
+def elf32(p_align, machine=0x28, e_type=3):
     """A minimal little-endian 32-bit ELF with one PT_LOAD segment."""
     total = ELF32_HEADER + ELF32_PHENTSIZE
     header = struct.pack(
         "<4sBBBB8xHHIIIIIHHHHHH",
         b"\x7fELF", 1, 1, 1, 0,          # magic, ELFCLASS32, LSB, version
-        3, machine, 1,                   # ET_DYN, machine, version
+        e_type, machine, 1,              # e_type, machine, version
         0, ELF32_HEADER, 0, 0,           # entry, phoff, shoff, flags
         ELF32_HEADER, ELF32_PHENTSIZE, 1, 0, 0, 0)
     phdr = struct.pack(
@@ -97,6 +97,7 @@ def patched_elf64(**fields):
         "e_phoff": (0x20, "<Q"),
         "e_phentsize": (0x36, "<H"),
         "e_phnum": (0x38, "<H"),
+        "e_type": (0x10, "<H"),
         "p_type": (ELF64_HEADER + 0x00, "<I"),
         "p_vaddr": (ELF64_HEADER + 0x10, "<Q"),
         "p_align": (ELF64_HEADER + 0x30, "<Q"),
@@ -362,6 +363,40 @@ class AbiDirectoryMustMatchTheFile(unittest.TestCase):
                                  elf64(ALIGNED, machine=62))
         self.assertEqual([], failures)
         self.assertEqual(1, scanner.libraries_scanned)
+
+
+class OnlySharedObjectsAreLibraries(unittest.TestCase):
+    """`e_type` decides what a file IS. Whether not being a shared object is
+    a finding depends on what it claimed to be."""
+
+    def test_relocatable_object_found_by_magic_is_left_alone(self):
+        # `cc -c` output has no program header table at all. Demanding one of
+        # every ELF rejected a valid build artifact and blocked the run.
+        payload = elf64(ALIGNED, e_type=1)
+        failures, scanner = scan("build/probe.o", payload)
+        self.assertEqual([], failures)
+        self.assertEqual(1, scanner.skipped_not_a_library)
+        self.assertEqual(0, scanner.libraries_scanned)
+
+    def test_non_shared_object_named_as_a_library_is_reported(self):
+        for e_type, name in [(1, "ET_REL"), (2, "ET_EXEC"), (4, "ET_CORE")]:
+            failures, _ = scan("jni/arm64-v8a/libfoo.so",
+                               elf64(ALIGNED, e_type=e_type))
+            self.assertEqual(1, len(failures), name)
+            self.assertIn("not a shared object (%s)" % name, failures[0])
+
+    def test_non_shared_object_in_an_abi_directory_is_reported(self):
+        # It claimed by location even though its name claims nothing.
+        failures, _ = scan("app.aar!jni/arm64-v8a/weird.bin",
+                           elf64(ALIGNED, e_type=2))
+        self.assertEqual(1, len(failures), failures)
+        self.assertIn("not a shared object (ET_EXEC)", failures[0])
+
+    def test_a_shared_object_is_still_inspected(self):
+        failures, scanner = scan(ANDROID_64, elf64(MISALIGNED, e_type=3))
+        self.assertEqual(1, len(failures), failures)
+        self.assertIn("p_align 0x1000", failures[0])
+        self.assertEqual(0, scanner.skipped_not_a_library)
 
 
 class ArchiveRecursionIsBounded(unittest.TestCase):

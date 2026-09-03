@@ -134,8 +134,11 @@ ELF_LAYOUT = {
     ELFCLASS32: (52, 0x1C, 0x2A, 0x2C, "I", 32, 0x04, 0x08, 0x10, 0x1C),
 }
 
-# e_machine sits at 0x12 in both classes.
+# e_type sits at 0x10 and e_machine at 0x12, in both classes.
+E_TYPE_OFFSET = 0x10
 E_MACHINE_OFFSET = 0x12
+ET_DYN = 3
+ET_NAMES = {0: "ET_NONE", 1: "ET_REL", 2: "ET_EXEC", 3: "ET_DYN", 4: "ET_CORE"}
 EM_ARM = 40
 EM_AARCH64 = 183
 EM_386 = 3
@@ -166,22 +169,16 @@ class MalformedElf(Exception):
     """A `.so` payload that cannot be read as a well-formed ELF."""
 
 
-def read_load_alignments(data):
-    """Return `(is_64_bit, [p_align of every PT_LOAD segment])`.
+def read_elf_header(data):
+    """Return `(ei_class, e_type, e_machine, layout, prefix)`.
 
-    Raises MalformedElf for anything that does not parse -- a truncated
-    library, a corrupted one, or a file that merely happens to be named
-    `.so`. Nothing is skipped: an entry this function could not read is an
-    entry whose alignment nobody checked, and that must not come out reading
-    the same as one checked and found compliant. Returning "exempt" for an
-    unreadable payload would also make the exemption reachable by corruption
-    -- a truncated 64-bit library starts with the ELF magic and would be
-    waved through as if it were a 32-bit slice.
+    Only the ELF header, so the caller can find out WHAT the file is before
+    committing to reading it as a shared library. A relocatable object from
+    `cc -c` legitimately has no program header table at all, and demanding
+    one of every ELF in the tree rejected it with "program header entry size
+    0 is too small" -- a valid build artifact blocking the run.
 
-    32-bit libraries are parsed rather than waved past on the class byte
-    alone, for the same reason: `is_64_bit` is False only once the file has
-    been shown to really be a 32-bit ELF. The caller exempts it from the
-    alignment rule, which does not apply to 32-bit ABIs.
+    Raises MalformedElf for anything that is not a readable ELF header.
     """
     if len(data) < 5 or data[:4] != ELF_MAGIC:
         raise MalformedElf("not an ELF file")
@@ -189,8 +186,8 @@ def read_load_alignments(data):
     ei_class = data[4]
     if ei_class not in ELF_LAYOUT:
         raise MalformedElf("unknown ELF class 0x%02x" % ei_class)
-    (header_size, phoff_off, phentsize_off, phnum_off, word, min_phentsize,
-     poffset_off, pvaddr_off, pfilesz_off, palign_off) = ELF_LAYOUT[ei_class]
+    layout = ELF_LAYOUT[ei_class]
+    header_size = layout[0]
 
     if len(data) < header_size:
         raise MalformedElf(
@@ -205,7 +202,29 @@ def read_load_alignments(data):
     else:
         raise MalformedElf("unknown ELF data encoding 0x%02x" % endian)
 
+    e_type = struct.unpack_from(prefix + "H", data, E_TYPE_OFFSET)[0]
     e_machine = struct.unpack_from(prefix + "H", data, E_MACHINE_OFFSET)[0]
+    return ei_class, e_type, e_machine, layout, prefix
+
+
+def read_load_alignments(data, layout, prefix):
+    """Return the `p_align` of every PT_LOAD segment of a shared object.
+
+    Raises MalformedElf for anything that does not parse -- a truncated
+    library, a corrupted one, or a file that merely happens to be named
+    `.so`. Nothing is skipped: an entry this function could not read is an
+    entry whose alignment nobody checked, and that must not come out reading
+    the same as one checked and found compliant. Returning "exempt" for an
+    unreadable payload would also make the exemption reachable by corruption
+    -- a truncated 64-bit library starts with the ELF magic and would be
+    waved through as if it were a 32-bit slice.
+
+    Only called once the header says this really is a shared object, so the
+    program header table is genuinely required here.
+    """
+    (header_size, phoff_off, phentsize_off, phnum_off, word, min_phentsize,
+     poffset_off, pvaddr_off, pfilesz_off, palign_off) = layout
+
     e_phoff = struct.unpack_from(prefix + word, data, phoff_off)[0]
     e_phentsize = struct.unpack_from(prefix + "H", data, phentsize_off)[0]
     e_phnum = struct.unpack_from(prefix + "H", data, phnum_off)[0]
@@ -257,7 +276,7 @@ def read_load_alignments(data):
         alignments.append(alignment)
     if not alignments:
         raise MalformedElf("no PT_LOAD segments")
-    return ei_class, e_machine, alignments
+    return alignments
 
 
 def is_android_payload(label):
@@ -362,11 +381,39 @@ class Scanner(object):
         self.libraries_scanned = 0
         self.skipped_32bit = 0
         self.skipped_non_android = 0
+        self.skipped_not_a_library = 0
         self.has_alignment_failure = False
 
     def check_library(self, label, data):
         try:
-            ei_class, e_machine, alignments = read_load_alignments(data)
+            ei_class, e_type, e_machine, layout, prefix = read_elf_header(data)
+        except MalformedElf as error:
+            self.failures.append("%s: %s" % (label, error))
+            return
+
+        # Only a shared object is a shared library. Whether a file that is
+        # not one is a finding or none of this gate's business depends on
+        # what it claimed to be: a name saying `.so`, or a place in an
+        # Android ABI directory, is a claim, and a relocatable object or an
+        # executable there cannot be loaded. An ELF found purely by its magic
+        # under a name that claims nothing -- a checked-in `cc -c` object,
+        # say -- claimed nothing and is simply not what this gate inspects.
+        declared = (looks_like_shared_library(label.split("!")[-1])
+                    or android_abi_for(label) is not None)
+        if e_type != ET_DYN:
+            if declared:
+                self.failures.append(
+                    "%s: not a shared object (%s)"
+                    % (label, ET_NAMES.get(e_type, "e_type %d" % e_type)))
+            else:
+                self.skipped_not_a_library += 1
+                if self.verbose:
+                    print("  not a shared object (%s), not inspected: %s"
+                          % (ET_NAMES.get(e_type, e_type), label))
+            return
+
+        try:
+            alignments = read_load_alignments(data, layout, prefix)
         except MalformedElf as error:
             self.failures.append("%s: %s" % (label, error))
             return
@@ -533,9 +580,10 @@ def main(argv):
 
     print("check-16k-page-alignment: %d Android 64-bit native libraries "
           "aligned to 0x%x or more (%d 32-bit and %d non-Android libraries "
-          "are not subject to the rule)"
+          "are not subject to the rule; %d ELF files are not shared objects)"
           % (scanner.libraries_scanned, REQUIRED_ALIGNMENT,
-             scanner.skipped_32bit, scanner.skipped_non_android))
+             scanner.skipped_32bit, scanner.skipped_non_android,
+             scanner.skipped_not_a_library))
     return 0
 
 
