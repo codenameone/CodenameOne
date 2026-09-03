@@ -2233,6 +2233,45 @@ public class LocalContinuityTest extends UITestBase {
         Continuity.setMaxAge(0L);
     }
 
+    /**
+     * An acknowledged origin stays refused even after the in-memory map has evicted it. lastSeen
+     * and durableSeen are bounded independently and hold different sets -- every arrival versus
+     * only the completed ones -- so a busy relay can push an acknowledged origin out of lastSeen
+     * while its durable mark remains. Consulting only lastSeen let the duplicate through and ran
+     * the application's listeners a second time, which is exactly what the durable mark is for.
+     */
+    @EdtTest
+    public void anAcknowledgedOriginIsRefusedAfterItsDedupEntryIsEvicted() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+
+        AppState handled = fromElsewhere("dealt with", 5L);
+        Continuity.acknowledge(handled);
+
+        // Enough other origins to push it out of the in-memory map, which is capped at 64.
+        for (int i = 0; i < 90; i++) {
+            Continuity.deliver(new AppState()
+                    .setDeviceId("crowd-" + i)
+                    .setSequence(i + 1)
+                    .setTimestamp(System.currentTimeMillis()));
+        }
+        flushSerialCalls();
+
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+        Continuity.deliver(handled);
+        flushSerialCalls();
+
+        assertEquals(0, seen[0],
+                "a state from an acknowledged origin was delivered again once the in-memory "
+                        + "dedup entry had been evicted, so its side effects run twice");
+    }
+
     /** Storage whose writes always fail, which is what a full disk looks like. */
     static class RefusingStorage extends Storage {
         @Override

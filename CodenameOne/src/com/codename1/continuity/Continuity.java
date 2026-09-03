@@ -250,11 +250,22 @@ public final class Continuity {
         // as new as the stored one.
         Map<String, Long> restored = readSeen();
         for (Map.Entry<String, Long> e : restored.entrySet()) {
-            Long have = lastSeen.get(e.getKey());
-            if (have == null || have.longValue() < e.getValue().longValue()) {
-                // Loaded marks describe states a previous run COMPLETED, so they are durable
-                // again as well as suppressing re-delivery in this one.
-                recordSeen(e.getKey(), e.getValue().longValue(), true);
+            // The two maps are advanced INDEPENDENTLY, because they can disagree and gating one
+            // on the other loses a mark. A loaded value describes a state a previous run
+            // COMPLETED, so it belongs in the durable set even when the in-memory set already
+            // holds something newer from this run -- deciding both on the lastSeen comparison
+            // alone dropped it, and the durable set is the one that survives the next restart.
+            //
+            // Found by auditing the read sites after a review found the same divergence at
+            // admission, rather than waiting for it to be reported.
+            long loaded = e.getValue().longValue();
+            Long inMemory = lastSeen.get(e.getKey());
+            if (inMemory == null || inMemory.longValue() < loaded) {
+                recordSeen(e.getKey(), loaded, false);
+            }
+            Long durable = durableSeen.get(e.getKey());
+            if (durable == null || durable.longValue() < loaded) {
+                recordDurable(e.getKey(), loaded);
             }
         }
         enabled = true;
@@ -1405,7 +1416,7 @@ public final class Continuity {
             // fresher state from the same device.
             return;
         }
-        Long seen = lastSeen.get(state.getDeviceId());
+        Long seen = seenSequence(state.getDeviceId());
         if (seen != null && seen.longValue() >= state.getSequence()) {
             // Delivered twice, which happens routinely: a continuation and a relay poll can carry
             // the same state.
@@ -1681,6 +1692,27 @@ public final class Continuity {
             durableSeen.put(device, Long.valueOf(sequence));
         }
         trimSeen();
+    }
+
+    /// The highest sequence known for a device, from EITHER map.
+    ///
+    /// The two are bounded independently and hold different sets -- lastSeen takes every arrival,
+    /// durableSeen only the ones that completed -- so they evict at different rates and an origin
+    /// can survive in one after being dropped from the other. Asking only lastSeen therefore let
+    /// a duplicate through: acknowledge a state, admit more than MAX_SEEN other origins, and the
+    /// acknowledged one is evicted from lastSeen while its durable mark remains. The duplicate
+    /// then passed the check and ran the application's listeners a second time, against the
+    /// act-once guarantee the durable mark exists to give.
+    private static Long seenSequence(String device) {
+        Long inMemory = lastSeen.get(device);
+        Long durable = durableSeen.get(device);
+        if (inMemory == null) {
+            return durable;
+        }
+        if (durable == null) {
+            return inMemory;
+        }
+        return durable.longValue() > inMemory.longValue() ? durable : inMemory;
     }
 
     /// Marks a device durably without disturbing the in-memory dedup mark, which may be newer.
