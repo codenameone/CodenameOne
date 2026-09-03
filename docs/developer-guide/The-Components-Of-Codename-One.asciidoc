@@ -288,6 +288,11 @@ You will need to define the following theme constants for the arrow to work:
 include::../demos/common/src/main/snippets/developer-guide/the-components-of-codename-one.properties[tag=the-components-of-codename-one-properties-001,indent=0]
 ----
 
+Each of the four image constants names an image in your theme resource, so add
+your own arrows under those names -- the values here are placeholders and there
+are no arrows built in. A constant naming an image the theme doesn't hold leaves
+the border with nothing to paint.
+
 Then style the `PopupDialog` UIID with the image for the `Dialog` itself.
 
 === InteractionDialog
