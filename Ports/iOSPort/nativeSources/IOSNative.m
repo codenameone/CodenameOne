@@ -10017,7 +10017,13 @@ void com_codename1_impl_ios_IOSNative_openContactPicker___int_boolean_int(CN1_TH
 #if defined(CN1_USE_CONTACT_PICKER) && TARGET_OS_IOS
     const BOOL requireAll = (requestedFields & CN1_CONTACT_REQUIRE_ALL) != 0;
     const int fields = requestedFields & ~CN1_CONTACT_REQUIRE_ALL;
-    const BOOL multi = multiSelect != JAVA_FALSE;
+    // A cap of one IS a single selection, whatever the caller passed for
+    // multiSelect. The multi-select picker has no cap of its own -- the limit
+    // is applied to the array it returns -- so honouring multiSelect here
+    // would let the user tick five contacts and watch four of them vanish on
+    // the way back. The single-select picker enforces the cap in the UI,
+    // where the user can see it.
+    const BOOL multi = multiSelect != JAVA_FALSE && selectionLimit > 1;
     const int limit = multi ? (int)selectionLimit : 1;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();

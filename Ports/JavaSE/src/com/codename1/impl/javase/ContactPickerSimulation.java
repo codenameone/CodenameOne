@@ -218,11 +218,13 @@ final class ContactPickerSimulation {
         }
         if ((fields & ContactPicker.PHONE) != 0) {
             out.setPhoneNumbers(copy(source.getPhoneNumbers()));
-            out.setPrimaryPhoneNumber(source.getPrimaryPhoneNumber());
+            out.setPrimaryPhoneNumber(primary(source.getPrimaryPhoneNumber(),
+                    source.getPhoneNumbers()));
         }
         if ((fields & ContactPicker.EMAIL) != 0) {
             out.setEmails(copy(source.getEmails()));
-            out.setPrimaryEmail(source.getPrimaryEmail());
+            out.setPrimaryEmail(primary(source.getPrimaryEmail(),
+                    source.getEmails()));
         }
         if ((fields & ContactPicker.ADDRESS) != 0) {
             out.setAddresses(copyAddresses(source.getAddresses()));
@@ -237,6 +239,51 @@ final class ContactPickerSimulation {
             out.setUrls(source.getUrls());
         }
         return out;
+    }
+
+    /**
+     * The primary value for a contact that has entries but names no primary.
+     *
+     * <p>The simulated address book fills the tables and leaves the primary
+     * unset, so copying it straight through handed the caller a contact with
+     * numbers and no primary number -- and the documented NAME|PHONE example,
+     * which reads exactly that, showed nothing in the simulator while working
+     * on the device. Android and iOS both promote the first entry they read,
+     * so the simulator does too.</p>
+     *
+     * <p>A Hashtable has no order to take a first entry from, so the label
+     * ranking below stands in for one. That keeps the answer stable across
+     * runs, which "whatever the iterator yields" would not.</p>
+     *
+     * @param declared the source's primary, used as-is when it has one
+     * @param entries  the label-to-value table, which may be null
+     * @return the primary value, or null when there are no entries
+     */
+    static String primary(String declared, Hashtable entries) {
+        if (declared != null) {
+            return declared;
+        }
+        if (entries == null || entries.isEmpty()) {
+            return null;
+        }
+        String[] ranked = {"mobile", "home", "work", "other"};
+        for (int iter = 0; iter < ranked.length; iter++) {
+            Object value = entries.get(ranked[iter]);
+            if (value != null) {
+                return String.valueOf(value);
+            }
+        }
+        // An unranked label. Lowest key wins so the answer does not depend on
+        // the table's iteration order.
+        String lowest = null;
+        Enumeration keys = entries.keys();
+        while (keys.hasMoreElements()) {
+            String key = String.valueOf(keys.nextElement());
+            if (lowest == null || key.compareTo(lowest) < 0) {
+                lowest = key;
+            }
+        }
+        return lowest == null ? null : String.valueOf(entries.get(lowest));
     }
 
     private static Hashtable copy(Hashtable source) {
@@ -348,10 +395,15 @@ final class ContactPickerSimulation {
 
     private static String describe(Contact contact) {
         StringBuilder out = new StringBuilder(name(contact));
-        if (contact.getPrimaryPhoneNumber() != null) {
-            out.append(" - ").append(contact.getPrimaryPhoneNumber());
-        } else if (contact.getPrimaryEmail() != null) {
-            out.append(" - ").append(contact.getPrimaryEmail());
+        // Through the same promotion the projection uses, so the row the user
+        // taps shows the number they are about to receive.
+        String phone = primary(contact.getPrimaryPhoneNumber(),
+                contact.getPhoneNumbers());
+        String email = primary(contact.getPrimaryEmail(), contact.getEmails());
+        if (phone != null) {
+            out.append(" - ").append(phone);
+        } else if (email != null) {
+            out.append(" - ").append(email);
         }
         return out.toString();
     }
