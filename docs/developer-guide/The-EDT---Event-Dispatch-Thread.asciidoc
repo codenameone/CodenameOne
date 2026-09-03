@@ -10,6 +10,10 @@ The EDT is the main thread of Codename One, by using one thread Codename One can
 TIP: This has huge advantages for your code. You can normally assume that all code will occur on a single thread and avoid complex synchronization logic.
 
 You can visualize the EDT as a loop such as this:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheEdtEventDispatchThreadJava013Snippet.java[tag=the-edt-event-dispatch-thread-java-013,indent=0]
+----
 
 
 Normally, every call you receive from Codename One will occur on the EDT. For example, every event, calls to paint(), and lifecycle calls (start etc.) should all occur on the EDT.
@@ -34,14 +38,26 @@ Codename One includes helper methods in the https://www.codenameone.com/javadoc/
 `callSerially(Runnable)` should normally be called off the EDT (in a separate thread), the run method within the submitted runnable will be invoked on the EDT.
 
 IMPORTANT: The Runnable passed to the `callSerially` and `callSeriallyAndWait` methods isn't a `Thread`. Use the `Runnable` interface as a convenient callback interface:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheEdtEventDispatchThreadJava014Snippet.java[tag=the-edt-event-dispatch-thread-java-014,indent=0]
+----
 
 
 TIP: You can write this code more concisely using Java 8 lambda code as such:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheEdtEventDispatchThreadJava015Snippet.java[tag=the-edt-event-dispatch-thread-java-015,indent=0]
+----
 
 
 This allows code to leave the EDT and then later on return to it to perform things within the EDT.
 
 The `callSeriallyAndWait(Runnable)` method blocks the current thread until the method completes, this is useful for cases such as user notification e.g.:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheEdtEventDispatchThreadJava016Snippet.java[tag=the-edt-event-dispatch-thread-java-016,indent=0]
+----
 
 
 TIP: If you're unsure use `callSerially`. The use cases for `callSeriallyAndWait` are rare. When you do need to wait, the overload that accepts a timeout lets background threads marshal results back to the EDT without risking an indefinite stall if the EDT is busy.
@@ -98,29 +114,53 @@ Invoke and block is the exact opposite of `callSeriallyAndWait()`, it blocks the
 a remarkably powerful tool most Swing developers don't know about.
 
 This is best explained by an example. Typical Java code reads as a single sequence as such:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheEdtEventDispatchThreadJava017Snippet.java[tag=the-edt-event-dispatch-thread-java-017,indent=0]
+----
 
 
 This works well normally but on the EDT it might be a problem, if one of the operations is slow it might slow the whole EDT (painting, event processing etc.). Normally you can move operations into a separate thread e.g.:
 
 This means that operation C will happen in parallel to operation B which might be a problem... +
 For example, instead of using operation names lets use a more "real world" example:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheEdtEventDispatchThreadJava018Snippet.java[tag=the-edt-event-dispatch-thread-java-018,indent=0]
+----
 
 
 Notice that the first and last operations must be conducted on the EDT but the middle operation might be slow!
 Since `updateUIWithContentOfFile` needs `readAndParseFile` to occur before it starts doing the new thread won't be enough.
 
 A simplistic approach is to do something like this:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheEdtEventDispatchThreadJava019Snippet.java[tag=the-edt-event-dispatch-thread-java-019,indent=0]
+----
 
 
 However, `updateUIWithContentOfFile` should be executed on the EDT and not on a random thread. The right way to do this would therefore be something like this:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheEdtEventDispatchThreadJava020Snippet.java[tag=the-edt-event-dispatch-thread-java-020,indent=0]
+----
 
 
 This is legal and would work reasonably well, however it gets complicated as you add more and more features that need to be chained serially after all these are 3 methods!
 
 Invoke and block solves this in a unique way you can get almost the exact same behavior by using this:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheEdtEventDispatchThreadJava021Snippet.java[tag=the-edt-event-dispatch-thread-java-021,indent=0]
+----
 
 
 Or this with Java 8 syntax:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheEdtEventDispatchThreadJava022Snippet.java[tag=the-edt-event-dispatch-thread-java-022,indent=0]
+----
 
 
 Invoke and block effectively blocks the current EDT in a legal way. It spawns a separate thread that runs the `run()` method and when that run method completes it goes back to the EDT.
@@ -142,9 +182,17 @@ Notice that the dialog show method will block the calling thread until the user 
 NOTE: Other APIs such as `NetworkManager.addToQueueAndWait()` also make use of this feature. Pretty much every "AndWait" method or blocking method uses this API internally!
 
 To explain how invokeAndBlock works you can return to the sample above of how the EDT works:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheEdtEventDispatchThreadJava023Snippet.java[tag=the-edt-event-dispatch-thread-java-023,indent=0]
+----
 
 
 `invokeAndBlock()` works in a similar way to this pseudo-code:
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/the-edt-event-dispatch-thread.txt[tag=the-edt-event-dispatch-thread-text-001,indent=0]
+----
 
 
 The EDT is effectively "blocked" but `invokeAndBlock` "redoes" it from within...
