@@ -257,16 +257,6 @@ appendix_goal_generate_graphql.adoc	ends the stream:
 appendix_goal_generate_grpc.adoc	Call sites use the static factory:
 appendix_goal_generate_grpc.adoc	The `@GrpcClient` interface looks like:
 appendix_goal_generate_openapi.adoc	Call sites use the static factory:
-basics.asciidoc	For example: see this code where:
-basics.asciidoc	From that point on you can write code that looks like this:
-basics.asciidoc	In the race to make code "`tighter`" you can make this even shorter. Most layout managers have their own custom terse syntax style for example:
-basics.asciidoc	Instead of:
-basics.asciidoc	Instead of:
-basics.asciidoc	Some things were changed so you won't have too many conflicts for example, `Log.p` or `Log.e` would have been problematic so you now have:
-basics.asciidoc	The UIID's translate the theme elements into a set of `Style` objects. These `Style` objects get their initial values from the theme but can be further manipulated after the fact. To make the text field's foreground color red you could use this code:
-basics.asciidoc	The same applies for most network manager calls e.g.:
-basics.asciidoc	This works great for regular layouts but might not for constraint based layouts. A constraint based layout accepts another argument. For example: `BorderLayout` needs a location for the `Component`:
-basics.asciidoc	and `setSameHeight` methods, for example:
 graphics.asciidoc	(that's: where the numbers appear), and the remaining marks (corresponding with seconds) will be short:
 graphics.asciidoc	3. Invert the translation performed in step 1:
 graphics.asciidoc	A `URLImage` can be created with a mask adapter to apply an effect to an image. This allows you to round downloaded images or apply any sort of masking for example: you can adapt the round mask code above as such:

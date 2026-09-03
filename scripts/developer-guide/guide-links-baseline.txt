@@ -27,7 +27,6 @@ The-Components-Of-Codename-One.asciidoc	http://awoiaf.westeros.org/index.php/A_G
 The-Components-Of-Codename-One.asciidoc	http://awoiaf.westeros.org/index.php/Portal:Books
 The-Components-Of-Codename-One.asciidoc	http://www.georgerrmartin.com/
 The-EDT---Event-Dispatch-Thread.asciidoc	http://foxtrot.sourceforge.net/
-basics.asciidoc	http://docs.oracle.com/Java
 basics.asciidoc	http://www.miglayout.com/QuickStart.pdf
 graphics.asciidoc	http://fontello.com/
 io.asciidoc	http://twillo.com/
