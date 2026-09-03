@@ -872,16 +872,24 @@ API_AVAILABLE(ios(11.0))
 #endif
     }
     [cn1LoadingDropSessions addObject:session];
-    // Whether *this* assembly is the one that owns the local completion state below. An older
-    // assembly must not consume state a newer one set: an external drop still loading when a
-    // local drag was dropped used to see that local session's flag and complete its source with
-    // the external drop's action. Two local drops cannot overlap -- the framework runs one drag
-    // at a time and a local drop's completion is what ends it -- so this is the whole of it.
+    // Two different questions, and they were one answer.
+    //
+    // Whether the drag started inside this application is what the framework reports as
+    // NativeDropEvent.isLocal(), and a drag any interaction here started is local by that
+    // reading.
     const BOOL localAssembly = (session.localDragSession != nil);
+    // Whether *this* framework's source is the one that started it is a narrower thing, and it
+    // is what the completion bookkeeping below belongs to. Another UIDragInteraction's drag also
+    // has a localDragSession, so answering the first question for the second had an unrelated
+    // drop take ownership of the state a Codename One source was waiting on -- and complete that
+    // source with its own result. The session identity that already answers this for the action
+    // mask answers it here too.
+    const BOOL ownsCompletion = localAssembly && cn1OutgoingSession != nil
+            && session.localDragSession == cn1OutgoingSession;
     // The mask this session offers, taken now. By the time a slow provider has finished the
     // framework's own memory of it belongs to whatever drag is running then.
     const int sessionActions = cn1AllowedActionsFor(session);
-    if (localAssembly) {
+    if (ownsCompletion) {
         cn1LocalDropInFlight = YES;
         cn1EndDeferred = NO;
         cn1LocalDropResult = -1;
@@ -1069,7 +1077,7 @@ API_AVAILABLE(ios(11.0))
         // past long ago -- can stop holding off. Only this one: another drop still loading is
         // still entitled to its answer.
         [cn1LoadingDropSessions removeObject:session];
-        if (localAssembly && cn1LocalDropInFlight) {
+        if (ownsCompletion && cn1LocalDropInFlight) {
             cn1LocalDropInFlight = NO;
             if (cn1EndDeferred) {
                 cn1EndDeferred = NO;

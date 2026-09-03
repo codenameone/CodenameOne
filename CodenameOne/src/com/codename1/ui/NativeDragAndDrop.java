@@ -761,6 +761,22 @@ public final class NativeDragAndDrop {
         int accepted;
         Component previous;
         int advertised;
+        if (target == null) {
+            // Nothing is at the release point any more. On a port that assembles a drop
+            // asynchronously the tree can be rebuilt while the item providers are still
+            // loading -- a form shown, a list replaced -- and the component that accepted
+            // this drag is then no longer where it was. It is still the component that
+            // accepted it, so it is offered the drop rather than the payload being dropped
+            // on the floor.
+            //
+            // Only when the position resolves to nothing at all. Where it resolves to some
+            // *other* component the position wins, because a release that lands somewhere
+            // else is a release somewhere else -- and this cannot tell that apart from a
+            // tree that changed underneath a slow load. Position is what a drop means
+            // everywhere else in here, and one heuristic guessing against it would make
+            // the two disagree.
+            target = stillWillingHoverTarget(content, action);
+        }
         synchronized (LOCK) {
             // What this drag advertised: the caller's answer where it has one, otherwise what
             // the last drag event said. A drop arriving with neither -- which no real port
@@ -905,6 +921,30 @@ public final class NativeDragAndDrop {
     }
 
     // ------------------------------------------------------------------------------------
+
+    /// The component this drag was last over, when it is still part of a live surface and
+    /// still willing to take what has arrived -- otherwise null.
+    ///
+    /// Asked only when the position no longer names anything. A component detached from its
+    /// surface cannot be dropped on: it has no coordinates to speak of and nothing would
+    /// repaint.
+    private static Component stillWillingHoverTarget(ClipboardContent content, int actions) {
+        Component hovered;
+        synchronized (LOCK) {
+            hovered = currentTarget;
+        }
+        if (hovered == null || TopLevelSupport.rootOf(hovered) == null
+                || !hovered.isNativeDropTarget() || !hovered.isEnabled()
+                || (actions & hovered.getAcceptedDropActions()) == 0) {
+            return null;
+        }
+        try {
+            return hovered.canAcceptNativeDrop(content) ? hovered : null;
+        } catch (Throwable err) {
+            Log.e(err);
+            return null;
+        }
+    }
 
     /// Resolves the deepest component under the pointer that is willing to take this content.
     ///

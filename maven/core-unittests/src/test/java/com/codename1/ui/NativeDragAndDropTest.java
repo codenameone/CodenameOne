@@ -790,6 +790,40 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDropWhoseTargetMovedIsStillDeliveredToIt() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        // The tree is rebuilt while a slow item provider is still loading: the component that
+        // accepted the drag is still there, but no longer where the release happened.
+        form.removeComponent(target);
+        Container filler = new Container();
+        form.add(BorderLayout.CENTER, filler);
+        Container elsewhere = new Container();
+        elsewhere.setNativeDropTarget(false);
+        form.add(BorderLayout.SOUTH, elsewhere);
+        form.revalidate();
+        // Put it back somewhere the release point does not reach.
+        form.add(BorderLayout.NORTH, target);
+        target.setPreferredSize(new com.codename1.ui.geom.Dimension(1, 1));
+        form.revalidate();
+
+        NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertTrue(target.events.contains("drop"),
+                "the component that accepted this drag is still the one that accepted it; the "
+                        + "payload goes to it rather than on the floor because the tree moved "
+                        + "while the providers were loading");
+        assertNotNull(target.dropped);
+    }
+
+    @FormTest
     void aDropThatLandsElsewhereTellsTheComponentItLeft() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder left = new DropRecorder();
