@@ -105,7 +105,9 @@ class TheComponentsOfCodenameOneJava173Snippet {
         }
 
         public Component getListFocusComponent(List list) {
-            return this;
+            // this renderer highlights the selected row itself, and returning the
+            // rubber stamp would draw the focus overlay with the last row's text
+            return null;
         }
     }
     // end::the-components-of-codename-one-java-173[]

@@ -100,15 +100,18 @@ class TheComponentsOfCodenameOneJava212Snippet {
            //get the current location from the Location API
            Location loc = LocationManager.getLocationManager().getCurrentLocation();
 
-          Coord lastLocation = new Coord(loc.getLatitude(), loc.getLongtitude());
-           // a material icon rather than an asset you would have to add
-           Image i = FontImage.createMaterial(FontImage.MATERIAL_PLACE, "Label", 4.0f);
-           PointsLayer pl = new PointsLayer();
-           pl.setPointIcon(i);
-           PointLayer p = new PointLayer(lastLocation, "You Are Here", i);
-           p.setDisplayName(true);
-           pl.addPoint(p);
-           mc.addLayer(pl);
+           // null until the device has a fix, so the map opens without the marker
+           if(loc != null) {
+               Coord lastLocation = new Coord(loc.getLatitude(), loc.getLongtitude());
+               // a material icon rather than an asset you would have to add
+               Image i = FontImage.createMaterial(FontImage.MATERIAL_PLACE, "Label", 4.0f);
+               PointsLayer pl = new PointsLayer();
+               pl.setPointIcon(i);
+               PointLayer p = new PointLayer(lastLocation, "You Are Here", i);
+               p.setDisplayName(true);
+               mc.addLayer(pl);
+               pl.addPoint(p);
+           }
         } catch (IOException ex) {
            ex.printStackTrace();
         }
