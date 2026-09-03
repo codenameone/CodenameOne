@@ -757,11 +757,19 @@ public final class NativeDragAndDrop {
     /// the action actually accepted, or `NativeDragOperation#ACTION_NONE`
     public static int drop(int windowId, int x, int y, ClipboardContent content, int action,
             int advertisedActions, boolean local) {
-        Component target = findTarget(windowId, x, y, content, action);
+        // Nothing materialized. Every representation the platform offered failed to be read --
+        // a transferable that threw, a one-shot stream already spent -- and an empty payload is
+        // not a drop. A target that filters on a type refuses it anyway, but one that takes
+        // anything would have been handed nothing and both it and the source told the transfer
+        // had happened. The state below is still cleared, and the component that was hovering is
+        // still told the drag left it.
+        boolean carriesSomething = content != null && content.getMimeTypes().length > 0;
+        Component target = carriesSomething
+                ? findTarget(windowId, x, y, content, action) : null;
         int accepted;
         Component previous;
         int advertised;
-        if (target == null) {
+        if (carriesSomething && target == null) {
             // Nothing is at the release point any more. On a port that assembles a drop
             // asynchronously the tree can be rebuilt while the item providers are still
             // loading -- a form shown, a list replaced -- and the component that accepted

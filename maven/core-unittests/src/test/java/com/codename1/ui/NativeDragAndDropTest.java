@@ -790,6 +790,30 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDropThatMaterializedNothingIsNotADrop() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        // Every representation failed to be read: a transferable that threw, or a one-shot
+        // stream already spent. What arrives is a payload with nothing in it.
+        int accepted = NativeDragAndDrop.drop(0, x, y, new ClipboardContent(),
+                NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertEquals(NativeDragOperation.ACTION_NONE, accepted,
+                "the source is told the transfer did not happen, because it did not");
+        assertFalse(target.events.contains("drop"),
+                "and a target that takes anything is not handed nothing and told it was a drop");
+        assertTrue(target.events.contains("exit"),
+                "the component that was hovering still hears that the drag left it");
+    }
+
+    @FormTest
     void aDropWhoseTargetMovedIsStillDeliveredToIt() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder target = addTarget(form);

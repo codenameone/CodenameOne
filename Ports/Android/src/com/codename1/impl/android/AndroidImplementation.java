@@ -10556,6 +10556,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// So it is copied where the provider can reach, under its own name, which is what a
     /// receiver sees. Not through writeAsProviderUri: that names and records what it mints as
     /// transport for a representation's bytes, and this is a file the source published.
+    private static final long MAX_STAGED_SHARE_BYTES = 8L * 1024 * 1024;
+
     private Uri shareableUriFor(File file, String authority) throws IOException {
         try {
             Uri direct = FileProvider.getUriForFile(getContext(), authority, file);
@@ -10564,6 +10566,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return direct;
         } catch (Throwable outsideTheRoots) {
             com.codename1.io.Log.e(outsideTheRoots);
+        }
+        // The copy runs on the thread that started the drag, which is the event dispatch
+        // thread, and a drag has to begin while the finger is still down -- so this cannot be
+        // moved off it and cannot be allowed to take long. Android stops waiting for input after
+        // five seconds; a few megabytes is far below that on any storage, and a file bigger than
+        // this has no business being copied at all. It belongs under a provider root, which is
+        // where the roots above now put the external storage such files actually live on.
+        if (file.length() > MAX_STAGED_SHARE_BYTES) {
+            throw new IOException("refusing to copy " + file.length() + " bytes on the event "
+                    + "dispatch thread to share " + file);
         }
         File dir = new File(getContext().getCacheDir(), "intent_files");
         dir.mkdirs();

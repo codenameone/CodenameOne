@@ -5428,7 +5428,17 @@ public class AndroidGradleBuilder extends Executor {
             String filePathsContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                     "<paths xmlns:android=\"http://schemas.android.com/apk/res/android\">\n" +
                     "    <cache-path name=\"intent_files\" path=\"intent_files/\" />\n" +
-                    request.getArg("android.file_paths", "    <files-path name=\"app_files\" path=\".\" />") +
+                    // The roots a file has to be under for FileProvider to serve it. The
+                    // application's own directories, and its external ones -- a document or a
+                    // video picked by the user lives out there, FileSystemStorage lists those
+                    // roots, and getUriForFile throws for anything outside them, so sharing
+                    // such a file meant copying it first. Declaring a root exposes nothing by
+                    // itself: a URI is still minted per file, and only for files this
+                    // application deliberately shares.
+                    //
+                    // Only the default. An application that sets the hint still says exactly
+                    // what it wants and gets nothing it did not ask for.
+                    request.getArg("android.file_paths", "    <files-path name=\"app_files\" path=\".\" />\n    <external-files-path name=\"app_external_files\" path=\".\" />\n    <external-cache-path name=\"app_external_cache\" path=\".\" />\n    <external-path name=\"external\" path=\".\" />\n") +
                     "</paths>";
 
             try {
