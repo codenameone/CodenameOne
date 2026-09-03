@@ -521,11 +521,41 @@ public final class Continuity {
         if (!enabled) {
             return;
         }
-        dirty = false;
-        AppState state = capture();
+        boolean[] providerFailed = new boolean[1];
+        AppState state = capture(providerFailed);
         if (state == null) {
             return;
         }
+        if (providerFailed[0]) {
+            // The last payload is CARRIED FORWARD rather than replaced by nothing.
+            //
+            // A provider that throws leaves this state with no payload, and writing that over a
+            // stored draft loses it -- the very thing a checkpoint exists to prevent, caused by a
+            // read that may well succeed next time. Skipping the write instead was the first
+            // attempt and it traded one loss for another: the rule beside this one is that a
+            // provider failure costs its own payload and NOTHING MORE, so the routes, which are
+            // current and real, have to be saved.
+            //
+            // Carrying forward gives up neither. The stored checkpoint keeps the newest routes
+            // and the newest payload that was ever successfully read, which is exactly what the
+            // application would have written had it checkpointed a moment before the failure.
+            //
+            // Found by a test failing only when the whole suite ran: another class had left a
+            // navigation stack behind, so the state was not empty, and an earlier version of this
+            // guard -- which only skipped EMPTY states -- wrote routes over the draft. That is
+            // not a fixture artifact; it is an application with routes whose provider threw.
+            AppState previous = readStored();
+            if (previous != null && !previous.getPayload().isEmpty()) {
+                state.setPayloadUnchecked(previous.getPayload());
+            }
+            // Still owed either way, so a later suspend retries the capture that failed.
+            dirty = true;
+            persist(state);
+            publishContinuation(state);
+            publishToRelay(state);
+            return;
+        }
+        dirty = false;
         if (!persist(state)) {
             // Still owed. `dirty` was cleared on the way in, and leaving it clear told the next
             // suspend there was nothing to write -- so a checkpoint that failed on a full disk
@@ -566,6 +596,14 @@ public final class Continuity {
     ///
     /// - `IllegalArgumentException`: when the provider returned an unrepresentable payload
     public static AppState capture() {
+        // Best effort, which is what this method has always been: an application calling it to
+        // feed its own transport wants whatever can be gathered. checkpoint() asks the private
+        // form instead, because for the DURABLE path a provider failure is not "no payload".
+        return capture(new boolean[1]);
+    }
+
+    /// As above, reporting through `providerFailed` whether the provider threw.
+    private static AppState capture(boolean[] providerFailed) {
         if (!enabled) {
             return null;
         }
@@ -579,8 +617,16 @@ public final class Continuity {
             } catch (Throwable t) {
                 // The provider is application code running on a housekeeping path. Its failure
                 // must not take down the navigation that triggered the checkpoint, so the routes
-                // are still saved and the payload is simply absent from this one.
+                // are still saved and the payload is simply absent from THIS state.
+                //
+                // Reported, though, because "absent" and "could not be gathered" are different
+                // answers and the caller decides what to do with them. A payload-only app whose
+                // provider threw would otherwise checkpoint an EMPTY state over the last good
+                // one, publish it, and clear the pending flag -- so a process death lost the
+                // draft that was safely stored a moment earlier, because of a failure that may
+                // well be transient.
                 Log.e(t);
+                providerFailed[0] = true;
             }
             if (payload != null) {
                 // NOT caught. An unrepresentable value is a programming error with exactly one
@@ -1303,6 +1349,20 @@ public final class Continuity {
         }
         // Admission only: not durable until the state has actually been completed.
         recordSeen(state.getDeviceId(), state.getSequence(), false);
+        if (state.isEmpty()) {
+            // A TOMBSTONE, not an offer. An enabled app with no routes and no payload still
+            // checkpoints, and the relay holds one document per user, so that empty state is
+            // published to overwrite whatever was there -- which is the point, it clears the
+            // other devices' stale copy. It carries a device id and a sequence, though, so the
+            // receiving side recognized it as a real arrival and ran the listeners: a
+            // "continue what you were doing?" prompt over nothing at all.
+            //
+            // The platform path has always got this right -- publishContinuation() withdraws the
+            // activity for an empty state rather than advertising one -- and only the relay path
+            // was missing the other half of it. Marked as seen above, so it is consumed rather
+            // than reconsidered, and simply not dispatched.
+            return;
+        }
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
@@ -1324,6 +1384,18 @@ public final class Continuity {
 
     /// Applies an arrival: offers it to the listeners, then restores or parks it.
     private static void dispatch(AppState state) {
+        if (isTooOld(state)) {
+            // Rechecked HERE, not only at admission, because admission is not the only way in.
+            // A continuation that cold-launches the app is parked and waits up to
+            // WINDOW_WAIT_MILLIS for the first form, and the waiter then comes back through this
+            // method -- so a state that was fresh when it landed and expired during the wait was
+            // restored anyway, past the check in admit() and the one in getRestorableState().
+            // An expired checkout or booking hold is exactly what maxAge exists to refuse.
+            //
+            // This check existed before the event-thread rewrite and was dropped by it. Its
+            // comment named this path.
+            return;
+        }
         if (Display.getInstance().getCurrent() == null) {
             // A continuation can cold-launch the app, and both Apple delegates hand it over while
             // init/start are still queued. Restoring against no form at all would run the route
@@ -1482,6 +1554,20 @@ public final class Continuity {
         // memory already holds the entry, so "unchanged" meant "write nothing" and both
         // acknowledge() and the restore path silently persisted nothing at all.
         rememberSeen();
+    }
+
+    /// Test seam: parks a state, as a cold-launch arrival with no form yet does.
+    static void parkForTest(AppState state) {
+        parked = state;
+    }
+
+    /// Test seam: the cold-launch drain, entered exactly where the waiter enters it.
+    ///
+    /// The wait itself cannot be reproduced in a unit harness -- it needs a launch with no form,
+    /// and this one always has one -- but the drain is the half that matters: it is where a state
+    /// that was fresh when it arrived and expired while waiting reaches dispatch().
+    static void drainParkedForTest() {
+        windowWaitFinished();
     }
 
     /// Test seam: the marks as they would be reloaded on the next launch.

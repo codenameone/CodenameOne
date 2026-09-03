@@ -45,6 +45,23 @@ import java.util.Map;
 public final class StateCodec {
     private static final String KEY_ROUTES = "routes";
     private static final String KEY_PAYLOAD = "payload";
+
+    /// Says that this document's payload values carry type tags.
+    ///
+    /// The decision has to be made once for the DOCUMENT, not guessed per value. decode() used to
+    /// ask of every string whether it looked tagged, so an untagged payload -- what a
+    /// hand-written endpoint or an older build produces, and which this codec deliberately
+    /// accepts -- had any ordinary string of the form "i:5" or "s:note" silently reinterpreted:
+    /// the first became an Integer, the second lost its prefix. That is application data changed
+    /// in transit, and no per-string rule can tell the two apart, because "i:5" is a perfectly
+    /// good string.
+    ///
+    /// A document written by this codec says so. One without the marker is read exactly as it
+    /// arrived.
+    private static final String KEY_ENCODING = "enc";
+
+    /// The only encoding this codec writes. Absent means untagged.
+    private static final String ENCODING_TAGGED = "1";
     private static final String KEY_DEVICE = "device";
     private static final String KEY_TITLE = "title";
     private static final String KEY_SEQUENCE = "seq";
@@ -72,6 +89,7 @@ public final class StateCodec {
         Map<String, Object> m = new HashMap<String, Object>();
         m.put(KEY_ROUTES, new ArrayList<String>(state.getRoutes()));
         m.put(KEY_PAYLOAD, encode(state.getPayload()));
+        m.put(KEY_ENCODING, ENCODING_TAGGED);
         m.put(KEY_DEVICE, state.getDeviceId());
         if (state.getTitle() != null) {
             m.put(KEY_TITLE, state.getTitle());
@@ -125,13 +143,18 @@ public final class StateCodec {
             }
             state.setRoutes(paths);
         }
+        // Whether the values are tagged is the DOCUMENT's answer, not a guess made per string.
+        // See KEY_ENCODING: without it, "i:5" is just a string and stays one.
+        Object encoding = m.get(KEY_ENCODING);
+        boolean tagged = encoding instanceof String && ENCODING_TAGGED.equals(encoding);
         Object payload = m.get(KEY_PAYLOAD);
         if (payload instanceof Map) {
             Map<String, Object> copy = new HashMap<String, Object>();
             Map<?, ?> read = (Map<?, ?>) payload;
             for (Map.Entry<?, ?> entry : read.entrySet()) {
                 if (entry.getKey() instanceof String) {
-                    copy.put((String) entry.getKey(), decode(entry.getValue()));
+                    copy.put((String) entry.getKey(),
+                            tagged ? decode(entry.getValue()) : entry.getValue());
                 }
             }
             // Not validated on the way in. This map came from another device, and refusing it
@@ -288,9 +311,14 @@ public final class StateCodec {
 
     /// Rebuilds a value `encodeValue` wrote.
     ///
-    /// An untagged value is passed through as-is rather than refused: it is what a hand-written
-    /// endpoint, or a device running a build older than the tagging, produces -- and a payload
-    /// that is merely untyped is more useful than no payload at all.
+    /// Only ever called for a document that DECLARED its values tagged, through KEY_ENCODING. A
+    /// document without that marker -- a hand-written endpoint, or a build older than the
+    /// tagging -- is passed through untouched by the caller, because there is no way to tell an
+    /// encoded "i:5" from a string whose value happens to be "i:5", and guessing corrupts the
+    /// second to rescue the first.
+    ///
+    /// A value that is untagged INSIDE a tagged document is still passed through: nested
+    /// containers are walked, and anything unrecognized is more useful untyped than discarded.
     private static Object decode(Object value) {
         if (value instanceof List) {
             List<?> in = (List<?>) value;

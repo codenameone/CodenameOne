@@ -1792,6 +1792,110 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A state that was fresh when it landed but expired while waiting for the first form must not
+     * be restored. The cold-launch waiter comes back through dispatch() up to WINDOW_WAIT_MILLIS
+     * later, past the check in admit() and the one in getRestorableState() -- so an expired
+     * checkout or booking hold was auto-restored anyway. That check existed before the
+     * event-thread rewrite and the rewrite dropped it.
+     *
+     * <p>Driven through the parked slot and the waiter's own drain, because the wait cannot be
+     * reproduced here: it needs a launch with no form and this harness always has one. An earlier
+     * version of this test delivered the same state twice and asserted nothing at all -- the
+     * second delivery was refused by the in-memory mark long before it could reach dispatch.</p>
+     */
+    @EdtTest
+    public void aStateThatExpiresWhileParkedIsNotRestored() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+
+        // Parked while it was fresh, and older than the limit by the time the waiter drains it.
+        AppState aged = fromElsewhere("stale by the time a form appeared", 61L);
+        aged.setTimestamp(System.currentTimeMillis() - 5000L);
+        Continuity.setMaxAge(1000L);
+        Continuity.parkForTest(aged);
+
+        Continuity.drainParkedForTest();
+        flushSerialCalls();
+
+        assertEquals(0, seen[0],
+                "a state that expired while it was parked was restored anyway");
+    }
+
+    /**
+     * An empty document is a tombstone, not an offer. An enabled app with no routes and no
+     * payload still checkpoints, and the relay holds one document per user, so that empty state
+     * is published to overwrite the stale one -- which is the point. It carries a device id and a
+     * sequence though, so the receiving side ran the listeners over it: a "continue what you were
+     * doing?" prompt about nothing. The platform path already withdrew the activity for an empty
+     * state; only the relay half was missing it.
+     */
+    @EdtTest
+    public void anEmptyArrivalIsConsumedRatherThanOffered() {
+        Continuity.setStateProvider(new RecordingProvider());
+        final int[] seen = new int[1];
+        Continuity.addContinuationListener(new ContinuityListener() {
+            public boolean stateReceived(AppState state) {
+                seen[0]++;
+                return true;
+            }
+        });
+
+        AppState empty = new AppState().setDeviceId("some-other-device").setSequence(71L)
+                .setTimestamp(System.currentTimeMillis());
+        Continuity.deliver(empty);
+        flushSerialCalls();
+
+        assertEquals(0, seen[0],
+                "an empty state was offered to the listeners, prompting the user over nothing");
+    }
+
+    /**
+     * A provider that throws must not replace a stored draft with an empty state. It leaves the
+     * state with no payload, and an app with no routes has nothing else in it -- so the write
+     * destroyed what was safely stored a moment ago, cleared the pending flag so no later suspend
+     * retried, and withdrew the platform continuation, all for a read that may succeed next time.
+     */
+    @EdtTest
+    public void aFailingProviderDoesNotWipeAStoredDraft() {
+        final boolean[] blowUp = new boolean[1];
+        Continuity.setStateProvider(new StateProvider() {
+            public Map<String, Object> saveState() {
+                if (blowUp[0]) {
+                    throw new IllegalStateException("cannot read the draft right now");
+                }
+                Map<String, Object> m = new HashMap<String, Object>();
+                m.put("draft", "half a sentence");
+                return m;
+            }
+
+            public void restoreState(Map<String, Object> payload) {
+            }
+        });
+
+        Continuity.checkpoint();
+        assertEquals("half a sentence",
+                Continuity.getRestorableState().getPayload().get("draft"),
+                "the draft should have been stored");
+
+        blowUp[0] = true;
+        Continuity.checkpoint();
+
+        AppState stored = Continuity.getRestorableState();
+        assertNotNull(stored, "the stored draft was destroyed by a provider that threw");
+        assertEquals("half a sentence", stored.getPayload().get("draft"),
+                "an empty state was written over the stored draft");
+        assertTrue(Continuity.isCheckpointPending(),
+                "the failed capture left nothing owed, so no later suspend retries it");
+    }
+
+    /**
      * A checkpoint whose write failed is still owed. `dirty` is cleared on the way in, so leaving
      * it clear told the next suspend there was nothing to save -- a checkpoint lost to a full
      * disk was never retried and the app came back to the last write that had succeeded.

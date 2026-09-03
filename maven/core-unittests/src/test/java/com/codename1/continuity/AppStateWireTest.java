@@ -527,4 +527,43 @@ public class AppStateWireTest {
         assertTrue(e.getMessage().length() < 2000,
                 "the message reproduced the whole key: " + e.getMessage().length() + " chars");
     }
+
+    /**
+     * An untagged payload is read exactly as it arrived. decode() used to ask of every string
+     * whether it looked tagged, so a hand-written endpoint or an older build sending the ordinary
+     * string "i:5" had it turned into an Integer, and "s:note" silently lost its prefix. No
+     * per-string rule can separate those, because "i:5" is a perfectly good string -- the
+     * document says once whether its values are tagged.
+     */
+    @Test
+    public void anUntaggedPayloadKeepsStringsThatLookLikeTags() {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("looksLikeAnInt", "i:5");
+        payload.put("looksLikeAString", "s:note");
+        Map<String, Object> doc = new HashMap<String, Object>();
+        doc.put("device", "some-other-device");
+        doc.put("seq", "3");
+        doc.put("payload", payload);
+        // No "enc" marker: this is what a hand-written endpoint produces.
+
+        AppState state = StateCodec.fromMap(doc);
+
+        assertNotNull(state);
+        assertEquals("i:5", state.getPayload().get("looksLikeAnInt"));
+        assertEquals("s:note", state.getPayload().get("looksLikeAString"));
+    }
+
+    /** And a document this codec wrote still round-trips its types. */
+    @Test
+    public void aTaggedDocumentStillRoundTripsItsTypes() {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        payload.put("count", Integer.valueOf(5));
+        payload.put("note", "i:5");
+        AppState state = new AppState().setPayload(payload).setDeviceId("d").setSequence(1L);
+
+        AppState back = StateCodec.fromMap(StateCodec.toMap(state));
+
+        assertEquals(Integer.valueOf(5), back.getPayload().get("count"));
+        assertEquals("i:5", back.getPayload().get("note"));
+    }
 }
