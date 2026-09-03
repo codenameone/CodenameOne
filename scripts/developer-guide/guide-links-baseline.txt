@@ -1,0 +1,41 @@
+# Developer guide links that do not resolve, or are not TLS.
+# One line per occurrence: a file naming the same bad URL twice gets
+# two lines, because that is two things to fix.
+# A ratchet: entries may be removed as links are fixed, never added.
+# Regenerate with check-guide-links.py --write-baseline.
+About-This-Guide.asciidoc	http://github.com/chen-fishbein/
+About-This-Guide.asciidoc	http://github.com/shannah/
+Advanced-Theming.asciidoc	http://freebiesbug.com/psd-freebies/iphone-6-ui-kit/
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.android.com/reference/android/content/Context.html
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/Mobihelp.html
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/Mobihelp.html
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/package-summary.html
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/api/reference/com/freshdesk/mobihelp/package-summary.html
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/android/integration_guide/
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/ios/api/
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/ios/api/
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/ios/integration_guide/
+Advanced-Topics-Under-The-Hood.asciidoc	http://developer.freshdesk.com/mobihelp/ios/integration_guide/#getting-started
+Advanced-Topics-Under-The-Hood.asciidoc	http://groovy-lang.org/
+Advanced-Topics-Under-The-Hood.asciidoc	http://jruby.org/
+Advanced-Topics-Under-The-Hood.asciidoc	http://shannah.github.io/cn1-freshdesk/
+Advanced-Topics-Under-The-Hood.asciidoc	http://stackoverflow.com/questions/11421048/android-ios-custom-uri-protocol-handling
+Advanced-Topics-Under-The-Hood.asciidoc	http://www.mirah.org/
+Introduction.asciidoc	http://www.xmlvm.org/
+Miscellaneous-Features.asciidoc	http://wiki.akosma.com/IPhone_URL_Schemes
+The-Components-Of-Codename-One.asciidoc	http://awoiaf.westeros.org/index.php/A_Game_of_Thrones
+The-Components-Of-Codename-One.asciidoc	http://awoiaf.westeros.org/index.php/Portal:Books
+The-Components-Of-Codename-One.asciidoc	http://www.georgerrmartin.com/
+The-EDT---Event-Dispatch-Thread.asciidoc	http://foxtrot.sourceforge.net/
+basics.asciidoc	http://docs.oracle.com/Java
+basics.asciidoc	http://www.miglayout.com/QuickStart.pdf
+graphics.asciidoc	http://fontello.com/
+io.asciidoc	http://twillo.com/
+io.asciidoc	http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3
+io.asciidoc	http://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html
+io.asciidoc	http://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html
+performance.asciidoc	http://optipng.sourceforge.net/
+signing.asciidoc	http://developer.android.com/guide/publishing/app-signing.html
+signing.asciidoc	http://developer.apple.com/
+signing.asciidoc	http://get.udid.io/
+signing.asciidoc	http://stackoverflow.com/questions/6320255/if-i-revoke-an-existing-distribution-certificate-will-it-mess-up-anything-with

@@ -20,6 +20,10 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
+      # The other root build_javadocs.sh generates from, and the other one
+      # check-guide-links.py indexes. Without it, deleting a linked CLDC type
+      # merges unvalidated and the next scheduled build is where it surfaces.
+      - 'Ports/CLDC11/src/**'
       # The developer guide this site renders includes a build hint table that is
       # generated rather than committed, so a change to the catalog or to the
       # renderer changes the published page without touching docs/. The
@@ -46,6 +50,10 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
+      # The other root build_javadocs.sh generates from, and the other one
+      # check-guide-links.py indexes. Without it, deleting a linked CLDC type
+      # merges unvalidated and the next scheduled build is where it surfaces.
+      - 'Ports/CLDC11/src/**'
       # As above: the build hint table is generated, not committed.
       - 'maven/build-hint-catalog/**'
       - 'maven/build-hint-tools/**'
@@ -276,6 +284,17 @@ jobs:
             --no-progress
             --root-dir public
             public/**/*.html
+
+      # The developer guide links into this site, so a page renamed, deleted or
+      # re-slugged here breaks the guide. The check lives in THIS workflow rather
+      # than in developer-guide-docs.yml because it is the route data that
+      # changed: widening that workflow's paths to docs/website/** would run the
+      # full guide build -- maven install, demo build, screenshot generation --
+      # on every blog post the daily publisher pushes, to run one Python script.
+      # This job already triggers on docs/website/**, and the check needs nothing
+      # but a checkout.
+      - name: Check developer guide links against the routes this site serves
+        run: python3 scripts/developer-guide/check-guide-links.py
 
       - name: Reject absolute codenameone.com links
         run: |

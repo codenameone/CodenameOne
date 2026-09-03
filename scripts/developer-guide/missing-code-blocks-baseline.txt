@@ -1,0 +1,407 @@
+# Prose that promises a code block where none follows.
+# A ratchet: entries may be removed as holes are filled, never added.
+# Regenerate with check-missing-code-blocks.py --write-baseline.
+3D-Graphics.asciidoc	ARGB pixels:
+3D-Graphics.asciidoc	Querying capabilities at runtime:
+3D-Graphics.asciidoc	own material, so a textured model renders with no extra setup:
+Advanced-Topics-Under-The-Hood.asciidoc	For the release build, you will also need to inject some proguard configuration so that important classes don't get stripped out at build time. The FreshDesk SDK instructions state:
+Advanced-Topics-Under-The-Hood.asciidoc	You can override these methods in the draggable components:
+Advertising.asciidoc	(for example "Sponsored"):
+Advertising.asciidoc	anchored at the top or bottom) and call `load()`:
+Advertising.asciidoc	identifier. The recommended order is to initialize, gather consent, then load:
+Advertising.asciidoc	manager and provider handle the foreground hook and freshness window for you:
+Advertising.asciidoc	method that registers its provider with `AdManager`:
+Advertising.asciidoc	next one when the current ad is dismissed:
+Advertising.asciidoc	rewards, verify server side rather than trusting the client:
+Advertising.asciidoc	transitions, no more often than a given interval:
+Ai-And-Speech.asciidoc	`ChatMessage` values to JSON under a named key:
+Ai-And-Speech.asciidoc	`SecureStorage` overloads:
+Ai-And-Speech.asciidoc	`chatStream(...)` can mutate the view directly:
+Ai-And-Speech.asciidoc	`cn1-ai-stablediffusion` cn1lib (when present in the consumer project):
+Ai-And-Speech.asciidoc	accepts either inline bytes plus a MIME type or a remote HTTPS URL:
+Ai-And-Speech.asciidoc	and streams the same text into a `ChatView`:
+Ai-And-Speech.asciidoc	calling `cancel()` on the resource closes the underlying socket:
+Ai-And-Speech.asciidoc	clustering:
+Ai-And-Speech.asciidoc	conversation:
+Ai-And-Speech.asciidoc	one user message:
+Ai-And-Speech.asciidoc	returns a string the runtime can hand to `JSONParser`:
+Ai-And-Speech.asciidoc	safe to log:
+Ai-And-Speech.asciidoc	you need a custom send pipeline:
+Analytics.asciidoc	Consent is broken down by category, so you can honor granular choices -- for example allowing crash reporting while declining behavioral analytics:
+Analytics.asciidoc	Each device is identified by a pseudonymous client id. It's generated on first use and stored locally -- it isn't derived from any hardware identifier. To honor an erasure request ("right to be forgotten"), reset it:
+Analytics.asciidoc	If you would rather not gate at all, switch the default so collection is active unless the user withdraws it. This places the compliance responsibility on you as the integrator:
+Analytics.asciidoc	If your application has already obtained consent through its own mechanism -- a custom prompt, a third-party consent-management platform, an enterprise device-management policy, or a jurisdiction where you have determined consent isn't required -- record it once at startup so reporting flows without a second prompt:
+Analytics.asciidoc	Once at least one provider is registered, report usage from anywhere in your app:
+Analytics.asciidoc	You can also seed every category and then revoke just one with the builder, for example to allow analytics but not ad storage:
+Analytics.asciidoc	`FirebaseAnalyticsProvider` forwards to the native Firebase Analytics SDK on Android and iOS. Register it like any other provider:
+Analytics.asciidoc	`GoogleAnalyticsProvider` uses the GA4 Measurement Protocol. Create it with a measurement id (`G-XXXXXXXX`) and a Measurement Protocol API secret from the GA4 admin console:
+Analytics.asciidoc	`MatomoAnalyticsProvider` targets Matomo (formerly Piwik) through its HTTP tracking API. Matomo can be self-hosted and supports IP anonymization, which makes it a good fit for privacy-sensitive deployments:
+Animations.asciidoc	That one command will enable swiping back from `currentForm`. https://www.codenameone.com/javadoc/com/codename1/util/LazyValue.html[LazyValue] allows you to pass a value lazily:
+Animations.asciidoc	builder:
+Annotation-Component-Binding.asciidoc	ASM and inserts the equivalent of:
+Annotation-Component-Binding.asciidoc	After binding, drive validation through the returned handle:
+Annotation-JSON-XML-Mapping.asciidoc	Hand-write a `Mapper<T>` and register it at startup:
+Annotation-JSON-XML-Mapping.asciidoc	mutation:
+Annotation-SQLite-ORM.asciidoc	dao surface isn't enough. Transactions:
+App-Review.asciidoc	By default the low-rating feedback is collected through an e-mail to the address passed to `setSupportEmail(String)`. To deliver feedback through your own backend, register a `FeedbackListener`:
+App-Review.asciidoc	Rather than picking the moment yourself, you can let `AppReview` decide based on simple engagement heuristics: how many times the app was launched, how long ago it was installed, and how long since it last asked. Configure it once (for example in your app's `init` or `start` method) and call `registerSession()` on every launch:
+App-Review.asciidoc	The simplest usage is a single call at a moment that makes sense in your app -- typically right after the user completed something rewarding (finished a level, saved a document, completed an order):
+Apple-Wallet-Extension.asciidoc	In Java, publish the user's cards whenever they change (typically after login) and keep a fresh token published so Wallet can skip the login screen:
+Authentication-And-Identity.asciidoc	Firebase Auth isn't an OIDC provider -- it issues Google-Identity-Toolkit-style tokens via REST endpoints. `com.codename1.social.FirebaseAuth` wraps those endpoints:
+Authentication-And-Identity.asciidoc	For federated sign-in (Google / Apple / Microsoft as Firebase providers), first obtain an ID token via the matching `*Connect` class, then swap it for a Firebase session:
+Authentication-And-Identity.asciidoc	Or, if the provider exposes a discovery document:
+Authentication-And-Identity.asciidoc	Pseudo-code (the actual HTTP calls depend on your server library):
+Authentication-And-Identity.asciidoc	Refresh the Firebase session at app launch:
+Authentication-And-Identity.asciidoc	`OidcClient` saves the response under a per-issuer + per-client-ID key using `com.codename1.io.oidc.TokenStore.DefaultStorageTokenStore` (which serializes to `com.codename1.io.Storage`). To restore on next launch:
+Authentication-And-Identity.asciidoc	`com.codename1.social.FacebookConnect` exposes both the old SDK-based `doLogin()` and a new SDK-free `signIn(...)` that uses the system browser via `OidcClient`. Use the new method for the simulator, the web port, and for apps that don't want to bundle the Facebook SDK at all:
+Authentication-And-Identity.asciidoc	`com.codename1.social.GoogleConnect` now offers a modern `signIn(...)` method that runs entirely through `OidcClient`:
+Authentication-And-Identity.asciidoc	becomes:
+Commerce.asciidoc	After a purchase, or on app start, validate the device's receipts with the cloud and refresh the entitlement cache. `refresh()` makes a blocking network call, so run it off the EDT:
+Commerce.asciidoc	Drive purchases through the manager (these delegate to the `Purchase` API):
+Commerce.asciidoc	In your `Lifecycle.init` (or wherever you set up purchases):
+Commerce.asciidoc	The core idea is the *entitlement*: an abstract access right such as `pro` or `remove_ads`. You map one or more store products to an entitlement, and your code only ever checks the entitlement:
+Crash-Protection.asciidoc	In your `Lifecycle.init`:
+Deep-Links-Routing.asciidoc	Or annotate a static factory method:
+Deep-Links-Routing.asciidoc	`AssetLinksBuilder` produces the payload:
+Deep-Links-Routing.asciidoc	attempts so they can confirm before discarding unsaved work:
+Deep-Links-Routing.asciidoc	without redirects. The plugin's `AasaBuilder` produces the payload:
+Desktop-Integration.asciidoc	same scheduling and handling code is shared across phone and desktop:
+Device-Input-And-Form-Factors.asciidoc	(or `Display`), mirroring the existing `CN.isShiftKeyDown()` family:
+Device-Input-And-Form-Factors.asciidoc	Any pointer listener receives an `ActionEvent`; call `getPointerEvent()` on it:
+Device-Input-And-Form-Factors.asciidoc	React to fold changes with a posture listener:
+Device-Input-And-Form-Factors.asciidoc	handles desktop and touch:
+Device-Input-And-Form-Factors.asciidoc	https://www.codenameone.com/javadoc/com/codename1/ui/DevicePosture.html[`DevicePosture`]:
+Device-Input-And-Form-Factors.asciidoc	pointer is a stylus or eraser:
+Events.asciidoc	The pointer events (touch events) can be intercepted by overriding one or more of these methods in `Component` or `Form`. Notice that unless you want to block functionality you should probably invoke `super` when overriding:
+Events.asciidoc	Then when you need to broadcast the event use:
+Events.asciidoc	https://www.codenameone.com/javadoc/com/codename1/ui/events/StyleListener.html[StyleListener] allows components to track changes to the style objects. For example, if the developer does something like:
+Game-Assets.asciidoc	is registered as solid. Applications add their own without changing the level format:
+Game-Builder.asciidoc	Loading and playing a level at runtime is three lines:
+Game-Builder.asciidoc	`start()` it:
+Game-Builder.asciidoc	the editor:
+Game-Development.asciidoc	as 2:1 diamonds -- columns step right-and-down, rows step left-and-down:
+Game-Development.asciidoc	build the frames yourself, which is what `ScrollerGameSample`'s runner does:
+Game-Development.asciidoc	come from one piece of geometry:
+Game-Development.asciidoc	each card's bounding box:
+Game-Development.asciidoc	engine can report completion, so guard with `isVoiceCompletionSupported()`:
+Game-Development.asciidoc	handle:
+Game-Development.asciidoc	layers the sprites within a cell:
+Game-Development.asciidoc	never recompute coordinates:
+Game-Development.asciidoc	objects, and step it once per frame from your `update`:
+Game-Development.asciidoc	rendered positions between physics states:
+Game-Development.asciidoc	required:
+Game-Development.asciidoc	rotation automatically (in pixels, screen space) -- and the scene draws it there:
+Game-Development.asciidoc	runs once before the first frame:
+Game-Development.asciidoc	that always faces the camera, so your existing 2D art keeps working in 3D:
+Game-Development.asciidoc	the thin point reads exactly the same to the eye:
+Game-Development.asciidoc	uploading it with `com.codename1.gpu.GraphicsDevice#createTexture(com.codename1.ui.Image)`:
+In-Car-Experiences.asciidoc	Head units enforce a hard cap on the number of rows/items they display (driver-distraction rules). Query it and trim accordingly:
+In-Car-Experiences.asciidoc	Register a single `CarApplication` from your app's `init()` -- before a head unit connects -- and return a root `CarScreen` that builds a template:
+In-Car-Experiences.asciidoc	`CarContext` manages a back stack, mirroring `androidx.car.app`'s `ScreenManager` and CarPlay's `CPInterfaceController`:
+In-Car-Experiences.asciidoc	`CarScreen` exposes optional lifecycle hooks -- `onCreate()`, `onResume()`, `onPause()`, `onDestroy()` -- and `CarApplication` is notified of connection changes via `onCarConnected(CarContext)` / `onCarDisconnected()`. You can also observe connection globally:
+Introduction.asciidoc	In a cold start `init(Object)` is invoked followed by the `start()` method. For example, `start()` can be invoked more than once if an app is minimized and restored, see the sidebar <<ApplicationLifecycle,Application Lifecycle>>:
+Introduction.asciidoc	Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecycle,Application Lifecycle Sidebar>> discusses the lifecycle in depth:
+Introduction.asciidoc	Now that you have a general sense of the lifecycle lets look at the last two lifecycle methods:
+Introduction.asciidoc	The hello world Java source file looks like this (removed some comments and whitespace):
+Maps.asciidoc	A native provider only renders on the platforms that ship its SDK. To show a provider's map *everywhere* -- including platforms with no native SDK for it -- register a `WebMapProvider`, which hosts the provider's JavaScript SDK inside a `BrowserComponent`:
+Maps.asciidoc	Because it needs only a web view, the web provider (id `web`) is the natural last step before the pure-vector fallback in a provider chain. The order is fully customizable from code, so you can express per-platform preferences -- for example "try the native Google SDK, then the web map, then the vector `MapView`":
+Maps.asciidoc	Every map -- vector or native -- exposes the same operations through `MapSurface`:
+Maps.asciidoc	For a real app you point `MapView` at a hosted tile service. The simplest keyless option is OpenFreeMap (OpenStreetMap-based vector tiles); for branded styles or higher quotas use a keyed provider such as MapTiler or your own self-hosted Protomaps/TileServer GL endpoint:
+Maps.asciidoc	When a provider is selected the build server injects that provider's implementation into your app and wires it in; with no provider selected (or when the provider is unavailable at runtime, for example when Google Play Services is missing) `NativeMap` simply renders the vector `MapView` fallback. You can configure the fallback basemap explicitly:
+Maven-Creating-CN1Libs.adoc	Now try it out. Try adding the following code to your application project's main class (or anywhere in the application project, for that matter):
+Maven-Creating-CN1Libs.adoc	The simulator dispatches every action on the Codename One EDT through `Display.callSerially`, so your method can call `Display.getInstance()`, `Form.show()`, `Dialog.show()`, `ToastBar.showInfoMessage()` and any other CN1 API. Reflection uses the same classloader that loaded `Display`, so cn1lib internals (including package-private classes) resolve normally:
+Media-And-Audio.asciidoc	`AudioEffects` provides small platform-neutral PCM transforms that compose with the mixer:
+Miscellaneous-Features.asciidoc	A typical use of this API would be something like this:
+Miscellaneous-Features.asciidoc	Easy thread can be created like this:
+Miscellaneous-Features.asciidoc	For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the need before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`:
+Miscellaneous-Features.asciidoc	For example: you can copy the `Image` to `Storage` using:
+Miscellaneous-Features.asciidoc	However, it gets better, say you want to return a value:
+Miscellaneous-Features.asciidoc	If you need to apply the scale manually for custom fonts or layout calculations, read the values directly:
+Miscellaneous-Features.asciidoc	It allows formatting numbers/dates & time based on platform locale. It also provides a great deal of the information you need such as the language/locale information you need to pick the proper resource bundle:
+Miscellaneous-Features.asciidoc	Or, you can use the `Media`, `MediaManager` and `MediaRecorderBuilder` APIs to capture audio, as a more customizable approach than using the Capture API:
+Miscellaneous-Features.asciidoc	The `Capture` API also includes a callback based API that uses the `ActionListener` interface to implement capture. For example: you can adapt the previous sample to use this API as such:
+Miscellaneous-Features.asciidoc	The following code demonstrates usage of the GeoFence API:
+Miscellaneous-Features.asciidoc	The list of available languages in the resource bundle could be retrieved like this. Notice that this a list that was set by you and doesn't need to confirm to the ISO language code standards:
+Miscellaneous-Features.asciidoc	These asynchronous calls make things a bit painful to wade through, so the API wraps them in a simplified synchronous version:
+Miscellaneous-Features.asciidoc	To solve this sort of used case you have two APIs in `Display`:
+Miscellaneous-Features.asciidoc	You can add more than one attachment by putting them directly into the attachment map for example:
+Miscellaneous-Features.asciidoc	You can install the bundle using code like this:
+Miscellaneous-Features.asciidoc	You can send a task to the thread using:
+Monetization.asciidoc	And you also provide a button to allow the user to manually synchronize the receipts:
+Monetization.asciidoc	And your `itemPurchased()` callback will need to add a world:
+Monetization.asciidoc	At the end of the `start()` method:
+Monetization.asciidoc	At this point, the app can track the sale of the world. To make it more useful, add `ToastBar` feedback for purchase completion:
+Monetization.asciidoc	In the hello world app you'll use this information in a few different places. On your main form you'll include a label to show the current expiry date, and you allow the user to press a button to synchronize receipts manually if they think the value is out of date:
+Monetization.asciidoc	In the main form, you want two buttons to subscribe to the `World`, for one month and one year respectively. They look like:
+Monetization.asciidoc	Now in the `start()` method, add a button that lets the user buy the world:
+Monetization.asciidoc	Now you'll change your buy code as follows:
+Monetization.asciidoc	On the server-side, your REST controller is a standard JAX-RS REST interface. The Netbeans web service wizard generated it and then it was modified to suit the purposes here. The methods of the `ReceiptsFacadeREST` class for the REST API are shown here:
+Monetization.asciidoc	Once implemented, your `fetchReceipts()` method will look like:
+Monetization.asciidoc	The `createRESTClient()` method shown there creates a `RESTfulWebServiceClient` and configuring it to use basic authentication with a username and password. The idea is that your user would have logged into your app at some point, and you would have a username and password on hand to pass back to the web service with the receipt data so that you can connect the subscription to a user account. The source of that method is listed here:
+Monetization.asciidoc	The `submitReceipt()` method is a little more complex, as it needs to calculate the new expiry date for your subscription:
+Monetization.asciidoc	The buy callbacks are like the ones implemented in the regular in-app purchase examples:
+Monetization.asciidoc	The general usage is as follows:
+Monetization.asciidoc	The source for your ReceiptStore is as follows:
+Monetization.asciidoc	To build the signed discount payload required by Apple you can use the `ApplePromotionalOffer` helper:
+Monetization.asciidoc	You are now ready to see the full magic of the `validateAndSaveReceipt()` method in all its glory:
+Monetization.asciidoc	You'll register it in your app's init() method so that it's always available:
+Monetization.asciidoc	You'll set these in your constants:
+Motion-Sensors.asciidoc	Callbacks arrive on the EDT, so the listener can update the UI directly. Sampling is reference counted: the hardware sensor draws power only while at least one listener is registered. Remove the listener once the screen is no longer visible, typically from the form's `removeNotify`, so the sensor powers down:
+Motion-Sensors.asciidoc	Register a `GestureListener` for one of the `GestureEvent.TYPE_*` gestures. The accelerometer powers on for the duration that a gesture listener stays registered:
+Motion-Sensors.asciidoc	The detection thresholds suit most apps as shipped, and you can tune them when a gesture needs to be more or less sensitive:
+Motion-Sensors.asciidoc	`MotionSensorManager.getInstance()` always returns a manager. On a device without motion hardware every sensor reports as unsupported, so application code can call the API without a null check on the manager itself. `getSensor(int)` returns `null` when the requested sensor isn't available on the current device:
+Native-Themes.asciidoc	`UIManager.addThemeProps` after the theme has been installed:
+Near-Field-Communication.asciidoc	Beyond NDEF, the discovered `Tag` exposes accessors for the underlying technologies:
+Near-Field-Communication.asciidoc	For FeliCa on iOS, set the system codes in `NfcReadOptions`:
+Near-Field-Communication.asciidoc	Host Card Emulation (HCE) lets the device pretend to be a contactless smart card. A nearby reader (Android phone, payment terminal, access control gate) sends ISO 7816 APDUs and your app responds. Subclass `HostCardEmulationService` and register the instance:
+Network-Connectivity.asciidoc	To advertise an HTTP server you wrote on port 8080:
+Network-Connectivity.asciidoc	To associate the device with a specific SSID:
+Notifications-And-Background-Execution.asciidoc	before; the bean has been extended with fluent, backward-compatible setters:
+Notifications-And-Background-Execution.asciidoc	then reference it from a notification with `setChannelId(...)`:
+Printing.asciidoc	`Printer.printImage(image, listener)` prints a `com.codename1.ui.Image` directly. The image is encoded to a temporary PNG file behind the scenes and the file is deleted once the print flow finishes:
+SVG-Transcoder.asciidoc	the generated class directly:
+The-Components-Of-Codename-One.asciidoc	A common source of confusion in the `MultiButton` is the difference between the icon and the emblem, since both may have an icon image associated with them. The icon is an image representing the entry while the emblem is an optional visual representation of the action that will be undertaken when the element is pressed. Both may be used simultaneously or individually of one another:
+The-Components-Of-Codename-One.asciidoc	A form is a container with a title, a content area, and an optional menu or menu-bar area. When you call methods such as `add` or `remove` on a form, you're invoking something that maps to this:
+The-Components-Of-Codename-One.asciidoc	A more practical "real world" example would be working with XML data. You can use something like this to show an XML `Tree`:
+The-Components-Of-Codename-One.asciidoc	A picker can work with your existing sample using code like this:
+The-Components-Of-Codename-One.asciidoc	A popup dialog is a common mobile paradigm showing a `Dialog` that points at a specific component. It's a standard `Dialog` that's shown in a unique way:
+The-Components-Of-Codename-One.asciidoc	And call its methods:
+The-Components-Of-Codename-One.asciidoc	Call the builder from a Maven plugin, an Ant task or a one-shot `main`:
+The-Components-Of-Codename-One.asciidoc	For example, if you wish to query a database or a web service you will need to derive the class and perform more advanced filtering by overriding the `filter` method:
+The-Components-Of-Codename-One.asciidoc	For example, suppose you want to pass a string with text to set in a textarea within the webpage. You can do something like:
+The-Components-Of-Codename-One.asciidoc	For example, this behavior might not be desired so to block that you can do:
+The-Components-Of-Codename-One.asciidoc	For example, to enclose the `CheckBox` components in a vertical `ComponentGroup` and the `RadioButton's` in a horizontal group, change the last line of the code above as such:
+The-Components-Of-Codename-One.asciidoc	For example, you can change the focus `Component` to have an icon:
+The-Components-Of-Codename-One.asciidoc	For example:
+The-Components-Of-Codename-One.asciidoc	For example: You might want to create a proxy for the https://developer.mozilla.org/en-You/docs/Web/API/Window/location[window.location] object so that you can access its properties more from Java:
+The-Components-Of-Codename-One.asciidoc	For example: the demo below uses the GRRM demo data from above to build a `ComboBox`:
+The-Components-Of-Codename-One.asciidoc	Here is a simple example of a `MultiList` containing a highly popular subject matter:
+The-Components-Of-Codename-One.asciidoc	Here is a simple example that also shows the difference between the `scale to fill` and `scale to fit` modes:
+The-Components-Of-Codename-One.asciidoc	If you add to the sample above a `Validator`:
+The-Components-Of-Codename-One.asciidoc	If you call `Display` directly instead of using `ShareButton`, pass the listener as the final argument to the new overload:
+The-Components-Of-Codename-One.asciidoc	In the sample below you fetch all the contacts from the device and enable search through them, notice it expects and image called `duke.png` which is the default Codename One icon renamed and placed in the src folder:
+The-Components-Of-Codename-One.asciidoc	It's also recommended to place the list in the `CENTER` location of a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] to produce the most effective results. For example:
+The-Components-Of-Codename-One.asciidoc	Let start by exploring how you can achieve this UI that fetches data from a webservice:
+The-Components-Of-Codename-One.asciidoc	Masking allows you to accept partial input in one field and implicitly move to the next, this can be used to all types of complex input thanks to the text component API. E.g with the code above you can mask the credit card input so the cursor jumps to the next field implicitly using this code:
+The-Components-Of-Codename-One.asciidoc	NOTE: In all the sample code below, you can assume that variables named `bc` represent an instance of https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html[BrowserComponent]:
+The-Components-Of-Codename-One.asciidoc	Normally, to build the model for a renderer of this type, you use something like:
+The-Components-Of-Codename-One.asciidoc	Notice in the sample below that you associate all the radio buttons with a group but don't do anything with the group as the radio buttons keep the reference internally. You also show the opposite side functionality and icon behavior:
+The-Components-Of-Codename-One.asciidoc	Notice that this feature works with the on-top and permanent versions of the side menu and not with the legacy versions:
+The-Components-Of-Codename-One.asciidoc	Notice that when you work with numeric values or anything related to the types mentioned above your code must be aware of the typing. For example: in this case the type is `Double` and not `String`:
+The-Components-Of-Codename-One.asciidoc	Now look at a more advanced Renderer:
+The-Components-Of-Codename-One.asciidoc	Now make it a bit more useful:
+The-Components-Of-Codename-One.asciidoc	Now that you have a webservice lets proceed to create the UI. Check out the code annotations below:
+The-Components-Of-Codename-One.asciidoc	One of the features of label that moved into `SpanLabel` to some extent is the ability to position the icon. For example, unlike a `Label` the icon position is determined by the layout manager of the composite so `setIconPosition` accepts a `BorderLayout` constraint:
+The-Components-Of-Codename-One.asciidoc	Or synchronously:
+The-Components-Of-Codename-One.asciidoc	Simple usage of the `Calendar` class looks something like this:
+The-Components-Of-Codename-One.asciidoc	Simple usage of the `ToastBar` class looks something like this:
+The-Components-Of-Codename-One.asciidoc	The Renderer is a simple interface with 2 methods:
+The-Components-Of-Codename-One.asciidoc	The callbacks you pass to `execute()` and `executeAndWait()` are single-use callbacks. You can’t, for example, store the `callback` variable on the JavaScript side for later use (for example: to respond to a button click event). If you need a "multi-use" callback, you should use the `addJSCallback()` method instead. Its usage looks identical to `execute()`, the difference is that the callback will live on after its first use. For example: Consider the following code:
+The-Components-Of-Codename-One.asciidoc	The code below provides a brief overview of these options:
+The-Components-Of-Codename-One.asciidoc	The data of the `Tree` arrives from a model for example: this:
+The-Components-Of-Codename-One.asciidoc	The first step is creating the webservice call, you won't go into too much detail here as webservices & IO are discussed later in the guide:
+The-Components-Of-Codename-One.asciidoc	The https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] interface can be implemented by anyone in this case you did a stupid simple implementation:
+The-Components-Of-Codename-One.asciidoc	The model for the XML hierarchy is implemented as such:
+The-Components-Of-Codename-One.asciidoc	The most simple/naive implementation may choose to implement the renderer as follows:
+The-Components-Of-Codename-One.asciidoc	The old API provided a synchronous wrapper around an inherently asynchronous process, and made extensive use of `invokeAndBlock()` underneath the covers. This resulted in a nice API with high-level abstractions that played with a synchronous programming model, but it came with a price-tag in performance, complexity, and predictability. Let’s take a simple example, getting a reference to the "window" object:
+The-Components-Of-Codename-One.asciidoc	The screenshot above was produced using the following code:
+The-Components-Of-Codename-One.asciidoc	The split pane component is a bit desktop specific but works reasonably well on devices. To get the image below you changed `SalesDemo.java` in the kitchen sink by changing this:
+The-Components-Of-Codename-One.asciidoc	Then implement the method `automoveToNext` as:
+The-Components-Of-Codename-One.asciidoc	Then you can retrieve its properties using the `get()` method:
+The-Components-Of-Codename-One.asciidoc	This code should output "The result was 7" to the console. It's fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute(java.lang.String,com.codename1.util.SuccessCallback)[execute()] method is:
+The-Components-Of-Codename-One.asciidoc	This sample below continues from the place where the <<text-component-sample-code,TextField sample above>> stopped by adding validation to that code:
+The-Components-Of-Codename-One.asciidoc	This swipe gesture is commonly used in touch interfaces to expose features such as delete, edit etc. It's trivial to use this component by determining the components placed on top and bottom (the revealed component):
+The-Components-Of-Codename-One.asciidoc	To make the code tighter, keep a reference to the `Component` or extend it as https://www.codenameone.com/javadoc/com/codename1/ui/list/DefaultListCellRenderer.html[DefaultListCellRenderer] does:
+The-Components-Of-Codename-One.asciidoc	Unlike the `InfiniteScrollAdapter` you can't use the `ContentPane` directly so you've to use a `BorderLayout` and place the `InfiniteContainer` there:
+The-Components-Of-Codename-One.asciidoc	Unlike the `MultiButton` it uses the `TextArea` internally to break lines seamlessly. The `SpanButton` is far simpler than the `MultiButton` and as a result isn't as configurable:
+The-Components-Of-Codename-One.asciidoc	What if you want componentName to be red? Just use:
+The-Components-Of-Codename-One.asciidoc	When using lightweight picker mode (`setUseLightweightPopup(true)`), you can add custom quick-action buttons to the popup. This is useful for actions like setting the date to "Today" or "+7 Days" without scrolling the wheels manually:
+The-Components-Of-Codename-One.asciidoc	With this:
+The-Components-Of-Codename-One.asciidoc	You can access JavaScript variables from the context by using code like this:
+The-Components-Of-Codename-One.asciidoc	You can also delay the showing of the status message using `showDelayed` as such:
+The-Components-Of-Codename-One.asciidoc	You can also query the context for objects and change their value for example:
+The-Components-Of-Codename-One.asciidoc	You can also set its properties:
+The-Components-Of-Codename-One.asciidoc	You can automatically clear a status message/progress after a timeout using the `setExpires` method as such:
+The-Components-Of-Codename-One.asciidoc	You can combine some demos above including the <<slider-stars-demo,Slider stars demo>> to rank GRRM's books in an interactive way:
+The-Components-Of-Codename-One.asciidoc	You can convert the sample above to use toggle buttons as such:
+The-Components-Of-Codename-One.asciidoc	You can dynamically download images directly into the `ImageViewer` with a custom list model like this:
+The-Components-Of-Codename-One.asciidoc	You can now replace the existing model by removing all the model related logic and changing the constructor call as such:
+The-Components-Of-Codename-One.asciidoc	You can show a progress indicator in the ToastBar like this:
+The-Components-Of-Codename-One.asciidoc	You can use the `ImageViewer` as a tool to view a single image which allows you to zoom in/out to that image as such:
+The-Components-Of-Codename-One.asciidoc	You can wrap a `TextField` with a clearable wrapper to get this effect on all platforms. For example: replace this:
+The-Components-Of-Codename-One.asciidoc	You need to change this code to use the `addJSCallback()` method as follows:
+The-Components-Of-Codename-One.asciidoc	You will need to define the following theme constants for the arrow to work:
+The-Components-Of-Codename-One.asciidoc	`ImageViewer` also supports optional side arrows (material font icons) and an optional thumbnail strip for direct image navigation:
+The-Components-Of-Codename-One.asciidoc	`InfiniteProgress` can be used in one of two ways either by embedding the component into the UI through something like this:
+The-Components-Of-Codename-One.asciidoc	`Label` text can be positioned in one of 4 locations as such:
+The-Components-Of-Codename-One.asciidoc	`Slider` is highly customizable for example: a slider can be used to replicate a 5-star rating widget as such. Notice that this slider will work when its given its preferred size otherwise more stars will appear. That's why you place it within a `FlowLayout`:
+The-Components-Of-Codename-One.asciidoc	`setRenderingPrototype` accepts a "fake" value that represents a reasonably large amount of data and it will be used to calculate the preferred size. For example: for a multiList that should render 2 lines of text with 20 characters and a 5mm square icon you can do something like this:
+The-Components-Of-Codename-One.asciidoc	app for specific examples, but here is a high-level view of some code that creates a Pie Chart:
+The-Components-Of-Codename-One.asciidoc	doing this, you need to define this entry for all entries, for example:
+The-Components-Of-Codename-One.asciidoc	or a go icon using a hint such as this:
+The-EDT---Event-Dispatch-Thread.asciidoc	A simplistic approach is to do something like this:
+The-EDT---Event-Dispatch-Thread.asciidoc	For example, instead of using operation names lets use a more "real world" example:
+The-EDT---Event-Dispatch-Thread.asciidoc	However, `updateUIWithContentOfFile` should be executed on the EDT and not on a random thread. The right way to do this would therefore be something like this:
+The-EDT---Event-Dispatch-Thread.asciidoc	IMPORTANT: The Runnable passed to the `callSerially` and `callSeriallyAndWait` methods isn't a `Thread`. Use the `Runnable` interface as a convenient callback interface:
+The-EDT---Event-Dispatch-Thread.asciidoc	Invoke and block solves this in a unique way you can get almost the exact same behavior by using this:
+The-EDT---Event-Dispatch-Thread.asciidoc	Or this with Java 8 syntax:
+The-EDT---Event-Dispatch-Thread.asciidoc	TIP: You can write this code more concisely using Java 8 lambda code as such:
+The-EDT---Event-Dispatch-Thread.asciidoc	The `callSeriallyAndWait(Runnable)` method blocks the current thread until the method completes, this is useful for cases such as user notification e.g.:
+The-EDT---Event-Dispatch-Thread.asciidoc	This is best explained by an example. Typical Java code reads as a single sequence as such:
+The-EDT---Event-Dispatch-Thread.asciidoc	To explain how invokeAndBlock works you can return to the sample above of how the EDT works:
+The-EDT---Event-Dispatch-Thread.asciidoc	You can visualize the EDT as a loop such as this:
+The-EDT---Event-Dispatch-Thread.asciidoc	`invokeAndBlock()` works in a similar way to this pseudo-code:
+Working-With-iOS.asciidoc	Repeating notifications will continue until they're canceled by the app. You can cancel a single notification by calling:
+appendix_goal_generate_graphql.adoc	The `@GraphQLClient` interface looks like:
+appendix_goal_generate_graphql.adoc	an `OnComplete<GraphQLResponse<T>>`:
+appendix_goal_generate_graphql.adoc	ends the stream:
+appendix_goal_generate_grpc.adoc	Call sites use the static factory:
+appendix_goal_generate_grpc.adoc	The `@GrpcClient` interface looks like:
+appendix_goal_generate_openapi.adoc	Call sites use the static factory:
+basics.asciidoc	For example: see this code where:
+basics.asciidoc	From that point on you can write code that looks like this:
+basics.asciidoc	In the race to make code "`tighter`" you can make this even shorter. Most layout managers have their own custom terse syntax style for example:
+basics.asciidoc	Instead of:
+basics.asciidoc	Instead of:
+basics.asciidoc	Some things were changed so you won't have too many conflicts for example, `Log.p` or `Log.e` would have been problematic so you now have:
+basics.asciidoc	The UIID's translate the theme elements into a set of `Style` objects. These `Style` objects get their initial values from the theme but can be further manipulated after the fact. To make the text field's foreground color red you could use this code:
+basics.asciidoc	The same applies for most network manager calls e.g.:
+basics.asciidoc	This works great for regular layouts but might not for constraint based layouts. A constraint based layout accepts another argument. For example: `BorderLayout` needs a location for the `Component`:
+basics.asciidoc	and `setSameHeight` methods, for example:
+graphics.asciidoc	(that's: where the numbers appear), and the remaining marks (corresponding with seconds) will be short:
+graphics.asciidoc	3. Invert the translation performed in step 1:
+graphics.asciidoc	A `URLImage` can be created with a mask adapter to apply an effect to an image. This allows you to round downloaded images or apply any sort of masking for example: you can adapt the round mask code above as such:
+graphics.asciidoc	And you will translate it down slightly so that it overlaps the center. This translation will be performed on the `GeneralPath` object directly rather than through the `Graphics` context:
+graphics.asciidoc	Center:
+graphics.asciidoc	For example: a `pointerPressed()` callback method can look like this:
+graphics.asciidoc	The `animate()` method in the `AnalogClock` class:
+graphics.asciidoc	The code to instantiate the clock, and start the animation would be something like:
+graphics.asciidoc	The remaining drawing code is as follows:
+graphics.asciidoc	The simple use case is pretty trivial:
+graphics.asciidoc	To do this you can override:
+graphics.asciidoc	Top Left Corner:
+graphics.asciidoc	`ConicGradient` - following the same pattern as the `Shape` hierarchy:
+graphics.asciidoc	can override or augment whatever the default set:
+graphics.asciidoc	class is the most common option and accepts a list of color stops along a line:
+graphics.asciidoc	coordinates of the component. You therefore need to get the absolute clock center position to perform the rotation:
+graphics.asciidoc	for the images. The default is a scale adapter although you might change that to scale fill in the future:
+graphics.asciidoc	hook. Two ways to install one:
+graphics.asciidoc	https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeSupported()[`Graphics.isShapeSupported()`] method. For example:
+graphics.asciidoc	it can be added to a form:
+graphics.asciidoc	mark at the 12 o'clock position:
+graphics.asciidoc	method to append curves to the drawing as follows:
+graphics.asciidoc	methods in the component as follows:
+graphics.asciidoc	name of icon to `icon_URLImage` then using this in the data:
+graphics.asciidoc	show this, try to place five of these components on a form inside a https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[BorderLayout] and see how it looks:
+graphics.asciidoc	straight lines rather than curves might look like this:
+graphics.asciidoc	to draw each individual tick:
+io.asciidoc	A more advanced usage of the `FileSystemStorage` API can be a `FileSystemStorage` `Tree`:
+io.asciidoc	A simpler implementation could do something like this:
+io.asciidoc	Above, if you want to select the IDs of all players that are ranked in the top 2, you can use an expression like:
+io.asciidoc	Above, you globally find a lastname element with a value of ‘Hewitt’, then grab the parent node of lastname which happens to be the player node, then grab the ID attribute from the player node. Or, you could get the same result from the following simpler statement:
+io.asciidoc	Above, you selected the IDs of all ranked players. Conversely, you can select the non-ranked players like this:
+io.asciidoc	After you do that once you can write/read contacts from storage if you so want:
+io.asciidoc	An `Externalizable` object *must* have a *default public constructor* and must implement the following 4 methods:
+io.asciidoc	And delete an entry using:
+io.asciidoc	And vice versa:
+io.asciidoc	Another approach is to use the `setFailSilently(true)` method on the `ConnectionRequest`. This will prevent the `ConnectionRequest` from displaying any errors to the user. It's a powerful strategy if you use the synchronous version of the APIs for example:
+io.asciidoc	As part of the premium cloud features it's possible to invoke Log.sendLog() to email a log directly to the developer account. Codename One can do that seamlessly based on changes printed into the log or based on exceptions that are uncaught or logged for example:
+io.asciidoc	Assuming you added a new date field to the object you can do the following. Notice that a `Date` is a `long` value in Java that can be null. For completeness the full class is presented below:
+io.asciidoc	Binding makes this all seamless. For example: the code above can be written as:
+io.asciidoc	By default `GZConnectionRequest` doesn't request gzipped data ( unzips it when its received) but its pretty easy to do so add the HTTP header `Accept-Encoding: gzip` for example:
+io.asciidoc	Codename One provides many tools to simplify the path between networking/IO & GUI. A common task of showing a wait dialog or progress sign while fetching network data can be simplified by using the https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgress.html[InfiniteProgress] class for example:
+io.asciidoc	Developers need to write the data of the object in the externalize method using the methods in the data output stream and read the data of the object in the internalize method for example:
+io.asciidoc	For a lot of REST requests this will fail because you need to add an HTTP header indicating that you accept JSON results. You have a special case support for that:
+io.asciidoc	For endpoints that return a list of DTOs, use `fetchAsMappedList`:
+io.asciidoc	For example, if you wish to have finer grained control over the submission process for example: for making a `HEAD` request you can do this with code like:
+io.asciidoc	For example: to block all network errors from showing anything to the user you could do something like this:
+io.asciidoc	For example: you can do something like this in your `init(Object)` method:
+io.asciidoc	For starters all the common methods of `Object` can be implemented with almost no code:
+io.asciidoc	If a document is ordered, you might want to select nodes by their position, for example:
+io.asciidoc	If you continue the example from above to show persistence to the SQL database you can do something like this:
+io.asciidoc	If you continue your example from above you can do something like this:
+io.asciidoc	Implementing the `Externalizable` interface is important when you want to store a proprietary object. In this case you must register the object with the `com.codename1.io.Util` class so the externalization algorithm will be able to recognize it by name by invoking:
+io.asciidoc	In the above code you do the following:
+io.asciidoc	It's also possible to nest expressions, for example:
+io.asciidoc	It's also possible to select parent nodes, by using the `..` expression. For example:
+io.asciidoc	Listing the entries is more interesting:
+io.asciidoc	Moving on, to select a node based on the existence of an attribute:
+io.asciidoc	Notice that you can also implement the same thing and much more by avoiding the response listener code and instead overriding the methods of the `ConnectionRequest` class which offers many points to override for example:
+io.asciidoc	One of the bigger features of properties are their ability to bind UI to a property. For example: if you continue the sample above with the `Contact` class, say you have a text field on the form and you want the property (which you mapped to the database) to have the value of the text field. You could do something like this:
+io.asciidoc	POST requests use the same builder pattern:
+io.asciidoc	Server returned headers are a bit trickier to read. You need to subclass the connection request and override the `readHeaders` method for example:
+io.asciidoc	Since strings might be null sometimes you also included convenience methods to implement such externalization. This effectively writes a boolean before writing the UTF to show whether the string is null:
+io.asciidoc	Since you assume most developers reading this will be familiar with Java here is the way to implement the multipart upload in the servlet API:
+io.asciidoc	Some headers are built-in as direct APIs for example: content type is directly exposed within the API since it's a pretty common use case. You can set the content kind of post request using:
+io.asciidoc	Some objects make sense as global objects, you can use the `Preferences` API to store that data directly but then you don't have the type safety that property objects bring to the table. That's where the binding of property objects to preferences makes sense. For example: say you have a global `Settings` property object you can bind it to preferences using:
+io.asciidoc	That's what the new method of `URLImage` does:
+io.asciidoc	The JSON ("JavaScript Object Notation") format is popular on the web for passing values to/from webservices since it works so well with JavaScript. Parsing JSON is as easy but has two different variations. You can use the https://www.codenameone.com/javadoc/com/codename1/io/JSONParser.html[JSONParser] class to build a tree of the JSON data as such:
+io.asciidoc	The XML processor handles global selections by using a double slash anywhere within the expression, for example:
+io.asciidoc	The `CachedDataService` will fetch data if it isn't cached locally and cache it. When you "refresh" it will send a special HTTP request that will send back the data if it has been updated since the last refresh:
+io.asciidoc	The `Rest` API makes it easy to invoke a RESTful webservice without many of the nuances of `ConnectionRequest`. You can use it to define the HTTP method and start building based on that. To get a parsed JSON result from a URL you could do:
+io.asciidoc	The cool thing is that this works with many component types and property types almost magically. Binding works by using an adapter class to convert the data to/from the component. The adapter itself works with a generic converter for example: this code:
+io.asciidoc	The sample code below demonstrates listing storage content, adding and viewing entries, and deleting entries:
+io.asciidoc	The simplest usage of `XMLParser` looks a bit like this:
+io.asciidoc	There are many methods of interest to keep an eye for:
+io.asciidoc	This can be tedious to do if you want all requests from your app to use this header. For this use case you can use:
+io.asciidoc	This means that this code won't compile:
+io.asciidoc	This should display an error message to the user if there was a problem sending the SMS:
+io.asciidoc	This simple example allows you to create a server and a client assuming the device supports both:
+io.asciidoc	This still carries most of the flexibilities of the regular binding for example: you can still get a binding object using:
+io.asciidoc	To parse a CSV use the https://www.codenameone.com/javadoc/com/codename1/io/CSVParser.html[CSVParser] class as such:
+io.asciidoc	Up until now this was pretty cool but if you looked at the UI construction code above you would see that it's pretty full of boilerplate code. The thing about boilerplate is that it shows where automation can be applied, that's the exact idea behind the magical "InstantUI" class. This means that the UI above can be generated using this code:
+io.asciidoc	When you used a POJO you did this:
+io.asciidoc	With properties you do this:
+io.asciidoc	Without this feature the code would look like this:
+io.asciidoc	Working with a database is pretty trivial, the application logic below can send arbitrary queries to the database and present the results in a `Table`. You can probably integrate this code into your app as a debugging tool:
+io.asciidoc	You added a new syntax:
+io.asciidoc	You can also add any arbitrary header type you want, for example: a common use case is basic authorization where the authorization header includes the Base64 encoded user/password combination as such:
+io.asciidoc	You can also override the error callbacks of the various types in the request for example: for a server error code you can do:
+io.asciidoc	You can always submit data in the `buildRequestBody` but this is flaky and has some limitations in devices/size allowed. HTTP standardized file upload capabilities through the multipart request protocol, this is implemented by countless servers and is well documented. Codename One supports this out of the box:
+io.asciidoc	You can build a UI that would allow you to edit the `Contact` property in memory:
+io.asciidoc	You can do some more elaborate bindings such as:
+io.asciidoc	You can now send hello world as an SMS to the end user. Once this is in place sending an SMS through REST is a matter of using the `Rest` API:
+io.asciidoc	You can pick either one of these approaches based on your personal preferences. Here you show both uses with the server API:
+io.asciidoc	You can send a get request to a URL using something like:
+io.asciidoc	You can then add entries to the contact table using:
+io.asciidoc	You can update an entry using:
+io.asciidoc	You might not have noticed this but in the previous verbose code you had lines like:
+io.asciidoc	You want to extract some data above into simpler string results. You can do this using:
+io.asciidoc	You've some special case defaults for some common property names, so if your property is named email it will use an email constraint by default. If it's named url or password etc. It will do the "right thing" unless you explicitly state otherwise. You can customize the constraint for a specific property using something like:
+io.asciidoc	`NetworkManager` also supports synchronous requests which work in a similar way to `Dialog` through the `invokeAndBlock` call and thus don't block the EDT footnote:[Event Dispatch Thread] illegally. For example: you can do something like this:
+io.asciidoc	`Storage` also offers a simple API in the form of the https://www.codenameone.com/javadoc/com/codename1/io/Preferences.html[Preferences] class. The `Preferences` class lets developers store simple variables, strings, numbers, booleans, and similar values without writing storage code. This is a common use case in applications. For example, you might need to store a server token:
+io.asciidoc	`com.codename1.io.JSONWriter` class is the complement of `JSONParser`:
+io.asciidoc	database by name:
+io.asciidoc	directly:
+io.asciidoc	download a `ConnectionRequest` to `Storage` using code like this:
+io.asciidoc	out any change made to the property:
+io.asciidoc	than a `Map` literal:
+io.asciidoc	that prevents setting the property to null and defaults it to an empty string:
+io.asciidoc	the array directly:
+io.asciidoc	values from parsed JSON:
+io.asciidoc	you will notice the `final` keyword:
+performance.asciidoc	All you need to do now is update the `lastScroll` variable whenever user interaction is in place. This works for user touches:
+performance.asciidoc	For example, Codename One annotates:
+performance.asciidoc	In the new Contacts demo you have a share button for each contact, the code for constructing a `ShareButton` looks like this:
+performance.asciidoc	Then you did this within the background loading thread:
+performance.asciidoc	These icons are in a shared resource file that you load and don't cache. The initial workaround was to cache this resource but a better solution was to convert this code:
+performance.asciidoc	This works for general scrolling:
+performance.asciidoc	`Simd` is accessed as a singleton:
+performance.asciidoc	method returns. This is what the `alloca*` family exposes:
+performance.asciidoc	the allocation helpers on `Simd`:
+security.asciidoc	Baking an API key (for example a Google Maps key) into your app is unsafe: anyone can extract it from the binary, and rotating it means shipping a new build. `com.codename1.security.Secrets` solves this. You define the secret once in the Codename One Cloud vault, and the app fetches it at runtime and caches it in `SecureStorage`:
+security.asciidoc	For HOTP, supply the counter explicitly and increment it after every successful authentication:
+security.asciidoc	For RSA-signed tokens (RS256/384/512) and ECDSA-signed tokens (ES256/384/512), pass the key to the dynamic overloads:
+security.asciidoc	Shared secrets are commonly distributed as Base32 strings (the format embedded in QR codes by authenticator apps). `com.codename1.security.Base32` handles the encoding:
+security.asciidoc	The runtime API is identical on both platforms -- request a token bound to a fresh server nonce, then POST it to your backend for verification:
+security.asciidoc	There are two simple methods in the `Util` class:
+security.asciidoc	This works through a new mechanism in storage where you can replace the storage instance with another instance using:
+security.asciidoc	To block copy & paste on a specific field do:
+security.asciidoc	To use a key that was generated outside the app, feed the DER bytes to the static factory methods:
+security.asciidoc	You can leverage that knowledge to change the encryption password on the encryption storage using pseudo-code like this:
+security.asciidoc	`com.codename1.components.OtpField` is a segmented input -- one box per character, that advances to the next box as the user types and steps back on backspace. This is the standard pattern for SMS confirmation and authenticator-app entry screens:
+security.asciidoc	`com.codename1.security.Cipher` also covers RSA encryption, and `com.codename1.security.Signature` covers digital signatures (RSA and ECDSA). Keys are represented by `com.codename1.security.PublicKey` and `com.codename1.security.PrivateKey`, which wrap X.509 SubjectPublicKeyInfo and PKCS#8 DER blobs respectively -- the same encodings used by OpenSSL:
+security.asciidoc	`com.codename1.security.Cipher` exposes AES through the platform's native AES implementation. AES-GCM is the recommended default because it's authenticated -- a single tag-mismatch failure detects any tampering of the ciphertext or the associated data:
+security.asciidoc	`com.codename1.security.Hash` implements MD5, SHA-1, SHA-224, SHA-256, SHA-384, and SHA-512. SHA-256 is the recommended default for new code; MD5 and SHA-1 are exposed only for compatibility with older protocols since both are broken for collision resistance:
+security.asciidoc	`com.codename1.security.Hmac` implements HMAC (RFC 2104) on top of any of the hash algorithms above. Use HMAC whenever a message authentication code is needed -- API request signing, session cookie tamper detection, JWT signing with the `HS` family, or TOTP token generation:
+security.asciidoc	`com.codename1.security.SecureStorage` keeps small string values in the operating system's secure keychain (iOS Keychain Services and the Android Keystore) so they're protected by the platform's secure enclave instead of being written to app storage. The quiet, no-prompt API is three calls:
