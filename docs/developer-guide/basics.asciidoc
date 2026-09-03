@@ -56,6 +56,10 @@ For example, https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLa
 You can define a group of components to have the same preferred width or height by using the `setSameWidth`
 and `setSameHeight` methods, for example:
 
+[source,java,title="setSameWidth/Height"]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava001Snippet.java[tag=basics-java-001,indent=0]
+----
 
 Codename One has a `setPreferredSize` method that lets developers explicitly request a component size. But, that caused many problems. For example, preferred size should change with device orientation or similar operations. The API also encouraged accidental hardcoding of UI values such as forcing pixel sizes. As a result, the method was deprecated.
 
@@ -109,6 +113,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 This works great for regular layouts but might not for constraint based layouts. A constraint based layout accepts another argument. For example: `BorderLayout` needs a location for the `Component`:
 
+[source,java,title='Adding to a Regular Container']
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava003Snippet.java[tag=basics-java-003,indent=0]
+----
 
 This line assumes you have an `import static com.codename1.ui.CN.*;` in the top of the file. In `BorderLayout` (which is a constraint based layout) placing an item in the `NORTH` places it in the top of the `Container`.
 
@@ -127,18 +135,38 @@ TIP: That's optional, if you don't like static imports you can just write `CN.` 
 
 From that point on you can write code that looks like this:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava005Snippet.java[tag=basics-java-005,indent=0]
+----
 
 Instead of:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava006Snippet.java[tag=basics-java-006,indent=0]
+----
 
 The same applies for most network manager calls e.g.:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava007Snippet.java[tag=basics-java-007,indent=0]
+----
 
 Instead of:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava008Snippet.java[tag=basics-java-008,indent=0]
+----
 
 Some things were changed so you won't have too many conflicts for example, `Log.p` or `Log.e` would have been problematic so you now have:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava009Snippet.java[tag=basics-java-009,indent=0]
+----
 
 Instead of `Display.getInstance().getCurrent()` you now have `getCurrentForm()` since `getCurrent()` is too generic. For most methods you should just be able to remove the `NetworkManager` or `Display` access and it should "just work."
 
@@ -168,6 +196,14 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 In the race to make code "`tighter`" you can make this even shorter. Most layout managers have their own custom terse syntax style for example:
 
+[source,java,title='Terse Syntax']
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava011Snippet.java[tag=basics-java-011,indent=0]
+----
+
+<1> Most layouts have a version of enclose to encapsulate components within (((Encapsulate)))
+
+<2> `FlowLayout` has variants that support aligning the components on various axis
 
 To sum this up, you can use layout managers and nesting to create elaborate UI's that implicitly adapt to different screen sizes and device orientation.
 
@@ -413,7 +449,15 @@ The constraint sample below spans the title across all three columns and spans t
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava022Snippet.java[tag=basics-java-022,indent=0]
 ----
 
+That sample creates its constraints with a shorthand. Written out in full, a
+constraint is a separate object you configure and then pass in place of the
+usual layout argument:
+
 [[full-code-tablelayout-constraint]]
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava023Snippet.java[tag=basics-java-023,indent=0]
+----
 
 [[table-layout-constraints]]
 .TableLayout constraints can be used to create elaborate UI's
@@ -619,16 +663,16 @@ image::img/layers.png["The Layered Pane",scaledwidth=80%]
 
 https://www.codenameone.com/javadoc/com/codename1/ui/layouts/GridBagLayout.html[GridBagLayout] was introduced to simplify the process of porting existing Swing/AWT code with a more familiar API. The API for this layout is problematic as it was designed for AWT/Swing where styles were unavailable. As a result it has its own insets API instead of using elements such as padding/margin.
 
-Your recommendation is to <<table-layout-section,use Table>> which is as powerful but has better Codename One integration.
+Prefer <<table-layout-section,`TableLayout`>>, which is just as capable and integrates better with Codename One.
 
-To show `GridBagLayout` you ported http://docs.oracle.com/Java SE/tutorial/uiswing/layout/gridbag.html[the sample from the Java tutorial] to Codename One:
+The sample below is https://docs.oracle.com/javase/tutorial/uiswing/layout/gridbag.html[the Java tutorial's GridBag example], ported to Codename One:
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava033Snippet.java[tag=basics-java-033,indent=0]
 ----
 
-Notice that because of the way gridbag works you didn't provide any terse syntax API for it although it should be possible.
+Because of the way GridBag works there's no terse syntax for it, although one should be possible.
 
 .GridbagLayout sample from the Java tutorial running on Codename One
 image::img/gridbag-layout.png[GridbagLayout sample from the Java tutorial running on Codename One,scaledwidth=20%]
@@ -664,7 +708,7 @@ https://www.codenameone.com/javadoc/com/codename1/ui/layouts/mig/MigLayout.html[
 WARNING: MiG is still considered experimental so proceed with caution! +
 The API was deprecated to serve as a warning of its experimental status.
 
-The best reference for MiG would probably be its http://www.miglayout.com/QuickStart.pdf[quick start guide (PDF link)]. As a reference you ported one of the samples from that PDF to Codename One:
+The best reference for MiG would probably be its http://www.miglayout.com/QuickStart.pdf[quick start guide (PDF link)]. The sample below is one of that guide's examples, ported to Codename One:
 
 [source,java]
 ----
@@ -693,6 +737,10 @@ Themes consist of a set of UIID definitions. Every component in Codename One has
 
 For example: see this code where:
 
+[source,java,title='setUIID on TextField']
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava036Snippet.java[tag=basics-java-036,indent=0]
+----
 
 This is a text field component (user input field) but it will look like a `Label`.
 
@@ -700,6 +748,10 @@ Effectively you told the text field that it should use the UIID of `Label` when 
 
 The UIID's translate the theme elements into a set of `Style` objects. These `Style` objects get their initial values from the theme but can be further manipulated after the fact. To make the text field's foreground color red you could use this code:
 
+[source,java,title='Setting a style directly']
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava037Snippet.java[tag=basics-java-037,indent=0]
+----
 
 The color is in hexadecimal `RRGGBB` format so `0xff00` would be green and `0xff0000` would be red.
 
