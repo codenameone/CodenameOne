@@ -61,7 +61,6 @@ import com.codename1.system.*;
 import com.codename1.annotations.*;
 import com.codename1.io.services.*;
 import java.util.*;
-import java.util.List;
 
 
 class IoJava115Snippet {
@@ -109,7 +108,10 @@ class IoJava115Snippet {
     void snippet() throws Exception {
         // tag::io-java-115[]
         // One-shot encoding of any Map / List / String / Number / Boolean / null tree
-        String json = JSONWriter.toJson(Map.of("name", "ada", "values", List.of(1, 2, 3)));
+        Map<String, Object> tree = new HashMap<>();
+        tree.put("name", "ada");
+        tree.put("values", Arrays.asList(1, 2, 3));
+        String json = JSONWriter.toJson(tree);
 
         // Streaming variants for large outputs (UTF-8)
         JSONWriter.toJson(value, writer);

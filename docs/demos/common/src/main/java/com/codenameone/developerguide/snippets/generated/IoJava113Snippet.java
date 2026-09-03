@@ -61,7 +61,7 @@ import com.codename1.system.*;
 import com.codename1.annotations.*;
 import com.codename1.io.services.*;
 import java.util.*;
-import java.io.CharArrayReader;
+import com.codename1.io.CharArrayReader;
 
 
 class IoJava113Snippet {
