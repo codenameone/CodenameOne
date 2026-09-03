@@ -14,15 +14,31 @@ New Maven projects enable CSS by default with `codename1.cssTheme=true` in `comm
 Once enabled your `theme.res` file will regenerate from a CSS file that resides under the `css` directory. Changes you make to the CSS file will instantly update the simulator as you save. But, there are some limits to this live update so sometimes a simulator restart would be necessary.
 
 [[OverlayThemes]]
-=== How the compiled CSS reaches your theme
+=== Layering one theme over another
 
-The CSS compiler doesn't replace your `theme.res`. It compiles the stylesheet into a second resource file and then layers that one on top, so the styles you write in CSS win over the ones already in the theme.
+Compiling CSS in a Maven project rewrites the build's `theme.res` in place. The
+compiler reads `src/main/css`, merges in whatever CSS the project's dependencies
+contribute, and writes the result as the theme the app loads. There's no second
+resource and nothing left underneath it, so a property you don't set in CSS is
+absent rather than inherited from something older.
 
-The layering is a theme constant, `@OverlayThemes`. Its value is a comma-separated list of resource names that live beside the theme, without the `.res` extension. When `UIManager` builds a theme it reads that constant, opens each name in turn and applies its properties over the ones already loaded, so a later overlay beats an earlier one and every overlay beats the base theme.
+Layering is a separate mechanism that you ask for explicitly. A theme constant
+named `@OverlayThemes` holds a comma-separated list of resource names, each
+without the `.res` extension. When `UIManager` finishes building a theme it reads
+that constant, opens each name in turn from the resource root and applies its
+properties over the ones already loaded, so a later overlay beats an earlier one
+and every overlay beats the theme that named them.
 
-You don't normally set it. Installing CSS support writes the constant for you, pointing it at the compiled stylesheet, which is why a CSS project works without anyone touching the theme's constants. It's worth knowing the constant exists for two reasons: it explains why a value you set in the Designer appears to be ignored when the CSS file sets the same one, and it's the mechanism to reach for when you want a second resource file to override a theme you don't own -- a theme shipped inside a cn1lib, for instance.
+Reach for it when you want to override a theme you don't own -- one shipped
+inside a cn1lib, for instance -- without editing the original. It's also what the
+Designer's CSS installer writes when it adds a stylesheet on top of an existing
+Designer theme, which is a migration path for older projects rather than the way
+a CSS project is built today.
 
-WARNING: An overlay is loaded by name from the same directory as the theme that names it. A name the build doesn't produce is skipped with a message on the error stream and the app carries on with the base theme, so a typo here shows up as styling that never applies rather than as a build failure.
+WARNING: An overlay is loaded by name from the resource root. A name the build
+doesn't produce is skipped with a message on the error stream and the app carries
+on with the theme it already has, so a typo shows up as styling that never
+applies rather than as a build failure.
 
 === Supported CSS selectors
 
