@@ -50,13 +50,24 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.rest.*;
+import com.codename1.xml.*;
+import com.codename1.ui.tree.*;
+import com.codename1.ui.table.*;
+import com.codename1.db.*;
+import com.codename1.io.gzip.*;
+import com.codename1.util.*;
+import com.codename1.system.*;
+import com.codename1.annotations.*;
+import com.codename1.io.services.*;
 import java.util.*;
 
 
-class IoJava037Snippet {
+class IoJava160Snippet {
+
 
     Object context;
-    Object url;
+    String url = "https://example.com";
     Object value;
     Object body;
     Object event;
@@ -77,54 +88,39 @@ class IoJava037Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
+    String myUrl = "https://example.com";
+    String baseUrl = "https://example.com";
+    String token = "token";
+    String myToken = "token";
+    String password = "password";
+    String user = "user";
+    String email = "user@example.com";
+    String fullPathToFile = "/path/to/file.txt";
+    String bodyValueAsString = "{}";
+    String petId = "1";
+    Result result;
+    ConnectionRequest request;
+    java.io.Reader reader;
+    java.io.Writer writer;
+    java.io.InputStream input;
+    java.io.OutputStream outputStream;
+    
     void snippet() throws Exception {
-        // tag::io-java-037[]
-        Form hi = new Form("Location", new BoxLayout(BoxLayout.Y_AXIS));
-        hi.add("Pinpointing Location");
-        Display.getInstance().callSerially(() -> {
-            Location l = Display.getInstance().getLocationManager().getCurrentLocationSync();
-            if(l == null) {
-                hi.add("Location unavailable");
-                hi.revalidate();
-                return;
-            }
-            ConnectionRequest request = new ConnectionRequest("https://maps.googleapis.com/maps/api/geocode/json", false) {
-                private String country;
-                private String region;
-                private String city;
-                private String json;
-
-                @Override
-                protected void readResponse(InputStream input) throws IOException {
-                        Result result = Result.fromContent(input, Result.JSON);
-                        country = result.getAsString("/results/address_components[types='country']/long_name");
-                        region = result.getAsString("/results/address_components[types='administrative_area_level_1']/long_name");
-                        city = result.getAsString("/results/address_components[types='locality']/long_name");
-                        json = result.toString();
-                }
-
-                @Override
-                protected void postResponse() {
-                    hi.removeAll();
-                    hi.add(country);
-                    hi.add(region);
-                    hi.add(city);
-                    hi.add(new SpanLabel(json));
-                    hi.revalidate();
-                }
-            };
-            request.setContentType("application/json");
-            request.addRequestHeader("Accept", "application/json");
-            request.addArgument("key", googleApiKey);
-            request.addArgument("latlng", l.getLatitude() + "," + l.getLongitude());
-
-            NetworkManager.getInstance().addToQueue(request);
-        });
-        hi.show();
-        /* omitted */
-        // end::io-java-037[]
+        // tag::io-java-160[]
+        new Contact().getPropertyIndex().registerExternalizable();
+        // end::io-java-160[]
     }
 
-    String googleApiKey = "YOUR-API-KEY";
+    public class Contact implements PropertyBusinessObject {
+        public final IntProperty<Contact> id  = new IntProperty<>("id");
+        public final Property<String, Contact> name = new Property<>("name");
+        public final Property<String, Contact> email = new Property<>("email");
+        public final Property<String, Contact> phone = new Property<>("phone");
+        public final Property<Date, Contact> dateOfBirth = new Property<>("dateOfBirth", Date.class);
+        public final Property<String, Contact> gender  = new Property<>("gender");
+        public final IntProperty<Contact> rank  = new IntProperty<>("rank");
+        public final PropertyIndex idx = new PropertyIndex(this, "Contact", id, name, email, phone, dateOfBirth, gender, rank);
+        public PropertyIndex getPropertyIndex() { return idx; }
+    }
 
 }

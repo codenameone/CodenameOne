@@ -50,13 +50,24 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.rest.*;
+import com.codename1.xml.*;
+import com.codename1.ui.tree.*;
+import com.codename1.ui.table.*;
+import com.codename1.db.*;
+import com.codename1.io.gzip.*;
+import com.codename1.util.*;
+import com.codename1.system.*;
+import com.codename1.annotations.*;
+import com.codename1.io.services.*;
 import java.util.*;
 
 
-class IoJava037Snippet {
+class IoJava139Snippet {
+
 
     Object context;
-    Object url;
+    String url = "https://example.com";
     Object value;
     Object body;
     Object event;
@@ -77,54 +88,65 @@ class IoJava037Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
+    String myUrl = "https://example.com";
+    String baseUrl = "https://example.com";
+    String token = "token";
+    String myToken = "token";
+    String password = "password";
+    String user = "user";
+    String email = "user@example.com";
+    String fullPathToFile = "/path/to/file.txt";
+    String bodyValueAsString = "{}";
+    String petId = "1";
+    Result result;
+    ConnectionRequest request;
+    java.io.Reader reader;
+    java.io.Writer writer;
+    java.io.InputStream input;
+    java.io.OutputStream outputStream;
+    
     void snippet() throws Exception {
-        // tag::io-java-037[]
-        Form hi = new Form("Location", new BoxLayout(BoxLayout.Y_AXIS));
-        hi.add("Pinpointing Location");
-        Display.getInstance().callSerially(() -> {
-            Location l = Display.getInstance().getLocationManager().getCurrentLocationSync();
-            if(l == null) {
-                hi.add("Location unavailable");
-                hi.revalidate();
-                return;
-            }
-            ConnectionRequest request = new ConnectionRequest("https://maps.googleapis.com/maps/api/geocode/json", false) {
-                private String country;
-                private String region;
-                private String city;
-                private String json;
+        // tag::io-java-139[]
+        Form hi = new Form("WebService Wizard", new BoxLayout(BoxLayout.Y_AXIS));
+        Button getNamesSync = new Button("Get Names - Sync");
+        Button getNamesASync = new Button("Get Names - ASync");
+        hi.add(getNamesSync).add(getNamesASync);
 
-                @Override
-                protected void readResponse(InputStream input) throws IOException {
-                        Result result = Result.fromContent(input, Result.JSON);
-                        country = result.getAsString("/results/address_components[types='country']/long_name");
-                        region = result.getAsString("/results/address_components[types='administrative_area_level_1']/long_name");
-                        city = result.getAsString("/results/address_components[types='locality']/long_name");
-                        json = result.toString();
+        getNamesSync.addActionListener((e) -> {
+            try {
+                String[] books = GameOfThronesService.getBookNames();
+                hi.add("--- SYNC");
+                for(String b : books) {
+                    hi.add(b);
                 }
+                hi.revalidate();
+            } catch(IOException err) {
+                Log.e(err);
+            }
+        });
 
+        getNamesASync.addActionListener((e) -> {
+            GameOfThronesService.getBookNamesAsync(new Callback<String[]>() {
                 @Override
-                protected void postResponse() {
-                    hi.removeAll();
-                    hi.add(country);
-                    hi.add(region);
-                    hi.add(city);
-                    hi.add(new SpanLabel(json));
+                public void onSucess(String[] value) {
+                    hi.add("--- ASYNC");
+                    for(String b : value) {
+                        hi.add(b);
+                    }
                     hi.revalidate();
                 }
-            };
-            request.setContentType("application/json");
-            request.addRequestHeader("Accept", "application/json");
-            request.addArgument("key", googleApiKey);
-            request.addArgument("latlng", l.getLatitude() + "," + l.getLongitude());
 
-            NetworkManager.getInstance().addToQueue(request);
+                @Override
+                public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                    Log.e(err);
+                }
+            });
         });
         hi.show();
-        /* omitted */
-        // end::io-java-037[]
+        // end::io-java-139[]
     }
 
-    String googleApiKey = "YOUR-API-KEY";
+    public class GameOfThronesService { public static String[] getBookNames() throws IOException { return new String[0]; }
+        public static void getBookNamesAsync(Callback<String[]> c) { } }
 
 }
