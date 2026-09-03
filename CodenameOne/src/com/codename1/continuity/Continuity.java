@@ -25,7 +25,6 @@ package com.codename1.continuity;
 import com.codename1.continuity.spi.ContinuityBridge;
 import com.codename1.continuity.spi.ContinuityCallback;
 import com.codename1.io.Log;
-import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.router.Navigation;
@@ -120,6 +119,19 @@ public final class Continuity {
 
     /// Where this installation's device id lives, so a state can recognize its own echo across
     /// restarts.
+    /// Every value below lives in Storage, not Preferences, and the names are kept only because
+    /// they are what the data was already called.
+    ///
+    /// Preferences cannot say whether a write reached the disk. set() puts the value in a static
+    /// Hashtable and then calls save(), which discards Storage.writeObject()'s result -- and
+    /// get() reads that same Hashtable, so reading a value back after writing it confirms the
+    /// cache and nothing else. A verification built that way was added here once and could not
+    /// detect the failure it was written for.
+    ///
+    /// These three all have durable meaning: an id that changes across a restart makes every
+    /// state this device sent look foreign, a counter that reloads lower has receivers refusing
+    /// this device until it catches up, and a mark that never lands lets an acknowledged state be
+    /// acted on twice. Storage.writeObject returns a boolean, so the failure is at least visible.
     static final String PREF_DEVICE_ID = "CN1$ContinuityDevice";
 
     /// Where the sequence counter lives. Persisted because a counter that restarted at zero would
@@ -734,6 +746,9 @@ public final class Continuity {
         // to the provider and returns false, so every later call re-applied the same state.
         if (isSameState(parked, state)) {
             parked = null;
+            // The slot is what holds a publication back; the decision has been made, so anything
+            // waiting on it can go out now.
+            startPublisher();
         }
         return shown;
     }
@@ -1087,21 +1102,26 @@ public final class Continuity {
     /// Writes the sequence counter so it keeps rising across a relaunch.
     /// Persists the sequence counter, and says whether it is actually on disk.
     ///
-    /// Read back rather than trusted. Preferences.set() returns void and swallows the underlying
-    /// Storage.writeObject() result, so a refused write -- a full disk is the ordinary cause --
-    /// looks exactly like a successful one from here. That silence is expensive on this
-    /// particular value: the counter reloads lower after a restart, and every receiving device
-    /// whose high-water mark already includes the higher number refuses this device's states
-    /// until the counter climbs past it again. States stop arriving, on the other device, with
-    /// nothing logged on either.
+    /// Written through Storage, whose writeObject() reports failure, rather than through
+    /// Preferences, which cannot.
+    ///
+    /// An earlier attempt at this wrote through Preferences and then read the value back to
+    /// check. That verifies nothing: Preferences.set() puts the value in a static Hashtable
+    /// before calling save(), save() discards Storage.writeObject()'s result, and
+    /// Preferences.get() reads the same Hashtable -- so the read-back returns what was just put
+    /// there whether or not any of it reached the disk.
+    ///
+    /// The silence matters on this value: the counter reloads lower after a restart, and every
+    /// receiving device whose high-water mark already includes the higher number refuses this
+    /// device's states until the counter climbs past it again. States stop arriving on the other
+    /// device, with nothing logged on either.
     ///
     /// #### Returns
     ///
-    /// true when the counter can be read back
+    /// true when the counter reached storage
     private static boolean rememberSequence(long seq) {
         try {
-            Preferences.set(PREF_SEQUENCE, seq);
-            return Preferences.get(PREF_SEQUENCE, (long) 0) == seq;
+            return Storage.getInstance().writeObject(PREF_SEQUENCE, Long.valueOf(seq));
         } catch (Throwable t) {
             Log.e(t);
             return false;
@@ -1209,6 +1229,24 @@ public final class Continuity {
             // may reach the relay while the framework is off, and this is the one funnel every
             // publication passes through -- including the ones started by a worker completing
             // after the application turned it off.
+            return;
+        }
+        // Read into a local before the test. PMD's NonThreadSafeSingleton matches the SHAPE of
+        // "null-check a static, then assign a static inside the branch" and reports it as a lazy
+        // initializer, which this is not -- and the project's gate has no per-finding allow list,
+        // so the shape is what has to change.
+        AppState awaitingDecision = parked;
+        if (awaitingDecision != null) {
+            // A fetched state is waiting on the user and has NOT been acknowledged. The relay
+            // holds one document per user, so publishing now replaces the only copy of it that
+            // exists anywhere -- it is in memory here and nowhere else -- and a process death
+            // while the prompt is on screen loses it for good. autoRestore off, or a listener
+            // that returns false to ask first, is the ordinary way to get here.
+            //
+            // Held rather than dropped. Whatever clears the slot -- the user accepting, the
+            // application acknowledging, a logout, the state expiring -- calls back in here, and
+            // an acknowledged state is safe to overwrite because the mark is already durable.
+            publishRequested = true;
             return;
         }
         if (publishing) {
@@ -1515,14 +1553,29 @@ public final class Continuity {
         if (waiting != null) {
             dispatch(waiting);
         }
+        // Whether it dispatched or was refused, the slot is no longer holding anything back.
+        startPublisher();
     }
 
     private static String loadDeviceId() {
         try {
-            String id = Preferences.get(PREF_DEVICE_ID, null);
+            String id = null;
+            if (Display.isInitialized() && Storage.getInstance().exists(PREF_DEVICE_ID)) {
+                Object o = Storage.getInstance().readObject(PREF_DEVICE_ID);
+                if (o instanceof String) {
+                    id = (String) o;
+                }
+            }
             if (id == null || id.length() == 0) {
                 id = Util.getUUID();
-                Preferences.set(PREF_DEVICE_ID, id);
+                if (!Storage.getInstance().writeObject(PREF_DEVICE_ID, id)) {
+                    // Minted but not stored, so the next launch mints another one and every state
+                    // this device has sent starts looking like a stranger's. Nothing here can
+                    // prevent that; saying so beats a silent identity change.
+                    Log.p("Continuity: the device id could not be stored; it will change on the "
+                            + "next launch and states already sent will not be recognized as "
+                            + "this device's own.");
+                }
             }
             return id;
         } catch (Throwable t) {
@@ -1661,7 +1714,11 @@ public final class Continuity {
     private static Map<String, Long> readSeen() {
         Map<String, Long> out = new HashMap<String, Long>();
         try {
-            String raw = Preferences.get(PREF_SEEN, "");
+            if (!Display.isInitialized() || !Storage.getInstance().exists(PREF_SEEN)) {
+                return out;
+            }
+            Object stored = Storage.getInstance().readObject(PREF_SEEN);
+            String raw = stored instanceof String ? (String) stored : null;
             if (raw == null || raw.length() == 0) {
                 return out;
             }
@@ -1766,7 +1823,14 @@ public final class Continuity {
         // natively instead. check-cast-semantics.sh refuses the shape, correctly: the only thing
         // here that can actually fail is the preference write.
         try {
-            Preferences.set(PREF_SEEN, sb.toString());
+            if (!Storage.getInstance().writeObject(PREF_SEEN, sb.toString())) {
+                // The marks stay in memory, so this run still acts once. What is lost is the
+                // guarantee across a restart: an acknowledged state can be offered again and its
+                // side effects run a second time. Recoverable, unlike the alternative of dropping
+                // the state, and every later acknowledgement retries the write.
+                Log.p("Continuity: the delivery marks could not be stored; an acknowledged state "
+                        + "may be offered again after a restart.");
+            }
         } catch (Throwable t) {
             Log.e(t);
         }
@@ -1774,7 +1838,13 @@ public final class Continuity {
 
     private static long loadSequence() {
         try {
-            return Preferences.get(PREF_SEQUENCE, (long) 0);
+            if (!Display.isInitialized() || !Storage.getInstance().exists(PREF_SEQUENCE)) {
+                return 0;
+            }
+            Object o = Storage.getInstance().readObject(PREF_SEQUENCE);
+            // instanceof rather than a cast: a failed cast does not throw on the iOS virtual
+            // machine, it hands the wrong object to the next instruction.
+            return o instanceof Number ? ((Number) o).longValue() : 0;
         } catch (Throwable t) {
             Log.e(t);
             return 0;

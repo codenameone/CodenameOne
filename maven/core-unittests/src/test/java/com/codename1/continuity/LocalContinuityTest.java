@@ -65,10 +65,10 @@ public class LocalContinuityTest extends UITestBase {
     public void installBridge() {
         Continuity.reset();
         Storage.getInstance().clearStorage();
-        // The delivery high-water marks are DURABLE now, so they outlive reset() by design --
-        // which is the whole point of them, and which makes them leak from one test into the
-        // next unless each starts from a clean slate.
-        com.codename1.io.Preferences.delete(Continuity.PREF_SEEN);
+        // The delivery high-water marks are DURABLE by design, so they outlive reset() -- which
+        // is the whole point of them, and which makes them leak from one test into the next
+        // unless each starts from a clean slate. clearStorage() above now covers them: they moved
+        // out of Preferences, which cannot report a failed write, and into Storage, which can.
         bridge = new LocalContinuityBridge();
         Continuity.setBridge(bridge);
         // A running application has a form on screen, and the framework deliberately holds an
@@ -1936,6 +1936,74 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * A checkpoint must not overwrite the relay's copy of an arrival the user is still deciding
+     * about. The relay holds one document per user, and a parked state exists ONLY in memory --
+     * so publishing replaces the last copy of it that exists anywhere, and a process death while
+     * the prompt is on screen loses it outright.
+     */
+    @EdtTest
+    public void aCheckpointWaitsWhileAnArrivalIsParked() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        final GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+        r.release();
+        pause(300L);
+        final int before = r.sent.size();
+
+        // An arrival the application has been asked about and has not answered.
+        Continuity.deliver(fromElsewhere("waiting on the user", 91L));
+        flushSerialCalls();
+        assertNotNull(Continuity.getRestorableState(), "the arrival should be parked");
+
+        Continuity.checkpoint();
+        pause(300L);
+        assertEquals(before, r.sent.size(),
+                "a checkpoint overwrote the relay's only copy of a state the user was still "
+                        + "being asked about");
+
+        // Answering releases it -- held, not dropped.
+        Continuity.restore();
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitAnySince(before);
+            }
+        });
+        assertTrue(r.sent.size() > before,
+                "the held publication was dropped rather than sent once the decision was made");
+    }
+
+    /**
+     * A mark that never reached storage must not be reported as durable. Preferences cannot say
+     * whether a write landed -- set() fills a static table and save() discards
+     * Storage.writeObject()'s result -- so these values moved to Storage, which can.
+     */
+    @EdtTest
+    public void marksThatCannotBeStoredAreNotSilentlyClaimed() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+
+        Storage original = Storage.getInstance();
+        Storage.setStorageInstance(new RefusingStorage());
+        try {
+            Continuity.acknowledge(fromElsewhere("cannot be stored", 95L));
+        } finally {
+            Storage.setStorageInstance(original);
+        }
+
+        Map<String, Long> persisted = Continuity.readSeenForTest();
+        assertFalse(persisted.containsKey("some-other-device"),
+                "a mark that never reached storage was reported as durable");
+    }
+
+    /**
      * A checkpoint whose write failed is still owed. `dirty` is cleared on the way in, so leaving
      * it clear told the next suspend there was nothing to save -- a checkpoint lost to a full
      * disk was never retried and the app came back to the last write that had succeeded.
@@ -2157,6 +2225,14 @@ public class LocalContinuityTest extends UITestBase {
         /// out), and an absence asserted too early is not evidence of anything: the publish simply
         /// had not happened yet. A bare sleep gave exactly that, so the test could pass without
         /// the code under it ever running.
+        /** Waits until more than `count` states have been sent. */
+        void awaitAnySince(int count) {
+            long deadline = System.currentTimeMillis() + 5000L;
+            while (System.currentTimeMillis() < deadline && sent.size() <= count) {
+                sleepBriefly();
+            }
+        }
+
         void awaitSent(long sequence) {
             long deadline = System.currentTimeMillis() + 5000L;
             while (System.currentTimeMillis() < deadline) {
