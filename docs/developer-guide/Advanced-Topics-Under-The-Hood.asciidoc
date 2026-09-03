@@ -2304,17 +2304,28 @@ To force an update check, run `mvn cn1:update` from the project root.
 
 ==== How does it work
 
-`mvn cn1:update` reads the Maven metadata for the Codename One plugin from
+`mvn cn1:update` does two separate things.
+
+First it makes sure `~/.codenameone/UpdateCodenameOne.jar` is there -- installed
+from a resource bundled in the plugin, or downloaded if that resource is missing
+-- and runs it. That's what keeps the shared tooling and the device skins under
+`~/.codenameone` current, and it's why the download happens once per machine
+rather than once per project. It no longer runs against your project directory,
+which is why a Maven project has no jars of its own to update: the plugin hands it
+a synthetic directory under `target/codenameone/update-dummy`, seeded with the
+project's `codenameone_settings.properties`.
+
+Then it reads the plugin's Maven metadata from
 https://repo.codenameone.com/maven2[the Codename One repository], resolves the
 newest published release and rewrites the `cn1.version` and `cn1.plugin.version`
-properties in the project's pom. The rest is ordinary Maven: the new
-framework, plugin and designer artifacts resolve on the next build and land in the
-local repository, so a second project on the same machine reuses that download
-rather than fetching its own copy.
+properties in the pom. The framework and plugin artifacts for that version then
+resolve on the next build like any other dependency. The Resource Editor doesn't:
+it's a separate artifact of around 43MB that's fetched when you run
+`mvn cn1:designer`.
 
-A project pinned to a `-SNAPSHOT` is left alone, because a snapshot already tracks
-the newest build. To move a project to a particular release rather than to the
-newest one, name it: `mvn cn1:update -DnewVersion=X.Y.Z`.
+A project pinned to a `-SNAPSHOT` keeps its version, because a snapshot already
+tracks the newest build. To move to a particular release rather than the newest
+one, name it: `mvn cn1:update -DnewVersion=X.Y.Z`.
 
 ==== What isn't covered
 
