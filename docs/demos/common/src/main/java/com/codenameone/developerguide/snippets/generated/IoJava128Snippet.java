@@ -107,7 +107,8 @@ class IoJava128Snippet {
     
     void snippet() throws Exception {
         // tag::io-java-128[]
-        request.downloadImageToStorage(url, (img) -> theImageIsHereDoSomethingWithIt(img));
+        request.setUrl(url);
+        request.downloadImageToStorage("cached-image", (img) -> theImageIsHereDoSomethingWithIt(img));
         // end::io-java-128[]
     }
 

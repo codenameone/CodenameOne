@@ -118,8 +118,9 @@ class IoJava141Snippet {
         // check if there is a new version of this on the server
         CachedDataService.updateData(data, new ActionListener() {
             public void actionPerformed(ActionEvent ev) {
-                // invoked when/if the data arrives, we now have a fresh cache
-                Storage.getInstance().writeObject("LocallyCachedData", data);
+                // the fresh copy arrives on the event, updateData leaves ours alone
+                CachedData fresh = (CachedData)((NetworkEvent)ev).getMetaData();
+                Storage.getInstance().writeObject("LocallyCachedData", fresh);
             }
         });
         // end::io-java-141[]

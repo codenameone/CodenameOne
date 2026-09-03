@@ -126,7 +126,7 @@ class IoJava095Snippet {
                 String p = (String)parent;
                 Vector result = new Vector();
                 for(String s : files) {
-                    result.add(p + s);
+                    result.add(p + FileSystemStorage.getInstance().getFileSystemSeparator() + s);
                 }
                 return result;
             }
