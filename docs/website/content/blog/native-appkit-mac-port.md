@@ -67,13 +67,21 @@ mvn -B \
 
 `mac-source` produces an Xcode project under the build target directory. `mac-os-x-native` produces the signed native result through the build service. Existing projects do not need a new application API.
 
-Catalyst remains available through the `mac-catalyst` path for an application that depends on it. It is no longer the default definition of “native Mac.”
+Catalyst has no separate build target. An application that depends on it can preserve the previous behavior by setting the existing hint and building an ordinary iOS target:
+
+```properties
+codename1.arg.macNative.enabled=true
+```
+
+Use `ios-source` for a local Xcode project or `ios-device` for a build-server build. Catalyst is no longer the default definition of “native Mac.”
 
 ## A port is a contract, not a screenshot
 
 The pull request ran the full native screenshot suite, 324 cases at merge time, plus platform and input tests. The same window layouts are captured at several aspect ratios. Text input, mouse routing, focus, resizing, modality, and screen scale have dedicated coverage.
 
-The work is not finished. Announcement accessibility maps to AppKit, but the port does not yet publish a complete `NSAccessibility` tree. Platform services with a UIKit-only implementation also need individual AppKit work. Those gaps are tracked as gaps; switching the default port does not erase them.
+Accessibility follows the window model too. `IOSNative.updateAccessibilityTree()` sends the framework semantics tree to `CN1MacAccessibilityUpdateTree()`, which installs a hierarchy of `NSAccessibilityElement` children on the relevant window. Roles, labels, values, states, standard and custom actions, and live-region announcements reach VoiceOver through AppKit instead of stopping at the portable tree.
+
+Platform services with a UIKit-only implementation still need individual AppKit work. Switching the default port does not make those integrations native to macOS automatically.
 
 ## Another Tuesday
 

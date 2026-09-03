@@ -17,7 +17,9 @@ Catalyst rendered a secondary window into a mutable image and copied it into a s
 
 Always-on-top, utility windows, minimize, restore, maximize, modality, menus, monitor scale, and input methods are desktop operations again.
 
-The existing Mac build targets keep their names. Catalyst remains available for applications that depend on it. Full accessibility tree publication still needs work, and the article says so.
+The existing Mac build targets keep their names. Applications that depend on Catalyst can set `codename1.arg.macNative.enabled=true` and build the ordinary `ios-source` or `ios-device` target; Catalyst has no target of its own.
+
+The framework semantics tree is published as a per-window hierarchy of `NSAccessibilityElement` children, so VoiceOver receives roles, labels, values, states, actions, and live-region announcements through AppKit.
 
 A new Codename One port used to be headline news. This one arrived in the same week as VoIP, VPN, OTP, contacts, native dialogs, billing, and a developer-guide rebuild.
 
