@@ -107,7 +107,7 @@ class IoJava125Snippet {
     
     void snippet() throws Exception {
         // tag::io-java-125[]
-        int id = result.getAsInteger("//player[//address[country/isocode='CA']]/@id");
+        int[] ids = result.getAsIntegerArray("//player[//address[country/isocode='CA']]/@id");
         // end::io-java-125[]
     }
 }

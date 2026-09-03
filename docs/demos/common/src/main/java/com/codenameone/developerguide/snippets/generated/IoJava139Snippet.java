@@ -142,6 +142,7 @@ class IoJava139Snippet {
                 }
             });
         });
+        hi.show();
         // end::io-java-139[]
     }
 

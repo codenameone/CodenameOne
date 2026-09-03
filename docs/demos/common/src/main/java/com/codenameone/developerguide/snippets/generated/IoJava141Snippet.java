@@ -120,6 +120,8 @@ class IoJava141Snippet {
             public void actionPerformed(ActionEvent ev) {
                 // the fresh copy arrives on the event, updateData leaves ours alone
                 CachedData fresh = (CachedData)((NetworkEvent)ev).getMetaData();
+                // the service fills in the bytes and validators but not the URL
+                fresh.setUrl(data.getUrl());
                 Storage.getInstance().writeObject("LocallyCachedData", fresh);
             }
         });
