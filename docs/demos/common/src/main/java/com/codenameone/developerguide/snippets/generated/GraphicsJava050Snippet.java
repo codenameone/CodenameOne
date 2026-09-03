@@ -51,6 +51,7 @@ import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
 import java.util.*;
+import com.codename1.ui.geom.Rectangle;
 
 
 class GraphicsJava050Snippet {
@@ -90,7 +91,8 @@ class GraphicsJava050Snippet {
                 null
         );
         g.setColor(gradient);
-        g.fillRect(getX(), getY(), getWidth(), getHeight());
+        // a Paint is consulted by fillShape; fillRect still uses the integer colour
+        g.fillShape(new Rectangle(getX(), getY(), getWidth(), getHeight()));
         // end::graphics-java-050[]
     }
 

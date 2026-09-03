@@ -86,8 +86,10 @@ class GraphicsJava062Snippet {
 
     @Override
     public boolean animate() {
-        if ( System.currentTimeMillis()/1000 != lastRenderedTime/1000){
-            currentTime.setTime(System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        if ( now/1000 != lastRenderedTime/1000){
+            currentTime.setTime(now);
+            lastRenderedTime = now;
             return true;
         }
         return false;
