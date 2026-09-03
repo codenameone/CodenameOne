@@ -140,10 +140,11 @@ final class JavaSENativeDragAndDrop {
             // AWT seeds a drag from the mouse event that provoked it and refuses without one.
             return false;
         }
-        final java.awt.Image dragImage = toAwtDragImage(op, target);
+        final double scale = target.awtOverlayScale();
+        final java.awt.Image dragImage = toAwtDragImage(op, scale);
         final Point offset = new Point(
-                (int) (op.getDragImageOffsetX() / target.canvasScale()),
-                (int) (op.getDragImageOffsetY() / target.canvasScale()));
+                (int) (op.getDragImageOffsetX() / scale),
+                (int) (op.getDragImageOffsetY() / scale));
         setExporting(op);
         EventQueue.invokeLater(new Runnable() {
             @Override
@@ -176,12 +177,34 @@ final class JavaSENativeDragAndDrop {
         setExporting(null);
     }
 
+    /// Codename One pixels per AWT point over a canvas.
+    ///
+    /// The display's backing scale, and the skin's zoom where there is a skin. A simulator
+    /// showing a device at a zoom other than 1 draws its content at that zoom on top of the
+    /// backing scale, so a preview divided by the backing scale alone came out zoomLevel times
+    /// too large or too small, with its grab point displaced by the same factor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `skinned`: true when the canvas is showing a device skin, which is what makes the
+    /// zoom apply
+    ///
+    /// - `backingScale`: the backing scale of the display the canvas is on
+    ///
+    /// - `zoom`: the skin's zoom level
+    static double overlayScale(boolean skinned, double backingScale, float zoom) {
+        if (skinned && zoom > 0) {
+            return backingScale / zoom;
+        }
+        return backingScale;
+    }
+
     /// Renders the operation's drag image at the size AWT expects.
     ///
     /// Codename One images are in surface pixels while AWT places a drag image in points, so on
-    /// a scaled display the image has to come down by the backing scale or the user drags a
-    /// picture twice the size of the thing they grabbed.
-    private static java.awt.Image toAwtDragImage(NativeDragOperation op, JavaSEPort.C canvas) {
+    /// a scaled display the image has to come down or the user drags a picture twice the size
+    /// of the thing they grabbed.
+    private static java.awt.Image toAwtDragImage(NativeDragOperation op, double scale) {
         com.codename1.ui.Image image = op.getDragImage();
         if (image == null) {
             return null;
@@ -191,8 +214,11 @@ final class JavaSENativeDragAndDrop {
             return null;
         }
         java.awt.Image awt = (java.awt.Image) peer;
-        double scale = canvas.canvasScale();
-        if (scale <= 1.0) {
+        // Both ways, not just down. A skin zoomed past 1 puts fewer Codename One pixels in
+        // an AWT point, so the preview has to grow -- and the grab point below is divided by
+        // the same number either way, which would put it outside an image that stayed as it
+        // was. Compared with a tolerance because it is a ratio of two measured scales.
+        if (scale <= 0 || Math.abs(scale - 1.0) < 0.001) {
             return awt;
         }
         int w = Math.max(1, (int) (image.getWidth() / scale));

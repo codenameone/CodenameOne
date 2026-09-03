@@ -6023,7 +6023,11 @@ public class Component implements Animation, StyleListener, Editable {
                 // without this the component the user dragged stays invisible for good.
                 leadParent.setVisible(true);
             }
-            Form p = getComponentForm();
+            // The top level, not the form: pointerDragged records the dragged component
+            // on TopLevelSupport.rootOf(this), and a component dragged inside a window
+            // has no form at all -- so asking for one left that window still holding a
+            // component it would never be told had stopped being dragged.
+            Container p = TopLevelSupport.rootOf(leadParent);
             if (p != null) {
                 p.setDraggedComponent(null);
                 p.repaint();

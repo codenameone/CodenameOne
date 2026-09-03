@@ -458,4 +458,19 @@ class JavaSENativeDragAndDropTest {
         assertEquals(NativeDragOperation.ACTION_NONE,
                 JavaSENativeDragAndDrop.preferred(NativeDragOperation.ACTION_NONE));
     }
+
+    @Test
+    void theDragPreviewIsScaledByTheSkinZoomAsWellAsTheDisplay() {
+        assertEquals(2.0, JavaSENativeDragAndDrop.overlayScale(false, 2.0, 1), 0.0001,
+                "with no skin the backing scale is the whole of it");
+        assertEquals(2.0, JavaSENativeDragAndDrop.overlayScale(false, 2.0, 4), 0.0001,
+                "and the zoom belongs to the skin, so without one it means nothing");
+        assertEquals(1.0, JavaSENativeDragAndDrop.overlayScale(true, 2.0, 2), 0.0001,
+                "a skin zoomed to 2 on a display backed at 2 draws one Codename One pixel per "
+                        + "point, so the preview is already the size AWT wants");
+        assertEquals(4.0, JavaSENativeDragAndDrop.overlayScale(true, 2.0, 0.5f), 0.0001,
+                "and a skin at half size holds twice as many of them again");
+        assertEquals(2.0, JavaSENativeDragAndDrop.overlayScale(true, 2.0, 0), 0.0001,
+                "a zoom of zero is not a scale anything can be divided by");
+    }
 }

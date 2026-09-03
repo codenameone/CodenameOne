@@ -3244,6 +3244,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             return retinaScale;
         }
 
+        /// Codename One pixels per AWT point for anything AWT lays over this canvas.
+        ///
+        /// The backing scale is only half of it. With a device skin the canvas also draws
+        /// at zoomLevel, which is why scaleCoordinateX/Y map a press back through
+        /// retinaScale / zoomLevel -- so this is the same factor the pointer is measured
+        /// with, read the other way round.
+        double awtOverlayScale() {
+            return JavaSENativeDragAndDrop.overlayScale(
+                    getScreenCoordinates() != null, canvasScale(), zoomLevel);
+        }
+
         int surfaceWidth() {
             if (windowId == 0) {
                 return getDisplayWidthImpl();

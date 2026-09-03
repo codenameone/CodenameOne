@@ -303,7 +303,7 @@ public final class NativeDragAndDrop {
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
-                    source.cancelLightweightDrag();
+                    cancelLightweightDrag(source);
                 }
             });
         }
@@ -496,14 +496,40 @@ public final class NativeDragAndDrop {
                 pressToken = null;
             }
         }
-        if (source != null) {
-            // A component can be both draggable and a native drag source. The native session
-            // owns the gesture from here, and the port stops delivering pointer drags, so the
-            // lightweight drag would otherwise be left activated with its image stranded where
-            // the drag began.
-            source.cancelLightweightDrag();
-        }
+        cancelLightweightDrag(source);
         return true;
+    }
+
+    /// Abandons the lightweight drag this gesture started, whichever component it belongs to.
+    ///
+    /// A component can be both draggable and a native drag source, and from here the operating
+    /// system owns the gesture: the port stops delivering pointer drags, no lightweight drop
+    /// ever runs, and a drag left activated keeps its component hidden with its image stranded
+    /// where the gesture began.
+    ///
+    /// Not necessarily the source's own drag. A drag source is found by walking *up* from the
+    /// press, so a draggable child inside a native-drag-source ancestor stages the ancestor --
+    /// and a motion too small to reach the native threshold starts the child's lightweight drag
+    /// first, which hides the child and records it on the top level. Cancelling the ancestor,
+    /// which never had a drag of its own, left that child invisible for good.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the component the native drag is running for, or null when there is none
+    private static void cancelLightweightDrag(Component source) {
+        if (source == null) {
+            return;
+        }
+        Container root = TopLevelSupport.rootOf(source);
+        Component dragged = root == null ? null : root.getDraggedComponent();
+        if (dragged != null && dragged != source) { // NOPMD CompareObjectsWithEquals
+            dragged.cancelLightweightDrag();
+        }
+        // The source as well, and whether or not it was the dragged one: a component can have
+        // activated a drag that never became the top level's -- grabbing a scroll does exactly
+        // that -- and those flags have to go, or the next gesture reads them as a drag already
+        // under way. Cancelling twice is harmless; the second call finds nothing activated.
+        source.cancelLightweightDrag();
     }
 
     /// Drops the operation prepared by a press that turned out to be a click. Called as the

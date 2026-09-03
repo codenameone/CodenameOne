@@ -1481,6 +1481,48 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aDraggedChildGetsItsVisibilityBackWhenItsAncestorIsTheSource() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            Form form = Display.getInstance().getCurrent();
+            // A drag source is found by walking up from the press, so pressing the draggable
+            // child stages the ancestor. The lightweight drag that a small motion starts still
+            // belongs to the child.
+            Container source = new Container(new BorderLayout());
+            source.setNativeDragOperation(new NativeDragOperation("the ancestor is the source"));
+            Container child = new Container();
+            child.setDraggable(true);
+            source.add(BorderLayout.CENTER, child);
+            form.setLayout(new BorderLayout());
+            form.add(BorderLayout.CENTER, source);
+            form.revalidate();
+
+            int x = child.getAbsoluteX() + 5;
+            int y = child.getAbsoluteY() + 5;
+            form.pointerPressed(x, y);
+            drag(form, x + 1, y + 1);
+            assertFalse(child.isVisible(),
+                    "a motion too small to be a native drag starts the child's lightweight one, "
+                            + "which hides the child while it carries its image");
+            assertSame(child, form.getDraggedComponent());
+
+            drag(form, x + 200, y + 200);
+            assertSame(source, implementation.getStartedNativeDrag().getSource());
+            assertTrue(child.isVisible(),
+                    "the operating system owns the gesture now and no lightweight drop will "
+                            + "ever run, so cancelling only the source left the child hidden");
+            assertNull(form.getDraggedComponent());
+
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_COPY);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aReleaseAfterARefusedStartDoesNotLeaveTheDragArmed() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);
