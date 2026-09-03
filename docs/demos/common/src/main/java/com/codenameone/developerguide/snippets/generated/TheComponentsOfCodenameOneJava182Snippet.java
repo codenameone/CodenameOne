@@ -127,6 +127,9 @@ class TheComponentsOfCodenameOneJava182Snippet {
         }
 
         Tree dt = new Tree(new StringArrayTreeModel());
+        Form hi = new Form("Tree", new BorderLayout());
+        hi.add(BorderLayout.CENTER, dt);
+        hi.show();
         // end::the-components-of-codename-one-java-182[]
     }
 }

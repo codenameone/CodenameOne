@@ -91,16 +91,16 @@ class TheComponentsOfCodenameOneJava147Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-147[]
+        TextField num1 = new TextField("", "", 5, TextField.NUMERIC);
+        TextField num2 = new TextField("", "", 5, TextField.NUMERIC);
+        TextField num3 = new TextField("", "", 5, TextField.NUMERIC);
+        TextField num4 = new TextField("", "", 5, TextField.NUMERIC);
         automoveToNext(num1, num2);
         automoveToNext(num2, num3);
         automoveToNext(num3, num4);
         // end::the-components-of-codename-one-java-147[]
     }
 
-    TextField num2 = new TextField();
-    TextField num1 = new TextField();
-    TextField num3 = new TextField();
-    TextField num4 = new TextField();
 
 
     void automoveToNext(TextField a, TextField b) { }

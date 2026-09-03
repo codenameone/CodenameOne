@@ -119,7 +119,10 @@ class TheComponentsOfCodenameOneJava189Snippet {
                     images[index] = placeholder;
                     Util.downloadUrlToStorageInBackground(imageURLs[index], "list" + index, (e) -> {
                             try {
-                                images[index] = EncodedImage.create(Storage.getInstance().createInputStream("list" + index));
+                                try(InputStream is = Storage.getInstance().createInputStream("list" + index)) {
+                                    // EncodedImage.create reads the stream but does not close it
+                                    images[index] = EncodedImage.create(is);
+                                }
                                 listeners.fireDataChangeEvent(index, DataChangedListener.CHANGED);
                             } catch(IOException err) {
                                 err.printStackTrace();
