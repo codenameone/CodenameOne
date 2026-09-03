@@ -21,13 +21,13 @@ Codename One has a secret weapon for that problem: builders.
 
 Builders already assemble the native product, so they can change its shape based on the Java packages the application actually uses. They link frameworks, inject permissions and background modes, generate native delegates and services, and create extension targets when needed. Leave a package out and its native machinery stays out too.
 
-[PR #5604](https://github.com/codenameone/CodenameOne/pull/5604) is where we crossed that old line. It adds first-class call management, VoIP push handling, managed VPN, and raw packet tunneling on Android. The Java API is the visible result. The bigger change is that builders assemble the system integration around it without turning every application team into the maintainer of two native build projects.
+[PR #5604](https://github.com/codenameone/CodenameOne/pull/5604) is where we crossed that old line. It adds first-class call management, VoIP push handling, managed VPN, and raw packet tunneling on Android and iOS. The Java API is the visible result. The bigger change is that builders assemble the system integration around it without turning every application team into the maintainer of two native build projects.
 
 ## TL;DR
 
 - [`Calls`](#a-call-is-a-system-session-before-it-is-a-media-session) connects application call state to CallKit on iOS and self-managed `ConnectionService` on Android. Your media and signaling stack remain yours.
 - [`Vpn`](#managed-vpn-with-an-important-platform-boundary) installs and controls managed IKEv2 profiles on iOS and Android. iOS also supports managed IPsec profiles.
-- [`VpnTunnel`](#the-packet-tunnel-boundary) exposes raw packets for an application-implemented tunnel on Android. The current iOS builder rejects that mode because it cannot yet produce the translated Network Extension target.
+- [`VpnTunnel`](#the-packet-tunnel-boundary) exposes raw packets for an application-implemented tunnel on Android and iOS. On iOS, the builder generates and signs a separate Network Extension containing the translated Java tunnel.
 - {{< post-link path="/blog/dialogs-in-native-windows" text="Dialogs and secondary windows" >}} now work together, including an opt-in native modal window.
 - {{< post-link path="/blog/native-appkit-mac-port" text="The new AppKit port" >}} builds a real Mac application instead of presenting an iOS application through Catalyst.
 - {{< post-link path="/blog/sms-otp-autofill" text="SMS one-time-code autofill" >}} fills a verification code without asking to read the inbox.
@@ -111,7 +111,7 @@ iOS and Android 11 or newer support managed IKEv2. iOS also supports managed IPs
 
 ### The packet tunnel boundary
 
-Android also supports `VpnTunnel`, where application code receives raw IP packets and forwards them through its own protocol:
+For protocols that do not fit a managed VPN profile, `VpnTunnel` lets application code receive raw IP packets and forward them through its own transport:
 
 ```java
 public final class AcmeTunnel extends VpnTunnel {
@@ -129,9 +129,16 @@ public final class AcmeTunnel extends VpnTunnel {
 }
 ```
 
-That low-level path is Android-only in this release. The iOS implementation would need a separate Network Extension executable containing the translated tunnel dependency graph, without the UIKit application shell. Generator scaffolding exists, but the builder deliberately fails an `ios.vpn.tunnel=true` build instead of producing an application whose tunnel can never run. Managed VPN configuration on iOS is fully supported; custom packet forwarding is not.
+The same Java packet loop runs on Android and iOS, but the process boundary is different. Android hosts it in a `VpnService` inside the application process. iOS requires a `NEPacketTunnelProvider` Network Extension: a separate executable with its own bundle identifier, provisioning profile, memory limit, and translated VM. The builder creates that target, includes the selected `VpnTunnel` implementation, adds the framework and entitlements, and embeds the signed extension in the application.
 
-That is an inconvenient sentence for a launch post, which is precisely why it belongs here.
+Apple grants the Network Extension entitlement case by case, so the target is deliberately opt-in. Once the App ID has that entitlement, name the tunnel class in `codenameone_settings.properties`:
+
+```properties
+codename1.arg.ios.vpn.tunnel=true
+codename1.arg.ios.vpn.tunnel.class=com.acme.AcmeTunnel
+```
+
+The extension starts fresh. It cannot see application statics, `Display`, or connections opened by the main application. Pass everything it needs through `TunnelSetup.data`, then initialize the transport from `VpnTunnel.onStart()`. This is a real cross-platform API without pretending the two operating systems have the same lifecycle.
 
 ## The builder is part of the runtime contract
 
