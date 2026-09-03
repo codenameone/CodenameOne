@@ -1918,16 +1918,28 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void copyToClipboard(Object obj) {
-        if (obj instanceof String || obj instanceof ClipboardContent) {
-            final String text = obj instanceof ClipboardContent
-                    ? ((ClipboardContent) obj).getText(ClipboardContent.MIME_TEXT) : (String)obj;
-            final ClipboardContent rich = obj instanceof ClipboardContent
-                    ? (ClipboardContent)obj : null;
+        if (obj instanceof ClipboardContent) {
+            // Without reading anything out of it. The text was fetched here and then never used
+            // -- the branch it fed cannot be reached for a ClipboardContent -- so a representation
+            // registered through setDataProvider was built the moment something was copied, even
+            // when no consumer ever asked for text or the consumer chose another flavor
+            // altogether. Writing the file or encoding the image is exactly what a provider
+            // exists to put off. RichTransferable resolves it if a consumer reads it.
+            final ClipboardContent rich = (ClipboardContent) obj;
             EventQueue.invokeLater(new Runnable() {
                 public void run() {
                     Toolkit toolkit = Toolkit.getDefaultToolkit();
                     Clipboard clipboard = toolkit.getSystemClipboard();
-                    clipboard.setContents(rich == null ? new StringSelection(text) : new RichTransferable(rich), null);
+                    clipboard.setContents(new RichTransferable(rich), null);
+                }
+            });
+        } else if (obj instanceof String) {
+            final String text = (String) obj;
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    Toolkit toolkit = Toolkit.getDefaultToolkit();
+                    Clipboard clipboard = toolkit.getSystemClipboard();
+                    clipboard.setContents(new StringSelection(text), null);
                 }
             });
         } else {

@@ -265,6 +265,37 @@ class JavaSENativeDragAndDropTest {
     }
 
     @Test
+    void copyingDoesNotBuildAPromisedRepresentation() {
+        final int[] built = { 0 };
+        ClipboardContent content = new ClipboardContent()
+                .setDataProvider(ClipboardContent.MIME_TEXT, new ClipboardDataProvider() {
+                    @Override
+                    public Object getClipboardData(String mimeType) {
+                        built[0]++;
+                        return "expensive";
+                    }
+                });
+
+        // Constructing a port overwrites the global JavaSEPort.instance, and other test classes
+        // reach through that static to drive the live Display -- so it goes back exactly as it
+        // was. JavaSEPortFontMappingTest documents the same hazard.
+        JavaSEPort previous = JavaSEPort.instance;
+        try {
+            new JavaSEPort().copyToClipboard(content);
+        } catch (Throwable headlessOrUninitialised) {
+            // The clipboard itself is not reachable from a test JVM. What is under test happens
+            // before that: whether putting the content on the clipboard reads it.
+        } finally {
+            JavaSEPort.instance = previous;
+        }
+
+        assertEquals(0, built[0],
+                "a representation registered as a provider is built when a consumer reads it, "
+                        + "not when something is copied -- writing the file or encoding the "
+                        + "image is exactly what deferring it is for");
+    }
+
+    @Test
     void aStreamedTextFlavorIsReadOnlyOnce() throws Exception {
         DataFlavor htmlStream = new DataFlavor("text/html;charset=UTF-8;class=java.io.InputStream");
         FakeTransferable t = new FakeTransferable()
