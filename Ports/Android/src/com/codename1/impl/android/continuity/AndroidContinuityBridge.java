@@ -126,7 +126,27 @@ public class AndroidContinuityBridge implements ContinuityBridge {
         @Override
         public void run() {
             try {
+                if (!Continuity.isCheckpointPending()) {
+                    // Asked HERE rather than before the hop. The framework writes through as the
+                    // user navigates, so by the time Android says it may kill the process there
+                    // is usually nothing owed -- but the answer lives in EDT-owned fields, and
+                    // reading it from Android's main thread was the one place this port reached
+                    // into the framework's state from off the event thread.
+                    return;
+                }
                 Continuity.checkpoint();
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
+    };
+
+    /// The resume poll, as a constant for the reason CHECKPOINT is one.
+    private static final Runnable POLL = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                Continuity.pollRelay();
             } catch (Throwable t) {
                 Log.e(t);
             }
@@ -155,8 +175,12 @@ public class AndroidContinuityBridge implements ContinuityBridge {
             // here is what makes "picked it up on the iPad, opened the phone" work: the poll is a
             // background request that returns immediately and does nothing at all when no relay is
             // installed.
+            //
+            // Marshalled, and NOT waited for. This runs on Android's main thread and pollRelay()
+            // reads EDT-owned fields to decide whether a fetch is already out; blocking here for
+            // a request that returns immediately anyway would only slow every resume.
             try {
-                Continuity.pollRelay();
+                Display.getInstance().callSerially(POLL);
             } catch (Throwable t) {
                 Log.e(t);
             }
@@ -173,23 +197,15 @@ public class AndroidContinuityBridge implements ContinuityBridge {
         @Override
         public void onSaveInstanceState(Bundle b) {
             try {
-                if (!Continuity.isCheckpointPending()) {
-                    // The ordinary case, and the reason this is asked first. The framework writes
-                    // through as the user navigates, so by the time Android says it may kill the
-                    // process there is usually nothing owed -- and answering that here costs no
-                    // thread hop at all.
-                    return;
-                }
                 // Onto the Codename One event thread, and waited for. This callback runs on
                 // Android's own main thread, which is not the EDT: StateProvider.saveState is
                 // application code documented to run on the EDT, and the route stack it is
-                // captured beside is an EDT-owned list. Reading both from here raced the running
-                // application and could capture a half-changed screen -- or throw, and lose the
-                // payload with nothing said.
+                // captured beside is an EDT-owned list. Reading either from here would race the
+                // running application, so the whole decision -- including whether anything is
+                // owed at all -- is made on the other side of the hop.
                 //
-                // Waiting blocks Android's main thread, which is why it is behind the check
-                // above: it is paid only when there is genuinely something to save, not on every
-                // suspend.
+                // Waiting blocks Android's main thread. That is the cost of a guaranteed flush at
+                // the last callback before the process can be reclaimed, and it is bounded.
                 Display.getInstance().callSeriallyAndWait(CHECKPOINT, CHECKPOINT_TIMEOUT_MILLIS);
             } catch (Throwable t) {
                 // Never allowed to escape. This runs on Android's main thread inside a platform

@@ -52,24 +52,9 @@ public class LocalContinuityBridge implements ContinuityBridge {
     /// The list of keys, kept beside them because `Preferences` cannot be enumerated.
     private static final String INDEX = "CN1$SyncedStoreKeys";
 
-    /// Guards the four fields below.
-    ///
-    /// They are written on the Codename One EDT -- setCallback from enable(), the published
-    /// activity from a checkpoint -- and read on the AWT event thread, because the simulator's
-    /// "Simulate ->" menu calls simulateArrival() and simulateStoreChange() from there. Without
-    /// this there is no happens-before between the two, so the menu could read a half-published
-    /// activity or miss the callback entirely, and the item would report "nothing to deliver" for
-    /// a state the application had just checkpointed. Nothing calls out to application code while
-    /// holding it.
-    private final Object lock = new Object();
-
-    /// Serializes the read-modify-write of the simulated store's key index.
-    ///
-    /// Static, because the index lives in Preferences rather than in this object: two bridges --
-    /// the simulator swaps them -- write the same underlying list, so an instance lock would not
-    /// actually serialize anything.
-    private static final Object INDEX_LOCK = new Object();
-
+    // EDT-owned. Everything here runs on the Codename One event thread: the framework calls in
+    // from there, and the simulator's "Simulate ->" items reach this class through
+    // SimulatorHookLoader, which dispatches every hook with Display.callSeriallyAndWait.
     private ContinuityCallback callback;
     private String publishedType;
     private String publishedTitle;
@@ -77,9 +62,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
 
     @Override
     public void setCallback(ContinuityCallback c) {
-        synchronized (lock) {
-            callback = c;
-        }
+        callback = c;
     }
 
     @Override
@@ -92,22 +75,16 @@ public class LocalContinuityBridge implements ContinuityBridge {
             Map<String, Object> userInfo) {
         Map<String, Object> copy = userInfo == null
                 ? null : new HashMap<String, Object>(userInfo);
-        synchronized (lock) {
-            // All three together: the menu reads the type and the payload as a pair, and setting
-            // them separately let it see a new type beside the previous payload.
-            publishedType = activityType;
-            publishedTitle = title;
-            publishedInfo = copy;
-        }
+        publishedType = activityType;
+        publishedTitle = title;
+        publishedInfo = copy;
     }
 
     @Override
     public void clearContinuation() {
-        synchronized (lock) {
-            publishedType = null;
-            publishedTitle = null;
-            publishedInfo = null;
-        }
+        publishedType = null;
+        publishedTitle = null;
+        publishedInfo = null;
     }
 
     /// The activity type currently advertised, or null when nothing is.
@@ -116,9 +93,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
     ///
     /// the type
     public String getPublishedType() {
-        synchronized (lock) {
-            return publishedType;
-        }
+        return publishedType;
     }
 
     /// The label currently advertised, or null.
@@ -127,9 +102,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
     ///
     /// the label
     public String getPublishedTitle() {
-        synchronized (lock) {
-            return publishedTitle;
-        }
+        return publishedTitle;
     }
 
     /// The payload currently advertised, or null when nothing is.
@@ -138,12 +111,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
     ///
     /// a copy of the payload
     public Map<String, Object> getPublishedInfo() {
-        synchronized (lock) {
-            // The null check and the copy under ONE hold: a clear landing between them turned the
-            // copy into new HashMap(null), which throws. The two accessors beside this one were
-            // guarded and this was missed -- the same enumeration slip that keeps costing here.
-            return publishedInfo == null ? null : new HashMap<String, Object>(publishedInfo);
-        }
+        return publishedInfo == null ? null : new HashMap<String, Object>(publishedInfo);
     }
 
     /// Delivers the currently advertised activity back to the app as though it had arrived from
@@ -157,19 +125,12 @@ public class LocalContinuityBridge implements ContinuityBridge {
     ///
     /// true when there was an activity to deliver and the app claimed it
     public boolean simulateArrival() {
-        String type;
-        Map<String, Object> copy;
-        synchronized (lock) {
-            if (publishedType == null || publishedInfo == null) {
-                return false;
-            }
-            // Read as a pair and copied under the lock, so a checkpoint landing mid-read cannot
-            // hand the menu one activity's type with another's payload.
-            type = publishedType;
-            copy = new HashMap<String, Object>(publishedInfo);
+        if (publishedType == null || publishedInfo == null) {
+            return false;
         }
+        Map<String, Object> copy = new HashMap<String, Object>(publishedInfo);
         copy.put("device", "simulated-device");
-        return simulateArrival(type, copy);
+        return simulateArrival(publishedType, copy);
     }
 
     /// Delivers an arbitrary activity, for tests that build their own.
@@ -183,10 +144,7 @@ public class LocalContinuityBridge implements ContinuityBridge {
     ///
     /// true when the app claimed it
     public boolean simulateArrival(String activityType, Map<String, Object> userInfo) {
-        ContinuityCallback c;
-        synchronized (lock) {
-            c = callback;
-        }
+        ContinuityCallback c = callback;
         if (c == null) {
             return false;
         }
@@ -209,28 +167,15 @@ public class LocalContinuityBridge implements ContinuityBridge {
 
     @Override
     public boolean syncedStorePut(String key, String value) {
-        synchronized (INDEX_LOCK) {
-            // The VALUE write is inside the lock too. Serializing only the index left the two
-            // halves able to interleave with remove(): the delete could land between this write
-            // and the index update, leaving a listed key with no value -- or this could report
-            // success while the concurrent remove stripped its index entry, so keys() omitted a
-            // value that is really stored. The store and its index have to move together or they
-            // do not describe the same thing.
-            Preferences.set(PREFIX + key, value);
-            // Read, modify and write the key index under ONE hold. Two concurrent put()s each
-            // read the same index, each added their own key, and the second write erased the
-            // first: both values stayed readable directly, while keys() omitted one of them for
-            // good -- so enumeration and clearTheSyncedStore() disagreed with the store itself.
-            List<String> keys = indexKeys();
-            if (!keys.contains(key)) {
-                keys.add(key);
-                writeIndex(keys);
-            }
-            // Read back rather than assume, so the simulation answers the same question the
-            // device does: is the value there now? Under the lock, so the answer cannot be
-            // invalidated by a remove() between the write and the read.
-            return value.equals(Preferences.get(PREFIX + key, null));
+        Preferences.set(PREFIX + key, value);
+        List<String> keys = indexKeys();
+        if (!keys.contains(key)) {
+            keys.add(key);
+            writeIndex(keys);
         }
+        // Read back rather than assume, so the simulation answers the same question the device
+        // does: is the value there now?
+        return value.equals(Preferences.get(PREFIX + key, null));
     }
 
     @Override
@@ -240,32 +185,23 @@ public class LocalContinuityBridge implements ContinuityBridge {
 
     @Override
     public void syncedStoreRemove(String key) {
-        synchronized (INDEX_LOCK) {
-            Preferences.delete(PREFIX + key);
-            List<String> keys = indexKeys();
-            if (keys.remove(key)) {
-                writeIndex(keys);
-            }
+        Preferences.delete(PREFIX + key);
+        List<String> keys = indexKeys();
+        if (keys.remove(key)) {
+            writeIndex(keys);
         }
     }
 
     @Override
     public String[] syncedStoreKeys() {
-        synchronized (INDEX_LOCK) {
-            // Under the same hold the writers take, so an enumeration cannot read the index
-            // halfway through somebody's update.
-            List<String> keys = indexKeys();
-            return keys.toArray(new String[keys.size()]);
-        }
+        List<String> keys = indexKeys();
+        return keys.toArray(new String[keys.size()]);
     }
 
     /// Reports a change made "on another device", which the Simulate menu uses to exercise an
     /// app's `SyncedStoreListener` without a second machine.
     public void simulateStoreChange() {
-        ContinuityCallback c;
-        synchronized (lock) {
-            c = callback;
-        }
+        ContinuityCallback c = callback;
         if (c == null) {
             return;
         }

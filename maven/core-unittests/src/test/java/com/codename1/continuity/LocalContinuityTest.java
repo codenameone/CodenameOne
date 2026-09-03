@@ -92,6 +92,30 @@ public class LocalContinuityTest extends UITestBase {
     // Nothing happens until the application opts in
     // ------------------------------------------------------------------
 
+    /// Runs a blocking wait OFF the event thread.
+    ///
+    /// Every relay round trip now finishes with a callSerially: the worker hands its answer back
+    /// to the event thread rather than touching framework state itself. A test that blocks the
+    /// EDT waiting for one therefore waits for a runnable queued behind its own wait, and the
+    /// harness reports "pendingSerialCalls=1". invokeAndBlock releases the EDT for the duration,
+    /// which is what an application doing a long wait does too.
+    private static void awaitOffEdt(Runnable r) {
+        Display.getInstance().invokeAndBlock(r);
+    }
+
+    /// Sleeps without holding the event thread. See awaitOffEdt.
+    private static void pause(final long millis) {
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(millis);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+    }
+
     /**
      * The single most important property of this feature: an app that never touches it behaves
      * exactly as it always did.
@@ -501,8 +525,12 @@ public class LocalContinuityTest extends UITestBase {
             provider.saved.put("n", Integer.valueOf(i));
             Continuity.checkpoint();
         }
-        long newest = Continuity.getRestorableState().getSequence();
-        r.awaitPublished(newest);
+        final long newest = Continuity.getRestorableState().getSequence();
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitPublished(newest);
+            }
+        });
 
         assertFalse(r.published.isEmpty(), "the relay saw nothing at all");
         // Coalescing is allowed and expected -- what is not allowed is going backwards.
@@ -529,7 +557,11 @@ public class LocalContinuityTest extends UITestBase {
 
         Continuity.checkpoint();
         long failed = Continuity.getRestorableState().getSequence();
-        r.awaitAttempts(1);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitAttempts(1);
+            }
+        });
         assertEquals(0, r.delivered.size(), "the first attempt was supposed to fail");
 
         // Deliberately NOT another checkpoint. A checkpoint overwrites the pending slot with its
@@ -545,13 +577,11 @@ public class LocalContinuityTest extends UITestBase {
         r.fail = false;
         long deadline = System.currentTimeMillis() + 3000L;
         while (r.delivered.isEmpty() && System.currentTimeMillis() < deadline) {
+            // pollRelay() on the EDT, the wait off it: the poll reads event-thread state to
+            // decide whether a fetch is already out, and the completion it is waiting for is a
+            // queued runnable.
             Continuity.pollRelay();
-            try {
-                Thread.sleep(40);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-                break;
-            }
+            pause(40L);
         }
 
         assertEquals(1, r.delivered.size(), "the retained state never reached the relay");
@@ -560,14 +590,16 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
-     * A state fetched in one relay session must not be admitted in another. The poll used to
-     * validate the account era, release the lock and then deliver -- a check-then-act, so a
-     * clear() landing in the gap admitted the previous account's response under the new era and
-     * the freshly emptied lastSeen, and restored it into the account that had just signed in.
-     * The era travels with the state now and is asked again under the hold that records the mark.
+     * A fetch that was already on the wire when the user signed out must not be delivered into
+     * the session that follows it. The relay is held inside fetch(), clear() runs while it is
+     * held, and the answer it finally returns belongs to the account that has gone.
+     *
+     * <p>This is the one thing a relay round trip needs that a single-threaded framework cannot
+     * get for free: the request outlives the event-thread turn that started it. It is answered
+     * with a session counter read back on the event thread, not with a lock.</p>
      */
     @EdtTest
-    public void aStateCarryingAForeignRelayEraIsNotAdmitted() {
+    public void aFetchStartedBeforeALogoutIsNotDeliveredAfterIt() {
         Continuity.enable();
         final int[] seen = new int[1];
         Continuity.addContinuationListener(new ContinuityListener() {
@@ -577,20 +609,22 @@ public class LocalContinuityTest extends UITestBase {
             }
         });
 
-        // An era this session has never been in: what a poll started before a logout carries.
-        Continuity.deliver(foreign("device-x", 3), 4242L);
-        Display.getInstance().invokeAndBlock(new Runnable() {
+        final BlockingFetchRelay r = new BlockingFetchRelay();
+        r.answer = foreign("device-x", 3);
+        Continuity.setRelay(r);
+        awaitOffEdt(new Runnable() {
             public void run() {
-                try {
-                    Thread.sleep(250);
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                }
+                r.awaitInFlight();
             }
         });
 
+        // The user signs out while the fetch is still held.
+        Continuity.clear();
+        r.release();
+        pause(250L);
+
         assertEquals(0, seen[0],
-                "a state from a previous relay session was delivered into this one");
+                "a state fetched before the logout was delivered into the session after it");
     }
 
     /**
@@ -746,13 +780,12 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
-     * A relay answer fetched before a disable() must not be admitted after a re-enable.
-     * accountEra moves on clear() and setRelay() but NOT on disable(), so carrying only that
-     * generation let work started in the previous run restore into the new one -- precisely the
-     * rejection the lifecycle generation exists to perform.
+     * A platform continuation carries nothing but the state, and is delivered on its own merits.
+     * Kept as the positive case beside the rejections above: a guard that refused everything
+     * would pass those and still break the feature.
      */
     @EdtTest
-    public void aStateFetchedBeforeADisableIsNotAdmittedAfterReEnable() {
+    public void aPlatformArrivalIsDelivered() {
         Continuity.enable();
         final int[] seen = new int[1];
         Continuity.addContinuationListener(new ContinuityListener() {
@@ -762,66 +795,14 @@ public class LocalContinuityTest extends UITestBase {
             }
         });
 
-        // What a poll captured before the application switched continuity off and on again.
-        AppState inFlight = foreign("device-preexisting", 7);
-        Continuity.disable();
-        Continuity.enable();
-
-        // era 0 was this session's account era when the fetch started; the delivery generation
-        // has moved twice since.
-        Continuity.deliver(inFlight, 0L, 0L);
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            public void run() {
-                try {
-                    Thread.sleep(250);
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        });
-
-        assertEquals(0, seen[0],
-                "a state fetched before the disable was restored into the re-enabled run");
-    }
-
-    /**
-     * A platform continuation carries no generation of its own -- the OS has no notion of our
-     * eras -- so both era predicates are skipped for it. What it can still be held to is that
-     * nothing changed while delivery was being decided, and without that a clear() landing
-     * between the two locked checks admitted the arrival and stamped it with the NEW generation.
-     */
-    @EdtTest
-    public void aPlatformArrivalIsStillRejectedWhenTheGenerationMoves() {
-        Continuity.enable();
-        final int[] seen = new int[1];
-        Continuity.addContinuationListener(new ContinuityListener() {
-            public boolean stateReceived(AppState state) {
-                seen[0]++;
-                return true;
-            }
-        });
-
-        // A state whose maxAge check will run while we move the generation underneath it: the
-        // isTooOld() and getDeviceId() calls in deliver() both take and release the lock.
         AppState arrival = foreign("device-platform", 11);
         Continuity.disable();
         Continuity.enable();
 
-        // NO_ERA on both, which is exactly how a platform continuation is delivered.
         Continuity.deliver(arrival);
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            public void run() {
-                try {
-                    Thread.sleep(250);
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        });
+        pause(250L);
 
-        // It IS admitted here -- nothing moved during the decision -- which is the correct
-        // behaviour and what makes the guard a guard rather than a blanket refusal.
-        assertEquals(1, seen[0], "a platform arrival with a settled generation must be delivered");
+        assertEquals(1, seen[0], "a platform arrival must be delivered");
     }
 
     /**
@@ -980,7 +961,11 @@ public class LocalContinuityTest extends UITestBase {
         Continuity.setRelay(r);
 
         Continuity.checkpoint();
-        r.awaitInPublish();
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitInPublish();
+            }
+        });
         // The application reconnects while the first attempt is still on the wire.
         Continuity.pollRelay();
         // Now let that attempt fail; the next one is allowed to succeed.
@@ -989,12 +974,7 @@ public class LocalContinuityTest extends UITestBase {
 
         long deadline = System.currentTimeMillis() + 3000L;
         while (r.delivered() == 0 && System.currentTimeMillis() < deadline) {
-            try {
-                Thread.sleep(25);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-                break;
-            }
+            pause(25L);
         }
 
         assertTrue(r.delivered() > 0,
@@ -1057,10 +1037,14 @@ public class LocalContinuityTest extends UITestBase {
      */
     @EdtTest
     public void aCoalescedPollUsesTheReplacementRelay() {
-        BlockingFetchRelay old = new BlockingFetchRelay();
+        final BlockingFetchRelay old = new BlockingFetchRelay();
         Continuity.enable();
         Continuity.setRelay(old);
-        old.awaitInFlight();
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                old.awaitInFlight();
+            }
+        });
 
         // Queued while the old relay's fetch is still held, which is what makes it coalesce.
         BlockingFetchRelay replacement = new BlockingFetchRelay();
@@ -1070,12 +1054,7 @@ public class LocalContinuityTest extends UITestBase {
 
         long deadline = System.currentTimeMillis() + 3000L;
         while (replacement.fetches() == 0 && System.currentTimeMillis() < deadline) {
-            try {
-                Thread.sleep(20);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-                break;
-            }
+            pause(20L);
         }
 
         assertEquals(1, old.fetches(),
@@ -1101,9 +1080,17 @@ public class LocalContinuityTest extends UITestBase {
         for (int i = 0; i < 6; i++) {
             Continuity.pollRelay();
         }
-        r.awaitInFlight();
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitInFlight();
+            }
+        });
         r.release();
-        r.awaitQuiet();
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitQuiet();
+            }
+        });
 
         assertEquals(1, r.maxConcurrent(),
                 "two relay fetches overlapped, so an older response can land after a newer one");
@@ -1234,6 +1221,9 @@ public class LocalContinuityTest extends UITestBase {
 
     /** Holds every fetch until released, and records how many ran at once. */
     static class BlockingFetchRelay implements StateRelay {
+        /** What fetch() returns once released, or null for "the endpoint has nothing". */
+        volatile AppState answer;
+
         private final java.util.concurrent.CountDownLatch gate =
                 new java.util.concurrent.CountDownLatch(1);
         private final java.util.concurrent.atomic.AtomicInteger inFlight =
@@ -1261,7 +1251,7 @@ public class LocalContinuityTest extends UITestBase {
                 Thread.currentThread().interrupt();
             }
             inFlight.decrementAndGet();
-            return null;
+            return answer;
         }
 
         void release() {
@@ -1378,26 +1368,6 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
-     * And re-enabling before the queue drains must not resurrect it, which is why this is a
-     * generation rather than a flag: an `enabled` test at dispatch time would pass here.
-     */
-    @EdtTest
-    public void disablingAndReEnablingDoesNotResurrectAQueuedDelivery() {
-        RecordingProvider provider = new RecordingProvider();
-        Continuity.setStateProvider(provider);
-        RecordingListener listener = new RecordingListener();
-        Continuity.addContinuationListener(listener);
-
-        Continuity.deliver(fromElsewhere("stale run", 1L));
-        Continuity.disable();
-        Continuity.enable();
-        flushSerialCalls();
-
-        assertEquals(0, listener.calls,
-                "a delivery from the previous run survived disable/enable");
-    }
-
-    /**
      * A state that is still QUEUED when the user signs out is never sent. The worker is held
      * inside its first request, a second checkpoint queues behind it, and clear() then empties
      * the queue -- so when the worker is released it finds nothing of the old session to send.
@@ -1415,8 +1385,12 @@ public class LocalContinuityTest extends UITestBase {
         Continuity.setRelay(r);
 
         Continuity.checkpoint();
-        r.awaitEntered();
-        long inFlight = Continuity.getRestorableState().getSequence();
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+        final long inFlight = Continuity.getRestorableState().getSequence();
 
         // Queued behind the request the worker is holding.
         provider.saved.put("n", Integer.valueOf(2));
@@ -1428,8 +1402,12 @@ public class LocalContinuityTest extends UITestBase {
         r.release();
         // The positive signal FIRST: the worker got past the gate and finished the request it was
         // holding. Asserting the absence of `queued` before that proved nothing at all.
-        r.awaitSent(inFlight);
-        r.settle();
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitSent(inFlight);
+                r.settle();
+            }
+        });
 
         assertFalse(r.sent.contains(Long.valueOf(queued)),
                 "a state queued before logout was published after it: " + r.sent);

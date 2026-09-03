@@ -32,6 +32,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * {@code NSUserActivityTypes} has two contributors, and there can only be one key.
@@ -76,6 +77,76 @@ class IPhoneBuilderContinuityPlistTest {
             at = haystack.indexOf(needle, at + needle.length());
         }
         return count;
+    }
+
+    // ------------------------------------------------------------------
+    // The type the native side reads
+    // ------------------------------------------------------------------
+
+    @Test
+    void theResolvedActivityTypeIsDeclaredForTheNativeSide() throws BuildException {
+        String out = IPhoneBuilder.withContinuityActivityType("", CONTINUITY_TYPE);
+
+        assertTrue(out.contains("<key>CN1ContinuityActivityType</key>"), out);
+        assertTrue(out.contains("<string>" + CONTINUITY_TYPE + "</string>"), out);
+        assertEquals(1, occurrences(out, "<key>CN1ContinuityActivityType</key>"),
+                "the key must appear exactly once: " + out);
+    }
+
+    @Test
+    void anAppThatDoesNotUseContinuityGetsNoSuchKey() throws BuildException {
+        String out = IPhoneBuilder.withContinuityActivityType("<key>Other</key><string>x</string>",
+                null);
+
+        assertFalse(out.contains("CN1ContinuityActivityType"), out);
+    }
+
+    /**
+     * The delegate compares the arriving activity type against this key. Deriving it natively from
+     * the bundle identifier instead looks equivalent and is wrong on the Mac slice, where
+     * DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER makes the id "&lt;package&gt;.maccatalyst" --
+     * so the derived type would be "&lt;package&gt;.maccatalyst.continuity" while every device
+     * publishes "&lt;package&gt;.continuity", and Handoff would be silently dead on Catalyst.
+     * The value written here is the package's, not the bundle's.
+     */
+    @Test
+    void theDeclaredTypeIsThePackagesAndCarriesNoCatalystSuffix() throws BuildException {
+        String out = IPhoneBuilder.withContinuityActivityType("", CONTINUITY_TYPE);
+
+        assertTrue(out.contains("<string>com.example.app.continuity</string>"), out);
+        assertFalse(out.contains("maccatalyst"), out);
+    }
+
+    @Test
+    void anApplicationsOwnMatchingDeclarationIsLeftAlone() throws BuildException {
+        String existing = "<key>CN1ContinuityActivityType</key><string>" + CONTINUITY_TYPE
+                + "</string>";
+
+        String out = IPhoneBuilder.withContinuityActivityType(existing, CONTINUITY_TYPE);
+
+        assertEquals(existing, out, "a matching declaration must not be duplicated");
+        assertEquals(1, occurrences(out, "<key>CN1ContinuityActivityType</key>"), out);
+    }
+
+    /**
+     * A stale injected value is refused rather than left standing. It is not a build hint: the
+     * type is what NSUserActivityTypes declares and what every device publishes, so a fragment
+     * naming a different one has the delegate turning away the application's own continuations
+     * while iOS keeps offering them -- nothing fails and nothing is logged.
+     */
+    @Test
+    void aDisagreeingInjectedTypeIsRefused() {
+        String existing = "<key>CN1ContinuityActivityType</key><string>com.other.app.continuity"
+                + "</string>";
+
+        try {
+            IPhoneBuilder.withContinuityActivityType(existing, CONTINUITY_TYPE);
+            fail("a fragment naming a different activity type must not be accepted");
+        } catch (BuildException expected) {
+            assertTrue(expected.getMessage().contains("CN1ContinuityActivityType"),
+                    expected.getMessage());
+            assertTrue(expected.getMessage().contains(CONTINUITY_TYPE), expected.getMessage());
+        }
     }
 
     // ------------------------------------------------------------------

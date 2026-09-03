@@ -25,6 +25,7 @@ package com.codename1.impl.ios;
 import com.codename1.continuity.spi.ContinuityCallback;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
+import com.codename1.ui.Display;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -42,18 +43,15 @@ import java.util.Map;
 /// The call must be unconditional. Wrapping it in an `if` the optimizer can prove false folds the
 /// whole thing away and reintroduces the bug.
 final class IOSContinuityCallbacks {
-    /// Guards `callback` and the pending arrival below.
+    /// The framework's inbound seam, owned by the event thread.
     ///
-    /// The platform hands a continuation over on a thread of its own -- on a cold launch from
-    /// `willConnectToSession`, before the EDT has run the application's init() -- while
-    /// setCallback runs on the EDT. Every field it protects is therefore written by one thread and
-    /// read by the other, and without it there was no happens-before between them at all: the
-    /// arrival a cold launch parked was not guaranteed to be visible to the thread that installs
-    /// the callback, and the take-and-clear in setCallback was not atomic with the store in
-    /// nativeContinuation. Either one silently drops the continuation, which is the single failure
-    /// this class exists to prevent. Nothing calls out to the framework while holding it.
-    private static final Object LOCK = new Object();
-
+    /// The platform hands a continuation over on a thread of its own, so `nativeContinuation`
+    /// marshals with `com.codename1.ui.Display#callSerially` and everything below it is ordinary
+    /// EDT code. The one arrival that cannot be marshalled is the one that beats the event thread
+    /// into existence -- a cold launch delivers from `willConnectToSession`, before Display is
+    /// initialized -- and that one is parked on the platform's thread. It needs no guard either:
+    /// the writes happen before the EDT is started, and starting a thread publishes everything
+    /// written before it.
     private static ContinuityCallback callback;
 
     /// Written once by the class initializer, which every thread's first touch of this class
@@ -78,46 +76,31 @@ final class IOSContinuityCallbacks {
     }
 
     static void setCallback(ContinuityCallback c) {
-        String type;
-        String json;
-        synchronized (LOCK) {
-            // Installed and READ under one hold, but not yet cleared -- see below. A continuation
-            // landing between installing and reading was written into a slot this method had
-            // already passed, so it was dropped by the very call that exists to deliver it.
-            callback = c;
-            type = pendingType;
-            json = pendingJson;
+        callback = c;
+        String type = pendingType;
+        String json = pendingJson;
+        if (c == null || type == null) {
+            return;
         }
-        if (c != null && type != null) {
-            // A continuation that cold-launched the app can reach this class before the
-            // application's init() has called Continuity.enable(), which is what installs the
-            // callback -- the scene delegate hands it over from willConnectToSession, which runs
-            // first. Delivered now instead of dropped, which is what the whole feature is for.
-            boolean claimed = false;
-            try {
-                claimed = c.continuationReceived(type, parse(json));
-            } catch (Throwable t) {
-                Log.e(t);
-            }
-            if (claimed) {
-                synchronized (LOCK) {
-                    // Cleared only once a callback has actually TAKEN it. The callback can
-                    // legitimately decline: SyncedStore.addChangeListener installs one without
-                    // enabling continuity -- a key/value store is not consent to restore a route
-                    // stack -- and on a cold launch that can happen before the application's
-                    // init() calls enable(). Clearing regardless meant the launch activity was
-                    // erased by the refusal, and the enable() moments later had nothing left to
-                    // deliver: initialization order alone silently lost the continuation.
-                    //
-                    // Only if it is still the same one. A newer arrival while the callback ran is
-                    // the one worth keeping, and blindly nulling would discard it.
-                    if (type.equals(pendingType)
-                            && (json == null ? pendingJson == null : json.equals(pendingJson))) {
-                        pendingType = null;
-                        pendingJson = null;
-                    }
-                }
-            }
+        // A continuation that cold-launched the app reaches this class before the application's
+        // init() has called Continuity.enable(), which is what installs the callback -- the scene
+        // delegate hands it over from willConnectToSession, which runs first. Delivered now
+        // instead of dropped, which is what the whole feature is for.
+        boolean claimed = false;
+        try {
+            claimed = c.continuationReceived(type, parse(json));
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+        if (claimed) {
+            // Cleared only once a callback has actually TAKEN it. The callback can legitimately
+            // decline: SyncedStore.addChangeListener installs one without enabling continuity --
+            // a key/value store is not consent to restore a route stack -- and on a cold launch
+            // that can happen before the application's init() calls enable(). Clearing regardless
+            // meant the launch activity was erased by the refusal, and the enable() moments later
+            // had nothing left to deliver.
+            pendingType = null;
+            pendingJson = null;
         }
     }
 
@@ -131,79 +114,61 @@ final class IOSContinuityCallbacks {
         if (dceGuard) {
             return false;
         }
-        ContinuityCallback c;
-        synchronized (LOCK) {
-            c = callback;
-        }
-        if (c == null) {
-            // The framework has not been enabled yet. That is the ordinary cold-launch ordering
-            // rather than a mistake, so the activity is held for setCallback to deliver instead
-            // of being dropped.
-            //
-            // Claimed all the same. The delegate's answer decides whether the activity falls
-            // through to the intents branch beside it, and one this app is about to act on must
-            // not: an app using both frameworks would otherwise have its own continuation offered
-            // to the wrong one, which would correctly decline it, and the launch would land on the
-            // home screen.
-            //
-            // But only when it is OURS. The native side matches on the ".continuity" suffix,
-            // which an App Intent id may also end in -- and claiming one of those here skipped
-            // the intents branch for an activity this framework then discarded on delivery.
-            //
-            // Declined only on a POSITIVE mismatch. Asking for the expected type can fail this
-            // early, before the stub has published package_name, and treating "cannot tell" as
-            // "not ours" would decline the framework's own cold launch -- the one case the whole
-            // feature exists for, and a worse outcome than the bug being fixed.
-            // Asked OUTSIDE the lock: it reads the app's package name through the framework, and
-            // nothing slow or re-entrant may run under a lock the platform thread also takes.
-            String expected = expectedTypeOrNull();
-            if (expected != null && !expected.equals(activityType)) {
-                return false;
-            }
-            synchronized (LOCK) {
-                // Re-read, because the framework may have been enabled while the question above
-                // was being answered. Parking an arrival for a setCallback that has already been
-                // and gone strands it until the next one -- and on a cold launch there is no next
-                // one. Delivering it directly is what this re-check buys.
-                c = callback;
-                if (c == null) {
-                    pendingType = activityType;
-                    pendingJson = userInfoJson;
-                    return true;
-                }
-            }
-        }
-        boolean claimed = false;
-        try {
-            claimed = c.continuationReceived(activityType, parse(userInfoJson));
-        } catch (Throwable t) {
-            Log.e(t);
+        // Answered on the platform's thread, from the activity type alone, because the delegate
+        // needs the answer now: it decides whether the activity falls through to the intents
+        // branch beside it, and one this app is about to act on must not.
+        //
+        // Declined only on a POSITIVE mismatch. Asking for the expected type can fail this early,
+        // before the stub has published package_name, and treating "cannot tell" as "not ours"
+        // would decline the framework's own cold launch -- the one case the whole feature exists
+        // for. Belt and braces in any case: the delegate already matches the exact type the build
+        // resolved, and this guards the app whose generated project predates that key.
+        String expected = expectedTypeOrNull();
+        if (expected != null && !expected.equals(activityType)) {
             return false;
         }
-        if (claimed) {
+        if (!Display.isInitialized()) {
+            // The event thread does not exist yet, so there is nothing to marshal to. Parked here
+            // and drained by setCallback; the EDT is started after these writes, which publishes
+            // them to it.
+            pendingType = activityType;
+            pendingJson = userInfoJson;
             return true;
         }
-        // DECLINED, which is not the same as "not ours". A callback is installed by
+        final String type = activityType;
+        final String json = userInfoJson;
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                deliverOnEdt(type, json);
+            }
+        });
+        return true;
+    }
+
+    /// Hands an arrival to the framework, or holds it. On the event thread.
+    private static void deliverOnEdt(String activityType, String userInfoJson) {
+        ContinuityCallback c = callback;
+        boolean claimed = false;
+        if (c != null) {
+            try {
+                claimed = c.continuationReceived(activityType, parse(userInfoJson));
+            } catch (Throwable t) {
+                Log.e(t);
+            }
+        }
+        if (claimed) {
+            return;
+        }
+        // Held, because DECLINED is not the same as "not ours". A callback is installed by
         // SyncedStore.addChangeListener() as well as by Continuity.enable(), and the store
         // listener deliberately leaves continuity disabled -- so an app that registers one before
         // enabling has a live callback that answers false to everything. A continuation arriving
         // in that window used to be handed over, refused, and dropped, and the enable() moments
         // later had nothing to recover: registering an unrelated store listener turned a parked
         // cold-launch continuation into a lost one.
-        //
-        // Held on the same rule the no-callback path uses: declined only on a POSITIVE mismatch.
-        // Asking for the expected type can fail this early, before the stub has published
-        // package_name, and treating "cannot tell" as "not ours" would discard the framework's
-        // own cold launch -- the one case this exists for.
-        String stillExpected = expectedTypeOrNull();
-        if (stillExpected != null && !stillExpected.equals(activityType)) {
-            return false;
-        }
-        synchronized (LOCK) {
-            pendingType = activityType;
-            pendingJson = userInfoJson;
-        }
-        return true;
+        pendingType = activityType;
+        pendingJson = userInfoJson;
     }
 
     /// The synced store changed on another of the user's devices.
@@ -211,18 +176,23 @@ final class IOSContinuityCallbacks {
         if (dceGuard) {
             return;
         }
-        ContinuityCallback c;
-        synchronized (LOCK) {
-            c = callback;
-        }
-        if (c == null) {
+        if (!Display.isInitialized()) {
             return;
         }
-        try {
-            c.syncedStoreChanged();
-        } catch (Throwable t) {
-            Log.e(t);
-        }
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                ContinuityCallback c = callback;
+                if (c == null) {
+                    return;
+                }
+                try {
+                    c.syncedStoreChanged();
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
+            }
+        });
     }
 
     /// This app's continuity activity type, or null when it cannot be determined yet.
@@ -232,7 +202,7 @@ final class IOSContinuityCallbacks {
     /// mismatch that reads as certainty.
     private static String expectedTypeOrNull() {
         try {
-            String pkg = com.codename1.ui.Display.getInstance().getProperty("package_name", null);
+            String pkg = Display.getInstance().getProperty("package_name", null);
             if (pkg == null || pkg.length() == 0) {
                 return null;
             }

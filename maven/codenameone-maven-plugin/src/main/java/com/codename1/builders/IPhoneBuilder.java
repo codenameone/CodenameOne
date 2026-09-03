@@ -11671,6 +11671,53 @@ public class IPhoneBuilder extends Executor {
     /// supported configuration silently useless: the content was findable, and tapping it did
     /// nothing, because without this key iOS never continues the activity and
     /// nativeSpotlightItemSelected is never reached.
+    /// Declares the continuity activity type where the app's own native code can read it.
+    ///
+    /// `NSUserActivityTypes` tells iOS which activities to offer; this tells the delegate which
+    /// of them is this framework's. It has to be a value the BUILD resolved, because the delegate
+    /// decides before any Java is running and cannot ask the framework -- and the obvious
+    /// substitute is wrong on the Mac slice: `DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER` makes
+    /// the Catalyst bundle id `<package>.maccatalyst`, so a type derived there from the bundle id
+    /// would be `<package>.maccatalyst.continuity` while every device publishes
+    /// `<package>.continuity`. The Mac plist is generated from the finished iOS one, so writing
+    /// it once here gives both slices the same string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inject`: the plist fragment being built
+    ///
+    /// - `continuityType`: the resolved activity type, or null when the app does not use the
+    ///   feature
+    ///
+    /// #### Returns
+    ///
+    /// the fragment, with the key added when one is needed
+    ///
+    /// #### Throws
+    ///
+    /// - `BuildException`: when the project injects a different type of its own
+    static String withContinuityActivityType(String inject, String continuityType)
+            throws BuildException {
+        if (continuityType == null) {
+            return inject;
+        }
+        // Refused rather than left alone when it disagrees, exactly as CN1DocumentsAppGroup is,
+        // because this is not a hint. An injected key naming a different type has the delegate
+        // rejecting the application's own continuations while iOS goes on offering them.
+        String injected = topLevelPlistString(inject, "CN1ContinuityActivityType");
+        if (injected != null && !injected.equals(continuityType)) {
+            throw new BuildException("ios.plistInject sets CN1ContinuityActivityType to '"
+                    + injected + "' while this build publishes '" + continuityType
+                    + "'. The application would refuse its own continuations. Remove the "
+                    + "injected key.");
+        }
+        if (declaresTopLevelPlistKey(inject, "CN1ContinuityActivityType")) {
+            return inject;
+        }
+        return inject + "\n<key>CN1ContinuityActivityType</key><string>"
+                + xmlEscape(continuityType) + "</string>";
+    }
+
     static String withSpotlightContinuation(String inject, boolean usesIntents) {
         if (!usesIntents || inject.contains("CoreSpotlightContinuation")) {
             return inject;
@@ -14577,6 +14624,17 @@ public class IPhoneBuilder extends Executor {
                         intentsManifest, continuityActivityType);
             }
         }
+
+        // The resolved type, written where the NATIVE side can read it. The delegate decides
+        // whether an arriving NSUserActivity is this framework's before any Java is running, and
+        // deriving that from [[NSBundle mainBundle] bundleIdentifier] is WRONG on the Mac slice:
+        // DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER makes that id "<package>.maccatalyst", so
+        // the derived type would be "<package>.maccatalyst.continuity" while the type this build
+        // declares above and the app publishes is "<package>.continuity". Handoff would be dead
+        // on Catalyst, which is the Mac-to-iPhone case the feature exists for. One value, decided
+        // here, read by both slices: the Mac plist is generated from this finished one, so it
+        // carries the key unchanged.
+        inject = withContinuityActivityType(inject, continuityActivityType);
         // CoreSpotlightContinuation is about Spotlight, not about App Intents, and gating it on
         // a declaration made an entire supported configuration silently useless: an app that
         // only calls Intents.index() declares no intent at all -- parseIntentsManifest treats a

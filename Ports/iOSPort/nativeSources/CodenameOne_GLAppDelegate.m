@@ -296,7 +296,33 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
     //
     // Placed after the browsing-web branch rather than before it for the reason that branch is
     // first: Universal Link behaviour must be bit-identical whether or not continuity is in play.
-    if (userActivity != nil && [userActivity.activityType hasSuffix:@".continuity"]) {
+    //
+    // Matched EXACTLY, against the type the BUILD resolved. A suffix test claimed any activity
+    // whose type merely ended in ".continuity" -- a donated App Intent with such an id, say --
+    // and on a cold launch that arrival was parked and reported handled before anything could
+    // tell it apart, so it never reached the intents dispatcher below and nothing rerouted it
+    // once initialization revealed the mismatch.
+    //
+    // Read from the plist rather than derived from [[NSBundle mainBundle] bundleIdentifier].
+    // Deriving it looks equivalent and is wrong on the Mac slice:
+    // DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER makes the Catalyst bundle id
+    // "<package>.maccatalyst", so the derived type would be "<package>.maccatalyst.continuity"
+    // while the type declared in NSUserActivityTypes and published by every device is
+    // "<package>.continuity" -- Handoff silently dead on Catalyst, which is the Mac-to-iPhone
+    // case this feature is for. IPhoneBuilder writes CN1ContinuityActivityType beside that
+    // declaration from the one value it resolved, and the Mac plist is generated from the
+    // finished iOS one, so both slices read the same string.
+    //
+    // Absent means no builder that knows this feature generated the project, so the activity is
+    // left to the branch below rather than guessed at.
+    NSString *cn1ContinuityExpected = [[NSBundle mainBundle]
+            objectForInfoDictionaryKey:@"CN1ContinuityActivityType"];
+    if (![cn1ContinuityExpected isKindOfClass:[NSString class]]
+            || [cn1ContinuityExpected length] == 0) {
+        cn1ContinuityExpected = nil;
+    }
+    if (userActivity != nil && cn1ContinuityExpected != nil
+            && [userActivity.activityType isEqualToString:cn1ContinuityExpected]) {
         NSString *payload = nil;
         if (userActivity.userInfo != nil
                 && [NSJSONSerialization isValidJSONObject:userActivity.userInfo]) {
