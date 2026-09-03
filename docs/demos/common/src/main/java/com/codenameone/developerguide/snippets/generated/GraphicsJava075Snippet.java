@@ -104,6 +104,7 @@ class GraphicsJava075Snippet {
         ml.getUnselectedButton().setIcon(placeholder);
         ml.getSelectedButton().setIcon(placeholder);
         hi.add(BorderLayout.CENTER, ml);
+        hi.show();
         // end::graphics-java-075[]
     }
 
