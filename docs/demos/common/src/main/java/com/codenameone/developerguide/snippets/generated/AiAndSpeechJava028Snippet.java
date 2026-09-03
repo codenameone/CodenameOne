@@ -91,6 +91,11 @@ class AiAndSpeechJava028Snippet {
             }
             String path = (String) evt.getSource();
             byte[] bytes = readAllBytes(path);
+            if (bytes == null || bytes.length == 0) {
+                // Nothing to describe. Sending an empty ImagePart produces a
+                // data URL with no payload, which the provider rejects.
+                return;
+            }
             ImagePart img = new ImagePart(bytes, "image/jpeg");
 
             ChatRequest req = ChatRequest.builder()
@@ -122,7 +127,18 @@ class AiAndSpeechJava028Snippet {
     }
 
     ChatView chatView = new ChatView();
-    byte[] readAllBytes(String path) { return new byte[0]; }
+    byte[] readAllBytes(String path) {
+        InputStream in = null;
+        try {
+            in = FileSystemStorage.getInstance().openInputStream(path);
+            return Util.readInputStream(in);
+        } catch (IOException err) {
+            Log.e(err);
+            return null;
+        } finally {
+            Util.cleanup(in);
+        }
+    }
 
 
 
