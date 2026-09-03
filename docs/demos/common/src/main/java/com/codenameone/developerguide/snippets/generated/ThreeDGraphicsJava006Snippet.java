@@ -82,7 +82,19 @@ class ThreeDGraphicsJava006Snippet {
     void snippet() throws Exception {
         // tag::3d-graphics-java-006[]
         if (CN.isGpuSupported()) {
-            // GraphicsDevice.getCapabilities() exposes max texture size, shader level, etc.
+            GpuCapabilities caps = device.getCapabilities();
+            Log.p("GPU " + caps.getRendererName()
+                    + ", max texture " + caps.getMaxTextureSize()
+                    + ", shader level 3: " + caps.isShaderLevel3());
+
+            // Size the atlas to what this device can actually hold rather than
+            // assuming a figure: the limit is as low as 2048 on older hardware.
+            int edge = Math.min(2048, caps.getMaxTextureSize());
+            Texture atlas = device.createTexture(edge, edge, null);
+
+            if (caps.isIntIndicesSupported()) {
+                // 32-bit indices are available, so a mesh may exceed 65535 vertices
+            }
         }
         // end::3d-graphics-java-006[]
     }

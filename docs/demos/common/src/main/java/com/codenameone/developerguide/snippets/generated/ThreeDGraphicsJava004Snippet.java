@@ -82,7 +82,10 @@ class ThreeDGraphicsJava004Snippet {
     void snippet() throws Exception {
         // tag::3d-graphics-java-004[]
         Texture tex = device.createTexture(myImage);     // or createTexture(w, h, argb)
-        tex.setFilter(Texture.Filter.LINEAR).setWrap(Texture.Wrap.REPEAT);
+        // NEAREST keeps texel edges crisp, which is what the checkerboard in the
+        // figure below needs. LINEAR is the better default for photographic
+        // textures, where smoothing is wanted rather than avoided.
+        tex.setFilter(Texture.Filter.NEAREST).setWrap(Texture.Wrap.REPEAT);
         Material m = new Material(Material.Type.UNLIT).setTexture(tex);
         // end::3d-graphics-java-004[]
     }
