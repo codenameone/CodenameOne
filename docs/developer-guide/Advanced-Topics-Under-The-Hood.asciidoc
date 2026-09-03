@@ -2312,8 +2312,11 @@ from a resource bundled in the plugin, or downloaded if that resource is missing
 `~/.codenameone` current, and it's why the download happens once per machine
 rather than once per project. It no longer runs against your project directory,
 which is why a Maven project has no jars of its own to update: the plugin hands it
-a synthetic directory under `target/codenameone/update-dummy`, seeded with the
-project's `codenameone_settings.properties`.
+a synthetic directory under `common/target/codenameone/update-dummy`, seeded with
+the project's `codenameone_settings.properties`. It's under `common` because that
+module holds `codenameone_settings.properties` and is therefore the one the plugin
+treats as the Codename One project; run from the root, the aggregator skips itself
+and `common` does the work.
 
 Then it reads the plugin's Maven metadata, resolves the newest published release
 and rewrites the `cn1.version` and `cn1.plugin.version` properties in the pom.
