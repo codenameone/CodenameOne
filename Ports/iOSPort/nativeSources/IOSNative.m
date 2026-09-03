@@ -10067,6 +10067,26 @@ void com_codename1_impl_ios_IOSNative_openContactPicker___int_boolean_int(CN1_TH
                     CN1_THREAD_GET_STATE_PASS_ARG 0);
             return;
         }
+        UIViewController* host = cn1PresentingController();
+        if (host == nil || host.presentedViewController != nil) {
+            // Something else is already on screen -- the share sheet, the file
+            // chooser, the gallery. UIKit refuses to present over it and calls
+            // nothing back, so going ahead would install this delegate for a
+            // picker that never appears: no delegate method would ever run,
+            // the Java listener would never be called, and Display would treat
+            // the pick as still in progress and refuse every later one for the
+            // life of the process.
+            //
+            // The same hazard as an Android activity whose result channel is
+            // busy, and the same answer: report the empty selection a
+            // cancelled pick reports, and leave the other presentation alone.
+            CN1Log(@"Contact picker: another view controller is presented, "
+                   "reporting an empty selection");
+            POOL_END();
+            com_codename1_impl_ios_IOSImplementation_contactPickerResult___int(
+                    CN1_THREAD_GET_STATE_PASS_ARG 0);
+            return;
+        }
         cn1ContactPickerLimit = limit;
         CNContactPickerViewController* picker =
                 [[CNContactPickerViewController alloc] init];
@@ -10080,7 +10100,7 @@ void com_codename1_impl_ios_IOSNative_openContactPicker___int_boolean_int(CN1_TH
                 : (id)[[CN1ContactPickerSingleDelegate alloc] init];
         cn1ContactPickerDelegate = delegate;
         picker.delegate = delegate;
-        [cn1PresentingController() presentViewController:picker animated:YES completion:nil];
+        [host presentViewController:picker animated:YES completion:nil];
 #ifndef CN1_USE_ARC
         [picker release];
 #endif
