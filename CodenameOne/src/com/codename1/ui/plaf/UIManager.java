@@ -2696,8 +2696,8 @@ public class UIManager {
         // time instead of scanning everything to find nothing.
         String[] dark = darkStyleKeys;
         if (styleId.startsWith("$Dark") && dark != null) {
-            for (int i = 0; i < dark.length; i++) {
-                if (dark[i].startsWith(styleId)) {
+            for (String darkKey : dark) {
+                if (darkKey.startsWith(styleId)) {
                     found = true;
                     break;
                 }

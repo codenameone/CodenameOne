@@ -396,7 +396,11 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /// carries a non-default ImageFactory (in which case the image is
     /// context-specific and must not be shared).
     private static java.util.HashMap<String, Image> sharedArt(Component context) {
-        if (ImageFactory.getImageFactory(context) != ImageFactory.getImageFactory(null)) {
+        // IDENTITY deliberately: the question is whether this context was given a
+        // different factory INSTANCE from the default, and two distinct factories
+        // that happened to compare equal would still produce images that must not
+        // be shared between contexts.
+        if (ImageFactory.getImageFactory(context) != ImageFactory.getImageFactory(null)) { //NOPMD CompareObjectsWithEquals
             return null;
         }
         int gen = UIManager.getThemeGeneration();

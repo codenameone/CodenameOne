@@ -3107,8 +3107,10 @@ public class Style {
                 singleListener = l;
                 return;
             }
-            if (singleListener == l || singleListener.equals(l)) {
+            if (singleListener.equals(l)) {
                 // EventDispatcher de-duplicates, so a repeat add is a no-op.
+                // equals(), not ==, because that is what EventDispatcher's own
+                // ArrayList.contains uses.
                 return;
             }
             promoteToDispatcher();
@@ -3133,7 +3135,7 @@ public class Style {
             return;
         }
         // ArrayList.remove is equals-based; match it.
-        if (singleListener != null && (singleListener == l || singleListener.equals(l))) {
+        if (singleListener != null && singleListener.equals(l)) {
             singleListener = null;
         }
     }

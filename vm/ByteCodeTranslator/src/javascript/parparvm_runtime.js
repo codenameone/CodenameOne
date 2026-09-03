@@ -5682,6 +5682,17 @@ bindNative(["cn1_java_lang_Class_getName_R_java_lang_String"], function(__cn1Thi
 bindNative(["cn1_java_lang_Class_isArray_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.name.indexOf("[]") > -1 ? 1 : 0; });
 bindNative(["cn1_java_lang_Class_isAssignableFrom_java_lang_Class_R_boolean"], function(__cn1ThisObject, cls) { return cls && cls.__classDef && cls.__classDef.assignableTo[__cn1ThisObject.__classDef.name] ? 1 : 0; });
 bindNative(["cn1_java_lang_Class_isInstance_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) { return jvm.instanceOf(obj, __cn1ThisObject.__classDef.name) ? 1 : 0; });
+bindNative(["cn1_java_lang_Class_getSuperclass_R_java_lang_Class"], function(__cn1ThisObject) {
+  const def = __cn1ThisObject.__classDef;
+  // Null for an interface, matching the C runtime: a class file records
+  // java/lang/Object as an interface's super_class, so the isInterface flag is
+  // the only thing separating the two and getSuperclass() must report null.
+  // Object, the primitives and void carry no baseClass at all.
+  if (!def || def.isInterface || !def.baseClass) {
+    return null;
+  }
+  return classObjectForName(def.baseClass);
+});
 bindNative(["cn1_java_lang_Class_isInterface_R_boolean"], function(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.isInterface ? 1 : 0; });
 bindNative(["cn1_java_lang_Class_newInstanceImpl_R_java_lang_Object"], function*(__cn1ThisObject) {
   const def = __cn1ThisObject.__classDef;
