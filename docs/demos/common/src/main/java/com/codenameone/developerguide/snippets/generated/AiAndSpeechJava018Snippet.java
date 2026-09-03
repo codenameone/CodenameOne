@@ -107,7 +107,15 @@ class AiAndSpeechJava018Snippet {
                 .build();
 
         openai.chat(req).ready(resp -> {
-            // The first response is the model asking for the tools, not the
+            if (resp.getToolCalls().isEmpty()) {
+                // ToolChoice.AUTO lets the model answer without reaching for a
+                // tool, and that answer is this response. There is nothing to
+                // send back.
+                Log.p(resp.getText());
+                return;
+            }
+
+            // Otherwise the response is the model asking for the tools, not the
             // answer. Run every call it asked for, then send the conversation
             // back once with a result for each: the assistant message names all
             // of them, and a follow-up carrying only some is rejected as an
@@ -129,9 +137,7 @@ class AiAndSpeechJava018Snippet {
                             "{\"error\": \"the tool failed\"}"));
                 }
             }
-            if (!resp.getToolCalls().isEmpty()) {
-                openai.chat(followUp.build()).ready(answer -> Log.p(answer.getText()));
-            }
+            openai.chat(followUp.build()).ready(answer -> Log.p(answer.getText()));
         });
         // end::ai-and-speech-java-018[]
     }
