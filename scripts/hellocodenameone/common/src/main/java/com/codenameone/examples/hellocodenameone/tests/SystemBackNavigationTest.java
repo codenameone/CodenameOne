@@ -75,12 +75,13 @@ public class SystemBackNavigationTest extends BaseTest {
     @Override
     public boolean runTest() {
         if (!"and".equals(Display.getInstance().getPlatformName())) {
-            // Scoped to Android in the port-status contract, so no other port's
-            // report carries this test; say so in the log all the same, because
-            // a reader of a suite log should not have to consult the contract
-            // to learn why a test went by in no time.
-            System.out.println("CN1SS:INFO:test=SystemBackNavigationTest status=SKIPPED"
-                    + " reason=no-system-back-action");
+            // Returns quietly, and must: this test is scoped to android in the
+            // port-status contract, so no other port's report has a slot for
+            // it, and port_status.py raises rather than ignore a
+            // "status=SKIPPED" marker naming a test it cannot place -- an
+            // unattributable skip is how a skip once rendered as a pass. A
+            // start/finish line for an out-of-scope test is dropped silently,
+            // so those are all this leaves behind.
             done();
             return true;
         }
