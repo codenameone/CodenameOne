@@ -56,6 +56,6 @@ class PerformanceJava010Snippet {
     BrowserComponent browserComponent;
     Resources theme;
     // tag::performance-java-010[]
-    private long lastScroll;
+    private volatile long lastScroll;
     // end::performance-java-010[]
 }

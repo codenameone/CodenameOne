@@ -88,7 +88,10 @@ class AuthenticationAndIdentityJava023Snippet {
         OidcClient.discover("https://provider.example.com").ready(new SuccessCallback<OidcClient>() {
             public void onSucess(OidcClient client) {
                 client.setClientId("CLIENT_ID")
-                      .setRedirectUri("https://example.com/callback")
+                      // Same public-client rules as the sample above: the
+                      // redirect has to be the custom scheme the app
+                      // registers, or the browser never hands control back.
+                      .setRedirectUri("com.example.app:/oauth2redirect")
                       .setScopes("openid", "email");
                 client.authorize().ready(tokens -> Log.p("signed in"));
             }

@@ -83,7 +83,14 @@ class PerformanceJava011Snippet {
     Resources theme;
     
     // tag::performance-java-011[]
-    @Concrete(name = "com.codename1.impl.ios.IOSImplementation")
+    // Each target reads its own attribute: name() is the iOS and default
+    // mapping, and the native Windows, Linux and macOS builds read win(),
+    // linux() and mac(). A target whose attribute is absent simply skips
+    // the optimization, so all four are supplied here.
+    @Concrete(name = "com.codename1.impl.ios.IOSImplementation",
+              win = "com.codename1.impl.windows.WindowsImplementation",
+              linux = "com.codename1.impl.linux.LinuxImplementation",
+              mac = "com.codename1.impl.mac.MacImplementation")
     public abstract class CodenameOneImplementation {
         // ...
     }

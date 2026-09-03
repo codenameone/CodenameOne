@@ -70,6 +70,7 @@ For native ParparVM output (C/Objective-C), you can also provide a class-level h
 * `@Concrete(name="fully.qualified.ConcreteClassName")` +
  Allows the translator to bypass virtual table lookup for `invokevirtual` calls on the annotated base class.
  The translator first attempts a direct call on the concrete class; if the method isn't implemented there, it falls back to the annotated base class implementation.
+ `name` is the mapping for iOS and the default target. The native Windows, Linux and macOS builds read `win`, `linux` and `mac` instead, and a target whose attribute is absent keeps ordinary virtual dispatch, so supply every target you ship.
 
 This is useful for platform abstraction classes where one implementation is guaranteed in the native pipeline.
 
@@ -573,6 +574,8 @@ Here you defined:
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava010Snippet.java[tag=performance-java-010,indent=0]
 ----
+
+The field is `volatile` because the listeners further down write it on the event dispatch thread while the loading thread reads it. Without that, the loader can keep seeing a stale timestamp and carry on decoding images while the user is still scrolling, which is the uneven scrolling this section sets out to remove.
 
 Then you did this within the background loading thread:
 
