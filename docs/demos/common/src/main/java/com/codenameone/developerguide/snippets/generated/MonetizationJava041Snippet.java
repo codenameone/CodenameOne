@@ -107,6 +107,8 @@ class MonetizationJava041Snippet {
     // end::monetization-java-041[]
     }
 
-    String[] PRODUCTS = {"com.example.world"};
+    String SKU_WORLD_1_MONTH = "com.example.world.month";
+    String SKU_WORLD_1_YEAR = "com.example.world.year";
+    String[] PRODUCTS = {SKU_WORLD_1_MONTH, SKU_WORLD_1_YEAR};
 
 }

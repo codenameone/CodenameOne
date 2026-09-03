@@ -198,7 +198,7 @@ class MonetizationJava036Snippet {
     }
 
     static final String RECEIPTS_KEY = "RECEIPTS.dat";
-    String[] PRODUCTS = {"com.example.world"};
+    String[] PRODUCTS = {SKU_WORLD_1_MONTH, SKU_WORLD_1_YEAR};
     static final String SKU_WORLD_1_MONTH = "com.example.world.month";
     static final String SKU_WORLD_1_YEAR = "com.example.world.year";
 
