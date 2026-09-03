@@ -87,10 +87,14 @@ class AnalyticsJava001Snippet {
         // tag::analytics-java-001[]
         Analytics.screen("Home", null);
 
-        Analytics.event(AnalyticsEvent.create("purchase")
-                .category("commerce")
-                .param("sku", "abc-123")
-                .param("value", 9.99)
+        // Pick a name of your own. Do not send "purchase" yourself: Purchase
+        // emits that one for every completed receipt, so a manual copy counts
+        // the same transaction twice and skews the funnel. The automatic events
+        // are listed further down this chapter.
+        Analytics.event(AnalyticsEvent.create("tutorial_complete")
+                .category("onboarding")
+                .param("step", "checkout")
+                .param("seconds", 42)
                 .build());
 
         Analytics.setUserProperty("plan", "pro");

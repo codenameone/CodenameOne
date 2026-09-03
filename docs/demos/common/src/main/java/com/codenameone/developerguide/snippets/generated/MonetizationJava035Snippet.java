@@ -106,8 +106,22 @@ class MonetizationJava035Snippet {
      boolean entryExists = s.exists(RECEIPTS_KEY);
      Object raw = entryExists ? s.readObject(RECEIPTS_KEY) : null;
      if (raw instanceof List) {
-     List<Receipt> receipts = (List<Receipt>)raw;
-     found = receipts.toArray(new Receipt[receipts.size()]);
+     // Checking the container is not checking its contents: a list holding
+     // anything else -- a key collision, an older schema, a partial write --
+     // makes toArray throw ArrayStoreException, which never reaches the
+     // callback and leaves synchronization stuck for the session. Copy
+     // element by element and fail the fetch if one does not belong.
+     List<?> stored = (List<?>) raw;
+     Receipt[] copy = new Receipt[stored.size()];
+     int i = 0;
+     for (Object o : stored) {
+     if (!(o instanceof Receipt)) {
+     copy = null;
+     break;
+     }
+     copy[i++] = (Receipt) o;
+     }
+     found = copy;
      } else if (entryExists) {
      found = null;
      } else {
