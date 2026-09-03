@@ -966,6 +966,11 @@ A `URLImage` can be created with a mask adapter to apply an effect to an image. 
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava073Snippet.java[tag=graphics-java-073,indent=0]
 ----
 
+NOTE: The adapter masks the image while resizing it to the placeholder, so a
+download that already matches the placeholder's dimensions is stored unmasked.
+Give the placeholder a size the source images don't already have when every
+image has to come out rounded.
+
 ===== URLImage in lists
 
 The biggest problem with image download service is with lists. You decided to attack this issue at the core by
