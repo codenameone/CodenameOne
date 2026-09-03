@@ -173,12 +173,37 @@ final class IOSContinuityCallbacks {
                 }
             }
         }
+        boolean claimed = false;
         try {
-            return c.continuationReceived(activityType, parse(userInfoJson));
+            claimed = c.continuationReceived(activityType, parse(userInfoJson));
         } catch (Throwable t) {
             Log.e(t);
             return false;
         }
+        if (claimed) {
+            return true;
+        }
+        // DECLINED, which is not the same as "not ours". A callback is installed by
+        // SyncedStore.addChangeListener() as well as by Continuity.enable(), and the store
+        // listener deliberately leaves continuity disabled -- so an app that registers one before
+        // enabling has a live callback that answers false to everything. A continuation arriving
+        // in that window used to be handed over, refused, and dropped, and the enable() moments
+        // later had nothing to recover: registering an unrelated store listener turned a parked
+        // cold-launch continuation into a lost one.
+        //
+        // Held on the same rule the no-callback path uses: declined only on a POSITIVE mismatch.
+        // Asking for the expected type can fail this early, before the stub has published
+        // package_name, and treating "cannot tell" as "not ours" would discard the framework's
+        // own cold launch -- the one case this exists for.
+        String stillExpected = expectedTypeOrNull();
+        if (stillExpected != null && !stillExpected.equals(activityType)) {
+            return false;
+        }
+        synchronized (LOCK) {
+            pendingType = activityType;
+            pendingJson = userInfoJson;
+        }
+        return true;
     }
 
     /// The synced store changed on another of the user's devices.
