@@ -82,7 +82,11 @@ class GraphicsJava064Snippet {
     void snippet() throws Exception {
         // tag::graphics-java-064[]
         AnalogClock clock = new AnalogClock();
-        parent.addComponent(clock);
+        // the clock draws to its own bounds and declares no preferred size, so it
+        // needs a region that stretches -- in a flow or box layout it would be 0x0
+        Form hi = new Form("Clock", new BorderLayout());
+        hi.add(BorderLayout.CENTER, clock);
+        hi.show();
         clock.start();
         // end::graphics-java-064[]
     }
@@ -92,6 +96,5 @@ class GraphicsJava064Snippet {
     }
 
 
-    Container parent = new Container();
 
 }
