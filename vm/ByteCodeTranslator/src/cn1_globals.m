@@ -12218,6 +12218,7 @@ void initConstantPool() {
     // it will wait two seconds unless an explicit GC occurs
     java_lang_System_startGCThread__(threadStateData);
     finishedNativeAllocations();
+    cn1StartupPhase("constantPoolReady");
 }
 
 JAVA_OBJECT utf8String = NULL;

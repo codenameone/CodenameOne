@@ -53,6 +53,9 @@
 typedef NS_ENUM(NSInteger, CN1MetalPipeline) {
     CN1MetalPipelineSolidColor = 0,    // FillRect, DrawLine, FillPolygon
     CN1MetalPipelineTexturedRGBA,      // DrawImage, TileImage
+    CN1MetalPipelineTexturedRounded,   // DrawImage with analytically rounded,
+                                       // ANTIALIASED corners -- so nothing has
+                                       // to build a rounded copy of the bitmap
     CN1MetalPipelineAlphaMask,         // DrawString glyph, DrawTextureAlphaMask
     CN1MetalPipelineClearPunch,        // ClearRect: write zeros, no blend
     CN1MetalPipelineLinearGradient,    // FillLinearGradient (pure GPU, no CG bitmap)
@@ -289,6 +292,8 @@ void CN1MetalFillGradient(int kind,
 // Lazily build an MTLTexture from a UIImage. Cached on the GLUIImage.
 // Returns nil on failure. Caller does not own the texture.
 id<MTLTexture> CN1MetalTextureFromUIImage(CN1Image *image);
+void CN1MetalDrawImageRounded(id<MTLTexture> texture, int alpha, int x, int y,
+                              int width, int height, float cornerRadius);
 
 // Global Metal device (from METALView's command queue); shared by anyone
 // who needs to allocate Metal resources.

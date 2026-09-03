@@ -945,6 +945,43 @@ public final class Graphics {
     /// - `w`: the width to occupy
     ///
     /// - `h`: the height to occupy
+    /// Whether this platform can round a picture's corners as it draws it.
+    ///
+    /// When it cannot, the only way to get rounded corners is to build a rounded
+    /// COPY of the bitmap -- read the pixels back, clear the alpha outside the
+    /// corner arcs and upload the result -- which is a full pixel round trip and
+    /// a second texture per picture. Code that wants rounded artwork should ask
+    /// here and keep that copy as its fallback.
+    ///
+    /// #### Returns
+    ///
+    /// true if [#drawImageRounded(Image, int, int, int, int, float)] rounds
+    public boolean isRoundedImageSupported() {
+        return impl.isRoundedImageDrawSupported();
+    }
+
+    /// Draws an image with rounded corners, without building a rounded copy of
+    /// it, on platforms that support it; elsewhere the image is drawn square.
+    ///
+    /// The corners are anti-aliased where the platform draws them analytically,
+    /// which a shaped clip of the same outline is not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `img`: the image to draw
+    /// - `x`: destination x
+    /// - `y`: destination y
+    /// - `w`: destination width
+    /// - `h`: destination height
+    /// - `cornerRadius`: radius in pixels, clamped to half the smaller side
+    public void drawImageRounded(Image img, int x, int y, int w, int h, float cornerRadius) {
+        if (cornerRadius <= 0) {
+            drawImage(img, x, y, w, h);
+            return;
+        }
+        impl.drawImageRounded(nativeGraphics, img.getImage(), x + xTranslate, y + yTranslate, w, h, cornerRadius);
+    }
+
     public void drawImage(Image img, int x, int y, int w, int h) {
         if (impl.isScaledImageDrawingSupported()) {
             img.drawImage(this, nativeGraphics, x, y, w, h);

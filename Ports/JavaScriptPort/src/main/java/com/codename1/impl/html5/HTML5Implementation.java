@@ -561,7 +561,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return x;
         }
         
-        return (int)(x * getDevicePixelRatio());
+        return (int)(x * devicePixelRatioValue());
     }
     
     private int getClientY(MouseEvent evt) {
@@ -569,7 +569,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (y == -1) {
             return y;
         }
-        return (int)((y + getScrollY_()) * getDevicePixelRatio());
+        return (int)((y + getScrollY_()) * devicePixelRatioValue());
     }
     
     private boolean hitTest(int x, int y) {
@@ -4038,10 +4038,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         //if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
             //requestFocus();
             //final int units = convertToPixels(e.getUnitsToScroll() * 5, true) * -1;
-        //final int dx = -(int)(e.getDeltaX() * getDevicePixelRatio() * wheelMultiplier());
-        //final int dy = -(int)(e.getDeltaY() * getDevicePixelRatio() * wheelMultiplier());
-        final int dx = -(int)(ne.getPixelX() * getDevicePixelRatio() * wheelMultiplier());
-        final int dy = -(int)(ne.getPixelY() * getDevicePixelRatio() * wheelMultiplier());
+        //final int dx = -(int)(e.getDeltaX() * devicePixelRatioValue() * wheelMultiplier());
+        //final int dy = -(int)(e.getDeltaY() * devicePixelRatioValue() * wheelMultiplier());
+        final int dx = -(int)(ne.getPixelX() * devicePixelRatioValue() * wheelMultiplier());
+        final int dy = -(int)(ne.getPixelY() * devicePixelRatioValue() * wheelMultiplier());
         //debugLog("dx="+dx+"; dy="+dy);
         // The wheel is handled where it lands, and goes no further. This used to treat the
         // dispatch above as a listener-only preflight and, whenever nothing consumed it,
@@ -4067,7 +4067,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         JavaScriptCanvasLayout.Dimensions dimensions = JavaScriptCanvasLayout.compute(
                 doc().getBody().getClientWidth(),
                 window.getInnerHeight(),
-                getDevicePixelRatio());
+                devicePixelRatioValue());
         canvas.setWidth(dimensions.getBackingWidth());
         canvas.setHeight(dimensions.getBackingHeight());
         outputCanvas.setWidth(dimensions.getBackingWidth());
@@ -4125,7 +4125,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (deferSemanticsWhileAnimating()) {
             return;
         }
-        semanticOverlay.update(getAccessibilityTreeSnapshot(), getDevicePixelRatio());
+        semanticOverlay.update(getAccessibilityTreeSnapshot(), devicePixelRatioValue());
     }
 
     /**
@@ -4170,7 +4170,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
                 semanticRefreshPending = false;
                 if (semanticOverlay != null && accessibilityContainer != null) {
-                    semanticOverlay.update(getAccessibilityTreeSnapshot(), getDevicePixelRatio());
+                    semanticOverlay.update(getAccessibilityTreeSnapshot(), devicePixelRatioValue());
                 }
             }
         });
@@ -4633,7 +4633,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             } else {
                 ff = JavaScriptDisplayMetrics.FormFactor.DESKTOP;
             }
-            dDensity = JavaScriptDisplayMetrics.pickDensity(getDevicePixelRatio(), ff, getDensityOverride());
+            dDensity = JavaScriptDisplayMetrics.pickDensity(devicePixelRatioValue(), ff, getDensityOverride());
         }
         return dDensity;
     }
@@ -4808,11 +4808,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
     }
 
-    static double getDevicePixelRatio() {
+    /// Named apart from the core API deliberately: `CodenameOneImplementation`
+    /// declares `public float devicePixelRatioValue()` as an INSTANCE method, and a
+    /// static method of the same name cannot override it -- that is a compile
+    /// error, not shadowing. This one stays static because the canvas plumbing
+    /// calls it from static context.
+    static double devicePixelRatioValue() {
         if (devicePixelRatio < 0) {
             devicePixelRatio = getDevicePixelRatio_();
         }
         return devicePixelRatio;
+    }
+
+    /// The core API: this port knows its ratio exactly, so callers never have to
+    /// derive one from the density bucket.
+    @Override
+    public float getDevicePixelRatio() {
+        return (float) devicePixelRatioValue();
     }
 
     @Override
@@ -5633,11 +5645,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * @return 
      */
     public static int scaleCoord(int x) {
-        return (int)(x / getDevicePixelRatio());
+        return (int)(x / devicePixelRatioValue());
     }
     
     public static double scaleCoord(double x) {
-        return x / getDevicePixelRatio();
+        return x / devicePixelRatioValue();
     }
     
     
@@ -5648,7 +5660,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * @return 
      */
     public static int unscaleCoord(int x) {
-        return (int)(x * getDevicePixelRatio());
+        return (int)(x * devicePixelRatioValue());
     }
     
     private void resizeNativeEditor() {
@@ -7421,7 +7433,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // by DPR to compare against a CSS-pixel threshold (without
                 // this divide, a 375x667 retina viewport reports 750x1334
                 // and trips the sw600 gate).
-                double dpr = getDevicePixelRatio();
+                double dpr = devicePixelRatioValue();
                 if (dpr <= 0) dpr = 1.0;
                 int minSide = (int) (Math.min(getDisplayWidth(), getDisplayHeight()) / dpr);
                 isTablet = minSide >= 600 ? 1 : 0;
@@ -12435,7 +12447,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // The display's pixel ratio when this font's height was worked out. A height is in
         // device pixels and everything drawn with it is divided by the ratio to reach CSS
         // pixels, so the height only means anything alongside the ratio it was sized against.
-        double ratioBasis = getDevicePixelRatio();
+        double ratioBasis = devicePixelRatioValue();
         // The height this font was created with, which never changes. Identity has to be built
         // from something that does not move: a font can be a key in a map when the display's
         // ratio changes, and a hash that changes underneath a stored key loses it.
@@ -12454,7 +12466,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
          * single place to recreate them: each brings itself up to date as it is used.</p>
          */
         void syncDensity() {
-            double current = getDevicePixelRatio();
+            double current = devicePixelRatioValue();
             if (current <= 0 || ratioBasis <= 0 || current == ratioBasis) {
                 return;
             }

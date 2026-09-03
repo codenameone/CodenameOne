@@ -65,6 +65,78 @@ public class UIManager {
     static boolean localeAccessible = true;
     private final HashMap<String, Style> styles = new HashMap<String, Style>();
     private final HashMap<String, Style> selectedStyles = new HashMap<String, Style>();
+    /// Prototype cache for the PREFIXED styles - the "press" and "dis" variants
+    /// every component resolves alongside its unselected and selected styles.
+    ///
+    /// Those two used to skip the cache entirely and re-parse the theme for
+    /// every component ever created. Building a component's four styles then
+    /// cost two full theme parses, which measured at roughly 0.3ms per
+    /// component - two orders of magnitude more than copying a prototype - and
+    /// it is paid by every Codename One application, on every screen.
+    private final HashMap<String, Style> prefixedStyles = new HashMap<String, Style>();
+
+    /// Style-lookup keys derived from a UIID, memoised.
+    ///
+    /// getComponentStyleImpl rebuilt them on EVERY request -- `id + "."` on
+    /// every call, and `prefix + '#' + id` again for every prefixed style. A
+    /// component asks for five styles, so on a screen of ~1,900 components that
+    /// was ~17,000 throwaway Strings and as many char[]; an allocation census of
+    /// one screen put java.lang.String at the top of the table with 28,486
+    /// objects, and this was its single largest contributor.
+    ///
+    /// Both keys are PURE functions of their inputs -- no theme state is
+    /// involved -- so unlike the style caches beside them these survive a theme
+    /// change and never need invalidating. Plain HashMaps, matching the access
+    /// assumptions of the style caches above.
+    ///
+    /// Bounded, because a UIID can be generated at run time: past the limit the
+    /// keys are simply rebuilt as before, so an unusual application loses the
+    /// optimisation instead of leaking.
+    private static final int KEY_CACHE_LIMIT = 512;
+    private final HashMap<String, String> dottedIdCache = new HashMap<String, String>();
+    private final HashMap<String, HashMap<String, String>> prefixedKeyCache =
+            new HashMap<String, HashMap<String, String>>();
+
+    private String dottedId(String id) {
+        String dotted = dottedIdCache.get(id);
+        if (dotted == null) {
+            dotted = id + ".";
+            if (dottedIdCache.size() < KEY_CACHE_LIMIT) {
+                dottedIdCache.put(id, dotted);
+            }
+        }
+        return dotted;
+    }
+
+    private String prefixedKey(String prefix, String dotted) {
+        HashMap<String, String> byId = prefixedKeyCache.get(prefix);
+        if (byId == null) {
+            byId = new HashMap<String, String>();
+            prefixedKeyCache.put(prefix, byId);
+        }
+        String key = byId.get(dotted);
+        if (key == null) {
+            key = prefix + '#' + dotted;
+            if (byId.size() < KEY_CACHE_LIMIT) {
+                byId.put(dotted, key);
+            }
+        }
+        return key;
+    }
+
+    /// Bumped whenever the theme changes, so anything that derives a cached
+    /// artifact FROM the theme - a rasterised switch thumb, a shadow, a
+    /// gradient - can tell in one integer comparison whether its cache is
+    /// still answering for the theme that is actually installed. Without a
+    /// signal like this, such caches either have to be per-component (so N
+    /// identical components rasterise N identical images) or risk surviving a
+    /// theme switch and painting the old colours.
+    private static int themeGeneration;
+
+    /// The current theme generation; see {@link #themeGeneration}.
+    public static int getThemeGeneration() {
+        return themeGeneration;
+    }
     private final HashMap<String, Object> themeConstants = new HashMap<String, Object>();
     /// Useful for caching theme images so they are not loaded twice in case
     /// an image reference is used it two places in the theme (e.g. same background
@@ -579,7 +651,7 @@ public class UIManager {
                 //if no id return the default style
                 id = "";
             } else {
-                id = id + ".";
+                id = dottedId(id);
             }
 
             if (selected) {
@@ -598,7 +670,15 @@ public class UIManager {
                         styles.put(id, style);
                     }
                 } else {
-                    return createStyle(id, prefix, false);
+                    // Cached on prefix + id, exactly as the unprefixed styles
+                    // are. The returned Style is a copy either way, so a
+                    // caller still gets its own mutable instance.
+                    String key = prefixedKey(prefix, id);
+                    style = prefixedStyles.get(key);
+                    if (style == null) {
+                        style = createStyle(id, prefix, false);
+                        prefixedStyles.put(key, style);
+                    }
                 }
             }
 
@@ -1527,6 +1607,8 @@ public class UIManager {
             buildTheme(themeProps);
             styles.clear();
             selectedStyles.clear();
+            prefixedStyles.clear();
+            themeGeneration++;
             imageCache.clear();
             current.refreshTheme(false);
         }
@@ -1636,6 +1718,8 @@ public class UIManager {
         }
         styles.clear();
         selectedStyles.clear();
+        prefixedStyles.clear();
+        themeGeneration++;
         imageCache.clear();
         current.refreshTheme(false);
     }
@@ -1810,13 +1894,33 @@ public class UIManager {
         styles.clear();
         themeConstants.clear();
         selectedStyles.clear();
+        prefixedStyles.clear();
+        themeGeneration++;
         imageCache.clear();
         if (themelisteners != null) {
             themelisteners.fireActionEvent(new ActionEvent(themeProps, ActionEvent.Type.Theme));
         }
         buildTheme(themeProps);
         breakTitleAreaToolbarDeriveCycle();
-        current.refreshTheme(true);
+        // Only the OUTERMOST application refreshes the look and feel.
+        //
+        // A theme carrying @includeNativeBool re-enters this method: buildTheme
+        // calls Display.installNativeTheme(), which loads the platform theme and
+        // applies it through here before the outer call merges the user theme on
+        // top. Refreshing on the way out of that inner application rebuilt every
+        // style for a theme that is about to be superseded, and the outer refresh
+        // then rebuilt them all again. Measured at 55-134ms of pure duplicate
+        // work inside Lifecycle.init, on the event dispatch thread, before any
+        // application code runs.
+        //
+        // buildThemeDepth is non-zero exactly while an enclosing buildTheme is
+        // running, which is the only way this method re-enters, and that
+        // enclosing call refreshes when it finishes. Nothing observes the theme
+        // in between: installNativeTheme returns straight into buildThemeImpl's
+        // merge loop.
+        if (buildThemeDepth == 0) {
+            current.refreshTheme(true);
+        }
     }
 
     /// resetThemeProps decides whether to install the legacy
@@ -2554,14 +2658,91 @@ public class UIManager {
         return darkMode != null && darkMode.booleanValue() && hasStyleDefinition("$Dark" + id);
     }
 
+    /// Whether any theme entry begins with this id, MEMOISED for the current theme.
+    ///
+    /// The answer cannot change while the theme does not, and the scan behind it
+    /// is linear in the whole theme: 448 defaults before a native theme and the
+    /// application's own are layered on top. createStyle asks this for every
+    /// style it builds -- through shouldUseDarkStyle, once per UIID -- so a dark
+    /// mode start-up walked the entire property table hundreds of times over.
+    /// Profiled on the native port, hasStyleDefinition and its caller were 5% of
+    /// the sampled start-up.
+    ///
+    /// Keyed on themeGeneration, which setThemePropsImpl already bumps whenever
+    /// the properties are replaced, so a theme change discards this by
+    /// construction rather than by remembering to.
     private boolean hasStyleDefinition(String styleId) {
-        for (String key : themeProps.keySet()) {
-            if (key.startsWith(styleId)) {
-                return true;
+        if (styleDefinitionCache == null || styleDefinitionCacheGeneration != themeGeneration) {
+            styleDefinitionCache = new HashMap<String, Boolean>();
+            styleDefinitionCacheGeneration = themeGeneration;
+            darkStyleKeys = indexDarkKeys();
+        }
+        Boolean cached = styleDefinitionCache.get(styleId);
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        boolean found = false;
+        // The memoisation above is per styleId, so a screen with hundreds of
+        // distinct uiids still walked the whole property table hundreds of
+        // times -- once for each uiid's first use. Profiled on the native port,
+        // that loop (String.startsWith plus the HashMap iterator) was the top
+        // non-GC cost of building a screen, and the first use of a uiid cost
+        // 112us against 800ns for every later use.
+        //
+        // Every caller asks the same question -- "does the theme define a $Dark
+        // override for this style" -- so only keys beginning with $Dark can
+        // ever match, and a theme that defines none (which is the normal case
+        // for an application that draws its own visuals) answers in constant
+        // time instead of scanning everything to find nothing.
+        String[] dark = darkStyleKeys;
+        if (styleId.startsWith("$Dark") && dark != null) {
+            for (int i = 0; i < dark.length; i++) {
+                if (dark[i].startsWith(styleId)) {
+                    found = true;
+                    break;
+                }
+            }
+        } else {
+            for (String key : themeProps.keySet()) {
+                if (key.startsWith(styleId)) {
+                    found = true;
+                    break;
+                }
             }
         }
-        return false;
+        styleDefinitionCache.put(styleId, Boolean.valueOf(found));
+        return found;
     }
+
+    /// The theme's $Dark keys, extracted once per theme generation. Usually
+    /// empty: an application that supplies its own visuals defines no dark
+    /// overrides at all, and then the query above never inspects a key.
+    private String[] indexDarkKeys() {
+        if (themeProps == null) {
+            return new String[0];
+        }
+        int n = 0;
+        for (String key : themeProps.keySet()) {
+            if (key.startsWith("$Dark")) {
+                n++;
+            }
+        }
+        String[] out = new String[n];
+        if (n == 0) {
+            return out;
+        }
+        int i = 0;
+        for (String key : themeProps.keySet()) {
+            if (key.startsWith("$Dark")) {
+                out[i++] = key;
+            }
+        }
+        return out;
+    }
+
+    private HashMap<String, Boolean> styleDefinitionCache;
+    private String[] darkStyleKeys;
+    private int styleDefinitionCacheGeneration = -1;
 
     /// This method is used to parse the margin and the padding
     ///
@@ -2569,6 +2750,30 @@ public class UIManager {
     ///
     /// - `str`
     private float[] toFloatArray(String str) {
+        // Called twice for every style built -- once for margin, once for
+        // padding -- and the straightforward version below is an allocation
+        // factory: one concatenation plus EIGHT substrings (a String and a
+        // char[] each), and four Float.parseFloat calls that each allocate a
+        // StringToReal.StringExponentPair. An allocation census of one screen
+        // counted 28,486 Strings, 13,946 char[] and 1,398 StringExponentPair,
+        // with this method among the largest single contributors.
+        //
+        // The fast path parses the shape theme metrics actually use -- four
+        // comma-separated plain decimals such as "0,0,0,0" or "1.5,2,1.5,2" --
+        // straight out of the original String with no substring and no
+        // StringToReal. ANYTHING it does not recognise falls through to the
+        // original implementation unchanged, so exotic input keeps its exact
+        // behaviour, including which exception it throws.
+        float[] fast = toFloatArrayFast(str);
+        if (fast != null) {
+            return fast;
+        }
+        return toFloatArrayFallback(str);
+    }
+
+    /// The original parse, kept verbatim as the fallback so anything the fast
+    /// path declines behaves exactly as it always did.
+    static float[] toFloatArrayFallback(String str) {
         float[] retVal = new float[4];
         str = str + ",";
         int rlen = retVal.length;
@@ -2578,6 +2783,96 @@ public class UIManager {
         }
         return retVal;
     }
+
+    /// Four comma-separated plain decimals, parsed without allocating anything
+    /// but the result. Returns null -- never a partial answer and never an
+    /// exception -- when the input is not exactly that shape, so the caller can
+    /// fall back.
+    static float[] toFloatArrayFast(String str) {
+        if (str == null) {
+            return null;
+        }
+        int len = str.length();
+        float[] out = new float[4];
+        int pos = 0;
+        for (int i = 0; i < 4; i++) {
+            int end = str.indexOf(',', pos);
+            if (end < 0) {
+                // The last field runs to the end of the string; a missing comma
+                // anywhere earlier means this is not the expected shape.
+                if (i != 3) {
+                    return null;
+                }
+                end = len;
+            }
+            if (end == pos) {
+                return null;
+            }
+            int p = pos;
+            boolean neg = false;
+            char c = str.charAt(p);
+            if (c == '-' || c == '+') {
+                neg = (c == '-');
+                p++;
+                if (p == end) {
+                    return null;
+                }
+            }
+            long whole = 0;
+            int digits = 0;
+            while (p < end) {
+                c = str.charAt(p);
+                if (c < '0' || c > '9') {
+                    break;
+                }
+                // Bail out rather than silently wrapping: the fallback can
+                // still parse a value this large correctly.
+                if (whole > 99999999L) {
+                    return null;
+                }
+                whole = whole * 10 + (c - '0');
+                digits++;
+                p++;
+            }
+            float value = whole;
+            if (p < end && str.charAt(p) == '.') {
+                p++;
+                long frac = 0;
+                int fracDigits = 0;
+                while (p < end) {
+                    c = str.charAt(p);
+                    if (c < '0' || c > '9') {
+                        break;
+                    }
+                    if (fracDigits < 7) {
+                        frac = frac * 10 + (c - '0');
+                        fracDigits++;
+                    }
+                    digits++;
+                    p++;
+                }
+                if (fracDigits > 0) {
+                    value = (float) (whole + (double) frac / POW10[fracDigits]);
+                }
+            }
+            if (digits == 0 || p != end) {
+                // Trailing junk, an exponent, whitespace, NaN, a hex literal --
+                // not this method's business.
+                return null;
+            }
+            out[i] = neg ? -value : value;
+            pos = end + 1;
+        }
+        // Anything after the fourth field means the input was not four fields.
+        if (pos <= len) {
+            return null;
+        }
+        return out;
+    }
+
+    private static final double[] POW10 = {
+        1d, 10d, 100d, 1000d, 10000d, 100000d, 1000000d, 10000000d
+    };
 
     /// The resource bundle allows us to implicitly localize the UI on the fly, once its
     /// installed all internal application strings query the resource bundle and extract

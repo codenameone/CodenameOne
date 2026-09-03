@@ -1132,6 +1132,62 @@ public abstract class CodenameOneImplementation {
     /// a native image
     public abstract Object createImage(byte[] bytes, int offset, int len);
 
+    /**
+     * Creates an image whose peer need not keep a decoded copy of the pixels for
+     * its own recovery, because the caller retains the encoded bytes and will
+     * recreate the image if the platform loses it.
+     *
+     * <p>Only worth overriding on a port that DOES hold such a copy -- one that
+     * uploads a GPU texture and keeps the CPU-side bitmap alive so it can
+     * re-upload after the OS discards the texture. That port pays for the
+     * picture twice for as long as it is on screen, and this call says it does
+     * not have to. Everywhere else the default is exactly right.</p>
+     *
+     * @param bytes the encoded image data
+     * @param offset offset within the array
+     * @param len number of bytes
+     * @return the platform image, or null on failure
+     */
+    public Object createImageNoBackingCopy(byte[] bytes, int offset, int len) {
+        return createImage(bytes, offset, len);
+    }
+
+    /**
+     * Whether this port can round a picture's corners as it draws it.
+     *
+     * <p>The alternative -- and what callers have to do when this is false -- is
+     * to build a rounded COPY of the bitmap: read the pixels back, clear the
+     * alpha outside the corner arcs, and upload the result as a second image.
+     * That is a full pixel round trip and a second texture per picture, and the
+     * corners are a property of how the picture is DRAWN, not of the picture.</p>
+     *
+     * @return true if {@link #drawImageRounded} rounds; false if it will simply
+     * draw the image square
+     */
+    public boolean isRoundedImageDrawSupported() {
+        return false;
+    }
+
+    /**
+     * Draws an image with its corners rounded to the given radius, if the port
+     * supports it; otherwise draws it square.
+     *
+     * <p>Check {@link #isRoundedImageDrawSupported()} first -- a caller that
+     * needs the corners must keep its own fallback for ports that cannot.</p>
+     *
+     * @param graphics the graphics context
+     * @param img the image
+     * @param x destination x
+     * @param y destination y
+     * @param w destination width
+     * @param h destination height
+     * @param cornerRadius radius in destination pixels, clamped by the port to
+     * half the smaller side
+     */
+    public void drawImageRounded(Object graphics, Object img, int x, int y, int w, int h, float cornerRadius) {
+        drawImage(graphics, img, x, y, w, h);
+    }
+
     /// Returns the width of a native image
     ///
     /// #### Parameters
@@ -5102,6 +5158,25 @@ public abstract class CodenameOneImplementation {
     ///
     /// #### Returns
     ///
+    /// The platform's own logical-pixel scale factor: device pixels per logical pixel,
+    /// the number iOS calls `UIScreen.scale` and Android calls `density`.
+    ///
+    /// This is NOT the same question as [#getDeviceDensity], even though the two are
+    /// easily confused. Density is a coarse DPI bucket used to pick artwork and to size
+    /// things in physical units. The scale factor is what the platform itself uses to
+    /// convert its own layout units into pixels, and on iOS it is only ever 1, 2 or 3 --
+    /// never the 3.5 that a 560-dpi bucket would imply. Anything laying out in
+    /// platform-logical units (density-independent pixels) has to ask this question, not the
+    /// density one, or it renders every dimension off by the ratio between them.
+    ///
+    /// #### Returns
+    ///
+    /// pixels per logical pixel, or 0 when the platform does not report one -- callers
+    /// should then fall back to deriving it from the density bucket
+    public float getDevicePixelRatio() {
+        return 0;
+    }
+
     /// one of the DENSITY constants of Display
     public int getDeviceDensity() {
         int d = getActualDisplayHeight() * getDisplayWidth();

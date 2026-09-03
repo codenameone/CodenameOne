@@ -51,6 +51,12 @@
     // texture's contents while the app was suspended, and we must not sample
     // the leftover garbage (which renders as a violet/magenta fill).
     int mtlTextureGeneration;
+    // Set by markImageNoBackingCopy: the Java EncodedImage that owns this peer
+    // keeps the ENCODED bytes and recreates the whole image after a suspend, so
+    // this object does not need to keep the decoded UIImage alive to rebuild its
+    // texture. Without it the picture is resident twice while it is on screen --
+    // CoreGraphics' decoded raster plus the GPU texture.
+    BOOL noBackingCopy;
     // Phase 3 v2: mutable-image render target. Allocated lazily by
     // CN1MetalEnsureMutableTexture sized to the mutable image's logical
     // dimensions. drawFrame opens an MTLRenderCommandEncoder against this
@@ -91,6 +97,7 @@
 // (Phase 3 mutable-image render target), that is returned instead -- it
 // is the freshest pixel source.
 -(id<MTLTexture>)getMTLTexture;
+-(void)setNoBackingCopy:(BOOL)v;
 
 // issue #5349: drop the cached read-only mtlTexture so the next getMTLTexture
 // re-decodes it from the retained UIImage. Called from the suspend backup for

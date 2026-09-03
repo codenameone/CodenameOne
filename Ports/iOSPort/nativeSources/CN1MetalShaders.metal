@@ -96,6 +96,53 @@ fragment float4 cn1_fs_textured(
     return tex.sample(s, in.texcoord) * tint;
 }
 
+// --------- TexturedRounded pipeline ---------
+// The textured draw with the quad's corners rounded analytically, so a picture
+// can be drawn with rounded corners without anyone building a rounded COPY of
+// the bitmap first.
+//
+// params.xy is the destination size in pixels and params.z the corner radius.
+// Coverage comes from a rounded-rectangle signed distance field and is a smooth
+// ramp across the last pixel, so the edge is ANTIALIASED. That is the whole
+// point of doing it here: a stencil clip of the same shape has a hard edge, and
+// against a reference that anti-aliases its corners a hard edge measures WORSE
+// than rounding the bitmap did -- which is why the copy survived the first
+// attempt to remove it.
+fragment float4 cn1_fs_textured_rounded(
+    VertexOutTextured in [[stage_in]],
+    constant float4 &tint [[buffer(0)]],
+    constant float4 &params [[buffer(1)]],
+    texture2d<float> tex [[texture(0)]])
+{
+    constexpr sampler s(mag_filter::linear, min_filter::linear, address::clamp_to_edge);
+    float w = params.x;
+    float h = params.y;
+    float hw = w * 0.5;
+    float hh = h * 0.5;
+    float r = min(params.z, min(hw, hh));
+    if (r < 0.0) {
+        r = 0.0;
+    }
+    // Position relative to the quad's centre, in pixels.
+    float px = in.texcoord.x * w - hw;
+    float py = in.texcoord.y * h - hh;
+    // Distance to the rounded rectangle: positive inside, and the magnitude in
+    // the last pixel is the coverage.
+    float dxe = abs(px) - (hw - r);
+    float dye = abs(py) - (hh - r);
+    float ax = max(dxe, 0.0);
+    float ay = max(dye, 0.0);
+    float outside = sqrt(ax * ax + ay * ay);
+    float inside = min(max(dxe, dye), 0.0);
+    float coverage = clamp(-(outside + inside - r), 0.0, 1.0);
+    if (coverage <= 0.0) {
+        return float4(0.0);
+    }
+    // Coverage scales every channel: the texture pipeline works in
+    // premultiplied terms, exactly as the tint modulator above it does.
+    return tex.sample(s, in.texcoord) * tint * coverage;
+}
+
 // --------- AlphaMask pipeline (Phase 2/4) ---------
 // Samples alpha from an R8/alpha-only texture and colorizes with the uniform.
 // Used for DrawString glyph atlas in Phase 4.

@@ -2941,6 +2941,32 @@ public class Container extends Component implements Iterable<Component> {
 
     }
 
+    /// Applies the safe-area insets without announcing them as a style change.
+    ///
+    /// The padding written here is scaffolding: `doLayout` and `calcPreferredSize` both
+    /// set it, use it for one measurement or layout, and hand it straight back to
+    /// `TmpInsets#restore`, which has always suppressed events for the same reason. Only
+    /// the setting half was left announcing, and a PADDING change is exactly what
+    /// `Component#styleChanged` answers with `revalidateLater()` on the parent - so
+    /// laying a safe-area container out queued another revalidate of the whole Form,
+    /// which laid it out again, which queued another. Nothing converged, because the
+    /// padding is reverted before anyone can observe it having settled.
+    ///
+    /// An idle app hides this: the EDT sleeps and the treadmill only turns once per
+    /// wake-up. It shows up the moment something keeps the EDT awake - a drag, or any
+    /// animation - where it consumed the entire frame budget (measured at ~200ms per
+    /// pass on the gallery, i.e. under 5fps, against ~15ms of actual painting).
+    private boolean snapToSafeAreaQuietly() {
+        Style s = getStyle();
+        boolean suppressed = s.isSuppressChangeEvents();
+        s.setSuppressChangeEvents(true);
+        try {
+            return snapToSafeAreaInternal();
+        } finally {
+            s.setSuppressChangeEvents(suppressed);
+        }
+    }
+
     void doLayout() {
         doLayoutDepth++;
         boolean restoreBounds = false;
@@ -2957,7 +2983,7 @@ public class Container extends Component implements Iterable<Component> {
                 }
                 Style s = getStyle();
                 tmpInsets.set(s);
-                restoreBounds = snapToSafeAreaInternal();
+                restoreBounds = snapToSafeAreaQuietly();
             }
         }
         layout.layoutContainer(this);
@@ -3580,7 +3606,7 @@ public class Container extends Component implements Iterable<Component> {
                 }
                 Style s = getStyle();
                 calcTmpInsets.set(s);
-                restoreBounds = snapToSafeAreaInternal();
+                restoreBounds = snapToSafeAreaQuietly();
             }
         }
 

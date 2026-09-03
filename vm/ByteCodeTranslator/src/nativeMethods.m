@@ -2728,13 +2728,38 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
             data->counter++;
             return;
         }
+        // Uncontended: take it without ever announcing a park.
+        //
+        // Clearing threadActive is what makes the thread parkable, and it is
+        // needed only because pthread_mutex_lock below can BLOCK -- a thread
+        // that blocks while the collector believes it is running would stop the
+        // mark from completing. A trylock that succeeds never blocks, so there
+        // is nothing to announce and nothing to wait out afterwards. Going
+        // through the parking path anyway made every synchronized call made
+        // while a mark was in flight wait for the handshake to clear, at the
+        // usleep's 100us granularity: measured at 8.7ms of blocked event
+        // dispatch thread per launch, all of it uncontended, entirely in
+        // Matrix.Factory.getDefault and IOSImplementation.extractHardRef.
+        //
+        // Returning without parking is the same shape as the reentrant case
+        // just above, which has always returned this way.
+        if (pthread_mutex_trylock(&data->__codenameOneMutex) == 0) {
+            data->counter++;
+            data->ownerThread = own;
+            return;
+        }
         threadStateData->threadActive = JAVA_FALSE;
         err = pthread_mutex_lock(&data->__codenameOneMutex);
         data->counter++;
         data->ownerThread = own;
+        CN1_STALL_T0(__stallMon);
         while (threadStateData->threadBlockedByGC) {
             usleep(100);
         }
+        // Instrumented so the [GCSTALL] report stops under-reporting: this
+        // handshake loop was invisible to it, which is why a run that really
+        // did lose time here reported stallMs=0.
+        CN1_STALL_ADD(__stallMon, CN1_STALL_HANDSHAKE, threadStateData);
         threadStateData->threadActive = JAVA_TRUE;
 
 

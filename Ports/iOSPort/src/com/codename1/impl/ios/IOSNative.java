@@ -119,6 +119,14 @@ public final class IOSNative {
     native void nativeDrawStringGlobal(int color, int alpha, long fontPeer, String str, int x, int y);
     native void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
     native void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints);
+
+    /// Whether this build can round a picture's corners as it draws it -- only
+    /// the Metal renderer has the shader.
+    native boolean isRoundedImageDrawSupported();
+
+    native void nativeDrawImageRoundedGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius);
+
+    native void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius);
     native void nativeTileImageGlobal(long peer, int alpha, int x, int y, int width, int height);
     native int stringWidthNative(long peer, String str);
     native int charWidthNative(long peer, char ch);
@@ -320,6 +328,12 @@ public final class IOSNative {
     native void peerDeinitialized(long peer);
     native void peerSetVisible(long peer, boolean v);
     native long createPeerImage(long peer, int[] wh);
+
+    /// Tells the peer it does not have to keep the decoded UIImage alive once it
+    /// has uploaded its texture: the caller holds the encoded bytes and will
+    /// recreate the image if the platform loses it. See
+    /// EncodedImage#invalidateDecodedImages().
+    native void markImageNoBackingCopy(long peer);
 
     native void releasePeer(long peer);
     native void retainPeer(long peer);
@@ -877,6 +891,15 @@ public final class IOSNative {
     native void scanBarCode();
 
     native long createTruetypeFont(String name);
+
+    /// Registers ONE bundled font file, by its bundle-relative name.
+    ///
+    /// createTrueTypeFont is given both the font's name and the file it lives
+    /// in, and the file is the cheap way to make the name resolvable. Without
+    /// it the only option is registering every bundled font to satisfy one
+    /// lookup -- 33 files and 5.7MB in an application shipping a font family,
+    /// measured at 25ms on the start-up path.
+    native void registerBundledFont(String fileName);
     native long deriveTruetypeFont(long uiFont, boolean bold, boolean italic, float size);
 
     native void log(String text);

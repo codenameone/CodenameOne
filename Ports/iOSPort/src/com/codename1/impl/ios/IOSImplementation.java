@@ -82,6 +82,7 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Vector;
 import com.codename1.io.Cookie;
@@ -3383,6 +3384,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         return n;
     }
 
+    @Override
+    public Object createImageNoBackingCopy(byte[] bytes, int offset, int len) {
+        Object o = createImage(bytes, offset, len);
+        if (o instanceof NativeImage) {
+            // This port keeps the decoded UIImage alive so it can re-upload the
+            // texture after iOS discards it during a suspend, which means every
+            // picture on screen is resident twice: CoreGraphics' decoded raster
+            // and the GPU texture built from it. The caller here is an
+            // EncodedImage, which holds the encoded bytes and rebuilds the whole
+            // image on the generation bump in applicationDidEnterBackground, so
+            // the peer can drop the UIImage the moment its texture exists.
+            nativeInstance.markImageNoBackingCopy(((NativeImage) o).peer);
+        }
+        return o;
+    }
+
     private long createImage(byte[] data, int[] widthHeight) {
         return nativeInstance.createImage(data, widthHeight);
     }
@@ -4743,6 +4760,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     private void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints) {
         nativeInstance.nativeDrawImageMutable(peer, alpha, x, y, width, height, renderingHints);
     }
+    private void nativeDrawImageRoundedMutable(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
+        nativeInstance.nativeDrawImageRoundedMutable(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+    }
+
+    private void nativeDrawImageRoundedGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints, float cornerRadius) {
+        nativeInstance.nativeDrawImageRoundedGlobal(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+    }
+
     private void nativeDrawImageGlobal(long peer, int alpha, int x, int y, int width, int height, int renderingHints) {
         nativeInstance.nativeDrawImageGlobal(peer, alpha, x, y, width, height, renderingHints);
     }
@@ -4940,10 +4965,69 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new BufferedInputStream(new NSFileInputStream(resource, null), resource);
     }
 
-    // this might be accessed on multiple threads
-    private Hashtable softReferenceMap = new Hashtable();
+    /**
+     * How many soft references this port keeps alive at once.
+     *
+     * <p>Codename One's soft references are CACHES: a decoded bitmap behind an
+     * EncodedImage, the int[] behind {@code Image.getRGB}, a scaled copy, a
+     * rasterised gradient. Every one of them is written expecting the reference
+     * to come back null once memory is wanted elsewhere, and every one of them
+     * can rebuild its value.</p>
+     *
+     * <p>This port had no such expiry: the map was a plain Hashtable, so a soft
+     * reference here was a HARD one that lived until a low-memory warning
+     * arrived. An application that decoded a screenful of artwork kept every
+     * full-size bitmap, every RGB array and every scaled copy for the life of
+     * the process. Bounding it restores the contract the callers were written
+     * against, and a miss costs a re-decode rather than a wrong result.</p>
+     */
+    private static final int SOFT_REF_BUDGET_BYTES = 24 * 1024 * 1024;
+
+    /// Bounded by BYTES, not by entry count: the values are overwhelmingly
+    /// bitmaps and pixel arrays whose sizes differ by three orders of
+    /// magnitude, so a cap of "96 things" is a cap of anywhere between a
+    /// megabyte and a quarter of a gigabyte.
+    private final java.util.LinkedHashMap softReferenceMap =
+            new java.util.LinkedHashMap(16, 0.75f, true);
+    private long softRefBytes;
+
+    /// A value's approximate retained size. Exact for the two kinds that
+    /// dominate (bitmaps and pixel arrays) and a nominal charge for anything
+    /// else, so an unrecognised value still counts towards the budget.
+    private static long softRefSize(Object o) {
+        if (o instanceof com.codename1.ui.Image) {
+            com.codename1.ui.Image i = (com.codename1.ui.Image) o;
+            long w = Math.max(0, i.getWidth());
+            long h = Math.max(0, i.getHeight());
+            return w * h * 4 + 64;
+        }
+        if (o instanceof int[]) {
+            return ((int[]) o).length * 4L + 64;
+        }
+        if (o instanceof byte[]) {
+            return ((byte[]) o).length + 64;
+        }
+        return 4096;
+    }
+
+    private void trimSoftRefs() {
+        while (softRefBytes > SOFT_REF_BUDGET_BYTES && !softReferenceMap.isEmpty()) {
+            java.util.Iterator it = softReferenceMap.entrySet().iterator();
+            Map.Entry eldest = (Map.Entry) it.next();   // access-order: least recently used
+            softRefBytes -= softRefSize(eldest.getValue());
+            it.remove();
+        }
+        if (softReferenceMap.isEmpty()) {
+            softRefBytes = 0;
+        }
+    }
+
     public static void flushSoftRefMap() {
-        instance.softReferenceMap = new Hashtable();
+        IOSImplementation impl = instance;
+        synchronized (impl.softReferenceMap) {
+            impl.softReferenceMap.clear();
+            impl.softRefBytes = 0;
+        }
     }
     
     /**
@@ -4961,11 +5045,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(o == null) {
             return null;
         }
-        Object val = softReferenceMap.get(o);
-        if(val != null) {
-            return val;
+        synchronized (softReferenceMap) {
+            return softReferenceMap.get(o);
         }
-        return null;
     }
 
     public Object createSoftWeakRef(Object o) {
@@ -4973,9 +5055,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(o == null) {
             return key;
         }
-        softReferenceMap.put(key, o);
+        synchronized (softReferenceMap) {
+            Object previous = softReferenceMap.put(key, o);
+            if (previous != null) {
+                softRefBytes -= softRefSize(previous);
+            }
+            softRefBytes += softRefSize(o);
+            trimSoftRefs();
+        }
         return key;
-        //return new SoftReference(o);
     }
 
     class Loc extends LocationManager {
@@ -7728,6 +7816,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         void nativeDrawImage(long peer, int alpha, int x, int y, int width, int height) {
             nativeDrawImageMutable(peer, alpha, x, y, width, height, renderingHints);
         }
+
+        void nativeDrawImageRounded(long peer, int alpha, int x, int y, int width, int height, float cornerRadius) {
+            nativeDrawImageRoundedMutable(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+        }
         
         
         
@@ -8410,6 +8502,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         @Override
+        void nativeDrawImageRounded(long peer, int alpha, int x, int y, int width, int height, float cornerRadius) {
+            nativeDrawImageRoundedGlobal(peer, alpha, x, y, width, height, renderingHints, cornerRadius);
+        }
+
+        @Override
         void nativeDrawAlphaMask(TextureAlphaMask mask) {
             if ( mask != null && mask.getTextureName() != 0 ){
                 Rectangle r = mask.getBounds();
@@ -8865,6 +8962,27 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private int dDensity = -1;
     
+    /// iOS renders at 1x, 2x or 3x and nothing else, so the scale follows directly from
+    /// the density bucket getDeviceDensity() already derives from the screen resolution.
+    ///
+    /// The two must not be conflated: the buckets approximate DPI (a 460ppi phone lands in
+    /// DENSITY_560), while UIScreen.scale on that same phone is 3. A caller laying out in
+    /// iOS logical points that used the bucket would size everything 3.5/3 too large.
+    @Override
+    public float getDevicePixelRatio() {
+        switch (getDeviceDensity()) {
+            case Display.DENSITY_560:
+            case Display.DENSITY_HD:
+                return 3f;
+            case Display.DENSITY_VERY_HIGH:
+                return 2f;
+            case Display.DENSITY_MEDIUM:
+                return 1f;
+            default:
+                return 0f;
+        }
+    }
+
     @Override
     public int getDeviceDensity() {
         // IMPORTANT:  If you modify this method, you MUST make the equivalent changes
@@ -9412,6 +9530,31 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyClip();
         NativeImage nm = (NativeImage)img;
         ng.nativeDrawImage(nm.peer, ng.alpha, x, y, w, h);
+    }
+
+    private static int roundedImageSupported = -1;
+
+    @Override
+    public boolean isRoundedImageDrawSupported() {
+        if (roundedImageSupported < 0) {
+            roundedImageSupported = nativeInstance.isRoundedImageDrawSupported() ? 1 : 0;
+        }
+        return roundedImageSupported == 1;
+    }
+
+    @Override
+    public void drawImageRounded(Object graphics, Object img, int x, int y, int w, int h, float cornerRadius) {
+        if (img == null) return;
+        if (cornerRadius <= 0 || !isRoundedImageDrawSupported()) {
+            drawImage(graphics, img, x, y, w, h);
+            return;
+        }
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.applyTransform();
+        ng.applyClip();
+        NativeImage nm = (NativeImage)img;
+        ng.nativeDrawImageRounded(nm.peer, ng.alpha, x, y, w, h, cornerRadius);
     }
 
     @Override
@@ -10189,6 +10332,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         fnt.style = com.codename1.ui.Font.STYLE_PLAIN;
         fontName = nativeFontName(fontName);
         fnt.name = fontName;
+        // Register the file this font lives in before asking for it by name.
+        // The native falls back to scanning the whole bundle when a name will
+        // not resolve, and that scan is what start-up used to pay: registering
+        // the one file that was named avoids it.
+        if (fileName != null && fileName.length() > 0) {
+            nativeInstance.registerBundledFont(fileName);
+        }
         fnt.peer = nativeInstance.createTruetypeFont(fontName);
         return fnt;
     }
@@ -13044,6 +13194,24 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public static void applicationWillResignActive() {
+        // PAIRED WITH THE TEXTURE DROP, which happens on this callback too:
+        // cn1ApplicationWillResignActive calls CN1MetalBackupMutableImagesForSuspend,
+        // and that drops the texture of every read-only image. An image created
+        // through createImageNoBackingCopy has released its decoded UIImage, so
+        // once its texture is gone the peer has no pixels at all -- it must be
+        // rebuilt from the encoded bytes, and this is what tells it to.
+        //
+        // Deliberately NOT on didEnterBackground: resigning active happens far
+        // more often than backgrounding and does not imply it -- Control Centre,
+        // the notification shade, an incoming call, the app switcher, a system
+        // alert. Each of those drops the textures and then hands control back
+        // without the app ever entering the background, so a bump wired to
+        // backgrounding would leave those images with no pixels and nothing
+        // telling them to rebuild: they would simply draw blank.
+        //
+        // A counter bump, not a sweep: nothing is walked and nothing is touched
+        // until a picture is actually asked for.
+        com.codename1.ui.EncodedImage.invalidateDecodedImages();
         minimized = true;
         callInterruptionActive = true;
         if(instance.life != null) {
@@ -13978,13 +14146,40 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.getHostOrIP();
     }
 
+
+    /// True when a socket handle cannot be used, so the caller must fall back to
+    /// the value CodenameOneImplementation documents for that method.
+    ///
+    /// The accept loop in com.codename1.io.Socket reports a failed accept by
+    /// asking the implementation for the pending error on the connection it did
+    /// NOT get -- a null. Every method here reaches the handle through
+    /// ((Long)socket).longValue(), and neither half of that is checked on this
+    /// port: ParparVM's CHECKCAST expands to nothing, and unboxing a null then
+    /// reads a field off address 0. On the desktop the same call raises a
+    /// NullPointerException that the accept loop catches and logs; here it was a
+    /// SIGSEGV that killed the process, so a port already in use took the whole
+    /// app down instead of reporting that it could not bind.
+    ///
+    /// instanceof rather than a null test on purpose -- it also covers a handle
+    /// that is not a Long, which the unchecked cast would otherwise hand to the
+    /// native layer as a wild pointer.
+    private static boolean noSocketHandle(Object socket) {
+        return !(socket instanceof Long);
+    }
+
     @Override
     public void disconnectSocket(Object socket) {
+        if (noSocketHandle(socket)) {
+            return;
+        }
         nativeInstance.disconnectSocket(((Long)socket).longValue());
     }    
     
     @Override
     public boolean isSocketConnected(Object socket) {
+        if (noSocketHandle(socket)) {
+            return false;
+        }
         return nativeInstance.isSocketConnected(((Long)socket).longValue());
     }
     
@@ -14000,26 +14195,41 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public String getSocketErrorMessage(Object socket) {
+        if (noSocketHandle(socket)) {
+            return null;
+        }
         return nativeInstance.getSocketErrorMessage(((Long)socket).longValue());
     }
     
     @Override
     public int getSocketErrorCode(Object socket) {
+        if (noSocketHandle(socket)) {
+            return -1;
+        }
         return nativeInstance.getSocketErrorCode(((Long)socket).longValue());
     }
     
     @Override
     public int getSocketAvailableInput(Object socket) {
+        if (noSocketHandle(socket)) {
+            return 0;
+        }
         return nativeInstance.getSocketAvailableInput(((Long)socket).longValue());
     }
     
     @Override
     public byte[] readFromSocketStream(Object socket) {
+        if (noSocketHandle(socket)) {
+            return null;
+        }
         return nativeInstance.readFromSocketStream(((Long)socket).longValue());
     }
     
     @Override
     public void writeToSocketStream(Object socket, byte[] data) {
+        if (noSocketHandle(socket)) {
+            return;
+        }
         nativeInstance.writeToSocketStream(((Long)socket).longValue(), data);
     }
 
@@ -14035,6 +14245,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void writeToSocketStream(Object socket, byte[] data, int offset, int len) {
+        if (noSocketHandle(socket)) {
+            return;
+        }
         nativeInstance.writeToSocketStream(((Long)socket).longValue(), data, offset, len);
     }
 

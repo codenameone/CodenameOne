@@ -50,6 +50,7 @@ public class CN1DebugMojo extends AbstractCN1Mojo {
         props.setProperty("jpda.address", System.getProperty("jpda.address"));
 
 
+        forwardLocalRepository(props);
         request.setProperties(props);
         request.setBaseDirectory(rootMavenProjectDir);
 
