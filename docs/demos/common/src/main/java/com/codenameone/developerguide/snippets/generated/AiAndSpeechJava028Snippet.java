@@ -94,10 +94,8 @@ class AiAndSpeechJava028Snippet {
             ImagePart img = new ImagePart(bytes, "image/jpeg");
 
             ChatRequest req = ChatRequest.builder()
-                    // No model named here: the request uses the client's default,
-                    // which is your proxy's for a shipped build and the Ollama
-                    // redirect's in the simulator. Either way it has to be a model
-                    // that accepts images.
+                    // No model named here: the request uses whatever default the
+                    // client carries. Whichever it is, it has to accept images.
                     .addMessage(ChatMessage.userWithImage(
                         "Describe the photo in one sentence.", img))
                     .build();

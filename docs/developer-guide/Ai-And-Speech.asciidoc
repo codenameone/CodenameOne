@@ -794,10 +794,13 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 
 This sample sends an image, so whichever model the client reaches has to accept
-one. For a shipped app that's whatever your proxy is configured with. In the
-simulator the redirect points the client at your local Ollama install instead,
-and its default there is a text-only model, so set `cn1.ai.ollamaModel` to a
-vision-capable model you've pulled before running this one.
+one -- for a shipped app, whatever your proxy is configured with.
+
+Note that the simulator's Ollama redirect doesn't apply here. It wraps the
+public-provider factories, and `localOpenAiCompatible` returns its client
+directly, which is the point: a proxy is a real endpoint and isn't something to
+swap out behind your back. To try this against a local model, build the client with
+`LlmClient.ollama(...)` and name a vision-capable model you've pulled.
 
 The photo leaves the device either way. Nothing here runs a model on the phone,
 so cover that in your privacy policy -- and note that the client is the proxy

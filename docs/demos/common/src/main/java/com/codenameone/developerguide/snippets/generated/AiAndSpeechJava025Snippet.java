@@ -86,12 +86,14 @@ class AiAndSpeechJava025Snippet {
         // holds only a short-lived, user-scoped token for your own endpoint, so
         // a stolen one expires and can be revoked for that user alone.
         SecureStorage store = SecureStorage.getInstance();
-        store.set("ai.session.token", sessionTokenFromServer);  // false when unsupported
+        boolean saved = store.set("ai.session.token", sessionTokenFromServer);
 
-        // On a port with no secure storage the set fails and the get answers
-        // null, but the token just fetched is still perfectly good for this run
-        // -- fall back to it rather than building a client with no credential.
-        String token = store.get("ai.session.token");           // null when absent
+        // Treat the store as a cache, not as the source of truth. When the write
+        // fails -- no secure storage on this port, or the keychain refused it --
+        // reading back gives either nothing or the previous, now expired, token.
+        // The one just issued is the good one, so use it and let persistence be
+        // best effort.
+        String token = saved ? store.get("ai.session.token") : sessionTokenFromServer;
         if (token == null) {
             token = sessionTokenFromServer;
         }

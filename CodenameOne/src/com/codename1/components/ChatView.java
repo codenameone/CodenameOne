@@ -126,6 +126,7 @@ public class ChatView extends Container {
                 row.add(b);
                 history.add(message);
                 bubbles.add(b);
+                b.owner = ChatView.this;
                 messages.add(row);
                 messages.revalidateLater();
                 messages.scrollComponentToVisible(b);
@@ -160,6 +161,25 @@ public class ChatView extends Container {
             return;
         }
         bubbles.get(bubbles.size() - 1).appendText(delta);
+    }
+
+    /// Replaces the stored message for a bubble whose text has changed, so
+    /// `#getHistory` reflects a streamed reply rather than the empty
+    /// placeholder `#beginAssistantStream` created. Only a message that is a
+    /// single text part is rebuilt -- one carrying an image or a tool call is
+    /// left alone. Called on the EDT by [ChatBubble].
+    void bubbleTextChanged(ChatBubble bubble, String text) {
+        int i = bubbles.indexOf(bubble);
+        if (i < 0 || i >= history.size()) {
+            return;
+        }
+        ChatMessage existing = history.get(i);
+        List<MessagePart> parts = existing.getParts();
+        if (parts == null || parts.size() != 1 || !(parts.get(0) instanceof TextPart)) {
+            return;
+        }
+        history.set(i, new ChatMessage(existing.getRole(),
+                Arrays.<MessagePart>asList(new TextPart(text))));
     }
 
     public void setTypingIndicatorVisible(final boolean v) {

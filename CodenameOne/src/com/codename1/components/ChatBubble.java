@@ -39,6 +39,10 @@ import com.codename1.ui.layouts.BorderLayout;
 /// rendering (markdown, code blocks) can subclass and override
 /// [#renderBody] without rewriting the wrapper.
 public class ChatBubble extends Container {
+    /// The view this bubble belongs to, set when it is added. Package private:
+    /// this is bookkeeping between ChatView and its bubbles, not API.
+    ChatView owner;
+
     private final TextArea body;
     private final ChatMessage message;
 
@@ -73,6 +77,13 @@ public class ChatBubble extends Container {
 
     private void applyText(String text) {
         body.setText(text == null ? "" : text);
+        // Keep the view's history in step with what the bubble shows. A streamed
+        // reply is otherwise only ever painted: the ChatMessage the view stored
+        // when this bubble was created stays empty, and anything building a
+        // request from getHistory() sends a blank assistant turn.
+        if (owner != null) {
+            owner.bubbleTextChanged(this, body.getText());
+        }
         revalidateLater();
     }
 

@@ -42,6 +42,30 @@ import static org.junit.jupiter.api.Assertions.*;
 class ChatViewTest extends UITestBase {
 
     @FormTest
+    void streamedTextReachesTheStoredMessage() {
+        // A streamed reply only ever reached the bubble: the ChatMessage stored
+        // when beginAssistantStream() created it stayed empty, so anything
+        // building a request from getHistory() -- LlmChatBinding included --
+        // sent a blank assistant turn for every completed reply.
+        ChatView v = new ChatView();
+        ChatBubble bubble = v.beginAssistantStream();
+        bubble.appendText("Hello");
+        bubble.appendText(", world");
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("Hello, world", history.get(history.size() - 1).getText());
+        assertEquals(Role.ASSISTANT, history.get(history.size() - 1).getRole());
+    }
+
+    @FormTest
+    void appendToLastMessageAlsoUpdatesHistory() {
+        ChatView v = new ChatView();
+        v.beginAssistantStream();
+        v.appendToLastMessage("streamed");
+        List<ChatMessage> history = v.getHistory();
+        assertEquals("streamed", history.get(history.size() - 1).getText());
+    }
+
+    @FormTest
     void freshViewHasEmptyHistoryAndAnInput() {
         ChatView v = new ChatView();
         assertEquals("ChatView", v.getUIID());
