@@ -533,48 +533,40 @@ public final class Continuity {
         if (!enabled) {
             return;
         }
-        boolean[] captureFailed = new boolean[1];
-        AppState state = capture(captureFailed);
+        // TWO answers, because the two failures need opposite handling and one flag gave them the
+        // same. A payload that could not be read still leaves routes worth saving and worth
+        // advertising; a sequence that did not reach the disk makes PUBLISHING the harmful part,
+        // because the receiving devices record that number durably and this one will hand it out
+        // again after a restart -- so every checkpoint it then sends is refused as already seen
+        // until the counter climbs past it. Folding them together published exactly that.
+        boolean[] payloadFailed = new boolean[1];
+        boolean[] sequenceFailed = new boolean[1];
+        AppState state = capture(payloadFailed, sequenceFailed);
         if (state == null) {
             return;
         }
-        if (captureFailed[0]) {
-            // The last payload is CARRIED FORWARD rather than replaced by nothing.
-            //
-            // A provider that throws leaves this state with no payload, and writing that over a
-            // stored draft loses it -- the very thing a checkpoint exists to prevent, caused by a
-            // read that may well succeed next time. Skipping the write instead was the first
-            // attempt and it traded one loss for another: the rule beside this one is that a
-            // provider failure costs its own payload and NOTHING MORE, so the routes, which are
-            // current and real, have to be saved.
-            //
-            // Carrying forward gives up neither. The stored checkpoint keeps the newest routes
-            // and the newest payload that was ever successfully read, which is exactly what the
-            // application would have written had it checkpointed a moment before the failure.
-            //
-            // Found by a test failing only when the whole suite ran: another class had left a
-            // navigation stack behind, so the state was not empty, and an earlier version of this
-            // guard -- which only skipped EMPTY states -- wrote routes over the draft. That is
-            // not a fixture artifact; it is an application with routes whose provider threw.
+        if (payloadFailed[0]) {
+            // The last payload is CARRIED FORWARD rather than replaced by nothing. Writing an
+            // empty state over a stored draft loses it, for a read that may well succeed next
+            // time; skipping the write instead loses the routes, which are current and real.
+            // Carrying forward gives up neither -- the checkpoint keeps the newest routes and the
+            // newest payload that ever read cleanly.
             AppState previous = readStored();
             if (previous != null && !previous.getPayload().isEmpty()) {
                 state.setPayloadUnchecked(previous.getPayload());
             }
-            // Still owed either way, so a later suspend retries the capture that failed.
-            dirty = true;
-            persist(state);
-            publishContinuation(state);
-            publishToRelay(state);
-            return;
         }
-        dirty = false;
+        // Owed while anything about this capture was not durable, so a later suspend retries it.
+        dirty = payloadFailed[0] || sequenceFailed[0];
         if (!persist(state)) {
-            // Still owed. `dirty` was cleared on the way in, and leaving it clear told the next
-            // suspend there was nothing to write -- so a checkpoint that failed on a full disk
-            // was never retried, and the app came back to whatever the last successful write
-            // held. The other channels still run: a continuation and a relay copy that reached
-            // the user's other devices are worth having even when this one could not be stored.
             dirty = true;
+        }
+        if (sequenceFailed[0]) {
+            // Stored locally and told to nobody. The local copy is still worth having -- this
+            // device does not deduplicate against itself -- but a sequence that cannot be proved
+            // durable must not reach another device, because a receiver's mark outlives the
+            // counter that produced it.
+            return;
         }
         publishContinuation(state);
         publishToRelay(state);
@@ -611,16 +603,23 @@ public final class Continuity {
         // Best effort, which is what this method has always been: an application calling it to
         // feed its own transport wants whatever can be gathered. checkpoint() asks the private
         // form instead, because for the DURABLE path a provider failure is not "no payload".
-        return capture(new boolean[1]);
+        return capture(new boolean[1], new boolean[1]);
     }
 
-    /// As above, reporting through `captureFailed` whether anything went wrong gathering the
-    /// state -- the provider throwing, or the sequence counter failing to reach disk.
+    /// As above, reporting the two ways a capture can come up short -- SEPARATELY, because the
+    /// caller has to treat them differently.
     ///
-    /// Named for the QUESTION rather than one of its causes. It began as "providerFailed" and
-    /// then acquired a second meaning, which is the sort of drift that makes a caller reason
-    /// about the wrong thing.
-    private static AppState capture(boolean[] captureFailed) {
+    /// `payloadFailed` means the provider threw and this state has no payload of its own. The
+    /// routes are still real and the state is still worth storing and advertising.
+    ///
+    /// `sequenceFailed` means the counter did not reach the disk. That one makes publishing the
+    /// harmful act: a receiver records the sequence durably, this device hands the same number
+    /// out again after a restart, and every later checkpoint is refused as already seen.
+    ///
+    /// They were one flag, twice: first called providerFailed and then given a second meaning,
+    /// then renamed to captureFailed to match -- which papered over the fact that the two answers
+    /// call for opposite handling rather than a better name.
+    private static AppState capture(boolean[] payloadFailed, boolean[] sequenceFailed) {
         if (!enabled) {
             return null;
         }
@@ -643,7 +642,7 @@ public final class Continuity {
                 // draft that was safely stored a moment earlier, because of a failure that may
                 // well be transient.
                 Log.e(t);
-                captureFailed[0] = true;
+                payloadFailed[0] = true;
             }
             if (payload != null) {
                 // NOT caught. An unrepresentable value is a programming error with exactly one
@@ -661,10 +660,7 @@ public final class Continuity {
         // relaunch -- so a receiver still holding the old high-water mark in lastSeen silently
         // ignored every state until the counter caught up.
         if (!rememberSequence(seq)) {
-            // Treated exactly like a provider that threw: the state is not durable, so the caller
-            // keeps the checkpoint owed and does not publish a sequence that this device cannot
-            // prove it will still be past after a restart.
-            captureFailed[0] = true;
+            sequenceFailed[0] = true;
         }
         state.setDeviceId(getDeviceId())
                 .setSequence(seq)

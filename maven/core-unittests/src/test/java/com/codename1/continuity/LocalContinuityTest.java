@@ -2060,6 +2060,89 @@ public class LocalContinuityTest extends UITestBase {
                 "a state whose write failed was marked handled, so it can never be recovered");
     }
 
+    /**
+     * A sequence that could not be stored must not be handed to another device. The receiver
+     * records it durably, this device hands the same number out again after a restart, and every
+     * checkpoint it then sends is refused as already seen until the counter climbs past it.
+     *
+     * <p>The local write still happens: this device does not deduplicate against itself, so the
+     * stored checkpoint is worth having. Only the PUBLISHING is harmful, which is why the payload
+     * failure beside it -- where publishing is fine -- cannot share the same flag.</p>
+     */
+    @EdtTest
+    public void aSequenceThatCannotBeStoredIsNotPublished() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        final GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+        r.release();
+        pause(300L);
+        final int before = r.sent.size();
+        bridge.clearContinuation();
+
+        Storage original = Storage.getInstance();
+        Storage.setStorageInstance(new RefusingOneStorage(original, Continuity.PREF_SEQUENCE));
+        try {
+            // NOT routeStackChanged(): that only schedules a flush, and the queued checkpoint
+            // then ran after the finally below had put the real storage back -- so the test was
+            // watching a second, perfectly successful checkpoint publish and calling it a
+            // failure of the first.
+            Continuity.checkpoint();
+            flushSerialCalls();
+        } finally {
+            Storage.setStorageInstance(original);
+        }
+        pause(300L);
+
+        assertEquals(before, r.sent.size(),
+                "a sequence that never reached storage was published to the relay, so the "
+                        + "receiver's durable mark will outlive the counter that produced it");
+        assertNull(bridge.getPublishedType(),
+                "the same sequence was advertised over the platform continuation");
+        assertTrue(Continuity.isCheckpointPending(),
+                "the checkpoint was reported as done even though the counter is not durable");
+    }
+
+    /** Storage that refuses ONE name and passes everything else through. */
+    static class RefusingOneStorage extends Storage {
+        private final Storage delegate;
+        private final String refused;
+
+        RefusingOneStorage(Storage delegate, String refused) {
+            this.delegate = delegate;
+            this.refused = refused;
+        }
+
+        @Override
+        public boolean writeObject(String name, Object o) {
+            if (refused.equals(name)) {
+                return false;
+            }
+            return delegate.writeObject(name, o);
+        }
+
+        @Override
+        public Object readObject(String name) {
+            return delegate.readObject(name);
+        }
+
+        @Override
+        public boolean exists(String name) {
+            return delegate.exists(name);
+        }
+
+        @Override
+        public void deleteStorageFile(String name) {
+            delegate.deleteStorageFile(name);
+        }
+    }
+
     /** Storage whose writes always fail, which is what a full disk looks like. */
     static class RefusingStorage extends Storage {
         @Override
