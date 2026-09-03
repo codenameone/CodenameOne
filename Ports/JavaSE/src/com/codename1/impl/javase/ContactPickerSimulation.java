@@ -322,7 +322,11 @@ final class ContactPickerSimulation {
     private static void show(final List<Contact> offered, final int fields,
             boolean multiSelect, final int selectionLimit,
             final ActionListener<ActionEvent> response) {
-        final Dialog dialog = new Dialog("Contacts");
+        // The cap is in the title as well as enforced below, so a tick that
+        // refuses to stay on reads as the rule it is rather than as a bug in
+        // the simulator.
+        final Dialog dialog = new Dialog(multiSelect && selectionLimit < offered.size()
+                ? "Contacts (pick up to " + selectionLimit + ")" : "Contacts");
         dialog.setLayout(new BorderLayout());
         dialog.setDisposeWhenPointerOutOfBounds(false);
         Container list = new Container(BoxLayout.y());
@@ -349,7 +353,21 @@ final class ContactPickerSimulation {
         } else if (multiSelect) {
             final List<CheckBox> boxes = new ArrayList<CheckBox>();
             for (int iter = 0; iter < offered.size(); iter++) {
-                CheckBox box = new CheckBox(describe(offered.get(iter)));
+                final CheckBox box = new CheckBox(describe(offered.get(iter)));
+                // The cap is enforced as the user ticks rather than when they
+                // press Done. Dropping the surplus at the end would report a
+                // different selection from the one on screen, and the
+                // platform pickers do not do that: Android stops accepting
+                // ticks at its limit and the iOS picker is presented in
+                // single-select mode when the limit is one.
+                box.addActionListener(new ActionListener<ActionEvent>() {
+                    @Override
+                    public void actionPerformed(ActionEvent ev) {
+                        if (box.isSelected() && selected(boxes) > selectionLimit) {
+                            box.setSelected(false);
+                        }
+                    }
+                });
                 boxes.add(box);
                 list.add(box);
             }
@@ -359,9 +377,10 @@ final class ContactPickerSimulation {
                 public void actionPerformed(ActionEvent ev) {
                     List<Contact> picked = new ArrayList<Contact>();
                     for (int iter = 0; iter < boxes.size(); iter++) {
-                        // Past the limit the extra ticks are dropped, which
-                        // is what a platform picker does when it stops
-                        // letting the user tick any more.
+                        // The bound is unreachable -- the tick handler above
+                        // never lets the count past it -- and is kept so this
+                        // loop cannot report more than the caller asked for
+                        // however the boxes got into their state.
                         if (boxes.get(iter).isSelected()
                                 && picked.size() < selectionLimit) {
                             picked.add(project(offered.get(iter), fields));
@@ -391,6 +410,20 @@ final class ContactPickerSimulation {
         dialog.add(BorderLayout.SOUTH, buttons);
         dialog.showStretched(BorderLayout.CENTER, true);
         response.actionPerformed(new ActionEvent(answer[0]));
+    }
+
+    /**
+     * @param boxes the multi-select rows
+     * @return how many are currently ticked
+     */
+    private static int selected(List<CheckBox> boxes) {
+        int count = 0;
+        for (int iter = 0; iter < boxes.size(); iter++) {
+            if (boxes.get(iter).isSelected()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static String describe(Contact contact) {
