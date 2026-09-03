@@ -85,8 +85,10 @@ class AuthenticationAndIdentityJava019Snippet {
     
     void snippet() throws Exception {
         // tag::authentication-and-identity-java-019[]
-        String clientId = "your-oauth-client-id";
-        String redirectUri = "your-app://oauth";
+        String clientId = "YOUR_IOS_OR_ANDROID_CLIENT_ID.apps.googleusercontent.com";
+        String redirectUri = "com.example.app:/oauth2redirect";
+        // without the api key every FirebaseAuth call fails before it is sent
+        FirebaseAuth.getInstance().withApiKey("YOUR_FIREBASE_WEB_API_KEY");
         GoogleConnect.getInstance().signIn(clientId, redirectUri, "openid", "email")
             .ready(new SuccessCallback<OidcTokens>() {
                 public void onSucess(OidcTokens g) {

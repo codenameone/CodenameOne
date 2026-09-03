@@ -86,7 +86,9 @@ class AuthenticationAndIdentityJava017Snippet {
     void snippet() throws Exception {
         // tag::authentication-and-identity-java-017[]
         GoogleConnect.getInstance().signIn(
-            "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+            // the iOS or Android client for a native build; the Web client
+            // belongs with an https redirect, in the simulator or web port
+            "YOUR_IOS_OR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
             "com.example.app:/oauth2redirect",
             "openid", "email", "profile"
         ).ready(new SuccessCallback<OidcTokens>() {
