@@ -89,8 +89,14 @@ class MonetizationJava041Snippet {
     public void itemPurchased(String sku) {
      Purchase iap = Purchase.getInAppPurchase();
 
-     // Force you to reload the receipts from the store.
-     iap.synchronizeReceiptsSync(0);
+     // Reload the receipts from the store. This answers false when the receipt
+     // could not be submitted or fetched, and the receipt then stays pending --
+     // so the expiry date below would be stale, or the epoch. Do not announce a
+     // success that did not happen.
+     if (!iap.synchronizeReceiptsSync(0)) {
+     ToastBar.showErrorMessage("Could not confirm the purchase yet -- it will retry.");
+     return;
+     }
      ToastBar.showMessage("Your subscription has been extended to "+iap.getExpiryDate(PRODUCTS), FontImage.MATERIAL_THUMB_UP);
     }
 

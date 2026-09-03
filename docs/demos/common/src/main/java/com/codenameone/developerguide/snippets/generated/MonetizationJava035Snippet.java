@@ -97,14 +97,19 @@ class MonetizationJava035Snippet {
      Receipt[] found;
      synchronized(RECEIPTS_KEY) {
      // readObject() answers null when the entry cannot be read or
-     // deserialized, and Purchase calls this from inside loadReceipts(),
-     // so throwing here would leave synchronization marked in progress for
-     // the rest of the session. Treat anything unreadable as "nothing
-     // stored" and always complete the callback.
-     Object stored = s.exists(RECEIPTS_KEY) ? s.readObject(RECEIPTS_KEY) : null;
-     if (stored instanceof List) {
-     List<Receipt> receipts = (List<Receipt>)stored;
+     // deserialized, and Purchase calls this from inside loadReceipts(), so
+     // throwing would leave synchronization marked in progress for the rest of
+     // the session. Answering with an empty array is worse still: loadReceipts
+     // persists a non-null result, so it would overwrite the receipts already
+     // known and revoke a live subscription. null fails the fetch and leaves
+     // them untouched, and only a genuinely absent entry is empty.
+     boolean entryExists = s.exists(RECEIPTS_KEY);
+     Object raw = entryExists ? s.readObject(RECEIPTS_KEY) : null;
+     if (raw instanceof List) {
+     List<Receipt> receipts = (List<Receipt>)raw;
      found = receipts.toArray(new Receipt[receipts.size()]);
+     } else if (entryExists) {
+     found = null;
      } else {
      found = new Receipt[0];
      }
