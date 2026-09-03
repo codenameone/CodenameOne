@@ -467,9 +467,14 @@ recording by path, MIME type, sample rate, bit rate and channel count instead of
 handing the job to the platform's own capture UI.
 
 Build it with `MediaRecorderBuilder.build()`, which passes the whole builder to
-the platform implementation. `MediaManager.createMediaRecorder(MediaRecorderBuilder)`
-accepts the same object but forwards only the path and the MIME type, so a sample
-rate or bit rate set on the builder is dropped and the platform's defaults apply.
+the platform implementation.
+
+`MediaManager.createMediaRecorder(MediaRecorderBuilder)` accepts the same object,
+and what it does with it depends on the destination. A builder with
+`redirectToAudioBuffer(true)` is delegated straight to `build()`, so every setting
+survives. A builder recording to a file is reduced to its path and MIME type,
+which drops any sample rate or bit rate set on it and leaves the platform's
+defaults in place -- call `build()` yourself when those settings matter.
 
 ==== Capture asynchronous API
 
