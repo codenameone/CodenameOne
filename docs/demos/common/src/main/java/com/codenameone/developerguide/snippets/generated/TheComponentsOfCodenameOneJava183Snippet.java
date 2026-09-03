@@ -61,6 +61,7 @@ import com.codename1.ui.tree.*;
 import com.codename1.ui.table.*;
 import com.codename1.contacts.*;
 import java.util.*;
+import com.codename1.io.CharArrayReader;
 
 
 class TheComponentsOfCodenameOneJava183Snippet {
@@ -92,13 +93,13 @@ class TheComponentsOfCodenameOneJava183Snippet {
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-183[]
         Form hi = new Form("XML Tree", new BorderLayout());
-        // any XML you package with the application will do
-        InputStream is = Display.getInstance().getResourceAsStream(getClass(), "/build.xml");
-        if(is == null) {
-            Log.p("/build.xml is not packaged with this application");
-            return;
-        }
-        try(Reader r = new InputStreamReader(is, "UTF-8");) {
+        // parsed inline here so the sample runs as it stands; in an application
+        // this would come from the network or a packaged resource
+        String xml = "<project name=\"demo\">"
+                + "  <target name=\"compile\"><javac srcdir=\"src\"/></target>"
+                + "  <target name=\"jar\"><zip destfile=\"demo.jar\"/></target>"
+                + "</project>";
+        try(Reader r = new CharArrayReader(xml.toCharArray())) {
             Element e = new XMLParser().parse(r);
             Tree xmlTree = new Tree(new XMLTreeModel(e)) {
                 @Override
