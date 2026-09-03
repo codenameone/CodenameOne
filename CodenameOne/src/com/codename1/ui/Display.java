@@ -8804,10 +8804,19 @@ public final class Display extends CN1Constants {
             // component is never left at, and a listener deriving a value from where the
             // scroll is -- Spinner3D's selected index -- changed it and changed it back.
             setScrollPosition(target, vertical, shown);
+            // The remainder measures a distance from `shown`, so it is worth keeping only
+            // if that is where the component ended up. A ScrollListener or an onScrollY
+            // override that scrolls the target runs synchronously inside the call above,
+            // while this is still the wheel's own target -- which is exactly when setScrollY
+            // leaves the carry alone -- and setScrollY clamps a position the component
+            // cannot take. Either way the carry would then describe a place it is not at,
+            // and the next notch would move by a distance nobody asked for.
+            int landed = vertical ? target.getScrollY() : target.getScrollX();
+            int remainder = snapping && landed == shown ? wanted - shown : 0;
             if (vertical) {
-                target.wheelSnapRemainderY = snapping ? wanted - shown : 0;
+                target.wheelSnapRemainderY = remainder;
             } else {
-                target.wheelSnapRemainderX = snapping ? wanted - shown : 0;
+                target.wheelSnapRemainderX = remainder;
             }
         } finally {
             wheelScrollTarget = null;

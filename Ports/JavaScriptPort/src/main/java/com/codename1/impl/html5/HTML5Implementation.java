@@ -4050,15 +4050,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // gesture nobody made. Display scrolls the component under the cursor itself now, so
         // a false return means nothing there can move, not that the port should emulate one.
         //
-        // isScrollWheeling() stays true across the dispatch for the same reason it does on
-        // the other ports: anything asking whether a wheel is in progress gets the same
-        // answer everywhere, even though nothing synthesises pointer events any more.
-        scrollWheeling = true;
-        try {
-            Display.getInstance().fireMouseWheelEvent(x, y, dx, dy, true, 0);
-        } finally {
-            scrollWheeling = false;
-        }
+        // Handed to the shared implementation rather than dispatched from here. This
+        // callback runs on a thread of its own -- the wheel listener above starts one per
+        // event -- and the dispatch now moves scroll positions, fires scroll listeners and
+        // repaints, so running it here mutates the component hierarchy off the event
+        // thread, racing layout and paint. Dispatching only listeners from this thread was
+        // survivable; scrolling from it is not.
+        //
+        // The inherited entry point marshals onto the event thread and owns the
+        // isScrollWheeling flag for the duration, which is the path every other port takes.
+        pointerWheelMoved(x, y, dx, dy, true, 0);
     }
     
     private void updateCanvasSize() {

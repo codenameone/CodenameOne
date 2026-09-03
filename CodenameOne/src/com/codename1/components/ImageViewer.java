@@ -603,7 +603,12 @@ public class ImageViewer extends Component {
         // while the logical position still has most of its travel left, and counting that
         // as movement swallows every further notch without anything moving -- the page it
         // sits on could not scroll while the pointer stayed over a picture that had stopped.
-        if (constrainedImageX() == wasX && constrainedImageY() == wasY) {
+        // On the axis that owns the gesture, and only that one. A zoomed image that
+        // overflows both ways can be against its top or bottom edge while sideways jitter
+        // still nudges it, and counting that as movement means a downward swipe at the
+        // edge of the picture stays here instead of scrolling the page under it.
+        boolean moved = verticalGesture ? constrainedImageY() != wasY : constrainedImageX() != wasX;
+        if (!moved) {
             // Put the logical position back too, or the pan drifts into the range that
             // paints nothing and the next wheel the other way has to travel through it.
             panPositionX = wasPanX;

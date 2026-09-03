@@ -495,6 +495,55 @@ class ScrollWheelGestureTest extends UITestBase {
     }
 
     @FormTest
+    void aListenerThatMovesTheTargetDuringTheNotchDropsTheCarry() {
+        // The carry measures a distance from where the wheel put the component. A
+        // ScrollListener runs synchronously inside that move and may scroll the component
+        // somewhere of its own choosing -- and it does so while this is still the wheel's
+        // own target, which is exactly the case setScrollY leaves the carry alone for. The
+        // remainder would then describe a position the component is nowhere near, and the
+        // next notch would move by a distance nobody asked for.
+        Form f = new Form("reentrant", new BorderLayout());
+        final ExactGridContainer page = new ExactGridContainer();
+        page.setScrollableY(true);
+        for (int i = 0; i < 60; i++) {
+            Label l = new Label("row");
+            l.setPreferredH(px(30));
+            page.add(l);
+        }
+        f.getContentPane().setLayout(BoxLayout.y());
+        f.getContentPane().add(page);
+        f.getContentPane().setScrollableY(false);
+        f.show();
+        f.revalidate();
+        DisplayTest.flushEdt();
+        page.setSnapToGrid(true);
+        int x = page.getAbsoluteX() + page.getWidth() / 2;
+        int y = page.getAbsoluteY() + page.getHeight() / 2;
+        int pitch = page.getComponentAt(1).getY() - page.getComponentAt(0).getY();
+        page.setScrollY(page.getComponentAt(2).getY());
+        DisplayTest.flushEdt();
+        assertEquals(0, page.wheelSnapRemainderY, "the setup has to start carrying nothing");
+
+        final boolean[] ran = new boolean[1];
+        page.addScrollListener(new ScrollListener() {
+            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+                if (!ran[0]) {
+                    ran[0] = true;
+                    page.setScrollY(0);
+                }
+            }
+        });
+
+        // Three quarters of a row: far enough to settle on the next one, leaving a
+        // remainder behind -- which is what makes this notch worth testing.
+        wheelPrecise(x, y, 0, -(pitch * 3 / 4));
+
+        assertTrue(ran[0], "the listener has to have run, or this asserts nothing");
+        assertEquals(0, page.wheelSnapRemainderY,
+                "a carry measured from a position the listener moved away from is worse than none");
+    }
+
+    @FormTest
     void aDragBetweenNotchesDropsWhatTheWheelWasCarrying() {
         Form f = new Form("carry", new BorderLayout());
         // An exact grid, the way Spinner3D overrides it. A plain Container calls anything
