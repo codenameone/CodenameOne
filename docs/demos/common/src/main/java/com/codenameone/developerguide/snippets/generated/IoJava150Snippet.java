@@ -108,17 +108,15 @@ class IoJava150Snippet {
     void snippet() throws Exception {
         // tag::io-java-150[]
         Meeting meet = new Meeting();
-        meet.subject.set("My Subject");
-        Log.p(meet.subject.get());
+        meet.setSubject("My Subject");
+        Log.p(meet.getSubject());
         // end::io-java-150[]
     }
 
-    public class Meeting implements PropertyBusinessObject {
-        public final Property<Date,Meeting> when = new Property<>("when");
-        public final Property<String,Meeting> subject = new Property<>("subject");
-        public final Property<Integer,Meeting> attendance = new Property<>("attendance");
-        private final PropertyIndex idx = new PropertyIndex(this, "Meeting", when, subject, attendance);
-        public PropertyIndex getPropertyIndex() { return idx; }
+    public class Meeting {
+        private String subject;
+        public String getSubject() { return subject; }
+        public void setSubject(String subject) { this.subject = subject; }
     }
 
 }

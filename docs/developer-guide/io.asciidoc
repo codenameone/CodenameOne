@@ -1543,7 +1543,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 This looks a bit like a handful, so start with usage which might clarify a few things, then dig into the class itself.
 
-When you used a POJO you did this:
+With a plain object you would have written this:
 
 [source,java]
 ----

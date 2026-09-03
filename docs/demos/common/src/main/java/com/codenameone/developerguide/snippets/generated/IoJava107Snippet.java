@@ -107,8 +107,8 @@ class IoJava107Snippet {
     
     void snippet() throws Exception {
         // tag::io-java-107[]
-        NetworkManager.getInstance().addToQueue(request);
         NetworkManager.getInstance().addErrorListener((e) -> e.consume());
+        NetworkManager.getInstance().addToQueue(request);
         // end::io-java-107[]
     }
 }

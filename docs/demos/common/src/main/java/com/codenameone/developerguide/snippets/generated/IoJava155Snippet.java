@@ -123,7 +123,8 @@ class IoJava155Snippet {
 
         @Override
         public boolean equals(Object obj) {
-            return obj.getClass() == getClass() && idx.equals(((TodoTask)obj).getPropertyIndex());
+            return obj != null && obj.getClass() == getClass() &&
+                idx.equals(((Meeting)obj).getPropertyIndex());
         }
 
         @Override

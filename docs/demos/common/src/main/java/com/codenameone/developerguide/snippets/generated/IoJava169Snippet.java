@@ -107,7 +107,7 @@ class IoJava169Snippet {
     
     void snippet() throws Exception {
         // tag::io-java-169[]
-        myNameTextField.setText(myNameTextField.getText());
+        myNameTextField.setText(myContact.name.get());
         myNameTextField.addActionListener(e -> myContact.name.set(myNameTextField.getText()));
         // end::io-java-169[]
     }

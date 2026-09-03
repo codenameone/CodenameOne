@@ -109,7 +109,7 @@ class IoJava122Snippet {
         // tag::io-java-122[]
         String first2[] = result.getAsStringArray("//player[position() < 3]/firstname");
 
-        String secondLast = result.getAsString("//player[last() - 1]/firstName");
+        String secondLast = result.getAsString("//player[last() - 1]/firstname");
         // end::io-java-122[]
     }
 }

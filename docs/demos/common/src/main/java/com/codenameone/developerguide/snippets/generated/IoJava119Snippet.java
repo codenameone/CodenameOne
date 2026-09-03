@@ -138,7 +138,7 @@ class IoJava119Snippet {
             };
             request.setContentType("application/json");
             request.addRequestHeader("Accept", "application/json");
-            request.addArgument("sensor", "true");
+            request.addArgument("key", googleApiKey);
             request.addArgument("latlng", l.getLatitude() + "," + l.getLongitude());
 
             NetworkManager.getInstance().addToQueue(request);
@@ -146,4 +146,7 @@ class IoJava119Snippet {
         hi.show();
         // end::io-java-119[]
     }
+
+    String googleApiKey = "YOUR-API-KEY";
+
 }

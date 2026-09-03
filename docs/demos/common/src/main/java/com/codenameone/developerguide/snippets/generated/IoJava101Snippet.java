@@ -108,7 +108,7 @@ class IoJava101Snippet {
     void snippet() throws Exception {
         // tag::io-java-101[]
         ConnectionRequest request = new ConnectionRequest(url +
-            "MyArgName=" + Util.encodeUrl(value), false);
+            "?MyArgName=" + Util.encodeUrl(value), false);
         // end::io-java-101[]
     }
 }
