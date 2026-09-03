@@ -89,10 +89,13 @@ class AuthenticationAndIdentityJava022Snippet {
             .authorizationEndpoint("https://provider.example.com/oauth2/authorize")
             .tokenEndpoint("https://provider.example.com/oauth2/token")
             .build();
+        // An installed app cannot keep a secret, so it is a public client: no
+        // client secret, and PKCE -- which OidcClient applies to every flow --
+        // is what protects the code exchange. The redirect has to come back to
+        // the app, so it is a custom scheme rather than an https URL.
         OidcClient client = OidcClient.create(cfg)
             .setClientId("CLIENT_ID")
-            .setClientSecret("CLIENT_SECRET")
-            .setRedirectUri("https://example.com/callback")
+            .setRedirectUri("com.example.app:/oauth2redirect")
             .setScopes("openid", "email");
         client.authorize().ready(new SuccessCallback<OidcTokens>() {
             public void onSucess(OidcTokens t) {
