@@ -177,7 +177,7 @@ final class AndroidNativeDragAndDrop {
         setExporting(op);
         setLastAction(UNDECIDED);
         setLocalDropAction(NativeDragOperation.ACTION_NONE);
-        view.post(new Runnable() {
+        boolean posted = view.post(new Runnable() {
             @Override
             public void run() {
                 boolean started = false;
@@ -199,6 +199,20 @@ final class AndroidNativeDragAndDrop {
                 }
             }
         });
+        if (!posted) {
+            // The view's message queue would not take it -- its looper is going away, which
+            // is what an activity transition looks like from here -- so the runnable will
+            // never run and nothing will ever report this drag finished. Everything staged
+            // for it goes back, and the refusal is returned rather than a completion fired:
+            // the framework has made the operation active by now and a false answer is what
+            // it clears it on, exactly as when the port cannot start a session at all.
+            // Reported success instead, this left a drag that had never begun looking like
+            // one still running, and every drag after it was refused for the life of the
+            // process.
+            AndroidImplementation.dragHolds(0);
+            setExporting(null);
+            return false;
+        }
         return true;
     }
 
