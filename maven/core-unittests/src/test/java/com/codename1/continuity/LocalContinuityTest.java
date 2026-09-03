@@ -1523,6 +1523,58 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * Automatic restoration must not write the durable mark when the restore itself declined to.
+     * admit() has already put the sequence in the live map, so persisting the map behind
+     * commit()'s back marks a state whose checkpoint never stored -- and after a restart enable()
+     * reloads that mark and refuses the relay's only recoverable copy.
+     */
+    @EdtTest
+    public void anAutoRestoreWhoseWriteFailedIsNotDurablyMarked() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+
+        AppState arrival = fromElsewhere("unstorable auto", 31L);
+        Storage original = Storage.getInstance();
+        Storage.setStorageInstance(new RefusingStorage());
+        try {
+            Continuity.deliver(arrival);
+            flushSerialCalls();
+        } finally {
+            Storage.setStorageInstance(original);
+        }
+
+        // What the next launch would load. The mark must not be there.
+        Map<String, Long> persisted = Continuity.readSeenForTest();
+        assertFalse(persisted.containsKey("some-other-device"),
+                "a state whose checkpoint never stored was durably marked handled, so the relay's "
+                        + "only copy is refused after a restart");
+    }
+
+    /**
+     * The high-water map is bounded where entries go IN, not only where they are written out.
+     * Trimming the serialization copy alone left the live map growing for the life of the
+     * process, and made every acknowledgement copy and rescan it -- memory and CPU both climbing
+     * with a relay that supplies many device ids.
+     */
+    @EdtTest
+    public void theLiveHighWaterMapIsBounded() {
+        Continuity.enable();
+
+        // Comfortably past the cap, all from distinct devices.
+        for (int i = 0; i < 200; i++) {
+            AppState s = new AppState()
+                    .setDeviceId("device-" + i)
+                    .setSequence(i + 1)
+                    .setTimestamp(System.currentTimeMillis());
+            Continuity.deliver(s);
+        }
+        flushSerialCalls();
+
+        assertTrue(Continuity.seenSizeForTest() <= 64,
+                "the live map grew past its cap: " + Continuity.seenSizeForTest());
+    }
+
+    /**
      * A checkpoint whose write failed is still owed. `dirty` is cleared on the way in, so leaving
      * it clear told the next suspend there was nothing to save -- a checkpoint lost to a full
      * disk was never retried and the app came back to the last write that had succeeded.

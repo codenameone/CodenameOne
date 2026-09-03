@@ -222,6 +222,7 @@ public final class Continuity {
                 lastSeen.put(e.getKey(), e.getValue());
             }
         }
+        trimSeen();
         enabled = true;
         ContinuityBridge b = bridgeInternal();
         if (b != null) {
@@ -728,9 +729,7 @@ public final class Continuity {
             // that way, and StateProvider.restoreState tells providers not to be. True would be
             // the worse failure of the two: a provider that only populates fields -- the
             // documented shape -- would leave the application on no screen at all.
-            if (applied) {
-                commit(state);
-            }
+            commit(state, applied);
             return false;
         }
         // Applying a state is not the user navigating, and the difference is not cosmetic. The
@@ -749,9 +748,7 @@ public final class Continuity {
         } finally {
             applyingRestore = false;
         }
-        if (shown || applied) {
-            commit(state);
-        }
+        commit(state, applied || shown);
         return shown;
     }
 
@@ -920,16 +917,31 @@ public final class Continuity {
         return paths;
     }
 
-    /// Makes an applied state the local checkpoint, and records that it was acted on.
+    /// Records that a state has been dealt with, and makes it the local checkpoint when there
+    /// was something to store.
     ///
-    /// The two belong together and in this order. noteActedOn() is durable and stops the relay
-    /// ever offering this state again, so it may only follow a write that actually succeeded --
-    /// otherwise the state is lost in both directions at once, nothing stored here and nothing
-    /// left to fetch. An unacknowledged state is offered again, which is recoverable.
-    private static void commit(AppState state) {
-        if (persist(state)) {
-            noteActedOn(state);
+    /// Two separate questions, which an earlier version answered with one flag and got wrong.
+    ///
+    /// WHETHER TO STORE is `applied`: a state that changed nothing here -- a route this build no
+    /// longer registers, with no payload the application could take -- must not replace the
+    /// user's own checkpoint with something unusable.
+    ///
+    /// WHETHER TO ACKNOWLEDGE is not the same question. The mark is durable and stops the relay
+    /// ever offering this state again, so the one case that must never mark is a write that was
+    /// attempted and FAILED: the relay's copy is then the only copy left. Nothing to store is not
+    /// that case -- there is nothing to recover, the application has had the state offered to its
+    /// listeners, and refusing to mark it only re-prompts the user on every launch for something
+    /// this build cannot use. A review asked for both halves to be gated together; this is the
+    /// half of that finding which does not hold, and the checkpoint it was really protecting is
+    /// protected by `applied` above.
+    private static void commit(AppState state, boolean applied) {
+        if (applied && !persist(state)) {
+            // Tried to store it and could not. The relay's copy is now the only one that exists,
+            // so it must go on being offered: acknowledging here loses the state in both
+            // directions at once.
+            return;
         }
+        noteActedOn(state);
     }
 
     /// Writes the checkpoint, and says whether it got there.
@@ -1226,6 +1238,7 @@ public final class Continuity {
             return;
         }
         lastSeen.put(state.getDeviceId(), Long.valueOf(state.getSequence()));
+        trimSeen();
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
@@ -1274,16 +1287,17 @@ public final class Continuity {
             }
         }
         if (autoRestore) {
+            // The mark is written by restore(), through commit(), and ONLY when it committed
+            // something. There was an unconditional rememberSeen() here, which quietly undid that:
+            // admit() has already put this sequence in the live map, so persisting the map wrote
+            // the mark for a state whose checkpoint had failed to store, or that applied nothing
+            // at all. After a restart enable() reloads it and the relay's only recoverable copy is
+            // refused -- the very loss commit() gates against, reached down a second path that
+            // never went through it.
+            //
+            // The in-memory mark still goes in at admission, which is what dedups within a run.
+            // Durability is a separate question and has one owner.
             restore(state);
-            // Durable only NOW, and only on the branch that actually consumed the state. Writing
-            // it at admission meant a process killed before this ran left a high-water mark for a
-            // state nothing had acted on -- and writing it on the PARKED branch below was the same
-            // bug one step further along: `parked` is a field, so a process killed before the
-            // application calls restore() loses the state while the mark survives, and the relay's
-            // repeat is rejected on the next launch. The parked branch gets its mark from
-            // restore() itself, through noteActedOn, when the application accepts it. The
-            // in-memory mark still goes in at admission, which is what dedups within a session.
-            rememberSeen();
         } else {
             parked = state;
         }
@@ -1383,6 +1397,7 @@ public final class Continuity {
         Long seen = lastSeen.get(from);
         if (seen == null || seen.longValue() < state.getSequence()) {
             lastSeen.put(from, Long.valueOf(state.getSequence()));
+            trimSeen();
         }
         // ALWAYS, not only when the in-memory map moved. That condition was written when the
         // durable copy tracked memory exactly; it no longer does -- the mark goes into memory at
@@ -1390,6 +1405,42 @@ public final class Continuity {
         // calls this, memory already holds the entry and "unchanged" meant "write nothing". Both
         // acknowledge() and the restore path were silently persisting nothing at all.
         rememberSeen();
+    }
+
+    /// Test seam: the marks as they would be reloaded on the next launch.
+    static Map<String, Long> readSeenForTest() {
+        return readSeen();
+    }
+
+    /// Test seam: how many devices the live map is holding.
+    static int seenSizeForTest() {
+        return lastSeen.size();
+    }
+
+    /// Evicts the lowest sequences until the live map is back inside MAX_SEEN.
+    ///
+    /// The LIVE map, not a copy taken on the way to storage. A user has a handful of devices, but
+    /// the ids arrive from a relay and nothing stops one from feeding many, which is the reason
+    /// there is a cap at all -- so it has to apply where entries are added rather than where they
+    /// happen to be written out.
+    ///
+    /// The lowest sequences go: those are the devices that have been quiet longest, and losing a
+    /// mark costs one duplicate delivery rather than anything durable.
+    private static void trimSeen() {
+        while (lastSeen.size() > MAX_SEEN) {
+            String lowest = null;
+            long lowestSeq = Long.MAX_VALUE;
+            for (Map.Entry<String, Long> e : lastSeen.entrySet()) {
+                if (e.getValue().longValue() < lowestSeq) {
+                    lowestSeq = e.getValue().longValue();
+                    lowest = e.getKey();
+                }
+            }
+            if (lowest == null) {
+                break;
+            }
+            lastSeen.remove(lowest);
+        }
     }
 
     /// Reads the persisted high-water marks. Never null.
@@ -1432,21 +1483,12 @@ public final class Continuity {
     /// Called after a delivery is accepted, which is rare -- it takes another device publishing --
     /// so this is not on any hot path.
     private static void rememberSeen() {
-        Map<String, Long> copy = new HashMap<String, Long>(lastSeen);
-        while (copy.size() > MAX_SEEN) {
-            String lowest = null;
-            long lowestSeq = Long.MAX_VALUE;
-            for (Map.Entry<String, Long> e : copy.entrySet()) {
-                if (e.getValue().longValue() < lowestSeq) {
-                    lowestSeq = e.getValue().longValue();
-                    lowest = e.getKey();
-                }
-            }
-            if (lowest == null) {
-                break;
-            }
-            copy.remove(lowest);
-        }
+        // Serialized straight from the live map, which trimSeen() has already bounded. This used
+        // to copy and trim HERE, which bounded the preference and left the map itself growing for
+        // the life of the process -- and made every acknowledgement copy the whole thing and scan
+        // it back down to the cap, so a relay feeding many device ids cost memory and rising CPU
+        // at once. The cap belongs where entries go IN.
+        Map<String, Long> copy = lastSeen;
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String, Long> e : copy.entrySet()) {
             if (sb.length() > 0) {
