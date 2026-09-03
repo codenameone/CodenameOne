@@ -246,6 +246,55 @@ class JavaSENativeDragAndDropTest {
         return out.toByteArray();
     }
 
+    // A Transferable says "I cannot produce this" with UnsupportedFlavorException. Anything else
+    // reaches AWT in the middle of a drag or a clipboard read it is running on this
+    // application's behalf. One test per flavor, because each reads its value its own way.
+
+    @Test
+    void aFailingTextProviderMakesItsFlavorUnsupported() {
+        final Transferable t = new JavaSEPort.RichTransferable(
+                new ClipboardContent().setDataProvider(ClipboardContent.MIME_TEXT, failing()));
+        assertThrows(UnsupportedFlavorException.class,
+                () -> t.getTransferData(DataFlavor.stringFlavor));
+    }
+
+    @Test
+    void aFailingFileProviderMakesItsFlavorUnsupported() {
+        final Transferable t = new JavaSEPort.RichTransferable(
+                new ClipboardContent().setDataProvider(ClipboardContent.MIME_FILE, failing()));
+        assertThrows(UnsupportedFlavorException.class,
+                () -> t.getTransferData(DataFlavor.javaFileListFlavor));
+    }
+
+    @Test
+    void aFailingTypedProviderMakesItsFlavorUnsupported() {
+        final Transferable t = new JavaSEPort.RichTransferable(
+                new ClipboardContent().setDataProvider("application/pdf", failing()));
+        assertThrows(UnsupportedFlavorException.class,
+                () -> t.getTransferData(flavorFor(t, "application/pdf")));
+    }
+
+    @Test
+    void aFailingProviderCostsOnlyItsOwnFlavor() throws Exception {
+        ClipboardContent content = new ClipboardContent()
+                .setDataProvider(ClipboardContent.MIME_FILE, failing())
+                .setData(ClipboardContent.MIME_TEXT, "the label survives");
+        Transferable t = new JavaSEPort.RichTransferable(content);
+
+        assertEquals("the label survives", t.getTransferData(DataFlavor.stringFlavor),
+                "the files could not be produced; the text was never in question");
+    }
+
+    /// A provider that fails, which ClipboardDataProvider explicitly permits.
+    private static ClipboardDataProvider failing() {
+        return new ClipboardDataProvider() {
+            @Override
+            public Object getClipboardData(String mimeType) {
+                throw new IllegalStateException("this one cannot be produced");
+            }
+        };
+    }
+
     @Test
     void anUnofferedFlavorIsRefusedRatherThanAnsweredWithNull() {
         ClipboardContent content = new ClipboardContent().setData(ClipboardContent.MIME_TEXT, "hi");

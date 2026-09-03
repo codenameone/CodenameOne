@@ -1964,6 +1964,20 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// -- the file that is only written if the user actually drops on the desktop -- and reading
     /// values here in order to decide what to advertise would build every one of them at the
     /// moment the drag starts, which is exactly what the providers exist to avoid.
+    /// `CodenameOneImplementation#clipboardValue(com.codename1.ui.ClipboardContent,
+    /// java.lang.String)`, reachable from the transferable below.
+    ///
+    /// RichTransferable is a nested class rather than a subclass, so it cannot reach an
+    /// inherited protected member by name; the port hands it down.
+    static Object clipboardRepresentation(ClipboardContent content, String mimeType) {
+        return clipboardValue(content, mimeType);
+    }
+
+    /// The same, for a representation carried as bytes.
+    static byte[] clipboardRepresentationBytes(ClipboardContent content, String mimeType) {
+        return clipboardBytes(content, mimeType);
+    }
+
     static final class RichTransferable implements Transferable {
         private final ClipboardContent data;
         private final DataFlavor[] flavors;
@@ -2077,15 +2091,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private static java.awt.Image decodeImage(ClipboardContent data, String mime) {
+            // Resolving the representation goes through clipboardValue, which is where a
+            // provider is allowed to fail: one throwing on the PNG used to escape the whole
+            // flavor, so a payload whose JPEG was perfectly good answered the standard image
+            // flavor with an exception instead of the JPEG.
+            byte[] bytes = clipboardRepresentationBytes(data, mime);
+            if (bytes == null) {
+                return null;
+            }
             try {
-                // Resolving the representation is inside this, not before it. A provider is
-                // allowed to fail, and one throwing on the PNG used to escape the whole
-                // flavor -- so a payload whose JPEG was perfectly good answered the standard
-                // image flavor with an exception instead of the JPEG.
-                byte[] bytes = data.getBytes(mime);
-                if (bytes == null) {
-                    return null;
-                }
                 return ImageIO.read(new ByteArrayInputStream(bytes));
             } catch (Throwable err) {
                 // A representation that will not resolve, or does not decode, is not the
@@ -2097,7 +2111,17 @@ public class JavaSEPort extends CodenameOneImplementation {
         /// Resolves the `application/x-file-list` representation (a single path/URI `String` or a
         /// `String[]` of them) to AWT `File` objects for the native file-list clipboard flavor.
         private static java.util.List<java.io.File> fileList(ClipboardContent data) {
-            String[] paths = data.getFiles();
+            // As decodeImage: a provider is permitted to fail, and a failure means this
+            // flavor cannot be produced -- which getTransferData says with
+            // UnsupportedFlavorException. Letting it out instead put an arbitrary exception
+            // from application code into AWT's own drag machinery.
+            Object value = clipboardRepresentation(data, ClipboardContent.MIME_FILE);
+            String[] paths = null;
+            if (value instanceof String[]) {
+                paths = (String[]) value;
+            } else if (value instanceof String) {
+                paths = new String[] { (String) value };
+            }
             if (paths == null) {
                 return null;
             }
@@ -2139,10 +2163,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             return false;
         }
 
+        /// Every read in getTransferData goes through clipboardValue. A flavor whose value
+        /// will not resolve is a flavor this transferable cannot supply, which the method
+        /// already has a way of saying; throwing application code's own exception out of it
+        /// instead handed AWT something it does not expect from a Transferable, in the middle
+        /// of a drag or a clipboard read it was performing on this application's behalf.
         public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException, IOException {
             if (DataFlavor.stringFlavor.equals(flavor)) {
-                String text = data.getText(ClipboardContent.MIME_TEXT);
-                if (text != null) {
+                Object text = clipboardRepresentation(data, ClipboardContent.MIME_TEXT);
+                if (text instanceof String) {
                     return text;
                 }
                 throw new UnsupportedFlavorException(flavor);
@@ -2175,7 +2204,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 throw new UnsupportedFlavorException(flavor);
             }
-            Object value = data.getData(mime);
+            Object value = clipboardRepresentation(data, mime);
             if (value instanceof String) {
                 if (InputStream.class.equals(flavor.getRepresentationClass())) {
                     return new ByteArrayInputStream(((String) value).getBytes("UTF-8"));

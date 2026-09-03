@@ -10282,8 +10282,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         int sdk = android.os.Build.VERSION.SDK_INT;
         List<String> mimeTypes = new ArrayList<String>();
         List<ClipData.Item> items = new ArrayList<ClipData.Item>();
-        String plain = content.getText(ClipboardContent.MIME_TEXT);
-        String html = content.getText(ClipboardContent.MIME_HTML);
+        String plain = clipboardText(content, ClipboardContent.MIME_TEXT);
+        String html = clipboardText(content, ClipboardContent.MIME_HTML);
         // A clip carries one text payload. Where the content has no text/plain but does have
         // some other text representation -- markdown, AsciiDoc, a URI list -- that one is the
         // payload, since publishing an empty clip instead would lose it outright.
@@ -10297,7 +10297,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if (ClipboardContent.MIME_FILE.equals(advertised[iter])) {
                     continue;
                 }
-                String value = content.getText(advertised[iter]);
+                String value = clipboardText(content, advertised[iter]);
                 if (value != null) {
                     plain = value;
                     primaryTextMime = advertised[iter];
@@ -10319,9 +10319,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 mimeTypes.add(primaryTextMime);
             }
         }
+        // One pass at a time. Together under a single catch, a failure in the first abandoned
+        // the two after it as well, so a clip whose image could not be written went out
+        // without the document and the typed representations it also had.
         try {
             addBinaryContent(content, mimeTypes, items);
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        try {
             addPublishedUris(content, mimeTypes, items);
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        try {
             addRemainingRepresentations(content, plain, mimeTypes, items);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
@@ -10397,7 +10408,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // It is also what puts the carried text on the document rather than on the thumbnail.
 
         // File references: MIME_FILE may be a single String or a String[]
-        Object fileData = content.getData(ClipboardContent.MIME_FILE);
+        Object fileData = clipboardValue(content, ClipboardContent.MIME_FILE);
         if (fileData != null) {
             String[] paths;
             if (fileData instanceof String[]) {
@@ -10441,18 +10452,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         String imageMime = null;
         byte[] imageBytes = null;
         String imageExt = null;
-        if (content.getBytes(ClipboardContent.MIME_PNG) != null) {
+        imageBytes = clipboardBytes(content, ClipboardContent.MIME_PNG);
+        if (imageBytes != null) {
             imageMime = ClipboardContent.MIME_PNG;
-            imageBytes = content.getBytes(ClipboardContent.MIME_PNG);
             imageExt = "png";
-        } else if (content.getBytes(ClipboardContent.MIME_JPEG) != null) {
-            imageMime = ClipboardContent.MIME_JPEG;
-            imageBytes = content.getBytes(ClipboardContent.MIME_JPEG);
-            imageExt = "jpg";
-        } else if (content.getBytes(ClipboardContent.MIME_GIF) != null) {
-            imageMime = ClipboardContent.MIME_GIF;
-            imageBytes = content.getBytes(ClipboardContent.MIME_GIF);
-            imageExt = "gif";
+        } else {
+            imageBytes = clipboardBytes(content, ClipboardContent.MIME_JPEG);
+            if (imageBytes != null) {
+                imageMime = ClipboardContent.MIME_JPEG;
+                imageExt = "jpg";
+            } else {
+                imageBytes = clipboardBytes(content, ClipboardContent.MIME_GIF);
+                if (imageBytes != null) {
+                    imageMime = ClipboardContent.MIME_GIF;
+                    imageExt = "gif";
+                }
+            }
         }
         if (imageBytes != null) {
             try {
@@ -10483,7 +10498,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// three of them. The clip's text still rides on the first, as it does on a file.
     private static void addPublishedUris(ClipboardContent content, List<String> mimeTypes,
             List<ClipData.Item> items) {
-        String list = content.getText(ClipboardContent.MIME_URI_LIST);
+        String list = clipboardText(content, ClipboardContent.MIME_URI_LIST);
         if (list == null) {
             return;
         }

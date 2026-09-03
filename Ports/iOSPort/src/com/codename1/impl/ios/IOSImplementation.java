@@ -9411,25 +9411,64 @@ public class IOSImplementation extends CodenameOneImplementation {
             sessionId = ++nextDragSessionId;
             exportedDrags.put(Integer.valueOf(sessionId), op);
         }
-        ClipboardContent content = op.getContent();
-        nativeInstance.beginNativeDragPayload(sessionId);
-        // Names, not values. Reading a representation here would build every promised file and
-        // encode every promised image at the moment the drag begins -- including for a drag the
-        // user then abandons -- which is the opposite of what setDataProvider promises. The
-        // native side asks for one through nativeDragResolveCallback if a receiver reads it.
-        String[] mimeTypes = content.getMimeTypes();
-        for (int iter = 0; iter < mimeTypes.length; iter++) {
-            String mime = mimeTypes[iter];
-            if (ClipboardContent.MIME_FILE.equals(mime)) {
-                // The exception, and it is UIKit's: the session needs its item count when it
-                // begins, and for a file drag that count is the number of files. So this one
-                // representation is resolved now.
-                nativeInstance.addNativeDragFiles(join(content.getFiles()));
-                continue;
+        try {
+            ClipboardContent content = op.getContent();
+            nativeInstance.beginNativeDragPayload(sessionId);
+            // Names, not values. Reading a representation here would build every promised file
+            // and encode every promised image at the moment the drag begins -- including for a
+            // drag the user then abandons -- which is the opposite of what setDataProvider
+            // promises. The native side asks for one through nativeDragResolveCallback if a
+            // receiver reads it.
+            String[] mimeTypes = content.getMimeTypes();
+            for (int iter = 0; iter < mimeTypes.length; iter++) {
+                String mime = mimeTypes[iter];
+                if (ClipboardContent.MIME_FILE.equals(mime)) {
+                    // The exception, and it is UIKit's: the session needs its item count when
+                    // it begins, and for a file drag that count is the number of files. So this
+                    // one representation is resolved now -- and on its own, because a provider
+                    // is permitted to fail and a payload offering an image beside its file
+                    // still has the image to drag.
+                    String[] files;
+                    try {
+                        files = content.getFiles();
+                    } catch (Throwable err) {
+                        com.codename1.io.Log.e(err);
+                        continue;
+                    }
+                    if (files != null && files.length > 0) {
+                        nativeInstance.addNativeDragFiles(join(files));
+                    }
+                    continue;
+                }
+                nativeInstance.declareNativeDragPayload(mime);
             }
-            nativeInstance.declareNativeDragPayload(mime);
+        } catch (Throwable err) {
+            // The session is already the framework's -- dragSessionStarted() made the
+            // operation active and it is in exportedDrags -- and returning zero tells UIKit to
+            // begin none, which means no completion and no payload release will ever arrive
+            // for it. So this is the one path that has to give it back by hand: without it the
+            // operation stayed active, every later drag was refused as one already running,
+            // and the payload was held for the life of the process.
+            com.codename1.io.Log.e(err);
+            abandonDragSession(sessionId);
+            return 0;
         }
+        // A payload that declared nothing needs no such care: the answer is non-zero, UIKit
+        // asks for the items, finds none, and completes the session itself.
         return op.getAllowedActions();
+    }
+
+    /// Gives back a drag session the framework had already committed to and that UIKit is
+    /// about to be told not to start.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sessionId`: the session being abandoned
+    private static void abandonDragSession(int sessionId) {
+        synchronized (exportedDrags) {
+            exportedDrags.remove(Integer.valueOf(sessionId));
+        }
+        NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
     }
 
     /// Invoked from CN1DragAndDrop.m when a receiver reads one of the drag's representations.
@@ -9507,11 +9546,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             // registered item pastes as nothing once the application is gone. The drag path is
             // where the laziness pays off, and it keeps it; see ClipboardDataProvider.
             nativeInstance.setClipboardContent(
-                    content.getText(com.codename1.ui.ClipboardContent.MIME_TEXT),
-                    content.getText(com.codename1.ui.ClipboardContent.MIME_HTML),
-                    content.getText(com.codename1.ui.ClipboardContent.MIME_RTF),
-                    content.getText(com.codename1.ui.ClipboardContent.MIME_MARKDOWN),
-                    content.getText(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC),
+                    clipboardText(content, com.codename1.ui.ClipboardContent.MIME_TEXT),
+                    clipboardText(content, com.codename1.ui.ClipboardContent.MIME_HTML),
+                    clipboardText(content, com.codename1.ui.ClipboardContent.MIME_RTF),
+                    clipboardText(content, com.codename1.ui.ClipboardContent.MIME_MARKDOWN),
+                    clipboardText(content, com.codename1.ui.ClipboardContent.MIME_ASCIIDOC),
                     clipboardImageBytes(content),
                     clipboardFileUris(content));
             super.copyToClipboard(obj);
@@ -9528,19 +9567,19 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// Preferred image representation (PNG, then JPEG, then GIF bytes) for the pasteboard, or null.
     private static byte[] clipboardImageBytes(com.codename1.ui.ClipboardContent content) {
-        byte[] b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_PNG);
+        byte[] b = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_PNG);
         if(b == null) {
-            b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_JPEG);
+            b = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_JPEG);
         }
         if(b == null) {
-            b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_GIF);
+            b = clipboardBytes(content, com.codename1.ui.ClipboardContent.MIME_GIF);
         }
         return b;
     }
 
     /// Newline-joined file URIs from the MIME_FILE representation (a String or String[]), or null.
     private static String clipboardFileUris(com.codename1.ui.ClipboardContent content) {
-        Object value = content.getData(com.codename1.ui.ClipboardContent.MIME_FILE);
+        Object value = clipboardValue(content, com.codename1.ui.ClipboardContent.MIME_FILE);
         if(value instanceof String) {
             return (String)value;
         }

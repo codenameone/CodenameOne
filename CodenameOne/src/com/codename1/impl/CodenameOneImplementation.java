@@ -5732,9 +5732,56 @@ public abstract class CodenameOneImplementation {
             return (String) obj;
         }
         if (obj instanceof ClipboardContent) {
-            return ((ClipboardContent) obj).getText(ClipboardContent.MIME_TEXT);
+            return clipboardText((ClipboardContent) obj, ClipboardContent.MIME_TEXT);
         }
         return null;
+    }
+
+    /// One representation of a clip, or null when there is none -- and when the provider
+    /// that would have built it failed.
+    ///
+    /// Every port read of a clip goes through here. `ClipboardDataProvider` says in as many
+    /// words that a provider may fail, and a port asking for a representation is asking on
+    /// the application's behalf: the failure belongs to that one type. Read directly, it
+    /// belonged to whatever the port was doing -- one throwing provider threw the whole copy
+    /// away, put its exception in the caller's lap, and on one platform left a drag session
+    /// in flight that nothing would ever complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the clip, which may be null
+    ///
+    /// - `mimeType`: the representation wanted
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null when the clip does not offer it or cannot produce it
+    protected static Object clipboardValue(ClipboardContent content, String mimeType) {
+        if (content == null) {
+            return null;
+        }
+        try {
+            return content.getData(mimeType);
+        } catch (Throwable err) {
+            // Logged rather than swallowed: a provider that fails is an application bug
+            // worth seeing, it is simply not this copy's or this drag's bug.
+            Log.e(err);
+            return null;
+        }
+    }
+
+    /// `#clipboardValue(com.codename1.ui.ClipboardContent, java.lang.String)` for a
+    /// representation carried as text.
+    protected static String clipboardText(ClipboardContent content, String mimeType) {
+        Object value = clipboardValue(content, mimeType);
+        return value instanceof String ? (String) value : null;
+    }
+
+    /// `#clipboardValue(com.codename1.ui.ClipboardContent, java.lang.String)` for a
+    /// representation carried as bytes.
+    protected static byte[] clipboardBytes(ClipboardContent content, String mimeType) {
+        Object value = clipboardValue(content, mimeType);
+        return value instanceof byte[] ? (byte[]) value : null;
     }
 
     /// Returns the clipboard representations available to framework code. The default adapter keeps
