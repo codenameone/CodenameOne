@@ -6684,9 +6684,19 @@ public class Component implements Animation, StyleListener, Editable {
     /// The default accepts anything unless
     /// `#setAcceptedDropMimeTypes(java.lang.String...)` narrowed it.
     ///
+    /// #### What the content holds here
+    ///
+    /// The MIME types the drag is offering, and not their values: decide on the types. A
+    /// drag in progress has not handed its data over yet, and on most platforms it cannot
+    /// be made to -- so `ClipboardContent#getData(java.lang.String)` answers null here even
+    /// for a representation the drop will produce. Reading it is not merely unhelpful
+    /// either: a representation a source can vend only once would be spent before the drop
+    /// could read it. `#nativeDrop(com.codename1.ui.NativeDropEvent)` is where the values
+    /// exist, and by then they are all there.
+    ///
     /// #### Parameters
     ///
-    /// - `content`: the representations the drag is offering
+    /// - `content`: the representations the drag is offering, by name
     ///
     /// #### Returns
     ///

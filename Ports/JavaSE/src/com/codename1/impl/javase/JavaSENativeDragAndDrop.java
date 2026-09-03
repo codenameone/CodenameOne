@@ -345,6 +345,17 @@ final class JavaSENativeDragAndDrop {
         return null;
     }
 
+    /// The provider a hover installs: the representation is named, and has no value here.
+    /// See `#contentFor(java.awt.datatransfer.Transferable, java.awt.datatransfer.DataFlavor[],
+    /// boolean)`, and `com.codename1.ui.Component#canAcceptNativeDrop(com.codename1.ui.ClipboardContent)`
+    /// for what a target may expect of it.
+    private static final ClipboardDataProvider NAMED_ONLY = new ClipboardDataProvider() {
+        @Override
+        public Object getClipboardData(String requested) {
+            return null;
+        }
+    };
+
     /// Describes a transferable as a `ClipboardContent`.
     ///
     /// #### Parameters
@@ -375,12 +386,14 @@ final class JavaSENativeDragAndDrop {
                     content.setData(mime, value);
                 }
             } else {
-                content.setDataProvider(mime, new ClipboardDataProvider() {
-                    @Override
-                    public Object getClipboardData(String requested) {
-                        return readValue(transferable, flavor, requested);
-                    }
-                });
+                // The type, and no way to read the value. A drop target is handed this
+                // content by canAcceptNativeDrop and may ask it for anything, and reading an
+                // AWT transferable mid-drag is not the same act as reading it at the drop:
+                // the data is not guaranteed to exist before acceptDrop, so the answer would
+                // be the platform's rather than the source's -- and a one-shot representation
+                // read now is spent before the drop can read it, which is the payload gone.
+                // A hover names what is on offer; the drop is where the values are.
+                content.setDataProvider(mime, NAMED_ONLY);
             }
         }
         // A file list is also a URI list as far as most applications are concerned, and a drag

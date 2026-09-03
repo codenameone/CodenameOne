@@ -348,6 +348,22 @@ class JavaSENativeDragAndDropTest {
     }
 
     @Test
+    void aTargetInspectingAValueWhileItHoversStillReadsNothing() throws Exception {
+        FakeTransferable t = new FakeTransferable()
+                .add(DataFlavor.stringFlavor, "hello")
+                .add(DataFlavor.javaFileListFlavor, Arrays.asList(new File("/tmp/a.txt")));
+
+        ClipboardContent content = JavaSENativeDragAndDrop.contentFor(t, t.getTransferDataFlavors(), false);
+        // canAcceptNativeDrop is handed this content and may ask it for anything.
+        assertNull(content.getData(ClipboardContent.MIME_TEXT));
+        assertNull(content.getData(ClipboardContent.MIME_FILE));
+        assertEquals(0, t.reads,
+                "a target that inspects a value while the drag is merely passing over must not "
+                        + "pull it across: the data need not exist before the drop, and a "
+                        + "representation the source can vend once would be spent");
+    }
+
+    @Test
     void aTextFlavorCarriedAsBytesStillReadsAsText() throws Exception {
         DataFlavor htmlBytes = new DataFlavor("text/html;charset=UTF-8;class=\"[B\"");
         FakeTransferable t = new FakeTransferable()

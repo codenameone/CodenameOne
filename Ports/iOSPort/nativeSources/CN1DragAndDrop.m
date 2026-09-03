@@ -938,7 +938,14 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
     // MIME type -> {data, the uniform type identifier it arrived under}. The identifier is kept
     // because it is what says how to read the bytes; see cn1TextFromData.
     NSMutableDictionary* collected = [[NSMutableDictionary alloc] init];
+    // One slot per dragged item, filled in place rather than appended. Every file load
+    // completes on its own schedule, so appending ordered the files by how long each took to
+    // materialize: one cloud-backed document among local ones was enough to hand the
+    // application a different order from the one the user dragged.
     NSMutableArray* files = [[NSMutableArray alloc] init];
+    for (NSUInteger slot = 0; slot < session.items.count; slot++) {
+        [files addObject:[NSNull null]];
+    }
     // The representations a file-vending provider also advertises, each named against a file on
     // disk rather than read into memory: {MIME type, path, charset}. One that is another name
     // for the document shares the document's own copy; one that is a representation of its own
@@ -948,8 +955,10 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
     NSMutableArray* fileBacked = [[NSMutableArray alloc] init];
     dispatch_group_t group = dispatch_group_create();
 
+    NSUInteger itemIndex = 0;
     for (UIDragItem* item in session.items) {
         NSItemProvider* provider = item.itemProvider;
+        const NSUInteger slot = itemIndex++;
         BOOL vendsFile = [provider hasItemConformingToTypeIdentifier:@"public.file-url"];
         if (vendsFile) {
             // A document provider commonly offers both a file URL and the document's own
@@ -985,7 +994,7 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
                 NSString* documentPath = target == nil ? nil : url.path;
                 if (target != nil) {
                     @synchronized (files) {
-                        [files addObject:target];
+                        [files replaceObjectAtIndex:slot withObject:target];
                     }
                 }
                 {
@@ -1089,14 +1098,25 @@ sessionAllowsMoveOperation:(id<UIDragSession>)session {
             CN1NativeDragDeliverDropAddFile([named objectAtIndex:0], [named objectAtIndex:1],
                                             charset.length == 0 ? nil : charset);
         }
-        if (files.count > 0) {
+        // In the order the items were dragged, with the slots nothing filled left out: an
+        // item that vends no file, or one whose file would not materialize, is not a gap in
+        // the list the application is handed.
+        NSMutableArray* ordered = [NSMutableArray array];
+        @synchronized (files) {
+            for (id path in files) {
+                if (path != [NSNull null]) {
+                    [ordered addObject:path];
+                }
+            }
+        }
+        if (ordered.count > 0) {
             CN1NativeDragDeliverDropAdd(@"application/x-file-list",
-                                        [files componentsJoinedByString:@"\n"], nil);
+                                        [ordered componentsJoinedByString:@"\n"], nil);
             // The same files as a URI list, which is what the session advertised and so what
             // a target filtered to it accepted the hover on. RFC 2483 separates them with
             // CRLF, which is what the other ports write and read.
             NSMutableString* uris = [NSMutableString string];
-            for (NSString* path in files) {
+            for (NSString* path in ordered) {
                 [uris appendString:[[NSURL fileURLWithPath:path] absoluteString]];
                 [uris appendString:@"\r\n"];
             }
