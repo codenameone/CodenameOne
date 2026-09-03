@@ -583,6 +583,39 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void oneOperationsPendingCompletionIsNotLostToAnother() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            final List<String> completions = new ArrayList<String>();
+            NativeDragOperation first = new NativeDragOperation("first")
+                    .setAllowedActions(NativeDragOperation.ACTION_MOVE);
+            NativeDragOperation second = new NativeDragOperation("second");
+            first.addCompletionListener(e -> completions.add("first:"
+                    + ((NativeDragOperation) e.getSource()).getPerformedAction()));
+            second.addCompletionListener(e -> completions.add("second:"
+                    + ((NativeDragOperation) e.getSource()).getPerformedAction()));
+
+            assertTrue(NativeDragAndDrop.startDrag(null, first));
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_MOVE);
+            // A different operation starts and ends before the first one's completion has run --
+            // an Android drag refused by the posted startDragAndDrop does exactly this, off the
+            // event dispatch thread. Sharing one slot, the second overwrote the first.
+            assertTrue(NativeDragAndDrop.startDrag(null, second));
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+
+            assertTrue(completions.contains("first:" + NativeDragOperation.ACTION_MOVE),
+                    "the first source is still owed the move it must delete its copy on, and "
+                            + "nothing else starting can take that away from it");
+            assertTrue(completions.contains("second:" + NativeDragOperation.ACTION_NONE));
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
     void aSecondDragIsRefusedWhileOneIsStillRunning() {
         implementation.resetNativeDragState();
         implementation.setNativeDragAndDropSupported(true);

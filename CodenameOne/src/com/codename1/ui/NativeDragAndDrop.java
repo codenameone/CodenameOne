@@ -264,19 +264,11 @@ public final class NativeDragAndDrop {
         return started;
     }
 
-    /// An operation whose completion has been queued but not yet delivered, and the outcome it is
-    /// waiting to report.
-    ///
-    /// A source offers the same `NativeDragOperation` instance for every drag of its component,
-    /// so the one that has just finished can be started again before the event dispatch thread
-    /// has run the completion of the drag before it. Left alone, that queued callback then
-    /// reports the *previous* drag's outcome while the new one is still running -- and a source
-    /// that deletes its data on a move deletes what the new drag is carrying.
-    private static NativeDragOperation completing;
-    private static int completingAction = NativeDragOperation.ACTION_NONE;
-
-    /// Delivers a queued completion, once, to whichever reaches it first: the callback
+    /// Delivers an owed completion, once, to whichever reaches it first: the callback
     /// `#dragCompleted(int)` queued, or the next start of the same operation.
+    ///
+    /// What is owed lives on the operation, so operations waiting at the same time do not
+    /// displace one another -- see `NativeDragOperation#oweCompletion(int)`.
     ///
     /// #### Parameters
     ///
@@ -284,14 +276,11 @@ public final class NativeDragAndDrop {
     private static void deliverCompletion(NativeDragOperation op) {
         int action;
         synchronized (LOCK) {
-            if (completing != op) { // NOPMD CompareObjectsWithEquals
-                // Already delivered, or owed by a different operation -- which has a queued
-                // callback of its own and is none of this one's business.
+            if (!op.owesCompletion()) {
+                // Already delivered; the other of the two paths got here first.
                 return;
             }
-            action = completingAction;
-            completing = null;
-            completingAction = NativeDragOperation.ACTION_NONE;
+            action = op.takeOwedAction();
         }
         op.fireCompleted(action);
     }
@@ -1010,8 +999,7 @@ public final class NativeDragAndDrop {
             return;
         }
         synchronized (LOCK) {
-            completing = op;
-            completingAction = performedAction;
+            op.oweCompletion(performedAction);
         }
         Display.getInstance().callSerially(new Runnable() {
             @Override

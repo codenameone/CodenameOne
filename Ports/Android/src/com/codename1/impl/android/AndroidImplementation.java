@@ -10539,8 +10539,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return;
         }
         for (int iter = 0; iter < items.size(); iter++) {
-            if (items.get(iter).getUri() != null) {
-                // The clip carries URIs already -- the files, which is what a list beside
+            Uri carried = items.get(iter).getUri();
+            if (carried != null && !isGeneratedClipFile(carried)) {
+                // The clip carries files the source published, which is what a list beside
                 // them names. Adding them again would drag every file twice, and they do not
                 // compare equal to the list's own entries either: what went onto the clip is
                 // a content URI this application minted for a path the source published.
@@ -10549,6 +10550,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 declareUriList(mimeTypes);
                 return;
             }
+            // A *generated* URI is not one of them. It carries a representation's bytes --
+            // an image, a document this application encoded -- and a reader filters it out
+            // precisely because the source never published it as a URI. Short-circuiting on
+            // one advertised text/uri-list for a clip whose only URI was that transport, so
+            // a payload of image bytes beside the image's own web address promised the
+            // address and delivered nothing.
         }
         boolean any = false;
         String[] lines = list.split("\n");

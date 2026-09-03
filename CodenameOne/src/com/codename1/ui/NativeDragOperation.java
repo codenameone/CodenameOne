@@ -277,6 +277,37 @@ public class NativeDragOperation {
         }
     }
 
+    /// The outcome this operation owes its completion listeners, and whether it owes one.
+    ///
+    /// Kept on the operation rather than in one slot beside the running drag, because more
+    /// than one can be waiting at a time: an operation that finished, whose completion is
+    /// queued for the event dispatch thread, while a second one starts and is refused before
+    /// the first has been told. Sharing a slot, the second overwrote the first and the first
+    /// source never learned its drag had ended -- so one waiting for a move to delete its
+    /// copy waited for good.
+    private boolean owesCompletion;
+    private int owedAction = ACTION_NONE;
+
+    /// Records an outcome that has still to reach the completion listeners.
+    void oweCompletion(int action) {
+        owesCompletion = true;
+        owedAction = action;
+    }
+
+    /// True while this operation has an outcome nobody has been told about.
+    boolean owesCompletion() {
+        return owesCompletion;
+    }
+
+    /// Takes the owed outcome, leaving nothing owed. Answering twice is what would report
+    /// one drag's end twice over.
+    int takeOwedAction() {
+        owesCompletion = false;
+        int action = owedAction;
+        owedAction = ACTION_NONE;
+        return action;
+    }
+
     /// Clears the outcome of a previous drag, because this operation is being installed as the
     /// active one again.
     ///
