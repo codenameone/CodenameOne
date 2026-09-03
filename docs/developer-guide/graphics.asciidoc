@@ -427,8 +427,11 @@ coordinates of the component. You therefore need to get the absolute clock cente
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava060Snippet.java[tag=graphics-java-060,indent=0]
 ----
 
-NOTE: Remember to call `resetAffine()` after you're done with the rotation, or you will see some unexpected
-results on your form.
+NOTE: Put the transform back when you're done with the rotation, or the drawing
+that follows uses your rotated coordinate system. Save it with `getTransform()`
+first and restore it with `setTransform()`, as the sample above does.
+`resetAffine()` looks like the way to do this and isn't: it clears the transform
+entirely, including one a parent set before your component was painted.
 
 *Drawing the Minute And Hour Hands*:
 
