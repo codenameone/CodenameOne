@@ -664,6 +664,15 @@ public class EncodedImage extends Image {
         getInternalImpl().drawImage(g, nativeGraphics, x, y, w, h);
     }
 
+    /// The decoded image's peer, announced through the same hook the normal draw
+    /// uses so the image is not reclaimed out from under the draw.
+    @Override
+    Object roundedDrawPeer() {
+        Display.impl.drawingEncodedImage(this);
+        Image internal = getInternalImpl();
+        return internal == null ? null : internal.roundedDrawPeer();
+    }
+
     /// {@inheritDoc}
     @Override
     void getRGB(int[] rgbData,

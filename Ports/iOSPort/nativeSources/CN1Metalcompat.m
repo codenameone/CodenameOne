@@ -1972,8 +1972,13 @@ BOOL CN1MetalReadMutableImagePixels(GLUIImage *image, int *outARGB,
 #endif
         return NO;
     }
+    // From the ZERO origin: the blit above copied the (readX, readY) region of
+    // the source INTO this scratch at (0, 0), and the scratch is only readW by
+    // readH, so a region starting at (readX, readY) runs off the end of it.
+    // Metal fails the read for any ordinary non-origin subregion. The loop
+    // below already treats the scratch as zero-based (srcX = (x + col) - readX).
     [shared getBytes:bytes bytesPerRow:rowBytes
-          fromRegion:MTLRegionMake2D((NSUInteger)readX, (NSUInteger)readY,
+          fromRegion:MTLRegionMake2D(0, 0,
                                      (NSUInteger)readW, (NSUInteger)readH)
          mipmapLevel:0];
 

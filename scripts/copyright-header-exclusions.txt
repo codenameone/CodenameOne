@@ -29,3 +29,4 @@ vm/ByteCodeTranslator/src/cn1_sqlite3_amalgamation.h | SQLite3 Multiple Ciphers 
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3mc.js | SQLite3 Multiple Ciphers WebAssembly loader, Emscripten generated, MIT over public-domain SQLite
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3-opfs-async-proxy.js | SQLite3 Multiple Ciphers OPFS proxy worker, MIT over public-domain SQLite
 vm/JavaAPI/src/java/util/LinkedHashMap.java | Apache Harmony source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/util/Collections.java | Apache Harmony source retaining its original Apache-2.0 notice

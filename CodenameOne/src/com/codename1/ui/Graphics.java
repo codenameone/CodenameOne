@@ -979,7 +979,17 @@ public final class Graphics {
             drawImage(img, x, y, w, h);
             return;
         }
-        impl.drawImageRounded(nativeGraphics, img.getImage(), x + xTranslate, y + yTranslate, w, h, cornerRadius);
+        Object peer = img.roundedDrawPeer();
+        if (peer == null) {
+            // Not drawable from a peer alone -- a procedural subclass or a
+            // rotated image. Rounding it here would drop the subclass's own
+            // drawing or the rotation, so it goes through the normal path and
+            // comes out square, which is what this method already promises on a
+            // platform that cannot round.
+            drawImage(img, x, y, w, h);
+            return;
+        }
+        impl.drawImageRounded(nativeGraphics, peer, x + xTranslate, y + yTranslate, w, h, cornerRadius);
     }
 
     public void drawImage(Image img, int x, int y, int w, int h) {

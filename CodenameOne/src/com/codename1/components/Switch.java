@@ -153,6 +153,14 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private final EventDispatcher changeDispatcher = new EventDispatcher();
     private final int valign = CENTER;
     private boolean value;
+    /// Whether the THEME supplied the artwork, rather than this component
+    /// generating it. calcPreferredSize can derive the generated artwork's size
+    /// arithmetically because it is a pure function of the font and the scale
+    /// constants, but a theme image is any size at all and has to be measured.
+    /// Recorded when the theme is read, because the generated images are cached
+    /// into these same fields and a null check cannot tell the two apart later.
+    private boolean themedArtwork;
+
     private Image thumbOnImage;
     private Image thumbOffImage;
     private Image thumbDisabledImage;
@@ -763,6 +771,22 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         // createRoundThumbImage / createRoundRectTrackImage), so the size can be
         // derived from them directly; the artwork is then built by the first
         // paint that actually needs it.
+        // ... but only for artwork this component GENERATES. A theme that
+        // supplies its own thumb or track sets the size itself, and deriving it
+        // from the font would under-measure a larger image and clip it. There is
+        // nothing to derive from in that case, so it is measured as before --
+        // the switches that pay the rasterisation are exactly the ones whose
+        // size cannot be known without it.
+        if (themedArtwork) {
+            requireImage(getCurrentThumbImage(), "thumb");
+            requireImage(getCurrentTrackOnImage(), "trackOn");
+            requireImage(getCurrentTrackOffImage(), "trackOff");
+            return new Dimension(
+                    getStyle().getHorizontalPadding() + Math.max(getCurrentThumbImage().getWidth(),
+                            Math.max(getCurrentTrackOnImage().getWidth(), getCurrentTrackOffImage().getWidth())),
+                    getStyle().getVerticalPadding() + Math.max(getCurrentThumbImage().getHeight(),
+                            Math.max(getCurrentTrackOnImage().getHeight(), getCurrentTrackOffImage().getHeight())));
+        }
         // The same on/off/disabled selection getCurrentThumbImage makes, so the
         // measurement is identical to the one the images gave.
         int fontSize = getFontSize();
@@ -875,6 +899,11 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                 getThemeImageConstant(getUIID().toLowerCase() + "OffTrackImage"));
         setTrackDisabledImage(UIManager.getInstance().
                 getThemeImageConstant(getUIID().toLowerCase() + "DisabledTrackImage"));
+        // Everything above assigns only when the theme actually supplied an
+        // image, so anything non-null here came from the theme.
+        themedArtwork = thumbOnImage != null || thumbOffImage != null
+                || thumbDisabledImage != null || trackOnImage != null
+                || trackOffImage != null || trackDisabledImage != null;
     }
 
     /// {@inheritDoc}

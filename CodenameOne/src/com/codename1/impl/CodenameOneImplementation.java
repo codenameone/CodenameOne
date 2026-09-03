@@ -1132,58 +1132,69 @@ public abstract class CodenameOneImplementation {
     /// a native image
     public abstract Object createImage(byte[] bytes, int offset, int len);
 
-    /**
-     * Creates an image whose peer need not keep a decoded copy of the pixels for
-     * its own recovery, because the caller retains the encoded bytes and will
-     * recreate the image if the platform loses it.
-     *
-     * <p>Only worth overriding on a port that DOES hold such a copy -- one that
-     * uploads a GPU texture and keeps the CPU-side bitmap alive so it can
-     * re-upload after the OS discards the texture. That port pays for the
-     * picture twice for as long as it is on screen, and this call says it does
-     * not have to. Everywhere else the default is exactly right.</p>
-     *
-     * @param bytes the encoded image data
-     * @param offset offset within the array
-     * @param len number of bytes
-     * @return the platform image, or null on failure
-     */
+    /// Creates an image whose peer need not keep a decoded copy of the pixels for
+    /// its own recovery, because the caller retains the encoded bytes and will
+    /// recreate the image if the platform loses it.
+    ///
+    /// Only worth overriding on a port that DOES hold such a copy -- one that
+    /// uploads a GPU texture and keeps the CPU-side bitmap alive so it can
+    /// re-upload after the OS discards the texture. That port pays for the
+    /// picture twice for as long as it is on screen, and this call says it does
+    /// not have to. Everywhere else the default is exactly right.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bytes`: the encoded image data
+    ///
+    /// - `offset`: offset within the array
+    ///
+    /// - `len`: number of bytes
+    ///
+    /// #### Returns
+    ///
+    /// the platform image, or null on failure
     public Object createImageNoBackingCopy(byte[] bytes, int offset, int len) {
         return createImage(bytes, offset, len);
     }
 
-    /**
-     * Whether this port can round a picture's corners as it draws it.
-     *
-     * <p>The alternative -- and what callers have to do when this is false -- is
-     * to build a rounded COPY of the bitmap: read the pixels back, clear the
-     * alpha outside the corner arcs, and upload the result as a second image.
-     * That is a full pixel round trip and a second texture per picture, and the
-     * corners are a property of how the picture is DRAWN, not of the picture.</p>
-     *
-     * @return true if {@link #drawImageRounded} rounds; false if it will simply
-     * draw the image square
-     */
+    /// Whether this port can round a picture's corners as it draws it.
+    ///
+    /// The alternative -- and what callers have to do when this is false -- is
+    /// to build a rounded COPY of the bitmap: read the pixels back, clear the
+    /// alpha outside the corner arcs, and upload the result as a second image.
+    /// That is a full pixel round trip and a second texture per picture, and the
+    /// corners are a property of how the picture is DRAWN, not of the picture.
+    ///
+    /// #### Returns
+    ///
+    /// true if `drawImageRounded` rounds; false if it will simply draw the image
+    /// square
     public boolean isRoundedImageDrawSupported() {
         return false;
     }
 
-    /**
-     * Draws an image with its corners rounded to the given radius, if the port
-     * supports it; otherwise draws it square.
-     *
-     * <p>Check {@link #isRoundedImageDrawSupported()} first -- a caller that
-     * needs the corners must keep its own fallback for ports that cannot.</p>
-     *
-     * @param graphics the graphics context
-     * @param img the image
-     * @param x destination x
-     * @param y destination y
-     * @param w destination width
-     * @param h destination height
-     * @param cornerRadius radius in destination pixels, clamped by the port to
-     * half the smaller side
-     */
+    /// Draws an image with its corners rounded to the given radius, if the port
+    /// supports it; otherwise draws it square.
+    ///
+    /// Check `isRoundedImageDrawSupported()` first -- a caller that needs the
+    /// corners must keep its own fallback for ports that cannot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `graphics`: the graphics context
+    ///
+    /// - `img`: the image
+    ///
+    /// - `x`: destination x
+    ///
+    /// - `y`: destination y
+    ///
+    /// - `w`: destination width
+    ///
+    /// - `h`: destination height
+    ///
+    /// - `cornerRadius`: radius in destination pixels, clamped by the port to
+    /// half the smaller side
     public void drawImageRounded(Object graphics, Object img, int x, int y, int w, int h, float cornerRadius) {
         drawImage(graphics, img, x, y, w, h);
     }

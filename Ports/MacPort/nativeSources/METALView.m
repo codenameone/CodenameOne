@@ -120,10 +120,19 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     /// accumulate into the first whole pixel and the content creeps as it should.
     double cn1WheelRemainderX;
     double cn1WheelRemainderY;
-    /// The surface the window server composites, and the Metal texture that
-    /// writes into it. One surface, not a drawable pool -- see makeBackingLayer.
-    IOSurfaceRef cn1PresentSurface;
-    id<MTLTexture> cn1PresentTexture;
+    /// The surfaces the window server composites, and the Metal textures that
+    /// write into them.
+    ///
+    /// TWO, alternating -- not the one this started with, and not CAMetalLayer's
+    /// pool either (see makeBackingLayer). Handing the layer a surface does not
+    /// wait for the window server to finish reading it, so writing the NEXT
+    /// frame into the same surface can land while the previous composite is
+    /// still in progress and put half of each frame on screen. Alternating gives
+    /// the compositor one surface to read while the renderer fills the other,
+    /// which is the least a single-writer/single-reader handoff needs.
+    IOSurfaceRef cn1PresentSurfaces[2];
+    id<MTLTexture> cn1PresentTextures[2];
+    int cn1PresentIndex;
 }
 
 @synthesize commandQueue;
@@ -179,11 +188,14 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 /// buffers to present a single image, measured at 21.5MB of IOSurface against
 /// the 11.6MB a single-surface compositor uses for the same window.
 ///
-/// Presenting through an IOSurface instead drops the pool entirely. The window
-/// server composites the surface directly out of shared memory, so handing it to
-/// the layer once is enough and updating it in place is what the next composite
-/// picks up. Layer-hosted still: AppKit adopts this as the view's own layer and
-/// never draws into it.
+/// Presenting through IOSurfaces instead keeps that down to two. The window
+/// server composites a surface directly out of shared memory, and the renderer
+/// alternates between the pair so the one being composited is never the one
+/// being written -- a single surface would have let the next frame land on top
+/// of a composite still in progress. Two plus the persistent screenTexture is
+/// still one buffer fewer than the pool, and the surfaces are the only part the
+/// window server ever sees. Layer-hosted still: AppKit adopts this as the view's
+/// own layer and never draws into it.
 - (CALayer *)makeBackingLayer {
     CALayer *l = [CALayer layer];
     l.opaque = YES;
@@ -435,39 +447,48 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 
     // The surface the window server reads. Replaced rather than resized: an
     // IOSurface is fixed at its creation size.
-    if (cn1PresentTexture != nil) {
-        [cn1PresentTexture release];
-        cn1PresentTexture = nil;
+    for (int i = 0; i < 2; i++) {
+        if (cn1PresentTextures[i] != nil) {
+            [cn1PresentTextures[i] release];
+            cn1PresentTextures[i] = nil;
+        }
+        if (cn1PresentSurfaces[i] != NULL) {
+            CFRelease(cn1PresentSurfaces[i]);
+            cn1PresentSurfaces[i] = NULL;
+        }
     }
-    if (cn1PresentSurface != NULL) {
-        CFRelease(cn1PresentSurface);
-        cn1PresentSurface = NULL;
-    }
+    cn1PresentIndex = 0;
     NSDictionary *surfaceProps = @{
         (id)kIOSurfaceWidth:           @(pw),
         (id)kIOSurfaceHeight:          @(ph),
         (id)kIOSurfaceBytesPerElement: @4,
         (id)kIOSurfacePixelFormat:     @((unsigned int)'BGRA'),
     };
-    cn1PresentSurface = IOSurfaceCreate((CFDictionaryRef)surfaceProps);
-    if (cn1PresentSurface != NULL) {
+    for (int i = 0; i < 2; i++) {
+        cn1PresentSurfaces[i] = IOSurfaceCreate((CFDictionaryRef)surfaceProps);
+        if (cn1PresentSurfaces[i] == NULL) {
+            continue;
+        }
         // sRGB, for the same reason the CAMetalLayer carried it: CoreGraphics
         // rasterises into DeviceRGB, and a surface tagged linear displays it
         // too bright.
-        IOSurfaceSetValue(cn1PresentSurface, CFSTR("IOSurfaceColorSpace"), kCGColorSpaceSRGB);
+        IOSurfaceSetValue(cn1PresentSurfaces[i], CFSTR("IOSurfaceColorSpace"), kCGColorSpaceSRGB);
         MTLTextureDescriptor *pdesc = [MTLTextureDescriptor
             texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
             width:pw height:ph mipmapped:NO];
         pdesc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
         pdesc.storageMode = MTLStorageModeShared;
-        cn1PresentTexture = [CN1MetalDevice() newTextureWithDescriptor:pdesc
-                                                             iosurface:cn1PresentSurface
-                                                                 plane:0];
-        // Handed over once. The window server composites out of the surface's
-        // shared memory, so every later frame just writes into it.
+        cn1PresentTextures[i] = [CN1MetalDevice() newTextureWithDescriptor:pdesc
+                                                                iosurface:cn1PresentSurfaces[i]
+                                                                    plane:0];
+    }
+    if (cn1PresentSurfaces[0] != NULL) {
+        // The first one, so there is something to show before a frame is drawn.
+        // Every later frame re-points the layer at whichever surface it just
+        // filled, which is also what marks the layer dirty.
         [CATransaction begin];
         [CATransaction setDisableActions:YES];
-        self.layer.contents = (id)cn1PresentSurface;
+        self.layer.contents = (id)cn1PresentSurfaces[0];
         [CATransaction commit];
     }
 
@@ -644,7 +665,13 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     self.renderCommandEncoder = nil;
     self.renderPassDescriptor = nil;
 
-    if (cn1PresentTexture == nil) {
+    // Alternate: the compositor may still be reading the surface handed over by
+    // the previous frame, and overwriting that one is what puts half of each
+    // frame on screen.
+    int presentIdx = cn1PresentIndex;
+    cn1PresentIndex = presentIdx ^ 1;
+    id<MTLTexture> presentTexture = cn1PresentTextures[presentIdx];
+    if (presentTexture == nil) {
         [self.commandBuffer commit];
         self.commandBuffer = nil;
         return NO;
@@ -654,7 +681,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
               sourceSlice:0 sourceLevel:0
              sourceOrigin:MTLOriginMake(0, 0, 0)
                sourceSize:MTLSizeMake(framebufferWidth, framebufferHeight, 1)
-                toTexture:cn1PresentTexture
+                toTexture:presentTexture
          destinationSlice:0 destinationLevel:0
         destinationOrigin:MTLOriginMake(0, 0, 0)];
     [blit endEncoding];
@@ -672,7 +699,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // The layer is retained by the block automatically; the surface is a CF type
     // and is not, so it is retained explicitly for the block's lifetime.
     CALayer *presentLayer = self.layer;
-    IOSurfaceRef presented = cn1PresentSurface;
+    IOSurfaceRef presented = cn1PresentSurfaces[presentIdx];
     CFRetain(presented);
     [self.commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
         [CATransaction begin];
@@ -726,14 +753,17 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 - (void)deleteFramebuffer {
     self.screenTexture = nil;
     self.stencilTexture = nil;
-    if (cn1PresentTexture != nil) {
-        [cn1PresentTexture release];
-        cn1PresentTexture = nil;
+    for (int i = 0; i < 2; i++) {
+        if (cn1PresentTextures[i] != nil) {
+            [cn1PresentTextures[i] release];
+            cn1PresentTextures[i] = nil;
+        }
+        if (cn1PresentSurfaces[i] != NULL) {
+            CFRelease(cn1PresentSurfaces[i]);
+            cn1PresentSurfaces[i] = NULL;
+        }
     }
-    if (cn1PresentSurface != NULL) {
-        CFRelease(cn1PresentSurface);
-        cn1PresentSurface = NULL;
-    }
+    cn1PresentIndex = 0;
     framebufferWidth = 0;
     framebufferHeight = 0;
 }

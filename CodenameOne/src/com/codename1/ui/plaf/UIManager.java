@@ -2844,10 +2844,18 @@ public class UIManager {
                     if (c < '0' || c > '9') {
                         break;
                     }
-                    if (fracDigits < 7) {
-                        frac = frac * 10 + (c - '0');
-                        fracDigits++;
+                    if (fracDigits == 7) {
+                        // Past what this path can carry exactly. DECLINING is not
+                        // the same as truncating: accepting the field and dropping
+                        // the rest of the digits returned the float for 0.1234567
+                        // where 0.123456789 was written, which is a different
+                        // float and a different margin. The fallback parses it
+                        // properly, and a value this precise is rare enough that
+                        // paying for the slow path is the right trade.
+                        return null;
                     }
+                    frac = frac * 10 + (c - '0');
+                    fracDigits++;
                     digits++;
                     p++;
                 }
