@@ -92,15 +92,14 @@ class TheComponentsOfCodenameOneJava179Snippet {
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-179[]
         Map<String, Object> proto = new HashMap<>();
-        map.put("Line1", "WWWWWWWWWWWWWWWWWWWW");
-        map.put("Line2", "WWWWWWWWWWWWWWWWWWWW");
+        proto.put("Line1", "WWWWWWWWWWWWWWWWWWWW");
+        proto.put("Line2", "WWWWWWWWWWWWWWWWWWWW");
         int mm5 = Display.getInstance().convertToPixels(5, true);
-        map.put("icon", Image.createImage(mm5, mm5));
-        myMultiList.setRenderingPrototype(map);
+        proto.put("icon", Image.createImage(mm5, mm5));
+        myMultiList.setRenderingPrototype(proto);
         // end::the-components-of-codename-one-java-179[]
     }
 
-    Map<String, Object> map = new HashMap<>();
 
 
     MultiList myMultiList = new MultiList();

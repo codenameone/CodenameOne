@@ -93,6 +93,7 @@ class TheComponentsOfCodenameOneJava148Snippet {
     private void automoveToNext(final TextField current, final TextField next) {
         current.addDataChangedListener((type, index) -> {
             if(current.getText().length() == 5) {
+                String val = current.getText();
                 current.stopEditing();
                 current.setText(val.substring(0, 4));
                 next.setText(val.substring(4));
@@ -102,6 +103,5 @@ class TheComponentsOfCodenameOneJava148Snippet {
     }
     // end::the-components-of-codename-one-java-148[]
 
-    String val = "value";
 
 }
