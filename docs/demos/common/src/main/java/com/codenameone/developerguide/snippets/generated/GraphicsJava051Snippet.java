@@ -85,19 +85,23 @@ class GraphicsJava051Snippet {
         float[] stops = { 0f, 0.5f, 1f };
 
         g.fillGradient(new LinearGradient(45f, colors, stops),
-                0, 0, getWidth(), getHeight());
+                getX(), getY(), getWidth(), getHeight());
 
         RadialGradient circle = new RadialGradient(colors, stops);
         circle.setShape(RadialGradient.SHAPE_CIRCLE)
               .setExtent(RadialGradient.EXTENT_FARTHEST_CORNER);
-        g.fillGradient(circle, 0, 0, getWidth(), getHeight());
+        g.fillGradient(circle, getX(), getY(), getWidth(), getHeight());
 
         g.fillGradient(new ConicGradient(colors, stops),
-                0, 0, getWidth(), getHeight());
+                getX(), getY(), getWidth(), getHeight());
         // end::graphics-java-051[]
     }
 
     int getHeight() { return 100; }
     int getWidth() { return 100; }
+
+
+    int getX() { return 0; }
+    int getY() { return 0; }
 
 }

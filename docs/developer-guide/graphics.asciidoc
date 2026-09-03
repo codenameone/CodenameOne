@@ -944,6 +944,13 @@ can override or augment whatever the default set:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/GraphicsJava072Snippet.java[tag=graphics-java-072,indent=0]
 ----
 
+
+NOTE: Decorators reach the storage-backed images only. `URLImage.fetch()`
+downloads a file-system-backed image through `Util.downloadImageToFileSystem`,
+which takes neither the global default nor a per-image decorator, so an image
+created with `createToFileSystem` is fetched without your `Authorization`
+header. Use `createToStorage` when the endpoint needs one.
+
 When a decorator is installed (global or per-call), `URLImage` skips the
 default `Util.downloadImageToStorage` path and builds a
 `ConnectionRequest` inline so the decorator can inspect / mutate it
