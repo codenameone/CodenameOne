@@ -23,11 +23,20 @@ resource and nothing left underneath it, so a property you don't set in CSS is
 absent rather than inherited from something older.
 
 Layering is a separate mechanism that you ask for explicitly. A theme constant
-named `@OverlayThemes` holds a comma-separated list of resource names, each
-without the `.res` extension. When `UIManager` finishes building a theme it reads
-that constant, opens each name in turn from the resource root and applies its
-properties over the ones already loaded, so a later overlay beats an earlier one
-and every overlay beats the theme that named them.
+named `OverlayThemes` holds a comma-separated list of resource names, each
+without the `.res` extension.
+
+Write that name bare wherever you author it. The Designer's constant editor and
+a CSS `#Constants` block both add the `@` that theme constants are stored with,
+exactly as they do for `includeNativeBool` or `commandBehavior`, so typing
+`@OverlayThemes` in either place produces `@@OverlayThemes` and nothing ever
+reads it. The stored key is `@OverlayThemes`, which is what you see in the
+resource and what code setting the property directly has to use.
+
+When `UIManager` finishes building a theme it reads that constant, opens each
+name in turn from the resource root and applies its properties over the ones
+already loaded, so a later overlay beats an earlier one and every overlay beats
+the theme that named them.
 
 Reach for it when you want to override a theme you don't own -- one shipped
 inside a cn1lib, for instance -- without editing the original. It's also what the
