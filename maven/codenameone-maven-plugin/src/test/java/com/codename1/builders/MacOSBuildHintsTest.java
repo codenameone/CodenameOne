@@ -46,6 +46,42 @@ import static org.junit.Assert.fail;
 /// are the tests that say so.
 public class MacOSBuildHintsTest {
 
+    /// A hint value carries whatever whitespace the settings file had around it, and the
+    /// two readers of this one used to compare it raw: "false " is neither "false" nor
+    /// "none", so a project that turned push OFF got the APNs entitlement emitted anyway --
+    /// and then could not sign against an App ID that does not grant it, because the
+    /// signing wizard reads the same settings file trimmed and left the capability alone.
+    @org.junit.Test
+    public void apsEnvironmentIgnoresSurroundingWhitespace() {
+        Map<String, String> raw = new HashMap<String, String>();
+        raw.put("macos.entitlements.apsEnvironment", " false ");
+        assertFalse("a trimmed false is still false",
+                parse(raw, "com.example").entitlementsFor("developerID").push(true));
+
+        raw.put("macos.entitlements.apsEnvironment", " none ");
+        assertFalse(parse(raw, "com.example").entitlementsFor("developerID").push(true));
+
+        raw.put("macos.entitlements.apsEnvironment", " development ");
+        MacOSBuildHints.EntitlementOverrides dev = parse(raw, "com.example").entitlementsFor("developerID");
+        assertTrue(dev.push(false));
+        assertEquals("development", dev.getApsEnvironment());
+
+        // All whitespace is not an environment: it reads as unset, so the class scan
+        // decides, exactly as an absent hint does.
+        raw.put("macos.entitlements.apsEnvironment", "   ");
+        assertFalse(parse(raw, "com.example").entitlementsFor("developerID").push(false));
+        assertTrue(parse(raw, "com.example").entitlementsFor("developerID").push(true));
+
+        // And it does not shadow the migrated spelling on the way. A modern key left blank
+        // counted as present, so the macNative value that actually said something was never
+        // read -- a project still using its legacy hint lost the entitlement it asks for.
+        raw.put("macNative.entitlements.apsEnvironment", "production");
+        MacOSBuildHints.EntitlementOverrides legacy =
+                parse(raw, "com.example").entitlementsFor("developerID");
+        assertTrue("a blank modern key must not shadow the migrated one", legacy.push(false));
+        assertEquals("production", legacy.getApsEnvironment());
+    }
+
     private static MacOSBuildHints parse(final Map<String, String> raw, String pkg) {
         MacOSBuildHints h = new MacOSBuildHints();
         h.parse(new MacOSBuildHints.HintSource() {

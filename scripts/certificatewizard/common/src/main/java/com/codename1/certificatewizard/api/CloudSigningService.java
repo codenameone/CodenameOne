@@ -246,6 +246,11 @@ public final class CloudSigningService implements SigningService {
                 bearerToken, r -> done(r, callback));
     }
 
+    public void enablePushCapability(String bundleIdAppleId, OnComplete<Result<Void>> callback) {
+        bundleIdsApi.enableCapability(bundleIdAppleId, new CapabilityRequest("PUSH_NOTIFICATIONS", null),
+                bearerToken, r -> done(r, callback));
+    }
+
     public void registerDevice(String name, String udid, OnComplete<Result<Void>> callback) {
         devicesApi.registerDevice(new RegisterDeviceRequest(name, udid, "IOS"), bearerToken, r -> done(r, callback));
     }
@@ -378,7 +383,9 @@ public final class CloudSigningService implements SigningService {
         List<SigningState.BundleId> outBundles = new ArrayList<SigningState.BundleId>();
         if (bundles != null) {
             for (BundleIdDTO b : bundles) {
-                outBundles.add(new SigningState.BundleId(b.id(), b.identifier(), b.name(), b.platform(), false));
+                // null, not false: the bundle-id listing reports no capabilities at all, and
+                // the wizard must not turn that silence into a claim about push (issue #5657).
+                outBundles.add(new SigningState.BundleId(b.id(), b.identifier(), b.name(), b.platform(), null));
             }
         }
         List<SigningState.Device> outDevices = new ArrayList<SigningState.Device>();

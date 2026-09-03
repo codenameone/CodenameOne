@@ -1126,7 +1126,10 @@ public final class Desktop {
     ///
     /// #### Returns
     ///
-    /// true if a listener consumed the wheel event
+    /// true if the wheel was acted on -- a listener consumed it, a component handled it, or
+    /// something scrolled. False means nothing under the cursor could move, which is the
+    /// answer a port needs to pass the gesture to whatever hosts the app; it is NOT an
+    /// invitation to emulate the wheel with pointer events.
     public boolean windowMouseWheelEvent(int windowId, int x, int y, int scrollX, int scrollY,
             boolean precise, int modifiers) {
         return Display.getInstance().windowMouseWheelEventImpl(windowId, x, y, scrollX, scrollY,

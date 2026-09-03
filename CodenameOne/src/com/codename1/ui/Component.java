@@ -363,6 +363,15 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean hideInPortrait;
     /// Indicates that this component and all its children should be hidden when the device is switched to landscape mode
     private boolean hideInLandscape;
+    /// Wheel movement a snapping component could not show yet, because it was smaller than
+    /// the distance to the next row. Carried to the following wheel event instead of being
+    /// dropped: without it a trackpad's small deltas each snap back to the row they started
+    /// on and the component never moves, and with it the visible position is always ON a
+    /// row -- which matters because Spinner3D reads its selected index straight off the
+    /// scroll position, so a component resting between rows reports a value nobody chose.
+    int wheelSnapRemainderY;
+    int wheelSnapRemainderX;
+
     private int scrollOpacity = 0xff;
     private boolean ignorePointerEvents;
     /// Indicates the decrement units for the scroll opacity
@@ -3375,7 +3384,14 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Returns
     ///
     /// The height of the area under the virtual keyboard in pixels
-    private int getInvisibleAreaUnderVKB() {
+    /// The part of this component the virtual keyboard is covering, which the scroll range
+    /// has to include or whatever is under the keyboard can never be brought into view.
+    ///
+    /// Package private rather than private because the wheel scroll in `Display` needs the
+    /// same number the drag path uses: a wheel clamps the position itself, and clamping to
+    /// a range that stops at the keyboard is how a field hidden behind it becomes
+    /// unreachable with a trackpad.
+    int getInvisibleAreaUnderVKB() {
         TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             int invisibleAreaUnderVKB = f.getInvisibleAreaUnderVKB();
@@ -3637,6 +3653,9 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `scrollX`: the X position of the scrolling
     protected void setScrollX(int scrollX) {
+        if (Display.getInstance().wheelScrollTarget != this) { //NOPMD CompareObjectsWithEquals
+            wheelSnapRemainderX = 0;
+        }
         // the setter must always update the value regardless...
         int scrollXtmp = scrollX;
         if (!isSmoothScrolling() || !isTensileDragEnabled()) {
@@ -3682,6 +3701,16 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `scrollY`: the Y position of the scrolling
     protected void setScrollY(int scrollY) {
+        if (Display.getInstance().wheelScrollTarget != this) { //NOPMD CompareObjectsWithEquals
+            // Anything that is not the wheel moving THIS component invalidates what it was
+            // carrying: the remainder describes a distance from a position this component
+            // is no longer at, so adding it to the next notch would move further than the
+            // notch asked for. A drag, a selection change and a programmatic scroll all
+            // land here -- including one made by a listener while the wheel is dispatching,
+            // which is why the test is the component being moved rather than whether a
+            // wheel is in flight at all.
+            wheelSnapRemainderY = 0;
+        }
         int oldAccessibilityScrollY = this.scrollY;
         if (this.scrollY != scrollY) {
             CodenameOneImplementation ci = Display.impl;
@@ -6712,6 +6741,21 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// true if a listener consumed the wheel event
     boolean fireMouseWheelEvent(com.codename1.ui.events.WheelEvent ev) {
+        return fireMouseWheelListeners(ev) || fireMouseWheelHandlers(ev);
+    }
+
+    /// The listener half of a wheel dispatch, walking up from this component.
+    ///
+    /// Separate from the handlers below because a listener can change the UI out from
+    /// under the gesture -- show a form, dispose a window, remove this component -- and
+    /// whoever called this has to be able to look again before anything else acts on a
+    /// tree that may no longer be on screen.
+    boolean fireMouseWheelListeners(com.codename1.ui.events.WheelEvent ev) {
+        // The whole chain, and before any built-in handling. Consuming is documented to
+        // prevent the DEFAULT behaviour, and a component that pans itself on a wheel is
+        // exactly that, so a listener anywhere above it has to be able to stop it: an
+        // application that binds control plus wheel to its own zoom on the form cannot be
+        // pre-empted by a viewer inside it.
         Component c = this;
         while (c != null) {
             if (c.mouseWheelListeners != null && c.mouseWheelListeners.hasListeners()) {
@@ -6722,6 +6766,46 @@ public class Component implements Animation, StyleListener, Editable {
             }
             c = c.getParent();
         }
+        return false;
+    }
+
+    /// The built-in half: the components that move content of their own.
+    boolean fireMouseWheelHandlers(com.codename1.ui.events.WheelEvent ev) {
+        Component c = this;
+        while (c != null) {
+            // Disabled components handle nothing, which is what the synthetic drag this
+            // replaced amounted to: Form.pointerDragged gated on isEnabled, so disabling a
+            // viewer or a map stopped the wheel panning it. The walk continues past it so
+            // an enabled ancestor still gets its turn.
+            if (c.isEnabled() && (c.mouseWheel(ev) || ev.isConsumed())) {
+                return true;
+            }
+            c = c.getParent();
+        }
+        return false;
+    }
+
+    /// Handles a scroll wheel or trackpad scroll over this component, before its listeners
+    /// and before anything above it in the hierarchy.
+    ///
+    /// A component that moves its own content -- an editor that scrolls itself, a viewer
+    /// that pans -- implements this. Everything else leaves it alone and the wheel scrolls
+    /// the nearest scrollable ancestor, which is what a wheel means.
+    ///
+    /// This exists because a wheel used to arrive as a synthetic press, drag and release
+    /// played into the component tree: a component that wanted the wheel got it by handling
+    /// pointer events, and so did every component that did not want it. The events are gone
+    /// and this is what replaces them, for the few components that have something of their
+    /// own to move.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ev`: the wheel event, carrying the scroll deltas in display pixels
+    ///
+    /// #### Returns
+    ///
+    /// true when this component handled the wheel and nothing else should act on it
+    protected boolean mouseWheel(com.codename1.ui.events.WheelEvent ev) {
         return false;
     }
 
@@ -7420,6 +7504,24 @@ public class Component implements Animation, StyleListener, Editable {
         this.dragActivated = dragActivated;
     }
 
+    /// Brings a faded scrollbar back and restarts the fade, for a scroll that did not come
+    /// from a pointer.
+    ///
+    /// pointerPressed and pointerReleased both do this, which is how the wheel used to get
+    /// it: the gesture it was emulated with went through them. Scrolling with a wheel now
+    /// touches neither, so once the scrollbar had faded out the content moved with nothing
+    /// on screen to say where in it the reader was.
+    void restoreFadingScrollbar() {
+        // Registered again, not only made opaque. The fade deregisters itself: animate()
+        // returns true while the opacity is coming down and the tick after it reaches zero
+        // falls through to tryDeregisterAnimated. So a scrollbar that has finished fading
+        // has no animation left, and restoring the opacity alone would light it up for
+        // good. A press or a release gets away with setting the field because the pointer
+        // paths around them re-register through checkAnimation.
+        scrollOpacity = 0xff;
+        checkAnimation();
+    }
+
     void checkAnimation() {
         Image bgImage = getStyle().getBgImage();
         if (bgImage != null && bgImage.isAnimation()) {
@@ -7468,6 +7570,39 @@ public class Component implements Animation, StyleListener, Editable {
     /// a valid Y position in the grid
     protected int getGridPosX() {
         return getScrollX();
+    }
+
+    /// Where this component would settle on its grid if it were scrolled to `position`,
+    /// answered without it ever being at that position.
+    ///
+    /// getGridPosY reads getScrollY, so asking where a wheel notch settles used to mean
+    /// scrolling there and snapping back from it. Everything watching saw both positions,
+    /// and the raw one is off the grid: Spinner3D mirrors the scroll into SpinnerNode,
+    /// which derives its selected index from it by rounding down, so a notch far too small
+    /// to change the selection still fired a selection change to the previous row and a
+    /// second one back to where it started -- twice into application listeners and twice
+    /// into the list model.
+    ///
+    /// The field is set and restored directly rather than through setScrollY, so nothing is
+    /// notified of a position the component is never left at. What getGridPos* reads is the
+    /// scroll position and the children's own coordinates, and those do not move with it.
+    int gridPositionFor(boolean vertical, int position) {
+        if (vertical) {
+            int was = scrollY;
+            scrollY = position;
+            try {
+                return getGridPosY();
+            } finally {
+                scrollY = was;
+            }
+        }
+        int was = scrollX;
+        scrollX = position;
+        try {
+            return getGridPosX();
+        } finally {
+            scrollX = was;
+        }
     }
 
     boolean isTensileMotionInProgress() {

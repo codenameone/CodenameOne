@@ -39,6 +39,12 @@ public final class MockSigningService implements SigningService {
     private final List<SigningState.ApnsKey> apns = new ArrayList<SigningState.ApnsKey>();
     private final List<SigningState.AppGroup> appGroups = new ArrayList<SigningState.AppGroup>();
     private final Map<String, List<String>> appGroupAssociations = new LinkedHashMap<String, List<String>>();
+    private final List<String> pushEnabledOn = new ArrayList<String>();
+    private final List<String> callLog = new ArrayList<String>();
+    private String pushCapabilityFailure;
+    private String profileDeletionFailure;
+    private int deletedProfileAttempts;
+    private final List<Long> deletedProfileIds = new ArrayList<Long>();
     private long seq = 100;
 
     public MockSigningService() {
@@ -58,6 +64,19 @@ public final class MockSigningService implements SigningService {
         bundles.add(new SigningState.BundleId("BID_A1", "com.example.myapp", "My App", "IOS", true));
         bundles.add(new SigningState.BundleId("BID_B2", "com.example.watch", "Watch App", "IOS", false));
         bundles.add(new SigningState.BundleId("BID_MAC", "com.example.myapp", "My App Mac", "MAC_OS", true));
+        // null push: what the real service reports for every App ID, because the listing
+        // endpoint carries no capabilities at all. The wizard has to render that as unknown
+        // rather than as off (issue #5657).
+        bundles.add(new SigningState.BundleId("BID_C3", "com.example.legacy", "Legacy App", "IOS", null));
+        // Registered for macOS and nothing else, which is what an account looks like after
+        // Mac signing was set up for a project before anything else was.
+        bundles.add(new SigningState.BundleId("BID_MACONLY", "com.example.macapp", "Mac Only App",
+                "MAC_OS", null));
+        // One App ID serving both platforms, which is what Apple's UNIVERSAL registration
+        // is: a capability change on it changes what EVERY profile issued from it was a
+        // snapshot of, iOS and Mac alike.
+        bundles.add(new SigningState.BundleId("BID_UNIV", "com.example.universal", "Universal App",
+                "UNIVERSAL", null));
         devices.add(new SigningState.Device("DEV_1", "Shai's iPhone", "00008120-000A1C3E0C68201E", "IOS", "ENABLED"));
         devices.add(new SigningState.Device("DEV_2", "QA iPad", "00008027-0004450E2688002E", "IOS", "ENABLED"));
         // A retired device is still on the account and Apple rejects a profile request naming it,
@@ -138,6 +157,98 @@ public final class MockSigningService implements SigningService {
         callback.completed(Result.ok(null));
     }
 
+    public void enablePushCapability(String bundleIdAppleId, OnComplete<Result<Void>> callback) {
+        callLog.add("enablePush:" + bundleIdAppleId);
+        if (pushCapabilityFailure != null) {
+            callback.completed(Result.<Void>fail(pushCapabilityFailure));
+            return;
+        }
+        pushEnabledOn.add(bundleIdAppleId);
+        for (int i = 0; i < bundles.size(); i++) {
+            SigningState.BundleId b = bundles.get(i);
+            if (b.id() != null && b.id().equals(bundleIdAppleId)) {
+                bundles.set(i, new SigningState.BundleId(b.id(), b.identifier(), b.name(), b.platform(),
+                        Boolean.TRUE));
+            }
+        }
+        callback.completed(Result.ok(null));
+    }
+
+    /// The App IDs push has been asserted on, so a test can tell "the wizard asked" from
+    /// "the App ID happened to have it already".
+    public List<String> pushEnabledOn() {
+        return new ArrayList<String>(pushEnabledOn);
+    }
+
+    /// Marks every profile of this bundle INVALID, which is what Apple does to the
+    /// profiles issued before a capability change.
+    public void invalidateProfilesFor(String bundleIdentifier) {
+        for (int i = 0; i < profiles.size(); i++) {
+            SigningState.Profile p = profiles.get(i);
+            if (bundleIdentifier != null && bundleIdentifier.equals(p.bundleId())) {
+                profiles.set(i, new SigningState.Profile(p.id(), p.appleProfileId(), p.name(),
+                        p.profileType(), p.bundleId(), p.uuid(), p.expiresAt(), "INVALID"));
+            }
+        }
+    }
+
+    /// Makes profile deletion fail with `message`, or succeed again when given null.
+    public void failProfileDeletion(String message) {
+        profileDeletionFailure = message;
+    }
+
+    /// How many times a delete was attempted, so a test can tell a retry from a run that
+    /// decided the profile had already been dealt with.
+    public int deletedProfileAttempts() {
+        return deletedProfileAttempts;
+    }
+
+    /// Which profiles a delete was attempted on, in order. A run retiring several invalid
+    /// profiles makes a bare count useless: what says the guard was reset is the SAME
+    /// profile being attempted a second time.
+    public List<Long> deletedProfileIds() {
+        return new ArrayList<Long>(deletedProfileIds);
+    }
+
+    /// Makes every push capability call fail with `message`, so a test can read the
+    /// diagnostic the wizard puts up rather than only the happy path.
+    public void failPushCapability(String message) {
+        pushCapabilityFailure = message;
+    }
+
+    /// Every call that changed something, in the order it arrived. A profile is a snapshot
+    /// of an App ID's capabilities, so WHEN a capability was changed relative to the
+    /// profiles issued from it is the thing a test has to be able to see.
+    public List<String> callLog() {
+        return new ArrayList<String>(callLog);
+    }
+
+    /// Moves one App ID to the front of the listing.
+    ///
+    /// Apple returns an account's bundle IDs in no documented order, so an identifier
+    /// registered for both platforms can come back either way round. A caller that
+    /// resolves such an identifier without saying which platform it means gets whichever
+    /// happens to be first, and a test has to be able to say "the macOS record was".
+    public void moveBundleToFront(String appleId) {
+        for (int i = 0; i < bundles.size(); i++) {
+            if (bundles.get(i).id() != null && bundles.get(i).id().equals(appleId)) {
+                bundles.add(0, bundles.remove(i));
+                return;
+            }
+        }
+    }
+
+    /// Drops every App ID registered for `platform`, so a test can build the account shape
+    /// where the identifiers on file are all for the other one.
+    public void removeBundlesForPlatform(String platform) {
+        for (int i = bundles.size() - 1; i >= 0; i--) {
+            String p = bundles.get(i).platform();
+            if (p != null && p.equals(platform)) {
+                bundles.remove(i);
+            }
+        }
+    }
+
     public List<String> appGroupAssociation(String bundleIdAppleId) {
         List<String> assoc = appGroupAssociations.get(bundleIdAppleId);
         return assoc == null ? new ArrayList<String>() : new ArrayList<String>(assoc);
@@ -150,6 +261,7 @@ public final class MockSigningService implements SigningService {
 
     public void createProfile(String name, String profileType, String bundleIdAppleId, List<String> certificateAppleIds,
                               List<String> deviceAppleIds, OnComplete<Result<Void>> callback) {
+        callLog.add("createProfile:" + bundleIdAppleId);
         String bundle = bundleIdAppleId;
         for (SigningState.BundleId b : bundles) {
             if (b.id().equals(bundleIdAppleId)) {
@@ -162,6 +274,12 @@ public final class MockSigningService implements SigningService {
     }
 
     public void deleteProfile(Long id, OnComplete<Result<Void>> callback) {
+        deletedProfileAttempts++;
+        deletedProfileIds.add(id);
+        if (profileDeletionFailure != null) {
+            callback.completed(Result.<Void>fail(profileDeletionFailure));
+            return;
+        }
         for (int i = profiles.size() - 1; i >= 0; i--) {
             if (profiles.get(i).id().equals(id)) {
                 profiles.remove(i);

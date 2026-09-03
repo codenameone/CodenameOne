@@ -74,6 +74,9 @@ public final class CertificateWizardStructureHarness {
             }
         });
 
+        // Bound to a project, because there is no other way to start: the wizard operates
+        // on one project's identifiers and refuses to run without one.
+        writeProjectBinding();
         final CertificateWizard[] app = new CertificateWizard[1];
         Display.getInstance().callSeriallyAndWait(new Runnable() {
             public void run() {
@@ -94,6 +97,11 @@ public final class CertificateWizardStructureHarness {
             new Runnable() { public void run() { checkMacDevelopmentDeadEnd(app[0]); } },
             new Runnable() { public void run() { checkCertificateDialogOpensOnTheNeededType(app[0]); } },
             new Runnable() { public void run() { checkRemainingSections(app[0]); } },
+            // Last, because it replaces the wizard: the checks above deliberately run with
+            // no project binding, and this one needs one.
+            new Runnable() { public void run() { app[0] = openProjectBoundWizard(); } },
+            new Runnable() { public void run() { fire(app[0].getForm(), "btn.newProfile"); } },
+            new Runnable() { public void run() { checkProjectScopedProfileDialog(app[0]); } },
         };
         for (Runnable stage : stages) {
             Display.getInstance().callSeriallyAndWait(stage);
@@ -153,6 +161,17 @@ public final class CertificateWizardStructureHarness {
 
         fire(form, "nav.bundles");
         check(find(form, "btn.addBundle") != null, "bundle add action present");
+        // The service reports no capabilities with the App ID listing, so the push column
+        // says so instead of filling the silence in with "Off" (issue #5657).
+        check(findTextContaining(form, "Unknown") != null,
+                "an App ID whose capabilities the service did not report says push is unknown");
+        // And the capability can be turned on from here. The builders also enable push for
+        // what they DETECT -- a VoIP reference on iOS, a push registration call in the
+        // macOS class scan -- and neither inference is reproducible in the wizard, so the
+        // remedy for a build whose entitlement the App ID does not grant has to be one
+        // click rather than a guess.
+        check(find(form, "btn.enablePush.BID_A1") != null,
+                "push can be enabled on an existing App ID");
         fire(form, "btn.addBundle");
         check(Display.getInstance().getCurrent() == form, "bundle modal overlays current form");
         check(find(form, "modal.cancel") != null, "bundle modal cancel action present");
@@ -231,6 +250,17 @@ public final class CertificateWizardStructureHarness {
         fire(form, "pick.type.mac_app_development");
         check(find(form, "pick.cert.3") == null, "a Mac App Store certificate is not a Mac development one");
         check(find(form, "btn.profileNeedsCert") != null, "the missing certificate is called out");
+        // And the certificate chosen under the previous type went with it. With a bundle
+        // picked, the certificate is the ONLY thing still missing -- so if one left behind
+        // by the type change were still in the request, canCreateProfile would see a
+        // non-empty list of certificate IDs and enable Create with no certificate row
+        // selected, sending Apple one that cannot sign this profile type.
+        fire(form, "pick.bundle.BID_MAC");
+        check(selectedChoice(form, "pick.bundle.BID_MAC"), "the Mac bundle ID is selectable here");
+        check(!enabled(form, "modal.profile.submit"),
+                "no certificate can sign this type, so create stays disabled");
+        check(requirementText(form).contains("certificate"),
+                "and the missing certificate is what it asks for: " + requirementText(form));
         check(find(form, "pick.device.DEV_1") == null, "an iPhone is not offered for a Mac profile");
         // and says so, rather than the section simply not being drawn -- which is the reading
         // that would make the check above pass for the wrong reason
@@ -327,6 +357,98 @@ public final class CertificateWizardStructureHarness {
         Component edtError = find(form, "page.message");
         check(edtError instanceof SpanLabel && ((SpanLabel)edtError).isTextSelectionEnabled(),
                 "EDT error text is selectable");
+    }
+
+    /// A second wizard, opened the way the IDE opens it: bound to a project whose package
+    /// name is one of the mock account's App IDs, which is what makes the project's own
+    /// rows tell themselves apart from the rest of the account.
+    /// Points the wizard at a throwaway project whose package name is one of the mock
+    /// account's App IDs. Required before any launch: without a project identifier the
+    /// wizard shows its launch failure and builds none of the pages checked here.
+    private static void writeProjectBinding() {
+        try {
+            java.io.File dir = new java.io.File(System.getProperty("java.io.tmpdir"),
+                    "cn1-certificatewizard-harness");
+            dir.mkdirs();
+            java.io.File settings = new java.io.File(dir, "codenameone_settings.properties");
+            write(settings, "codename1.packageName=com.example.myapp\n"
+                    + "codename1.displayName=My App\n");
+            java.io.File binding = new java.io.File(dir, "binding.properties");
+            write(binding, "projectDir=" + dir.getAbsolutePath() + "\n"
+                    + "settings=" + settings.getAbsolutePath() + "\n");
+            System.setProperty("certificatewizard.input", binding.getAbsolutePath());
+        } catch (Exception ex) {
+            check(false, "the harness could not write a project binding: " + ex);
+        }
+    }
+
+    private static CertificateWizard openProjectBoundWizard() {
+        writeProjectBinding();
+        CertificateWizard.setServiceForTesting(new MockSigningService());
+        CertificateWizard bound = new CertificateWizard();
+        bound.runApp();
+        return bound;
+    }
+
+    private static void write(java.io.File f, String content) throws java.io.IOException {
+        java.io.OutputStream out = new java.io.FileOutputStream(f);
+        try {
+            out.write(content.getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+    }
+
+    /// The new-profile dialog for a project the wizard knows the bundle ID of.
+    ///
+    /// The account holds three App IDs and only two of them belong to this project, which
+    /// used to be a list to search rather than a choice to make (issue #5654). The
+    /// project's own App ID and the single certificate that can sign an App Store profile
+    /// start chosen, so the dialog opens ready to create rather than opening disabled.
+    private static void checkProjectScopedProfileDialog(CertificateWizard app) {
+        Form form = app.getForm();
+        check(find(form, "modal.profile.submit") != null, "profile modal opens for a bound project");
+        check(find(form, "pick.bundle.BID_A1") != null, "the project's own bundle ID is offered");
+        check(find(form, "pick.bundle.BID_B2") == null,
+                "an unrelated bundle ID is not offered by default");
+        check(selectedChoice(form, "pick.bundle.BID_A1"),
+                "the project's bundle ID starts selected");
+        check(selectedChoice(form, "pick.cert.1"),
+                "the one certificate that can sign this profile type starts selected");
+        check(enabled(form, "modal.profile.submit"),
+                "so the dialog opens ready to create rather than disabled");
+        Component showAll = find(form, "btn.profileShowAllBundles");
+        check(showAll != null, "the rest of the account is one click away");
+        fire(form, "btn.profileShowAllBundles");
+        check(find(form, "pick.bundle.BID_B2") != null, "and shows every bundle ID when asked");
+        check(selectedChoice(form, "pick.bundle.BID_A1"),
+                "widening the list does not lose the selection");
+        check(find(form, "btn.profileShowProjectBundles") != null, "and the narrowing is reversible");
+        // Narrowing the list again has to take the selection with it. A hidden bundle left
+        // selected is a choice nothing on screen accounts for, and Create submitted it.
+        fire(form, "pick.bundle.BID_B2");
+        check(selectedChoice(form, "pick.bundle.BID_B2"), "an unrelated bundle can still be chosen");
+        fire(form, "btn.profileShowProjectBundles");
+        check(find(form, "pick.bundle.BID_B2") == null, "narrowing hides the unrelated bundle");
+        check(selectedChoice(form, "pick.bundle.BID_A1"),
+                "and moves the selection back to a row that is on screen");
+        // The account holds the same identifier registered for both platforms. A default
+        // chosen platform-neutrally picked the iOS one and kept it when the type became a
+        // Mac one, so Create sent Apple an App ID that cannot carry the profile.
+        fire(form, "pick.type.mac_app_store");
+        check(selectedChoice(form, "pick.bundle.BID_MAC"),
+                "a Mac profile type selects the macOS registration of the identifier");
+        // Not merely deselected: an App ID registered for iOS cannot carry a Mac profile,
+        // and while the row was on screen it could be picked outright -- nothing refused
+        // the selection and Create submitted it.
+        check(find(form, "pick.bundle.BID_A1") == null,
+                "and stops offering the iOS one at all");
+        check(find(form, "pick.bundle.BID_B2") == null,
+                "no iOS App ID is offered for a Mac profile, this project's or anyone's");
+        fire(form, "pick.type.ios_app_store");
+        check(selectedChoice(form, "pick.bundle.BID_A1"),
+                "and back again when the type returns to iOS");
+        fire(form, "modal.cancel");
     }
 
     private static boolean selectedSegment(Container root, String name) {

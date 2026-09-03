@@ -2320,9 +2320,21 @@ public final class Display extends CN1Constants {
                 || t == PointerEvent.TYPE_ERASER;
     }
 
-    /// Dispatches a mouse wheel event to the component under the given coordinates. Invoked by the
-    /// implementation on the EDT before the default scrolling gesture is synthesized. Returns true
-    /// if a listener consumed the event, in which case the default scroll should be skipped.
+    /// Dispatches a mouse wheel event to the component under the given coordinates, and scrolls
+    /// it. Invoked by the implementation on the EDT.
+    ///
+    /// This is where a wheel ends: listeners on the component and its ancestors see it first and
+    /// may consume it, then `Component#mouseWheel(com.codename1.ui.events.WheelEvent)` may take
+    /// it, and what neither claimed scrolls the nearest ancestor that can move in that direction.
+    /// A port calls this and does nothing else.
+    ///
+    /// It used to dispatch to listeners only, as a preflight before the port synthesized a press,
+    /// a few drags and a release to do the scrolling. Those synthetic events are gone -- they
+    /// pressed whatever sat under the cursor, so a trackpad nudge over a button activated it --
+    /// and the scrolling they existed for happens here instead. The method is deliberately the
+    /// single terminal entry point rather than one of a pair: a port that called the wrong half
+    /// of a split API would either scroll nothing or go back to faking pointer events, which is
+    /// the bug this replaced.
     ///
     /// #### Parameters
     ///
@@ -2340,7 +2352,10 @@ public final class Display extends CN1Constants {
     ///
     /// #### Returns
     ///
-    /// true if a listener consumed the wheel event
+    /// true if the wheel was acted on -- a listener consumed it, a component handled it, or
+    /// something scrolled. False means nothing under the cursor could move, which is the
+    /// answer a port needs to pass the gesture to whatever hosts the app; it is NOT an
+    /// invitation to emulate the wheel with pointer events.
     public boolean fireMouseWheelEvent(int x, int y, int scrollX, int scrollY, boolean precise, int modifiers) {
         return windowMouseWheelEventImpl(0, x, y, scrollX, scrollY, precise, modifiers);
     }
@@ -8644,7 +8659,10 @@ public final class Display extends CN1Constants {
     ///
     /// #### Returns
     ///
-    /// true if a listener consumed the wheel event
+    /// true if the wheel was acted on -- a listener consumed it, a component handled it, or
+    /// something scrolled. False means nothing under the cursor could move, which is the
+    /// answer a port needs to pass the gesture to whatever hosts the app; it is NOT an
+    /// invitation to emulate the wheel with pointer events.
     boolean windowMouseWheelEventImpl(int windowId, int x, int y, int scrollX, int scrollY,
             boolean precise, int modifiers) {
         if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
@@ -8678,7 +8696,193 @@ public final class Display extends CN1Constants {
             return false;
         }
         com.codename1.ui.events.WheelEvent we = new com.codename1.ui.events.WheelEvent(cmp, x, y, scrollX, scrollY, precise, modifiers);
-        return cmp.fireMouseWheelEvent(we);
+        if (cmp.fireMouseWheelListeners(we)) {
+            return true;
+        }
+        // Looked at again between the phases. A listener that did not consume can still
+        // have shown a form, disposed the window or removed the component, and the rest of
+        // this would then pan a detached image viewer or scroll a form nobody is looking
+        // at -- state that surfaces later when that UI comes back. The gesture this
+        // replaced re-checked the same way between its queued steps.
+        if (!wheelTargetStillOnScreen(root, cmp, windowId)) {
+            return false;
+        }
+        if (cmp.fireMouseWheelHandlers(we)) {
+            return true;
+        }
+        if (!wheelTargetStillOnScreen(root, cmp, windowId)) {
+            return false;
+        }
+        return scrollForWheel(cmp, scrollX, scrollY);
+    }
+
+    /// Scrolls the nearest scrollable ancestor of `cmp` for a wheel nobody handled.
+    ///
+    /// A wheel is a scroll, and this is where it happens: the framework used to emulate one
+    /// by playing a synthetic press, drag and release into the component tree, which every
+    /// component that reacts to a pointer then had to defend itself against -- a switch
+    /// toggled, a list selected a row, an image viewer panned half way. There is a wheel
+    /// API now, so the scroll is applied to the container that scrolls and no pointer event
+    /// is invented at all.
+    ///
+    /// A component that wants the wheel for itself takes it before this, by consuming the
+    /// event in `Component#mouseWheel` or in a listener.
+    /// Whether the component a wheel was aimed at is still in the tree it was found in,
+    /// and that tree is still what the user is looking at.
+    private boolean wheelTargetStillOnScreen(Container root, Component cmp, int windowId) {
+        // Modality as well as identity. A listener that did not consume can still put a
+        // modal up, and its window blocks the one the wheel came from while that window's
+        // tree stays perfectly visible and attached -- so every other check here passes and
+        // the wheel would scroll content behind the modal. The entry point tests this once,
+        // before the listeners run; this is the same test after they have.
+        if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
+            return false;
+        }
+        if (windowId > 0) {
+            Window w = Desktop.getInstance().windowById(windowId);
+            if (w != root || !w.isWindowShowing()) { //NOPMD CompareObjectsWithEquals
+                return false;
+            }
+        } else if (getCurrent() != root) { //NOPMD CompareObjectsWithEquals
+            return false;
+        }
+        return TopLevelSupport.rootOf(cmp) == root; //NOPMD CompareObjectsWithEquals
+    }
+
+    private boolean scrollForWheel(Component cmp, int scrollX, int scrollY) {
+        boolean scrolled = false;
+        if (scrollY != 0) {
+            scrolled = scrollAxisForWheel(cmp, true, scrollY);
+        }
+        if (scrollX != 0) {
+            scrolled = scrollAxisForWheel(cmp, false, scrollX) || scrolled;
+        }
+        return scrolled;
+    }
+
+    /// The component `#applyScroll` is moving right now, and only while it is moving it.
+    ///
+    /// Component#setScrollY reads this to tell the wheel's own two-step -- set the raw
+    /// position, then snap it -- from every other way a scroll position changes, because
+    /// only the former may keep the remainder it is carrying. isScrollWheeling cannot
+    /// answer that: it is true for the whole dispatch, so a listener that consumed the
+    /// wheel and moved a snapping component itself looked like the framework's own snap
+    /// and kept a remainder measured from somewhere else.
+    Component wheelScrollTarget;
+
+    private boolean applyScroll(Component target, boolean vertical, int position, int max) {
+        int ceiling = max < 0 ? 0 : max;
+        int before = vertical ? target.getScrollY() : target.getScrollX();
+        boolean snapping = target.isSnapToGrid();
+        if (snapping) {
+            // A snapping component cannot come to rest between rows, so the last position
+            // it can actually hold is the last one on its grid -- not the raw scroll
+            // ceiling, which can sit well past it. Spinner3D's scroller is exactly that
+            // shape: calcScrollSize returns listHeight + 6 * rowHeight so the final item
+            // can reach the middle of the view, while its getGridPosY caps at
+            // calcFlatListHeight() - rowHeight, six rows short of that ceiling.
+            //
+            // Measured against the raw ceiling, every further notch at the last item moves
+            // `wanted` and nothing else: the event counts as handled, the component does
+            // not move, and the page under a spinner sitting at the end of its list would
+            // never scroll again.
+            int gridCeiling = target.gridPositionFor(vertical, ceiling);
+            if (gridCeiling >= 0 && gridCeiling < ceiling) {
+                ceiling = gridCeiling;
+            }
+        }
+        // A snapping component moves in whole rows, so anything left over from the last
+        // event is carried into this one. The position the gesture has actually asked for
+        // is therefore the visible one plus that carry -- and comparing THAT before and
+        // after is what says whether the component has anything left to give: a component
+        // pinned at an edge reports nothing moved and the wheel goes to the page, while one
+        // that merely cannot show this notch yet keeps it and shows it on a later one.
+        int carry = snapping ? (vertical ? target.wheelSnapRemainderY : target.wheelSnapRemainderX) : 0;
+        int wantedBefore = before + carry;
+        int wanted = Math.max(0, Math.min(ceiling, position + carry));
+        if (wanted == wantedBefore) {
+            return false;
+        }
+        wheelScrollTarget = target;
+        try {
+            // Every event lands on the grid, and whether the device is precise no longer
+            // enters into it: carrying the remainder is what keeps a trackpad moving, so
+            // there is nothing left for a precise flag to decide. Snapping only notched
+            // wheels left a trackpad gesture resting between rows with no release, motion
+            // or idle callback to settle it -- and Spinner3D derives its selected index
+            // from where the scroll actually is, so resting between rows is a value nobody
+            // chose.
+            int shown = wanted;
+            if (snapping) {
+                shown = Math.max(0, Math.min(ceiling, target.gridPositionFor(vertical, wanted)));
+            }
+            // One move, straight to where the gesture settles. Going to the raw position
+            // first and snapping back from it published a position off the grid that the
+            // component is never left at, and a listener deriving a value from where the
+            // scroll is -- Spinner3D's selected index -- changed it and changed it back.
+            setScrollPosition(target, vertical, shown);
+            // The remainder measures a distance from `shown`, so it is worth keeping only
+            // if that is where the component ended up. A ScrollListener or an onScrollY
+            // override that scrolls the target runs synchronously inside the call above,
+            // while this is still the wheel's own target -- which is exactly when setScrollY
+            // leaves the carry alone -- and setScrollY clamps a position the component
+            // cannot take. Either way the carry would then describe a place it is not at,
+            // and the next notch would move by a distance nobody asked for.
+            int landed = vertical ? target.getScrollY() : target.getScrollX();
+            int remainder = snapping && landed == shown ? wanted - shown : 0;
+            if (vertical) {
+                target.wheelSnapRemainderY = remainder;
+            } else {
+                target.wheelSnapRemainderX = remainder;
+            }
+        } finally {
+            wheelScrollTarget = null;
+        }
+        target.restoreFadingScrollbar();
+        target.repaint();
+        return true;
+    }
+
+    private void setScrollPosition(Component target, boolean vertical, int position) {
+        if (vertical) {
+            target.setScrollY(position);
+        } else {
+            target.setScrollX(position);
+        }
+    }
+
+    /// Scrolls the first ancestor that can actually move on this axis, which is not always
+    /// the first one that scrolls: a list inside a page is scrollable right up to its last
+    /// row, and a wheel that stopped dead there would strand the reader half way down a
+    /// page that had plenty left to show. So the walk continues past a container already at
+    /// the edge it is being pushed against, and the page takes over -- which is what every
+    /// other toolkit does with nested scrollers, and what the drag this replaced did by
+    /// handing the gesture up.
+    private boolean scrollAxisForWheel(Component cmp, boolean vertical, int delta) {
+        Component c = cmp;
+        while (c != null) {
+            // A disabled component takes no wheel, exactly as it took no synthetic drag:
+            // Form.pointerDragged gated on isEnabled, so disabling a scroller used to stop
+            // the wheel too. The walk continues, so an enabled ancestor still gets it.
+            if (c.isEnabled() && (vertical ? c.isScrollableY() : c.isScrollableX())) {
+                // Clamped here rather than left to setScrollY: that one only clamps for a
+                // component with tensile drag off, because a finger is allowed to overshoot
+                // and spring back. A wheel notch has nothing to spring back from.
+                // The vertical range includes what the virtual keyboard is covering, the
+                // same way the drag path and setScrollY compute it: a wheel that stopped at
+                // the keyboard could never bring the field behind it into view.
+                int max = vertical
+                        ? c.getScrollDimension().getHeight() - c.getHeight()
+                                + c.getInvisibleAreaUnderVKB()
+                        : c.getScrollDimension().getWidth() - c.getWidth();
+                int from = vertical ? c.getScrollY() : c.getScrollX();
+                if (applyScroll(c, vertical, from - delta, max)) {
+                    return true;
+                }
+            }
+            c = c.getParent();
+        }
+        return false;
     }
 
     /// Dispatches a magnify (pinch) gesture aimed at one native window. Invoked by the
