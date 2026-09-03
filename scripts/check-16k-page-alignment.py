@@ -37,6 +37,7 @@ Usage:
 
 import io
 import os
+import re
 import struct
 import subprocess
 import sys
@@ -235,10 +236,25 @@ def is_android_payload(label):
     return False
 
 
+# A shared-library soname version is numeric: `libfoo.so.1`, `libfoo.so.1.2`.
+SONAME_VERSION = re.compile(r"[0-9]+(\.[0-9]+)*\Z")
+
+
 def looks_like_shared_library(name):
-    """True for `libfoo.so` and for a versioned `libfoo.so.1`."""
+    """True for `libfoo.so` and for a versioned `libfoo.so.1` or `.so.1.2`.
+
+    The version has to be numeric. A looser "contains `.so.`" test also
+    swallows the metadata that sits beside a native library -- a
+    `libfoo.so.sha256` checksum, a `libfoo.so.asc` signature -- and this gate
+    reads every tracked path, so it would fail the whole run with "not an ELF
+    file" over a text file. Being strict here costs nothing: a file that is
+    genuinely a library is still found by its magic whatever it is called.
+    """
     base = os.path.basename(name).lower()
-    return base.endswith(".so") or ".so." in base
+    if base.endswith(".so"):
+        return True
+    _, separator, version = base.partition(".so.")
+    return bool(separator) and SONAME_VERSION.match(version) is not None
 
 
 def looks_like_archive(name):

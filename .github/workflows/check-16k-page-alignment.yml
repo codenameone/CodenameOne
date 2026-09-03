@@ -33,6 +33,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Unit-test the gate's classification boundaries
+        # Every case in here is one a review caught: something unreadable
+        # passing as compliant, or a valid artifact rejected by a rule that
+        # does not apply to it. Run before the scan, so a broken gate is
+        # reported as a broken gate rather than as a clean tree.
+        shell: bash
+        run: python3 scripts/test_check_16k_page_alignment.py
+
       - name: Scan tracked native artifacts for 16 KB page alignment
         shell: bash
         run: scripts/check-16k-page-alignment.py --verbose
