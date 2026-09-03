@@ -124,9 +124,14 @@ class AdvertisingJava006Snippet {
             }
 
             public void onFailedToLoad(AdError error) {
-                // Transient provider and network errors are normal here. Without
-                // a retry the offer stays disabled for the life of the screen, so
-                // back off and try again rather than dropping it silently.
+                // Retry only what can succeed later. A network error or an empty
+                // ad inventory is transient; an unsupported platform or a bad ad
+                // unit id never becomes valid, and retrying those turns the
+                // graceful "no ads here" path into a permanent timer.
+                if (error.getCode() != AdError.CODE_NETWORK_ERROR
+                        && error.getCode() != AdError.CODE_NO_FILL) {
+                    return;
+                }
                 retryDelay = Math.min(retryDelay * 2, 60000);
                 UITimer.timer(retryDelay, false, form, () -> ad.load());
             }
