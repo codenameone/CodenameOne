@@ -101,11 +101,12 @@ class GraphicsJava061Snippet {
 
         double minuteAngle = minute/60.0*2.0*Math.PI;
 
-        // Rotate and draw the minute hand
+        // Rotate and draw the minute hand, keeping the caller's transform
+        Transform originalTransform = g.getTransform();
         g.rotate((float)minuteAngle, (int)absCX, (int)absCY);
         g.setColor(0x000000);
         g.fillShape(translatedMinuteHand);
-        g.resetAffine();
+        g.setTransform(originalTransform);
 
 
         // Draw the hour hand
@@ -126,10 +127,11 @@ class GraphicsJava061Snippet {
                 (double)(calendar.get(Calendar.MINUTE))/60.0;
 
         double angle = hour/12.0*2.0*Math.PI;
+        Transform beforeHourHand = g.getTransform();
         g.rotate((float)angle, (int)absCX, (int)absCY);
         g.setColor(0x000000);
         g.fillShape(translatedHourHand);
-        g.resetAffine();
+        g.setTransform(beforeHourHand);
         // end::graphics-java-061[]
     }
 

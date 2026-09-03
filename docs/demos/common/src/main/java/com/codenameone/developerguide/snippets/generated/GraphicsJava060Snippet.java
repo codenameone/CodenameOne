@@ -91,13 +91,15 @@ class GraphicsJava060Snippet {
         double absCX = getAbsoluteX()+cX-getX();
         double absCY = getAbsoluteY()+cY-getY();
 
+        // keep whatever transform the caller had, rather than resetting to none
+        Transform originalTransform = g.getTransform();
         g.rotate((float)secondAngle, (int)absCX, (int)absCY);
         g.setColor(0xff0000);
         g.drawShape(
                 translatedSecondHand,
                 new Stroke(2f, Stroke.CAP_BUTT, Stroke.JOIN_BEVEL, 1f)
         );
-        g.resetAffine();
+        g.setTransform(originalTransform);
         // end::graphics-java-060[]
     }
 
