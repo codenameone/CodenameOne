@@ -33,6 +33,11 @@ exactly as they do for `includeNativeBool` or `commandBehavior`, so typing
 reads it. The stored key is `@OverlayThemes`, which is what you see in the
 resource and what code setting the property directly has to use.
 
+In a CSS `#Constants` block, quote the value whenever you name more than one
+overlay. The compiler keeps only the first value it parses out of the
+declaration, so `OverlayThemes: base,extra;` loses `extra` without a word while
+`OverlayThemes: "base,extra";` keeps both.
+
 When `UIManager` finishes building a theme it reads that constant, opens each
 name in turn from the resource root and applies its properties over the ones
 already loaded, so a later overlay beats an earlier one and every overlay beats
