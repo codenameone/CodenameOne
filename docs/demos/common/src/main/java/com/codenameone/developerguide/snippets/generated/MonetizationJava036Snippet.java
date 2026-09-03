@@ -105,9 +105,20 @@ class MonetizationJava036Snippet {
      callback.onSucess(Boolean.FALSE);
      return;
      }
-     List<Receipt> receipts = raw instanceof List
-     ? (List<Receipt>)raw
-     : new ArrayList<Receipt>();
+     // The container's type says nothing about its elements, and iterating a
+     // list holding something else throws before the callback runs, which
+     // leaves synchronization stuck for the session. Copy with a check, the
+     // same way fetchReceipts() does.
+     List<Receipt> receipts = new ArrayList<Receipt>();
+     if (raw instanceof List) {
+     for (Object o : (List<?>) raw) {
+     if (!(o instanceof Receipt)) {
+     callback.onSucess(Boolean.FALSE);
+     return;
+     }
+     receipts.add((Receipt) o);
+     }
+     }
      // Check to see if this receipt already exists. That should not happen,
      // but a store can resend one.
      for (Receipt r : receipts) {
