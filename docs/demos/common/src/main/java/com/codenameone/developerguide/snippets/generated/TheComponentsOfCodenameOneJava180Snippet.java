@@ -102,6 +102,8 @@ class TheComponentsOfCodenameOneJava180Snippet {
                 createListEntry("A Dream of Spring", "Ugh"));
 
         combo.setRenderer(new GenericListCellRenderer<>(new MultiButton(), new MultiButton()));
+        hi.add(combo);
+        hi.show();
         // end::the-components-of-codename-one-java-180[]
     }
 
