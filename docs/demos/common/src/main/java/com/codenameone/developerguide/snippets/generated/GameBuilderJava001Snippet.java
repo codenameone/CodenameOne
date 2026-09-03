@@ -86,7 +86,10 @@ class GameBuilderJava001Snippet {
     void snippet() throws Exception {
         // tag::game-builder-java-001[]
         GameLevel level = GameLevel.load(
-                Display.getInstance().getResourceAsStream(MyScene.class, "/games/Level1.game"));
+                // Flat resource namespace on the device -- "/Level1.game", not
+                // "/games/Level1.game", which resolves to null there. This is the
+                // path the editor's generated companion uses.
+                Display.getInstance().getResourceAsStream(MyScene.class, "/Level1.game"));
         GameSceneView view = new GameSceneView(level, AssetCatalog.load(packsJson));
         form.add(BorderLayout.CENTER, view);
         form.show();

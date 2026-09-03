@@ -90,7 +90,9 @@ class GameBuilderJava002Snippet extends GameSceneView {
     protected void onUpdate(double dt) {
         GameInput in = getInput();
         Scene scene = getScene();
-        for (int i = 0; i < scene.size(); i++) {
+        // Backwards, because collecting a coin removes it from the scene and a
+        // forward loop would step over the next sprite.
+        for (int i = scene.size() - 1; i >= 0; i--) {
             Sprite s = scene.get(i);
             GameElement el = (GameElement) s.getUserData();
             if (el == null) continue;
@@ -99,8 +101,15 @@ class GameBuilderJava002Snippet extends GameSceneView {
                     if (in.isGameKeyDown(Display.GAME_RIGHT)) s.setX(s.getX() + 200 * dt);
                     // jump height, lives, gravity... all read from el.getInt(...)/getDouble(...)
                 }
-                case "slime" -> s.setX(s.getX() + el.getDouble("speed", 1.5)); // patrol
-                case "coin"  -> { if (s.intersects(player)) score += el.getInt("value", 10); }
+                // speed is pixels per second, so scale it by the frame delta --
+                // otherwise the patrol runs at whatever rate the device renders at
+                case "slime" -> s.setX(s.getX() + el.getDouble("speed", 60) * dt);
+                case "coin"  -> {
+                    if (s.intersects(player)) {
+                        score += el.getInt("value", 10);
+                        scene.remove(s);   // consume it, or it scores again every frame
+                    }
+                }
             }
         }
     }
