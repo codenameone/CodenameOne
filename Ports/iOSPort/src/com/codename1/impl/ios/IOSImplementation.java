@@ -9117,9 +9117,31 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         String files = nativeInstance.getClipboardFileUris();
         if(files != null && files.length() > 0) {
+            // The pasteboard's URLs, which are not all files: a link copied out of Safari is one
+            // of these too, and calling it a file handed a file-only target a web address
+            // through getFiles() as though it were a document on disk. Every one of them is the
+            // URI list; only the ones naming something on this device are the file list.
             String[] parts = splitClipboardFileUris(files);
-            content.setData(com.codename1.ui.ClipboardContent.MIME_FILE,
-                    parts.length == 1 ? parts[0] : parts);
+            java.util.List<String> local = new java.util.ArrayList<String>();
+            StringBuilder uris = new StringBuilder();
+            for(int iter = 0 ; iter < parts.length ; iter++) {
+                if(namesALocalFile(parts[iter])) {
+                    local.add(parts[iter]);
+                }
+                if(uris.length() > 0) {
+                    // RFC 2483, which is what every other port here writes and reads.
+                    uris.append("\r\n");
+                }
+                uris.append(parts[iter]);
+            }
+            if(!local.isEmpty()) {
+                content.setData(com.codename1.ui.ClipboardContent.MIME_FILE,
+                        local.size() == 1 ? local.get(0)
+                                : local.toArray(new String[local.size()]));
+            }
+            if(uris.length() > 0) {
+                content.setData(com.codename1.ui.ClipboardContent.MIME_URI_LIST, uris.toString());
+            }
         }
         int mimeCount = content.getMimeTypes().length;
         if(mimeCount > 1 || (s == null && mimeCount > 0)) {
@@ -9577,27 +9599,78 @@ public class IOSImplementation extends CodenameOneImplementation {
         return b;
     }
 
-    /// Newline-joined file URIs from the MIME_FILE representation (a String or String[]), or null.
+    /// Newline-joined URLs for the pasteboard: the files this content names, and the URIs it
+    /// publishes under `ClipboardContent#MIME_URI_LIST`. Null when it has neither.
+    ///
+    /// One argument, because the pasteboard has one notion of a URL and the native side already
+    /// writes each of these as `public.url` -- which is what a receiving application reads a link
+    /// off. Without the URI list here a content whose only representation was a link passed null
+    /// for every argument, and the copy published an empty pasteboard: nothing outside this
+    /// application saw the link at all.
     private static String clipboardFileUris(com.codename1.ui.ClipboardContent content) {
-        Object value = clipboardValue(content, com.codename1.ui.ClipboardContent.MIME_FILE);
-        if(value instanceof String) {
-            return (String)value;
+        java.util.List<String> urls = new java.util.ArrayList<String>();
+        appendClipboardUrls(urls, clipboardValue(content, com.codename1.ui.ClipboardContent.MIME_FILE));
+        String list = clipboardText(content, com.codename1.ui.ClipboardContent.MIME_URI_LIST);
+        if(list != null) {
+            // RFC 2483: CRLF separated, and a line opening with a hash is a comment.
+            String[] lines = list.split("\n");
+            for(int i = 0 ; i < lines.length ; i++) {
+                String line = lines[i].trim();
+                if(line.length() > 0 && line.charAt(0) != '#') {
+                    appendClipboardUrls(urls, line);
+                }
+            }
         }
+        StringBuilder sb = new StringBuilder();
+        for(int i = 0 ; i < urls.size() ; i++) {
+            if(sb.length() > 0) {
+                sb.append('\n');
+            }
+            sb.append(urls.get(i));
+        }
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
+    /// Adds a `MIME_FILE` value -- a `String` or a `String[]` -- to the pasteboard's URL list,
+    /// skipping anything already there so a file named by both representations travels once.
+    private static void appendClipboardUrls(java.util.List<String> urls, Object value) {
         if(value instanceof String[]) {
             String[] arr = (String[])value;
-            StringBuilder sb = new StringBuilder();
             for(int i = 0 ; i < arr.length ; i++) {
-                if(arr[i] == null || arr[i].length() == 0) {
-                    continue;
-                }
-                if(sb.length() > 0) {
-                    sb.append('\n');
-                }
-                sb.append(arr[i]);
+                appendClipboardUrls(urls, arr[i]);
             }
-            return sb.length() == 0 ? null : sb.toString();
+            return;
         }
-        return null;
+        if(value instanceof String) {
+            String one = (String)value;
+            if(one.length() > 0 && !urls.contains(one)) {
+                urls.add(one);
+            }
+        }
+    }
+
+    /// True when this URL names something on this device rather than somewhere on the web.
+    ///
+    /// A link copied out of a browser comes back off the pasteboard as an https URL, and calling
+    /// that a file handed a file-only target a web address through `getFiles()` as though it
+    /// were a document on disk. It is still reported, under `MIME_URI_LIST`, which is what it is.
+    private static boolean namesALocalFile(String url) {
+        if(url == null || url.length() == 0) {
+            return false;
+        }
+        if(url.charAt(0) == '/' || url.charAt(0) == '~') {
+            // An absolute path, which is a local file by construction. Tested before the scheme,
+            // because a path may perfectly well contain a colon and reading one as a scheme
+            // would call /tmp/a:b.txt a web address.
+            return true;
+        }
+        int colon = url.indexOf(':');
+        int slash = url.indexOf('/');
+        if(colon < 0 || (slash >= 0 && slash < colon)) {
+            // No scheme: a relative path, possibly one whose own name contains a colon.
+            return true;
+        }
+        return "file".equals(url.substring(0, colon).toLowerCase());
     }
 
     private static String[] splitClipboardFileUris(String joined) {
