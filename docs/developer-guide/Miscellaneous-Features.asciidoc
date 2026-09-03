@@ -477,11 +477,16 @@ which drops any sample rate or bit rate set on it and leaves the platform's
 defaults in place -- call `build()` yourself when those settings matter.
 
 How far the settings then travel depends on the port. Android, iOS and the
-simulator hand the path, MIME type, sampling rate, bit rate and channel count
-to the platform recorder. The JavaScript port applies the sampling rate and
-channel count when recording into an audio buffer, but its file recorder takes
-only the path, so a web build records at the browser's defaults whichever way the
-recorder was constructed.
+simulator hand the path, MIME type, sampling rate, bit rate and channel count to
+the platform recorder. The JavaScript port takes only the path when recording to
+a file, so a web file recording uses the browser's defaults; recording into an
+audio buffer it does ask for the sampling rate and channel count, and the browser
+is free to decline -- Safari, and any browser that doesn't offer the `sampleRate`
+constraint, hands back its own rate instead.
+
+Treat the builder's numbers as preferences rather than guarantees, and read
+back what you were actually given: an `AudioBuffer` reports `getSampleRate()` and
+`getNumChannels()` for the data it holds, whichever platform filled it.
 
 ==== Capture asynchronous API
 
