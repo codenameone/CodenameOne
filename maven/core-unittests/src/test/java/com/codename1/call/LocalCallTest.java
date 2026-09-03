@@ -707,7 +707,15 @@ public class LocalCallTest {
                 && System.currentTimeMillis() < limit) {
             sleep();
         }
-        assertEquals(before, liveTimerThreads(),
+        // NOT MORE than before, rather than exactly the same. What this test is about is a
+        // safety timer that outlives the answer, so growth is the failure; a DROP is not. The
+        // count is JVM-wide -- liveTimerThreads() matches any thread named "Timer-" -- so timers
+        // started by earlier tests in this run can expire inside the window above, and the loop
+        // exits immediately when that happens because the count is no longer greater than the
+        // baseline. Equality then failed with "expected 4 but was 2": two unrelated timers had
+        // finished, which is exactly what should happen and has nothing to do with call
+        // deferral.
+        assertTrue(liveTimerThreads() <= before,
                 "answering must leave no safety timer running");
     }
 
