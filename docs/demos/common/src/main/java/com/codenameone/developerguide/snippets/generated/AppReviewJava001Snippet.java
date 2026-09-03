@@ -85,6 +85,11 @@ class AppReviewJava001Snippet {
     
     void snippet() throws Exception {
         // tag::app-review-java-001[]
+        // Configure the store URL and the feedback route first -- the next
+        // sample does that. Where no native review prompt exists this opens the
+        // fallback widget, and without them a high rating opens nothing while
+        // low-rating feedback goes nowhere. The flow still records itself as
+        // completed, so the user is never asked again.
         AppReview.getInstance().requestReview();
         // end::app-review-java-001[]
     }
