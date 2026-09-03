@@ -272,6 +272,22 @@ public final class Display extends CN1Constants {
     /// This is the instance of the EDT used internally to indicate whether
     /// we are executing on the EDT or some arbitrary thread
     private Thread edt;
+
+    /// Whether `edt` is actually inside its dispatch loop.
+    ///
+    /// `edt.isAlive()` cannot answer that. A thread that has left `mainEDTLoop`'s loop stays
+    /// alive for the whole of its teardown -- `Desktop.disposeAll()` and `impl.deinitialize()`,
+    /// either of which can block -- so an `init()` landing in that window adopted a thread that
+    /// was on its way out and started no dispatch thread of its own. The new generation then had
+    /// none at all: everything it queued waited for ever and `isInitialized()` stayed false,
+    /// which `init()` cannot repair because it guards on `codenameOneRunning`.
+    ///
+    /// So the departing thread PUBLISHES the fact rather than leaving it to be inferred, and does
+    /// it under `lock` against the same adoption decision -- the two orderings are then the two
+    /// correct outcomes rather than a race. It is a plain boolean, read and written only inside
+    /// that monitor.
+    private boolean edtDispatching;
+
     /// Contains animations that must be played in full by the EDT before anything further
     /// may be processed. This is useful for transitions/intro's etc... that animate without
     /// user interaction.
@@ -513,10 +529,32 @@ public final class Display extends CN1Constants {
             // thread. Nothing clears this field when an EDT terminates, so
             // testing only for null left a dead thread recorded for ever and
             // re-initialising never started a working one -- the display then
-            // has no dispatch at all. This is a thread that has actually
-            // died, not one that might be mid-teardown; the speculative
-            // machinery that used to be here was removed on purpose.
-            if (INSTANCE.edt == null || !INSTANCE.edt.isAlive()) {
+            // has no dispatch at all.
+            //
+            // Being alive is not enough to say it IS one, either, which is the
+            // half this used to call speculative. It is not: a thread that has
+            // left the dispatch loop stays alive for its whole teardown, and
+            // adopting it there is how a generation ends up with no dispatch
+            // thread at all. edtDispatching answers that question from the one
+            // place that knows, and the lock makes the two answers ordered
+            // rather than raced.
+            boolean startDispatchThread;
+            synchronized (lock) {
+                // Held across the decision AND the claim, because the departing thread renounces
+                // the flag inside the same monitor. Either it gets there first -- this sees no
+                // dispatch thread and starts one -- or this does, in which case codenameOneRunning
+                // was already set true above and the thread's next test keeps it in the loop,
+                // which is the adoption that is legitimately free.
+                startDispatchThread = INSTANCE.edt == null || !INSTANCE.edt.isAlive()
+                        || !INSTANCE.edtDispatching;
+                if (startDispatchThread) {
+                    // Claimed here rather than by the new thread. Between start() and its first
+                    // instruction the thread is alive and not yet dispatching, so a second init()
+                    // in that window would read "no dispatch thread" and start another one.
+                    INSTANCE.edtDispatching = true;
+                }
+            }
+            if (startDispatchThread) {
                 INSTANCE.touchScreen = impl.isTouchDevice();
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
@@ -1252,6 +1290,32 @@ public final class Display extends CN1Constants {
     /// all events are carried out. It differs from the MIDP event thread to
     /// prevent blocking of actual input and drawing operations. This also
     /// enables functionality such as "true" modal dialogs etc...
+    /// Whether the dispatch loop should run another turn, renouncing `edtDispatching` in the
+    /// same breath when it should not.
+    ///
+    /// The renunciation has to happen HERE rather than after the loop, and under the lock that
+    /// `init()` takes to decide adoption. Otherwise the two steps are a race the wrong way round:
+    /// this thread observes that it is stopping, an `init()` sees a thread that is still alive and
+    /// still flagged as dispatching, adopts it and starts nothing -- and then this thread clears
+    /// the flag and dies, leaving a generation with no event dispatch at all.
+    ///
+    /// The other order is not a failure but the case adoption exists for. An `init()` that gets
+    /// the lock first has already set `codenameOneRunning` back to true, so this returns true and
+    /// the thread simply keeps dispatching for the new generation.
+    private boolean keepDispatching() {
+        synchronized (lock) {
+            if (codenameOneRunning) {
+                return true;
+            }
+            // Cleared BEFORE the teardown that follows the loop, never after it. disposeAll() and
+            // impl.deinitialize() can each block for as long as they like, and for all of it this
+            // thread is alive and not dispatching -- exactly the window that must not read as a
+            // working EDT.
+            edtDispatching = false;
+            return false;
+        }
+    }
+
     void mainEDTLoop() {
         impl.initEDT();
         UIManager.getInstance();
@@ -1299,7 +1363,7 @@ public final class Display extends CN1Constants {
             }
         }
 
-        while (codenameOneRunning) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
+        while (keepDispatching()) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
             try {
                 // wait indefinetly Lock surrounds the should method to prevent serial calls from
                 // getting "lost"
@@ -1331,6 +1395,13 @@ public final class Display extends CN1Constants {
                 edtLoopImpl();
             } catch (Throwable err) {
                 if (!codenameOneRunning) {
+                    // Renounced on this exit as well. The teardown after the loop is deliberately
+                    // skipped here -- the implementation threw on its way down -- but the thread
+                    // is just as alive and just as finished with dispatching while it unwinds,
+                    // and that is all an adopting init() would have to go on.
+                    synchronized (lock) {
+                        edtDispatching = false;
+                    }
                     return;
                 }
                 Log.e(err);
@@ -1360,7 +1431,13 @@ public final class Display extends CN1Constants {
         impl.deinitialize();
         //INSTANCE.impl = null;
         //INSTANCE.codenameOneGraphics = null;
-        INSTANCE.edt = null;
+        // Only if it is still OURS. A new generation may have started its own EDT while this
+        // one was tearing down, and clearing the field unconditionally disowned that live
+        // thread: isEdt() then answered false ON the event dispatch thread, so work meant to
+        // run there was queued behind itself instead.
+        if (INSTANCE.edt == Thread.currentThread()) {
+            INSTANCE.edt = null;
+        }
     }
 
     /// Returns the stack trace from the exception on the given
