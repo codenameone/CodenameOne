@@ -42,9 +42,17 @@ Using these callbacks, the app receives notifications whenever a purchase change
 
 Now in the `start()` method, add a button that lets the user buy the world:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava029Snippet.java[tag=monetization-java-029,indent=0]
+----
 
 At this point, the app can track the sale of the world. To make it more useful, add `ToastBar` feedback for purchase completion:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava030Snippet.java[tag=monetization-java-030,indent=0]
+----
 
 NOTE: You can test out this code in the simulator without doing any more setup and it will work. If you want the code to work on Android and iOS, you'll need to set up the app and in-app purchase settings in the Google Play and iTunes stores respectively as explained below
 
@@ -76,9 +84,17 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Now you'll change your buy code as follows:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava031Snippet.java[tag=monetization-java-031,indent=0]
+----
 
 And your `itemPurchased()` callback will need to add a world:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava032Snippet.java[tag=monetization-java-032,indent=0]
+----
 
 NOTE: When you set up the products in the iTunes store you will need to mark the product as a consumable product or iTunes will prevent you from purchasing it more than once
 
@@ -104,6 +120,10 @@ Apple allows you to present discounted introductory pricing to existing subscrib
 
 To build the signed discount payload required by Apple you can use the `ApplePromotionalOffer` helper:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava033Snippet.java[tag=monetization-java-033,indent=0]
+----
 
 Apple generates the signature and timestamp from your App Store Connect server notifications endpoint; Codename One passes them to the native StoreKit APIs. For one-time products you can call `purchase(sku, offer)` instead of `subscribe(...)`.
 
@@ -174,11 +194,19 @@ A basic receipt store needs to implement just two methods:
 
 You'll register it in your app's init() method so that it's always available:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava034Snippet.java[tag=monetization-java-034,indent=0]
+----
 
 These methods are designed to be asynchronous since real-world apps will always be connecting to some sort of network service. Instead of returning a value, both of these methods are passed instances of the `SuccessCallback` class. It's important to make sure to call `callback.onSuccess()` *ALWAYS* when the methods have completed, even if there is an error, or the Buy class will just assume that you're taking a long time to complete the task, and will continue to wait for you to finish.
 
 Once implemented, your `fetchReceipts()` method will look like:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava035Snippet.java[tag=monetization-java-035,indent=0]
+----
 
 This is straight forward. You're checking to see if you already have a list of receipts stored. If so you return that list to the callback. If not you return an empty array of receipts.
 
@@ -186,6 +214,10 @@ NOTE: `Receipt` implements `Externalizable` so you are able to write instances d
 
 The `submitReceipt()` method is a little more complex, as it needs to calculate the new expiry date for your subscription:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava036Snippet.java[tag=monetization-java-036,indent=0]
+----
 
 The main logic of this method involves iterating through all the existing receipts to find the *latest* current expiry date, so that when the user purchases a subscription, it's added onto the end of the current subscription (if one exists) rather than going from today's date. This enables users to renew their subscription before the subscription has expired.
 
@@ -207,6 +239,10 @@ In your hello world app you synchronize the subscriptions in a few places.
 
 At the end of the `start()` method:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava037Snippet.java[tag=monetization-java-037,indent=0]
+----
 
 And you also provide a button to allow the user to manually synchronize the receipts:
 
@@ -230,6 +266,16 @@ You should now have all the background required to implement the Hello World Sub
 
 In the main form, you want two buttons to subscribe to the `World`, for one month and one year respectively. They look like:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava040Snippet.java[tag=monetization-java-040,indent=0]
+----
+
+<1> In the event handler you check if the user is subscribed by calling `isSubscribed(PRODUCTS)`.  Notice that you check it against the array of both the one month and one year subscription SKUs.
+
+<2> You are able to tell the user when the current expiry date is so that they can gauge whether to proceed.
+
+<3> Since this is a non-renewable subscription, you use the `Purchase.purchase()` method. See following note about `subscribe()` vs `purchase()`
 
 ==== Subscribe() vs purchase()
 
@@ -245,6 +291,10 @@ Which one you use depends on the type of product that's being purchased. If your
 
 The buy callbacks are like the ones implemented in the regular in-app purchase examples:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava041Snippet.java[tag=monetization-java-041,indent=0]
+----
 
 Notice that, in `itemPurchased()` you don't need to explicitly create any receipts or submit anything to the receipt store. This is handled for you automatically. You do make a call to `synchronizeReceiptsSync(0)` but this is just to ensure that your toast message has the new expiry date loaded already.
 
