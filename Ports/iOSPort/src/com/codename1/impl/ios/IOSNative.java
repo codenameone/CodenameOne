@@ -698,6 +698,51 @@ public final class IOSNative {
     native long createPersonPhotoImage(long id);
     native String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email);
     native boolean deleteContact(int id);
+
+    /**
+     * Whether {@code CNContactPickerViewController} was compiled into this
+     * build and can run on this device.
+     *
+     * <p>False when the application never referenced
+     * {@code com.codename1.contacts.ContactPicker}, because the builder only
+     * turns on {@code CN1_USE_CONTACT_PICKER} and links ContactsUI when it
+     * did.</p>
+     */
+    native boolean isContactPickerSupported();
+
+    /**
+     * Presents the system contact picker.
+     *
+     * <p>Unlike every other native on this class the picker needs no
+     * {@code NSContactsUsageDescription}: it runs out of process and hands
+     * back only the contacts the user tapped.</p>
+     *
+     * @param requestedFields bit set of
+     *                        {@code com.codename1.contacts.ContactPicker}
+     *                        constants
+     * @param multiSelect     true to let the user pick more than one
+     * @param selectionLimit  the largest selection to report back
+     */
+    native void openContactPicker(int requestedFields, boolean multiSelect, int selectionLimit);
+
+    /**
+     * Copies one picked contact into a Java {@code Contact}.
+     *
+     * <p>Valid only between the {@code contactPickerResult} callback and
+     * {@link #releasePickedContacts()}, which is when the native side is
+     * still holding the array the picker returned.</p>
+     *
+     * @param index           position in the picked array
+     * @param cnt             the contact to populate, whose hashtables must
+     *                        already exist
+     * @param requestedFields bit set of
+     *                        {@code com.codename1.contacts.ContactPicker}
+     *                        constants
+     */
+    native void updatePickedContact(int index, Contact cnt, int requestedFields);
+
+    /** Drops the picked contacts the native side was holding. */
+    native void releasePickedContacts();
     
     native void dial(String phone);
     native void requestAppStoreReview();

@@ -177,6 +177,14 @@ class WatchNativeBuilder {
             // translator, so they appear only in projects that use the feature. That is why they
             // outlived two rounds of this list: a build that never touches Vision never links it,
             // and the watch link only fails for the app that does.
+            // ContactsUI is absent from the watchOS SDK -- verified with the ls above against
+            // WatchOS26.2, where the directory does not exist -- and the iOS slice links it when
+            // the app references com.codename1.contacts.ContactPicker. Contacts.framework beside
+            // it IS present, so that one is linkable rather than optional; only the UI half has
+            // to be weak-linked. IOSNative.m already compiles the picker out for the watch
+            // (CN1_USE_CONTACT_PICKER is only honoured under TARGET_OS_IOS), so nothing on the
+            // watch slice calls into it.
+            + "ContactsUI.framework;"
             + "AdSupport.framework;CoreImage.framework;CoreNFC.framework;"
             + "CoreTelephony.framework;JavaScriptCore.framework;Vision.framework;"
             // Named by PlatformFeatureCatalog rather than written in IPhoneBuilder, so they are
@@ -222,6 +230,11 @@ class WatchNativeBuilder {
             + "LocalAuthentication.framework;MobileCoreServices.framework;"
             + "NaturalLanguage.framework;NetworkExtension.framework;PhotosUI.framework;"
             + "QuartzCore.framework;Security.framework;UserNotifications.framework;"
+            // Linked on the iOS slice alongside ContactsUI when the app references
+            // com.codename1.contacts.ContactPicker. Present in both watch SDKs, and the watch
+            // never calls into it -- but a framework that IS there links harmlessly, and
+            // declaring it linkable is what the partition test above asks for.
+            + "Contacts.framework;"
             + "WatchConnectivity.framework";
 
     WatchNativeBuilder(IPhoneBuilder owner) {

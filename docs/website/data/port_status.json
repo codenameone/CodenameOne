@@ -611,6 +611,15 @@
       ]
     },
     {
+      "id": "contact-picker",
+      "category": "Device APIs",
+      "name": "Contact picker",
+      "description": "Checks the request contract of the privacy-minimized contact picker: the fields and selection limits it accepts and rejects, and that a result carrying no selection is an empty array rather than a null.",
+      "tests": [
+        "ContactPickerApiTest"
+      ]
+    },
+    {
       "id": "secure-storage-crypto",
       "category": "Storage and security",
       "name": "Secure storage and cryptography",

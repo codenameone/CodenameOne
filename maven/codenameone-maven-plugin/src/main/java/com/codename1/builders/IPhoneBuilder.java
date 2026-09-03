@@ -1409,6 +1409,15 @@ public class IPhoneBuilder extends Executor {
     private boolean usesWifiHotspotConfig;
     private boolean usesBonjour;
     private boolean usesCalendarApi;
+    /**
+     * Whether the application shows the system contact picker.
+     *
+     * <p>Keyed on {@code ContactPicker} alone rather than on the contacts
+     * package, because the point of the picker is that it is the one member
+     * of that package which needs neither the address book nor a usage
+     * description.</p>
+     */
+    private boolean usesContactPicker;
     private boolean usesCalendarEventApi;
     private boolean usesCalendarTaskApi;
     private String firstBonjourType;
@@ -2421,6 +2430,22 @@ public class IPhoneBuilder extends Executor {
                     if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0) {
                         usesCalendarApi = true;
                     }
+                    // classesDir only, and deliberately so. Reviewers read the
+                    // database scan beside this one -- which passes buildinRes
+                    // as well -- and conclude a cn1lib's reference would be
+                    // invisible here. It would not: CN1BuildMojo.mergeJars
+                    // merges EVERY compile-classpath element except
+                    // codenameone-core and java-runtime into the
+                    // -jar-with-dependencies.jar that becomes dist.jar, so a
+                    // library's classes arrive already merged with the
+                    // application's own and are walked as loose classes. What
+                    // reaches buildinRes is native input -- framework zips,
+                    // static archives, the port's own sources -- none of which
+                    // references a Java class.
+                    if (!usesContactPicker
+                            && "com/codename1/contacts/ContactPicker".equals(cls)) {
+                        usesContactPicker = true;
+                    }
                     if (!usesLocalNotifications && cls.indexOf("com/codename1/notifications/LocalNotification") == 0) {
                         usesLocalNotifications = true;
                     }
@@ -2739,6 +2764,19 @@ public class IPhoneBuilder extends Executor {
                     // entries for every feature, health included, and is
                     // indifferent to what follows.
                     aiAcc.consumeMethod(cls, method);
+                    // Display carries the contact picker too, and an app is
+                    // free to call it there instead of through ContactPicker.
+                    // The class reference cannot say so -- every app
+                    // references Display -- so the two entry points are named.
+                    // Missing one ships an iOS build with the picker compiled
+                    // out and every pick answering empty, while the same app
+                    // works on Android and in the simulator.
+                    if (!usesContactPicker
+                            && "com/codename1/ui/Display".equals(cls)
+                            && (method.indexOf("pickContacts") > -1
+                                || method.indexOf("isContactPickerSupported") > -1)) {
+                        usesContactPicker = true;
+                    }
                     // Health.getStore()/getWorkouts() mean a real platform
                     // store; Health.getSensors() means BLE only. The class
                     // reference alone cannot tell them apart, so the facade
@@ -4269,6 +4307,27 @@ public class IPhoneBuilder extends Executor {
                 } else if (!addLibs.toLowerCase().contains("eventkit")) {
                     addLibs = addLibs + ";EventKit.framework";
                 }
+            }
+
+            // CNContactPickerViewController, behind
+            // com.codename1.contacts.ContactPicker. The define and the two
+            // frameworks travel together: the native sources only reference
+            // ContactsUI inside CN1_USE_CONTACT_PICKER, and turning the define
+            // on without linking would fail at link rather than at compile.
+            //
+            // Contacts.framework comes with it because the picker hands back
+            // CNContact objects the native code then reads.
+            if (usesContactPicker) {
+                try {
+                    replaceInFile(new File(buildinRes, "IOSNative.m"),
+                            "//#define CN1_USE_CONTACT_PICKER",
+                            "#define CN1_USE_CONTACT_PICKER");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_USE_CONTACT_PICKER", ex);
+                }
+                addLibs = appendFrameworks(addLibs, "ContactsUI.framework",
+                        "Contacts.framework");
             }
 
             // DeviceCheck.framework backs App Attest (com.codename1.security.

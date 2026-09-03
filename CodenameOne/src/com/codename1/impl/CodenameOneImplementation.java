@@ -8474,6 +8474,91 @@ public abstract class CodenameOneImplementation {
         return true;
     }
 
+    /// Returns true when the platform has a contact picker that hands over a
+    /// user-selected subset of the address book without the broad contacts
+    /// permission, see `com.codename1.contacts.ContactPicker`.
+    ///
+    /// #### Returns
+    ///
+    /// true if `#pickContacts(int, boolean, int, boolean, com.codename1.ui.events.ActionListener)`
+    /// shows a picker
+    public boolean isContactPickerSupported() {
+        return false;
+    }
+
+    /// Shows the platform's contact picker and reports the user's selection.
+    ///
+    /// A port that has no picker leaves this alone. The default reports an
+    /// empty selection rather than reading the address book, because falling
+    /// back to a broad read is exactly what the caller was avoiding.
+    ///
+    /// **An override must call `response` exactly once**, whether the user
+    /// picked, cancelled or the platform refused. `Display` counts on that to
+    /// know when a pick has finished, and a port that answers twice or not at
+    /// all breaks the next pick rather than only its own.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestedFields`: bit set of the field constants on
+    /// `com.codename1.contacts.ContactPicker`
+    ///
+    /// - `multiSelect`: true to let the user pick more than one contact
+    ///
+    /// - `selectionLimit`: the largest number of contacts the user may pick
+    ///
+    /// - `requireAllRequestedFields`: true to offer only contacts holding
+    /// every requested field
+    ///
+    /// - `response`: invoked with a `com.codename1.contacts.Contact` array
+    /// source once the user is done
+    public void pickContacts(int requestedFields, boolean multiSelect,
+                             int selectionLimit, boolean requireAllRequestedFields,
+                             ActionListener<ActionEvent> response) {
+        fireContactPickerResult(response, new Contact[0]);
+    }
+
+    /// Hands a picker result to its listener on the EDT.
+    ///
+    /// Ports call this from whatever thread the platform's picker answered
+    /// on -- an Android activity result, an iOS delegate callback -- so the
+    /// application's listener always runs where the rest of its code does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: the listener passed to
+    /// `#pickContacts(int, boolean, int, boolean, com.codename1.ui.events.ActionListener)`
+    ///
+    /// - `picked`: the selection, null being treated as empty
+    protected void fireContactPickerResult(ActionListener<ActionEvent> response,
+                                           Contact[] picked) {
+        if (response == null) {
+            return;
+        }
+        Contact[] result = picked == null ? new Contact[0] : picked;
+        Display.getInstance().callSerially(new ContactPickerDelivery(response, result));
+    }
+
+    /// Delivers one contact-picker selection on the EDT.
+    ///
+    /// A named static class rather than the anonymous one this obviously
+    /// wants to be. An anonymous one would capture the implementation it was
+    /// created in for no reason, which is a SpotBugs finding, and the gate is
+    /// zero-findings.
+    private static final class ContactPickerDelivery implements Runnable {
+        private final ActionListener<ActionEvent> response;
+        private final Contact[] picked;
+
+        ContactPickerDelivery(ActionListener<ActionEvent> response, Contact[] picked) {
+            this.response = response;
+            this.picked = picked;
+        }
+
+        @Override
+        public void run() {
+            response.actionPerformed(new ActionEvent(picked));
+        }
+    }
+
     /// removed a contact from the device contacts book
     ///
     /// #### Parameters

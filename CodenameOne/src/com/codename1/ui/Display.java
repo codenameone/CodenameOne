@@ -6742,6 +6742,147 @@ public final class Display extends CN1Constants {
         return impl.isContactsPermissionGranted();
     }
 
+    /// Returns true when the platform has a contact picker, see
+    /// `com.codename1.contacts.ContactPicker`.
+    ///
+    /// #### Returns
+    ///
+    /// true if `#pickContacts(int, boolean, int, boolean, com.codename1.ui.events.ActionListener)`
+    /// will show a picker
+    public boolean isContactPickerSupported() {
+        return impl.isContactPickerSupported();
+    }
+
+    /// Shows the platform's contact picker, see
+    /// `com.codename1.contacts.ContactPicker` for the API applications should
+    /// use and for what the arguments mean.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestedFields`: bit set of the field constants on
+    /// `com.codename1.contacts.ContactPicker`
+    ///
+    /// - `multiSelect`: true to let the user pick more than one contact
+    ///
+    /// - `selectionLimit`: the largest number of contacts the user may pick
+    ///
+    /// - `requireAllRequestedFields`: true to offer only contacts holding
+    /// every requested field
+    ///
+    /// - `response`: invoked with a `com.codename1.contacts.Contact` array
+    /// source once the user is done
+    public void pickContacts(final int requestedFields, final boolean multiSelect,
+                             final int selectionLimit,
+                             final boolean requireAllRequestedFields,
+                             final ActionListener<ActionEvent> response) {
+        if (!isEdt()) {
+            // The guard below is a plain field read and written without a
+            // lock, because Codename One is single threaded and core carries
+            // no synchronization. Nothing stops an application calling this
+            // from a background thread, though, and two that did would both
+            // see the flag clear and both start a pick -- which is the state
+            // the flag exists to prevent. Moving the whole check-and-start
+            // onto the EDT serializes it without a lock, and costs a caller
+            // that was already on the EDT nothing.
+            callSerially(new DeferredContactPick(requestedFields, multiSelect,
+                    selectionLimit, requireAllRequestedFields, response));
+            return;
+        }
+        if (contactPickInProgress) {
+            // A second pick while the first is still on screen, which a
+            // double tap is enough to produce. The platforms cannot honour it
+            // either -- UIKit refuses to present a second modal controller,
+            // and the Android picker activity is already on top -- and the
+            // single result slot each port keeps would then decode the first
+            // pick with the second request's fields and hand it to the second
+            // listener, leaving the first listener with nothing. Reporting an
+            // empty selection is what a cancelled pick reports, so the caller
+            // needs no separate case for it.
+            deliverEmptyContactPick(response);
+            return;
+        }
+        contactPickInProgress = true;
+        impl.pickContacts(requestedFields, multiSelect, selectionLimit,
+                requireAllRequestedFields, new ContactPickCompletion(response));
+    }
+
+    /// True between a contact pick starting and its listener being called.
+    ///
+    /// Read and written on the EDT only: the call in comes from application
+    /// code and every port answers through `Display#callSerially(Runnable)`.
+    private boolean contactPickInProgress;
+
+    private void deliverEmptyContactPick(ActionListener<ActionEvent> response) {
+        if (response == null) {
+            return;
+        }
+        callSerially(new EmptyContactPick(response));
+    }
+
+    /// Re-enters `#pickContacts` on the EDT for an off-EDT caller.
+    private class DeferredContactPick implements Runnable {
+        private final int requestedFields;
+        private final boolean multiSelect;
+        private final int selectionLimit;
+        private final boolean requireAllRequestedFields;
+        private final ActionListener<ActionEvent> response;
+
+        DeferredContactPick(int requestedFields, boolean multiSelect,
+                int selectionLimit, boolean requireAllRequestedFields,
+                ActionListener<ActionEvent> response) {
+            this.requestedFields = requestedFields;
+            this.multiSelect = multiSelect;
+            this.selectionLimit = selectionLimit;
+            this.requireAllRequestedFields = requireAllRequestedFields;
+            this.response = response;
+        }
+
+        @Override
+        public void run() {
+            pickContacts(requestedFields, multiSelect, selectionLimit,
+                    requireAllRequestedFields, response);
+        }
+    }
+
+    /// Tells one listener that its pick produced nothing.
+    ///
+    /// A named static class rather than the anonymous one this obviously
+    /// wants to be: an anonymous one would capture the Display for no reason,
+    /// which is a SpotBugs finding, and that gate is zero-findings.
+    private static final class EmptyContactPick implements Runnable {
+        private final ActionListener<ActionEvent> response;
+
+        EmptyContactPick(ActionListener<ActionEvent> response) {
+            this.response = response;
+        }
+
+        @Override
+        public void run() {
+            response.actionPerformed(new ActionEvent(new Contact[0]));
+        }
+    }
+
+    /// Clears the in-progress flag and passes the selection on.
+    ///
+    /// Wrapping the application's listener rather than trusting the port to
+    /// report back is what makes the flag above reliable for every port at
+    /// once, including one whose picker answers without an EDT hop.
+    private class ContactPickCompletion implements ActionListener<ActionEvent> {
+        private final ActionListener<ActionEvent> response;
+
+        ContactPickCompletion(ActionListener<ActionEvent> response) {
+            this.response = response;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent ev) {
+            contactPickInProgress = false;
+            if (response != null) {
+                response.actionPerformed(ev);
+            }
+        }
+    }
+
     /// Create a contact to the device contacts book
     ///
     /// #### Parameters

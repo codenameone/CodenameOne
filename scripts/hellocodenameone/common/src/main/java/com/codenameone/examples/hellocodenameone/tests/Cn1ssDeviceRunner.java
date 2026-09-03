@@ -511,6 +511,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new FloatingToStringTest(),
             new StringFormatTest(),
             new ClipboardRoundTripTest(),
+            // The contact picker's request contract, and the only thing in
+            // this suite that references com.codename1.contacts.ContactPicker
+            // -- which is what makes the iOS build compile and link its
+            // CNContactPickerViewController delegate at all.
+            new ContactPickerApiTest(),
             // Log is an extension point (subclass + override createWriter) and the
             // JavaScript port used to shadow Log.e with a console stub, so a
             // subclass's writer was never created (issue #5519). Assertion-only.
