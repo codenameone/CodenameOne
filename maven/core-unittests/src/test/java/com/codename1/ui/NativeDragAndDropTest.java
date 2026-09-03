@@ -848,6 +848,30 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void aTargetThatStoppedTakingPointerEventsIsNotHandedTheDelayedDrop() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+        assertEquals("[enter]", target.events.toString());
+
+        // Opted out while a slow item provider was still loading, so by the time the drop
+        // arrives the walk no longer reaches it -- and neither may the fallback that answers
+        // when the walk finds nothing.
+        target.setIgnorePointerEvents(true);
+        NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY);
+        flushSerialCalls();
+
+        assertFalse(target.events.contains("drop"),
+                "a component that stopped taking pointer events is not a drop target, however "
+                        + "recently it was hovering");
+        assertNull(target.dropped);
+    }
+
+    @FormTest
     void aDropThatLandsElsewhereTellsTheComponentItLeft() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder left = new DropRecorder();

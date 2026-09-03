@@ -10321,6 +10321,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         try {
             addBinaryContent(content, mimeTypes, items);
+            addPublishedUris(content, mimeTypes, items);
             addRemainingRepresentations(content, plain, mimeTypes, items);
         } catch (Throwable t) {
             com.codename1.io.Log.e(t);
@@ -10467,6 +10468,56 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 // and the other representations with it.
                 com.codename1.io.Log.e(t);
             }
+        }
+    }
+
+    /// Puts the URIs a text/uri-list names on the clip as URIs.
+    ///
+    /// A URI is what an Android receiver reads off `ClipData.Item#getUri()`, and a link has
+    /// nothing else to be read off. Left to the passes around this one a uri-list became
+    /// carried text, or -- where the clip had text already -- a content URI holding the list
+    /// as a document; either way a receiver that took the clip because it advertised
+    /// text/uri-list found no URI on it at all.
+    ///
+    /// One item per URI, because an item is a dragged object and a list of three links is
+    /// three of them. The clip's text still rides on the first, as it does on a file.
+    private static void addPublishedUris(ClipboardContent content, List<String> mimeTypes,
+            List<ClipData.Item> items) {
+        String list = content.getText(ClipboardContent.MIME_URI_LIST);
+        if (list == null) {
+            return;
+        }
+        for (int iter = 0; iter < items.size(); iter++) {
+            if (items.get(iter).getUri() != null) {
+                // The clip carries URIs already -- the files, which is what a list beside
+                // them names. Adding them again would drag every file twice, and they do not
+                // compare equal to the list's own entries either: what went onto the clip is
+                // a content URI this application minted for a path the source published.
+                // Naming the type is enough; the URIs the clip carries are what a reader
+                // builds the list back out of.
+                declareUriList(mimeTypes);
+                return;
+            }
+        }
+        boolean any = false;
+        String[] lines = list.split("\n");
+        for (int iter = 0; iter < lines.length; iter++) {
+            String line = lines[iter].trim();
+            // RFC 2483: a line opening with a hash is a comment, not a URI.
+            if (line.length() == 0 || line.charAt(0) == '#') {
+                continue;
+            }
+            items.add(new ClipData.Item(Uri.parse(line)));
+            any = true;
+        }
+        if (any) {
+            declareUriList(mimeTypes);
+        }
+    }
+
+    private static void declareUriList(List<String> mimeTypes) {
+        if (!mimeTypes.contains(ClipboardContent.MIME_URI_LIST)) {
+            mimeTypes.add(ClipboardContent.MIME_URI_LIST);
         }
     }
 

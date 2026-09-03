@@ -967,8 +967,13 @@ public final class NativeDragAndDrop {
         synchronized (LOCK) {
             hovered = currentTarget;
         }
+        // Every test findTarget applies, including the one about pointer events: a
+        // component that opted out of being pointed at between the hover and the drop is
+        // not a target any more, and the walk has already skipped it -- so restoring it
+        // here was the one way it could still be dropped on.
         if (hovered == null || TopLevelSupport.rootOf(hovered) == null
-                || !hovered.isNativeDropTarget() || !hovered.isEnabled()
+                || !hovered.isNativeDropTarget() || hovered.isIgnorePointerEvents()
+                || !hovered.isEnabled()
                 || (actions & hovered.getAcceptedDropActions()) == 0) {
             return null;
         }
