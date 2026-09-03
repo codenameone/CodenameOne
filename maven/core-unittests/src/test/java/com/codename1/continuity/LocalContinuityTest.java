@@ -1895,6 +1895,46 @@ public class LocalContinuityTest extends UITestBase {
                 "the failed capture left nothing owed, so no later suspend retries it");
     }
 
+    /*
+     * There is deliberately NO test here for setBridge(null) handing resolution back to the
+     * platform. The fix covers it -- refreshBridge() resolves override-or-platform and installs
+     * the callback on whichever it picks -- but core-unittests has no platform bridge for
+     * resolution to find, so nothing observable changes in this harness. A test written for it
+     * passed against the BROKEN code too, because the fixture's bridge still held the callback
+     * installed at enable(): it asserted nothing and was removed rather than left looking like
+     * cover. The sibling below exercises the other half of the same condition, and does catch it.
+     */
+
+
+    /**
+     * And a sync-only client gets one too. It installs the inbound seam through
+     * SyncedStore.addChangeListener and deliberately leaves continuity off -- a key/value store
+     * is not consent to broadcast a route stack -- so gating the callback on `enabled` left it
+     * with none, and store changes made on another device never reached its listener.
+     */
+    @EdtTest
+    public void aSyncOnlyClientGetsTheCallbackOnABridgeSwap() {
+        final int[] changes = new int[1];
+        SyncedStoreListener l = new SyncedStoreListener() {
+            public void storeChanged() {
+                changes[0]++;
+            }
+        };
+        registered.add(l);
+        SyncedStore.addChangeListener(l);
+        assertFalse(Continuity.isEnabled(),
+                "registering a store listener must not enable continuity");
+
+        LocalContinuityBridge replacement = new LocalContinuityBridge();
+        Continuity.setBridge(replacement);
+
+        replacement.simulateStoreChange();
+        flushSerialCalls();
+
+        assertEquals(1, changes[0],
+                "a sync-only client got no callback on the replacement bridge");
+    }
+
     /**
      * A checkpoint whose write failed is still owed. `dirty` is cleared on the way in, so leaving
      * it clear told the next suspend there was nothing to save -- a checkpoint lost to a full

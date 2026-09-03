@@ -1768,13 +1768,20 @@ public final class Continuity {
     public static void setBridge(ContinuityBridge b) {
         bridge = b;
         bridgeOverridden = b != null;
-        if (b != null && enabled) {
-            try {
-                b.setCallback(new Callback());
-            } catch (Throwable t) {
-                Log.e(t);
-            }
-        }
+        // Delegated, not repeated. This used to install the callback itself under
+        // `b != null && enabled`, and both halves of that were wrong while refreshBridge() --
+        // ten lines below, doing the same job -- had them right.
+        //
+        // `b != null` skipped the case that needs it most: setBridge(null) hands resolution back
+        // to the PLATFORM, and the bridge it then resolves is a different object that has never
+        // been given a callback. Outbound calls kept working, so the seam looked healthy while
+        // every inbound continuation and synced-store notification went nowhere.
+        //
+        // `enabled` is not the right question either. A sync-only application installs the
+        // inbound seam through SyncedStore.addChangeListener and deliberately leaves continuity
+        // off, so storeCallbackInstalled is true while enabled is false -- and it got no callback
+        // at all.
+        refreshBridge();
     }
 
     /// Internal. The resolved platform bridge, for `com.codename1.continuity.sync`, which is a
