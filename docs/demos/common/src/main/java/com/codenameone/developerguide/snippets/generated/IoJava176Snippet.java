@@ -107,7 +107,7 @@ class IoJava176Snippet {
     
     void snippet() throws Exception {
         // tag::io-java-176[]
-        iui.setTextFieldConstraint(contact.email, TextArea.ANY);
+        iui.setTextFieldConstraint(myContact.email, TextArea.ANY);
         // end::io-java-176[]
     }
 
@@ -123,6 +123,6 @@ class IoJava176Snippet {
         public final PropertyIndex idx = new PropertyIndex(this, "Contact", id, name, email, phone, dateOfBirth, gender, rank);
         public PropertyIndex getPropertyIndex() { return idx; }
     }
-    Contact contact = new Contact();
+    Contact myContact = new Contact();
 
 }
