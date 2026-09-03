@@ -91,6 +91,10 @@ class TheComponentsOfCodenameOneJava188Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-188[]
+        Image red = FontImage.createMaterial(FontImage.MATERIAL_LOOKS_ONE, "Label", 6.0f);
+        Image green = FontImage.createMaterial(FontImage.MATERIAL_LOOKS_TWO, "Label", 6.0f);
+        Image blue = FontImage.createMaterial(FontImage.MATERIAL_LOOKS_3, "Label", 6.0f);
+        Image gray = FontImage.createMaterial(FontImage.MATERIAL_LOOKS_4, "Label", 6.0f);
         ImageViewer iv = new ImageViewer(red);
         iv.setImageList(new DefaultListModel<>(red, green, blue, gray));
         iv.setNavigationArrowsVisible(true);
@@ -99,11 +103,7 @@ class TheComponentsOfCodenameOneJava188Snippet {
         // end::the-components-of-codename-one-java-188[]
     }
 
-    Image red;
 
 
-    Image blue;
-    Image green;
-    Image gray;
 
 }

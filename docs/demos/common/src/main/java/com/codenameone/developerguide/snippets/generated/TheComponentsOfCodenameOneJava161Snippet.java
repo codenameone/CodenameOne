@@ -67,7 +67,6 @@ class TheComponentsOfCodenameOneJava161Snippet {
 
 
     Object context;
-    TextField url = new TextField();
     Object value;
     Object body;
     Object event;
@@ -91,6 +90,17 @@ class TheComponentsOfCodenameOneJava161Snippet {
     
     void snippet() throws Exception {
         // tag::the-components-of-codename-one-java-161[]
+        TextField firstName = new TextField("", "First Name");
+        TextField surname = new TextField("", "Surname");
+        TextField url = new TextField("", "URL", 20, TextField.URL);
+        TextField email = new TextField("", "E-Mail", 20, TextField.EMAILADDR);
+        TextField phone = new TextField("", "Phone", 20, TextField.PHONENUMBER);
+            TextField num1 = new TextField("", "", 5, TextField.NUMERIC);
+        TextField num2 = new TextField("", "", 5, TextField.NUMERIC);
+        TextField num3 = new TextField("", "", 5, TextField.NUMERIC);
+        TextField num4 = new TextField("", "", 5, TextField.NUMERIC);
+        Button submit = new Button("Submit");
+
         Validator v = new Validator();
         v.addConstraint(firstName, new LengthConstraint(2)).
                 addConstraint(surname, new LengthConstraint(2)).
@@ -106,17 +116,8 @@ class TheComponentsOfCodenameOneJava161Snippet {
         // end::the-components-of-codename-one-java-161[]
     }
 
-    TextField num1 = new TextField();
-    TextField num3 = new TextField();
-    TextField num4 = new TextField();
-    TextField num2 = new TextField();
 
 
-    Button submit = new Button();
-    TextField email = new TextField();
-    TextField surname = new TextField();
     String phoneRegex = "[0-9-]+";
-    TextField firstName = new TextField();
-    TextField phone = new TextField();
 
 }
