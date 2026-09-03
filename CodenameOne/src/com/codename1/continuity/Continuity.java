@@ -717,6 +717,16 @@ public final class Continuity {
         // was the case that never got marked. The relay offered the unchanged document again
         // after every restart, and with automatic restore off the no-argument wrapper re-applied
         // it on every call.
+        // Written to storage BEFORE it is acknowledged, and for both shapes of state.
+        //
+        // The order matters and this is the safe one. noteActedOn() is durable: once it has run,
+        // the relay's copy is refused for good. Acknowledging first and dying before the write
+        // lost the state entirely -- the payload was applied in memory, never stored, and never
+        // offered again -- and a payload-only continuation is exactly the shape most likely to
+        // hit it, because an app that does not use @Route has nothing else that checkpoints. The
+        // reverse order costs at worst one re-delivery of a state that is already applied, which
+        // restoring again handles.
+        persist(state);
         noteActedOn(state);
         List<String> routes = state.getRoutes();
         if (routes.isEmpty()) {
@@ -746,12 +756,6 @@ public final class Continuity {
             shown = false;
         } finally {
             applyingRestore = false;
-        }
-        if (shown) {
-            // Locally, and only locally. Suppressing the checkpoint above also suppressed the
-            // write that records where the user now is, and without this a cold start would come
-            // back to the position that preceded the restore.
-            persist(state);
         }
         return shown;
     }

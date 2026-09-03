@@ -20661,11 +20661,19 @@ static NSUbiquitousKeyValueStore *cn1ContinuityStore(void) {
     // no observer, even once the network came back. Resolving again on the next call costs one
     // synchronize; getting it permanently wrong costs the feature.
     pthread_mutex_lock(&cn1ContinuityStoreLock);
-    if (store == nil) {
     @try {
         NSUbiquitousKeyValueStore *s = [NSUbiquitousKeyValueStore defaultStore];
-        if (s != nil && [s synchronize]) {
-            store = [s retain];
+        // The observer goes on independently of the probe, and this is the half that used to be
+        // missing. Registering for a notification is local: it needs no connectivity and no
+        // successful synchronize, and the store object is the same singleton either way. Tying it
+        // to the probe meant an offline launch installed no observer at all -- and an application
+        // that only registers a SyncedStoreListener makes exactly ONE store call, from
+        // addChangeListener, so nothing ever asked again. Reconnecting produced no callback for
+        // the life of the process, which is the whole feature for that app.
+        //
+        // Latched separately from `store` for the reason the store is latched at all: two callers
+        // arriving together must not both register, or every remote change is delivered twice.
+        if (s != nil && cn1ContinuityStoreObserver == nil) {
             cn1ContinuityStoreObserver = [[[NSNotificationCenter defaultCenter]
                     addObserverForName:NSUbiquitousKeyValueStoreDidChangeExternallyNotification
                                 object:s
@@ -20675,9 +20683,15 @@ static NSUbiquitousKeyValueStore *cn1ContinuityStore(void) {
                         CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
             }] retain];
         }
+        if (store == nil && s != nil && [s synchronize]) {
+            store = [s retain];
+        }
     } @catch (NSException *e) {
-        store = nil;
-    }
+        // Deliberately NOT "store = nil". The handler now covers calls that already resolved --
+        // it moved out of the store == nil guard when the observer stopped depending on the probe
+        // -- and this port is MRR, so nulling a retained store would both leak it and lose a
+        // working store because a later synchronize threw. A failed attempt simply leaves the
+        // state it found: still nil, so the next call tries again.
     }
     pthread_mutex_unlock(&cn1ContinuityStoreLock);
     return store;

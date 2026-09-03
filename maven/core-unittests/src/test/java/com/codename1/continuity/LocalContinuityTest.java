@@ -1440,6 +1440,31 @@ public class LocalContinuityTest extends UITestBase {
     }
 
     /**
+     * An applied state has to reach local storage, and a payload-only one is the case that proves
+     * it. noteActedOn() is durable -- once it runs the relay's copy is refused for good -- so a
+     * state that was acknowledged and never written is lost outright if the process dies before
+     * anything else checkpoints. An app that does not use @Route has nothing else that
+     * checkpoints, which is exactly the app this shape of state belongs to.
+     */
+    @EdtTest
+    public void aPayloadOnlyRestoreIsWrittenToStorage() {
+        RecordingProvider provider = new RecordingProvider();
+        Continuity.setStateProvider(provider);
+
+        AppState payloadOnly = fromElsewhere("stored payload", 12L);
+        payloadOnly.setRoutes(new ArrayList<String>());
+
+        assertFalse(Continuity.restore(payloadOnly), "a route-less state shows no form");
+
+        // What the next cold start would find: nothing is parked, so this is storage answering.
+        AppState stored = Continuity.getRestorableState();
+        assertNotNull(stored,
+                "the applied payload-only state was acknowledged but never written to storage");
+        assertEquals("stored payload", stored.getPayload().get("note"),
+                "storage holds a different state than the one that was applied");
+    }
+
+    /**
      * And the parked slot is released on application, not on a form appearing. Gating it on the
      * return value kept a payload-only arrival parked for ever, so every restore() re-applied it.
      */
@@ -1455,13 +1480,14 @@ public class LocalContinuityTest extends UITestBase {
         flushSerialCalls();
 
         assertFalse(Continuity.restore(), "a route-less state shows no form");
-        AppState left = Continuity.getRestorableState();
-        assertFalse(left != null && isSame(left, payloadOnly),
-                "the parked state was applied and must not still be offered");
-    }
 
-    private static boolean isSame(AppState a, AppState b) {
-        return a.getDeviceId().equals(b.getDeviceId()) && a.getSequence() == b.getSequence();
+        // Storage legitimately holds it now -- an applied state IS the local checkpoint, which is
+        // what the next cold start should come back to -- so asking getRestorableState() alone
+        // cannot tell the parked slot from the stored copy. Remove the stored copy and ask again:
+        // whatever answers now can only be the parked slot, and it has to be empty.
+        Storage.getInstance().deleteStorageFile(Continuity.STORAGE_KEY);
+        AppState left = Continuity.getRestorableState();
+        assertNull(left, "the parked state was applied and must not still be waiting");
     }
 
     /**
