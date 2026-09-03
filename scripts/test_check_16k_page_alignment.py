@@ -55,13 +55,13 @@ ELF32_HEADER = 52
 ELF32_PHENTSIZE = 32
 
 
-def elf64(p_align):
+def elf64(p_align, machine=0xB7):
     """A minimal little-endian 64-bit ELF with one PT_LOAD segment."""
     total = ELF64_HEADER + ELF64_PHENTSIZE
     header = struct.pack(
         "<4sBBBB8xHHIQQQIHHHHHH",
         b"\x7fELF", 2, 1, 1, 0,          # magic, ELFCLASS64, LSB, version
-        3, 0xB7, 1,                      # ET_DYN, AArch64, version
+        3, machine, 1,                   # ET_DYN, machine, version
         0, ELF64_HEADER, 0, 0,           # entry, phoff, shoff, flags
         ELF64_HEADER, ELF64_PHENTSIZE, 1, 0, 0, 0)
     phdr = struct.pack(
@@ -72,13 +72,13 @@ def elf64(p_align):
     return header + phdr
 
 
-def elf32(p_align):
+def elf32(p_align, machine=0x28):
     """A minimal little-endian 32-bit ELF with one PT_LOAD segment."""
     total = ELF32_HEADER + ELF32_PHENTSIZE
     header = struct.pack(
         "<4sBBBB8xHHIIIIIHHHHHH",
         b"\x7fELF", 1, 1, 1, 0,          # magic, ELFCLASS32, LSB, version
-        3, 0x28, 1,                      # ET_DYN, ARM, version
+        3, machine, 1,                   # ET_DYN, machine, version
         0, ELF32_HEADER, 0, 0,           # entry, phoff, shoff, flags
         ELF32_HEADER, ELF32_PHENTSIZE, 1, 0, 0, 0)
     phdr = struct.pack(
@@ -98,6 +98,7 @@ def patched_elf64(**fields):
         "e_phentsize": (0x36, "<H"),
         "e_phnum": (0x38, "<H"),
         "p_type": (ELF64_HEADER + 0x00, "<I"),
+        "p_vaddr": (ELF64_HEADER + 0x10, "<Q"),
         "p_align": (ELF64_HEADER + 0x30, "<Q"),
     }
     for field, value in fields.items():
@@ -316,9 +317,51 @@ class MalformedElfHeadersAreReported(unittest.TestCase):
             self.assertEqual([], failures, hex(value))
             self.assertEqual(1, scanner.libraries_scanned, hex(value))
 
+    def test_vaddr_and_offset_not_congruent_modulo_align(self):
+        # ELF requires p_vaddr == p_offset (mod p_align). A segment that is
+        # not cannot be mapped as it declares itself.
+        self.assert_reported(patched_elf64(p_vaddr=0x1000),
+                             "are not congruent modulo p_align")
+
     def test_no_load_segments(self):
         # A single PT_NOTE (4) and nothing to measure alignment against.
         self.assert_reported(patched_elf64(p_type=4), "no PT_LOAD segments")
+
+
+class AbiDirectoryMustMatchTheFile(unittest.TestCase):
+    """The ABI directory is the evidence used to pick a rule, so a file that
+    contradicts it leaves no sound verdict -- report, do not guess."""
+
+    def test_32_bit_library_under_a_64_bit_abi_is_not_silently_exempted(self):
+        failures, scanner = scan("app.aar!jni/arm64-v8a/libfoo.so",
+                                 elf32(MISALIGNED))
+        self.assertEqual(1, len(failures), failures)
+        self.assertIn("cannot hold", failures[0])
+        self.assertEqual(0, scanner.skipped_32bit)
+
+    def test_wrong_architecture_under_an_abi_is_not_counted_compliant(self):
+        # x86_64 bytes under arm64-v8a: aligned, but Android cannot load it
+        # there, so counting it as a compliant arm64 slice is wrong.
+        failures, scanner = scan("app.aar!jni/arm64-v8a/libfoo.so",
+                                 elf64(ALIGNED, machine=62))
+        self.assertEqual(1, len(failures), failures)
+        self.assertIn("cannot hold", failures[0])
+        self.assertEqual(0, scanner.libraries_scanned)
+
+    def test_every_abi_directory_accepts_its_own_architecture(self):
+        for abi, payload in [("armeabi-v7a", elf32(MISALIGNED, 40)),
+                             ("x86", elf32(MISALIGNED, 3)),
+                             ("arm64-v8a", elf64(ALIGNED, 183)),
+                             ("x86_64", elf64(ALIGNED, 62))]:
+            failures, _ = scan("app.aar!jni/%s/libfoo.so" % abi, payload)
+            self.assertEqual([], failures, abi)
+
+    def test_a_library_outside_an_abi_directory_is_not_second_guessed(self):
+        # No ABI directory means no assertion to contradict.
+        failures, scanner = scan("app.aar!libs/weirdname.bin",
+                                 elf64(ALIGNED, machine=62))
+        self.assertEqual([], failures)
+        self.assertEqual(1, scanner.libraries_scanned)
 
 
 class ArchiveRecursionIsBounded(unittest.TestCase):

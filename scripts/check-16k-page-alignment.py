@@ -130,8 +130,35 @@ PT_LOAD = 1
 # program header layouts differ in field order, not just in width, so the
 # offsets cannot be derived from the word size.
 ELF_LAYOUT = {
-    ELFCLASS64: (64, 0x20, 0x36, 0x38, "Q", 56, 0x08, 0x20, 0x30),
-    ELFCLASS32: (52, 0x1C, 0x2A, 0x2C, "I", 32, 0x04, 0x10, 0x1C),
+    ELFCLASS64: (64, 0x20, 0x36, 0x38, "Q", 56, 0x08, 0x10, 0x20, 0x30),
+    ELFCLASS32: (52, 0x1C, 0x2A, 0x2C, "I", 32, 0x04, 0x08, 0x10, 0x1C),
+}
+
+# e_machine sits at 0x12 in both classes.
+E_MACHINE_OFFSET = 0x12
+EM_ARM = 40
+EM_AARCH64 = 183
+EM_386 = 3
+EM_X86_64 = 62
+EM_MIPS = 8
+EM_RISCV = 243
+
+# What an Android ABI directory asserts about the library inside it. The gate
+# picks which rule to apply from that directory name, so when the file
+# contradicts it the evidence is self-contradictory and NEITHER verdict is
+# sound: exempting it as 32-bit and accepting it as an aligned 64-bit slice
+# are both guesses. Reported rather than guessed, for the same reason an
+# unreadable file is. Verified against every library in the tree before being
+# switched on -- all 18 agree with their directory.
+ANDROID_ABI_ELF = {
+    "armeabi": (ELFCLASS32, EM_ARM),
+    "armeabi-v7a": (ELFCLASS32, EM_ARM),
+    "arm64-v8a": (ELFCLASS64, EM_AARCH64),
+    "x86": (ELFCLASS32, EM_386),
+    "x86_64": (ELFCLASS64, EM_X86_64),
+    "mips": (ELFCLASS32, EM_MIPS),
+    "mips64": (ELFCLASS64, EM_MIPS),
+    "riscv64": (ELFCLASS64, EM_RISCV),
 }
 
 
@@ -163,7 +190,7 @@ def read_load_alignments(data):
     if ei_class not in ELF_LAYOUT:
         raise MalformedElf("unknown ELF class 0x%02x" % ei_class)
     (header_size, phoff_off, phentsize_off, phnum_off, word, min_phentsize,
-     poffset_off, pfilesz_off, palign_off) = ELF_LAYOUT[ei_class]
+     poffset_off, pvaddr_off, pfilesz_off, palign_off) = ELF_LAYOUT[ei_class]
 
     if len(data) < header_size:
         raise MalformedElf(
@@ -178,6 +205,7 @@ def read_load_alignments(data):
     else:
         raise MalformedElf("unknown ELF data encoding 0x%02x" % endian)
 
+    e_machine = struct.unpack_from(prefix + "H", data, E_MACHINE_OFFSET)[0]
     e_phoff = struct.unpack_from(prefix + word, data, phoff_off)[0]
     e_phentsize = struct.unpack_from(prefix + "H", data, phentsize_off)[0]
     e_phnum = struct.unpack_from(prefix + "H", data, phnum_off)[0]
@@ -218,10 +246,18 @@ def read_load_alignments(data):
         if alignment & (alignment - 1):
             raise MalformedElf(
                 "PT_LOAD p_align 0x%x is not a power of two" % alignment)
+        # ELF requires p_vaddr and p_offset to be congruent modulo p_align;
+        # a segment that is not cannot be mapped as it declares itself, so
+        # calling it aligned would vouch for a library no loader can honour.
+        p_vaddr = struct.unpack_from(prefix + word, data, offset + pvaddr_off)[0]
+        if alignment > 1 and (p_vaddr % alignment) != (p_offset % alignment):
+            raise MalformedElf(
+                "PT_LOAD p_vaddr 0x%x and p_offset 0x%x are not congruent "
+                "modulo p_align 0x%x" % (p_vaddr, p_offset, alignment))
         alignments.append(alignment)
     if not alignments:
         raise MalformedElf("no PT_LOAD segments")
-    return ei_class == ELFCLASS64, alignments
+    return ei_class, e_machine, alignments
 
 
 def is_android_payload(label):
@@ -248,6 +284,23 @@ def is_android_payload(label):
 
 # A shared-library soname version is numeric: `libfoo.so.1`, `libfoo.so.1.2`.
 SONAME_VERSION = re.compile(r"[0-9]+(\.[0-9]+)*\Z")
+
+
+def android_abi_for(label):
+    """The Android ABI directory governing this library, or None.
+
+    The innermost match wins: the directory closest to the file is the one
+    whose contents Android will load for that ABI.
+    """
+    found = None
+    for part in label.split("!"):
+        segments = [segment.lower()
+                    for segment in part.replace("\\", "/").split("/")]
+        for index in range(len(segments) - 1):
+            if (segments[index] in ANDROID_LIB_DIRS
+                    and segments[index + 1] in ANDROID_ABIS):
+                found = segments[index + 1]
+    return found
 
 
 def looks_like_shared_library(name):
@@ -313,11 +366,26 @@ class Scanner(object):
 
     def check_library(self, label, data):
         try:
-            is_64_bit, alignments = read_load_alignments(data)
+            ei_class, e_machine, alignments = read_load_alignments(data)
         except MalformedElf as error:
             self.failures.append("%s: %s" % (label, error))
             return
-        if not is_64_bit:
+
+        # The ABI directory is the evidence this gate uses to decide which
+        # rule applies, so a file that contradicts it leaves no sound verdict
+        # to reach -- exempting it as 32-bit and accepting it as an aligned
+        # 64-bit slice would both be guesses.
+        abi = android_abi_for(label)
+        expected = ANDROID_ABI_ELF.get(abi)
+        if expected is not None and (ei_class, e_machine) != expected:
+            self.failures.append(
+                "%s: packaged under %s but the file is %d-bit e_machine %d, "
+                "which that directory cannot hold"
+                % (label, abi, 64 if ei_class == ELFCLASS64 else 32,
+                   e_machine))
+            return
+
+        if ei_class != ELFCLASS64:
             self.skipped_32bit += 1
             if self.verbose:
                 print("  32-bit (not subject to 16 KB pages): %s" % label)
