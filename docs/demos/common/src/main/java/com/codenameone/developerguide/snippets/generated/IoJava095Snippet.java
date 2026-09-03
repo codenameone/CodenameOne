@@ -142,9 +142,14 @@ class IoJava095Snippet {
                 String n = (String)child;
                 // the paths above are built with the platform separator, which is
                 // a backslash on Windows
-                int pos = n.lastIndexOf(FileSystemStorage.getInstance().getFileSystemSeparator());
-                if(pos < 0) {
-                    return n;
+                char sep = FileSystemStorage.getInstance().getFileSystemSeparator();
+                // roots arrive with a trailing separator
+                while(n.length() > 1 && n.charAt(n.length() - 1) == sep) {
+                    n = n.substring(0, n.length() - 1);
+                }
+                int pos = n.lastIndexOf(sep);
+                if(pos < 0 || pos == n.length() - 1) {
+                    return n; // a bare root has no basename to show
                 }
                 return n.substring(pos + 1);
             }
