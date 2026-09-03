@@ -473,8 +473,9 @@ the platform implementation.
 and what it does with it depends on the destination. A builder with
 `redirectToAudioBuffer(true)` is delegated straight to `build()`, so every setting
 survives. A builder recording to a file is reduced to its path and MIME type,
-which drops any sample rate or bit rate set on it and leaves the platform's
-defaults in place -- call `build()` yourself when those settings matter.
+which drops the sample rate, bit rate and channel count set on it and leaves
+the platform's defaults in place -- so a builder asking for stereo yields a mono
+file. Call `build()` yourself when any of those settings matter.
 
 How far the settings then travel depends on the port, and on the format. The
 JavaScript port takes only the path when recording to a file, so a web file
