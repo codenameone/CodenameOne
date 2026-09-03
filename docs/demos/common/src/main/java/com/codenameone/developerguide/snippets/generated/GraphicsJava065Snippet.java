@@ -84,10 +84,13 @@ class GraphicsJava065Snippet {
             class MyForm extends Form {
 
                 public MyForm() {
-                    super("Rectangle Rotations");
-                    for ( int i=0; i< 10; i++ ){
-                        this.addComponent(new RectangleComponent());
-                    }
+                    super("Rectangle Rotations", new BorderLayout());
+                    // one per position, so the rotation can be compared across the screen
+                    add(BorderLayout.NORTH, new RectangleComponent());
+                    add(BorderLayout.SOUTH, new RectangleComponent());
+                    add(BorderLayout.EAST, new RectangleComponent());
+                    add(BorderLayout.WEST, new RectangleComponent());
+                    add(BorderLayout.CENTER, new RectangleComponent());
                 }
             }
             new MyForm().show();
