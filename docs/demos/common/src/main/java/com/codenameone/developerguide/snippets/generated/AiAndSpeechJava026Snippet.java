@@ -98,7 +98,17 @@ class AiAndSpeechJava026Snippet {
         view.addMessage(greeting);
         history.add(greeting);
 
+        // One request at a time. A second send while the first is still
+        // streaming builds its request without the first reply, and the two
+        // completions then append to the history in whatever order they finish,
+        // producing turns like user A, user B, assistant B, assistant A.
+        boolean[] sending = {false};
+
         view.setOnSend(e -> {
+            if (sending[0]) {
+                return;
+            }
+            sending[0] = true;
             String text = view.getInput().getText();
             view.getInput().clear();
             ChatMessage sent = ChatMessage.user(text);
@@ -120,12 +130,15 @@ class AiAndSpeechJava026Snippet {
                     streaming.appendText(d);
                 }
             }).ready(resp -> {
+                sending[0] = false;
                 view.setTypingIndicatorVisible(false);
                 // Record what the assistant actually said, so the next turn
                 // carries it rather than an empty placeholder.
                 history.add(resp.getAssistantMessage());
             }).except(err -> {
-                // Without this the indicator stays up for good on a failure.
+                // Without this the indicator stays up for good on a failure, and
+                // the guard above would block every later send.
+                sending[0] = false;
                 view.setTypingIndicatorVisible(false);
                 Log.e(err);
             });

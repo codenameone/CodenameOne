@@ -786,6 +786,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 
-The same code runs unchanged in the simulator when Ollama is detected,
-on Android with the multi-modal native client, and on iOS through the
-cloud build pipeline.
+The same code runs unchanged in the simulator, where the redirect points it at
+your local Ollama install, and on Android and iOS, where it calls the provider
+over HTTPS. Be clear with yourself about what that means on a device: the
+captured photo is uploaded to the provider. Nothing here runs a model on the
+phone, so cover that in your privacy policy, and keep the key off the device as
+the `SecureStorage` section above describes.

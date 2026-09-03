@@ -84,11 +84,16 @@ class AiAndSpeechJava017Snippet {
         // tag::ai-and-speech-java-017[]
         StringBuilder buffer = new StringBuilder();
 
+        // Open the assistant bubble first. appendToLastMessage() writes to
+        // whichever bubble is newest, which is nothing at all on a fresh view
+        // and the user's own message once one has been added.
+        ChatBubble streaming = chatView.beginAssistantStream();
+
         openai.chatStream(req, new StreamingListener.Adapter() {
             @Override
             public void onContentDelta(String delta) {
                 buffer.append(delta);
-                chatView.appendToLastMessage(delta);
+                streaming.appendText(delta);
             }
 
             @Override

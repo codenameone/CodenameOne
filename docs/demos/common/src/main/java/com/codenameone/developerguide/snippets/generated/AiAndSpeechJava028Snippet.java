@@ -94,11 +94,11 @@ class AiAndSpeechJava028Snippet {
             ImagePart img = new ImagePart(bytes, "image/jpeg");
 
             ChatRequest req = ChatRequest.builder()
-                    // Whatever model you name has to exist wherever the client
-                    // points. With the simulator's Ollama redirect that is your
-                    // local install, so name a vision-capable model you pulled
-                    // there rather than assuming an OpenAI one resolves.
-                    .model(visionModel)
+                    // No model named here on purpose: a request that omits one
+                    // uses the client's default, which LlmClient#setDefaultModel
+                    // sets and the simulator's Ollama redirect sets for you. Name
+                    // one explicitly and the redirect cannot honour it, so the
+                    // sample stops running locally.
                     .addMessage(ChatMessage.userWithImage(
                         "Describe the photo in one sentence.", img))
                     .build();
@@ -125,6 +125,5 @@ class AiAndSpeechJava028Snippet {
     byte[] readAllBytes(String path) { return new byte[0]; }
 
 
-    String visionModel = "gpt-4o";
 
 }

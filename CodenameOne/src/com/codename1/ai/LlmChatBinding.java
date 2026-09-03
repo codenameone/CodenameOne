@@ -127,10 +127,30 @@ public final class LlmChatBinding {
     }
 
     private static List<ChatMessage> buildOutgoingMessages(ChatView view, ChatRequest baseRequest) {
-        List<ChatMessage> history = view.getHistory();
-        if (history.isEmpty()) {
-            return baseRequest.getMessages();
+        return mergeOutgoing(view.getHistory(), baseRequest);
+    }
+
+    /// Combines the base request's messages with the conversation so far.
+    ///
+    /// The base request carries the application's own framing -- typically a
+    /// system prompt -- and the view carries the conversation. Returning only
+    /// the history dropped that framing from every request, not merely from
+    /// later ones: `bind` appends the user message and the assistant
+    /// placeholder to the view before this runs, so the history is never empty
+    /// by the time it is asked.
+    ///
+    /// Package private so it can be tested without a `ChatView`.
+    static List<ChatMessage> mergeOutgoing(List<ChatMessage> history, ChatRequest baseRequest) {
+        List<ChatMessage> base = baseRequest == null ? null : baseRequest.getMessages();
+        if (history == null || history.isEmpty()) {
+            return base;
         }
-        return new ArrayList<ChatMessage>(history);
+        if (base == null || base.isEmpty()) {
+            return new ArrayList<ChatMessage>(history);
+        }
+        List<ChatMessage> out = new ArrayList<ChatMessage>(base.size() + history.size());
+        out.addAll(base);
+        out.addAll(history);
+        return out;
     }
 }
