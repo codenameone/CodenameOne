@@ -104,6 +104,7 @@ class AdvertisingJava006Snippet {
         ad.setAdListener(new AdListener() {
             public void onLoaded() {
                 retryDelay = 1000;
+                loadFailures = 0;
                 // A rewarded ad is an opt-in format, so a loaded ad only enables
                 // the offer. Showing it here would put a full screen ad in front
                 // of a user who never asked for one.
@@ -124,12 +125,17 @@ class AdvertisingJava006Snippet {
             }
 
             public void onFailedToLoad(AdError error) {
-                // Retry only what can succeed later. A network error or an empty
-                // ad inventory is transient; an unsupported platform or a bad ad
-                // unit id never becomes valid, and retrying those turns the
-                // graceful "no ads here" path into a permanent timer.
-                if (error.getCode() != AdError.CODE_NETWORK_ERROR
-                        && error.getCode() != AdError.CODE_NO_FILL) {
+                // getCode() is provider specific -- adapters forward their own
+                // SDK's numbers -- so the only codes that mean the same thing
+                // everywhere are Codename One's own. Stop on those, since an
+                // unsupported platform or a bad ad unit id never becomes valid
+                // and retrying turns the graceful no-ads path into a permanent
+                // timer. Anything else may be transient, so retry it, but bound
+                // the attempts: an unrecognized permanent failure must not
+                // retry for the life of the screen either.
+                if (error.getCode() == AdError.CODE_UNSUPPORTED
+                        || error.getCode() == AdError.CODE_INVALID_REQUEST
+                        || ++loadFailures > 5) {
                     return;
                 }
                 retryDelay = Math.min(retryDelay * 2, 60000);
@@ -147,5 +153,6 @@ class AdvertisingJava006Snippet {
 
 
     int retryDelay = 1000;
+    int loadFailures;
 
 }

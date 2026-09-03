@@ -17,7 +17,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 === The engagement scheduler
 
-Rather than picking the moment yourself, you can let `AppReview` decide based on simple engagement heuristics: how many times the app was launched, how long ago it was installed, and how long since it last asked. Configure it once (for example in your app's `init` or `start` method) and call `registerSession()` on every launch:
+Rather than picking the moment yourself, you can let `AppReview` decide based on simple engagement heuristics: how many times the app was launched, how long ago it was installed, and how long since it last asked. Configure it once (for example in your app's `init` or `start` method) and call `registerSession()` on every launch -- but after a form is showing, not during `init`. It prompts as soon as the thresholds are met, and on a platform with no native prompt that dialog is a `Sheet`, which needs something to show on:
 
 [source,java]
 ----

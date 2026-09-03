@@ -103,8 +103,13 @@ class AppReviewJava002Snippet {
                 .setMinimumDaysInstalled(3)     // and installed at least 3 days
                 .setDaysBetweenPrompts(30)      // never nag more than monthly
                 .setStoreUrl(storeUrl)
-                .setSupportEmail("support@example.com")
-                .registerSession();
+                .setSupportEmail("support@example.com");
+
+        // registerSession() prompts as soon as the thresholds are met, and the
+        // fallback dialog is a Sheet, which throws when no form is current. That
+        // is exactly the state during init, so configure there and record the
+        // session once a form is up.
+        form.addShowListener(e -> AppReview.getInstance().registerSession());
         // end::app-review-java-002[]
     }
 }
