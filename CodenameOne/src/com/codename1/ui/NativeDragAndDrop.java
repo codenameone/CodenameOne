@@ -211,6 +211,10 @@ public final class NativeDragAndDrop {
             currentAction = NativeDragOperation.ACTION_NONE;
         }
         op.setSource(source);
+        // Whatever this operation still owes from its last session, paid before it is armed for
+        // this one. Already on the event dispatch thread here, which is where a completion
+        // belongs, so its listeners hear the drag that ended before the one beginning.
+        deliverCompletion(op);
         op.resetPerformedAction();
         if (renderPreview && needsGeneratedImage(op) && source != null) {
             try {
@@ -260,6 +264,38 @@ public final class NativeDragAndDrop {
         return started;
     }
 
+    /// An operation whose completion has been queued but not yet delivered, and the outcome it is
+    /// waiting to report.
+    ///
+    /// A source offers the same `NativeDragOperation` instance for every drag of its component,
+    /// so the one that has just finished can be started again before the event dispatch thread
+    /// has run the completion of the drag before it. Left alone, that queued callback then
+    /// reports the *previous* drag's outcome while the new one is still running -- and a source
+    /// that deletes its data on a move deletes what the new drag is carrying.
+    private static NativeDragOperation completing;
+    private static int completingAction = NativeDragOperation.ACTION_NONE;
+
+    /// Delivers a queued completion, once, to whichever reaches it first: the callback
+    /// `#dragCompleted(int)` queued, or the next start of the same operation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `op`: the operation whose completion is owed
+    private static void deliverCompletion(NativeDragOperation op) {
+        int action;
+        synchronized (LOCK) {
+            if (completing != op) { // NOPMD CompareObjectsWithEquals
+                // Already delivered, or owed by a different operation -- which has a queued
+                // callback of its own and is none of this one's business.
+                return;
+            }
+            action = completingAction;
+            completing = null;
+            completingAction = NativeDragOperation.ACTION_NONE;
+        }
+        op.fireCompleted(action);
+    }
+
     /// Reports that the platform started a drag session on its own, for the operation the press
     /// prepared. Ports whose operating system owns the drag gesture -- where a long press, not
     /// the framework's own threshold, is what begins a drag -- call this instead of returning
@@ -270,7 +306,7 @@ public final class NativeDragAndDrop {
     /// the operation the session is carrying, or null when nothing was prepared -- in which case
     /// the port should refuse to start a session
     public static NativeDragOperation dragSessionStarted() {
-        NativeDragOperation op;
+        final NativeDragOperation op;
         final Component source;
         synchronized (LOCK) {
             if (active != null) {
@@ -295,7 +331,17 @@ public final class NativeDragAndDrop {
             targetGeneration++;
             currentAction = NativeDragOperation.ACTION_NONE;
         }
-        op.resetPerformedAction();
+        // Queued rather than run here: this is the platform's own thread, and a completion
+        // belongs to the event dispatch thread. Behind the callback dragCompleted queued for the
+        // previous session, which is what puts that session's outcome before the reset arming
+        // this one -- otherwise the reset happened first and the late completion wrote the old
+        // drag's action onto the operation the new drag is using.
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                op.resetPerformedAction();
+            }
+        });
         if (source != null) {
             // On the event dispatch thread, because it repaints. A component that is draggable
             // as well as a native drag source would otherwise be left mid-drag with its image
@@ -851,7 +897,20 @@ public final class NativeDragAndDrop {
                 // selected and never receives the drop, whatever the event dispatch thread is
                 // doing. That is what a target refusing outright must use -- reject() in a
                 // callback is a late change of mind, honoured from the next event onward.
-                accepted = currentAction;
+                //
+                // Intersected with what is true at the release, not taken on its own. The action
+                // the platform proposes can change after the last drag event -- a modifier key
+                // let go turns a move into a copy -- and a target can narrow its own mask in the
+                // same window. Reporting the decision regardless told the platform a move had
+                // been performed, which on a local drag is the word a source deletes its data on,
+                // while the event delivered to the target refused that same move as no longer
+                // permitted.
+                //
+                // Nothing performable leaves nothing, rather than falling back to the declarative
+                // answer: a target that chose a move did not agree to a copy, and one whose
+                // callback rejected the drag outright must not have that refusal promoted into a
+                // drop.
+                accepted = currentAction & action & target.getAcceptedDropActions();
             } else {
                 // A different component from the one the callbacks were about: the pointer
                 // moved between the last drag event and the drop, so there is no decision of
@@ -917,7 +976,11 @@ public final class NativeDragAndDrop {
         Component target = findTarget(windowId, x, y, content, action);
         synchronized (LOCK) {
             if (target != null && target == currentTarget) { // NOPMD CompareObjectsWithEquals
-                return currentAction;
+                // Narrowed exactly as the drop narrows it. This exists so that what the platform
+                // commits to is what the drop then reports, so the two have to answer the same
+                // question -- an accepted action the release no longer proposes is not something
+                // either of them may promise.
+                return currentAction & action & target.getAcceptedDropActions();
             }
             return target == null ? NativeDragOperation.ACTION_NONE
                     : preferredAction(action & target.getAcceptedDropActions());
@@ -946,10 +1009,14 @@ public final class NativeDragAndDrop {
         if (op == null) {
             return;
         }
+        synchronized (LOCK) {
+            completing = op;
+            completingAction = performedAction;
+        }
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                op.fireCompleted(performedAction);
+                deliverCompletion(op);
             }
         });
     }

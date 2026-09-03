@@ -367,6 +367,48 @@ class NativeDragAndDropTest extends UITestBase {
     }
 
     @FormTest
+    void anAcceptedActionThePlatformNoLongerProposesIsNotReported() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        // The target chose a move out of a drag that offered both.
+        target.rejectAction = NativeDragOperation.ACTION_MOVE;
+
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"),
+                NativeDragOperation.ACTION_COPY | NativeDragOperation.ACTION_MOVE);
+        flushSerialCalls();
+
+        // The user let the modifier go before releasing, so the platform proposes only a copy.
+        // Answering "moved" would tell it a move was performed -- and on a local drag that is
+        // the word the source deletes its data on -- while the target agreed to no such thing.
+        assertEquals(NativeDragOperation.ACTION_NONE,
+                NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_COPY),
+                "the accepted move is no longer performable, and nothing is the honest answer");
+        flushSerialCalls();
+        assertFalse(target.events.contains("drop"));
+    }
+
+    @FormTest
+    void anAcceptedActionThePlatformStillProposesIsReported() {
+        Form form = Display.getInstance().getCurrent();
+        DropRecorder target = addTarget(form);
+        target.rejectAction = NativeDragOperation.ACTION_MOVE;
+
+        int x = target.getAbsoluteX() + 5;
+        int y = target.getAbsoluteY() + 5;
+        NativeDragAndDrop.dragEnter(0, x, y, textContent("hi"),
+                NativeDragOperation.ACTION_COPY | NativeDragOperation.ACTION_MOVE);
+        flushSerialCalls();
+
+        assertEquals(NativeDragOperation.ACTION_MOVE,
+                NativeDragAndDrop.drop(0, x, y, textContent("hi"), NativeDragOperation.ACTION_MOVE),
+                "the ordinary case: what the target chose is still what the release performs");
+        flushSerialCalls();
+        assertTrue(target.events.contains("drop"));
+    }
+
+    @FormTest
     void aTargetThatCannotPerformTheActionLetsAnAncestorHaveIt() {
         Form form = Display.getInstance().getCurrent();
         DropRecorder outer = addTarget(form);
@@ -472,6 +514,44 @@ class NativeDragAndDropTest extends UITestBase {
             assertTrue(NativeDragAndDrop.startDrag(null, op));
             assertEquals(NativeDragOperation.ACTION_NONE, op.getPerformedAction(),
                     "a drag in flight has performed nothing yet, whatever the last one did");
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
+            flushSerialCalls();
+        } finally {
+            implementation.setNativeDragAndDropSupported(false);
+            implementation.resetNativeDragState();
+        }
+    }
+
+    @FormTest
+    void aCompletionOwedIsPaidBeforeTheSameOperationDragsAgain() {
+        implementation.resetNativeDragState();
+        implementation.setNativeDragAndDropSupported(true);
+        try {
+            final List<Integer> completions = new ArrayList<Integer>();
+            NativeDragOperation op = new NativeDragOperation("reused")
+                    .setAllowedActions(NativeDragOperation.ACTION_COPY | NativeDragOperation.ACTION_MOVE);
+            op.addCompletionListener(e -> completions.add(
+                    Integer.valueOf(((NativeDragOperation) e.getSource()).getPerformedAction())));
+
+            assertTrue(NativeDragAndDrop.startDrag(null, op));
+            NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_MOVE);
+            // Deliberately not flushed: the completion is queued, and the same instance is
+            // dragged again before the event dispatch thread has run it -- which is what happens
+            // when the press beginning the next drag is already ahead of it in the queue.
+            assertTrue(NativeDragAndDrop.startDrag(null, op),
+                    "the previous session is over, so the next drag is not refused");
+            assertEquals(1, completions.size(),
+                    "the outcome of the drag that ended is delivered before the operation is "
+                            + "armed again, rather than during the drag that follows");
+            assertEquals(NativeDragOperation.ACTION_MOVE, completions.get(0).intValue());
+            assertEquals(NativeDragOperation.ACTION_NONE, op.getPerformedAction(),
+                    "and the drag now running has performed nothing yet");
+
+            flushSerialCalls();
+            assertEquals(1, completions.size(), "the queued callback does not deliver it twice");
+            assertEquals(NativeDragOperation.ACTION_NONE, op.getPerformedAction(),
+                    "a late completion must not write the old drag's action onto the new one");
+
             NativeDragAndDrop.dragCompleted(NativeDragOperation.ACTION_NONE);
             flushSerialCalls();
         } finally {
