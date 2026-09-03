@@ -140,16 +140,22 @@ class MonetizationJava036Snippet {
      // the end of the current expiry date
      Calendar cal = Calendar.getInstance();
      cal.setTime(currExpiry);
-     switch (receipt.getSku()) {
-     case SKU_WORLD_1_MONTH:
+     Date newExpiry = null;
+     if (SKU_WORLD_1_MONTH.equals(receipt.getSku())) {
      cal.add(Calendar.MONTH, 1);
-     break;
-     case SKU_WORLD_1_YEAR:
+     newExpiry = cal.getTime();
+     } else if (SKU_WORLD_1_YEAR.equals(receipt.getSku())) {
      cal.add(Calendar.YEAR, 1);
+     newExpiry = cal.getTime();
      }
-     Date newExpiry = cal.getTime();
 
+     // Purchase submits every receipt to the store, including products outside
+     // this subscription group. Only the subscription SKUs get an expiry date:
+     // stamping a consumable or a one-off purchase with the subscription's
+     // expiry would make isSubscribed() report it as an active subscription.
+     if (newExpiry != null) {
      receipt.setExpiryDate(newExpiry);
+     }
      receipts.add(receipt);
      stored = s.writeObject(RECEIPTS_KEY, receipts);
 

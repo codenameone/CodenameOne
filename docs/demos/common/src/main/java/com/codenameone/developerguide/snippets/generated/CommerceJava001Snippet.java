@@ -87,10 +87,13 @@ class CommerceJava001Snippet {
         // tag::commerce-java-001[]
         // With no cloud answer -- a build without commerce, an offline start, a
         // degraded account -- isEntitled falls back to asking the store for a
-        // subscription with this same id. Give at least one granting product a
-        // SKU equal to the entitlement id if that offline path has to unlock,
-        // because the cloud's entitlement-to-SKU mapping is not on the device.
-        if (CommerceManager.getInstance().isEntitled("pro")) {
+        // subscription named after the entitlement itself, because the cloud's
+        // entitlement-to-SKU mapping is not on the device. This chapter sells
+        // pro_monthly and grants pro, so that fallback has nothing to match and
+        // the SKUs have to be checked directly for the offline case.
+        boolean pro = CommerceManager.getInstance().isEntitled("pro")
+                || Purchase.getInAppPurchase().isSubscribed("pro_monthly");
+        if (pro) {
             // unlock pro features
         }
         // end::commerce-java-001[]
