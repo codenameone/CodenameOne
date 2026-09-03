@@ -43,15 +43,26 @@ import zipfile
 # -Wl,-z,max-page-size=16384 and -Wl,-z,common-page-size=16384.
 REQUIRED_ALIGNMENT = 0x4000
 
-# Containers that can carry a JNI payload. `.aar` is the one this repository
-# actually checks in, but an `.apk`/`.aab`/`.jar` reaching the tree would
-# smuggle the same problem past a gate that only knew about AARs.
-ARCHIVE_EXTENSIONS = frozenset([".aar", ".apk", ".aab", ".jar", ".zip"])
+# Containers and libraries are recognised by content, never by file
+# extension. An extension list is a curated allow-list, and this one was
+# already wrong: it knew `.aar`/`.apk`/`.aab`/`.jar`/`.zip` and so walked
+# straight past every `.cn1lib` in the tree -- Codename One's own library
+# format, a ZIP, and the standard packaging path by which a cn1lib ships
+# Android natives. `tests/core/lib/QRScanner.cn1lib` reaches real `.so`
+# files through `nativeand.zip` and then `ZBarScannerLibrary.aar`, and none
+# of them were being inspected.
+#
+# Sniffing the magic bytes ends that class of bug instead of moving the
+# list forward one entry: any container, whatever it is called, and any
+# ELF, whatever it is called, is found.
+ZIP_MAGIC = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
 
-# An archive inside an archive is legitimate (an AAR embeds `classes.jar`),
-# so recurse -- but bound it, because a malformed or hostile ZIP should not
-# be able to spin this gate forever.
-MAX_ARCHIVE_DEPTH = 3
+# An archive inside an archive is legitimate and, as the QRScanner cn1lib
+# shows, three deep happens in practice. Bounded so a malformed or hostile
+# ZIP cannot spin this gate forever, but with headroom: exceeding the limit
+# is reported as a failure, so a limit set too close to real usage would
+# raise false alarms rather than silently skip.
+MAX_ARCHIVE_DEPTH = 8
 
 # A whole-tree run that inspected nothing must not report success: a wrong
 # working directory, or a `git ls-files` that came back empty, would
@@ -62,6 +73,8 @@ MAX_ARCHIVE_DEPTH = 3
 MIN_LIBRARIES_SCANNED = 1
 
 ELF_MAGIC = b"\x7fELF"
+# Longest magic this gate sniffs, so callers know how many bytes to read.
+MAGIC_LENGTH = 4
 ELFCLASS32 = 1
 ELFCLASS64 = 2
 ELFDATA2LSB = 1
@@ -158,6 +171,15 @@ def read_load_alignments(data):
     return ei_class == ELFCLASS64, alignments
 
 
+def classify(head):
+    """Return "zip", "elf" or None for the first bytes of a file."""
+    if head[:4] == ELF_MAGIC:
+        return "elf"
+    if head[:4] in ZIP_MAGIC:
+        return "zip"
+    return None
+
+
 class Scanner(object):
     def __init__(self, verbose):
         self.verbose = verbose
@@ -211,23 +233,37 @@ class Scanner(object):
             for entry in archive.infolist():
                 if entry.is_dir():
                     continue
-                name = entry.filename
-                extension = os.path.splitext(name)[1].lower()
-                if extension == ".so":
-                    self.check_library("%s!%s" % (label, name),
-                                       archive.read(entry))
-                elif extension in ARCHIVE_EXTENSIONS:
-                    self.scan_archive("%s!%s" % (label, name),
-                                      archive.read(entry), depth + 1)
+                # Only the magic is decompressed for entries that turn out to
+                # be neither, which is nearly all of them.
+                try:
+                    with archive.open(entry) as stream:
+                        head = stream.read(MAGIC_LENGTH)
+                except (zipfile.BadZipFile, OSError, RuntimeError) as error:
+                    self.failures.append(
+                        "%s!%s: cannot read entry (%s)"
+                        % (label, entry.filename, error))
+                    continue
+                kind = classify(head)
+                if kind is None:
+                    continue
+                nested = "%s!%s" % (label, entry.filename)
+                if kind == "elf":
+                    self.check_library(nested, archive.read(entry))
+                else:
+                    self.scan_archive(nested, archive.read(entry), depth + 1)
 
     def scan_path(self, path):
-        extension = os.path.splitext(path)[1].lower()
-        if extension == ".so":
-            with open(path, "rb") as handle:
-                self.check_library(path, handle.read())
-        elif extension in ARCHIVE_EXTENSIONS:
-            with open(path, "rb") as handle:
-                self.scan_archive(path, handle.read(), 1)
+        with open(path, "rb") as handle:
+            head = handle.read(MAGIC_LENGTH)
+        kind = classify(head)
+        if kind is None:
+            return
+        with open(path, "rb") as handle:
+            data = handle.read()
+        if kind == "elf":
+            self.check_library(path, data)
+        else:
+            self.scan_archive(path, data, 1)
 
 
 def tracked_files():
@@ -252,9 +288,9 @@ def main(argv):
     paths = [arg for arg in argv if not arg.startswith("-")]
     whole_tree = not paths
     if whole_tree:
-        paths = [name for name in tracked_files()
-                 if os.path.splitext(name)[1].lower() in
-                 ARCHIVE_EXTENSIONS | frozenset([".so"])]
+        # Every tracked file. scan_path sniffs and ignores what is neither a
+        # container nor an ELF, so nothing has to be guessed from a name.
+        paths = tracked_files()
 
     scanner = Scanner(verbose)
     for path in paths:
