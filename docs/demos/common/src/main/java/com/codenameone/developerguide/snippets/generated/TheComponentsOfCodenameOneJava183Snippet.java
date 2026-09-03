@@ -104,7 +104,12 @@ class TheComponentsOfCodenameOneJava183Snippet {
                 @Override
                 protected String childToDisplayLabel(Object child) {
                     if(child instanceof Element) {
-                        return ((Element)child).getTagName();
+                        Element e = (Element)child;
+                        // getTagName() throws for the elements that carry text
+                        if(e.isTextElement()) {
+                            return e.getText();
+                        }
+                        return e.getTagName();
                     }
                     return child.toString();
                 }

@@ -105,6 +105,7 @@ class TheComponentsOfCodenameOneJava160Snippet {
         c.setIcon(icon);
         c.setIconPosition(BorderLayout.EAST);
         hi.add(d).add(l).add(r).add(c);
+        hi.show();
         // end::the-components-of-codename-one-java-160[]
     }
 

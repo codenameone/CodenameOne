@@ -127,6 +127,7 @@ class TheComponentsOfCodenameOneJava158Snippet {
                 add(twoLinesIconEmblemHorizontal).
                 add(twoLinesIconCheckBox).
                 add(fourLinesIcon);
+        hi.show();
         // end::the-components-of-codename-one-java-158[]
     }
 

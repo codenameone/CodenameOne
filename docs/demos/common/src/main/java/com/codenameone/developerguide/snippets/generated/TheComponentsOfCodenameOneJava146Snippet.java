@@ -102,6 +102,7 @@ class TheComponentsOfCodenameOneJava146Snippet {
         Label top = new Label("Top", icon);
         top.setTextPosition(Component.TOP);
         hi.add(left).add(right).add(bottom).add(top);
+        hi.show();
         // end::the-components-of-codename-one-java-146[]
     }
 

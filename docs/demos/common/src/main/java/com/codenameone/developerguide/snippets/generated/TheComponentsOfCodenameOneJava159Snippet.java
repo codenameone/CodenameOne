@@ -96,6 +96,7 @@ class TheComponentsOfCodenameOneJava159Snippet {
         SpanButton sb = new SpanButton("SpanButton is a composite component (lead component) that looks/acts like a Button but can break lines rather than crop them when the text is very long.");
         sb.setIcon(icon);
         hi.add(sb);
+        hi.show();
         // end::the-components-of-codename-one-java-159[]
     }
 
