@@ -50,10 +50,15 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.SuccessCallback;
 
+class AuthenticationAndIdentityJava022Snippet {
 
-class PerformanceJava010Snippet {
 
     Object context;
     Object url;
@@ -77,7 +82,26 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::authentication-and-identity-java-022[]
+        OidcConfiguration cfg = OidcConfiguration.newBuilder()
+            .authorizationEndpoint("https://provider.example.com/oauth2/authorize")
+            .tokenEndpoint("https://provider.example.com/oauth2/token")
+            .build();
+        // An installed app cannot keep a secret, so it is a public client: no
+        // client secret, and PKCE -- which OidcClient applies to every flow --
+        // is what protects the code exchange. The redirect has to come back to
+        // the app, so it is a custom scheme rather than an https URL.
+        OidcClient client = OidcClient.create(cfg)
+            .setClientId("CLIENT_ID")
+            .setRedirectUri("com.example.app:/oauth2redirect")
+            .setScopes("openid", "email");
+        client.authorize().ready(new SuccessCallback<OidcTokens>() {
+            public void onSucess(OidcTokens t) {
+                AccessToken legacy = t.toAccessToken();  // for code that still expects AccessToken
+            }
+        });
+        // end::authentication-and-identity-java-022[]
+    }
 }

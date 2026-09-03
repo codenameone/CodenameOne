@@ -50,10 +50,17 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
+import com.codename1.security.Signature;
+import com.codename1.security.KeyPair;
+import com.codename1.security.KeyGenerator;
+import com.codename1.security.Cipher;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava039Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +84,26 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-039[]
+        // Generate a fresh RSA-2048 key pair (run on a background thread; key
+        // generation can take a noticeable amount of time)
+        KeyPair kp = KeyGenerator.rsa(2048);
+
+        // Encrypt a small payload (e.g. wrap an AES key)
+        byte[] sealed = Cipher.rsaEncrypt(Cipher.RSA_OAEP_SHA256, kp.getPublicKey(), payload);
+        byte[] opened = Cipher.rsaDecrypt(Cipher.RSA_OAEP_SHA256, kp.getPrivateKey(), sealed);
+
+        // Sign / verify
+        byte[] sig = Signature.sign(Signature.SHA256_WITH_RSA, kp.getPrivateKey(), data);
+        boolean ok = Signature.verify(Signature.SHA256_WITH_RSA, kp.getPublicKey(), data, sig);
+        // end::security-java-039[]
+    }
+
+    byte[] data = "data".getBytes();
+
+
+    byte[] payload = "payload".getBytes();
+
 }

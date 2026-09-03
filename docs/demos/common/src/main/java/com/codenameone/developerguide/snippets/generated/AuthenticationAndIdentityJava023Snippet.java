@@ -50,10 +50,15 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.SuccessCallback;
 
+class AuthenticationAndIdentityJava023Snippet {
 
-class PerformanceJava010Snippet {
 
     Object context;
     Object url;
@@ -77,7 +82,20 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::authentication-and-identity-java-023[]
+        OidcClient.discover("https://provider.example.com").ready(new SuccessCallback<OidcClient>() {
+            public void onSucess(OidcClient client) {
+                client.setClientId("CLIENT_ID")
+                      // Same public-client rules as the sample above: the
+                      // redirect has to be the custom scheme the app
+                      // registers, or the browser never hands control back.
+                      .setRedirectUri("com.example.app:/oauth2redirect")
+                      .setScopes("openid", "email");
+                client.authorize().ready(tokens -> Log.p("signed in"));
+            }
+        });
+        // end::authentication-and-identity-java-023[]
+    }
 }

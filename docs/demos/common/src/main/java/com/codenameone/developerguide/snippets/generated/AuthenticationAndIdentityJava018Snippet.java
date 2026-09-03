@@ -50,10 +50,15 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.SuccessCallback;
 
+class AuthenticationAndIdentityJava018Snippet {
 
-class PerformanceJava010Snippet {
 
     Object context;
     Object url;
@@ -77,7 +82,24 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::authentication-and-identity-java-018[]
+        FacebookConnect.getInstance().signIn(
+            "FB_APP_ID",
+            // This flow is for the simulator and the web port, where the
+            // response comes back through the browser, so the redirect is an
+            // https URL registered with Facebook. A native Android or iOS build
+            // registers a custom scheme instead, as the OidcClient samples above
+            // do -- match the redirect to the target you are building.
+            "https://example.com/oauth2redirect",
+            "public_profile", "email"
+        ).ready(new SuccessCallback<OidcTokens>() {
+            public void onSucess(OidcTokens t) {
+                String accessToken = t.getAccessToken(); // ID token will be null
+                // call https://graph.facebook.com/me with the access token for user data
+            }
+        });
+        // end::authentication-and-identity-java-018[]
+    }
 }

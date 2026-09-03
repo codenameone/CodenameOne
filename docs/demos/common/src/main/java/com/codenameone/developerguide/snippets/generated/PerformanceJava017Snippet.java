@@ -50,10 +50,13 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class PerformanceJava017Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +80,21 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::performance-java-017[]
+        // don't do anything while we are scrolling or animating
+        long idle = System.currentTimeMillis() - lastScroll;
+        while(idle < 1500 || contactsDemo.getAnimationManager().isAnimating() || scrollY != contactsDemo.getScrollY()) {
+            scrollY = contactsDemo.getScrollY();
+            Util.sleep(Math.min(1500, Math.max(100, 2000 - ((int)idle))));
+            idle = System.currentTimeMillis() - lastScroll;
+        }
+        // end::performance-java-017[]
+    }
+
+    int scrollY;
+    Container contactsDemo = new Container();
+    long lastScroll;
+
 }

@@ -50,10 +50,16 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.components.OtpField;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava045Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +83,23 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-045[]
+        OtpField otp = new OtpField(6);                  // 6 digits, numeric
+        otp.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                if (Otp.verifyTotp(secret, otp.getText(), 1)) {
+                    // accepted
+                } else {
+                    otp.clear();
+                }
+            }
+        });
+        form.add(otp);
+        // end::security-java-045[]
+    }
+
+    byte[] secret = "secret".getBytes();
+
 }

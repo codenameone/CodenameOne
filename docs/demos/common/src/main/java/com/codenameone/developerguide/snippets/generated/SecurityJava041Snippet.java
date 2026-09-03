@@ -50,10 +50,13 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava041Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +80,16 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-041[]
+        KeyPair kp   = KeyGenerator.rsa(2048);
+        String  rs   = Jwt.sign(claims, kp.getPrivateKey(), Jwt.RS256);
+        Jwt     read = Jwt.parse(rs);
+        boolean ok   = read.verify(kp.getPublicKey());
+        // end::security-java-041[]
+    }
+
+    java.util.Map<String, Object> claims = new java.util.HashMap<>();
+
 }

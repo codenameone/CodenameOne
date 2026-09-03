@@ -50,10 +50,13 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava043Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +80,24 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-043[]
+        String code = Otp.hotp(secret, counter, 6);
+        // advance only once the verifier has accepted it, or a lost code
+        // desynchronizes this client from a verifier with no look-ahead window
+        if (serverAccepted(code)) {
+            counter++;
+        }
+        // end::security-java-043[]
+    }
+
+    byte[] secret = "secret".getBytes();
+
+
+    long counter;
+
+
+    boolean serverAccepted(String code) { return true; }
+
 }

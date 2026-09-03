@@ -50,10 +50,13 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class PerformanceJava014Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +80,19 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::performance-java-014[]
+        byte[]  scratchB = simd.allocaByte(64);
+        int[]   scratchI = simd.allocaInt(32);
+        float[] scratchF = simd.allocaFloat(32);
+
+        // Deterministic initial contents:
+        byte[]  zeroed   = simd.allocaByteZeroed(64);
+        int[]   filled   = simd.allocaIntFilled(32, -1);
+        // end::performance-java-014[]
+    }
+
+    com.codename1.util.Simd simd = com.codename1.util.Simd.get();
+
 }

@@ -50,10 +50,15 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.SuccessCallback;
 
+class AuthenticationAndIdentityJava019Snippet {
 
-class PerformanceJava010Snippet {
 
     Object context;
     Object url;
@@ -77,7 +82,24 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::authentication-and-identity-java-019[]
+        String clientId = "YOUR_IOS_OR_ANDROID_CLIENT_ID.apps.googleusercontent.com";
+        String redirectUri = "com.example.app:/oauth2redirect";
+        // without the api key every FirebaseAuth call fails before it is sent
+        FirebaseAuth.getInstance().withApiKey("YOUR_FIREBASE_WEB_API_KEY");
+        GoogleConnect.getInstance().signIn(clientId, redirectUri, "openid", "email")
+            .ready(new SuccessCallback<OidcTokens>() {
+                public void onSucess(OidcTokens g) {
+                    FirebaseAuth.getInstance().signInWithIdpIdToken(g.getIdToken(), "google.com")
+                        .ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
+                            public void onSucess(FirebaseAuth.FirebaseUser u) {
+                                // Firebase user is now signed in.
+                            }
+                        });
+                }
+            });
+        // end::authentication-and-identity-java-019[]
+    }
 }

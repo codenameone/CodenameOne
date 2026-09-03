@@ -50,10 +50,14 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
+import com.codename1.security.Hash;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava036Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +81,23 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-036[]
+        // One-shot
+        byte[] digest = Hash.sha256("hello".getBytes("UTF-8"));
+        String hex    = Hash.toHex(digest);          // 64-character lowercase hex
+        byte[] back   = Hash.fromHex(hex);           // round-trip helper
+
+        // Streaming
+        Hash h = Hash.create(Hash.SHA256);
+        h.update(part1);
+        h.update(part2);
+        byte[] full = h.digest();                    // hash is reset after digest()
+        // end::security-java-036[]
+    }
+
+    byte[] part2 = "part2".getBytes();
+    byte[] part1 = "part1".getBytes();
+
 }

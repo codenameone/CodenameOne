@@ -50,10 +50,14 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
+import com.codename1.security.Hmac;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava037Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +81,24 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-037[]
+        byte[] tag = Hmac.sha256(secret, message);
+
+        // Streaming
+        Hmac h = Hmac.create(Hash.SHA256, secret);
+        h.update(part1);
+        h.update(part2);
+        byte[] tag2 = h.doFinal();
+        // end::security-java-037[]
+    }
+
+    byte[] part1 = "part1".getBytes();
+    byte[] part2 = "part2".getBytes();
+    byte[] secret = "secret".getBytes();
+
+
+    byte[] message = "message".getBytes();
+
 }

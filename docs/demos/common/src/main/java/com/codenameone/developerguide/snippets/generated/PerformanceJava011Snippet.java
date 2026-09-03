@@ -50,10 +50,14 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.annotations.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class PerformanceJava011Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +81,18 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    // tag::performance-java-011[]
+    // Each target reads its own attribute: name() is the iOS and default
+    // mapping, and the native Windows, Linux and macOS builds read win(),
+    // linux() and mac(). A target whose attribute is absent simply skips
+    // the optimization, so all four are supplied here.
+    @Concrete(name = "com.codename1.impl.ios.IOSImplementation",
+              win = "com.codename1.impl.windows.WindowsImplementation",
+              linux = "com.codename1.impl.linux.LinuxImplementation",
+              mac = "com.codename1.impl.mac.MacImplementation")
+    public abstract class CodenameOneImplementation {
+        // ...
+    }
+    // end::performance-java-011[]
 }

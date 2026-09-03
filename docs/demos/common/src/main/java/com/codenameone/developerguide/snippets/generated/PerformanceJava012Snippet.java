@@ -50,10 +50,14 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.util.Simd;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class PerformanceJava012Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +81,13 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::performance-java-012[]
+        Simd simd = Simd.get(); // equivalent to CN.getSimd()
+        if (simd.isSupported()) {
+            // native SIMD is wired up on this platform
+        }
+        // end::performance-java-012[]
+    }
 }

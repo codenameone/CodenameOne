@@ -50,10 +50,15 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.SuccessCallback;
 
+class AuthenticationAndIdentityJava020Snippet {
 
-class PerformanceJava010Snippet {
 
     Object context;
     Object url;
@@ -77,7 +82,20 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::authentication-and-identity-java-020[]
+        FirebaseAuth fa = FirebaseAuth.getInstance().withApiKey(KEY);
+        if (!fa.isSignedIn()) {
+            fa.refresh().ready(new SuccessCallback<FirebaseAuth.FirebaseUser>() {
+                public void onSucess(FirebaseAuth.FirebaseUser u) {
+                    // u is null if no refresh token was stored
+                }
+            });
+        }
+        // end::authentication-and-identity-java-020[]
+    }
+
+    String KEY = "your-api-key";
+
 }

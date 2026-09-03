@@ -50,10 +50,15 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.SuccessCallback;
 
+class AuthenticationAndIdentityJava016Snippet {
 
-class PerformanceJava010Snippet {
 
     Object context;
     Object url;
@@ -77,7 +82,22 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::authentication-and-identity-java-016[]
+        client.refreshIfExpired(60).ready(new SuccessCallback<OidcTokens>() {
+            public void onSucess(OidcTokens tokens) {
+                if (tokens == null) {
+                    // No saved tokens, or they expired and we have no refresh token.
+                    client.authorize();
+                } else {
+                    // Reuse `tokens.getAccessToken()` -- still valid (refreshed if needed).
+                }
+            }
+        });
+        // end::authentication-and-identity-java-016[]
+    }
+
+    com.codename1.io.oidc.OidcClient client;
+
 }

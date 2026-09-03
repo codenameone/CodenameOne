@@ -50,10 +50,17 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.security.Otp;
+import com.codename1.components.OtpField;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava044Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +84,36 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-044[]
+        OtpField field = new OtpField(6);
+        field.addCompleteListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                String userInput = field.getText();
+                // tolerance=1 allows the previous, current, and next 30-second
+                // windows to compensate for clock skew between the device and the
+                // server. tolerance=0 is strict but unforgiving; tolerance=2 or 3
+                // is more permissive but increases the brute-force attack surface.
+                if (Otp.verifyTotp(secret, userInput, 1)) {
+                    // Where this check runs on your server, record the time
+                    // step this code belongs to and reject a second code from
+                    // the same step: verifyTotp is stateless, so a captured
+                    // code stays valid for the rest of the tolerance window.
+                    grantAccess();
+                } else {
+                    field.clear();
+                    Dialog.show("Invalid code", "Try again", "OK", null);
+                }
+            }
+        });
+        form.add(field);
+        // end::security-java-044[]
+    }
+
+    byte[] secret = "secret".getBytes();
+
+
+    void grantAccess() { }
+
 }

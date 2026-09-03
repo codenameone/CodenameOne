@@ -50,10 +50,13 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava040Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +80,17 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-040[]
+        PublicKey  pub  = PublicKey.rsa(x509SpkiBytes);          // openssl rsa -pubout -outform DER
+        PrivateKey priv = PrivateKey.rsa(pkcs8DerBytes);         // openssl pkcs8 -topk8 -nocrypt -outform DER
+        // end::security-java-040[]
+    }
+
+    byte[] x509SpkiBytes;
+
+
+    byte[] pkcs8DerBytes;
+
 }

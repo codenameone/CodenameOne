@@ -50,10 +50,13 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava030Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +80,13 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-030[]
+        Storage.setStorageInstance(new MyCustomStorageSubclass());
+        // end::security-java-030[]
+    }
+
+    class MyCustomStorageSubclass extends Storage { }
+
 }

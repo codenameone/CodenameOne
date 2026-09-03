@@ -50,10 +50,15 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
+import com.codename1.security.Otp;
+import com.codename1.security.Base32;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava042Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +82,20 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-042[]
+        byte[] secret = Base32.decode("JBSWY3DPEHPK3PXP");
+
+        // Generate the current 6-digit TOTP code (30-second step, SHA-1)
+        String code = Otp.totp(secret);
+
+        // Verify the code the user typed in, allowing one step of clock skew on
+        // either side (so the previous, current, and next codes are all accepted)
+        boolean ok = Otp.verifyTotp(secret, userInput, 1);
+        // end::security-java-042[]
+    }
+
+    String userInput = "";
+
 }

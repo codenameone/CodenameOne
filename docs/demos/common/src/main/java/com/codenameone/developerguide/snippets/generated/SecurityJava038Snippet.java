@@ -50,10 +50,17 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
+import com.codename1.security.SecureRandom;
+import com.codename1.security.SecretKey;
+import com.codename1.security.KeyGenerator;
+import com.codename1.security.Cipher;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava038Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +84,18 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-038[]
+        SecretKey key   = KeyGenerator.aes(256);
+        byte[]    nonce = SecureRandom.bytes(12);
+        byte[]    aad   = "v1".getBytes("UTF-8");
+
+        byte[] ciphertext = Cipher.aesEncrypt(Cipher.AES_GCM, key, nonce, aad, plaintext);
+        byte[] decrypted  = Cipher.aesDecrypt(Cipher.AES_GCM, key, nonce, aad, ciphertext);
+        // end::security-java-038[]
+    }
+
+    byte[] plaintext = "plaintext".getBytes();
+
 }

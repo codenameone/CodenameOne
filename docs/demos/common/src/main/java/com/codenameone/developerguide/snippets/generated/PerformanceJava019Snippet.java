@@ -50,10 +50,13 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class PerformanceJava019Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +80,25 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::performance-java-019[]
+        contactsDemo.addScrollListener(new ScrollListener() {
+            int initial = -1;
+            @Override
+            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+                // scrolling is sensitive on devices...
+                if(initial < 0) {
+                    initial = scrollY;
+                }
+                lastScroll = System.currentTimeMillis();
+                // ...
+            }
+        });
+        // end::performance-java-019[]
+    }
+
+    Container contactsDemo = new Container();
+    long lastScroll;
+
 }

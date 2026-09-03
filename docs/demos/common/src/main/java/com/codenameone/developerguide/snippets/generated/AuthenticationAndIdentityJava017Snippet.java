@@ -50,10 +50,15 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.util.SuccessCallback;
 
+class AuthenticationAndIdentityJava017Snippet {
 
-class PerformanceJava010Snippet {
 
     Object context;
     Object url;
@@ -77,7 +82,21 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::authentication-and-identity-java-017[]
+        GoogleConnect.getInstance().signIn(
+            // the iOS or Android client for a native build; the Web client
+            // belongs with an https redirect, in the simulator or web port
+            "YOUR_IOS_OR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+            "com.example.app:/oauth2redirect",
+            "openid", "email", "profile"
+        ).ready(new SuccessCallback<OidcTokens>() {
+            public void onSucess(OidcTokens t) {
+                String email = t.getEmail();
+                String idToken = t.getIdToken();
+            }
+        });
+        // end::authentication-and-identity-java-017[]
+    }
 }

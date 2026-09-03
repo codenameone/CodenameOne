@@ -50,10 +50,13 @@ import com.codename1.security.*;
 import com.codename1.social.*;
 import com.codename1.ui.spinner.*;
 import java.io.*;
+import com.codename1.io.oidc.*;
+import com.codename1.security.*;
 import java.util.*;
 
 
-class PerformanceJava010Snippet {
+class SecurityJava033Snippet {
+
 
     Object context;
     Object url;
@@ -77,7 +80,11 @@ class PerformanceJava010Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    // tag::performance-java-010[]
-    private volatile long lastScroll;
-    // end::performance-java-010[]
+    
+    void snippet() throws Exception {
+        // tag::security-java-033[]
+        // off the EDT -- the first call may hit the network:
+        String mapsKey = Secrets.get("googlemaps.key");
+        // end::security-java-033[]
+    }
 }
