@@ -486,9 +486,15 @@ what its codec supports: Android sets the sampling rate and
 bit rate when encoding AAC and leaves both to the encoder for AMR, and the
 simulator never reads the bit rate at all.
 
-Treat the builder's numbers as preferences rather than guarantees, and read
-back what you were actually given: an `AudioBuffer` reports `getSampleRate()` and
-`getNumChannels()` for the data it holds, whichever platform filled it.
+Treat the builder's numbers as preferences rather than guarantees. An
+`AudioBuffer` reports `getSampleRate()` for the data it holds -- the recorder
+fills that in from the rate the audio actually arrived at, or from the rate it
+resampled the audio to, so the figure describes the samples in your hands.
+
+`getNumChannels()` is weaker: the JavaScript port fills it from the channel count
+that was requested rather than from the stream, so on the web it can report stereo
+for a mono recording. If the layout matters, derive it from the sample count you
+receive rather than trusting the field.
 
 ==== Capture asynchronous API
 
