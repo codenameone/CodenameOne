@@ -408,6 +408,16 @@ class AndroidContactPicker {
                 // back carrying the name as well -- which is data the caller
                 // deliberately did not ask for and which this API promises
                 // not to hand over.
+                //
+                // Leaving the field unset is as far as this can go. Review
+                // asked for Contact.getDisplayName() to stop synthesizing a
+                // name from the primary phone, email or id on a picked
+                // contact, which would mean new state on a value object the
+                // whole framework shares, to make one consumer's getter
+                // behave unlike every other Contact's. The API says instead
+                // which getters answer "was a name supplied" -- getFirstName
+                // and getFamilyName -- which composes what is already public
+                // rather than widening it.
                 if ((requestedFields & ContactPicker.NAME) != 0) {
                     String display = column(cursor, nameColumn);
                     if (display != null) {

@@ -9864,7 +9864,14 @@ static id cn1ContactPickerDelegate = nil;
 
 static int cn1ContactPickerLimit = 0;
 
-/// Publishes the selection and wakes the Java side.
+/// Hands the selection that is already published over to the Java side.
+static void cn1DeliverContactPickerResult(void) {
+    int count = cn1PickedContacts == nil ? 0 : (int)[cn1PickedContacts count];
+    com_codename1_impl_ios_IOSImplementation_contactPickerResult___int(
+            CN1_THREAD_GET_STATE_PASS_ARG count);
+}
+
+/// Publishes the selection and wakes the Java side once the picker is gone.
 static void cn1ContactPickerFinished(NSArray* contacts) {
 #ifndef CN1_USE_ARC
     [cn1PickedContacts release];
@@ -9904,9 +9911,27 @@ static void cn1ContactPickerFinished(NSArray* contacts) {
     cn1PickedContacts = contacts;
 #endif
     cn1ContactPickerDelegate = nil;
-    int count = cn1PickedContacts == nil ? 0 : (int)[cn1PickedContacts count];
-    com_codename1_impl_ios_IOSImplementation_contactPickerResult___int(
-            CN1_THREAD_GET_STATE_PASS_ARG count);
+    // NOT delivered from here. UIKit dismisses the picker only after this
+    // delegate method returns, so the controller is still on screen right
+    // now -- and a listener that starts another pick straight away would run
+    // into its own picker on the way out and be told, wrongly, that nothing
+    // was selected. Hopping to the next main-queue turn lets the dismissal
+    // begin; its transition coordinator then says when it has finished.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIViewController* host = cn1PresentingController();
+        id<UIViewControllerTransitionCoordinator> transition =
+                host == nil ? nil : host.transitionCoordinator;
+        // animateAlongsideTransition: answers NO when no transition is
+        // running, and does not call the block -- so delivering in that case
+        // is the missing delivery rather than a second one.
+        if (transition == nil
+                || ![transition animateAlongsideTransition:nil
+                        completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+                    cn1DeliverContactPickerResult();
+                }]) {
+            cn1DeliverContactPickerResult();
+        }
+    });
 }
 
 /// Single selection.

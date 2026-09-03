@@ -74,6 +74,15 @@ import com.codename1.ui.events.ActionListener;
 /// Anything that has to outlive the callback must be copied out of the
 /// `Contact` and stored by the application.
 ///
+/// One getter does not follow the rule that an unrequested field stays null,
+/// and cannot be made to. `Contact#getDisplayName()` never returns null: on a
+/// contact carrying no name it makes one up from the primary phone number,
+/// the primary email or the id, and caches it. That is how every `Contact` in
+/// the framework behaves, not only a picked one, so a picker that suppressed
+/// it would be the odd one out rather than the correct one. Ask
+/// `Contact#getFirstName()` and `Contact#getFamilyName()` when what you need
+/// to know is whether a name was actually supplied.
+///
 /// For the same reason `Contact#getId()` on a picked contact is only an
 /// opaque platform identifier useful for telling two picked contacts apart.
 /// Passing it to `ContactsManager#getContactById(String)` needs full
