@@ -2272,6 +2272,54 @@ public class LocalContinuityTest extends UITestBase {
                         + "dedup entry had been evicted, so its side effects run twice");
     }
 
+    /**
+     * A tombstone supersedes work still parked from the same origin. An empty state is that
+     * device saying it has nothing any more, so an older state of its own that is waiting on the
+     * user no longer exists -- offering it keeps proposing work the origin cleared, and the
+     * publication hold keeps this device's checkpoints off the relay behind it.
+     */
+    @EdtTest
+    public void aTombstoneClearsWorkStillParkedFromTheSameOrigin() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        Continuity.setAutoRestore(false);
+        final GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+        r.release();
+        pause(300L);
+        final int before = r.sent.size();
+
+        Continuity.deliver(fromElsewhere("waiting on the user", 111L));
+        flushSerialCalls();
+        Continuity.checkpoint();
+        pause(250L);
+        assertEquals(before, r.sent.size(), "the checkpoint should be held while it is parked");
+
+        // The same origin says it has nothing now.
+        Continuity.deliver(new AppState()
+                .setDeviceId("some-other-device")
+                .setSequence(112L)
+                .setTimestamp(System.currentTimeMillis()));
+        flushSerialCalls();
+
+        AppState left = Continuity.getRestorableState();
+        assertFalse(left != null && "some-other-device".equals(left.getDeviceId()),
+                "work the origin cleared with a tombstone is still being offered");
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitAnySince(before);
+            }
+        });
+        assertTrue(r.sent.size() > before,
+                "the checkpoint stayed held behind work the origin had already cleared");
+    }
+
     /** Storage whose writes always fail, which is what a full disk looks like. */
     static class RefusingStorage extends Storage {
         @Override

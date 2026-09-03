@@ -1436,6 +1436,19 @@ public final class Continuity {
             // activity for an empty state rather than advertising one -- and only the relay path
             // was missing the other half of it. Marked as seen above, so it is consumed rather
             // than reconsidered, and simply not dispatched.
+            //
+            // It also SUPERSEDES anything still parked from the same origin. A tombstone is that
+            // origin saying it has nothing any more, so an older state of its own that is waiting
+            // on the user is work that no longer exists: getRestorableState() would go on offering
+            // it, and the publication hold would go on withholding this device's checkpoints
+            // behind it. Same shape as acknowledge() and expiry -- another way an arrival ends,
+            // and every one of them has to release the slot.
+            AppState waiting = parked;
+            if (waiting != null && state.getDeviceId().equals(waiting.getDeviceId())
+                    && waiting.getSequence() <= state.getSequence()) {
+                parked = null;
+                startPublisher();
+            }
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
