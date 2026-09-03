@@ -933,16 +933,24 @@ public final class Continuity {
                 // Off the EDT because fetch() blocks, and touching NOTHING: the relay came in as
                 // a local and the answer goes back through the event queue.
                 AppState fetched = null;
+                boolean failed = false;
                 try {
                     fetched = r.fetch();
                 } catch (Throwable t) {
+                    // Kept SEPARATE from "the endpoint had nothing". Collapsing a timeout or a
+                    // server error into the same null told pollFinished() the read had succeeded
+                    // and found an empty relay, which is what makes writing over the document
+                    // safe -- so a queued checkpoint went out and replaced another device's state
+                    // that this device had never managed to read.
                     Log.e(t);
+                    failed = true;
                 }
                 final AppState result = fetched;
+                final boolean fetchFailed = failed;
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
                     public void run() {
-                        pollFinished(result, session);
+                        pollFinished(result, fetchFailed, session);
                     }
                 });
             }
@@ -950,7 +958,7 @@ public final class Continuity {
     }
 
     /// A fetch has come back. On the EDT, where every field below is owned.
-    private static void pollFinished(AppState fetched, int session) {
+    private static void pollFinished(AppState fetched, boolean fetchFailed, int session) {
         if (session != relaySession) {
             // A clear(), a setRelay() or a reset() happened while this was in flight. The answer
             // belongs to the endpoint or the account that has since gone away: delivering it would
@@ -965,6 +973,13 @@ public final class Continuity {
         if (pollAgain) {
             pollAgain = false;
             startPoll();
+            return;
+        }
+        if (fetchFailed) {
+            // No publication on the strength of a read that did not happen. Sending the queued
+            // checkpoint would replace the relay's single document, and the whole reason that is
+            // safe after a poll is that the poll established what was there. A failed fetch
+            // establishes nothing, so anything owed waits for a read that succeeds.
             return;
         }
         // Owed work goes out AFTER the fetch, never before it.
@@ -1287,6 +1302,36 @@ public final class Continuity {
         Display.getInstance().startThread(new Runnable() {
             @Override
             public void run() {
+                // Confirmed on the EVENT THREAD immediately before the request, not only when it
+                // comes back. The session check used to live in publishFinished() alone, which is
+                // after the fact: clear() or setRelay() landing between this worker being started
+                // and its first instruction still let the request go out. RestStateRelay resolves
+                // getToken() INSIDE publish(), so a quick logout and login sent the previous
+                // account's state under the NEXT account's credentials -- while clear() documents
+                // that nothing follows it.
+                //
+                // callSeriallyAndWait, not a read of relaySession from here: that field is owned
+                // by the event thread and this is not it. Blocking this worker on the EDT is
+                // fine, it is the direction that is safe -- the EDT never waits on us.
+                //
+                // What this cannot close is the instant between the answer and the call below.
+                // That is the same window clear() already documents: a request on the wire cannot
+                // be recalled. It closes the rest of it, which was the whole gap between queueing
+                // and sending.
+                final boolean[] stillOurs = new boolean[1];
+                try {
+                    Display.getInstance().callSeriallyAndWait(new Runnable() {
+                        @Override
+                        public void run() {
+                            stillOurs[0] = session == relaySession;
+                        }
+                    });
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
+                if (!stillOurs[0]) {
+                    return;
+                }
                 // Off the EDT because publish() blocks, and touching NOTHING: the relay and the
                 // state came in as locals and the outcome goes back through the event queue.
                 boolean sent = true;

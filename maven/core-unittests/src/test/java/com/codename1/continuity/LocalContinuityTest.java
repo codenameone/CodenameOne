@@ -2320,6 +2320,89 @@ public class LocalContinuityTest extends UITestBase {
                 "the checkpoint stayed held behind work the origin had already cleared");
     }
 
+    /**
+     * A logout between queueing a publish and the worker reaching the network must stop the
+     * request. RestStateRelay resolves getToken() INSIDE publish(), so a quick logout and login
+     * would otherwise send the previous account's state under the next account's credentials --
+     * and clear() documents that nothing follows it.
+     */
+    @EdtTest
+    public void aLogoutStopsAPublishThatHasNotReachedTheNetwork() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        final GatedRelay r = new GatedRelay();
+        Continuity.setRelay(r);
+        awaitOffEdt(new Runnable() {
+            public void run() {
+                r.awaitEntered();
+            }
+        });
+        r.release();
+        pause(300L);
+
+        // Queue a publish, then sign out before the worker can get to the wire. The worker
+        // confirms its session on the event thread, and this test body IS the event thread, so
+        // the confirmation cannot run until after clear() below.
+        Continuity.checkpoint();
+        final int before = r.sent.size();
+        Continuity.clear();
+        pause(500L);
+
+        assertEquals(before, r.sent.size(),
+                "a state queued before the logout was sent afterwards, which with a token "
+                        + "resolved inside publish() means the previous account's work went out "
+                        + "under the next account's credentials");
+    }
+
+    /**
+     * A fetch that failed is not an empty relay. Collapsing a timeout into the same null said the
+     * read had succeeded and found nothing -- which is what makes overwriting the single document
+     * safe -- so a queued checkpoint replaced another device's state this one had never read.
+     */
+    @EdtTest
+    public void aFailedFetchDoesNotAuthoriseAPublish() {
+        RecordingProvider provider = new RecordingProvider();
+        provider.saved.put("n", Integer.valueOf(1));
+        Continuity.setStateProvider(provider);
+        final ThrowingFetchRelay r = new ThrowingFetchRelay();
+        Continuity.setRelay(r);
+
+        Continuity.checkpoint();
+        Continuity.pollRelay();
+        pause(600L);
+
+        assertTrue(r.fetches() > 0, "the relay should have been asked");
+        assertEquals(0, r.published(),
+                "a checkpoint was published on the strength of a fetch that failed, so another "
+                        + "device's state can be overwritten without ever having been read");
+    }
+
+    /** A relay whose fetch always fails, which is what a timeout looks like. */
+    static class ThrowingFetchRelay implements StateRelay {
+        private final java.util.concurrent.atomic.AtomicInteger fetched =
+                new java.util.concurrent.atomic.AtomicInteger();
+        private final java.util.concurrent.atomic.AtomicInteger posts =
+                new java.util.concurrent.atomic.AtomicInteger();
+
+        public void publish(AppState state) {
+            posts.incrementAndGet();
+        }
+
+        public AppState fetch() throws java.io.IOException {
+            fetched.incrementAndGet();
+            throw new java.io.IOException("the endpoint timed out");
+        }
+
+        int fetches() {
+            return fetched.get();
+        }
+
+        int published() {
+            return posts.get();
+        }
+    }
+
     /** Storage whose writes always fail, which is what a full disk looks like. */
     static class RefusingStorage extends Storage {
         @Override
