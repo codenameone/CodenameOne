@@ -263,12 +263,19 @@ class VpnTunnelNativeBuilder {
     }
 
     /**
-     * Checks that the named tunnel class is actually in the application.
+     * Checks that the named tunnel class is actually in this build.
      *
      * <p>Checked HERE, against the compiled classes, rather than left to the
      * generated stub's javac. Both refuse, but this one can say which hint
      * was wrong; javac would report an unresolvable symbol inside a source
      * file the developer never wrote.</p>
+     *
+     * <p>Looks where the TRANSLATOR looks, which is more than the
+     * application's own classes: a cn1lib can package a {@code VpnTunnel},
+     * and {@code foldInCallAndVpnLibraryUsage} already recognises a project
+     * whose only tunnel usage is inside a submitted library. Refusing that
+     * project because the class is not a loose file would reject a
+     * configuration the rest of the build supports.</p>
      *
      * <p>EXISTENCE only. Whether the class is a {@code VpnTunnel} and
      * whether it has a no-argument constructor are left to javac on the
@@ -280,17 +287,109 @@ class VpnTunnelNativeBuilder {
      * exactly.</p>
      *
      * @param classesDir the compiled application classes
+     * @param libsDir    where submitted libraries were unzipped
      */
-    void verifyTunnelClass(File classesDir) {
-        File cls = new File(classesDir,
-                tunnelClass.replace('.', File.separatorChar) + ".class");
-        if (!cls.isFile()) {
-            throw new BuildException(HINT_CLASS + " names "
-                    + tunnelClass + ", which is not in this application."
-                    + " The extension has to instantiate that class, so the"
-                    + " name has to be the fully qualified one -- including"
-                    + " the package -- of a VpnTunnel subclass this project"
-                    + " compiles.");
+    void verifyTunnelClass(File classesDir, File libsDir) {
+        String entry = tunnelClass.replace('.', '/') + ".class";
+        if (new File(classesDir, entry.replace('/', File.separatorChar)).isFile()) {
+            return;
+        }
+        if (containsClass(libsDir, entry)) {
+            return;
+        }
+        throw new BuildException(HINT_CLASS + " names "
+                + tunnelClass + ", which is not in this application or in"
+                + " any library it submitted. The extension has to"
+                + " instantiate that class, so the name has to be the fully"
+                + " qualified one -- including the package, and with $ for a"
+                + " nested class -- of a VpnTunnel subclass this build"
+                + " compiles.");
+    }
+
+    /**
+     * Whether {@code entry} is in any archive or loose class file under
+     * {@code dir}.
+     *
+     * <p>The same shapes {@code LibraryClassPrefixScan} walks -- jar, aar,
+     * zip and loose {@code .class} -- because that is what a submitted
+     * library arrives as, and the two have to agree about what "in a
+     * library" means.</p>
+     */
+    private static boolean containsClass(File dir, String entry) {
+        if (dir == null || !dir.isDirectory()) {
+            return false;
+        }
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File child : children) {
+            if (child.isDirectory()) {
+                if (containsClass(child, entry)) {
+                    return true;
+                }
+                continue;
+            }
+            String name = child.getName().toLowerCase(java.util.Locale.ROOT);
+            if (name.endsWith(".jar") || name.endsWith(".aar")
+                    || name.endsWith(".zip")) {
+                java.util.zip.ZipFile zip = null;
+                try {
+                    zip = new java.util.zip.ZipFile(child);
+                    if (zip.getEntry(entry) != null) {
+                        return true;
+                    }
+                } catch (IOException unreadable) {
+                    // Not an archive this build can open. Skipped rather
+                    // than fatal: the translator will fail on it too, with a
+                    // better message than one about the tunnel class.
+                    continue;
+                } finally {
+                    if (zip != null) {
+                        try {
+                            zip.close();
+                        } catch (IOException ignored) {
+                            // Nothing to do; the file is only being read.
+                        }
+                    }
+                }
+            }
+        }
+        return new File(dir, entry.replace('/', File.separatorChar)).isFile();
+    }
+
+    /**
+     * The classpath the generated stubs are compiled against.
+     *
+     * <p>The application's classes plus the archives a submitted library
+     * arrived in, because {@link #verifyTunnelClass} accepts a tunnel from
+     * one and javac has to be able to resolve it. Additive: a build without
+     * a tunnel keeps exactly the classpath it had, and one with a tunnel
+     * only gains what the translator could already see.</p>
+     */
+    String stubClasspath(File classesDir, File libsDir) {
+        StringBuilder cp = new StringBuilder(classesDir.getAbsolutePath());
+        appendArchives(cp, libsDir);
+        return cp.toString();
+    }
+
+    private static void appendArchives(StringBuilder cp, File dir) {
+        if (dir == null || !dir.isDirectory()) {
+            return;
+        }
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            if (child.isDirectory()) {
+                appendArchives(cp, child);
+                continue;
+            }
+            String name = child.getName().toLowerCase(java.util.Locale.ROOT);
+            if (name.endsWith(".jar") || name.endsWith(".zip")) {
+                cp.append(File.pathSeparator).append(child.getAbsolutePath());
+            }
         }
     }
 
@@ -353,7 +452,7 @@ class VpnTunnelNativeBuilder {
                 + "        // Class.forName is banned in the framework"
                 + " itself.\n"
                 + "        com.codename1.vpn.tunnel.VpnTunnel tunnel =\n"
-                + "                new " + tunnelClass + "();\n"
+                + "                new " + sourceName(tunnelClass) + "();\n"
                 + "        // The four the provider calls, in the order it"
                 + " calls them.\n"
                 + "        com.codename1.impl.vpn.ExtensionTunnelHost.begin("
@@ -376,6 +475,19 @@ class VpnTunnelNativeBuilder {
         owner.log("[vpnTunnel] Wrote " + stubClass + ".java; the packet-tunnel"
                 + " extension is translated from " + tunnelClass
                 + " rather than sharing the app's translation");
+    }
+
+    /**
+     * The hint's value as JAVA source names it.
+     *
+     * <p>{@code ios.vpn.tunnel.class} is a binary name, so a nested tunnel
+     * arrives as {@code com.example.Outer$Tunnel} -- which is what the class
+     * file is called and what {@link #verifyTunnelClass} looks for, and is
+     * not something javac will parse. The generated stub has to say
+     * {@code com.example.Outer.Tunnel}.</p>
+     */
+    static String sourceName(String binaryName) {
+        return binaryName == null ? "" : binaryName.replace('$', '.');
     }
 
     /**
@@ -463,9 +575,19 @@ class VpnTunnelNativeBuilder {
             if (!f.isFile()) {
                 continue;
             }
+            // .S and .s are sources here, and leaving them out was a link
+            // error waiting for a device. The translator emits
+            // cn1_virtual_thread_asm.S beside cn1_virtual_thread.c, and on
+            // arm64 the C half calls into it -- cn1VirtualThreadSwitch,
+            // cn1VirtualThreadPrime, cn1VirtualThreadTrampoline -- so
+            // staging the caller without the callee gives the extension
+            // three undefined symbols. (The watch's staging has the same
+            // omission and does not fail on it: watchOS is arm64_32, where
+            // the assembly is not built.)
             boolean source = name.endsWith(".m") || name.endsWith(".c")
                     || name.endsWith(".mm") || name.endsWith(".cpp")
-                    || name.endsWith(".cc");
+                    || name.endsWith(".cc") || name.endsWith(".S")
+                    || name.endsWith(".s");
             if (!source && !name.endsWith(".h")) {
                 // Only the code. The extension's plist and entitlements are
                 // written by IOSVpnTunnelExtensionBuilder against the HOST's
@@ -518,6 +640,65 @@ class VpnTunnelNativeBuilder {
     }
 
     /**
+     * The bundle identifier the extension signs under, honouring the
+     * override.
+     *
+     * <p>Resolved in ONE place because three things have to agree: the
+     * target's {@code PRODUCT_BUNDLE_IDENTIFIER}, the provisioning profile
+     * the archive validates against, and the
+     * {@code CN1VpnTunnelExtensionIdentifier} the host plist carries -- which
+     * is what {@code CN1Vpn.m} puts in
+     * {@code NETunnelProviderProtocol.providerBundleIdentifier}. A tunnel
+     * whose host names a different identifier than the extension ships under
+     * starts nothing: iOS has no provider to associate the saved
+     * configuration with, and says so nowhere.</p>
+     *
+     * <p>Mirrors {@code IPhoneBuilder.callDirectoryBundleId}, including both
+     * refusals, for the same reasons that method gives at length.</p>
+     */
+    String bundleId(BuildRequest request) {
+        String override = request.getArg(
+                "ios.vpn.tunnel.buildSettings.PRODUCT_BUNDLE_IDENTIFIER", null);
+        if (override != null && override.trim().length() > 0) {
+            String value = override.trim();
+            // NO Xcode substitution. Xcode expands $(...) for the target it
+            // builds; nothing expands it here, so the same hint would be one
+            // identifier in the target and the literal text in the host plist
+            // and the profile check.
+            if (value.indexOf("$(") >= 0 || value.indexOf("${") >= 0) {
+                throw new BuildException("ios.vpn.tunnel.buildSettings"
+                        + ".PRODUCT_BUNDLE_IDENTIFIER is '" + value + "'."
+                        + " Xcode build-setting substitutions cannot be used"
+                        + " here: the same string is written into the host"
+                        + " Info.plist and checked against the provisioning"
+                        + " profile, and neither expands it. Give the bundle"
+                        + " identifier itself.");
+            }
+            // INSIDE the host's namespace. Apple requires an embedded app
+            // extension's identifier to be the containing app's plus a
+            // suffix and rejects the archive at embedded-binary validation
+            // otherwise -- at upload, long after every check here has
+            // passed, and with a message about the binary rather than about
+            // this hint.
+            String host = request.getPackageName();
+            if (host != null && host.length() > 0
+                    && !(value.startsWith(host + ".")
+                            && value.length() > host.length() + 1)) {
+                throw new BuildException("ios.vpn.tunnel.buildSettings"
+                        + ".PRODUCT_BUNDLE_IDENTIFIER is '" + value + "',"
+                        + " which is not inside '" + host + "'. An app"
+                        + " extension's bundle identifier has to be the"
+                        + " containing app's followed by a suffix, so Apple"
+                        + " would reject the archive when it validates the"
+                        + " embedded binary. Use something like '" + host
+                        + ".vpntunnel'.");
+            }
+            return value;
+        }
+        return IOSVpnTunnelExtensionBuilder.bundleId(request.getPackageName());
+    }
+
+    /**
      * The build settings the extension target carries.
      *
      * <p>Package-visible and separate from the Ruby so a test can read them:
@@ -530,8 +711,9 @@ class VpnTunnelNativeBuilder {
     Map<String, String> buildSettings(BuildRequest request, String deviceFamily) {
         String name = IOSVpnTunnelExtensionBuilder.EXTENSION_NAME;
         Map<String, String> settings = new LinkedHashMap<String, String>();
-        settings.put("PRODUCT_BUNDLE_IDENTIFIER",
-                IOSVpnTunnelExtensionBuilder.bundleId(request.getPackageName()));
+        // Through the resolver, so an override is validated once and the
+        // target, the profile check and the host plist cannot disagree.
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", bundleId(request));
         settings.put("PRODUCT_NAME", "$(TARGET_NAME)");
         settings.put("INFOPLIST_FILE", name + "/Info.plist");
         settings.put("CODE_SIGN_ENTITLEMENTS", name + "/" + name + ".entitlements");

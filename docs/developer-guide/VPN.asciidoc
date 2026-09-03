@@ -154,15 +154,26 @@ translated program and the virtual machine, and nothing the port or a
 library hand-wrote.
 
 Two things are yours to arrange, and neither is something a build can do for
-you. Apple grants
-`com.apple.developer.networking.networkextension` case by case rather than
-from the developer portal, so setting `ios.vpn.tunnel=true` is you saying you
-hold it -- an App ID without it fails codesigning with an error naming the
-entitlement and not the reason it appeared. And the extension signs under its
-own App ID, `<packageName>.vpntunnel`, so a device archive needs a
-provisioning profile for that identifier passed as
+you. Apple grants `com.apple.developer.networking.networkextension` case by
+case rather than from the developer portal, so setting `ios.vpn.tunnel=true`
+is you saying you hold it -- an App ID without it fails codesigning with an
+error naming the entitlement and not the reason it appeared.
+
+*Both* App IDs need it, which surprises people. The extension carries the
+entitlement because it *is* the provider; the app carries it because
+`NETunnelProviderManager` -- what `Tunnels.start` uses to save the
+configuration and start the tunnel -- is Network Extension API too. Signing
+only the `.appex` produces an app whose every start fails with a permission
+error. The build writes the entitlement into both, and refuses before the
+archive if either profile doesn't grant it.
+
+And the extension signs under its own App ID, `<packageName>.vpntunnel`, so a
+device archive needs a provisioning profile for that identifier passed as
 `ios.appext.CN1VpnTunnel.provisioningData` or `.provisioningURL`, exactly as
-the Call Directory extension does.
+the Call Directory extension does. Override the identifier with
+`ios.vpn.tunnel.buildSettings.PRODUCT_BUNDLE_IDENTIFIER` if you must; it has
+to stay inside the app's own namespace, because Apple rejects an embedded
+extension that isn't.
 
 `TunnelSetup.data` exists for that reason, and the rule worth taking away
 follows from it:
@@ -219,12 +230,13 @@ Referencing `com.codename1.vpn.profile` links `NetworkExtension.framework` and
 injects the Personal VPN entitlement with no hint at all.
 
 Codename One never injects `com.apple.developer.networking.networkextension`
-into your app from a class reference. Apple grants it case by case rather
-than self-serve, and an entitlement an App ID doesn't carry fails codesigning
-with an error naming the entitlement and not the reason it appeared. That's
-why the hint exists at all rather than the package alone turning the
-extension on -- and why the entitlement is written into the *extension's* own
-entitlements file, where it belongs, rather than into the host app's.
+from a class reference. Apple grants it case by case rather than self-serve,
+and an entitlement an App ID doesn't carry fails codesigning with an error
+naming the entitlement and not the reason it appeared. That's why the hint
+exists at all rather than the package alone turning the extension on: the
+hint is the assertion that both App IDs hold the grant, and it's on that
+assertion -- and only then -- that the build writes the entitlement into the
+app and into the extension.
 
 Android needs no hints. Referencing the package adds the `VpnService`, its
 `BIND_VPN_SERVICE` declaration and the foreground-service permissions the

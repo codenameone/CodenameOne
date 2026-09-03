@@ -812,7 +812,17 @@ public final class IOSVpnTunnelExtensionBuilder {
      * @return the mangled prefix
      */
     static String mangle(String binaryName) {
-        return binaryName == null ? "" : binaryName.replace('.', '_');
+        // '$' and '/' as well as '.', which is what ParparVM does and what
+        // WatchNativeBuilder.mangle already documented. Replacing only '.'
+        // was right for every name anyone had tried and wrong for a NESTED
+        // tunnel -- com.example.Outer$Tunnel is a legal value for
+        // ios.vpn.tunnel.class, and the provider then declared __NEW_com_
+        // example_Outer$Tunnel, a symbol the translation never defines. The
+        // extension failed at link, which nothing in CI compiles far enough
+        // to see.
+        return binaryName == null ? ""
+                : binaryName.replace('.', '_').replace('/', '_')
+                        .replace('$', '_');
     }
 
     static String infoPlist(String displayName, String shortVersion,

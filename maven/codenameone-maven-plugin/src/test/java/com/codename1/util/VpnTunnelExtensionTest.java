@@ -119,6 +119,22 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void aNestedTunnelReachesTheSymbolsTheTranslationDefines() {
+        // ParparVM mangles '.', '/' and '$' to '_'. Replacing only '.' was
+        // right for every name anyone had tried and wrong for a nested
+        // tunnel: com.example.Outer$Tunnel is a legal value for
+        // ios.vpn.tunnel.class, and the provider then declared
+        // __NEW_com_example_Outer$Tunnel -- a symbol the translation never
+        // defines, so the extension failed at link.
+        String src = IOSVpnTunnelExtensionBuilder.providerSource(
+                "com.example.Outer$Tunnel");
+        assertTrue(src.contains("__NEW_com_example_Outer_Tunnel()"));
+        assertTrue(src.contains("com_example_Outer_Tunnel_ctor__"));
+        assertFalse(src.contains("Outer$Tunnel"),
+                "no '$' can survive into a C symbol");
+    }
+
+    @Test
     void theTunnelClassIsNamedRatherThanLookedUp() {
         // Class.forName would not survive obfuscation, which is why the
         // framework bans it -- so the class is baked in as a symbol at

@@ -303,14 +303,21 @@ public class IPhoneBuilder extends Executor {
     /// Keys the generated Call Directory extension resolves as well, so an
     /// injected value of the wrong TYPE is a build error rather than the
     /// project's own choice. See appendCallPlist.
-    private static final String[] CALL_PLIST_COORDINATED = {
+    private static final String[] PLIST_COORDINATED = {
         "CN1CallAppGroup",
         "CN1CallDirectoryExtensionIdentifier",
+        // Not a call key, and the reason this list is no longer named after
+        // calls. CN1Vpn.m reads it and assigns it to
+        // NETunnelProviderProtocol.providerBundleIdentifier, so the host and
+        // the generated extension have to name the same bundle -- a
+        // disagreement leaves iOS with no provider to start and nothing
+        // anywhere saying so.
+        "CN1VpnTunnelExtensionIdentifier",
     };
 
-    private static boolean isCoordinatedCallKey(String key) {
-        for (int i = 0; i < CALL_PLIST_COORDINATED.length; i++) {
-            if (CALL_PLIST_COORDINATED[i].equals(key)) {
+    private static boolean isCoordinatedPlistKey(String key) {
+        for (int i = 0; i < PLIST_COORDINATED.length; i++) {
+            if (PLIST_COORDINATED[i].equals(key)) {
                 return true;
             }
         }
@@ -419,7 +426,7 @@ public class IPhoneBuilder extends Executor {
         }
         if (plistKeyNamed(plistWithoutComments(inject), key, 0) >= 0) {
             String tag = injectedPlistValueTag(inject, key);
-            if (isCoordinatedCallKey(key) && tag != null
+            if (isCoordinatedPlistKey(key) && tag != null
                     && !"string".equals(tag)) {
                 // A VALID plist value of the wrong type -- <false/>, an
                 // <array>, a <dict>. The key check has already suppressed
@@ -3849,7 +3856,7 @@ public class IPhoneBuilder extends Executor {
         // thousand lines earlier than the block that enables the defines.
         vpnTunnelBuilder.parseHints(request, usesCustomTunnel);
         if (vpnTunnelBuilder.isEnabled()) {
-            vpnTunnelBuilder.verifyTunnelClass(classesDir);
+            vpnTunnelBuilder.verifyTunnelClass(classesDir, buildinRes);
             // What the PORT contributed, recorded before the translation
             // exists so the extension target can compile the translated
             // program and leave the port out. See recordPortNatives: a
@@ -3890,9 +3897,19 @@ public class IPhoneBuilder extends Executor {
             javacPath = "javac";
         }
         String[] stubSourceTarget = getStubCompileSourceTarget(javacPath);
+        // The application's classes, plus the archives a submitted library
+        // arrived in when this build generates a packet tunnel. A tunnel may
+        // be packaged in a cn1lib -- the class scanner already recognises
+        // that, and the translator already sees it -- and the generated stub
+        // constructs the class by name, so javac has to resolve it too.
+        // Additive and only then: without the hint this is exactly the
+        // classpath it has always been.
+        String stubCompileClasspath = vpnTunnelBuilder.isEnabled()
+                ? vpnTunnelBuilder.stubClasspath(classesDir, buildinRes)
+                : classesDir.getAbsolutePath();
         try {
             if (!execWithFiles(stubSource, stubSource, ".java", javacPath, "-source", stubSourceTarget[0], "-target", stubSourceTarget[1], "-classpath",
-                    classesDir.getAbsolutePath(),
+                    stubCompileClasspath,
                     "-d", classesDir.getAbsolutePath())) {
                 return false;
             }
@@ -5502,13 +5519,35 @@ public class IPhoneBuilder extends Executor {
                 }
                 enableFeatureDefine(buildinRes, "CN1_VPN_TUNNEL",
                         "com.codename1.vpn.tunnel");
-                // NOT the entitlement. com.apple.developer.networking
-                // .networkextension is granted case by case, so it is written
-                // into the EXTENSION's own entitlements file by
-                // IOSVpnTunnelExtensionBuilder and never injected into the
-                // host -- an App ID without the grant would fail codesigning
-                // with a message naming the entitlement and not the reason it
-                // appeared.
+                // The HOST carries the entitlement too, and this said the
+                // opposite until a review pointed at the API. The extension
+                // is not the only target that touches Network Extension: the
+                // APP calls NETunnelProviderManager to save the provider
+                // configuration and start the tunnel, and that needs
+                // com.apple.developer.networking.networkextension with
+                // packet-tunnel-provider on the app's own App ID. Signing
+                // only the .appex leaves every save and start failing with a
+                // permission error on a device, from a build that looked
+                // complete.
+                //
+                // Injected HERE and never from a class reference, which is
+                // the distinction that matters: Apple grants this one case by
+                // case, so it may only be written for a project that said it
+                // holds the grant -- and ios.vpn.tunnel is exactly that
+                // statement. An App ID without it fails codesigning with a
+                // message naming the entitlement and not the reason it
+                // appeared, which is why referencing com.codename1.vpn.tunnel
+                // alone still writes nothing.
+                //
+                // A project that set the hint itself is left alone: the key
+                // is in the renderer's array-valued set, so its value is
+                // emitted as an <array> whatever it holds.
+                if (request.getArg("ios.entitlements.com.apple.developer"
+                        + ".networking.networkextension", null) == null) {
+                    request.putArgument("ios.entitlements.com.apple.developer"
+                            + ".networking.networkextension",
+                            "packet-tunnel-provider");
+                }
                 log("[vpnTunnel] Packet-tunnel extension enabled; the"
                         + " extension will run " + vpnTunnelBuilder.getTunnelClass());
             }
@@ -14426,6 +14465,25 @@ public class IPhoneBuilder extends Executor {
                         "CN1CallDirectoryExtensionIdentifier",
                         callDirectoryBundleId(request));
             }
+        }
+
+        // The provider the app starts, which the host has to name.
+        //
+        // CN1Vpn.m reads this key and assigns it to
+        // NETunnelProviderProtocol.providerBundleIdentifier; without it that
+        // property is nil, iOS has no provider to associate the saved
+        // configuration with, and the tunnel simply never comes up -- with
+        // nothing in the build, the archive or the device log to say why.
+        // Resolved through the same helper the target and the profile check
+        // use, so an ios.vpn.tunnel.buildSettings override cannot make the
+        // three disagree.
+        //
+        // OUTSIDE the callPlistWanted block above: a packet tunnel has
+        // nothing to do with owning calls, and an app that writes one need
+        // never touch com.codename1.call.
+        if (vpnTunnelBuilder.isEnabled()) {
+            inject = appendCallPlist(inject, "CN1VpnTunnelExtensionIdentifier",
+                    vpnTunnelBuilder.bundleId(request));
         }
 
         // Receive-shared-content: the host app reads the shared payload from this App Group

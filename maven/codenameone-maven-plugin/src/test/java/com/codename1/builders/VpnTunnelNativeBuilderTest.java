@@ -178,6 +178,85 @@ class VpnTunnelNativeBuilderTest {
     }
 
     @Test
+    void theStubSpellsANestedTunnelTheWayJavaDoes() {
+        // The hint is a BINARY name -- what the class file is called, and
+        // what verifyTunnelClass looks for -- and javac will not parse one.
+        assertEquals("com.example.Outer.Tunnel",
+                VpnTunnelNativeBuilder.sourceName("com.example.Outer$Tunnel"));
+        assertEquals("com.example.MyTunnel",
+                VpnTunnelNativeBuilder.sourceName("com.example.MyTunnel"));
+    }
+
+    @Test
+    void theExtensionSignsUnderOneIdentifierEverywhere() {
+        // Three things have to agree: the target, the profile check and the
+        // CN1VpnTunnelExtensionIdentifier the host plist carries, which
+        // CN1Vpn.m puts in providerBundleIdentifier. Resolved once, so an
+        // override cannot make them disagree.
+        VpnTunnelNativeBuilder builder = new VpnTunnelNativeBuilder(null);
+        BuildRequest plain = request("true", "com.example.app.MyTunnel");
+        builder.parseHints(plain, true);
+        assertEquals("com.example.app.vpntunnel", builder.bundleId(plain));
+
+        BuildRequest overridden = request("true", "com.example.app.MyTunnel");
+        overridden.putArgument("ios.vpn.tunnel.buildSettings"
+                + ".PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.tunnel");
+        assertEquals("com.example.app.tunnel", builder.bundleId(overridden));
+
+        BuildRequest substituted = request("true", "com.example.app.MyTunnel");
+        substituted.putArgument("ios.vpn.tunnel.buildSettings"
+                + ".PRODUCT_BUNDLE_IDENTIFIER",
+                "$(APP_BUNDLE_IDENTIFIER).vpntunnel");
+        assertTrue(assertThrows(BuildException.class,
+                () -> builder.bundleId(substituted)).getMessage()
+                        .contains("substitutions"),
+                "Xcode expands $(...) for its own target and nothing expands"
+                + " it in the host plist or the profile check");
+
+        BuildRequest outside = request("true", "com.example.app.MyTunnel");
+        outside.putArgument("ios.vpn.tunnel.buildSettings"
+                + ".PRODUCT_BUNDLE_IDENTIFIER", "com.other.tunnel");
+        assertTrue(assertThrows(BuildException.class,
+                () -> builder.bundleId(outside)).getMessage()
+                        .contains("com.example.app"),
+                "Apple rejects an embedded extension outside its host's"
+                + " namespace, at upload and long after this build");
+    }
+
+    @Test
+    void aTunnelPackagedInALibraryIsAccepted() throws Exception {
+        // foldInCallAndVpnLibraryUsage already recognises a project whose
+        // only tunnel usage is inside a submitted library, so refusing that
+        // project because the class is not a loose file would reject a
+        // configuration the rest of the build supports.
+        File classes = Files.createTempDirectory("cn1classes").toFile();
+        File libs = Files.createTempDirectory("cn1libs").toFile();
+        File jar = new File(libs, "mylib.jar");
+        try (java.util.zip.ZipOutputStream zos =
+                new java.util.zip.ZipOutputStream(
+                        new java.io.FileOutputStream(jar))) {
+            zos.putNextEntry(new java.util.zip.ZipEntry(
+                    "com/example/lib/LibTunnel.class"));
+            zos.write(new byte[] {(byte) 0xCA, (byte) 0xFE});
+            zos.closeEntry();
+        }
+
+        VpnTunnelNativeBuilder builder = new VpnTunnelNativeBuilder(null);
+        builder.parseHints(request("true", "com.example.lib.LibTunnel"), true);
+        builder.verifyTunnelClass(classes, libs);
+        // ...and javac has to resolve it, or the generated stub fails on a
+        // class the build just said was there.
+        assertTrue(builder.stubClasspath(classes, libs)
+                .contains(jar.getAbsolutePath()));
+
+        VpnTunnelNativeBuilder missing = new VpnTunnelNativeBuilder(null);
+        missing.parseHints(request("true", "com.example.NotThere"), true);
+        assertTrue(assertThrows(BuildException.class,
+                () -> missing.verifyTunnelClass(classes, libs)).getMessage()
+                        .contains("com.example.NotThere"));
+    }
+
+    @Test
     void theTargetIsBuiltAsAnAppExtension() {
         VpnTunnelNativeBuilder builder = new VpnTunnelNativeBuilder(null);
         BuildRequest request = request("true", "com.example.app.MyTunnel");
